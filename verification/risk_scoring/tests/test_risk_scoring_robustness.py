@@ -25,7 +25,7 @@ sys.path.insert(0, str(backend_path))
 
 from app.application.services.policy_engine import evaluate_condition  # noqa: E402
 from app.application.services.risk_engine import RiskScoringEngine  # noqa: E402
-from app.domain.value_objects_phase2 import RiskScore  # noqa: E402
+from app.domain.value_objects_investigation import RiskScore  # noqa: E402
 
 engine = RiskScoringEngine()
 

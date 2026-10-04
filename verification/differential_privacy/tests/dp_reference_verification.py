@@ -22,7 +22,7 @@ sys.path.insert(0, str(backend_dir))
 from app.application.services.privacy_service import PrivacyService
 from app.application.services.psi_service import PSI_PRIME, PSIService
 from app.domain.value_objects import ModelWeights
-from app.domain.value_objects_phase2 import PrivacyPreservingIdentifier
+from app.domain.value_objects_investigation import PrivacyPreservingIdentifier
 
 # ---------------------------------------------------------------------------
 # Independent Pure-Python Mathematical Reference Functions
@@ -56,7 +56,7 @@ def ref_dh_exponentiation(val_int: int, key_a: int, key_b: int, prime: int = PSI
 
 def ref_hmac_128bit(raw_value: str, entity_type: str, hmac_key: str = "fraud-intel-simulator") -> str:
     """Computes 128-bit truncated HMAC-SHA256 identity hash."""
-    from app.domain.value_objects_phase2 import standardize_input
+    from app.domain.value_objects_investigation import standardize_input
     standardized = standardize_input(raw_value, entity_type)
     salted = f"{entity_type}:{standardized}"
     return hmac.new(hmac_key.encode(), salted.encode(), hashlib.sha256).hexdigest()[:32]

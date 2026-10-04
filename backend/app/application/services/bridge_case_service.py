@@ -27,8 +27,8 @@ import threading
 from datetime import UTC, datetime
 from typing import Any
 
-from app.domain.entities_phase2 import FinintBridgeTicket, FinintTicketAuditEntry
 from app.domain.enums import FinintTicketStatus, FinintTicketType
+from app.domain.investigation_entities import FinintBridgeTicket, FinintTicketAuditEntry
 
 logger = logging.getLogger(__name__)
 

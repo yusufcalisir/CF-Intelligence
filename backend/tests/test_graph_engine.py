@@ -3,8 +3,8 @@
 import pytest
 
 from app.application.services.graph_engine import GraphEngine
-from app.domain.entities_phase2 import Entity, Relationship
 from app.domain.enums import EntityType, RelationshipType
+from app.domain.investigation_entities import Entity, Relationship
 
 
 def _make_entity(eid: str, etype: EntityType = EntityType.CUSTOMER, bank: str = "bank_a") -> Entity:

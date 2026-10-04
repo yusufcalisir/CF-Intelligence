@@ -24,7 +24,7 @@ from app.application.services.psi_service import PSI_PRIME, PSIService
 from app.domain.security_evaluator import MIAEvaluator, DLGEvaluator
 from app.domain.label_privacy_guard import LabelPrivacyGuard, LabelPrivacyViolationError
 from app.domain.value_objects import ModelWeights
-from app.domain.value_objects_phase2 import PrivacyPreservingIdentifier
+from app.domain.value_objects_investigation import PrivacyPreservingIdentifier
 
 @pytest.fixture
 def privacy_service() -> PrivacyService:

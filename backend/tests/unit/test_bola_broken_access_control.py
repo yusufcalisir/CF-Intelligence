@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain.entities_phase2 import Alert
 from app.domain.enums import AlertSeverity, AlertStatus, EntityType
+from app.domain.investigation_entities import Alert
 from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
 from app.main import app, seed_mock_data
 from app.presentation.routers.alerts import get_alert_service

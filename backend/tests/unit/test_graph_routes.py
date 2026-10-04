@@ -12,8 +12,8 @@ from datetime import UTC, datetime
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain.entities_phase2 import Entity, Relationship
 from app.domain.enums import EntityType, RelationshipType, RiskLevel
+from app.domain.investigation_entities import Entity, Relationship
 from app.main import app
 from app.presentation.routers.graph import _graph_engine
 

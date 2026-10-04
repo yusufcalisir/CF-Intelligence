@@ -1,6 +1,6 @@
 # Scientific Claim Classification Review — Explainability (XAI) Module
 
-**Subsystem:** Explainability & Interpretable ML (`explainability_service.py`, `realtime_explainer.py`, `value_objects_phase2.py`)  
+**Subsystem:** Explainability & Interpretable ML (`explainability_service.py`, `realtime_explainer.py`, `value_objects_investigation.py`)  
 **Auditor Role:** Senior Researcher in Explainable AI (XAI), Interpretable ML, & Scientific Software Verification  
 **Evaluation Standard:** Peer-Reviewed XAI Scientific Audit  
 **Date:** 2026-07-31  

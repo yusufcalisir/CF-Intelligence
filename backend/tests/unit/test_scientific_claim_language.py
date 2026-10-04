@@ -58,7 +58,7 @@ class TestScientificClaimLanguageIntegrity:
             DOCS_DIR / "aml-platform.md",
             DOCS_DIR / "threat_model.md",
             DOCS_DIR / "data_retention_policy_spec.md",
-            DOCS_DIR / "architecture-phase2.md",
+            DOCS_DIR / "collaborative_aml_architecture.md",
         ]
         for doc in audit_docs:
             if doc.is_file():

@@ -1,6 +1,6 @@
 # Explainable AI (XAI) Domain & Practical Assessment Report
 
-**Subsystem:** Explainability & Interpretable ML (`explainability_service.py`, `realtime_explainer.py`, `value_objects_phase2.py`)  
+**Subsystem:** Explainability & Interpretable ML (`explainability_service.py`, `realtime_explainer.py`, `value_objects_investigation.py`)  
 **Auditor Role:** Senior Researcher in Explainable AI (XAI), Interpretable ML, & Scientific Software Verification  
 **Evaluation Standard:** XAI Practical & Human-Centered Evaluation Framework  
 **Date:** 2026-08-01  

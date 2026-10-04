@@ -1,0 +1,42 @@
+[
+  {
+    "finding_id": "FL-0001",
+    "target_file": "backend/app/application/services/fl_engine.py",
+    "change_description": "Added unified _get_proportions helper that gracefully falls back to uniform weighting (1.0 / count) when total_samples <= 0, resolving ZeroDivisionError across FedAdam, FedAdaGrad, FedYogi, and SCAFFOLD.",
+    "lines_modified": "212-245, 401-415, 451-460",
+    "verification_test": "backend/tests/unit/test_fl_core_correctness.py::TestNumericalStabilityAndEdgeCases::test_zero_samples_does_not_raise_zerodivision",
+    "status": "VERIFIED"
+  },
+  {
+    "finding_id": "FL-0002",
+    "target_file": "backend/app/application/services/model_service.py",
+    "change_description": "Strictly validate layer count, individual tensor shapes, and total flat element count in ModelService.set_parameters, raising descriptive ValueError on mismatch and using strict=True in zip.",
+    "lines_modified": "11, 626-654",
+    "verification_test": "backend/tests/unit/test_fl_core_correctness.py::TestParameterCompatibilityValidation::test_set_parameters_rejects_layer_count_mismatch",
+    "status": "VERIFIED"
+  },
+  {
+    "finding_id": "FL-0003",
+    "target_file": "backend/app/application/services/fl_engine.py",
+    "change_description": "Sanitize and clamp client sample counts to non-negative integers (clean_samples.append(max(0, int(s)))) to prevent negative sample weight inversion.",
+    "lines_modified": "185",
+    "verification_test": "backend/tests/unit/test_fl_core_correctness.py::TestNumericalStabilityAndEdgeCases::test_negative_sample_counts_clamped",
+    "status": "VERIFIED"
+  },
+  {
+    "finding_id": "FL-0004",
+    "target_file": "backend/app/application/services/fl_engine.py",
+    "change_description": "Generate unique ephemeral IDs for unkeyed aggregation calls (simulation_id=None) and prune state immediately post-aggregation, preventing shared static 'default_sim' memory leaks and cross-run state pollution.",
+    "lines_modified": "247-285, 415-445, 461-468",
+    "verification_test": "backend/tests/unit/test_fl_core_correctness.py::TestSimulationAndClientIsolation::test_ephemeral_calls_without_simulation_id_do_not_leak_memory",
+    "status": "VERIFIED"
+  },
+  {
+    "finding_id": "FL-0005",
+    "target_file": "backend/app/application/services/simulation_service.py",
+    "change_description": "Added structured logger.warning when zero client updates are collected in a round, ensuring operational visibility during total client failure edge cases.",
+    "lines_modified": "972-978",
+    "verification_test": "backend/tests/integration/test_system_integration_reality.py",
+    "status": "VERIFIED"
+  }
+]

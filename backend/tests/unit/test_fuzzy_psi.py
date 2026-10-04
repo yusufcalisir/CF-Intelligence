@@ -5,7 +5,7 @@ from __future__ import annotations
 from app.application.services.entity_resolution import EntityResolutionService
 from app.application.services.psi_service import PSIService
 from app.domain.enums import EntityType
-from app.domain.value_objects_phase2 import (
+from app.domain.value_objects_investigation import (
     calculate_jaccard_similarity,
     compute_minhash_signature,
     standardize_input,

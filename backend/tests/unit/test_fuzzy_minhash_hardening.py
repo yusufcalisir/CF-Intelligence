@@ -19,7 +19,7 @@ import concurrent.futures
 
 import pytest
 
-from app.application.schemas.phase2 import EntityFuzzyResolveRequest
+from app.application.schemas.investigation import EntityFuzzyResolveRequest
 from app.application.services.entity_resolution import EntityResolutionService
 from app.domain.enums import EntityType
 from app.domain.fuzzy_psi import (

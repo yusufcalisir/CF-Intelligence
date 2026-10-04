@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from app.domain.entities_phase2 import Alert, SharedIntelligence
 from app.domain.enums import (
     AlertSeverity,
     AlertStatus,
@@ -26,7 +25,8 @@ from app.domain.enums import (
     TriageAction,
     TriagePriority,
 )
-from app.domain.value_objects_phase2 import PrivacyPreservingIdentifier
+from app.domain.investigation_entities import Alert, SharedIntelligence
+from app.domain.value_objects_investigation import PrivacyPreservingIdentifier
 from app.infrastructure.redis_store import RedisStore
 
 logger = logging.getLogger(__name__)

@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from app.application.services.model_service import ModelService
 from app.application.services.risk_engine import RiskScoringEngine
 from app.config import get_settings
-from app.domain.value_objects_phase2 import RiskScore, RiskWeightConfig
+from app.domain.value_objects_investigation import RiskScore, RiskWeightConfig
 from app.main import app
 from app.presentation.routers.realtime_inference import (
     reset_circuit_breaker,

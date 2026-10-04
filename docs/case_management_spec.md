@@ -63,7 +63,7 @@ graph TD
 
 ### Core Source Components
 
-- **Domain Models & State Engine**: [`backend/app/domain/case_management.py`](../backend/app/domain/case_management.py), [`backend/app/domain/entities_phase2.py`](../backend/app/domain/entities_phase2.py), [`backend/app/domain/enums.py`](../backend/app/domain/enums.py)
+- **Domain Models & State Engine**: [`backend/app/domain/case_management.py`](../backend/app/domain/case_management.py), [`backend/app/domain/investigation_entities.py`](../backend/app/domain/investigation_entities.py), [`backend/app/domain/enums.py`](../backend/app/domain/enums.py)
 - **Workbench Services**: [`backend/app/application/services/case_workbench.py`](../backend/app/application/services/case_workbench.py), [`backend/app/application/services/case_service.py`](../backend/app/application/services/case_service.py)
 - **Agentic AML Copilot**: [`backend/app/application/services/aml_agentic_copilot.py`](../backend/app/application/services/aml_agentic_copilot.py)
 - **Regulatory Reporting & XSD Engine**: [`backend/app/application/services/regulatory_reporter.py`](../backend/app/application/services/regulatory_reporter.py)

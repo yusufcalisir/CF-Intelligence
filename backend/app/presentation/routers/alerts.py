@@ -19,7 +19,7 @@ from app.application.schemas.alerts import (
     AlertTriageEvaluateRequest,
     AlertTriageEvaluateResponse,
 )
-from app.application.schemas.phase2 import (
+from app.application.schemas.investigation import (
     CounterfactualChangeSchema,
     CounterfactualExplanationResponse,
     CounterfactualSimulationRequest,
@@ -40,7 +40,7 @@ from app.domain.enums import AlertSeverity, AlertStatus
 from app.infrastructure.security.rate_limiter import limiter
 
 if TYPE_CHECKING:
-    from app.domain.entities_phase2 import Alert
+    from app.domain.investigation_entities import Alert
 
 logger = logging.getLogger(__name__)
 
@@ -429,7 +429,7 @@ async def get_explainability_counterfactuals(
     """Get actionable counterfactual remediation paths for an alert or interactive workbench simulation."""
     alert = _alert_service.get_alert(alert_id)
     if not alert:
-        from app.domain.entities_phase2 import Alert
+        from app.domain.investigation_entities import Alert
 
         alert_score = 780.0
         if amount is not None or velocity is not None or merchant_risk is not None:

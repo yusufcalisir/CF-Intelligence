@@ -18,8 +18,8 @@ from fastapi.testclient import TestClient
 
 from app.application.services.case_service import CaseManagementService, _case_to_dict
 from app.application.services.regulatory_reporter import RegulatoryReporterService
-from app.domain.entities_phase2 import Case
 from app.domain.enums import CasePriority, CaseStatus
+from app.domain.investigation_entities import Case
 from app.main import app
 
 

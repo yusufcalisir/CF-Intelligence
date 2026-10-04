@@ -16,7 +16,7 @@ import logging
 import math
 import threading
 
-from app.domain.value_objects_phase2 import RiskScore, RiskSignal, RiskWeightConfig
+from app.domain.value_objects_investigation import RiskScore, RiskSignal, RiskWeightConfig
 
 logger = logging.getLogger(__name__)
 

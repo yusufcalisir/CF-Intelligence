@@ -18,9 +18,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.config import get_settings
-from app.domain.entities_phase2 import Entity, Relationship
 from app.domain.enums import EntityType, RelationshipType, RiskLevel
-from app.domain.value_objects_phase2 import GraphSubgraph
+from app.domain.investigation_entities import Entity, Relationship
+from app.domain.value_objects_investigation import GraphSubgraph
 from app.infrastructure.redis_store import RedisStore
 
 logger = logging.getLogger(__name__)

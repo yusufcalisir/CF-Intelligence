@@ -3,7 +3,7 @@
 import pytest
 
 from app.application.services.risk_engine import RiskScoringEngine
-from app.domain.value_objects_phase2 import RiskWeightConfig
+from app.domain.value_objects_investigation import RiskWeightConfig
 
 
 @pytest.fixture

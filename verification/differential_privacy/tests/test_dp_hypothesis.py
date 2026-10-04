@@ -21,7 +21,7 @@ sys.path.insert(0, str(backend_dir))
 
 from app.application.services.privacy_service import PrivacyBudget, PrivacyBudgetExceededError, PrivacyService
 from app.domain.value_objects import ModelWeights
-from app.domain.value_objects_phase2 import PrivacyPreservingIdentifier
+from app.domain.value_objects_investigation import PrivacyPreservingIdentifier
 
 @pytest.fixture
 def privacy_service() -> PrivacyService:

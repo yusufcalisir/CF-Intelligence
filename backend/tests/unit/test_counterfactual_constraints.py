@@ -19,8 +19,8 @@ from app.application.services.counterfactual_service import (
     validate_counterfactual_transition,
     validate_feature_perturbation,
 )
-from app.domain.entities_phase2 import Alert
 from app.domain.enums import AlertSeverity, AlertStatus
+from app.domain.investigation_entities import Alert
 from app.domain.risk_engine import (
     PolicyAction,
     RiskTier,

@@ -1,7 +1,7 @@
 # Final Post-Remediation Scientific Audit Report
 # Explainability (XAI) Subsystem : Privacy-Preserving Cross-Bank Fraud Detection
 
-**Module:** `app.application.services.explainability_service`, `app.domain.realtime_explainer`, `app.domain.value_objects_phase2`  
+**Module:** `app.application.services.explainability_service`, `app.domain.realtime_explainer`, `app.domain.value_objects_investigation`  
 **Audit Standard:** Comprehensive Publication-Quality Scientific Audit (Post-Remediation Final Release)  
 **Date:** 2026-08-06  
 **Report Status:** FINAL (Post-Remediation Release)  

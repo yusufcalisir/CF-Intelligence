@@ -347,9 +347,9 @@ CF-Intelligence/
 │   │   │
 │   │   ├── domain/                                  # Enterprise Domain Entities, Value Objects & Security Invariants
 │   │   │   ├── entities.py                          # Core domain entities (Bank, Transaction, Alert, ModelCheckpoint)
-│   │   │   ├── entities_phase2.py                   # Extended consortium entities & audit tracking
+│   │   │   ├── investigation_entities.py            # Extended consortium entities & audit tracking
 │   │   │   ├── value_objects.py                     # Immutable value objects (NormalizedTransaction, ModelWeights)
-│   │   │   ├── value_objects_phase2.py              # HMAC salted identifiers & tokenized entity descriptors
+│   │   │   ├── value_objects_investigation.py       # HMAC salted identifiers & tokenized entity descriptors
 │   │   │   ├── value_objects_pqc.py                 # NIST Level 3/5 Kyber-768 & Dilithium-3 metadata
 │   │   │   ├── value_objects_rdp.py                 # Rényi Differential Privacy accounting structures
 │   │   │   ├── value_objects_zkp.py                 # Groth16 zk-SNARK attestation proof structures
@@ -719,7 +719,7 @@ CF-Intelligence/
 ├── docs/                                            # Complete Technical Specifications & Architecture (39+ Docs)
 │   ├── DATASETS.md                                  # Authoritative enterprise datasets & topological storage blueprint
 │   ├── architecture.md                              # Master Clean Architecture system design specification
-│   ├── architecture-phase2.md                       # Extended enterprise consortium & security specifications
+│   ├── collaborative_aml_architecture.md            # Extended enterprise consortium & security specifications
 │   ├── threat_model.md                              # Formal STRIDE threat model & attack surface analysis
 │   ├── system_design.md                             # High-level component interactions & data flow blueprints
 │   ├── aml-platform.md                              # AML/CFT compliance platform architecture & SAR workflows
@@ -1023,7 +1023,7 @@ $$
 
 ## 9. 9-Signal Composite Risk Engine & Model Explainability
 
-### 9.1 Composite Risk Scoring Engine (`risk_engine.py` & `value_objects_phase2.py`)
+### 9.1 Composite Risk Scoring Engine (`risk_engine.py` & `value_objects_investigation.py`)
 Combines 9 independent risk signals into a unified risk score ($0 - 1000$):
 
 $$
@@ -1585,7 +1585,7 @@ Under Non-IID Dirichlet distribution ($\alpha = 0.50$), the platform evaluates a
 | **[IBM AMLSim Graph](https://github.com/IBM/AMLSim)** | Synthetic Banking Graph (1.32M txns, 1,719 alerts) | `0.7000` | **0.6527** (15-rnd GraphSAGE) | 0.4210 (Isolated GNN) | 64.1% | Multi-hop cycle and fan-in/fan-out graph neighborhood aggregation. |
 | **[Danish SynthAML](https://github.com/Spar-Nord-Bank/SynthAML)** | Synthetic AML Alert Triage (20k alerts, Spar Nord) | `0.9900` | **0.9924** (6-rnd AlertMLP) | 0.7245 (Worst isolated: 0.2214) | 98.8% | Alert-level triage model resolves isolated cold-start bank blind spots (canonical Run B: 0.9924; historical Run A: 0.9985). |
 | **[AUSTRAC AMLNet](https://github.com/gitgriffith/AMLNet)** | Typology Networks (1.09M txns, Griffith Univ) | `0.9900` | **1.0000** (6-rnd AMLNetClassifier) | 0.7810 (Isolated) | 100.0% | Deterministic complex structuring and layering network topologies. |
-| **[CFI-CrossBank Consortium](experiments/cross_bank/report.md)** | Multi-Bank Consortium (v1 Prototype / [v2 Canonical](benchmarks/results/crossbank_v2/phase3_2_reconciliation_report.md)) | `0.9500` | **0.9729** (v1 Union) / **0.1779** (v2 FedAvg AP) | 0.8832 (v1 Isolated) / 0.1656 (v2 Isolated) | 98.8% | Architectural prototype (**+55.59% simulated volume averted**; 2/2 synthetic incidents detected; canonical v2 multi-seed protocol achieved 0.1779 AP / 0.9013 ROC). |
+| **[CFI-CrossBank Consortium](experiments/cross_bank/report.md)** | Multi-Bank Consortium (v1 Prototype / [v2 Canonical](benchmarks/results/crossbank_v2/reconciliation_report.md)) | `0.9500` | **0.9729** (v1 Union) / **0.1779** (v2 FedAvg AP) | 0.8832 (v1 Isolated) / 0.1656 (v2 Isolated) | 98.8% | Architectural prototype (**+55.59% simulated volume averted**; 2/2 synthetic incidents detected; canonical v2 multi-seed protocol achieved 0.1779 AP / 0.9013 ROC). |
 
 > **Research Finding on Budget Equalization & Collaborative Rescue:**  
 > Historical PaySim synthetic fallback evaluations (preserved in `legacy_artifact`) showed severe Non-IID degradation (FedAvg `0.1463` vs centralized `0.4654`), demonstrating that naive averaging requires adaptive drift control when features lack inductive bias; canonical evaluations on real sampled PaySim data achieve mean parity ($0.9545 \pm 0.0119$ vs $0.9545 \pm 0.0073$). For the Credit Card dataset, an earlier unequal-budget comparison (2 centralized epochs vs. 10 federated passes) appeared to favour FL (`0.7788` vs. `0.7059`). Under **controlled optimization budget parity** (10 dataset passes / ~35.6k optimizer steps across 3 seeds), Centralized (`0.8219 ± 0.0364`) and FedAvg (`0.8248 ± 0.0417`) showed similar observed mean performance across the three evaluated seeds ($\Delta = +0.0029$, with overlapping 95% CIs and an observed mean difference that is small relative to across-seed variability; this descriptive similarity does not imply formal statistical equivalence). The primary demonstrated value of FL on Credit Card is **collaborative rescue of data-starved participants**: Bank C (2 fraud cases in Seed 123) collapses to PR-AUC 0.2468 in isolation but reaches 0.8599 under federation (3-seed mean: 0.5428 in isolation vs 0.8248 under federation). Legacy unequal-budget artifacts are archived in `experiments/credit_card/legacy_unequal_budget/`.

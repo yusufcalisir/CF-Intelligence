@@ -43,7 +43,7 @@ from app.application.services.payment_recall_service import (
     RecallCaseNotFoundError,
     get_recall_service,
 )
-from app.domain.entities_phase2 import RecallCase
+from app.domain.investigation_entities import RecallCase
 
 logger = logging.getLogger(__name__)
 

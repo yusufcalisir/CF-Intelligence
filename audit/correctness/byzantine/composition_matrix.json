@@ -1,0 +1,35 @@
+{
+  "phase": "Phase 5C",
+  "title": "Byzantine Defense Pipeline Composition & Privacy Compatibility Matrix",
+  "generated_at": "2026-10-04T00:23:55Z",
+  "compositions": [
+    {
+      "pairing": "Additive Secure Aggregation (SecAgg) + Byzantine Defense (Krum / Median / Trimmed Mean / Bulyan)",
+      "supported": false,
+      "mathematical_conflict": "Additive SecAgg masks individual client vectors with zero-sum pseudo-random pairwise perturbations: \\tilde{u}_i = u_i + \\sum_{j > i} s_{ij} - \\sum_{j < i} s_{ji}. While \\sum_i \\tilde{u}_i = \\sum_i u_i, individual vectors \\tilde{u}_i are completely randomized. Non-linear aggregators relying on coordinate sorting, medians, or L2 pairwise distances operating on \\tilde{u}_i evaluate random noise rather than true gradients, corrupting the consensus update.",
+      "runtime_action": "Rejected at pipeline configuration validation with InvalidPipelineConfigurationError.",
+      "verified_by": "tests/unit/test_byzantine_correctness.py:TestPipelineCompositionAndConflictGuards.test_simulation_service_rejects_secagg_with_nonlinear_defense"
+    },
+    {
+      "pairing": "Homomorphic Encryption (CKKS FHE) + Byzantine Defense (Krum / Median / Trimmed Mean / Bulyan)",
+      "supported": false,
+      "mathematical_conflict": "CKKS homomorphic encryption supports addition and scalar multiplication over encrypted ciphertexts without a decryption key. Coordinate sorting, argmin, and non-linear threshold comparisons cannot be evaluated over ciphertext without interactive comparison protocols or high-depth polynomial approximations that exceed standard FHE ring dimensions.",
+      "runtime_action": "Rejected at pipeline configuration validation with InvalidPipelineConfigurationError.",
+      "verified_by": "tests/unit/test_byzantine_correctness.py:TestPipelineCompositionAndConflictGuards.test_simulation_service_rejects_fhe_with_nonlinear_defense"
+    },
+    {
+      "pairing": "Trusted Execution Environment (TEE) + Byzantine Defense (Krum / Median / Trimmed Mean / Bulyan)",
+      "supported": true,
+      "mechanism": "Client weights are sealed via AEAD or encrypted mTLS session and ingested directly into the hardware-isolated enclave memory. Plaintext weights never leave enclave boundaries. The enclave CPU evaluates non-linear robust aggregators (Krum, Median, Trimmed Mean, Bulyan) natively inside enclave memory before sealing the aggregated global weights.",
+      "runtime_action": "Fully supported. TEEDriver.execute_secure_aggregation dispatches the specified method inside enclave boundary.",
+      "verified_by": "tests/unit/test_byzantine_correctness.py:TestPipelineCompositionAndConflictGuards.test_tee_driver_dispatches_robust_aggregation_inside_enclave"
+    },
+    {
+      "pairing": "Differential Privacy (DP-SGD / Post-Hoc DP) + Byzantine Defense",
+      "supported": true,
+      "mechanism": "Local bank updates are clipped to norm bound C at each client node, bounding the sensitivity of each client vector. The robust aggregator then filters or trims malicious outliers. Calibrated Gaussian noise can be injected to achieve (\\epsilon, \\delta)-DP guarantees. Sensitivity is strictly bounded by the clipping threshold.",
+      "runtime_action": "Fully supported. Clipping norm bounds ensure bounded inputs to Byzantine distance metrics.",
+      "verified_by": "tests/unit/test_privacy_correctness.py and tests/unit/test_byzantine_correctness.py"
+    }
+  ]
+}

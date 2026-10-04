@@ -1,6 +1,6 @@
 # Scientific Verification Inventory — Explainability (XAI) Module
 
-**Module Path:** `app.application.services.explainability_service`, `app.domain.realtime_explainer`, `app.domain.value_objects_phase2`  
+**Module Path:** `app.application.services.explainability_service`, `app.domain.realtime_explainer`, `app.domain.value_objects_investigation`  
 **Auditor Role:** Senior Researcher in Explainable AI (XAI), Interpretable ML, & Scientific Software Verification  
 **Evaluation Standard:** Systematic Scientific & Algorithmic Inventory  
 **Date:** 2026-07-31  

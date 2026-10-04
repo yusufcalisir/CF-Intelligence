@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from app.domain.entities_phase2 import Scenario
+    from app.domain.investigation_entities import Scenario
 
 from app.application.schemas.event_schemas import (
     EVENT_TYPE_ALERT,
@@ -197,7 +197,6 @@ class StreamingEngine:
         """Process a scenario streaming event and update the local in-memory stores."""
         import uuid
 
-        from app.domain.entities_phase2 import Alert, CaseEvent, SharedIntelligence
         from app.domain.enums import (
             AlertSeverity,
             AlertStatus,
@@ -207,6 +206,7 @@ class StreamingEngine:
             RelationshipType,
             RiskLevel,
         )
+        from app.domain.investigation_entities import Alert, CaseEvent, SharedIntelligence
         from app.presentation.routers.alerts import get_alert_service
         from app.presentation.routers.cases import get_case_service
         from app.presentation.routers.entities import get_entity_service

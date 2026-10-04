@@ -24,8 +24,8 @@ from starlette.testclient import TestClient
 from app.application.services.entity_resolution import EntityResolutionService
 from app.application.services.kms_service import get_kms_service
 from app.application.services.psi_service import PSIService
-from app.domain.entities_phase2 import Entity
 from app.domain.enums import EntityType, RiskLevel
+from app.domain.investigation_entities import Entity
 from app.domain.psi_service import (
     PRIME_BIT_LENGTH,
     PSI_PRIME,

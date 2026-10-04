@@ -1,0 +1,40 @@
+{
+  "phase": "5B",
+  "remediation_ledger": [
+    {
+      "finding_id": "PRIV-0001",
+      "target_file": "backend/app/application/services/simulation_service.py",
+      "lines_modified": "779-825",
+      "change_type": "BRANCHING_REPAIR",
+      "summary": "Invoked model_service.train_local_with_opacus when use_opacus_dp is true and populated train_res['actual_epsilon'].",
+      "regression_test": "backend/tests/unit/test_privacy_correctness.py::TestPrivacyStateIsolation::test_opacus_actual_epsilon_recorded_in_direct_partition_flow"
+    },
+    {
+      "finding_id": "PRIV-0002",
+      "target_file": "backend/app/application/services/fl_engine.py",
+      "lines_modified": "611-616",
+      "change_type": "BOUNDARY_GUARD",
+      "summary": "Added guard if not client_weights or len(client_weights) < 2 to safely handle empty or single-client SecAgg requests.",
+      "regression_test": "backend/tests/unit/test_privacy_correctness.py::TestSecureAggregationContracts::test_secure_aggregation_resilience_empty_and_single_client"
+    },
+    {
+      "finding_id": "PRIV-0003",
+      "target_files": [
+        "backend/app/infrastructure/security/tee_driver.py",
+        "backend/app/infrastructure/security/fhe_driver.py"
+      ],
+      "lines_modified": "tee_driver.py:127-130, fhe_driver.py:141-145",
+      "change_type": "FAIL_CLOSED_VALIDATION",
+      "summary": "Added explicit ValueError guards for empty weights in TEEDriver.execute_secure_aggregation and FHEDriver.encrypt_weights.",
+      "regression_test": "backend/tests/unit/test_privacy_correctness.py::TestFHEAndTEEContracts::test_fhe_empty_weights_rejection and test_tee_secure_aggregation_empty_guard"
+    },
+    {
+      "finding_id": "PRIV-0004",
+      "target_file": "backend/app/application/services/simulation_service.py",
+      "lines_modified": "451-463",
+      "change_type": "EARLY_VALIDATION",
+      "summary": "Added early fail-closed validation for dp_epsilon, dp_delta, and dp_max_grad_norm in run_simulation.",
+      "regression_test": "backend/tests/unit/test_privacy_correctness.py::TestDifferentialPrivacyContracts::test_gaussian_noise_scale_invalid_parameters_fail_closed"
+    }
+  ]
+}

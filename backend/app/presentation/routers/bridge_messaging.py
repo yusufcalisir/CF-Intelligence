@@ -50,7 +50,7 @@ from app.application.services.bridge_case_service import (
     generate_bank_keypair,
     get_bridge_service,
 )
-from app.domain.entities_phase2 import FinintBridgeTicket
+from app.domain.investigation_entities import FinintBridgeTicket
 
 logger = logging.getLogger(__name__)
 

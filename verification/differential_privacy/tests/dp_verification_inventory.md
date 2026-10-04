@@ -15,7 +15,7 @@ This document presents a complete scientific audit and verification inventory of
   * `backend/app/domain/security_evaluator.py`
   * `backend/app/domain/label_privacy_guard.py`
   * `backend/app/domain/fuzzy_psi.py`
-  * `backend/app/domain/value_objects_phase2.py`
+  * `backend/app/domain/value_objects_investigation.py`
 
 ---
 

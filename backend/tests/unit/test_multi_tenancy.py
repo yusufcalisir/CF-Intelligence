@@ -170,7 +170,7 @@ class TestPrivacyIdentifierKMS:
 
     def test_compute_with_kms_differs_per_tenant(self) -> None:
         """The same raw value should hash differently for different banks."""
-        from app.domain.value_objects_phase2 import PrivacyPreservingIdentifier
+        from app.domain.value_objects_investigation import PrivacyPreservingIdentifier
 
         hash_a = PrivacyPreservingIdentifier.compute_with_kms(
             "john.doe@example.com", "CUSTOMER", "bank_a"
@@ -182,7 +182,7 @@ class TestPrivacyIdentifierKMS:
 
     def test_compute_with_kms_deterministic(self) -> None:
         """Same input + same bank should produce the same hash."""
-        from app.domain.value_objects_phase2 import PrivacyPreservingIdentifier
+        from app.domain.value_objects_investigation import PrivacyPreservingIdentifier
 
         hash1 = PrivacyPreservingIdentifier.compute_with_kms(
             "john.doe@example.com", "CUSTOMER", "bank_a"
@@ -194,7 +194,7 @@ class TestPrivacyIdentifierKMS:
 
     def test_backward_compatible_compute(self) -> None:
         """The original compute() with default key should still work."""
-        from app.domain.value_objects_phase2 import PrivacyPreservingIdentifier
+        from app.domain.value_objects_investigation import PrivacyPreservingIdentifier
 
         hash1 = PrivacyPreservingIdentifier.compute("test@email.com", "CUSTOMER")
         hash2 = PrivacyPreservingIdentifier.compute("test@email.com", "CUSTOMER")

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from app.application.services.explainability_service import ExplainabilityService
-from app.domain.entities_phase2 import Alert
 from app.domain.enums import AlertSeverity, AlertStatus
+from app.domain.investigation_entities import Alert
 
 
 def _make_sample_alert(alert_id: str = "alt_1001", risk_score: float = 750.0) -> Alert:
@@ -110,8 +110,8 @@ class TestGNNExplainer:
 
     def test_explain_gnn_embedding_calculates_edge_contributions(self):
         from app.application.services.graph_engine import GraphEngine
-        from app.domain.entities_phase2 import Entity, Relationship
         from app.domain.enums import EntityType, RelationshipType
+        from app.domain.investigation_entities import Entity, Relationship
 
         ge = GraphEngine()
         ge.register_entity(

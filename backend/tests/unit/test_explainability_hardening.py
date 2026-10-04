@@ -20,8 +20,8 @@ from fastapi.testclient import TestClient
 from app.application.services.alert_service import AlertIntelligenceService
 from app.application.services.explainability_service import ExplainabilityService
 from app.application.services.graph_engine import GraphEngine
-from app.domain.entities_phase2 import Alert, Entity, Relationship
 from app.domain.enums import AlertSeverity, AlertStatus, EntityType, RelationshipType
+from app.domain.investigation_entities import Alert, Entity, Relationship
 from app.domain.realtime_explainer import FastInferenceExplainer, _get_local_cache, _put_local_cache
 from app.main import app
 

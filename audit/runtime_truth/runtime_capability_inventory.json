@@ -404,7 +404,7 @@
         "backend/app/application/services/alert_service.py :: AlertIntelligenceService"
       ],
       "domain_components": [
-        "backend/app/domain/entities_phase2.py :: Alert",
+        "backend/app/domain/investigation_entities.py :: Alert",
         "backend/app/domain/enums.py :: AlertSeverity, AlertStatus"
       ],
       "data_dependencies": [
@@ -455,7 +455,7 @@
       ],
       "domain_components": [
         "backend/app/domain/case_management.py :: FourEyesApprovalEngine",
-        "backend/app/domain/entities_phase2.py :: Case",
+        "backend/app/domain/investigation_entities.py :: Case",
         "backend/app/domain/enums.py :: CaseStatus, CasePriority"
       ],
       "data_dependencies": [

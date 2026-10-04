@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from app.domain.value_objects_phase2 import (
+from app.domain.value_objects_investigation import (
     CounterfactualExplanation,
     DecisionReplayReport,
     EdgeContribution,
@@ -34,7 +34,7 @@ from app.domain.value_objects_phase2 import (
 )
 
 if TYPE_CHECKING:
-    from app.domain.entities_phase2 import Alert
+    from app.domain.investigation_entities import Alert
 
 logger = logging.getLogger(__name__)
 

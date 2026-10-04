@@ -21,7 +21,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from app.application.services.explainability_service import ExplainabilityService
 from app.application.services.model_service import FraudDetectionModel
-from app.domain.entities_phase2 import Alert, AlertSeverity
+from app.domain.investigation_entities import Alert, AlertSeverity
 
 explainer_service = ExplainabilityService()
 

@@ -10,8 +10,8 @@ Verifies:
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain.entities_phase2 import Case
 from app.domain.enums import CasePriority, CaseStatus
+from app.domain.investigation_entities import Case
 from app.main import app
 from app.presentation.routers.cases import _case_service
 

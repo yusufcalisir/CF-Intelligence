@@ -30,7 +30,7 @@ def test_case_status_transitions_and_sar_filing(case_service, alert_service):
 
     # 2. Add an alert
     from app.application.services.alert_service import _alert_to_dict
-    from app.domain.entities_phase2 import Alert
+    from app.domain.investigation_entities import Alert
 
     alert = Alert(
         bank_id="bank_a",

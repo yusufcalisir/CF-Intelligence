@@ -9,8 +9,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain.entities_phase2 import Alert
 from app.domain.enums import AlertSeverity, AlertStatus, CasePriority, CaseStatus
+from app.domain.investigation_entities import Alert
 from app.main import app
 from app.presentation.routers.alerts import get_alert_service
 from app.presentation.routers.cases import get_case_service

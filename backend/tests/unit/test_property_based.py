@@ -22,7 +22,7 @@ from app.application.services.risk_engine import RiskScoringEngine
 from app.config import get_settings
 from app.domain.enums import AggregationMethod
 from app.domain.value_objects import ModelWeights
-from app.domain.value_objects_phase2 import RiskWeightConfig
+from app.domain.value_objects_investigation import RiskWeightConfig
 from app.presentation.routers.banks import _compute_js_divergence, _compute_psi
 
 settings_obj = get_settings()

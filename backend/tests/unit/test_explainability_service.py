@@ -3,8 +3,8 @@
 import pytest
 
 from app.application.services.explainability_service import ExplainabilityService
-from app.domain.entities_phase2 import Alert
 from app.domain.enums import AlertSeverity, AlertStatus
+from app.domain.investigation_entities import Alert
 
 
 @pytest.fixture

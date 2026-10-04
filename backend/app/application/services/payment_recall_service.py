@@ -36,13 +36,13 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from app.domain.entities_phase2 import RecallAuditEntry, RecallCase
 from app.domain.enums import (
     RecallMessageType,
     RecallReasonCode,
     RecallStatus,
     ResolutionCode,
 )
+from app.domain.investigation_entities import RecallAuditEntry, RecallCase
 
 logger = logging.getLogger(__name__)
 

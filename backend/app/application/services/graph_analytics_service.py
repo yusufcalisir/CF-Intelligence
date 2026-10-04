@@ -131,7 +131,7 @@ class GraphAnalyticsService:
                 for r in res_rels:
                     from datetime import datetime
 
-                    from app.domain.entities_phase2 import Relationship
+                    from app.domain.investigation_entities import Relationship
 
                     relationships.append(
                         Relationship(

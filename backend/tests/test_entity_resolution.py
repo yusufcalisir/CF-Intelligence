@@ -4,7 +4,7 @@ import pytest
 
 from app.application.services.entity_resolution import EntityResolutionService
 from app.domain.enums import EntityType, RelationshipType
-from app.domain.value_objects_phase2 import PrivacyPreservingIdentifier
+from app.domain.value_objects_investigation import PrivacyPreservingIdentifier
 
 
 @pytest.fixture

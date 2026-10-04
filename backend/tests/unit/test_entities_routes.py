@@ -10,8 +10,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain.entities_phase2 import Entity
 from app.domain.enums import EntityType, RiskLevel
+from app.domain.investigation_entities import Entity
 from app.main import app
 from app.presentation.routers.entities import get_entity_service
 

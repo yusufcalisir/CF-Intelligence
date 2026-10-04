@@ -15,8 +15,8 @@ from app.application.services.counterfactual_service import (
 )
 from app.application.services.explainability_service import ExplainabilityService
 from app.application.services.risk_engine import RiskScoringEngine
-from app.domain.entities_phase2 import Alert
 from app.domain.enums import AlertSeverity, AlertStatus
+from app.domain.investigation_entities import Alert
 
 
 def _create_sample_alert(

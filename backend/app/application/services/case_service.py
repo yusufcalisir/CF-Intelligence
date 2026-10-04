@@ -17,8 +17,8 @@ import threading
 from datetime import UTC, datetime
 from typing import Any
 
-from app.domain.entities_phase2 import Case, CaseEvent, CaseNote
 from app.domain.enums import CasePriority, CaseStatus
+from app.domain.investigation_entities import Case, CaseEvent, CaseNote
 from app.domain.models.case import (
     DuplicateSupervisorSignatureError,
     FourEyesVerificationError,

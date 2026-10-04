@@ -30,14 +30,14 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.domain.entities_phase2 import Alert
+from app.domain.investigation_entities import Alert
 from app.domain.risk_engine import (
     PolicyAction,
     RiskTier,
     classify_risk_tier,
     map_tier_to_action,
 )
-from app.domain.value_objects_phase2 import CounterfactualChange, CounterfactualExplanation
+from app.domain.value_objects_investigation import CounterfactualChange, CounterfactualExplanation
 
 logger = logging.getLogger(__name__)
 

@@ -21,8 +21,8 @@ from datetime import UTC, datetime
 import pytest
 
 from app.application.services.graph_engine import GraphEngine
-from app.domain.entities_phase2 import Entity, Relationship
 from app.domain.enums import EntityType, RelationshipType, RiskLevel
+from app.domain.investigation_entities import Entity, Relationship
 
 
 @pytest.fixture

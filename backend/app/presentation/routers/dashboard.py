@@ -22,7 +22,7 @@ from app.application.schemas.dashboard import (
 )
 from app.application.services.risk_engine import RiskScoringEngine
 from app.domain.enums import EntityType
-from app.domain.value_objects_phase2 import RiskWeightConfig
+from app.domain.value_objects_investigation import RiskWeightConfig
 from app.presentation.routers.alerts import get_alert_service
 from app.presentation.routers.cases import get_case_service
 from app.presentation.routers.entities import get_entity_service

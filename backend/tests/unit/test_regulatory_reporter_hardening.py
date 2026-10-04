@@ -23,8 +23,8 @@ from app.application.services.regulatory_reporter import (
     RegulatoryReporterService,
     SARValidationError,
 )
-from app.domain.entities_phase2 import Alert, Case
 from app.domain.enums import AlertSeverity, CasePriority, CaseStatus
+from app.domain.investigation_entities import Alert, Case
 from app.main import app
 
 client = TestClient(app)

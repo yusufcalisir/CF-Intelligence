@@ -27,8 +27,8 @@ from app.application.services.alert_service import (
     DeduplicationConfig,
 )
 from app.dependencies import resolve_tenant
-from app.domain.entities_phase2 import Alert
 from app.domain.enums import AlertSeverity, TriageAction, TriagePriority
+from app.domain.investigation_entities import Alert
 from app.main import app
 
 

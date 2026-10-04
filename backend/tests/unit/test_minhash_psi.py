@@ -23,8 +23,8 @@ import math
 import pytest
 
 from app.application.services.graph_engine import GraphEngine
-from app.domain.entities_phase2 import Entity
 from app.domain.enums import EntityType, RelationshipType
+from app.domain.investigation_entities import Entity
 from app.domain.minhash_lsh import (
     DEFAULT_SIMILARITY_TEST_VECTORS,
     CollisionCharacterizationSummary,

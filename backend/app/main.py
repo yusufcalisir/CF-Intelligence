@@ -228,7 +228,6 @@ def seed_mock_data() -> None:
     """Seed initial demonstration data for AML financial crime intelligence platform."""
     from app.application.services.alert_service import _alert_to_dict, _intel_to_dict
     from app.application.services.case_service import _case_to_dict
-    from app.domain.entities_phase2 import Alert, SharedIntelligence
     from app.domain.enums import (
         AlertSeverity,
         AlertStatus,
@@ -239,6 +238,7 @@ def seed_mock_data() -> None:
         RelationshipType,
         RiskLevel,
     )
+    from app.domain.investigation_entities import Alert, SharedIntelligence
     from app.presentation.routers.alerts import get_alert_service
     from app.presentation.routers.cases import get_case_service
     from app.presentation.routers.entities import get_entity_service

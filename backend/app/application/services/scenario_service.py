@@ -21,8 +21,8 @@ import uuid
 
 import numpy as np
 
-from app.domain.entities_phase2 import Scenario, StreamingEvent
 from app.domain.enums import ScenarioType
+from app.domain.investigation_entities import Scenario, StreamingEvent
 
 logger = logging.getLogger(__name__)
 

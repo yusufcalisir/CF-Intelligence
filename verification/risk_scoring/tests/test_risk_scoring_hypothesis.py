@@ -21,7 +21,7 @@ PROJECT_ROOT = r"c:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank f
 sys.path.insert(0, PROJECT_ROOT)
 
 from app.application.services.risk_engine import RiskScoringEngine, COUNTRY_RISK, MERCHANT_RISK
-from app.domain.value_objects_phase2 import RiskWeightConfig, RiskScore, RiskSignal
+from app.domain.value_objects_investigation import RiskWeightConfig, RiskScore, RiskSignal
 
 engine = RiskScoringEngine()
 

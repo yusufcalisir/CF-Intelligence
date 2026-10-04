@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from app.domain.entities_phase2 import Case
+    from app.domain.investigation_entities import Case
 
 logger = logging.getLogger(__name__)
 

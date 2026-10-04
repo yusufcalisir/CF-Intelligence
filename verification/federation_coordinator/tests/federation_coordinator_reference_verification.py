@@ -18,7 +18,7 @@ PROJECT_ROOT = r"c:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank f
 sys.path.insert(0, PROJECT_ROOT)
 
 from app.application.services.coordinator_service import CoordinatorService
-from app.domain.entities_phase2 import Alert, AlertSeverity
+from app.domain.investigation_entities import Alert, AlertSeverity
 
 def run_reference_verification():
     np.random.seed(42)

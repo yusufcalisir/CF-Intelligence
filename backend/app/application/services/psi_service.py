@@ -25,8 +25,8 @@ from app.domain.psi_service import (
 )
 
 if TYPE_CHECKING:
-    from app.domain.entities_phase2 import Entity
     from app.domain.enums import EntityType
+    from app.domain.investigation_entities import Entity
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ class PSIService:
                                 continue
 
                             # Standardize inputs
-                            from app.domain.value_objects_phase2 import standardize_input
+                            from app.domain.value_objects_investigation import standardize_input
 
                             std_a = standardize_input(val_a, k)
                             std_b = standardize_input(val_b, k)
@@ -115,7 +115,7 @@ class PSIService:
                                     matched_features.append(k)
                             else:
                                 # Simulated DH encryption comparison
-                                from app.domain.value_objects_phase2 import (
+                                from app.domain.value_objects_investigation import (
                                     PrivacyPreservingIdentifier,
                                 )
 

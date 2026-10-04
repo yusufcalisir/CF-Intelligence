@@ -17,10 +17,10 @@ import threading
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from app.domain.entities_phase2 import Entity, Relationship
 from app.domain.enums import EntityType, RelationshipType, RiskLevel
 from app.domain.fuzzy_psi import FuzzyPSIMatcher
-from app.domain.value_objects_phase2 import (
+from app.domain.investigation_entities import Entity, Relationship
+from app.domain.value_objects_investigation import (
     PrivacyPreservingIdentifier,
     calculate_jaccard_similarity,
     compute_minhash_signature,

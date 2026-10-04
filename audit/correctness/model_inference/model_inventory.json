@@ -1,0 +1,105 @@
+{
+  "phase": "5D",
+  "name": "Phase 5D Runtime Model Inventory",
+  "inventory": [
+    {
+      "model_name": "FraudDetectionModel",
+      "model_family": "Multi-Layer Perceptron (MLP)",
+      "implementation": "backend/app/application/services/model_service.py:FraudDetectionModel",
+      "input_dimension": 10,
+      "feature_schema": "FEATURE_NAMES in backend/app/application/services/data_generator.py",
+      "output_dimension": 1,
+      "output_semantics": "Probability of fraud in [0.0, 1.0]",
+      "activation_semantics": "Linear(10,64) -> ReLU -> Norm1 -> Dropout(0.3) -> Linear(64,32) -> ReLU -> Norm2 -> Dropout(0.2) -> Linear(32,1) -> Sigmoid()",
+      "threshold": "Score threshold >= 600.0 (composite risk score in [0, 1000] mapping to ML prob threshold ~0.50)",
+      "artifact_format": "PyTorch state_dict (.pt)",
+      "registry_identity": "storage/models/{simulation_id}/model_v{version}.pt and manifest.json",
+      "loading_path": "backend/app/presentation/routers/predict.py:_get_cached_serving_model and _load_challenger_model",
+      "inference_path": "backend/app/presentation/routers/predict.py:predict_transaction and predict_batch",
+      "runtime_reachability": "ACTIVE",
+      "tests": [
+        "backend/tests/unit/test_model_inference_correctness.py",
+        "backend/tests/unit/test_model_service.py",
+        "backend/tests/unit/test_predict.py",
+        "backend/tests/unit/test_predict_routes.py"
+      ]
+    },
+    {
+      "model_name": "GraphSAGEModel",
+      "model_family": "Graph Neural Network (GNN)",
+      "implementation": "backend/app/application/services/graph_embedding.py:GraphSAGEModel",
+      "input_dimension": 12,
+      "feature_schema": "Node features + adjacency neighborhood aggregation",
+      "output_dimension": 16,
+      "output_semantics": "Topological risk embedding vector (used by RiskScoringEngine for topological anomaly detection)",
+      "activation_semantics": "GraphConv -> ReLU -> Dropout -> GraphConv -> L2 Normalize",
+      "threshold": "Cosine similarity anomaly threshold >= 0.75",
+      "artifact_format": "PyTorch state_dict (.pt)",
+      "registry_identity": "storage/models/graph/graphsage_v1.pt",
+      "loading_path": "backend/app/application/services/graph_embedding.py:GraphEmbeddingService",
+      "inference_path": "backend/app/application/services/risk_engine.py:_eval_gnn_topological_risk",
+      "runtime_reachability": "ACTIVE",
+      "tests": [
+        "backend/tests/unit/test_graph_embedding.py",
+        "backend/tests/unit/test_graph_embedding_hardening.py"
+      ]
+    },
+    {
+      "model_name": "IEEECISNeuralClassifier",
+      "model_family": "Deep Tabular MLP (Benchmark)",
+      "implementation": "backend/app/domain/benchmarks/ieee_cis.py:IEEECISNeuralClassifier",
+      "input_dimension": 42,
+      "feature_schema": "IEEE-CIS Fraud Detection 42-feature subset",
+      "output_dimension": 1,
+      "output_semantics": "Fraud probability",
+      "activation_semantics": "Linear(42, 64) -> ReLU -> Dropout -> Linear(64, 32) -> ReLU -> Linear(32, 1) -> Sigmoid()",
+      "threshold": 0.5,
+      "artifact_format": "In-memory PyTorch state dict",
+      "registry_identity": "Benchmark runner ephemeral",
+      "loading_path": "FederatedIEEECISTrainer.evaluate",
+      "inference_path": "FederatedIEEECISTrainer.evaluate",
+      "runtime_reachability": "BENCHMARK_ONLY",
+      "tests": [
+        "backend/tests/unit/test_ieee_cis_benchmark.py"
+      ]
+    },
+    {
+      "model_name": "PaySimNeuralClassifier",
+      "model_family": "Mobile Money Fraud MLP (Benchmark)",
+      "implementation": "backend/app/domain/benchmarks/paysim.py:PaySimNeuralClassifier",
+      "input_dimension": 13,
+      "feature_schema": "PaySim financial simulator 13-feature schema",
+      "output_dimension": 1,
+      "output_semantics": "Fraud probability",
+      "activation_semantics": "Linear(13, 32) -> ReLU -> Linear(32, 16) -> ReLU -> Linear(16, 1) -> Sigmoid()",
+      "threshold": 0.5,
+      "artifact_format": "In-memory PyTorch state dict",
+      "registry_identity": "Benchmark runner ephemeral",
+      "loading_path": "FederatedPaySimTrainer.evaluate",
+      "inference_path": "FederatedPaySimTrainer.evaluate",
+      "runtime_reachability": "BENCHMARK_ONLY",
+      "tests": [
+        "backend/tests/unit/test_paysim_federated.py"
+      ]
+    },
+    {
+      "model_name": "FlagshipMLPClassifier",
+      "model_family": "Cross-Bank Flagship Experiment MLP",
+      "implementation": "backend/app/domain/benchmarks/cross_bank_flagship.py:FlagshipMLPClassifier",
+      "input_dimension": 10,
+      "feature_schema": "10-feature Non-IID bank dataset schema",
+      "output_dimension": 1,
+      "output_semantics": "Fraud probability",
+      "activation_semantics": "Linear(10, 64) -> ReLU -> Linear(64, 32) -> ReLU -> Linear(32, 1) -> Sigmoid()",
+      "threshold": 0.5,
+      "artifact_format": "In-memory PyTorch state dict",
+      "registry_identity": "Experiment runner ephemeral",
+      "loading_path": "CrossBankFlagshipExperiment.evaluate",
+      "inference_path": "CrossBankFlagshipExperiment.evaluate",
+      "runtime_reachability": "BENCHMARK_ONLY",
+      "tests": [
+        "backend/tests/unit/test_flagship_cross_bank_experiment.py"
+      ]
+    }
+  ]
+}

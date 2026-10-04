@@ -21,7 +21,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from app.application.services.explainability_service import ExplainabilityService
 from app.domain.realtime_explainer import FastInferenceExplainer
-from app.domain.entities_phase2 import Alert, AlertSeverity
+from app.domain.investigation_entities import Alert, AlertSeverity
 
 explainer_service = ExplainabilityService()
 fast_explainer = FastInferenceExplainer()
@@ -155,7 +155,7 @@ def test_inv3_feature_contribution_array_properties(amount: float, velocity: flo
 def test_inv4_gnn_edge_percentage_sum_invariant(node_suffix: int):
     """Invariant 4: Edge contribution percentages sum to exactly 100.0%."""
     from app.application.services.graph_engine import GraphEngine
-    from app.domain.entities_phase2 import Entity, Relationship
+    from app.domain.investigation_entities import Entity, Relationship
     from app.domain.enums import EntityType, RelationshipType
 
     node_id = f"entity_node_{node_suffix}"

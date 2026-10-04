@@ -9,7 +9,7 @@
 
 ## Executive Overview
 
-This inventory documents every algorithm, mathematical operation, signal normalization function, weighting scheme, AST evaluation logic, and behavioral guarantee implemented in the **Risk Scoring & Decision Engine** subsystem (`backend/app/application/services/risk_engine.py`, `policy_engine.py`, `value_objects_phase2.py`).
+This inventory documents every algorithm, mathematical operation, signal normalization function, weighting scheme, AST evaluation logic, and behavioral guarantee implemented in the **Risk Scoring & Decision Engine** subsystem (`backend/app/application/services/risk_engine.py`, `policy_engine.py`, `value_objects_investigation.py`).
 
 ---
 

@@ -13,8 +13,8 @@ from app.domain.ai_act_compliance import (
     generate_transparency_report,
     record_human_oversight,
 )
-from app.domain.entities_phase2 import Case
 from app.domain.enums import CasePriority, CaseStatus
+from app.domain.investigation_entities import Case
 
 
 def test_sar_xml_passes_xsd_validation() -> None:

@@ -5,7 +5,7 @@
 **Target Files:**  
 - `backend/app/application/services/risk_engine.py` (`RiskScoringEngine`)  
 - `backend/app/application/services/policy_engine.py` (`PolicyEngineService`, `evaluate_condition`)  
-- `backend/app/domain/value_objects_phase2.py` (`RiskScore`, `RiskSignal`, `RiskWeightConfig`)  
+- `backend/app/domain/value_objects_investigation.py` (`RiskScore`, `RiskSignal`, `RiskWeightConfig`)  
 - `backend/app/application/services/alert_service.py` (`AlertService`)  
 **Audit Period:** July 2026  
 **Auditor:** Senior Researcher in Financial Fraud Detection, Risk Scoring Systems, Decision Engines, and Scientific Software Verification

@@ -20,7 +20,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from app.application.services.explainability_service import ExplainabilityService
 from app.domain.realtime_explainer import FastInferenceExplainer
-from app.domain.entities_phase2 import Alert, AlertSeverity
+from app.domain.investigation_entities import Alert, AlertSeverity
 
 explainer_service = ExplainabilityService()
 fast_explainer = FastInferenceExplainer()
