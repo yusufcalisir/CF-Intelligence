@@ -356,7 +356,7 @@ Adversarial ML risks are audited against the **MITRE ATLAS** (Adversarial Threat
 **Threat**: In-transit event messages (alerts, training updates) could be reordered, duplicated, or dropped, causing inconsistent system state.
 
 **Mitigations**:
-*   **Apache Kafka/Redpanda Backbone**: When enabled, replaces Redis Pub/Sub with a fault-tolerant, append-only log. Events are partitioned by bank ID, ordered by offset, and durably persisted. Consumer groups provide exactly-once semantics.
+*   **Apache Kafka/Redpanda Backbone**: When enabled, replaces Redis Pub/Sub with a fault-tolerant, append-only log. Events are partitioned by bank ID, ordered by offset, and durably persisted. Consumer groups provide at-least-once transport delivery paired with application-level idempotency deduplication.
 *   **Event Metadata Injection**: Each published event is tagged with topic, partition, offset, broker address, and millisecond timestamp for full audit traceability.
 
 ### 10.3 Database Consistency Under High Write Load

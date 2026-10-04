@@ -1,0 +1,168 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at_utc": "2026-10-04T17:55:00Z",
+  "inventory_name": "CF-Intelligence Master Technical Evidence Inventory",
+  "classification_taxonomy": [
+    "CURRENT_AUTHORITATIVE",
+    "CURRENT_SUPPORTING",
+    "HISTORICAL_SUPERSEDED",
+    "QUARANTINED",
+    "DEMO_ONLY",
+    "SYNTHETIC_EVIDENCE",
+    "REAL_DATA_EVIDENCE",
+    "ENVIRONMENT_LIMITED",
+    "NOT_A_CERTIFICATION_ARTIFACT"
+  ],
+  "evidence_artifacts": [
+    {
+      "path": "benchmarks/results/canonical_evidence_registry.json",
+      "classification": "CURRENT_AUTHORITATIVE",
+      "domain": "scientific_benchmarks",
+      "description": "Master machine-readable canonical registry for all 12 benchmark families, tracking population, seeds, metrics, and mandatory caveats."
+    },
+    {
+      "path": "benchmarks/results/summary.md",
+      "classification": "CURRENT_AUTHORITATIVE",
+      "domain": "scientific_benchmarks",
+      "description": "Authoritative tabular summary of empirical benchmark results, deltas, and sample standard deviations."
+    },
+    {
+      "path": "docs/CANONICAL_EVIDENCE.md",
+      "classification": "CURRENT_AUTHORITATIVE",
+      "domain": "provenance_governance",
+      "description": "Comprehensive provenance guide detailing one-way evidence flow, dataset taxonomy, and retired evidence inventory."
+    },
+    {
+      "path": "docs/LIMITATIONS.md",
+      "classification": "CURRENT_AUTHORITATIVE",
+      "domain": "governance_limitations",
+      "description": "Formal negative results ledger (NR-001 to NR-005), anti-metric shopping protocol, and epistemic vulnerability matrix."
+    },
+    {
+      "path": "audit/correctness/system/lifecycle_integrity_report.md",
+      "classification": "CURRENT_AUTHORITATIVE",
+      "domain": "whole_system_verification",
+      "description": "Authoritative evaluation of compound transaction lifecycle failure, cross-tenant composition, provenance races, and 7-dimension semantic reconciliation."
+    },
+    {
+      "path": "audit/correctness/system/distributed_correctness_report.md",
+      "classification": "CURRENT_AUTHORITATIVE",
+      "domain": "distributed_failure_verification",
+      "description": "Evaluation of multi-worker CAS, ambiguous commits, client retry, model round recovery, and worker restart invariants."
+    },
+    {
+      "path": "audit/correctness/system/system_verification_report.md",
+      "classification": "CURRENT_AUTHORITATIVE",
+      "domain": "cross_domain_integration",
+      "description": "Initial whole-system verification report establishing foundation cross-domain invariants and fail-closed model inference repair."
+    },
+    {
+      "path": "backend/tests/integration/test_lifecycle_integrity.py",
+      "classification": "CURRENT_AUTHORITATIVE",
+      "domain": "executable_test_suite",
+      "description": "Executable test suite covering 5 primary adversarial lifecycle scenarios, 7 final invariants, and 3 metamorphic checks."
+    },
+    {
+      "path": "backend/tests/integration/test_distributed_recovery.py",
+      "classification": "CURRENT_AUTHORITATIVE",
+      "domain": "executable_test_suite",
+      "description": "Executable test suite covering distributed coordination, ambiguous commits, worker restart, and security fail-closed behavior."
+    },
+    {
+      "path": "backend/tests/integration/test_transaction_lifecycle.py",
+      "classification": "CURRENT_AUTHORITATIVE",
+      "domain": "executable_test_suite",
+      "description": "Executable integration suite covering case CAS, decision provenance, active privacy, and human vs machine outcome separation."
+    },
+    {
+      "path": "backend/tests/integration/test_tenant_isolation_e2e.py",
+      "classification": "CURRENT_AUTHORITATIVE",
+      "domain": "executable_test_suite",
+      "description": "Executable end-to-end suite verifying multi-tenant isolation, same-ID coexistence, and BOLA prevention."
+    },
+    {
+      "path": "backend/tests/integration/test_retry_consistency.py",
+      "classification": "CURRENT_AUTHORITATIVE",
+      "domain": "executable_test_suite",
+      "description": "Executable suite verifying streaming redelivery metamorphic equivalence, parallel transaction preservation, and crash-window idempotency."
+    },
+    {
+      "path": "experiments/ieee_cis/canonical_results.json",
+      "classification": "REAL_DATA_EVIDENCE",
+      "domain": "empirical_benchmark",
+      "description": "Level 1 canonical raw benchmark results on 590,540 real Kaggle IEEE-CIS transactions (Centralized AP: 0.4422, FedAvg AP: 0.3895)."
+    },
+    {
+      "path": "benchmarks/results/raw/creditcard_controlled_budget.json",
+      "classification": "REAL_DATA_EVIDENCE",
+      "domain": "empirical_benchmark",
+      "description": "Level 1 canonical raw benchmark on European Credit Card dataset with budget-equalized execution (Centralized AP: 0.8219, FedAvg AP: 0.8248)."
+    },
+    {
+      "path": "benchmarks/results/raw/elliptic_temporal_canonical.json",
+      "classification": "REAL_DATA_EVIDENCE",
+      "domain": "empirical_benchmark",
+      "description": "Level 1 canonical raw benchmark on Elliptic Bitcoin graph (203k nodes, 234k edges) under Inductive GraphSAGE (AP: 0.3761)."
+    },
+    {
+      "path": "benchmarks/results/raw/byzantine_federated_canonical.json",
+      "classification": "REAL_DATA_EVIDENCE",
+      "domain": "empirical_benchmark",
+      "description": "72-condition canonical multi-round federated benchmark on real Credit Card data under scaled sign-inversion attacks across 12 simulated bank clients."
+    },
+    {
+      "path": "benchmarks/crossbank_v2/results/canonical_results.json",
+      "classification": "SYNTHETIC_EVIDENCE",
+      "domain": "empirical_benchmark",
+      "description": "Flagship CrossBank v2 synthetic multi-bank benchmark across 5 seeds and 7 topologies under Protocol 2.1.0."
+    },
+    {
+      "path": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json",
+      "classification": "CURRENT_SUPPORTING",
+      "domain": "empirical_benchmark",
+      "description": "Opacus DP-SGD PRV accountant privacy-utility trade-off sweep proving utility collapse under noise sigma >= 3.0."
+    },
+    {
+      "path": "benchmarks/results/raw/byzantine_benchmark_sign_inversion.json",
+      "classification": "QUARANTINED",
+      "domain": "historical_benchmark",
+      "description": "Quarantined single-seed algebraic prototype claiming 99.7% universal retention; retained strictly for historical audit provenance."
+    },
+    {
+      "path": "benchmarks/results/raw/graphsage_synthetic_smoke_benchmark.json",
+      "classification": "HISTORICAL_SUPERSEDED",
+      "domain": "historical_benchmark",
+      "description": "Retired 1,500-node synthetic chain graph benchmark (0.9001 / 0.9860), permanently superseded by canonical Elliptic real-data benchmark."
+    },
+    {
+      "path": "benchmarks/results/raw/fraud_benchmark_ieee_cis.json",
+      "classification": "HISTORICAL_SUPERSEDED",
+      "domain": "historical_benchmark",
+      "description": "Historical synthetic fallback run (0.7811 / 0.7554), permanently superseded by canonical Kaggle 590k raw dataset execution."
+    },
+    {
+      "path": "app/infrastructure/redis_store.py",
+      "classification": "ENVIRONMENT_LIMITED",
+      "domain": "runtime_infrastructure",
+      "description": "Local in-memory fallback store simulating Redis key-value storage; physical multi-node Redis cluster failover not exercised."
+    },
+    {
+      "path": "app/infrastructure/security/enclave_driver.py",
+      "classification": "ENVIRONMENT_LIMITED",
+      "domain": "runtime_security",
+      "description": "Software-emulated TEE driver; bare-metal hardware SGX/Nitro attestation requires physical cloud enclaves."
+    },
+    {
+      "path": "frontend/src/views/LandingPage.tsx",
+      "classification": "DEMO_ONLY",
+      "domain": "presentation_layer",
+      "description": "Interactive demonstration landing surface for platform overview and visual onboarding; showcase only."
+    },
+    {
+      "path": "frontend/src/views/LiveOperationsView.tsx",
+      "classification": "CURRENT_SUPPORTING",
+      "domain": "presentation_layer",
+      "description": "Live operations dashboard for real-time transaction streaming, alert feed, and simulation monitoring."
+    }
+  ]
+}

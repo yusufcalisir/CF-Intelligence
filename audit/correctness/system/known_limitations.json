@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at_utc": "2026-10-04T17:57:00Z",
+  "register_name": "CF-Intelligence Authoritative Limitations Register",
+  "limitations": [
+    {
+      "area": "Distributed Cache & State",
+      "limitation": "Physical Redis cluster split-brain, multi-node replication lag, and Sentinel failover not exercised in automated tests.",
+      "type": "ENVIRONMENT",
+      "impact": "In-memory Redis fallback store provides local mutex safety but cannot certify physical distributed Redis quorum behavior.",
+      "what_is_verified": "In-memory fallback store correctly maintains atomic operations, key expiry, hash maps, and multi-tenant key prefixes locally.",
+      "what_would_be_required": "Multi-node bare-metal or cloud Redis cluster deployment with chaos engineering network partition injection."
+    },
+    {
+      "area": "Relational Persistence & Concurrency",
+      "limitation": "Physical PostgreSQL multi-connection row lock contention and deadlock resolution not exercised.",
+      "type": "ENVIRONMENT",
+      "impact": "SQLite file/WAL locking handles thread concurrency locally, but cannot prove distributed PostgreSQL advisory lock behavior under high concurrent writes.",
+      "what_is_verified": "Application-level optimistic CAS concurrency (version-checking, expected_status) functions correctly and prevents lost updates.",
+      "what_would_be_required": "Dedicated PostgreSQL 16 cluster with pooled PgBouncer connections and synthetic concurrent row-lock collision harnesses."
+    },
+    {
+      "area": "Hardware Security & Enclave Isolation",
+      "limitation": "Physical Intel SGX / AMD SEV / AWS Nitro Enclave silicon attestation not exercised.",
+      "type": "DEPLOYMENT",
+      "impact": "TEE enclave measurement and key derivation are emulated in software via SoftwareEmulatedTEEDriver.",
+      "what_is_verified": "The cryptographic measurement protocol, attestation token structure, and HMAC signature validation pipeline are operational.",
+      "what_would_be_required": "Provisioning physical bare-metal hardware with Intel SGX DCAP / ECDSA attestation infrastructure and Intel Quote Verification Enclave."
+    },
+    {
+      "area": "Regulatory FIU Transmission",
+      "limitation": "Direct electronic submission to statutory FinCEN BSA E-Filing or European FIU web services is not implemented.",
+      "type": "EXTERNAL_INTEGRATION",
+      "impact": "Platform cannot automatically submit statutory filings to government authorities without manual export and institutional human review.",
+      "what_is_verified": "Compilation of schema-validated UNODC goAML 4.0 XML and EU AMLA JSON dossiers with HMAC-SHA256 encrypted envelopes and Four-Eyes sign-off.",
+      "what_would_be_required": "Institutional banking charter accreditation, FinCEN / FIU API developer credentials, and dedicated government VPN leased lines."
+    },
+    {
+      "area": "Event Streaming Delivery",
+      "limitation": "Event transport delivery semantics are at-least-once, not native exactly-once.",
+      "type": "ARCHITECTURAL",
+      "impact": "Duplicate transport attempts may occur during network retries or consumer group rebalancing.",
+      "what_is_verified": "Application-level idempotency filters duplicate deliveries using canonical event_id and (tenant_id, key) hashes, preventing duplicate business objects.",
+      "what_would_be_required": "Permanent two-phase commit or Kafka transactional producer/consumer architecture across all event boundaries."
+    },
+    {
+      "area": "Historical Graph Reconstruction",
+      "limitation": "Historical graph state relies on event-time as_of filtering rather than full immutable bi-temporal snapshots.",
+      "type": "ARCHITECTURAL",
+      "impact": "Filtering excludes transactions after timestamp T, but node attributes (e.g. updated entity name) reflect the current state.",
+      "what_is_verified": "Historical transaction edge traversal correctly restricts graph topology to edges with timestamp <= as_of.",
+      "what_would_be_required": "Bitemporal graph storage engine recording valid-time and transaction-time intervals on both nodes and edges."
+    },
+    {
+      "area": "Differential Privacy Utility Trade-Off",
+      "limitation": "Severe detection utility collapse (NR-001) occurs under strong privacy noise (sigma >= 3.0, epsilon <= 0.35).",
+      "type": "EVIDENCE",
+      "impact": "Banks cannot operate at extreme differential privacy (epsilon < 1.0) without surrendering significant fraud detection power.",
+      "what_is_verified": "Formal Renyi DP and PRV moments accounting with Opacus DP-SGD gradient clipping across standardized noise multipliers.",
+      "what_would_be_required": "Architectural deployment of hybrid PETs (combining DP with Secure Aggregation and TEE) to reduce required noise variance."
+    },
+    {
+      "area": "Frontend Browser Diversity",
+      "limitation": "Frontend behavioral correctness is verified in jsdom, Vitest, and headless Chromium, not exhaustively across physical mobile browsers.",
+      "type": "ENVIRONMENT",
+      "impact": "Browser-specific quirks in legacy Safari, mobile webviews, or uncommon browsers are not certified.",
+      "what_is_verified": "Zero layout shift, responsive card grids, Four-Eyes modals, and WebSocket streaming state updates function correctly in standard DOM environments.",
+      "what_would_be_required": "Cloud device farm testing across real iOS Safari, Android Chrome, and Firefox mobile devices."
+    }
+  ]
+}

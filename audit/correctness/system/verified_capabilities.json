@@ -1,0 +1,207 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at_utc": "2026-10-04T17:56:00Z",
+  "matrix_name": "CF-Intelligence Capability Certification Matrix",
+  "capabilities": [
+    {
+      "capability": "Federated Learning Core",
+      "implementation": "FederatedLearningEngine (FedAvg, FedProx, SCAFFOLD)",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/unit/test_fl_engine.py, test_fl_algorithms.py, test_lifecycle_integrity.py",
+      "known_limitations": "Communication rounds bounded in memory; multi-datacenter network jitter emulated locally.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Server-Side FL Optimizers",
+      "implementation": "FedAdam, FedYogi, FedAdagrad, Q-FedAvg server-side momentum algorithms",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/unit/test_server_optimizers.py (100% passing)",
+      "known_limitations": "Requires careful tuning of server learning rate eta_g and epsilon damping under Non-IID skew.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Differential Privacy",
+      "implementation": "Opacus DP-SGD with PRVAccountant and Renyi DP moments accounting",
+      "verification_level": "VERIFIED_WITH_LIMITATIONS",
+      "evidence": "verification/differential_privacy/tests/, dp_privacy_utility_tradeoff.json",
+      "known_limitations": "Severe utility collapse (NR-001) under strong noise sigma >= 3.0 (epsilon <= 0.35); operational trade-off required.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Secure Aggregation (SecAgg)",
+      "implementation": "Pairwise additive zero-sum masking with HKDF domain separation",
+      "verification_level": "VERIFIED",
+      "evidence": "verification/secure_aggregation/tests/, test_zero_server_knowledge.py",
+      "known_limitations": "Evaluated in local and in-memory multi-node harnesses; full distributed threshold key reconstruction depends on network layer.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Homomorphic Encryption (FHE)",
+      "implementation": "TenSEAL CKKS vector encryption for homomorphic parameter summation",
+      "verification_level": "VERIFIED",
+      "evidence": "verification/secure_aggregation/tests/test_fhe_homomorphic_sum.py",
+      "known_limitations": "High computational overhead limits practical application to parameter vector aggregations; full homomorphic inference not implemented.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "TEE / Enclave Path",
+      "implementation": "SoftwareEmulatedTEEDriver with HMAC-SHA256 measurement attestation",
+      "verification_level": "EMULATED",
+      "evidence": "backend/tests/unit/test_sgx_enclave_attestation.py",
+      "known_limitations": "Physical bare-metal Intel SGX / AMD SEV hardware not exercised; must not claim physical silicon attestation.",
+      "production_claim_allowed": false
+    },
+    {
+      "capability": "Byzantine Poisoning Defenses",
+      "implementation": "Coordinate Trimmed Mean, Coordinate Median, Multi-Krum, Bulyan",
+      "verification_level": "VERIFIED",
+      "evidence": "benchmarks/results/raw/byzantine_federated_canonical.json, test_byzantine_suite.py",
+      "known_limitations": "Tolerates up to f < n/2 (Trimmed Mean) or f < (n-2)/2 (Krum); incurs clean-data utility penalty (NR-005) under Non-IID Dirichlet skew.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Model Preprocessing Parity",
+      "implementation": "Canonical preprocess_transaction() reference preprocessor",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/unit/test_zero_leakage_contract.py, test_predict.py",
+      "known_limitations": "Strict ordinal-encoding with constant feature order; unknown categorical values map to category zero or nearest alias.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Model Inference Execution",
+      "implementation": "PyTorch CPU neural forward pass with fail-closed exception handling",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/integration/test_transaction_lifecycle.py, test_predict.py",
+      "known_limitations": "Inference runs on CPU; multi-GPU Triton serving clusters not exercised.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Model Governance & Versioning",
+      "implementation": "ModelRegistry and ModelEvaluationEngine with immutable version binding",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/integration/test_lifecycle_integrity.py (Scenario 3), test_model_registry.py",
+      "known_limitations": "Storage relies on local directory structure; external S3/MinIO artifact repository is optional.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Graph Intelligence & UBO Engine",
+      "implementation": "StreamingGraphService and UBOGraphService with topological cycle detection",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/unit/test_ubo_graph.py, test_streaming_graph.py",
+      "known_limitations": "Event-time as_of filtering bounded by window memory; perfect immutable bi-temporal node replay not guaranteed.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Inductive GraphSAGE",
+      "implementation": "PyTorch Geometric Inductive GraphSAGE with neighbor sampling",
+      "verification_level": "REAL_DATA_BENCHMARKED",
+      "evidence": "benchmarks/results/raw/elliptic_temporal_canonical.json, test_graphsage_pipeline.py",
+      "known_limitations": "Evaluated on Elliptic Bitcoin graph (AP: 0.3761); full cross-bank federated GraphSAGE remains an experimental prototype.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Historical Graph Queries",
+      "implementation": "Temporal as_of filtering on graph edges and transaction events",
+      "verification_level": "VERIFIED_WITH_LIMITATIONS",
+      "evidence": "backend/tests/integration/test_transaction_lifecycle.py (Scenario 9)",
+      "known_limitations": "Supports filtering transactions by timestamp; does not maintain full immutable bi-temporal node state snapshots.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Explainability (SHAP & LIME)",
+      "implementation": "Surrogate KernelExplainer (bounded permutations) and Local Heuristic Explainer",
+      "verification_level": "VERIFIED_WITH_LIMITATIONS",
+      "evidence": "backend/tests/unit/test_explainability.py, test_alert_explainability.py",
+      "known_limitations": "Evaluates bounded permutation budget (N=100) for sub-50ms API SLAs; heuristics must not be claimed as exhaustive Shapley values.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Streaming Ingestion",
+      "implementation": "StreamingEngine with schema validation and async queue processing",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/unit/test_streaming_engine.py, test_retry_consistency.py",
+      "known_limitations": "Operates over in-memory and WebSocket queues in local tests; physical Kafka broker cluster not deployed in test environment.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Online Feature Store",
+      "implementation": "FeatureStoreService with TTL-backed rolling velocity and baseline statistics",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/unit/test_feature_store_service.py, test_lifecycle_integrity.py",
+      "known_limitations": "Online lookups use in-memory store in local test environment; Feast Redis cluster is optional.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Idempotency & Deduplication",
+      "implementation": "IdempotencyService with (tenant_id, key) namespace partitioning and payload hashing",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/integration/test_retry_consistency.py, test_lifecycle_integrity.py",
+      "known_limitations": "Idempotency TTL provides bounded request idempotency (typically 24 hours), not permanent infinite uniqueness.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Multi-Tenant Isolation",
+      "implementation": "Tenant-scoped database schemas, BOLA/IDOR prevention headers, and Vault transit keys",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/integration/test_tenant_isolation_e2e.py, test_lifecycle_integrity.py (Scenario 2)",
+      "known_limitations": "Enforced in application layer and SQLite file partitions; physical cross-database VPC segregation requires cloud deployment.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Alert Generation & Dispatch",
+      "implementation": "AlertService with composite risk scoring and deduplication keys",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/unit/test_alerts.py, test_lifecycle_integrity.py (Scenario 5)",
+      "known_limitations": "Alert thresholds fixed a priori to prevent metric shopping.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Case Management & CAS Concurrency",
+      "implementation": "CaseManagementService with optimistic CAS version check and timeline hash chain",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/integration/test_transaction_lifecycle.py, test_distributed_recovery.py",
+      "known_limitations": "Version increment strictly monotonic; terminal cases cannot receive further status modifications.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Four-Eyes Dual Control Approval",
+      "implementation": "Mandatory distinct supervisor sign-offs with self-approval prohibition",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/integration/test_lifecycle_integrity.py (Scenario 5), test_cases_routes.py",
+      "known_limitations": "Enforced at case closure (/resolve endpoint); requires primary and secondary supervisors distinct from assigned investigator.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Regulatory Report Generation (goAML 4.0 / FinCEN SAR)",
+      "implementation": "FIURegulatoryService producing schema-validated XML 4.0 dossiers",
+      "verification_level": "VERIFIED_WITH_LIMITATIONS",
+      "evidence": "backend/tests/unit/test_fiu_regulatory_service.py (33 tests passing)",
+      "known_limitations": "Generates exportable electronic dossiers; direct statutory submission to FinCEN BSA E-Filing or FIU portals is NOT implemented.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Webhook Event Dispatching",
+      "implementation": "WebhookService with HMAC-SHA256 signatures, SSRF IP blocking, and exponential backoff",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/unit/test_webhook_gateway.py (16 tests passing)",
+      "known_limitations": "Transport delivery is at-least-once; receiver must implement idempotency using event_id.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Frontend Behavioral Correctness",
+      "implementation": "React 19 + TypeScript SPA with Tailwind CSS, lucide icons, and zero layout shift",
+      "verification_level": "VERIFIED_WITH_LIMITATIONS",
+      "evidence": "364 Vitest tests passing, Playwright E2E suites passing",
+      "known_limitations": "Tested in jsdom, Vitest, and headless Chromium; physical multi-browser matrix across mobile platforms not exhaustively tested.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Whole-System Lifecycle Recovery",
+      "implementation": "Durable SQLite state reconstruction, immutable decision provenance, and 7-dimension reconciliation",
+      "verification_level": "VERIFIED_WITH_LIMITATIONS",
+      "evidence": "backend/tests/integration/test_lifecycle_integrity.py (23/23 tests passing)",
+      "known_limitations": "Tested under local SQLite WAL and in-memory Redis fallback; physical Redis cluster failover and PostgreSQL contention are environment-limited.",
+      "production_claim_allowed": true
+    }
+  ]
+}
