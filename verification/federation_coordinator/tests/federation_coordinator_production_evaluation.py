@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Reliability & Production Engineering Evaluation for Federation Coordinator.
 
 Evaluates:
@@ -8,12 +10,9 @@ Evaluates:
   5. Distinction against Enterprise Orchestration Platforms (Temporal, K8s Operators, Ray)
 """
 
-from __future__ import annotations
-
 from pathlib import Path
-
-import sys
 import json
+import sys
 import psutil
 
 PROJECT_ROOT = str(Path(__file__).resolve().parents[3] / "backend")
