@@ -36,7 +36,7 @@
       "num_accounts": 10000,
       "temporal_split_cutoff": 140.0
     },
-    "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\amlsim"
+    "output_dir": "experiments/amlsim"
   },
   "hardware": {
     "os_platform": "Windows",
@@ -368,14 +368,14 @@
   },
   "calibration": null,
   "artifact_paths": {
-    "results_json": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\amlsim\\results.json",
-    "comparative_baselines_json": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\amlsim\\comparative_baselines.json",
-    "audit_dossier": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\amlsim\\audit_dossier.md",
-    "raw_benchmark": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\benchmarks\\results\\raw\\fraud_benchmark_amlsim.json",
-    "pr_curves": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\amlsim\\plots\\pr_curves.png",
-    "roc_curves": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\amlsim\\plots\\roc_curves.png",
-    "typology_detection": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\amlsim\\plots\\typology_detection.png",
-    "hop_ablation": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\amlsim\\plots\\hop_ablation.png",
-    "consolidated_figure": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\docs\\figures\\benchmark_amlsim_comparison.png"
+    "results_json": "experiments/amlsim/results.json",
+    "comparative_baselines_json": "experiments/amlsim/comparative_baselines.json",
+    "audit_dossier": "experiments/amlsim/audit_dossier.md",
+    "raw_benchmark": "benchmarks/results/raw/fraud_benchmark_amlsim.json",
+    "pr_curves": "experiments/amlsim/plots/pr_curves.png",
+    "roc_curves": "experiments/amlsim/plots/roc_curves.png",
+    "typology_detection": "experiments/amlsim/plots/typology_detection.png",
+    "hop_ablation": "experiments/amlsim/plots/hop_ablation.png",
+    "consolidated_figure": "docs/figures/benchmark_amlsim_comparison.png"
   }
 }

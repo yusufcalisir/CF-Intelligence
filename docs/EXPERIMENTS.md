@@ -81,14 +81,14 @@ experiments/<dataset>/
 
 | Dataset Directory | Benchmark Scope | Core Model / Strategy | Primary Metrics Captured | Status |
 | :--- | :--- | :--- | :--- | :---: |
-| [`experiments/paysim/`](file:///experiments/paysim/) | PaySim Mobile Money Remittance | `PaySimNeuralClassifier` (FedAvg) | PR-AUC: 0.1184, ROC-AUC: 0.8700 | `STANDARDIZED` |
-| [`experiments/ieee_cis/`](file:///experiments/ieee_cis/) | IEEE-CIS Card-Not-Present Fraud | `DeepFraudMLP` (FedAvg/FedProx) | PR-AUC: 0.0691, ROC-AUC: 0.6632 | `STANDARDIZED` |
-| [`experiments/credit_card/`](file:///experiments/credit_card/) | European Credit Card PCA Fraud | `DeepFraudMLP` (FedAvg) | PR-AUC: 0.7750, ROC-AUC: 0.9837 | `STANDARDIZED` |
-| [`experiments/elliptic/`](file:///experiments/elliptic/) | Elliptic Bitcoin Blockchain Graph | `Inductive GraphSAGE (Multi-Seed)` | PR-AUC: 0.3761, ROC-AUC: 0.8325 | `STANDARDIZED` |
-| [`experiments/amlsim/`](file:///experiments/amlsim/) | IBM AMLSim Graph Network | GraphSAGE vs Tabular MLP | PR-AUC: 0.6527, Cycle Rec: 67.4% | `STANDARDIZED` |
-| [`experiments/synthaml/`](file:///experiments/synthaml/) | Spar Nord SynthAML Lookback | `DeepFraudMLP` (FedAvg) | PR-AUC: 0.9985, ROC-AUC: 0.9995 | `STANDARDIZED` |
-| [`experiments/amlnet/`](file:///experiments/amlnet/) | AUSTRAC Rare-Event AMLNet | `DeepFraudMLP` (FedAvg) | PR-AUC: 1.0000, ROC-AUC: 1.0000 | `STANDARDIZED` |
-| [`experiments/cross_bank/`](file:///experiments/cross_bank/) | CFI-CrossBank-01 Consortium | 3-Bank Consortium (FedAvg) | +55.59% Uplift, 836,000 USD Averted | `STANDARDIZED` |
+| [`experiments/paysim/`](../experiments/paysim/) | PaySim Mobile Money Remittance | `PaySimNeuralClassifier` (FedAvg) | PR-AUC: 0.1184, ROC-AUC: 0.8700 | `STANDARDIZED` |
+| [`experiments/ieee_cis/`](../experiments/ieee_cis/) | IEEE-CIS Card-Not-Present Fraud | `DeepFraudMLP` (FedAvg/FedProx) | PR-AUC: 0.0691, ROC-AUC: 0.6632 | `STANDARDIZED` |
+| [`experiments/credit_card/`](../experiments/credit_card/) | European Credit Card PCA Fraud | `DeepFraudMLP` (FedAvg) | PR-AUC: 0.7750, ROC-AUC: 0.9837 | `STANDARDIZED` |
+| [`experiments/elliptic/`](../experiments/elliptic/) | Elliptic Bitcoin Blockchain Graph | `Inductive GraphSAGE (Multi-Seed)` | PR-AUC: 0.3761, ROC-AUC: 0.8325 | `STANDARDIZED` |
+| [`experiments/amlsim/`](../experiments/amlsim/) | IBM AMLSim Graph Network | GraphSAGE vs Tabular MLP | PR-AUC: 0.6527, Cycle Rec: 67.4% | `STANDARDIZED` |
+| [`experiments/synthaml/`](../experiments/synthaml/) | Spar Nord SynthAML Lookback | `DeepFraudMLP` (FedAvg) | PR-AUC: 0.9985, ROC-AUC: 0.9995 | `STANDARDIZED` |
+| [`experiments/amlnet/`](../experiments/amlnet/) | AUSTRAC Rare-Event AMLNet | `DeepFraudMLP` (FedAvg) | PR-AUC: 1.0000, ROC-AUC: 1.0000 | `STANDARDIZED` |
+| [`experiments/cross_bank/`](../experiments/cross_bank/) | CFI-CrossBank-01 Consortium | 3-Bank Consortium (FedAvg) | +55.59% Uplift, 836,000 USD Averted | `STANDARDIZED` |
 
 ### 2.2 Execution Run Directory Topology (`experiments/results/`)
 Dynamic experiment runs initiated via the runner harness create isolated execution snapshots:
@@ -265,5 +265,5 @@ Any frontend component or dashboard consuming `results.json` receives fully type
 ## 7. Verification Test Suites
 
 Artifact standardization, file schemas, report completeness, and verification CLI operations are validated by dedicated automated unit tests:
-- [`backend/tests/unit/test_experiment_artifact_hierarchy.py`](file:///backend/tests/unit/test_experiment_artifact_hierarchy.py): 9 comprehensive unit tests asserting existence and integrity of all 5 artifacts across all 8 datasets (`paysim`, `ieee_cis`, `credit_card`, `elliptic`, `amlsim`, `synthaml`, `amlnet`, `cross_bank`), `config.json` schema, `metrics.csv` headers/rows, `report.md` required sections, `plots/` image validity, and `--verify` CLI exit code (**9 tests, 100% passing**).
+- [`backend/tests/unit/test_experiment_artifact_hierarchy.py`](../backend/tests/unit/test_experiment_artifact_hierarchy.py): 9 comprehensive unit tests asserting existence and integrity of all 5 artifacts across all 8 datasets (`paysim`, `ieee_cis`, `credit_card`, `elliptic`, `amlsim`, `synthaml`, `amlnet`, `cross_bank`), `config.json` schema, `metrics.csv` headers/rows, `report.md` required sections, `plots/` image validity, and `--verify` CLI exit code (**9 tests, 100% passing**).
 

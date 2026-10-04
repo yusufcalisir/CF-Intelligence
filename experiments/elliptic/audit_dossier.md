@@ -61,8 +61,8 @@ This comparison does not establish an empirical causal mechanism for performance
 
 ## 5. Scientific Artifact Traceability
 
-- **Result Payload**: [`results.json`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\experiments\elliptic\results.json)
-- **Comparative Baselines**: [`comparative_baselines.json`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\experiments\elliptic\comparative_baselines.json)
-- **Raw Benchmark**: [`graphsage_elliptic_benchmark.json`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\experiments\elliptic\graphsage_elliptic_benchmark.json)
-- **Consolidated Figure**: [`benchmark_graphsage_elliptic.png`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\experiments\elliptic\plots\benchmark_graphsage_elliptic.png)
+- **Result Payload**: [`results.json`](results.json)
+- **Comparative Baselines**: [`comparative_baselines.json`](comparative_baselines.json)
+- **Raw Benchmark**: [`graphsage_elliptic_benchmark.json`](graphsage_elliptic_benchmark.json)
+- **Consolidated Figure**: [`benchmark_graphsage_elliptic.png`](plots\benchmark_graphsage_elliptic.png)
 

@@ -27,7 +27,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-backend_path = r"c:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\backend"
+backend_path = str(Path(__file__).resolve().parents[3] / "backend")
 if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 

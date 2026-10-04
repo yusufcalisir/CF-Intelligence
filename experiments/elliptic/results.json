@@ -39,7 +39,7 @@
       "checkpoint_criterion": "validation_pr_auc",
       "threshold_criterion": "validation_f1_maximization"
     },
-    "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic"
+    "output_dir": "experiments/elliptic"
   },
   "hardware": {
     "os_platform": "Windows",
@@ -523,15 +523,15 @@
   },
   "calibration": null,
   "artifact_paths": {
-    "results_json": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\results.json",
-    "comparative_baselines": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\comparative_baselines.json",
-    "audit_dossier": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\audit_dossier.md",
-    "benchmark_raw": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\graphsage_elliptic_benchmark.json",
-    "pr_curves": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\plots\\pr_curves.png",
-    "roc_curves": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\plots\\roc_curves.png",
-    "neighborhood_ablation": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\plots\\neighborhood_ablation.png",
-    "temporal_generalization": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\plots\\temporal_generalization.png",
-    "consolidated_figure": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\plots\\benchmark_graphsage_elliptic.png",
-    "docs_figure": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\docs\\figures\\benchmark_graphsage_elliptic.png"
+    "results_json": "experiments/elliptic/results.json",
+    "comparative_baselines": "experiments/elliptic/comparative_baselines.json",
+    "audit_dossier": "experiments/elliptic/audit_dossier.md",
+    "benchmark_raw": "experiments/elliptic/graphsage_elliptic_benchmark.json",
+    "pr_curves": "experiments/elliptic/plots/pr_curves.png",
+    "roc_curves": "experiments/elliptic/plots/roc_curves.png",
+    "neighborhood_ablation": "experiments/elliptic/plots/neighborhood_ablation.png",
+    "temporal_generalization": "experiments/elliptic/plots/temporal_generalization.png",
+    "consolidated_figure": "experiments/elliptic/plots/benchmark_graphsage_elliptic.png",
+    "docs_figure": "docs/figures/benchmark_graphsage_elliptic.png"
   }
 }

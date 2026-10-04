@@ -11,12 +11,14 @@ Verifies mathematical and explainability invariants across hundreds of randomize
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import sys
 import pytest
 import numpy as np
 from hypothesis import given, settings, strategies as st  # type: ignore
 
-PROJECT_ROOT = r"c:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\backend"
+PROJECT_ROOT = str(Path(__file__).resolve().parents[3] / "backend")
 sys.path.insert(0, PROJECT_ROOT)
 
 from app.application.services.explainability_service import ExplainabilityService

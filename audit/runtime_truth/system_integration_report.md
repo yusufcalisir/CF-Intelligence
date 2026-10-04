@@ -17,8 +17,8 @@ $$\text{User Action} \longrightarrow \text{Frontend} \longrightarrow \text{FastA
 Every user-visible metric, chart, model result, and attestation badge has been linked directly to its runtime producer. Injected failures (such as missing models, unavailable Kafka streaming, offline Redis persistence, and absent SGX hardware) trigger transparent, truthful degradations without any synthetic data fabrication.
 
 Key outcomes:
-- **14/14 End-to-End Reality Flows Verified (100% Pass Rate)** via [test_system_integration_reality.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/integration/test_system_integration_reality.py).
-- **7/7 Phase 2 Runtime Truth Invariants Revalidated (100% Pass Rate)** via [test_runtime_truth_invariants.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_runtime_truth_invariants.py).
+- **14/14 End-to-End Reality Flows Verified (100% Pass Rate)** via [test_system_integration_reality.py](../../backend/tests/integration/test_system_integration_reality.py).
+- **7/7 Phase 2 Runtime Truth Invariants Revalidated (100% Pass Rate)** via [test_runtime_truth_invariants.py](../../backend/tests/unit/test_runtime_truth_invariants.py).
 - **356/356 Vitest Frontend Tests Passing (86/86 Suites, 100% Pass Rate)**.
 - **Frontend Production Bundle Built Cleanly** (`tsc -b && vite build` in 10.78s with 0 errors).
 - **8/8 Failure Injections Validated** against the Fail-Truthful Invariant with zero fake success.
@@ -139,7 +139,7 @@ Completed State Saved with is_canonical_reference: false, provenance: LIVE_ORCHE
   ```json
   {"models": [], "total_models": 0}
   ```
-- [ModelRegistryPanel.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/components/dashboard/ModelRegistryPanel.tsx) renders the honest empty state: *"No registered models found in consortium catalog"*.
+- [ModelRegistryPanel.tsx](../../frontend/src/components/dashboard/ModelRegistryPanel.tsx) renders the honest empty state: *"No registered models found in consortium catalog"*.
 - Scoring a sample against a non-existent model ID returns `HTTP 404 Not Found`, with zero fallback probability generation.
 
 ---
@@ -222,14 +222,14 @@ Completed State Saved with is_canonical_reference: false, provenance: LIVE_ORCHE
 
 - `GET /api/v1/dashboard/comparative-baselines` loads from `experiments/elliptic/synthetic/comparative_baselines.json`:
   - Contains explicit `provenance: "CANONICAL_BENCHMARK_REFERENCE"`.
-  - Frontend [ComparativeModelWidget.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/components/dashboard/ComparativeModelWidget.tsx) displays *"Benchmark Reference"*.
+  - Frontend [ComparativeModelWidget.tsx](../../frontend/src/components/dashboard/ComparativeModelWidget.tsx) displays *"Benchmark Reference"*.
   - When the reference file is missing on disk, the endpoint raises `HTTP 503 Service Unavailable`, rejecting any hardcoded fallback.
 
 ---
 
 ## Q. Technical Dossier Verification (Core Flow 9)
 
-- In [TechnicalReportModal.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/components/TechnicalReportModal.tsx):
+- In [TechnicalReportModal.tsx](../../frontend/src/components/TechnicalReportModal.tsx):
   - Downloaded JSON includes `dossier_type: "CANONICAL_BENCHMARK_REFERENCE_DOSSIER"`.
   - Filename includes timestamp and canonical identifier: `cfi_canonical_benchmark_dossier_...json`.
   - Does not masquerade as an ad-hoc unexecuted runtime report.
@@ -244,7 +244,7 @@ Completed State Saved with is_canonical_reference: false, provenance: LIVE_ORCHE
     - `is_hardware_backed`: `False`
     - `driver_mode`: `"SOFTWARE_EMULATION_SANDBOX"`
     - `mrenclave`: SHA-256 sandbox digest
-  - [SecureHardwarePanel.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/components/dashboard/SecureHardwarePanel.tsx) renders:
+  - [SecureHardwarePanel.tsx](../../frontend/src/components/dashboard/SecureHardwarePanel.tsx) renders:
     *"Cryptographic software emulation (MRENCLAVE/MRSIGNER sandbox measurement, zero hardware SGX)."*
 
 ---
@@ -262,7 +262,7 @@ Completed State Saved with is_canonical_reference: false, provenance: LIVE_ORCHE
 
 - Valid utility inputs yield mathematically calculated ROI:
   $$\mathrm{ROI} = \frac{\mathrm{Cost}_{\mathrm{Local}} - \mathrm{Cost}_{\mathrm{FL}}}{\mathrm{Cost}_{\mathrm{FL}}}$$
-- When $\mathrm{Cost}_{\mathrm{FL}} \le 0$ or undefined, [BenchmarkHubPage.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/BenchmarkHubPage.tsx#L144-L146) renders:
+- When $\mathrm{Cost}_{\mathrm{FL}} \le 0$ or undefined, [BenchmarkHubPage.tsx](../../frontend/src/pages/BenchmarkHubPage.tsx#L144-L146) renders:
   `"ROI Multiple: Pending Evaluation"`
 - Literal `'8.4'` fallback string is 100% eliminated from all dynamic calculation paths.
 
@@ -335,13 +335,13 @@ Completed State Saved with is_canonical_reference: false, provenance: LIVE_ORCHE
 
 ## AB. Repairs Applied
 
-- **[backend/app/presentation/routers/simulation.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/simulation.py#L980-L990)**: Added explicit persistence of `is_canonical_reference: False`, `provenance: "LIVE_ORCHESTRATED_RUN"`, `execution_mode: "LIVE_RUNTIME"`, `tee_is_hardware_backed: False`, and `tee_driver_mode: "SOFTWARE_EMULATION_SANDBOX"` into the completed simulation results dictionary.
+- **[backend/app/presentation/routers/simulation.py](../../backend/app/presentation/routers/simulation.py#L980-L990)**: Added explicit persistence of `is_canonical_reference: False`, `provenance: "LIVE_ORCHESTRATED_RUN"`, `execution_mode: "LIVE_RUNTIME"`, `tee_is_hardware_backed: False`, and `tee_driver_mode: "SOFTWARE_EMULATION_SANDBOX"` into the completed simulation results dictionary.
 
 ---
 
 ## AC. Regression Tests Added
 
-- **[backend/tests/integration/test_system_integration_reality.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/integration/test_system_integration_reality.py)**: Created 14 dedicated automated integration tests covering the complete vertical execution lifecycle.
+- **[backend/tests/integration/test_system_integration_reality.py](../../backend/tests/integration/test_system_integration_reality.py)**: Created 14 dedicated automated integration tests covering the complete vertical execution lifecycle.
 
 ---
 

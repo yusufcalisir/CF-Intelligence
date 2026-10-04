@@ -10,7 +10,7 @@ FedProx adds a proximal regularization term to the local objective function to c
 ---
 
 ## 2. Implementation in CF-Intelligence
-- **Location**: [`backend/app/application/services/fl_engine.py`](file:///backend/app/application/services/fl_engine.py)
+- **Location**: [`backend/app/application/services/fl_engine.py`](../../backend/app/application/services/fl_engine.py)
 - **Mathematical Formulation**:
   Bank $k$ optimizes the regularized surrogate objective at round $t$:
 
@@ -41,9 +41,9 @@ FedProx adds a proximal regularization term to the local objective function to c
 ## 5. Non-IID Dirichlet Sweep Empirical Evaluation
 
 The platform evaluates FedProx ($\mu = 0.01$) against FedAvg and SCAFFOLD under varying degrees of Dirichlet label and feature skew $\alpha \in \{0.1, 0.5, 1.0\}$:
-- **Experiment Runner**: [`experiments/ablations/dirichlet_sweep.py`](file:///experiments/ablations/dirichlet_sweep.py)
-- **Empirical Dossier**: [`experiments/ablations/audit_dossier.md`](file:///experiments/ablations/audit_dossier.md)
-- **Publication Figure**: [`docs/figures/benchmark_fl_convergence.png`](file:///docs/figures/benchmark_fl_convergence.png)
+- **Experiment Runner**: [`experiments/ablations/dirichlet_sweep.py`](../../experiments/ablations/dirichlet_sweep.py)
+- **Empirical Dossier**: [`experiments/ablations/audit_dossier.md`](../../experiments/ablations/audit_dossier.md)
+- **Publication Figure**: [`docs/figures/benchmark_fl_convergence.png`](../figures/benchmark_fl_convergence.png)
 
 ### Empirical Results Summary across 10 Federation Rounds
 
@@ -58,6 +58,6 @@ The platform evaluates FedProx ($\mu = 0.01$) against FedAvg and SCAFFOLD under 
 ---
 
 ## 6. Test Suite Verification
-- **Unit Tests**: [`backend/tests/unit/test_fl_engine.py`](file:///backend/tests/unit/test_fl_engine.py)
-- **Dirichlet Sensitivity Tests**: [`backend/tests/unit/test_dirichlet_sweep.py`](file:///backend/tests/unit/test_dirichlet_sweep.py)
-- **Benchmark Runner**: [`benchmarks/runners/run_fl_benchmark.py`](file:///benchmarks/runners/run_fl_benchmark.py)
+- **Unit Tests**: [`backend/tests/unit/test_fl_engine.py`](../../backend/tests/unit/test_fl_engine.py)
+- **Dirichlet Sensitivity Tests**: [`backend/tests/unit/test_dirichlet_sweep.py`](../../backend/tests/unit/test_dirichlet_sweep.py)
+- **Benchmark Runner**: [`benchmarks/runners/run_fl_benchmark.py`](../../benchmarks/runners/run_fl_benchmark.py)

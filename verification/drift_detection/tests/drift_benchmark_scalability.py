@@ -11,6 +11,8 @@ Measures:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import sys
 import time
 import json
@@ -18,7 +20,7 @@ import tracemalloc
 import numpy as np
 import scipy.stats as stats
 
-PROJECT_ROOT = r"c:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\backend"
+PROJECT_ROOT = str(Path(__file__).resolve().parents[3] / "backend")
 sys.path.insert(0, PROJECT_ROOT)
 
 from app.application.services.drift_service import ModelDriftService
@@ -144,7 +146,7 @@ def benchmark_drift():
         }
 
     # Write output to json
-    out_path = r"C:\Users\Yusuf\.gemini\antigravity-ide\brain\a3429c9e-0a37-425b-9a52-3b35832b8a38\scratch\drift_benchmark_results.json"
+    out_path = str(Path(__file__).resolve().parent / "drift_benchmark_results.json")
     with open(out_path, "w") as f:
         json.dump(benchmark_data, f, indent=2)
 

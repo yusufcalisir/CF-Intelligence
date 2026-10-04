@@ -10,13 +10,15 @@ Evaluates:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import sys
 import json
 import torch
 import numpy as np
 import scipy.stats as stats
 
-PROJECT_ROOT = r"c:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\backend"
+PROJECT_ROOT = str(Path(__file__).resolve().parents[3] / "backend")
 sys.path.insert(0, PROJECT_ROOT)
 
 from app.application.services.explainability_service import ExplainabilityService
@@ -166,7 +168,7 @@ def evaluate_explainability_quality():
     }
 
     # Write results to json
-    out_path = r"C:\Users\Yusuf\.gemini\antigravity-ide\brain\a3429c9e-0a37-425b-9a52-3b35832b8a38\scratch\explainability_quality_results.json"
+    out_path = str(Path(__file__).resolve().parent / "explainability_quality_results.json")
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
 

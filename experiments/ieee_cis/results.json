@@ -34,7 +34,7 @@
       "temporal_cutoff_dt": 344408.0,
       "nrows_loaded": 15000
     },
-    "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\ieee_cis"
+    "output_dir": "experiments/ieee_cis"
   },
   "hardware": {
     "os_platform": "Windows",

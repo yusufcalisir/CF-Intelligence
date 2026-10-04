@@ -10,12 +10,14 @@ Evaluates:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import sys
 import json
 import time
 import numpy as np
 
-PROJECT_ROOT = r"c:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\backend"
+PROJECT_ROOT = str(Path(__file__).resolve().parents[3] / "backend")
 sys.path.insert(0, PROJECT_ROOT)
 
 from app.application.services.coordinator_service import CoordinatorService
@@ -110,7 +112,7 @@ def evaluate_distributed_systems():
     ]
 
     # Write results to json
-    out_path = r"C:\Users\Yusuf\.gemini\antigravity-ide\brain\a3429c9e-0a37-425b-9a52-3b35832b8a38\scratch\federation_coordinator_ds_results.json"
+    out_path = str(Path(__file__).resolve().parent / "federation_coordinator_ds_results.json")
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
 

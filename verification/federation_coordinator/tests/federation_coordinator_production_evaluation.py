@@ -10,11 +10,13 @@ Evaluates:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import sys
 import json
 import psutil
 
-PROJECT_ROOT = r"c:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\backend"
+PROJECT_ROOT = str(Path(__file__).resolve().parents[3] / "backend")
 sys.path.insert(0, PROJECT_ROOT)
 
 def evaluate_production_engineering():
@@ -58,8 +60,10 @@ def evaluate_production_engineering():
         ]
     }
 
-    out_path = r"C:\Users\Yusuf\.gemini\antigravity-ide\brain\a3429c9e-0a37-425b-9a52-3b35832b8a38\scratch\federation_coordinator_prod_results.json"
-    with open(out_path, "w") as f:
+    out_dir = Path(__file__).resolve().parent / "results"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "federation_coordinator_prod_results.json"
+    with open(out_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
 
     print("Production Engineering Evaluation Completed Successfully!")

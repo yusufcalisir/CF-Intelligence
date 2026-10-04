@@ -11,8 +11,8 @@ Byzantine Robustness protects federated consortium models against malicious, com
 ---
 
 ## 2. Implementation in CF-Intelligence
-- **Domain Modules**: [`backend/app/domain/byzantine_defense.py`](file:///backend/app/domain/byzantine_defense.py), [`backend/app/domain/attack_injector.py`](file:///backend/app/domain/attack_injector.py), and [`backend/app/domain/spectral_defense.py`](file:///backend/app/domain/spectral_defense.py)
-- **FL Orchestration Engine**: [`backend/app/application/services/fl_engine.py`](file:///backend/app/application/services/fl_engine.py)
+- **Domain Modules**: [`backend/app/domain/byzantine_defense.py`](../../backend/app/domain/byzantine_defense.py), [`backend/app/domain/attack_injector.py`](../../backend/app/domain/attack_injector.py), and [`backend/app/domain/spectral_defense.py`](../../backend/app/domain/spectral_defense.py)
+- **FL Orchestration Engine**: [`backend/app/application/services/fl_engine.py`](../../backend/app/application/services/fl_engine.py)
 
 ### 2.1 Coordinate-wise Trimmed Mean
 For each coordinate $j \in \{1, \dots, d\}$, the coordinator sorts the client updates $\{ \Delta w_{1,j}, \dots, \Delta w_{K,j} \}$, trims the smallest $\beta$ and largest $\beta$ fractions (where $\beta < 0.5$), and computes the mean of the remaining updates:
@@ -77,10 +77,10 @@ Empirically validated on 2,000 holdout transactions across 4 adversarial attack 
 ---
 
 ## 6. Test Suite & Verification Reference
-- **Adversarial Poisoning Suite Runner**: [`experiments/byzantine/run_poisoning_suite.py`](file:///experiments/byzantine/run_poisoning_suite.py)
-- **Attack Injector Domain Module**: [`backend/app/domain/attack_injector.py`](file:///backend/app/domain/attack_injector.py)
-- **Byzantine Domain Engine & Breakdown Analyzer**: [`backend/app/domain/byzantine_defense.py`](file:///backend/app/domain/byzantine_defense.py)
-- **Unit & Branch Coverage Tests**: [`backend/tests/unit/test_byzantine_defense_branches.py`](file:///backend/tests/unit/test_byzantine_defense_branches.py)
-- **Spectral SVD Tests**: [`backend/tests/unit/test_spectral_defense.py`](file:///backend/tests/unit/test_spectral_defense.py)
-- **Interactive Scenarios Attack Test**: [`backend/tests/unit/test_attack_injector.py`](file:///backend/tests/unit/test_attack_injector.py)
-- **Benchmark Raw Results**: [`benchmarks/results/raw/byzantine_breakdown_analysis.json`](file:///benchmarks/results/raw/byzantine_breakdown_analysis.json)
+- **Adversarial Poisoning Suite Runner**: [`experiments/byzantine/run_poisoning_suite.py`](../../experiments/byzantine/run_poisoning_suite.py)
+- **Attack Injector Domain Module**: [`backend/app/domain/attack_injector.py`](../../backend/app/domain/attack_injector.py)
+- **Byzantine Domain Engine & Breakdown Analyzer**: [`backend/app/domain/byzantine_defense.py`](../../backend/app/domain/byzantine_defense.py)
+- **Unit & Branch Coverage Tests**: [`backend/tests/unit/test_byzantine_defense_branches.py`](../../backend/tests/unit/test_byzantine_defense_branches.py)
+- **Spectral SVD Tests**: [`backend/tests/unit/test_spectral_defense.py`](../../backend/tests/unit/test_spectral_defense.py)
+- **Interactive Scenarios Attack Test**: [`backend/tests/unit/test_attack_injector.py`](../../backend/tests/unit/test_attack_injector.py)
+- **Benchmark Raw Results**: [`benchmarks/results/raw/byzantine_breakdown_analysis.json`](../../benchmarks/results/raw/byzantine_breakdown_analysis.json)

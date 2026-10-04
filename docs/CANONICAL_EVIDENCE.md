@@ -4,7 +4,7 @@
 **Effective Commit**: `4cc1ffba0d253a4c336b2d5e267b5b6666c742c1`  
 **Parent Frozen Protocol Commit**: `2f64a02b65caa0b35588ec8c016290d1f2ac6e61`  
 **Governing Standard**: CFI-RECON-2026-v1  
-**Master Machine-Readable Registry**: [`benchmarks/results/canonical_evidence_registry.json`](file:///benchmarks/results/canonical_evidence_registry.json)
+**Master Machine-Readable Registry**: [`benchmarks/results/canonical_evidence_registry.json`](../benchmarks/results/canonical_evidence_registry.json)
 
 ---
 

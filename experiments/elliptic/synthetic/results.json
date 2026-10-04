@@ -37,7 +37,7 @@
       "checkpoint_criterion": "validation_pr_auc",
       "threshold_criterion": "validation_f1_maximization"
     },
-    "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic"
+    "output_dir": "experiments/elliptic/synthetic"
   },
   "hardware": {
     "os_platform": "Windows",
@@ -133,9 +133,9 @@
   },
   "calibration": null,
   "artifact_paths": {
-    "results_json": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic\\results.json",
-    "comparative_baselines": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic\\comparative_baselines.json",
-    "audit_dossier": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic\\audit_dossier.md",
-    "benchmark_raw": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic\\graphsage_elliptic_benchmark.json"
+    "results_json": "experiments/elliptic/synthetic/results.json",
+    "comparative_baselines": "experiments/elliptic/synthetic/comparative_baselines.json",
+    "audit_dossier": "experiments/elliptic/synthetic/audit_dossier.md",
+    "benchmark_raw": "experiments/elliptic/synthetic/graphsage_elliptic_benchmark.json"
   }
 }

@@ -47,9 +47,9 @@ This empirical evaluation measures the resilience and breakdown thresholds of fi
 
 ### 4. Verification Reference
 
-- **Harness Script:** [`experiments/byzantine/run_poisoning_suite.py`](file:///experiments/byzantine/run_poisoning_suite.py)
-- **Raw Metrics:** [`experiments/byzantine/byzantine_results.json`](file:///experiments/byzantine/byzantine_results.json)
-- **Visual Artifact:** [`docs/figures/benchmark_byzantine_resilience.png`](file:///docs/figures/benchmark_byzantine_resilience.png)
-- **Algorithm Specification:** [`docs/algorithms/byzantine_resilience.md`](file:///docs/algorithms/byzantine_resilience.md)
-- **Unit Tests:** [`backend/tests/unit/test_byzantine_defense_branches.py`](file:///backend/tests/unit/test_byzantine_defense_branches.py)
+- **Harness Script:** [`experiments/byzantine/run_poisoning_suite.py`](run_poisoning_suite.py)
+- **Raw Metrics:** [`experiments/byzantine/byzantine_results.json`](byzantine_results.json)
+- **Visual Artifact:** [`docs/figures/benchmark_byzantine_resilience.png`](../../docs/figures/benchmark_byzantine_resilience.png)
+- **Algorithm Specification:** [`docs/algorithms/byzantine_resilience.md`](../../docs/algorithms/byzantine_resilience.md)
+- **Unit Tests:** [`backend/tests/unit/test_byzantine_defense_branches.py`](../../backend/tests/unit/test_byzantine_defense_branches.py)
 

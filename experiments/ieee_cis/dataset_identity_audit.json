@@ -1,8 +1,8 @@
 {
   "timestamp_utc": "2026-10-02T17:33:27.695677+00:00",
   "git_head": "5c16fb8c1ea76255238c7400325cf28ec6c3e293",
-  "transaction_csv_path": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\backend\\storage\\datasets\\ieee_cis\\train_transaction.csv",
-  "identity_csv_path": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\backend\\storage\\datasets\\ieee_cis\\train_identity.csv",
+  "transaction_csv_path": "backend/storage/datasets/ieee_cis/train_transaction.csv",
+  "identity_csv_path": "backend/storage/datasets/ieee_cis/train_identity.csv",
   "transaction_size_bytes": 683351067,
   "identity_size_bytes": 26529680,
   "transaction_sha256": "3a5c83ab6b3cc13dcabe5ffa9f522307fd5f7f7b6e6f6a60c32284ca6283d642",

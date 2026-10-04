@@ -8,7 +8,7 @@ In standard FedAvg, when local data distributions differ ($\nabla F_i(w^*) \neq 
 ---
 
 ## 2. Implementation in CF-Intelligence
-- **Location**: [`backend/app/application/services/fl_engine.py`](file:///backend/app/application/services/fl_engine.py)
+- **Location**: [`backend/app/application/services/fl_engine.py`](../../backend/app/application/services/fl_engine.py)
 - **Control Variates**:
   - Global control variate: $c \in \mathbb{R}^d$
   - Client-specific control variate: $c_k \in \mathbb{R}^d$ for each Bank $k$.
@@ -46,9 +46,9 @@ In standard FedAvg, when local data distributions differ ($\nabla F_i(w^*) \neq 
 ## 5. Non-IID Dirichlet Sweep Empirical Evaluation
 
 The platform evaluates SCAFFOLD against FedAvg and FedProx under varying degrees of Dirichlet label and feature skew $\alpha \in \{0.1, 0.5, 1.0\}$:
-- **Experiment Runner**: [`experiments/ablations/dirichlet_sweep.py`](file:///experiments/ablations/dirichlet_sweep.py)
-- **Empirical Dossier**: [`experiments/ablations/audit_dossier.md`](file:///experiments/ablations/audit_dossier.md)
-- **Publication Figure**: [`docs/figures/benchmark_fl_convergence.png`](file:///docs/figures/benchmark_fl_convergence.png)
+- **Experiment Runner**: [`experiments/ablations/dirichlet_sweep.py`](../../experiments/ablations/dirichlet_sweep.py)
+- **Empirical Dossier**: [`experiments/ablations/audit_dossier.md`](../../experiments/ablations/audit_dossier.md)
+- **Publication Figure**: [`docs/figures/benchmark_fl_convergence.png`](../figures/benchmark_fl_convergence.png)
 
 ### Empirical Results Summary across 10 Federation Rounds
 
@@ -63,6 +63,6 @@ The platform evaluates SCAFFOLD against FedAvg and FedProx under varying degrees
 ---
 
 ## 6. Test Suite Verification
-- **Unit Tests**: [`backend/tests/unit/test_fl_engine.py`](file:///backend/tests/unit/test_fl_engine.py)
-- **Dirichlet Sensitivity Tests**: [`backend/tests/unit/test_dirichlet_sweep.py`](file:///backend/tests/unit/test_dirichlet_sweep.py)
-- **Benchmark Runner**: [`benchmarks/runners/run_fl_benchmark.py`](file:///benchmarks/runners/run_fl_benchmark.py)
+- **Unit Tests**: [`backend/tests/unit/test_fl_engine.py`](../../backend/tests/unit/test_fl_engine.py)
+- **Dirichlet Sensitivity Tests**: [`backend/tests/unit/test_dirichlet_sweep.py`](../../backend/tests/unit/test_dirichlet_sweep.py)
+- **Benchmark Runner**: [`benchmarks/runners/run_fl_benchmark.py`](../../benchmarks/runners/run_fl_benchmark.py)

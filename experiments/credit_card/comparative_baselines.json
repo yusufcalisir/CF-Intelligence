@@ -36,7 +36,7 @@
   },
   "provenance": {
     "dataset_name": "European Credit Card Fraud Detection",
-    "source_uri": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\backend\\storage\\datasets\\creditcard\\creditcard.csv",
+    "source_uri": "backend/storage/datasets/creditcard/creditcard.csv",
     "sha256_hash": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
     "seed": 42,
     "git_commit": "d2eb8bb9b7debf4fb829e6092e191800477bf0a8",

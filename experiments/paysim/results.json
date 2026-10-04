@@ -34,7 +34,7 @@
       "temporal_cutoff_step": 8.0,
       "nrows_loaded": 30000
     },
-    "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\paysim"
+    "output_dir": "experiments/paysim"
   },
   "hardware": {
     "os_platform": "Windows",

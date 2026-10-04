@@ -34,5 +34,5 @@
     "_LEGACY_split_note": "temporal_cutoff_step=8 produced only 3 test fraud examples. Canonical split is stratified random 80/20 (179 test fraud)."
   },
   "canonical_runner": "experiments/paysim/run_paysim_canonical_benchmark.py",
-  "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\paysim"
-}
+  "output_dir": "experiments/paysim"
+}

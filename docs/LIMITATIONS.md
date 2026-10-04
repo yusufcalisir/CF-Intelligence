@@ -58,7 +58,7 @@ In compliance with the Anti-Metric Shopping Protocol, this section explicitly do
 ### 2.1 Negative Result NR-001: Differential Privacy Utility Collapse under Strong Noise ($\sigma \ge 3.0$)
 
 #### Empirical Observation
-In [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](file:///benchmarks/results/raw/dp_privacy_utility_tradeoff.json), evaluating Gaussian DP-SGD noise multipliers $\sigma \in [0.0, 3.0]$ reveals a steep Pareto trade-off between privacy loss ($\epsilon$) and fraud detection power ($\mathrm{PR\text{-}AUC}$):
+In [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](../benchmarks/results/raw/dp_privacy_utility_tradeoff.json), evaluating Gaussian DP-SGD noise multipliers $\sigma \in [0.0, 3.0]$ reveals a steep Pareto trade-off between privacy loss ($\epsilon$) and fraud detection power ($\mathrm{PR\text{-}AUC}$):
 
 | Noise Multiplier ($\sigma$) | RDP Privacy Loss ($\epsilon, \delta=10^{-5}$) | Holdout PR-AUC | Utility Delta ($\Delta \text{PR-AUC}$) | Status & Trade-Off Analysis |
 | :---: | :---: | :---: | :---: | :--- |
@@ -82,7 +82,7 @@ In [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](file:///benchmark
 ### 2.2 Negative Result NR-002: Decentralization & Centralization Performance Gap ($\Delta_{\mathrm{privacy}}$)
 
 #### Empirical Observation
-In [`docs/enterprise_benchmark_report.md`](file:///docs/enterprise_benchmark_report.md) Section 3.2, comparing a theoretically pooled centralized database against the decentralized federated champion shows a persistent performance deficit:
+In [`enterprise_benchmark_report.md`](enterprise_benchmark_report.md) Section 3.2, comparing a theoretically pooled centralized database against the decentralized federated champion shows a persistent performance deficit:
 
 | Evaluation Paradigm | Privacy Perimeter | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Centralization Gap ($\Delta_{\mathrm{privacy}}$) |
 | :--- | :--- | :---: | :---: | :---: | :---: |
@@ -98,7 +98,7 @@ In [`docs/enterprise_benchmark_report.md`](file:///docs/enterprise_benchmark_rep
 ### 2.3 Negative Result NR-003: Deep Neural MLP Vulnerability to Extreme Imbalance on Tabular Data
 
 #### Empirical Observation
-In [`docs/enterprise_benchmark_report.md`](file:///docs/enterprise_benchmark_report.md) Section 3.4 (PaySim benchmark across $30{,}000$ transactions with 0.05% fraud prevalence), deep multi-layer perceptrons without tree-based ensembling or specialized graph topology failed completely:
+In [`enterprise_benchmark_report.md`](enterprise_benchmark_report.md) Section 3.4 (PaySim benchmark across $30{,}000$ transactions with 0.05% fraud prevalence), deep multi-layer perceptrons without tree-based ensembling or specialized graph topology failed completely:
 
 | Model Architecture | Optimization Paradigm | Holdout PR-AUC | Holdout ROC-AUC | Recall @ 0.1% FPR | Verdict |
 | :--- | :--- | :---: | :---: | :---: | :--- |
@@ -134,13 +134,13 @@ In PaySim federated optimization across 10 communication rounds with Dirichlet s
 #### Empirical Observation & Canonical Multi-Round Benchmark
 Evaluated across two complementary benchmark suites:
 
-1. **Canonical Multi-Round 72-Condition Benchmark** ([`benchmarks/results/raw/byzantine_federated_canonical.json`](file:///benchmarks/results/raw/byzantine_federated_canonical.json), Status: `CANONICAL`):
+1. **Canonical Multi-Round 72-Condition Benchmark** ([`benchmarks/results/raw/byzantine_federated_canonical.json`](../benchmarks/results/raw/byzantine_federated_canonical.json), Status: `CANONICAL`):
    - Evaluated on real Credit Card Fraud tabular data partitioned into 12 simulated bank clients under Non-IID Dirichlet distribution ($\alpha = 0.50$, $\min(\text{samples}) = 50$, zero-positive clients permitted, 10 federated rounds, $N=3$ seeds).
    - Under clean baseline conditions ($f=0$), honest FedAvg achieves PR-AUC $0.7179 \pm 0.0207$. Robust aggregators incur a small clean utility penalty or maintain parity: Trimmed Mean ($\beta=0.20$) achieves $0.7177 \pm 0.0183$ ($\Delta = -0.0002$), Coordinate Median achieves $0.7145 \pm 0.0150$ ($\Delta = -0.0034$), Bulyan achieves $0.7161 \pm 0.0205$ ($\Delta = -0.0018$), Multi-Krum achieves $0.7118 \pm 0.0253$ ($\Delta = -0.0061$), and Single Krum achieves $0.6729 \pm 0.0270$ ($\Delta = -0.0450$).
    - Under evaluated scaled sign-inversion attack ($\times -3.0$, $f=2$ Byzantine nodes): FedAvg collapses to $0.5279 \pm 0.3140$ (with Seed 42 catastrophic collapse to $0.1653$), while Trimmed Mean retains $0.7141 \pm 0.0129$ ($99.54\% \pm 4.05\%$ mean retention relative to clean FedAvg) and Multi-Krum retains $0.7061 \pm 0.0341$ ($98.48\% \pm 6.93\%$).
    - Disclosed seed collapses: Single Krum collapsed to $0.0011$ on Seed 456; ALIE-style perturbations collapsed Coordinate Median ($0.2045$) and Bulyan ($0.2220$) on Seed 123.
 
-2. **Historical Single-Seed Prototype (Quarantined)** ([`benchmarks/results/raw/byzantine_benchmark_sign_inversion.json`](file:///benchmarks/results/raw/byzantine_benchmark_sign_inversion.json), Status: `HISTORICAL_QUARANTINED`):
+2. **Historical Single-Seed Prototype (Quarantined)** ([`benchmarks/results/raw/byzantine_benchmark_sign_inversion.json`](../benchmarks/results/raw/byzantine_benchmark_sign_inversion.json), Status: `HISTORICAL_QUARANTINED`):
    - Evaluated an early 10-client prototype on synthetic Gaussian data ($0.7344 / 0.7369 \approx 99.66\% \approx 99.7\%$). Retained strictly for archival traceability:
 
 | Aggregation Method | Clean Non-IID PR-AUC | Adversarial Attack Resilience | Clean Data Efficiency | Clean Penalty ($\Delta$) | Status |

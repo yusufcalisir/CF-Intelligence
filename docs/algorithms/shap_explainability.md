@@ -8,7 +8,7 @@ SHAP (SHapley Additive exPlanations; Lundberg & Lee, 2017) resolves this by comp
 ---
 
 ## 2. Implementation in CF-Intelligence
-- **Location**: [`backend/app/application/services/explainability_service.py`](file:///backend/app/application/services/explainability_service.py)
+- **Location**: [`backend/app/application/services/explainability_service.py`](../../backend/app/application/services/explainability_service.py)
 - **Mathematical Formulation**:
   For an input transaction $x \in \mathbb{R}^p$ with composite model prediction $f(x)$, SHAP attributes an additive score $\phi_i$ to each feature $i \in \{1, \dots, p\}$:
 
@@ -43,10 +43,10 @@ SHAP (SHapley Additive exPlanations; Lundberg & Lee, 2017) resolves this by comp
 ---
 
 ## 5. Test Suite Verification
-- **Mathematical Invariant Tests**: [`backend/tests/unit/test_shap_mathematical_invariants.py`](file:///backend/tests/unit/test_shap_mathematical_invariants.py) (Additivity axiom across 100 real transactions, symmetry, dummy player, reproducibility, and fraud cluster top-3 consistency)
-- **Unit & Hardening Tests**: [`backend/tests/unit/test_explainability_service.py`](file:///backend/tests/unit/test_explainability_service.py), [`backend/tests/unit/test_explainability_hardening.py`](file:///backend/tests/unit/test_explainability_hardening.py)
-- **Latency Benchmark**: [`benchmarks/runners/run_latency_benchmark.py`](file:///benchmarks/runners/run_latency_benchmark.py)
-- **Latency Output**: [`benchmarks/results/raw/latency_concurrency_benchmark.json`](file:///benchmarks/results/raw/latency_concurrency_benchmark.json)
+- **Mathematical Invariant Tests**: [`backend/tests/unit/test_shap_mathematical_invariants.py`](../../backend/tests/unit/test_shap_mathematical_invariants.py) (Additivity axiom across 100 real transactions, symmetry, dummy player, reproducibility, and fraud cluster top-3 consistency)
+- **Unit & Hardening Tests**: [`backend/tests/unit/test_explainability_service.py`](../../backend/tests/unit/test_explainability_service.py), [`backend/tests/unit/test_explainability_hardening.py`](../../backend/tests/unit/test_explainability_hardening.py)
+- **Latency Benchmark**: [`benchmarks/runners/run_latency_benchmark.py`](../../benchmarks/runners/run_latency_benchmark.py)
+- **Latency Output**: [`benchmarks/results/raw/latency_concurrency_benchmark.json`](../../benchmarks/results/raw/latency_concurrency_benchmark.json)
 
 ---
 
@@ -57,9 +57,9 @@ While SHAP provides local feature attribution for what caused an elevated risk s
 
 In financial domains, naive counterfactual algorithms (such as unconstrained gradient descent or nearest-neighbor perturbation) produce invalid or non-actionable suggestions—e.g., suggesting an account change its opening date, altering historical SAR filings, or setting transaction amounts to negative values. The CF-Intelligence Counterfactual Engine resolves this by enforcing strict domain boundary guardrails, immutable attribute locks, and live model re-inference verification.
 
-- **Location**: [`backend/app/application/services/counterfactual_service.py`](file:///backend/app/application/services/counterfactual_service.py)
-- **Integration**: [`backend/app/application/services/explainability_service.py`](file:///backend/app/application/services/explainability_service.py)
-- **Frontend Explorer**: [`frontend/src/components/cases/CounterfactualExplorer.tsx`](file:///frontend/src/components/cases/CounterfactualExplorer.tsx)
+- **Location**: [`backend/app/application/services/counterfactual_service.py`](../../backend/app/application/services/counterfactual_service.py)
+- **Integration**: [`backend/app/application/services/explainability_service.py`](../../backend/app/application/services/explainability_service.py)
+- **Frontend Explorer**: [`frontend/src/components/cases/CounterfactualExplorer.tsx`](../../frontend/src/components/cases/CounterfactualExplorer.tsx)
 
 ### 6.2 Mathematical Formulation & Sparsity Optimization
 Given an original transaction feature vector $x \in \mathcal{X} \subset \mathbb{R}^p$, original risk score $S(x) \in [0.0, 1.0]$, and target clearance threshold $\tau^* < S(x)$ (typically $\tau^* = 0.50$ for `ALLOW` or $\tau^* = 0.60$ for `REQUIRE_MFA`), the counterfactual optimization problem is formulated as finding a counterfactual vector $x^* \in \mathcal{X}$ satisfying:
@@ -109,7 +109,7 @@ For mutable attributes, values must fall within strictly defined real-world bank
 | `device_type` | Categorical Allowed Set | Approved channels (`mobile_app`, `web_browser`, `pos_terminal`, `atm`) |
 
 ### 6.5 Live Model Re-Inference Verification
-To eliminate false confidence from static heuristics, every counterfactual recommendation undergoes live forward-pass evaluation through the active [`RiskScoringEngine`](file:///backend/app/application/services/risk_scoring_engine.py). A counterfactual is certified only when:
+To eliminate false confidence from static heuristics, every counterfactual recommendation undergoes live forward-pass evaluation through the active [`RiskScoringEngine`](../../backend/app/application/services/risk_scoring_engine.py). A counterfactual is certified only when:
 
 1. **Monotonic Risk Reduction**: $S(x') < S(x)$ (the risk score strictly decreases).
 2. **Threshold Satisfaction**: $S(x') \le \tau^*$ (the risk score reaches or drops below target clearance).
@@ -117,7 +117,7 @@ To eliminate false confidence from static heuristics, every counterfactual recom
 4. **Feasibility Validation**: `validate_counterfactual_transition(x, x') == True`.
 
 ### 6.6 Verification Test Suites
-- **Constraint & Boundary Tests**: [`backend/tests/unit/test_counterfactual_constraints.py`](file:///backend/tests/unit/test_counterfactual_constraints.py) (27 tests covering immutable attribute enforcement, domain feasibility bounds, invalid category rejection, re-inference prediction flips, and $L_0$ sparsity verification)
-- **Integration Tests**: [`backend/tests/unit/test_counterfactuals.py`](file:///backend/tests/unit/test_counterfactuals.py) (6 tests verifying service-level orchestration, backward compatibility, and error handling)
-- **Frontend Component Tests**: [`frontend/src/components/cases/__tests__/CounterfactualExplorer.test.tsx`](file:///frontend/src/components/cases/__tests__/CounterfactualExplorer.test.tsx) (4 Vitest tests covering interactive recourse exploration, slider bounds, locked immutable fields, and re-inference telemetry)
+- **Constraint & Boundary Tests**: [`backend/tests/unit/test_counterfactual_constraints.py`](../../backend/tests/unit/test_counterfactual_constraints.py) (27 tests covering immutable attribute enforcement, domain feasibility bounds, invalid category rejection, re-inference prediction flips, and $L_0$ sparsity verification)
+- **Integration Tests**: [`backend/tests/unit/test_counterfactuals.py`](../../backend/tests/unit/test_counterfactuals.py) (6 tests verifying service-level orchestration, backward compatibility, and error handling)
+- **Frontend Component Tests**: [`frontend/src/components/cases/__tests__/CounterfactualExplorer.test.tsx`](../../frontend/src/components/cases/__tests__/CounterfactualExplorer.test.tsx) (4 Vitest tests covering interactive recourse exploration, slider bounds, locked immutable fields, and re-inference telemetry)
 

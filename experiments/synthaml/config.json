@@ -29,5 +29,5 @@
     "alpha": null,
     "fedprox_mu": 0.01
   },
-  "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\synthaml"
+  "output_dir": "experiments/synthaml"
 }

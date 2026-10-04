@@ -29,5 +29,5 @@
     "split_timestep": 34,
     "bidirectional_flow": true
   },
-  "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic"
+  "output_dir": "experiments/elliptic"
 }

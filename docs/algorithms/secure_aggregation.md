@@ -12,7 +12,7 @@ while remaining cryptographically blinded to any individual bank's contribution 
 ---
 
 ## 2. Implementation in CF-Intelligence
-- **Location**: [`backend/app/infrastructure/security/p2p_secagg_driver.py`](file:///backend/app/infrastructure/security/p2p_secagg_driver.py)
+- **Location**: [`backend/app/infrastructure/security/p2p_secagg_driver.py`](../../backend/app/infrastructure/security/p2p_secagg_driver.py)
 - **Key Exchange**: X25519 (Curve25519 Diffie-Hellman key agreement over $\mathbb{F}_{2^{255}-19}$).
 - **Pairwise Zero-Sum Masking**:
   For every pair of active banks $(i, j)$ with $i < j$:
@@ -53,16 +53,16 @@ $$\sum_{i=1}^K \widetilde{\Delta w}_i = \sum_{i=1}^K \Delta w_i + \underbrace{\s
 
 ## 5. Test Suite Verification & Scientific Proofs
 - **Scientific Verification Suite (53 Passing Tests)**:
-  - [`verification/secure_aggregation/tests/test_secagg_correctness.py`](file:///verification/secure_aggregation/tests/test_secagg_correctness.py): 27 mathematical tests proving exact pairwise mask cancellation $\sum_{u \in U} \mathbf{m}_u \equiv \mathbf{0} \pmod{2^{32}}$ for $N \in \{2, 3, 5, 8\}$ and dimensions $d \in \{1, 16, 256, 1024, 20000\}$, with floating-point tolerance $\le 10^{-6}$ against unblinded model updates.
-  - [`verification/secure_aggregation/tests/test_zero_server_knowledge.py`](file:///verification/secure_aggregation/tests/test_zero_server_knowledge.py): 7 statistical and cryptographic tests verifying Pearson correlation $|r(w, y)| < 0.05$ (zero correlation), Shannon entropy $H(y) \ge 31.95\text{ bits}$, $N-2$ non-collusion protection, Shamir $(t, n)$ dropout privacy, and round isolation.
-  - [`verification/secure_aggregation/tests/test_secagg_hypothesis.py`](file:///verification/secure_aggregation/tests/test_secagg_hypothesis.py): 6 Hypothesis property-based tests verifying unweighted and weighted zero-sum invariants.
-  - [`verification/secure_aggregation/tests/test_secagg_robustness.py`](file:///verification/secure_aggregation/tests/test_secagg_robustness.py): 12 failure injection and protocol stress scenarios.
-  - [`verification/secure_aggregation/tests/test_fhe_homomorphic_sum.py`](file:///verification/secure_aggregation/tests/test_fhe_homomorphic_sum.py): TenSEAL CKKS homomorphic linearity verification.
+  - [`verification/secure_aggregation/tests/test_secagg_correctness.py`](../../verification/secure_aggregation/tests/test_secagg_correctness.py): 27 mathematical tests proving exact pairwise mask cancellation $\sum_{u \in U} \mathbf{m}_u \equiv \mathbf{0} \pmod{2^{32}}$ for $N \in \{2, 3, 5, 8\}$ and dimensions $d \in \{1, 16, 256, 1024, 20000\}$, with floating-point tolerance $\le 10^{-6}$ against unblinded model updates.
+  - [`verification/secure_aggregation/tests/test_zero_server_knowledge.py`](../../verification/secure_aggregation/tests/test_zero_server_knowledge.py): 7 statistical and cryptographic tests verifying Pearson correlation $|r(w, y)| < 0.05$ (zero correlation), Shannon entropy $H(y) \ge 31.95\text{ bits}$, $N-2$ non-collusion protection, Shamir $(t, n)$ dropout privacy, and round isolation.
+  - [`verification/secure_aggregation/tests/test_secagg_hypothesis.py`](../../verification/secure_aggregation/tests/test_secagg_hypothesis.py): 6 Hypothesis property-based tests verifying unweighted and weighted zero-sum invariants.
+  - [`verification/secure_aggregation/tests/test_secagg_robustness.py`](../../verification/secure_aggregation/tests/test_secagg_robustness.py): 12 failure injection and protocol stress scenarios.
+  - [`verification/secure_aggregation/tests/test_fhe_homomorphic_sum.py`](../../verification/secure_aggregation/tests/test_fhe_homomorphic_sum.py): TenSEAL CKKS homomorphic linearity verification.
 - **Unit & Integration Tests**:
-  - [`backend/tests/unit/test_p2p_secagg_driver.py`](file:///backend/tests/unit/test_p2p_secagg_driver.py): 16 unit tests covering Curve25519 ECDH key exchange, HMAC bundle signing, PRNG counter expansion, and modular arithmetic.
-  - [`backend/tests/unit/test_p2p_secagg_dropout_recovery.py`](file:///backend/tests/unit/test_p2p_secagg_dropout_recovery.py): Dropout reconstruction using Shamir $(t, n)$ shares.
-  - [`backend/tests/unit/test_shamir_engine.py`](file:///backend/tests/unit/test_shamir_engine.py): Polynomial secret sharing primitives over Galois fields.
-  - [`backend/tests/unit/test_compression_engine.py`](file:///backend/tests/unit/test_compression_engine.py): 22 unit tests verifying wire transfer measurements, Top-K gradient sparsification, FP16/INT8 quantization, and SecAgg protocol overhead bounds.
+  - [`backend/tests/unit/test_p2p_secagg_driver.py`](../../backend/tests/unit/test_p2p_secagg_driver.py): 16 unit tests covering Curve25519 ECDH key exchange, HMAC bundle signing, PRNG counter expansion, and modular arithmetic.
+  - [`backend/tests/unit/test_p2p_secagg_dropout_recovery.py`](../../backend/tests/unit/test_p2p_secagg_dropout_recovery.py): Dropout reconstruction using Shamir $(t, n)$ shares.
+  - [`backend/tests/unit/test_shamir_engine.py`](../../backend/tests/unit/test_shamir_engine.py): Polynomial secret sharing primitives over Galois fields.
+  - [`backend/tests/unit/test_compression_engine.py`](../../backend/tests/unit/test_compression_engine.py): 22 unit tests verifying wire transfer measurements, Top-K gradient sparsification, FP16/INT8 quantization, and SecAgg protocol overhead bounds.
 
 ---
 
@@ -102,4 +102,4 @@ $$\mathrm{Payload}_{\mathrm{R3}} = K(K - 1) \cdot 32 \quad (\text{bytes})$$
 | `SCAFFOLD` | 63,008 B | **0.3004 MB** | **2.00×** | Dual parameter + control variate exchange |
 | `TENSEAL_CKKS` | 330,792 B | **1.5773 MB** | **10.50×** | Fully homomorphic ciphertext expansion ($10.5\times$ bandwidth) |
 
-The complete empirical benchmark analysis and 4-panel bandwidth visualization figure are documented in [`docs/enterprise_benchmark_report.md#24-federated-communication-cost--bandwidth-profiling-benchmark`](file:///docs/enterprise_benchmark_report.md) and [`docs/figures/benchmark_communication.png`](file:///docs/figures/benchmark_communication.png).
+The complete empirical benchmark analysis and 4-panel bandwidth visualization figure are documented in [`docs/enterprise_benchmark_report.md#24-federated-communication-cost--bandwidth-profiling-benchmark`](../enterprise_benchmark_report.md) and [`docs/figures/benchmark_communication.png`](../figures/benchmark_communication.png).

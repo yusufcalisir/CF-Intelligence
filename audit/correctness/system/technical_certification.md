@@ -47,7 +47,7 @@ Certification was conducted by synthesizing results across three successive veri
 
 ## 4. Master Evidence Inventory
 
-Technical evidence within the repository is classified into nine mutually exclusive tiers ([`audit/correctness/system/evidence_inventory.json`](file:///audit/correctness/system/evidence_inventory.json)):
+Technical evidence within the repository is classified into nine mutually exclusive tiers ([`evidence_inventory.json`](evidence_inventory.json)):
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -82,7 +82,7 @@ Technical evidence within the repository is classified into nine mutually exclus
 
 ## 5. Verified Capability Certification Matrix
 
-Detailed in [`audit/correctness/system/verified_capabilities.json`](file:///audit/correctness/system/verified_capabilities.json):
+Detailed in [`verified_capabilities.json`](verified_capabilities.json):
 
 | Subsystem / Capability | Implementation Component | Verification Level | Test Evidence | Claim Boundary |
 | :--- | :--- | :--- | :--- | :--- |
@@ -116,7 +116,7 @@ Detailed in [`audit/correctness/system/verified_capabilities.json`](file:///audi
 
 ## 6. Scientific Benchmark Baseline & Evidence Reconciliation
 
-All benchmark numbers reported across documentation are strictly reconciled with Level 1 raw execution JSON files in [`benchmarks/results/raw/`](file:///benchmarks/results/raw/):
+All benchmark numbers reported across documentation are strictly reconciled with Level 1 raw execution JSON files in [`benchmarks/results/raw/`](../../../benchmarks/results/raw/):
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -219,7 +219,7 @@ All benchmark numbers reported across documentation are strictly reconciled with
 
 ## 13. Limitations Register Summary
 
-Derived from [`audit/correctness/system/known_limitations.json`](file:///audit/correctness/system/known_limitations.json):
+Derived from [`known_limitations.json`](known_limitations.json):
 
 1. **Physical Redis Cluster Failover:** Environment limited. Verified locally via thread-safe in-memory fallback.
 2. **Physical PostgreSQL Contention:** Environment limited. Verified locally via SQLite WAL and optimistic CAS.

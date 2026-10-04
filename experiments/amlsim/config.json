@@ -31,5 +31,5 @@
     "num_accounts": 10000,
     "temporal_split_cutoff": 140.0
   },
-  "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\amlsim"
+  "output_dir": "experiments/amlsim"
 }

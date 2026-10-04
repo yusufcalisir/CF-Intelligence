@@ -31,5 +31,5 @@
     "pos_weight": 25.0,
     "nrows_loaded": null
   },
-  "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\credit_card"
+  "output_dir": "experiments/credit_card"
 }

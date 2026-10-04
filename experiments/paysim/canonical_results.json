@@ -6,7 +6,7 @@
     "name": "PaySim Mobile Money Fraud",
     "dataset_type": "externally_simulated",
     "source": "real_csv_systematic_10th",
-    "csv_path": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\backend\\storage\\datasets\\paysim\\PS_20174392719_1491204439457_log.csv",
+    "csv_path": "backend/storage/datasets/paysim/PS_20174392719_1491204439457_log.csv",
     "sha256": "16910f90577b0d981bf8ff289714510bb89bc71bff7d3f220f024e287e4eea6b",
     "sampling_strategy": "systematic every 10th row",
     "sample_every_nth": 10,
