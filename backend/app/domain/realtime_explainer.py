@@ -33,11 +33,51 @@ _local_cache_lock = threading.RLock()
 _MAX_LOCAL_CACHE_SIZE = 1000
 
 
-def _build_cache_key(transaction_id: str, tenant_id: str | None = None) -> str:
-    """Build tenant-isolated cache key for realtime explanation results."""
-    if tenant_id:
-        return f"cfi:shap:{tenant_id}:{transaction_id}"
-    return f"cfi:shap:{transaction_id}"
+def _compute_feature_fingerprint(
+    feature_vector: dict[str, Any] | list[float] | None = None,
+) -> str | None:
+    """Compute a deterministic hash of the input feature vector to prevent stale cache reuse."""
+    if feature_vector is None:
+        return None
+    import hashlib
+
+    hasher = hashlib.sha256()
+    if isinstance(feature_vector, dict):
+        normalized = {k: v for k, v in sorted(feature_vector.items())}
+        hasher.update(json.dumps(normalized, sort_keys=True, default=str).encode("utf-8"))
+    elif isinstance(feature_vector, (list, tuple)):
+        hasher.update(json.dumps([float(x) for x in feature_vector]).encode("utf-8"))
+    else:
+        hasher.update(str(feature_vector).encode("utf-8"))
+    return hasher.hexdigest()[:12]
+
+
+def _build_cache_key(
+    transaction_id: str,
+    tenant_id: str | None = None,
+    feature_fingerprint: str | None = None,
+    model_version: str | None = None,
+    as_of: Any = None,
+) -> str:
+    """Build multi-dimensional cache key for realtime explanation results.
+
+    Enforces that cached results cannot collide across:
+    - Tenants (tenant_id)
+    - Transactions (transaction_id)
+    - Model artifacts/versions (model_version)
+    - Enriched/online feature vector contents (feature_fingerprint)
+    - Historical query snapshots (as_of)
+    """
+    prefix = f"cfi:shap:{tenant_id}" if tenant_id else "cfi:shap"
+    key = f"{prefix}:{transaction_id}"
+    if model_version:
+        key += f":m_{model_version}"
+    if as_of:
+        as_of_str = as_of.isoformat() if hasattr(as_of, "isoformat") else str(as_of)
+        key += f":t_{as_of_str}"
+    if feature_fingerprint:
+        key += f":f_{feature_fingerprint}"
+    return key
 
 
 def _put_local_cache(key: str, value: str) -> None:
@@ -62,16 +102,26 @@ def invalidate_realtime_cache(transaction_id: str | None = None, tenant_id: str 
         if transaction_id is None:
             _local_shap_cache.clear()
         else:
-            k = _build_cache_key(transaction_id, tenant_id)
-            _local_shap_cache.pop(k, None)
-            _local_shap_cache.pop(f"cfi:shap:{transaction_id}", None)
+            prefix_tenant = f"cfi:shap:{tenant_id}:{transaction_id}" if tenant_id else None
+            prefix_global = f"cfi:shap:{transaction_id}"
+            keys_to_remove = [
+                k
+                for k in _local_shap_cache
+                if (prefix_tenant and (k == prefix_tenant or k.startswith(f"{prefix_tenant}:")))
+                or k == prefix_global
+                or k.startswith(f"{prefix_global}:")
+            ]
+            for k in keys_to_remove:
+                _local_shap_cache.pop(k, None)
 
     try:
         client = get_redis_client()
         if client and transaction_id:
-            k = _build_cache_key(transaction_id, tenant_id)
-            client.delete(k)
-            client.delete(f"cfi:shap:{transaction_id}")
+            patterns = [f"cfi:shap:*:{transaction_id}*", f"cfi:shap:{transaction_id}*"]
+            for pat in patterns:
+                matched_keys = client.keys(pat)
+                if matched_keys:
+                    client.delete(*matched_keys)
     except Exception as exc:
         logger.debug("Redis cache invalidation error: %s", exc)
 
@@ -154,6 +204,8 @@ class FastInferenceExplainer:
         feature_vector: dict[str, Any] | list[float],
         webhook_url: str | None = None,
         tenant_id: str | None = None,
+        model_version: str | None = None,
+        as_of: Any = None,
     ) -> dict[str, Any]:
         """Calculates fast heuristic feature attributions asynchronously, caches result in Redis (300s TTL), and triggers webhook."""
         if isinstance(feature_vector, dict):
@@ -179,7 +231,14 @@ class FastInferenceExplainer:
             "shap_values": shap_values,
         }
 
-        redis_key = _build_cache_key(transaction_id, tenant_id)
+        feature_fp = _compute_feature_fingerprint(feature_vector)
+        redis_key = _build_cache_key(
+            transaction_id,
+            tenant_id=tenant_id,
+            feature_fingerprint=feature_fp,
+            model_version=model_version,
+            as_of=as_of,
+        )
         serialized = json.dumps(res)
         _put_local_cache(redis_key, serialized)
 
@@ -219,9 +278,18 @@ class FastInferenceExplainer:
         feature_vector: dict[str, Any] | list[float],
         webhook_url: str | None = None,
         tenant_id: str | None = None,
+        model_version: str | None = None,
+        as_of: Any = None,
     ) -> dict[str, Any]:
         """Asynchronously requests fast heuristic explanation, checking Redis cache first for sub-millisecond hit."""
-        redis_key = _build_cache_key(transaction_id, tenant_id)
+        feature_fp = _compute_feature_fingerprint(feature_vector)
+        redis_key = _build_cache_key(
+            transaction_id,
+            tenant_id=tenant_id,
+            feature_fingerprint=feature_fp,
+            model_version=model_version,
+            as_of=as_of,
+        )
 
         # 1. Fast Path: In-memory LRU cache hit
         cached_local = _get_local_cache(redis_key)
@@ -256,7 +324,14 @@ class FastInferenceExplainer:
         logger.info(
             "Fast explanation cache MISS for transaction '%s'. Enqueueing async computation...", transaction_id
         )
-        self.compute_shap(transaction_id, feature_vector, webhook_url=webhook_url, tenant_id=tenant_id)
+        self.compute_shap(
+            transaction_id,
+            feature_vector,
+            webhook_url=webhook_url,
+            tenant_id=tenant_id,
+            model_version=model_version,
+            as_of=as_of,
+        )
 
         return {
             "job_id": job_id,

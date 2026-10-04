@@ -330,8 +330,16 @@ class ExplainabilityService:
                     baseline[:, 8] = 0.0
                     baseline[:, 9] = np.linspace(0.20, 1.0, 30)
 
+                import hashlib
+
+                from app.application.services.data_generator import FEATURE_NAMES
+
+                baseline_bytes = np.ascontiguousarray(baseline).tobytes()
+                baseline_fp = hashlib.sha256(baseline_bytes).hexdigest()[:16]
+                model_key = getattr(model, "version", None) or getattr(model, "model_id", None) or id(model)
+
                 with self._explainer_lock:
-                    cache_key = (id(model), baseline.shape[0])
+                    cache_key = (model_key, id(model), tuple(FEATURE_NAMES), baseline.shape, baseline_fp)
                     explainer = self._explainer_cache.get(cache_key)
                     if explainer is None:
                         explainer = shap.KernelExplainer(predict_fn, baseline)
@@ -446,12 +454,15 @@ class ExplainabilityService:
         txn_dict: dict,
         model: Any = None,
         background_data: np.ndarray | None = None,
+        nsamples: int = 100,
     ) -> list[dict[str, Any]]:
         """Compute SHAP values for a single transaction using the trained global model.
 
         If no model is trained yet, falls back to an analytical local explanation.
         """
-        results = self.compute_batch_shap_values([txn_dict], model=model, background_data=background_data)
+        results = self.compute_batch_shap_values(
+            [txn_dict], model=model, background_data=background_data, nsamples=nsamples
+        )
         return results[0] if results else []
 
     def compute_lime_explanation(
@@ -669,6 +680,11 @@ class ExplainabilityService:
             f"LIME local surrogate explanation (fidelity R²={fidelity_r2:.3f}, kernel width={sigma:.2f}): "
             f"{top_summary} Local linear model intercept: {intercept:.3f}."
         )
+        if fidelity_r2 < 0.50:
+            explanation_text += (
+                " [CAUTION: Low surrogate fidelity; local linear approximation explains "
+                f"only {fidelity_r2 * 100:.1f}% of local model variance; interpret attributions cautiously.]"
+            )
 
         return LIMEExplanationReport(
             alert_id=alert.id if alert else None,
@@ -784,11 +800,14 @@ class ExplainabilityService:
         node_id: str,
         as_of: datetime | None = None,
     ) -> GNNExplanationReport:
-        """Compute GNNExplainer graph attribution over entity neighborhood.
+        """Compute topological heuristic graph attribution over 2-hop entity neighborhood.
 
         Highlights top-contributing subgraphs, edge types, and neighbor linkages
-        that drove GraphSAGE embedding classification.
-        Binds to graph state as of historical timestamp to prevent future-edge leakage.
+        within the 2-hop topological risk neighborhood.
+        Binds to graph state as of historical timestamp enforcing Guarantee A (event-time
+        cutoff isolation: edges with event_time > as_of are strictly excluded).
+        Note: This is a topological neighborhood heuristic over graph structure, not a
+        gradient-based GNNExplainer optimization over internal GraphSAGE model weights.
         """
         from app.application.services.graph_engine import GraphEngine
 
@@ -838,7 +857,7 @@ class ExplainabilityService:
         top_driver = contributions[0] if contributions else None
         driver_text = (
             f"Primary GNN Driver: {top_driver.relationship_type.upper().replace('_', ' ')} edge with {top_driver.target[:12]} "
-            f"contributed {top_driver.contribution_percentage}% to the GraphSAGE risk embedding."
+            f"contributed {top_driver.contribution_percentage}% to the 2-hop topological risk subgraph."
             if top_driver
             else "Primary GNN Driver: Isolated entity with 0 graph neighbors; risk driven purely by local transaction features."
         )

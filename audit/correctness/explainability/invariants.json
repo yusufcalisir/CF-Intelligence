@@ -13,8 +13,8 @@
       "id": "XAI-INV-02",
       "description": "The explainer must use the same model parameters/version as the prediction being explained.",
       "importance": "CRITICAL",
-      "test": "test_model_version_binding_and_hotswapping",
-      "evidence": "Explainer cache is keyed by (id(model), baseline_len); hot-swapping creates new explainer instances.",
+      "test": "test_model_version_binding_and_hotswapping, test_explanation_cache_separated_by_model_version",
+      "evidence": "Explainer cache is keyed by (model_key, id(model), tuple(FEATURE_NAMES), baseline.shape, baseline_fp); hot-swapping creates new explainer instances.",
       "status": "REMEDIATED_AND_VERIFIED"
     },
     {
@@ -37,8 +37,8 @@
       "id": "XAI-INV-05",
       "description": "Attribution index i must correspond to the feature occupying model input position i.",
       "importance": "HIGH",
-      "test": "test_feature_order_and_naming_fidelity",
-      "evidence": "SHAP_FEATURE_NAMES aligns 100% with FEATURE_NAMES in data_generator.",
+      "test": "test_feature_order_and_naming_fidelity, test_explainer_cache_feature_schema_binding",
+      "evidence": "SHAP_FEATURE_NAMES aligns 100% with FEATURE_NAMES in data_generator, and tuple(FEATURE_NAMES) is bound into explainer cache key.",
       "status": "VERIFIED"
     },
     {
@@ -51,26 +51,26 @@
     },
     {
       "id": "XAI-INV-07",
-      "description": "Explanation semantics must explicitly correspond to the quantity actually explained (probability in [0, 1]).",
+      "description": "Explanation semantics must explicitly correspond to the quantity actually explained (positive-class fraud probability output in [0, 1]).",
       "importance": "HIGH",
-      "test": "test_shapley_local_additivity_oracle",
-      "evidence": "predict_fn returns model probabilities via final sigmoid; base_value and model_output are in [0, 1].",
+      "test": "test_shapley_local_additivity_oracle, test_shap_predict_fn_matches_serving_prediction",
+      "evidence": "predict_fn returns sigmoid probability scores in [0, 1], matching direct model inference to < 1e-6 numerical tolerance.",
       "status": "VERIFIED"
     },
     {
       "id": "XAI-INV-08",
       "description": "Expected/reference/baseline values must correspond to the explainer and output space actually used.",
       "importance": "HIGH",
-      "test": "test_shapley_local_additivity_oracle",
-      "evidence": "explainer.expected_value evaluated over baseline population in probability space.",
+      "test": "test_shapley_local_additivity_oracle, test_explainer_cache_distinguishes_equal_size_different_backgrounds",
+      "evidence": "explainer.expected_value evaluated over baseline population in probability space; baseline content fingerprint prevents stale baseline collision.",
       "status": "VERIFIED"
     },
     {
       "id": "XAI-INV-09",
       "description": "Attribution decomposition must locally reconstruct the model output: f(x) == E[f(x)] + sum(phi_i).",
       "importance": "CRITICAL",
-      "test": "test_shapley_local_additivity_oracle, test_shap_efficiency_axiom_mathematical_precision",
-      "evidence": "abs((base_value + sum_contributions) - model_output) < 1e-3 verified across batches.",
+      "test": "test_shapley_local_additivity_oracle, test_shap_additivity_distribution_statistics",
+      "evidence": "Measured across 10 distinct samples with nsamples=100: max absolute reconstruction error = 3.44e-4, mean error = 1.55e-4.",
       "status": "VERIFIED"
     },
     {
@@ -93,24 +93,24 @@
       "id": "XAI-INV-12",
       "description": "Heuristic/approximate explanations must not be represented as exact SHAP/model attribution.",
       "importance": "CRITICAL",
-      "test": "test_fast_inference_explainer_semantics_and_cache_isolation",
-      "evidence": "FastInferenceExplainer reports method=fast_heuristic, source=FAST_HEURISTIC_COMPUTED; fallback reports fallback_heuristic.",
+      "test": "test_fast_inference_explainer_semantics_and_cache_isolation, test_fallback_heuristic_identity_preserved_end_to_end",
+      "evidence": "FastInferenceExplainer reports method=fast_heuristic; fallback reports fallback_heuristic; UI renders amber FALLBACK HEURISTIC badge.",
       "status": "REMEDIATED_AND_VERIFIED"
     },
     {
       "id": "XAI-INV-13",
-      "description": "Cached explanations must be keyed by every state dimension necessary (model, baseline, tenant).",
+      "description": "Cached explanations must be keyed by every state dimension necessary (tenant, transaction_id, model, as_of, feature fingerprint, baseline).",
       "importance": "HIGH",
-      "test": "test_fast_inference_explainer_semantics_and_cache_isolation",
-      "evidence": "Realtime cache keys use cfi:shap:{tenant_id}:{transaction_id}; KernelExplainer cache uses (id(model), baseline_len).",
+      "test": "test_explanation_cache_separated_by_model_version, test_explanation_cache_separated_by_feature_state, test_explainer_cache_distinguishes_equal_size_different_backgrounds",
+      "evidence": "Realtime cache keys use cfi:shap:{tenant_id}:{transaction_id}:m_{m}:t_{t}:f_{f}; KernelExplainer cache uses (model_key, id(model), tuple(FEATURE_NAMES), baseline.shape, baseline_fp).",
       "status": "REMEDIATED_AND_VERIFIED"
     },
     {
       "id": "XAI-INV-14",
       "description": "Explanation failure must not silently produce fabricated reason codes or successful-looking explanations.",
       "importance": "CRITICAL",
-      "test": "test_fail_closed_on_non_finite_numeric_inputs",
-      "evidence": "Non-finite values raise explicit ValueError; zero fabricated fallbacks on bad input.",
+      "test": "test_fail_closed_on_non_finite_numeric_inputs, test_lime_low_fidelity_truthfulness",
+      "evidence": "Non-finite values raise explicit ValueError; LIME surrogate fits with R^2 < 0.50 append explicit low-fidelity cautions.",
       "status": "REMEDIATED_AND_VERIFIED"
     },
     {
@@ -133,16 +133,16 @@
       "id": "XAI-INV-17",
       "description": "Where graph state contributes to explanation, explanation must correspond to graph state legitimately used.",
       "importance": "HIGH",
-      "test": "test_gnn_explanation_temporal_binding_with_as_of",
-      "evidence": "explain_gnn_embedding accepts as_of=alert.created_at to prevent future-edge leakage into historical explanations.",
+      "test": "test_gnn_explanation_temporal_binding_with_as_of, test_historical_graph_explanation_late_event_semantics",
+      "evidence": "explain_gnn_embedding enforces Guarantee A (event-time cutoff isolation: edges > as_of excluded; late-arriving records <= as_of participate).",
       "status": "REMEDIATED_AND_VERIFIED"
     },
     {
       "id": "XAI-INV-18",
       "description": "API/frontend explanation output must preserve the semantics produced by the explanation engine.",
       "importance": "HIGH",
-      "test": "test_alert_intelligence_service_preserves_actual_feature_values",
-      "evidence": "_get_top_features preserves true raw value; Predictor.tsx and AlertsPage.tsx render directional +/- sign and continuous magnitude bars.",
+      "test": "test_alert_intelligence_service_preserves_actual_feature_values, test_fallback_heuristic_identity_preserved_end_to_end",
+      "evidence": "_get_top_features preserves true raw value; Predictor.tsx and AlertsPage.tsx render directional +/- sign, continuous magnitude bars, and fallback heuristic badges.",
       "status": "REMEDIATED_AND_VERIFIED"
     }
   ]

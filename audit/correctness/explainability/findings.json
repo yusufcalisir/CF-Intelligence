@@ -144,6 +144,42 @@
       "repair_strategy": "Enforce strict fail-closed validation via preprocess_transaction and assert np.all(np.isfinite(shap_matrix))",
       "tests": "test_fail_closed_on_non_finite_numeric_inputs, test_explainer_produces_strictly_finite_attributions",
       "final_status": "REMEDIATED"
+    },
+    {
+      "id": "XAI-0009",
+      "severity": "HIGH",
+      "capability": "Explainer Cache Background & Feature Schema Identity",
+      "component": "ExplainabilityService._explainer_cache",
+      "file_function": "backend/app/application/services/explainability_service.py",
+      "trigger": "Baseline reference population values change while model object and row count remain identical",
+      "intended_semantics": "Explainer cache key must incorporate background content digest and feature schema to prevent stale explainer reuse across different reference distributions",
+      "actual_behavior": "Cache key was (id(model), baseline.shape[0]), which blindfolded the cache to baseline values and feature ordering",
+      "root_cause": "Omission of content fingerprint and feature schema in explainer cache key",
+      "prediction_impact": "None",
+      "explanation_impact": "Explainer reuse across different reference baselines resulted in mismatched expected_values and attribution shifts",
+      "user_visible_impact": "Inconsistent baseline risk expectations and biased SHAP attributions",
+      "proof": "Two distinct backgrounds of shape (30, 10) (e.g. zeros vs 0.85s) returned the identical cached explainer with stale expected_value 0.046 instead of 0.85",
+      "repair_strategy": "Strengthen cache key to (model_key, id(model), tuple(FEATURE_NAMES), baseline.shape, baseline_fp) using SHA-256 fingerprint of baseline bytes",
+      "tests": "test_explainer_cache_distinguishes_equal_size_different_backgrounds, test_explainer_cache_feature_schema_binding",
+      "final_status": "REMEDIATED"
+    },
+    {
+      "id": "XAI-0010",
+      "severity": "HIGH",
+      "capability": "Explanation Result Cache Multi-Dimensional Identity",
+      "component": "FastInferenceExplainer.compute_shap & explain_async",
+      "file_function": "backend/app/domain/realtime_explainer.py",
+      "trigger": "Re-explaining a transaction after feature enrichment mutation, model promotion, or as_of change",
+      "intended_semantics": "Cached explanation results must be bound to model_version, as_of timestamp, and feature vector fingerprint",
+      "actual_behavior": "compute_shap and explain_async only keyed cache by cfi:shap:{tenant_id}:{transaction_id}, allowing stale explanations to survive feature mutations",
+      "root_cause": "Omission of feature_fingerprint, model_version, and as_of parameters in domain explainer cache key building",
+      "prediction_impact": "None",
+      "explanation_impact": "Mutated or enriched transaction features returned stale pre-mutation explanations from cache",
+      "user_visible_impact": "Investigation UI showed out-of-date explanations when features changed while transaction ID was preserved",
+      "proof": "test_explanation_cache_separated_by_feature_state and test_explanation_cache_separated_by_model_version showed stale cache hits without feature fingerprint",
+      "repair_strategy": "Incorporate model_version, as_of, and feature vector SHA-256 fingerprint into key: cfi:shap:{tenant_id}:{transaction_id}:m_{model_version}:t_{as_of}:f_{feature_fingerprint}",
+      "tests": "test_explanation_cache_separated_by_model_version, test_explanation_cache_separated_by_feature_state",
+      "final_status": "REMEDIATED"
     }
   ]
 }

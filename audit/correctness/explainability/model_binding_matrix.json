@@ -6,11 +6,11 @@
       "prediction_model_resolver": "_get_cached_serving_model(sim_id)",
       "model_identity_version": "FraudDetectionModel / v1.4.2-champion",
       "explainer_resolver": "ExplainabilityService.compute_shap_values(txn, model=serving_model)",
-      "explainer_model_identity_version": "FraudDetectionModel / v1.4.2-champion (identical object reference)",
+      "explainer_model_identity_version": "FraudDetectionModel / v1.4.2-champion (bound via in-process object id(model) and persistent model_key)",
       "feature_schema": "FEATURE_NAMES (10 features: amount, mcc, country, device, velocity, hour, merch_risk, cust_hist, cb_count, acct_age)",
       "preprocessing_path": "app.application.services.data_generator.preprocess_transaction",
-      "cache_key": "(id(model), baseline.shape[0])",
-      "binding_verification": "VERIFIED (test_model_version_binding_and_hotswapping)",
+      "cache_key": "(model_key, id(model), tuple(FEATURE_NAMES), baseline.shape, baseline_fp)",
+      "binding_verification": "VERIFIED (test_model_version_binding_and_hotswapping, test_explainer_cache_distinguishes_equal_size_different_backgrounds)",
       "status": "BOUND_AND_VERIFIED"
     },
     {
@@ -21,8 +21,8 @@
       "explainer_model_identity_version": "Bound explicitly to serving_model",
       "feature_schema": "SHAP_FEATURE_NAMES (10 features)",
       "preprocessing_path": "app.application.services.data_generator.preprocess_transaction",
-      "cache_key": "(id(model), baseline.shape[0])",
-      "binding_verification": "VERIFIED (test_model_version_binding_and_hotswapping)",
+      "cache_key": "(model_key, id(model), tuple(FEATURE_NAMES), baseline.shape, baseline_fp)",
+      "binding_verification": "VERIFIED (test_model_version_binding_and_hotswapping, test_explainer_cache_feature_schema_binding)",
       "status": "BOUND_AND_VERIFIED"
     },
     {
@@ -33,8 +33,8 @@
       "explainer_model_identity_version": "FraudDetectionModel",
       "feature_schema": "FEATURE_NAMES (10 features)",
       "preprocessing_path": "app.application.services.data_generator.preprocess_transaction",
-      "cache_key": "Stateless per alert request",
-      "binding_verification": "VERIFIED (test_lime_surrogate_explanation_uses_canonical_preprocessing)",
+      "cache_key": "Stateless per alert request (evaluated against active model predict_fn)",
+      "binding_verification": "VERIFIED (test_lime_surrogate_explanation_uses_canonical_preprocessing, test_lime_low_fidelity_truthfulness)",
       "status": "BOUND_AND_VERIFIED"
     },
     {
@@ -42,11 +42,11 @@
       "prediction_model_resolver": "GraphSAGE 2-hop neighborhood aggregator",
       "model_identity_version": "GraphSAGE model weights",
       "explainer_resolver": "ExplainabilityService.explain_gnn_embedding(node_id, as_of=alert.created_at)",
-      "explainer_model_identity_version": "GraphSAGE embedding topology",
+      "explainer_model_identity_version": "GraphSAGE topological risk neighborhood (Guarantee A: event-time cutoff isolation)",
       "feature_schema": "Graph edge attributes (relationshipType, source, target)",
       "preprocessing_path": "GraphEngine.get_subgraph(radius=2, as_of=as_of)",
-      "cache_key": "Historical timestamp filtered (as_of)",
-      "binding_verification": "VERIFIED (test_gnn_explanation_temporal_binding_with_as_of)",
+      "cache_key": "Historical event-time cutoff filtered (as_of)",
+      "binding_verification": "VERIFIED (test_gnn_explanation_temporal_binding_with_as_of, test_historical_graph_explanation_late_event_semantics)",
       "status": "BOUND_AND_VERIFIED"
     },
     {
@@ -57,8 +57,8 @@
       "explainer_model_identity_version": "FastPath-Online-V1 (Heuristic)",
       "feature_schema": "amount, velocity_1h, merchant_category",
       "preprocessing_path": "Clean MCC lower string parsing & float cast",
-      "cache_key": "cfi:shap:{tenant_id}:{transaction_id}",
-      "binding_verification": "VERIFIED (test_fast_inference_explainer_semantics_and_cache_isolation)",
+      "cache_key": "cfi:shap:{tenant_id}:{transaction_id}:m_{model_version}:t_{as_of}:f_{feature_fingerprint}",
+      "binding_verification": "VERIFIED (test_explanation_cache_separated_by_model_version, test_explanation_cache_separated_by_feature_state)",
       "status": "BOUND_AND_VERIFIED"
     }
   ]

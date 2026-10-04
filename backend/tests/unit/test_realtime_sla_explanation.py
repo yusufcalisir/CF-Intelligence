@@ -99,7 +99,9 @@ def test_shap_cache_hit_returns_immediately() -> None:
 
         # Clear the local LRU cache entry so explain_async must reach the Redis path
         from app.domain.realtime_explainer import _local_shap_cache
-        _local_shap_cache.pop(f"cfi:shap:{tx_id}", None)
+        for k in list(_local_shap_cache.keys()):
+            if tx_id in k:
+                _local_shap_cache.pop(k, None)
 
         res = explainer.explain_async(tx_id, feature_vector)
 

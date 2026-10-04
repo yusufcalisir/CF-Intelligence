@@ -784,9 +784,23 @@ export function ExplainabilityPanel({
 
               {/* Top Features */}
               <div>
-                <h4 className="text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>📊</span> Kernel SHAP Feature Attribution
-                </h4>
+                {(() => {
+                  const isFallback = (report.top_features || []).some(
+                    (f: any) => f.explanation_method === 'fallback_heuristic'
+                  );
+                  return (
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>📊</span> {isFallback ? 'Analytical Fallback Attribution' : 'Kernel SHAP Feature Attribution'}
+                      </h4>
+                      {isFallback && (
+                        <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-bold">
+                          FALLBACK HEURISTIC
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="space-y-2.5">
                   {(report.top_features || []).slice(0, 5).map((f, i) => {
                     const anyF = f as any;

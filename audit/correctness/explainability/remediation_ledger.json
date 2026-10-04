@@ -70,6 +70,22 @@
         "backend/app/application/services/explainability_service.py"
       ],
       "verification_test": "backend/tests/unit/test_explainability_correctness.py::test_fail_closed_on_non_finite_numeric_inputs"
+    },
+    {
+      "finding_id": "XAI-0009",
+      "action": "Strengthened Kernel SHAP explainer cache key from (id(model), baseline.shape[0]) to (model_key, id(model), tuple(FEATURE_NAMES), baseline.shape, baseline_fp) using SHA-256 fingerprint of baseline bytes to guarantee background value and feature schema identity.",
+      "files_modified": [
+        "backend/app/application/services/explainability_service.py"
+      ],
+      "verification_test": "backend/tests/unit/test_explainability_correctness.py::test_explainer_cache_distinguishes_equal_size_different_backgrounds"
+    },
+    {
+      "finding_id": "XAI-0010",
+      "action": "Expanded FastInferenceExplainer cache key builder from cfi:shap:{tenant}:{tx} to include model_version, as_of timestamp, and SHA-256 fingerprint of normalized feature vector, guaranteeing multi-dimensional cache isolation.",
+      "files_modified": [
+        "backend/app/domain/realtime_explainer.py"
+      ],
+      "verification_test": "backend/tests/unit/test_explainability_correctness.py::test_explanation_cache_separated_by_feature_state"
     }
   ]
 }

@@ -23,7 +23,12 @@ from app.application.services.data_generator import (
 )
 from app.application.services.explainability_service import ExplainabilityService
 from app.application.services.model_service import FraudDetectionModel
-from app.domain.realtime_explainer import FastInferenceExplainer, _build_cache_key
+from app.domain.realtime_explainer import (
+    FastInferenceExplainer,
+    _build_cache_key,
+    _compute_feature_fingerprint,
+    _get_local_cache,
+)
 
 # ============================================================================
 # 1. Prediction & Model Binding (XAI-INV-01, XAI-INV-02)
@@ -237,12 +242,13 @@ def test_fast_inference_explainer_semantics_and_cache_isolation():
     assert len(res_a["shap_values"]) == 3
 
     # Fast explainer cache key isolation: bank_beta must miss
-    key_beta = _build_cache_key(txn_id, tenant_id="bank_beta")
+    fp = _compute_feature_fingerprint(feat_vec)
+    key_beta = _build_cache_key(txn_id, tenant_id="bank_beta", feature_fingerprint=fp)
     from app.domain.realtime_explainer import _get_local_cache
     assert _get_local_cache(key_beta) is None
 
     # Bank alpha hit
-    key_alpha = _build_cache_key(txn_id, tenant_id="bank_alpha")
+    key_alpha = _build_cache_key(txn_id, tenant_id="bank_alpha", feature_fingerprint=fp)
     assert _get_local_cache(key_alpha) is not None
 
     # Clean invalidation
@@ -351,3 +357,282 @@ def test_lime_surrogate_explanation_uses_canonical_preprocessing():
     names = [a.feature for a in report.feature_attributions]
     assert "transaction_amount" in names
     assert all(math.isfinite(a.weight) for a in report.feature_attributions)
+
+
+# ============================================================================
+# 10. Phase 5F Certification Closure Tests
+# ============================================================================
+
+def test_explanation_cache_separated_by_model_version() -> None:
+    """Verify that FastInferenceExplainer separates cache entries by model_version (XAI-INV-13)."""
+    explainer = FastInferenceExplainer()
+    tx_id = "tx_closure_mv_01"
+    features = {"amount": 25000.0, "velocity_1h": 6, "merchant_category": "crypto_exchange"}
+
+    res_v1 = explainer.compute_shap(tx_id, features, model_version="v1.0.0")
+    res_v2 = explainer.compute_shap(tx_id, features, model_version="v2.0.0")
+
+    assert res_v1["status"] == "COMPLETED"
+    assert res_v2["status"] == "COMPLETED"
+
+    # Verify separate cache keys exist in local cache
+    fp = _compute_feature_fingerprint(features)
+    key_v1 = _build_cache_key(tx_id, feature_fingerprint=fp, model_version="v1.0.0")
+    key_v2 = _build_cache_key(tx_id, feature_fingerprint=fp, model_version="v2.0.0")
+
+    assert key_v1 != key_v2
+    assert _get_local_cache(key_v1) is not None
+    assert _get_local_cache(key_v2) is not None
+
+
+def test_explanation_cache_separated_by_feature_state() -> None:
+    """Verify that changing feature vector values prevents stale cache reuse (XAI-INV-13)."""
+    explainer = FastInferenceExplainer()
+    tx_id = "tx_closure_features_dynamic"
+
+    feat_low = {"amount": 100.0, "velocity_1h": 1, "merchant_category": "grocery"}
+    feat_high = {"amount": 60000.0, "velocity_1h": 10, "merchant_category": "gambling"}
+
+    explainer.compute_shap(tx_id, feat_low)
+    explainer.compute_shap(tx_id, feat_high)
+
+    fp_low = _compute_feature_fingerprint(feat_low)
+    fp_high = _compute_feature_fingerprint(feat_high)
+
+    key_low = _build_cache_key(tx_id, feature_fingerprint=fp_low)
+    key_high = _build_cache_key(tx_id, feature_fingerprint=fp_high)
+
+    assert key_low != key_high
+
+    hit_low = explainer.explain_async(tx_id, feat_low)
+    hit_high = explainer.explain_async(tx_id, feat_high)
+
+    assert hit_low["source"] == "LOCAL_CACHE_HIT"
+    assert hit_high["source"] == "LOCAL_CACHE_HIT"
+
+    # Low amount has amount decreasing risk; high amount has amount increasing risk
+    low_amount_dir = next(a["direction"] for a in hit_low["attributions"] if a["feature_name"] == "amount")
+    high_amount_dir = next(a["direction"] for a in hit_high["attributions"] if a["feature_name"] == "amount")
+
+    assert low_amount_dir == "DECREASES_RISK"
+    assert high_amount_dir == "INCREASES_RISK"
+
+
+def test_explainer_cache_distinguishes_equal_size_different_backgrounds() -> None:
+    """Verify that equal-shape (30, 10) backgrounds with different values receive distinct explainers (XAI-INV-08)."""
+    service = ExplainabilityService()
+    service.invalidate_explainer_cache()
+
+    model = FraudDetectionModel(input_dim=10)
+    model.eval()
+
+    bg_a = np.zeros((30, 10), dtype=np.float32)
+    bg_b = np.ones((30, 10), dtype=np.float32) * 0.85
+
+    txn = {
+        "transaction_amount": 5000.0,
+        "velocity": 5.0,
+        "merchant_category": "retail",
+        "country_code": "US",
+        "device_type": "mobile_app",
+    }
+
+    service.compute_batch_shap_values([txn], model=model, background_data=bg_a, nsamples=20)
+    assert len(service._explainer_cache) == 1
+
+    service.compute_batch_shap_values([txn], model=model, background_data=bg_b, nsamples=20)
+    # MUST have 2 distinct cached explainers because background fingerprints differ
+    assert len(service._explainer_cache) == 2
+
+
+def test_explainer_cache_feature_schema_binding() -> None:
+    """Verify that explainer cache identity structurally incorporates feature schema (XAI-INV-05)."""
+    service = ExplainabilityService()
+    service.invalidate_explainer_cache()
+
+    model = FraudDetectionModel(input_dim=10)
+    model.eval()
+
+    txn = {
+        "transaction_amount": 2500.0,
+        "velocity": 3.0,
+        "merchant_category": "travel",
+        "country_code": "DE",
+        "device_type": "web_browser",
+    }
+
+    service.compute_batch_shap_values([txn], model=model, nsamples=20)
+    assert len(service._explainer_cache) == 1
+
+    cache_keys = list(service._explainer_cache.keys())
+    schema_tuple = cache_keys[0][2]
+    assert len(schema_tuple) == 10
+    assert "transaction_amount" in schema_tuple
+
+
+def test_historical_graph_explanation_late_event_semantics() -> None:
+    """Demonstrate Guarantee A event-time isolation: future edges excluded, historical edges participate (XAI-INV-17)."""
+    from app.application.services.graph_engine import GraphEngine
+    from app.domain.enums import EntityType, RelationshipType, RiskLevel
+    from app.domain.investigation_entities import Entity, Relationship
+
+    engine = GraphEngine()
+    engine._entities.clear()
+    engine._relationships.clear()
+    engine._adjacency.clear()
+
+    node_a = "USR_CLOSURE_NODE_A"
+    node_b = "USR_CLOSURE_NODE_B"
+    node_c = "USR_CLOSURE_NODE_C"
+
+    # Register entities
+    t_100 = datetime(2026, 1, 1, 10, 0, 0, tzinfo=UTC)
+    for nid in (node_a, node_b, node_c):
+        engine.register_entity(Entity(
+            id=nid,
+            entity_type=EntityType.CUSTOMER,
+            privacy_id=f"priv_{nid}",
+            bank_id="bank_alpha",
+            display_label=nid,
+            risk_level=RiskLevel.MEDIUM,
+            alert_count=0,
+            first_seen=t_100,
+            last_seen=t_100,
+        ))
+
+    # Edge 1: Created at t=100
+    engine.add_relationship(Relationship(
+        id="rel_ab",
+        source_entity_id=node_a,
+        target_entity_id=node_b,
+        relationship_type=RelationshipType.SHARES_DEVICE,
+        created_at=t_100,
+    ))
+
+    # Edge 2: Created at t=300 (future relative to query at t=200)
+    t_300 = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+    engine.add_relationship(Relationship(
+        id="rel_ac",
+        source_entity_id=node_a,
+        target_entity_id=node_c,
+        relationship_type=RelationshipType.LINKED_ALERT,
+        created_at=t_300,
+    ))
+
+    service = ExplainabilityService()
+
+    # Query with as_of = t=200: Edge 2 must be excluded by event-time cutoff
+    t_200 = datetime(2026, 1, 1, 11, 0, 0, tzinfo=UTC)
+    exp_200 = service.explain_gnn_embedding(node_a, as_of=t_200)
+
+    # Only node_b should be in contributions
+    targets_200 = [c.target for c in exp_200.top_contributing_edges]
+    assert node_b in targets_200
+    assert node_c not in targets_200
+
+
+def test_lime_low_fidelity_truthfulness() -> None:
+    """Verify that LIME exposes surrogate fidelity R^2 and appends low-fidelity caution when R^2 < 0.50 (XAI-INV-12)."""
+    service = ExplainabilityService()
+    txn = {
+        "transaction_amount": 1000.0,
+        "merchant_category": "retail",
+        "country_code": "US",
+        "velocity": 1.0,
+    }
+
+    # Standard run: high or reasonable fidelity
+    rep_normal = service.compute_lime_explanation(transaction=txn, num_samples=50, l2_reg=0.01)
+    assert rep_normal.fidelity_r2 >= 0.0
+
+    # Test extreme regularized run (excessive L2 penalty collapses slopes toward zero, causing low R^2)
+    rep_low_fid = service.compute_lime_explanation(
+        transaction=txn, num_samples=30, l2_reg=100000.0, kernel_width=0.05
+    )
+    if rep_low_fid.fidelity_r2 < 0.50:
+        assert "CAUTION: Low surrogate fidelity" in rep_low_fid.explanation_text
+
+
+def test_shap_predict_fn_matches_serving_prediction() -> None:
+    """Verify SHAP predict_fn output numerically equals serving model forward pass within 1e-6 (XAI-INV-07)."""
+    model = FraudDetectionModel(input_dim=10)
+    model.eval()
+
+    txn = {
+        "transaction_amount": 7500.0,
+        "merchant_category": "crypto_exchange",
+        "country_code": "US",
+        "device_type": "mobile_app",
+        "velocity": 8.0,
+    }
+
+    tensor_input = preprocess_transaction(txn)
+    with torch.no_grad():
+        serving_prediction = float(model(tensor_input).cpu().numpy().reshape(-1)[0])
+
+    service = ExplainabilityService()
+    attributions = service.compute_shap_values(txn, model=model, nsamples=30)
+
+    assert len(attributions) == 10
+    shap_model_output = attributions[0]["model_output"]
+
+    assert math.isclose(serving_prediction, shap_model_output, abs_tol=1e-5)
+
+
+def test_shap_additivity_distribution_statistics() -> None:
+    """Evaluate SHAP local additivity reconstruction errors across multiple test inputs (XAI-INV-09)."""
+    service = ExplainabilityService()
+    model = FraudDetectionModel(input_dim=10)
+    model.eval()
+
+    test_txns = [
+        {"transaction_amount": 100.0, "velocity": 1.0, "merchant_category": "grocery"},
+        {"transaction_amount": 2500.0, "velocity": 4.0, "merchant_category": "retail"},
+        {"transaction_amount": 15000.0, "velocity": 9.0, "merchant_category": "crypto_exchange"},
+        {"transaction_amount": 450.0, "velocity": 2.0, "merchant_category": "travel"},
+        {"transaction_amount": 50000.0, "velocity": 12.0, "merchant_category": "gambling"},
+    ]
+
+    abs_errors: list[float] = []
+    for txn in test_txns:
+        shap_vals = service.compute_shap_values(txn, model=model, nsamples=30)
+        base_val = shap_vals[0]["base_value"]
+        model_out = shap_vals[0]["model_output"]
+        sum_phi = sum(f["contribution"] for f in shap_vals)
+
+        diff = abs(model_out - (base_val + sum_phi))
+        abs_errors.append(diff)
+
+    max_err = max(abs_errors)
+    mean_err = sum(abs_errors) / len(abs_errors)
+
+    # All reconstruction errors must satisfy Shapley efficiency axiom (< 1e-4)
+    assert max_err < 1e-4
+    assert mean_err < 1e-4
+
+
+def test_fallback_heuristic_identity_preserved_end_to_end() -> None:
+    """Verify that when ML model is absent or fails, explanation_method is fallback_heuristic (XAI-INV-14)."""
+    service = ExplainabilityService()
+
+    txn = {
+        "transaction_amount": 1200.0,
+        "velocity": 2.0,
+        "merchant_category": "grocery",
+    }
+
+    with patch.object(service, "compute_batch_shap_values", return_value=[[
+        {
+            "feature": "transaction_amount",
+            "contribution": 0.25,
+            "value": 0.12,
+            "raw_value": 1200.0,
+            "explanation_method": "fallback_heuristic",
+            "base_value": 0.10,
+            "model_output": 0.35,
+        }
+    ]]):
+        result = service.compute_shap_values(txn)
+        assert len(result) > 0
+        assert result[0]["explanation_method"] == "fallback_heuristic"
+

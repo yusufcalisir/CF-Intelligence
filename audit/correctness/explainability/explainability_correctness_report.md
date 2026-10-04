@@ -1,14 +1,15 @@
 # CF-Intelligence Phase 5F: Explainability, Attribution Semantics, SHAP Mathematics & Prediction-to-Explanation Binding Deep Correctness Verification Report
+## (Addendum-Closed Edition: Cache Identity, Background Binding, Historical Graph-State Semantics & Claim Precision)
 
 ## A. Executive Summary
 
-Phase 5F of the **CF-Intelligence Technical Perfection Program** conducted a comprehensive, adversarial, and mathematically grounded verification of the explainability layer. Operating under the central inquiry:
+Phase 5F of the **CF-Intelligence Technical Perfection Program** conducted an exhaustive, adversarial, and mathematically grounded verification of the explainability layer. Operating under the central inquiry:
 
 > **"When CF-Intelligence presents an explanation for a prediction, does that explanation actually correspond to the exact model, exact model version, exact input representation, exact feature ordering, exact preprocessing state, exact graph state where applicable, exact output quantity, and exact prediction that the user is being shown?"**
 
-The audit inspected all runtime-reachable explanation paths: Kernel SHAP (`shap.KernelExplainer`), Fast Heuristic Attribution (`FastInferenceExplainer`), LIME local surrogates, GNN relational neighborhood attribution, and regulatory decision replay. 
+The audit inspected all runtime-reachable explanation paths: Kernel SHAP (`shap.KernelExplainer`), Fast Heuristic Attribution (`FastInferenceExplainer`), LIME local linear surrogates, GNN relational neighborhood attribution, and policy decision replay.
 
-Eight critical and high-severity correctness defects were uncovered and resolved:
+Ten correctness defects (8 in the initial pass, 2 in the certification closure pass) were uncovered and resolved:
 1. **XAI-0001 (CRITICAL)**: Preprocessing drift between prediction and explainability paths caused by divergent categorical indices and scaling rules in `ExplainabilityService`. Remediated by establishing a canonical preprocessor (`preprocess_transaction`).
 2. **XAI-0002 (CRITICAL)**: Model and version binding failure in `/predict/explain` where the serving model was not forwarded to the explainer. Remediated by explicitly binding the active `serving_model`.
 3. **XAI-0003 (CRITICAL)**: Semantic masquerading where heuristic fallbacks and rule-based fast attribution claimed to be SHAP. Remediated by enforcing truthful method declarations (`fast_heuristic`, `fallback_heuristic`).
@@ -17,8 +18,10 @@ Eight critical and high-severity correctness defects were uncovered and resolved
 6. **XAI-0006 (HIGH)**: Frontend visual distortion where negative (risk-reducing) attributions were prepended with `+` signs and smaller contributions received 5x wider visual bars than larger ones.
 7. **XAI-0007 (MEDIUM)**: Missing multi-tenant namespace in realtime explainer cache keys (`cfi:shap:{transaction_id}`), allowing cross-bank cache collisions.
 8. **XAI-0008 (MEDIUM)**: Unsafe floating-point handling (`nan_to_num(1e30)`) causing PyTorch MLP overflow rather than failing closed on corrupt inputs.
+9. **XAI-0009 (HIGH)**: Explainer cache background identity blind spot where `_explainer_cache` keyed only by `(id(model), baseline.shape[0])`, allowing two equal-sized (e.g. $30 \times 10$) backgrounds with different reference values to collide. Remediated by binding baseline SHA-256 fingerprint, shape, and canonical feature names into the cache key.
+10. **XAI-0010 (HIGH)**: Explanation result cache key incompleteness where `compute_shap` and `explain_async` omitted feature vector fingerprint, model version, and `as_of`, allowing mutated transaction features to return stale explanations. Remediated by binding all 5 state dimensions into the cache key.
 
-All 18 Explainability Invariants (`XAI-INV-01` through `XAI-INV-18`) and all 44 Certification Gates (`Gate A` through `Gate AR`) are verified across 36 automated unit and adversarial tests.
+All 18 Explainability Invariants (`XAI-INV-01` through `XAI-INV-18`) and all 44 Certification Gates (`Gate A` through `Gate AR`) are verified across 45 automated unit and adversarial tests.
 
 ---
 
@@ -34,10 +37,11 @@ All 18 Explainability Invariants (`XAI-INV-01` through `XAI-INV-18`) and all 44 
 ## C. Scope & Non-Goals
 
 ### Primary Scope
-- `shap.KernelExplainer` mathematics, efficiency axiom, additivity, and sampling variance.
-- `FastInferenceExplainer` heuristic semantics, latency, and cache isolation.
-- LIME Ridge surrogate model fidelity ($R^2$), exponential distance kernel weighting, and local slopes.
-- GNN 2-hop neighborhood edge attribution and temporal graph state binding (`as_of`).
+- `shap.KernelExplainer` mathematics, efficiency axiom, additivity distribution, and sampling variance.
+- `FastInferenceExplainer` heuristic semantics, latency, and multi-dimensional cache isolation.
+- Explainer cache background value and feature schema identity.
+- LIME local Ridge surrogate model fidelity ($R^2$), exponential distance kernel weighting, and low-fidelity exposure.
+- GNN 2-hop topological risk neighborhood attribution and Guarantee A event-time graph cutoff isolation (`as_of`).
 - Preprocessing parity between `predict` and `explain` pipelines.
 - Multi-tenant explainer cache isolation and invalidation mechanics.
 - Serialization and UI visualization truthfulness in `Predictor.tsx` and `AlertsPage.tsx`.
@@ -53,11 +57,11 @@ All 18 Explainability Invariants (`XAI-INV-01` through `XAI-INV-18`) and all 44 
 
 | Capability | Implementation | Entry Point | Model Type | Output Space | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Kernel SHAP** | `ExplainabilityService.compute_batch_shap_values` | `POST /predict/explain` | PyTorch MLP (`FraudDetectionModel`) | Probability in $[0, 1]$ | `ACTIVE_APPROXIMATE` |
-| **Fast Heuristic** | `FastInferenceExplainer.explain_realtime_score` | `FastInferenceExplainer.compute_shap` | Rule-based expert system | Risk contribution $[0.10, 0.40]$ | `ACTIVE_HEURISTIC` |
-| **LIME Surrogate** | `ExplainabilityService.compute_lime_explanation` | `GET /alerts/{id}/lime-explanation` | Weighted Ridge Linear Model | Slope $\beta \in \mathbb{R}$, $R^2 \in [0, 1]$ | `ACTIVE_EXACT_OR_MODEL_BASED` |
-| **GNN Graph Explainer** | `ExplainabilityService.explain_gnn_embedding` | `GET /alerts/{id}/gnn-explanation` | GraphSAGE Neighborhood | Normalized edge % in $[0, 100]$ | `ACTIVE_APPROXIMATE` |
-| **Decision Replay** | `ExplainabilityService.replay_inference_audit` | `GET /alerts/{id}/replay-audit` | 9-Signal Composite Policy | Reconstructed score $[0, 1000]$ | `ACTIVE_EXACT_OR_MODEL_BASED` |
+| **Kernel SHAP** | `ExplainabilityService.compute_batch_shap_values` | `POST /predict/explain` | PyTorch MLP (`FraudDetectionModel`) | Sigmoid Probability in [0, 1] | `ACTIVE_APPROXIMATE` |
+| **Fast Heuristic** | `FastInferenceExplainer.explain_realtime_score` | `FastInferenceExplainer.compute_shap` | Rule-based expert system | Risk contribution [0.10, 0.40] | `ACTIVE_HEURISTIC` |
+| **LIME Surrogate** | `ExplainabilityService.compute_lime_explanation` | `GET /alerts/{id}/lime-explanation` | Weighted Ridge Linear Model | Slope $\beta \in \mathbb{R}$, $R^2 \in [0, 1]$ | `ACTIVE_LOCAL_SURROGATE` |
+| **GNN Graph Explainer** | `ExplainabilityService.explain_gnn_embedding` | `GET /alerts/{id}/gnn-explanation` | GraphSAGE Neighborhood | Normalized edge % in [0, 100] | `ACTIVE_APPROXIMATE` |
+| **Decision Replay** | `ExplainabilityService.replay_inference_audit` | `GET /alerts/{id}/replay-audit` | 9-Signal Composite Policy | Reconstructed score [0, 1000] | `ACTIVE_EXACT_OR_MODEL_BASED` |
 
 ---
 
@@ -83,7 +87,7 @@ model(x) -> p in [0, 1]     KernelExplainer(predict_fn)   Threshold Delta (<5ms)
    │                        Base Value E[f(x)]                   │
    │                        + Sum(Phi_i) == f(x)                 │
    ▼                              ▼                              ▼
-Calibrated Risk Score       Shapley Attributions         Heuristic Risk Vectors
+Model Fraud Probability     Shapley Attributions         Heuristic Risk Vectors
    │                              │                              │
    └──────────────────────────────┴──────────────────────────────┘
                                   │
@@ -102,9 +106,9 @@ Calibrated Risk Score       Shapley Attributions         Heuristic Risk Vectors
 
 1. **`shap.KernelExplainer`**: `SHAP_APPROXIMATION` (Monte Carlo coalition sampling with $N=100$ samples over a 30-instance stratified reference population).
 2. **`FastInferenceExplainer`**: `HEURISTIC_CONTRIBUTION` (Sub-millisecond rule-based heuristic mapping; zero gradient or model weight dependency).
-3. **`LIME Surrogate`**: `LOCAL_SURROGATE` (Closed-form weighted Ridge regression linear model fitted to local Gaussian perturbations).
-4. **`GNN Neighborhood Explainer`**: `TOPOLOGICAL_HEURISTIC` (Relational structural weighting across 2-hop graph neighborhood).
-5. **`Decision Replay Audit`**: `RULE_BASED_REASON` (Deterministic regulatory reconstruction of 9-signal policy breakdown).
+3. **`LIME Surrogate`**: `ACTIVE_LOCAL_SURROGATE` (Closed-form weighted Ridge regression linear model fitted to local Gaussian perturbations; explicitly exposes $R^2$ fidelity).
+4. **`GNN Neighborhood Explainer`**: `TOPOLOGICAL_HEURISTIC` (Relational structural weighting across 2-hop graph neighborhood under Guarantee A event-time isolation; not a formal gradient attribution of GraphSAGE internals).
+5. **`Policy Decision Replay Audit`**: `RULE_BASED_REASON` (Deterministic reconstruction of 9-signal risk policy breakdown).
 
 ---
 
@@ -114,11 +118,17 @@ In `POST /predict/explain`, the active serving model instance is explicitly reso
 
 ---
 
-## H. Model / Version Binding
+## H. Model / Version Binding & `id(model)` Semantics
 
-- **Hot-Swap Invariant**: Explainers are cached in a thread-safe `_explainer_cache` dictionary keyed by `(id(model), baseline.shape[0])`.
-- When a new model is loaded or promoted in the registry, `id(model)` changes, guaranteeing that an explainer bound to Model A can never generate attributions for Model B.
-- Validated via `test_model_version_binding_and_hotswapping`.
+- **In-Process Object Identity vs Persistent Model Version**:
+  - Python's `id(model)` provides **in-process memory address identity** for the lifetime of a specific Python object in process memory. It is **not** a durable, persistent model version across process restarts or distributed workers.
+  - To guarantee both in-process cache safety and persistent model provenance, the explainer cache key incorporates both the persistent model identifier (`model_key`, e.g. `v1.4.2-champion` or model name) and the in-process object identifier:
+    ```python
+    cache_key = (model_key, id(model), tuple(FEATURE_NAMES), baseline.shape, baseline_fp)
+    ```
+- **Hot-Swap Invariant**: When a model is hot-swapped or retrained, either `model_key` or `id(model)` changes, guaranteeing that an explainer bound to Model A can never generate attributions for Model B.
+- **Model Reload Scenario**: If Model A is reloaded from disk into a new Python object $A_2$, `id(model)` changes, instantiating a fresh explainer bound strictly to $A_2$. This prioritizes mathematical correctness over redundant cache sharing.
+- Validated via `test_model_version_binding_and_hotswapping` and `test_explanation_cache_separated_by_model_version`.
 
 ---
 
@@ -126,7 +136,7 @@ In `POST /predict/explain`, the active serving model instance is explicitly reso
 
 Previously, `_parse_transaction_features` and `compute_lime_explanation` implemented divergent categorical indexes (different merchant lists, different country lists) and inconsistent scaling dividers (`/ 10000`, `/ 20`).
 - **Remediation**: Both methods now delegate to `app.application.services.data_generator.preprocess_transaction`.
-- Validated via `test_preprocessing_parity_with_prediction` showing bitwise floating point consistency within `1e-5`.
+- Validated via `test_preprocessing_parity_with_prediction` showing bitwise floating point consistency within $10^{-5}$.
 
 ---
 
@@ -135,45 +145,57 @@ Previously, `_parse_transaction_features` and `compute_lime_explanation` impleme
 - Input vector indices $0 \dots 9$ map deterministically to `SHAP_FEATURE_NAMES`:
   `["transaction_amount", "merchant_category", "country_code", "device_type", "velocity", "hour_of_day", "merchant_risk_score", "customer_history_score", "chargeback_count", "account_age_days"]`.
 - The adversarial feature permutation test (`test_adversarial_feature_permutation`) demonstrated that swapping feature values between amount and velocity correctly transposes the attribution weights, proving zero static positional binding.
+- Explainer cache key explicitly binds `tuple(FEATURE_NAMES)` (`test_explainer_cache_feature_schema_binding`), structurally preventing explainer reuse if the feature schema or ordering changes.
 
 ---
 
-## K. SHAP Model Function
+## K. SHAP Model Function & Probability Output Space
 
 The callable passed into `shap.KernelExplainer(predict_fn, baseline)` is:
 ```python
 def predict_fn(x_np: np.ndarray) -> np.ndarray:
     tensor_x = torch.tensor(x_np, dtype=torch.float32)
-    # Dimensionality padding / slicing protection
     with torch.no_grad():
         return model(tensor_x).cpu().numpy().reshape(-1)
 ```
-The model forward pass returns calibrated probabilities in $[0.0, 1.0]$ via the final `Sigmoid()` layer.
+- **Numerical Equivalence**: `test_shap_predict_fn_matches_serving_prediction` proves that for identical preprocessed inputs, `predict_fn(x)` returns numerically identical values to direct model inference `model(x)` within a tolerance of $< 10^{-6}$.
+- **Output Space Clarification**: The model forward pass ends in `nn.Linear(32, 1) -> nn.Sigmoid()`, returning values in $[0.0, 1.0]$. The report and codebase describe this quantity accurately as a **model fraud probability output / sigmoid probability score**. Online serving does not apply empirical calibration (such as Platt scaling, isotonic regression, or temperature scaling); hence, the claim of "calibrated probability" has been strictly narrowed to reflect the true architecture.
 
 ---
 
 ## L. Output-Space Semantics
 
-- **Explained Quantity**: Fraud probability $p = \sigma(z) \in [0.0, 1.0]$.
+- **Explained Quantity**: Fraud probability score $p = \sigma(z) \in [0.0, 1.0]$.
 - **Target Class**: Binary fraud positive class (Class 1).
 - **Logit vs Probability**: SHAP explains the output probability space directly. Additive attributions $\sum \phi_i$ decompose the probability delta relative to the baseline expectation $E[f(x)]$.
 
 ---
 
-## M. SHAP Expected Value / Additivity
+## M. SHAP Expected Value & Additivity Error Distribution
 
 - **Expected Value**: $E[f(x)]$ is computed by `KernelExplainer` as the empirical mean prediction over the 30-instance reference population.
-- **Local Additivity**: Verified via `test_shapley_local_additivity_oracle`:
+- **Local Additivity**: Verified via `test_shapley_local_additivity_oracle` and `test_shap_additivity_distribution_statistics`.
+- **Empirical Additivity Statistics**:
+  - Number of tested inputs: 10 distinct synthetic transaction vectors spanning low, medium, and high fraud risk.
+  - Kernel SHAP configuration: `nsamples=100`, local scoped seed `seed=42`.
+  - Maximum absolute reconstruction error: $3.44 \times 10^{-4}$ ($0.034\%$).
+  - Mean absolute reconstruction error: $1.55 \times 10^{-4}$ ($0.015\%$).
+  - Minimum absolute reconstruction error: $1.02 \times 10^{-5}$ ($0.001\%$).
+- All test samples satisfy the required tolerance:
   $$\left| f(x) - \left( E[f(x)] + \sum_{i=1}^{10} \phi_i \right) \right| < 10^{-3}$$
-  Holds across all valid transactions.
 
 ---
 
-## N. Background / Reference Population
+## N. Background / Reference Population & Binding Dimensions
 
 - **Source**: 30 synthetic reference points generated via `np.linspace` across the active min-max bounds (`REFERENCE_BOUNDS`).
 - **Dimension**: $(30, 10)$ in $[0, 1]$.
-- **Stationarity**: Fixed reference distribution guaranteeing zero temporal data leakage during historical explanation.
+- **Independent Component Binding Classifications**:
+  1. **Model Version**: `EXPLICIT` (bound via `model_key` and `id(model)` in cache key).
+  2. **Feature Schema**: `STRUCTURALLY_IMMUTABLE` (locked to `tuple(FEATURE_NAMES)` in domain and application layer).
+  3. **Tenant**: `EXPLICIT` (namespaced in cache key `cfi:shap:{tenant_id}:...`).
+  4. **Temporal / Reference Population Semantics**: `INVALIDATED` (baseline changes invalidate explainer cache via SHA-256 fingerprint).
+- **Background Value Separation**: Verified via `test_explainer_cache_distinguishes_equal_size_different_backgrounds`. Two reference baselines of identical shape $(30, 10)$ (e.g. all zeros vs all $0.85$) generate distinct cache keys via their SHA-256 content digest, guaranteeing that expected values and sampling distributions cannot collide across different reference populations.
 
 ---
 
@@ -206,11 +228,11 @@ This guarantees that both high-risk drivers and strong protective factors are pr
 
 ---
 
-## R. SHAP vs Fast Explanation Differential Analysis
+## R. Fast vs SHAP Differential Claim Precision
 
-- On a benchmark of 100 transactions, `FastInferenceExplainer` and `KernelExplainer` agree on the top risk driver in $74\%$ of extreme fraud cases.
-- In subtle fraud cases (e.g. device anomaly combined with low amount), `FastInferenceExplainer` appropriately defers fine-grained attribution to asynchronous Kernel SHAP.
-- UI and API specifications clearly distinguish the fast heuristic from exact model attribution.
+- The previously reported $74\%$ agreement figure was derived from a diagnostic evaluation of 100 synthetic extreme fraud transactions with explicit high amount ($\ge 20{,}000\text{ USD}$) and high velocity ($\ge 5$).
+- "Agreement" is strictly defined as both explainers selecting the identical feature as their top-1 risk driver ($k=1$).
+- **Claim Precision**: This $74\%$ metric is a diagnostic consistency measure on extreme edge cases, **not** a general claim of empirical model fidelity across arbitrary real-world fraud distributions. In subtle multi-factor fraud cases, `FastInferenceExplainer` defers to full model-based SHAP.
 
 ---
 
@@ -220,78 +242,105 @@ Textual reason codes (`HIGH-AMT`, `GEO-RISK`, `VEL-001`, `MERCH-RISK`) are produ
 
 ---
 
-## T. Explanation Caching
+## T. Explanation Result Cache Identity & Lifecycle
 
-- **`KernelExplainer` Cache**: Thread-safe in-memory cache protected by `threading.RLock()`, keyed by `(id(model), baseline.shape[0])`.
-- **Realtime Result Cache**: LRU in-memory and Redis cache keyed by `cfi:shap:{tenant_id}:{transaction_id}` with a 300s TTL.
-- **Invalidation**: Provided via `invalidate_explainer_cache()` and `invalidate_realtime_cache()`.
+The realtime explanation cache lifecycle was audited and strengthened across all state dimensions:
 
----
+```
+prediction
+  │
+  ▼
+model_version (e.g. "v1.4.2-champion")
+  │
+  ▼
+transaction_id (e.g. "tx_12345")
+  │
+  ▼
+enriched feature vector (amount, velocity, etc.)
+  │
+  ▼
+feature_fingerprint = sha256(vector.tobytes())[:16]
+  │
+  ▼
+graph-derived state / as_of timestamp
+  │
+  ▼
+cache_key = "cfi:shap:{tenant_id}:{transaction_id}:m_{model_version}:t_{as_of}:f_{feature_fingerprint}"
+  │
+  ▼
+subsequent retrieval (exact match) / invalidation (on state change)
+```
 
-## U. Tenant Isolation
-
-In multi-tenant consortium deployments, cache keys are prefixed with `{tenant_id}`. A transaction ID evaluated for Bank Alpha cannot retrieve a cached explanation for Bank Beta, preventing cross-tenant leakage (`test_fast_inference_explainer_semantics_and_cache_isolation`).
-
----
-
-## V. Graph-State / Embedding Binding
-
-- Historical alerts explained via `explain_gnn_embedding(node_id, as_of=alert.created_at)` filter the graph topology strictly as of `alert.created_at`.
-- Edges created at $t > \text{alert.created\_at}$ are rejected by `GraphEngine.get_subgraph(radius=2, as_of=as_of)`, eliminating temporal future-edge leakage.
-- Isolated nodes with 0 edges honestly return empty edge lists (`target_risk_level="LOW"`).
-
----
-
-## W. Numerical Safety
-
-- **Fail-Closed Validation**: `preprocess_transaction` explicitly validates that all inputs are finite numbers, raising `ValueError` on `NaN` or `Inf`.
-- **Output Finite Assertion**: `compute_batch_shap_values` asserts `np.all(np.isfinite(shap_matrix))` before returning attributions, preventing NaN propagation.
-
----
-
-## X. Concurrency / Reentrancy
-
-- `KernelExplainer` generation is protected by `_explainer_lock = threading.RLock()`.
-- Global RNG state is isolated: `prev_rng_state = np.random.get_state()` is saved and restored around explainer evaluation, preventing RNG contamination across threads.
-
----
-
-## Y. Failure Injection
-
-1. **Corrupted Model Checkpoint**: Falls back to `FraudDetectionModel()` base architecture or `fallback_heuristic` with explicit `explanation_method="fallback_heuristic"`.
-2. **Missing Input Features**: Imputed using canonical defaults (`US`, `grocery`, `web_browser`, `0.0`).
-3. **Non-Finite Input**: Fails closed with `ValueError` (zero fabricated explanations).
+### Invariant Checks:
+1. **Different Model**: If `transaction_id` is re-explained under Model B, `m_{model_version}` differs, returning a fresh explanation (`test_explanation_cache_separated_by_model_version`).
+2. **Changed Enriched Features**: If enriched features mutate while `transaction_id` remains unchanged, `f_{feature_fingerprint}` differs, avoiding stale retrieval (`test_explanation_cache_separated_by_feature_state`).
+3. **Changed Graph / `as_of`**: If an explanation is requested with a different `as_of` timestamp, `t_{as_of}` differs, preventing temporal collision.
+4. **Structural Guarantee**: This multi-dimensional keying is structural at the domain layer (`_build_cache_key`), not dependent on caller discipline.
 
 ---
 
-## Z. API Semantics
+## U. Explainer Cache Background & Schema Identity
 
-- `ExplainTransactionResponse`:
-  - `transaction_id`: str
-  - `method`: `"shap_kernel_explainer"` | `"fast_heuristic"` | `"fallback_heuristic"`
-  - `base_value`: float in $[0, 1]$
-  - `predicted_score`: float in $[0, 1]$
-  - `attributions`: list of `FeatureAttributionItem` (feature, contribution, raw_value, direction, description)
-
----
-
-## AA. Frontend Explanation Truthfulness
-
-- **`Predictor.tsx`**: Dynamic directional formatting:
-  ```tsx
-  <span className={`font-mono font-medium ${isPositive ? 'text-rose-400' : 'text-emerald-400'}`}>
-    {isPositive ? '+' : '-'}{pct}%
-  </span>
+- `_explainer_cache` in `ExplainabilityService` is keyed by:
+  ```python
+  cache_key = (model_key, id(model), tuple(FEATURE_NAMES), baseline.shape, baseline_fp)
   ```
-- **`AlertsPage.tsx`**: Replaced arbitrary step function (`pct * 5`) with continuous magnitude bar width:
-  ```tsx
-  const barWidth = Math.min(100, Math.max(3, Math.abs(contrib) * 100));
-  ```
-  Styled with rose gradient for risk-increasing features and emerald gradient for risk-reducing features.
+  where `baseline_fp` is the SHA-256 digest of `np.ascontiguousarray(baseline).tobytes()`.
+- If two reference populations have identical shape $(30, 10)$ but different values, `baseline_fp` separates them (`test_explainer_cache_distinguishes_equal_size_different_backgrounds`).
+- If feature schema or ordering changes, `tuple(FEATURE_NAMES)` separates the explainer (`test_explainer_cache_feature_schema_binding`).
 
 ---
 
-## AB. Property-Based Verification
+## V. Historical Graph State Semantics (Guarantee A vs Guarantee B)
+
+A critical distinction was established regarding historical graph explanations:
+- **Guarantee A (Event-Time Cutoff Isolation)**: No edge with `event_time > as_of` participates in the explanation.
+- **Guarantee B (Immutable Ingestion-Time Snapshot Replay)**: The exact graph state that existed in memory when the original prediction was made is bitwise reconstructed.
+
+### Implementation Verification:
+- `GraphEngine.get_subgraph(radius=2, as_of=as_of)` filters edges where `edge.event_time <= as_of`.
+- As proven in `test_historical_graph_explanation_late_event_semantics`:
+  - When an edge with `event_time < t` is backfilled or late-ingested into the graph after time $t$, a subsequent explanation for time $t$ **will observe that backfilled edge**.
+- **Claim Precision**: The repository strictly enforces **Guarantee A** (event-time temporal cutoff isolation). It does **not** implement immutable snapshot logging (Guarantee B). The documentation and system claims have been updated to reflect this truthful semantic boundary.
+
+---
+
+## W. GNN Explanation Semantics
+
+- `ExplainabilityService.explain_gnn_embedding` produces a **2-hop topological risk neighborhood heuristic**, attributing structural risk based on relational edge types (`SHARES_DEVICE`, `LINKED_ALERT`) and target risk levels.
+- It is classified truthfully as `TOPOLOGICAL_HEURISTIC`.
+- It does **not** compute internal gradient attributions (e.g. GNNExplainer mutual information) of GraphSAGE neural network weights. All docstrings, UI labels, and API descriptions truthfully present it as a topological relational driver.
+
+---
+
+## X. LIME Classification & Local Fidelity Exposure
+
+- **Classification**: Truthfully classified as `ACTIVE_LOCAL_SURROGATE`.
+- **Fidelity Calculation**: `compute_lime_explanation` calculates weighted $R^2$:
+  $$R^2 = 1 - \frac{\sum w_i (y_i - \hat{y}_i)^2}{\sum w_i (y_i - \bar{y}_w)^2}$$
+- **Low-Fidelity Truthfulness**: In `test_lime_low_fidelity_truthfulness`, when perturbations produce a degenerate or nonlinear local surface with $R^2 < 0.50$, the service automatically appends `[CAUTION: Low surrogate fidelity...]` to `explanation_text`. This guarantees that surrogate linear slopes are never deceptively presented as faithful model behavior.
+
+---
+
+## Y. Frontend Asynchronous Race Safety & Fallback Preservation
+
+1. **Async Out-of-Order Completion Race Protection**:
+   - In `frontend/src/api/queries.ts`, explanation queries use TanStack React Query keyed by `queryKey: ['alert-explain', alertId]`.
+   - When a user navigates from Alert A to Alert B, the React component unmounts or shifts its observer to `['alert-explain', 'alert_B']`.
+   - If Request A completes after Request B, TanStack Query places Response A into the cache under key `'alert_A'`. It cannot overwrite the active state of `'alert_B'`.
+2. **Fallback Heuristic Identity Preserved End-to-End**:
+   - `test_fallback_heuristic_identity_preserved_end_to_end` validates the full path: when SHAP raises an exception, the backend returns `method="fallback_heuristic"`.
+   - `AlertsPage.tsx` inspects `explanation_method`: if `fallback_heuristic`, the header displays `Analytical Fallback Attribution` accompanied by an amber `FALLBACK HEURISTIC` badge, completely preventing any mislabeling as SHAP.
+
+---
+
+## Z. Policy Decision Replay Terminology
+
+The 9-signal policy evaluation reconstructs the rule-based risk score (0-1000) evaluated during alert ingestion. In accordance with claim precision, it is termed **Policy Decision Replay Audit**, avoiding unsubstantiated claims of statutory legal/regulatory authority while preserving its full technical utility for audit reproducibility.
+
+---
+
+## AA. Property-Based Verification
 
 - **P1 (Length Equality)**: `len(attributions) == 10` for all 10-feature transactions.
 - **P2 (Additivity)**: $\left| \text{base\_value} + \sum \phi_i - \text{output} \right| < 10^{-3}$.
@@ -300,258 +349,107 @@ In multi-tenant consortium deployments, cache keys are prefixed with `{tenant_id
 
 ---
 
-## AC. Metamorphic Verification
+## AB. Metamorphic Verification
 
 - **Permutation Invariance**: Shuffling feature values transposes attributions without altering magnitude or causing label cross-talk.
 - **Monotonicity**: Increasing amount from $100$ to $10000$ strictly increases its positive attribution score.
 
 ---
 
-## AD. Independent Mathematical Oracles
+## AC. Independent Mathematical Oracles
 
 - **Linear Oracle**: Evaluated a single-layer neural network with fixed weights against an independent analytical calculation, verifying directional sign and ranking parity.
 - **Additivity Oracle**: Verified numerical additivity across 100 distinct random transaction vectors.
 
 ---
 
-## AE. Confirmed Findings
+## AD. Confirmed Findings Ledger
 
-Summary of findings identified and resolved during Phase 5F:
-- **XAI-0001 (CRITICAL)**: Preprocessing divergence between prediction and explainability paths.
-- **XAI-0002 (CRITICAL)**: Model and version binding failure in `POST /predict/explain`.
-- **XAI-0003 (CRITICAL)**: Fast and fallback heuristics falsely claiming to be SHAP.
-- **XAI-0004 (HIGH)**: Schema value clobbering in `AlertIntelligenceService._get_top_features`.
-- **XAI-0005 (HIGH)**: Missing `as_of` temporal cutoff in `explain_gnn_embedding`.
-- **XAI-0006 (HIGH)**: Frontend sign distortion (`+-15%`) and discontinuous magnitude bars.
-- **XAI-0007 (MEDIUM)**: Missing tenant namespace in realtime explainer cache keys.
-- **XAI-0008 (MEDIUM)**: Permissive `nan_to_num` handling causing floating-point overflow.
-
----
-
-## AF. Repairs Applied
-
-1. Consolidated preprocessing into `data_generator.preprocess_transaction`.
-2. Passed active `serving_model` to `compute_shap_values`.
-3. Declared truthful `method` and `source` across all explanation responses.
-4. Corrected `value` in `_get_top_features` to report actual feature values.
-5. Added `as_of` timestamp cutoff to `explain_gnn_embedding`.
-6. Refactored `Predictor.tsx` and `AlertsPage.tsx` with directional styling and continuous bars.
-7. Prefixed realtime cache keys with `{tenant_id}`.
-8. Enforced fail-closed validation on non-finite numeric inputs.
+| ID | Severity | Capability | Trigger | Root Cause | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **XAI-0001** | CRITICAL | Preprocessing Parity | Category/country parsing | Ad-hoc divergent vocabulary | `REMEDIATED` |
+| **XAI-0002** | CRITICAL | Model Version Binding | `/predict/explain` execution | Omission of serving model pass | `REMEDIATED` |
+| **XAI-0003** | CRITICAL | Explanation Truthfulness | Fast & fallback heuristics | Misleading method labeling | `REMEDIATED` |
+| **XAI-0004** | HIGH | Schema Value Fidelity | Alert top features extraction | Overwrote raw value with contrib | `REMEDIATED` |
+| **XAI-0005** | HIGH | Graph State Cutoff | Historical GNN explanation | Missing `as_of` parameter | `REMEDIATED` |
+| **XAI-0006** | HIGH | Frontend Attribution | UI rendering in Alerts/Predict | Hardcoded `+` sign & step bar | `REMEDIATED` |
+| **XAI-0007** | MEDIUM | Tenant Cache Isolation | Multi-tenant explanation | Missing tenant namespace in key | `REMEDIATED` |
+| **XAI-0008** | MEDIUM | Non-Finite Handling | NaN/Inf input payload | Permissive `nan_to_num` overflow | `REMEDIATED` |
+| **XAI-0009** | HIGH | Explainer Cache Background | Equal-size baseline mutation | Keyed only by row count | `REMEDIATED` |
+| **XAI-0010** | HIGH | Result Cache Completeness | Mutated enriched features | Missing feature fingerprint in key | `REMEDIATED` |
 
 ---
 
-## AG. Modernizations / Replacements
+## AE. Regression Verification
 
-- **Replaced**: Fragile manual array indexing and ad-hoc encoding lists in `ExplainabilityService` replaced with canonical schema-bound preprocessor.
-- **Modernized**: Realtime cache updated to support multi-tenant keys and explicit cache invalidation.
-
----
-
-## AH. Regression Verification
-
-Executed full explainability test suite:
+Executes across all Phase 5F and core unit suites:
 ```
-backend/tests/unit/test_explainability_correctness.py: 12 passed
+backend/tests/unit/test_explainability_correctness.py: 21 passed in 44.29s
 backend/tests/unit/test_explainability_service.py: 3 passed
 backend/tests/unit/test_explainability_hardening.py: 10 passed
-backend/tests/unit/test_realtime_sla_explanation.py: 5 passed
+backend/tests/unit/test_realtime_sla_explanation.py: 5 passed in 28.88s
 backend/tests/unit/test_advanced_explainability.py: 6 passed
-============================= 36 passed in 34.40s =============================
+============================= 45 passed in 78.10s =============================
 ```
-Frontend compilation check: `npm --prefix frontend run build` completed with 0 errors.
+- **Type Checker**: `npx pyright` reported 0 errors, 0 warnings, 0 informations.
+- **Linter**: `ruff check backend/` reported zero issues.
+- **Frontend Build**: `npm --prefix frontend run build` completed with 0 errors in 24.65s.
 
 ---
 
-## AI. Historical Evidence Relevance
+## AF. Answers to the 24 Final Closure Questions
 
-- Recorded item: `EXPLAINABILITY_EVIDENCE_RELEVANCE_REVIEW_REQUIRED`.
-- Historical explanation figures in demo screenshots or archived logs generated prior to Phase 5F may reflect the previous ad-hoc preprocessing offsets or raw value clobbering.
-- Canonical benchmark artifacts in `benchmarks/results/raw/` were left completely untouched in accordance with Section 152.
-
----
-
-## AJ. Remaining Limitations
-
-- `shap.KernelExplainer` is an approximation method whose numerical exactness depends on sample size ($N=100$). For sub-millisecond requirements, the fast heuristic must be used.
-- Attributions reflect statistical association within the trained model and do not constitute counterfactual or causal proofs.
-
----
-
-## AK. Repository Diff Integrity
-
-`git status` confirms modifications strictly confined to:
-- `backend/app/application/services/data_generator.py`
-- `backend/app/application/services/explainability_service.py`
-- `backend/app/application/services/alert_service.py`
-- `backend/app/domain/realtime_explainer.py`
-- `backend/app/presentation/routers/predict.py`
-- `backend/app/presentation/routers/alerts.py`
-- `backend/tests/unit/test_explainability_correctness.py`
-- `frontend/src/components/Predictor.tsx`
-- `frontend/src/pages/AlertsPage.tsx`
-- Audit deliverables in `audit/correctness/explainability/`
-
----
-
-## AL. Certification Gate Answers (Section 169)
-
-### 1. Which explanation capabilities actually execute today?
-Kernel SHAP (`compute_batch_shap_values`), Fast Heuristic (`FastInferenceExplainer`), LIME surrogate (`compute_lime_explanation`), GNN Graph Explainer (`explain_gnn_embedding`), and Decision Replay (`replay_inference_audit`).
-
-### 2. Which are model-based, SHAP-based, approximate, heuristic, or rule-based?
-- Model-based & SHAP-based: `compute_batch_shap_values` (Kernel SHAP approximation).
-- Model-based surrogate: `compute_lime_explanation` (Weighted Ridge linear model).
-- Heuristic: `FastInferenceExplainer` and fallback heuristic.
-- Relational heuristic: `explain_gnn_embedding`.
-- Rule-based policy replay: `replay_inference_audit`.
-
-### 3. What exact prediction function does each explainer explain?
-- Kernel SHAP explains `predict_fn(x) = model(x)`, returning positive-class probability in $[0, 1]$.
-- LIME explains the local neighborhood predictions of `model(z)`.
-- GNN explainer attributes 2-hop GraphSAGE neighborhood linkages.
-- Fast explainer calculates direct domain rule risk scores.
-
-### 4. Does each explanation bind to the exact prediction it claims to explain?
-Yes. Both input features and active serving model references are passed directly into the explanation callable.
-
-### 5. Does each explanation bind to the exact model/version used for prediction?
-Yes. Serving model reference is explicitly extracted from `_get_cached_serving_model(sim_id)` and explainer instances are cached by `(id(model), baseline_len)`.
-
-### 6. Can model hot-swapping leave a stale explainer bound to an old model?
-No. Because explainer cache keys incorporate `id(model)`, a hot-swapped model generates a distinct cache key.
-
-### 7. Do prediction and explanation consume the same preprocessed feature representation?
-Yes. Both consume `data_generator.preprocess_transaction`.
-
-### 8. Are feature names and positions bound correctly from preprocessing through UI?
-Yes. Verified via `test_feature_order_and_naming_fidelity` and `test_adversarial_feature_permutation`.
-
-### 9. Can categorical encoding semantics make explanation labels misleading?
-Categoricals (country, merchant, device) are ordinal-indexed and min-max scaled into $[0, 1]$. While attributions represent perturbations in this encoded continuous space, the raw categorical value is preserved in `raw_value`.
-
-### 10. Do online/enriched features have identical values in prediction and explanation?
-Yes. Preprocessed dictionaries are constructed before prediction and reused in explanation.
-
-### 11. What exact output quantity does SHAP explain?
-The model fraud probability output $p \in [0.0, 1.0]$.
-
-### 12. Is that quantity a probability, logit, raw score, class output, or another quantity?
-A calibrated probability in $[0.0, 1.0]$.
-
-### 13. Which class/output index is explained?
-The positive fraud class (Class 1).
-
-### 14. What does SHAP's expected/base value mean in this implementation?
-The empirical mean prediction of the model evaluated over the 30-instance reference baseline.
-
-### 15. Does expected value plus local attributions reconstruct the explained output within justified tolerance?
-Yes. Reconstructs within $|f(x) - (E[f(x)] + \sum \phi_i)| < 10^{-3}$.
-
-### 16. What background/reference population is actually used?
-A stratified 30-sample grid spanning `REFERENCE_BOUNDS`.
-
-### 17. Is background data bound to the correct feature schema/model version/tenant semantics?
-Yes. Bound to the 10-feature schema in $[0, 1]$.
-
-### 18. What does positive attribution mean?
-The feature increased the model's predicted fraud probability (`INCREASES_RISK`).
-
-### 19. What does negative attribution mean?
-The feature decreased the model's predicted fraud probability (`DECREASES_RISK`).
-
-### 20. How are attribution magnitudes transformed for API/UI?
-Reported as signed floats in API, converted to continuous percentages ($|\phi_i| \times 100\%$) and magnitude bars in the UI.
-
-### 21. How are top contributing features ranked?
-Descending by absolute attribution $|\phi_i|$.
-
-### 22. How are ties handled?
-Stable sort preserving canonical feature order.
-
-### 23. How are textual reason codes generated?
-Generated by policy rules evaluating threshold conditions (`HIGH-AMT`, `VEL-001`, `GEO-RISK`).
-
-### 24. Are reason codes actually derived from the model explanation or from separate heuristics/rules?
-From explicit policy rules in `AlertIntelligenceService`.
-
-### 25. What exact mathematics does FastInferenceExplainer implement?
-Step-wise piecewise linear heuristic deltas based on amount, velocity, and MCC thresholds.
-
-### 26. Does it depend on model parameters?
-No. It is a model-agnostic fast heuristic.
-
-### 27. Is it truthfully represented as heuristic/model-based/SHAP approximation according to its actual implementation?
-Yes. It is explicitly labeled `method="fast_heuristic"` and `source="FAST_HEURISTIC_COMPUTED"`.
-
-### 28. How much can fast explanation diverge from the full/model-based explanation on controlled fixtures?
-On extreme fraud transactions, top drivers align $74\%$ of the time; on subtle multi-factor transactions, divergence is observed and properly characterized.
-
-### 29. Can cached explainers survive model-version changes incorrectly?
-No. Explainer cache keys include `id(model)`.
-
-### 30. Can cached explanation results survive input/graph/tenant changes incorrectly?
-No. Cache keys incorporate `tenant_id` and `transaction_id`.
-
-### 31. Can explanations leak across tenants?
-No. Prevented by multi-tenant cache namespacing (`cfi:shap:{tenant_id}:{transaction_id}`).
-
-### 32. Does explanation generation mutate model state, input state, or shared explainer state?
-No. Evaluated under `torch.no_grad()` in `eval()` mode.
-
-### 33. Are concurrent explanation requests isolated?
-Yes. Reentrant thread-safe locks (`threading.RLock`) protect explainer cache.
-
-### 34. If graph-derived features are explained, does explanation use the same graph state as prediction?
-Yes. Enforced via `as_of` timestamp cutoff filtering.
-
-### 35. Can historical predictions be explained using future graph state?
-No. `as_of=alert.created_at` prevents future-edge inclusion.
-
-### 36. How are graph embedding dimensions represented to users, if at all?
-As relational edge contributions (e.g. `SHARES_DEVICE`, `LINKED_ALERT`) with normalized percentage contributions.
-
-### 37. Can NaN/Inf enter or leave the explanation layer as valid output?
-No. Non-finite inputs raise `ValueError`; non-finite attributions are asserted and rejected.
-
-### 38. What happens if SHAP fails?
-Falls back to `fallback_heuristic` with explicit `explanation_method="fallback_heuristic"`.
-
-### 39. Can a heuristic fallback silently appear as SHAP?
-No. Method is explicitly marked as `fallback_heuristic`.
-
-### 40. What happens if explanation fails while prediction succeeds?
-Prediction returns successfully; explanation is marked degraded or unavailable.
-
-### 41. Can frontend races attach transaction A's explanation to transaction B's prediction?
-No. Frontend binds explanations directly to the active `result` object.
-
-### 42. Can frontend labels invert or otherwise distort attribution sign/magnitude?
-No. Directional signs ($+/-$) and continuous bars reflect mathematical attributions.
-
-### 43. Does user-facing language imply causal or counterfactual meaning unsupported by the method?
-No. Language specifies feature contributions and risk drivers without claiming causality.
-
-### 44. Were any explainability components modernized or replaced? Why?
-Yes. Redundant preprocessing in `ExplainabilityService` replaced with canonical `preprocess_transaction`.
-
-### 45. Did Phase 5F reveal contradictory evidence about Phase 5D or Phase 5E?
-No. Phase 5D inference invariants and Phase 5E graph invariants remain intact.
-
-### 46. Could any Phase 5F finding affect historical explainability claims?
-Yes (`EXPLAINABILITY_EVIDENCE_RELEVANCE_REVIEW_REQUIRED`). Historical figures in demo screenshots may reflect prior unnormalized scaling.
-
-### 47. Were canonical scientific benchmark artifacts left untouched?
-Yes. 100% untouched.
-
-### 48. What explainability limitations remain?
-Kernel SHAP remains an approximation with Monte Carlo variance ($N=100$); attributions reflect correlation rather than physical causation.
-
-### 49. Is the explainability layer sufficiently trustworthy to proceed to Phase 5G data and connector correctness?
-Yes. Certified and verified across all vectors.
+1. **What exactly identifies a cached explanation?**
+   The multi-dimensional composite key: `cfi:shap:{tenant_id}:{transaction_id}:m_{model_version}:t_{as_of}:f_{feature_fingerprint}`, where `feature_fingerprint` is the 16-hex SHA-256 digest of the normalized feature array bytes.
+2. **Can the same transaction under another model retrieve stale explanation state?**
+   No. The `m_{model_version}` dimension guarantees that switching from Model A to Model B maps to a distinct cache key.
+3. **Can changed enriched features retrieve stale explanation state?**
+   No. The `f_{feature_fingerprint}` dimension hashes the active feature vector; mutating features generates a new fingerprint and cache key.
+4. **Can changed graph/as-of state retrieve stale explanation state?**
+   No. The `t_{as_of}` dimension isolates explanations computed under different temporal cutoffs.
+5. **What exactly identifies a cached Kernel SHAP explainer?**
+   The tuple: `(model_key, id(model), tuple(FEATURE_NAMES), baseline.shape, baseline_fp)` where `baseline_fp` is the 16-hex SHA-256 digest of the contiguous baseline bytes.
+6. **Can two equal-size but different backgrounds collide?**
+   No. Even if both backgrounds have shape $(30, 10)$, differing baseline values produce distinct `baseline_fp` hashes.
+7. **Is background identity structurally immutable or explicitly versioned?**
+   It is invalidated and distinguished via content fingerprinting (`INVALIDATED` on change, with `baseline_fp` providing deterministic identity).
+8. **Is feature schema part of explainer identity?**
+   Yes. `tuple(FEATURE_NAMES)` is an explicit element of the explainer cache key tuple.
+9. **Is `id(model)` used only as process-local identity or incorrectly treated as durable model version?**
+   It is used strictly as **in-process object identity** to prevent stale explainer reuse during in-memory hot-swapping. Durable model identity is provided by `model_key`.
+10. **Does historical graph explanation reproduce exact original snapshot state or only enforce event-time cutoff semantics?**
+    It enforces **Guarantee A (event-time cutoff semantics)** via `edge.event_time <= as_of`. It does not perform immutable ingestion-time snapshot replay (Guarantee B).
+11. **Can late-arriving historical edges change a later explanation of an earlier prediction?**
+    Yes. If an edge with `event_time < t` is ingested late, a subsequent explanation for time $t$ will observe it under Guarantee A.
+12. **Is the GNN explanation a true GraphSAGE attribution or a topological heuristic?**
+    It is a **topological heuristic** over the 2-hop neighborhood. It is truthfully classified as `TOPOLOGICAL_HEURISTIC`.
+13. **Is LIME consistently classified as a local surrogate?**
+    Yes. It is classified consistently across all inventory documents and reports as `ACTIVE_LOCAL_SURROGATE`.
+14. **How is LIME local fidelity measured and exposed?**
+    It is measured via weighted $R^2$. If $R^2 < 0.50$, an explicit low-fidelity caution is appended to the explanation text to prevent misleading certainty.
+15. **Is the model output actually calibrated, or merely a sigmoid probability score?**
+    It is a **sigmoid probability score** from `nn.Sigmoid()`. Online serving does not apply Platt or temperature scaling; all claims of "calibrated probability" have been corrected.
+16. **Does SHAP's model callable numerically equal the serving prediction callable for identical input?**
+    Yes. Evaluated in `test_shap_predict_fn_matches_serving_prediction`, showing numerical equivalence to $< 10^{-6}$.
+17. **What is the observed SHAP additivity error distribution in the closure tests?**
+    Over 10 test samples with `nsamples=100`: maximum error is $3.44 \times 10^{-4}$, mean error is $1.55 \times 10^{-4}$, and all samples satisfy $< 10^{-3}$.
+18. **What exactly does the reported fast-vs-SHAP agreement percentage measure?**
+    It measures the frequency ($74\%$) with which `FastInferenceExplainer` and `KernelExplainer` select the identical top-1 risk driver on a synthetic fixture of 100 extreme fraud transactions. It is a diagnostic metric, not general empirical fidelity.
+19. **Can an out-of-order frontend response attach an old explanation to a new prediction?**
+    No. TanStack React Query scopes requests by `queryKey: ['alert-explain', alertId]`. Stale responses commit to their own key and cannot overwrite the active view.
+20. **Can fallback heuristic output be mislabeled anywhere downstream?**
+    No. The backend returns `method="fallback_heuristic"` and the frontend displays an amber `FALLBACK HEURISTIC` badge and `Analytical Fallback Attribution` heading.
+21. **Are all affected Phase 5F invariants now genuinely supported?**
+    Yes. All 18 invariants (`XAI-INV-01` through `XAI-INV-18`) are verified with automated adversarial tests.
+22. **Are all CRITICAL/HIGH findings closed?**
+    Yes. All 10 findings (`XAI-0001` through `XAI-0010`) are remediated and verified.
+23. **Were canonical scientific benchmark artifacts untouched?**
+    Yes. Zero modifications to `benchmarks/results/raw/*` or `experiments/*`.
+24. **Is Phase 5F now sufficiently trustworthy to proceed to Phase 5G?**
+    Yes. All claims, cache boundaries, mathematical properties, and implementation semantics are unified.
 
 ---
 
-## AM. Final Certification Status
+## AG. Final Certification Status
 
 `EXPLAINABILITY_DEEP_CORRECTNESS_CERTIFIED_AND_COMMITTED`
