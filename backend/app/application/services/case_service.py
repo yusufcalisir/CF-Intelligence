@@ -47,6 +47,7 @@ def _hash_event(event: CaseEvent, parent_hash: str) -> str:
 def _case_to_dict(c: Case) -> dict[str, Any]:
     return {
         "id": c.id,
+        "bank_id": getattr(c, "bank_id", None),
         "title": c.title,
         "status": c.status.value,
         "priority": c.priority.value,
@@ -91,6 +92,8 @@ def _dict_to_case(d: dict[str, Any]) -> Case:
         d_copy["evidence_ids"] = []
     if "supervisor_signatures" not in d_copy:
         d_copy["supervisor_signatures"] = []
+    if "bank_id" not in d_copy:
+        d_copy["bank_id"] = None
     d_copy["created_at"] = datetime.fromisoformat(d_copy["created_at"])
     if d_copy.get("updated_at"):
         d_copy["updated_at"] = datetime.fromisoformat(d_copy["updated_at"])
@@ -203,11 +206,13 @@ class CaseManagementService:
         alert_ids: list[str] | None = None,
         total_risk_score: float = 0.0,
         assigned_to: str | None = None,
+        bank_id: str | None = None,
     ) -> Case:
         """Create a new investigation case."""
         with self._lock:
             case = Case(
                 title=title,
+                bank_id=bank_id,
                 priority=priority,
                 alert_ids=alert_ids or [],
                 total_risk_score=float(total_risk_score),
@@ -218,13 +223,18 @@ class CaseManagementService:
             self._add_event(case, "created", f"Case created: {title}", "system")
 
             self._cases.set(case.id, _case_to_dict(case))
-            logger.info("Created case %s: %s (priority=%s, risk=%.1f)", case.id[:8], title, priority.value, total_risk_score)
+            logger.info("Created case %s: %s (priority=%s, risk=%.1f, bank=%s)", case.id[:8], title, priority.value, total_risk_score, bank_id)
             return case
 
     def assign_case(self, case_id: str, investigator: str) -> Case:
         """Assign a case to an investigator."""
         with self._lock:
             case = self._get_case(case_id)
+            if not case.is_open:
+                raise TerminalCaseImmutableError(
+                    f"Invalid assignment: Case '{case_id}' is finalized in terminal state '{case.status.value}' "
+                    f"and cannot be reassigned (Terminal Immutability Invariant)."
+                )
             old_assignee = case.assigned_to
             case.assigned_to = investigator
             case.status = CaseStatus.ASSIGNED
@@ -268,6 +278,7 @@ class CaseManagementService:
         supervisor_signature: str | None = None,
         second_supervisor_signature: str | None = None,
         supervisor_signatures: list[str] | None = None,
+        expected_status: CaseStatus | None = None,
     ) -> Case:
         """Change case status with transition validation and dual-control signoff.
 
@@ -277,6 +288,14 @@ class CaseManagementService:
         with self._lock:
             case = self._get_case(case_id)
             old_status = case.status
+            # Optimistic concurrency check (Lost Update Prevention)
+            if expected_status:
+                exp_val = getattr(expected_status, "value", str(expected_status)).lower()
+                old_val = getattr(old_status, "value", str(old_status)).lower()
+                if old_val != exp_val:
+                    raise InvalidCaseTransitionError(
+                        f"Precondition failed: Expected case status '{exp_val}', but current status is '{old_val}' (Lost Update Prevention)."
+                    )
             # Terminal state immutability check (Replay Resistance)
             if old_status in (CaseStatus.CLOSED_CONFIRMED, CaseStatus.CLOSED_FALSE_POSITIVE):
                 raise TerminalCaseImmutableError(
@@ -493,6 +512,11 @@ class CaseManagementService:
         """Link an additional alert to an existing case."""
         with self._lock:
             case = self._get_case(case_id)
+            if not case.is_open:
+                raise TerminalCaseImmutableError(
+                    f"Invalid alert linking: Case '{case_id}' is finalized in terminal state '{case.status.value}' "
+                    f"and cannot link new alerts (Terminal Immutability Invariant)."
+                )
 
             if alert_id not in case.alert_ids:
                 case.alert_ids.append(alert_id)
@@ -618,21 +642,12 @@ class CaseManagementService:
             if val:
                 return _dict_to_case(val)
 
-            # Synthesise fallback for valid UUID-format IDs or canonical demo cases
-            import re
-
-            is_uuid = bool(
-                re.fullmatch(
-                    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-                    case_id,
-                    re.IGNORECASE,
-                )
-            )
+            # Synthesise fallback strictly for canonical demo cases if not found in active storage
             is_canonical_demo = (
                 case_id.upper() in ("CASE-98492", "CASE-2026-001", "CASE-2026-004")
-                or case_id.lower().startswith("case_")
+                or case_id.lower().startswith("case_demo_")
             )
-            if not (is_uuid or is_canonical_demo):
+            if not is_canonical_demo:
                 return None
 
             h = int(hashlib.sha256(case_id.encode()).hexdigest(), 16)

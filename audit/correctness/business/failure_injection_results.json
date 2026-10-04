@@ -1,0 +1,78 @@
+{
+  "test_suite": "Business Logic Adversarial Failure Injection",
+  "executed_at": "2026-10-04T17:28:00Z",
+  "scenarios": [
+    {
+      "scenario_id": "FAIL-INJ-01",
+      "name": "Cross-Tenant Object-Reference Mutation (BOLA)",
+      "target": "PATCH /api/v1/cases/{case_id} & POST /api/v1/cases/{case_id}/file-sar",
+      "injection": "Caller with tenant 'bank_beta' attempts to read, mutate status, or generate SAR for a case belonging to 'bank_alpha'",
+      "expected_outcome": "HTTP 403 Forbidden with zero mutation to database or timeline",
+      "actual_outcome": "HTTP 403 Forbidden ('Cross-tenant case access forbidden')",
+      "result": "PASS"
+    },
+    {
+      "scenario_id": "FAIL-INJ-02",
+      "name": "Stale Update Race Condition (Lost Update Prevention)",
+      "target": "PATCH /api/v1/cases/{case_id}",
+      "injection": "Two analysts read state S0='open'. Analyst 1 transitions to S1='investigating'. Analyst 2 submits update with expected_status='open'",
+      "expected_outcome": "Analyst 2 request fails with HTTP 409 Conflict ('Precondition failed: Expected case status')",
+      "actual_outcome": "HTTP 409 Conflict returned; case remains in 'investigating' without corruption",
+      "result": "PASS"
+    },
+    {
+      "scenario_id": "FAIL-INJ-03",
+      "name": "Self-Approval Evasion via Casing & Prefix Variation",
+      "target": "POST /api/v1/cases/{case_id}/sign & POST /api/v1/cases/{case_id}/resolve",
+      "injection": "Assigned investigator 'john_doe' attempts to sign closure as 'supervisor:JOHN_DOE'",
+      "expected_outcome": "HTTP 403 Forbidden ('Self-approval prohibited: Assigned investigator cannot approve their own case')",
+      "actual_outcome": "HTTP 403 Forbidden returned; clean_identity normalizes identity and blocks bypass",
+      "result": "PASS"
+    },
+    {
+      "scenario_id": "FAIL-INJ-04",
+      "name": "Terminal State Mutation Leak (Replay Resistance)",
+      "target": "CaseManagementService.link_alert / assign_case / change_status",
+      "injection": "Attempt to link new alert, reassign, or reopen a case in 'closed_confirmed' status",
+      "expected_outcome": "TerminalCaseImmutableError raised; case remains finalized and immutable",
+      "actual_outcome": "TerminalCaseImmutableError successfully raised across all mutation vectors",
+      "result": "PASS"
+    },
+    {
+      "scenario_id": "FAIL-INJ-05",
+      "name": "Regulatory SAR Generation for False Positive Case",
+      "target": "POST /api/v1/cases/{case_id}/file-sar",
+      "injection": "Client requests FinCEN SAR XML generation for a case resolved as 'closed_false_positive'",
+      "expected_outcome": "HTTP 400 Bad Request ('Cannot generate SAR filing for a case resolved as CLOSED_FALSE_POSITIVE')",
+      "actual_outcome": "HTTP 400 Bad Request returned; fail-closed behavior verified",
+      "result": "PASS"
+    },
+    {
+      "scenario_id": "FAIL-INJ-06",
+      "name": "Arbitrary Non-Existent UUID Synthesis Trap",
+      "target": "GET /api/v1/cases/{random_uuid}",
+      "injection": "Client queries a valid RFC-4122 UUID4 that does not exist in Redis",
+      "expected_outcome": "HTTP 404 Not Found without synthesizing a fake mock case",
+      "actual_outcome": "HTTP 404 Not Found ('Case not found: <uuid>')",
+      "result": "PASS"
+    },
+    {
+      "scenario_id": "FAIL-INJ-07",
+      "name": "Webhook SSRF DNS Resolution Failure (Fail-Closed)",
+      "target": "WebhookService.register_subscription",
+      "injection": "Client registers target URL pointing to non-existent or internal unresolvable domain",
+      "expected_outcome": "ValueError / registration rejected upfront under fail-closed policy",
+      "actual_outcome": "Registration rejected ('Invalid or disallowed webhook target URL')",
+      "result": "PASS"
+    },
+    {
+      "scenario_id": "FAIL-INJ-08",
+      "name": "Webhook Retries and Kafka Redelivery Deduplication",
+      "target": "WebhookService.dispatch_event",
+      "injection": "Dispatch event called multiple times for the same alert payload to simulate Kafka redelivery",
+      "expected_outcome": "Both dispatches carry the exact same deterministic X-CFI-Event-Id",
+      "actual_outcome": "Exact same 'evt_<hash>' returned across all deliveries",
+      "result": "PASS"
+    }
+  ]
+}

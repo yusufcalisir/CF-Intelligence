@@ -86,6 +86,7 @@ class Case:
     """
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    bank_id: str | None = None
     title: str = ""
     status: CaseStatus = CaseStatus.OPEN
     priority: CasePriority = CasePriority.P3_MEDIUM

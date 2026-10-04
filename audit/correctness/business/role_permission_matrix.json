@@ -1,0 +1,71 @@
+{
+  "matrix_metadata": {
+    "scope": "RBAC & Dual-Control Permission Matrix",
+    "version": "1.0.0"
+  },
+  "roles": [
+    "analyst",
+    "investigator",
+    "supervisor",
+    "senior_supervisor",
+    "compliance_officer",
+    "mlro",
+    "admin"
+  ],
+  "operations": {
+    "create_case": {
+      "allowed_roles": ["analyst", "investigator", "supervisor", "admin"],
+      "four_eyes_required": false
+    },
+    "view_case": {
+      "allowed_roles": ["analyst", "investigator", "supervisor", "senior_supervisor", "compliance_officer", "mlro", "admin"],
+      "four_eyes_required": false
+    },
+    "assign_case": {
+      "allowed_roles": ["supervisor", "senior_supervisor", "admin"],
+      "four_eyes_required": false
+    },
+    "transition_investigating": {
+      "allowed_roles": ["analyst", "investigator", "supervisor", "admin"],
+      "four_eyes_required": false
+    },
+    "escalate_case": {
+      "allowed_roles": ["analyst", "investigator", "supervisor", "admin"],
+      "four_eyes_required": false
+    },
+    "sign_as_supervisor": {
+      "allowed_roles": ["supervisor", "senior_supervisor", "mlro", "admin"],
+      "four_eyes_required": true,
+      "constraint": "ApproverID != InvestigatorID"
+    },
+    "resolve_confirmed_fraud": {
+      "allowed_roles": ["supervisor", "senior_supervisor", "mlro"],
+      "four_eyes_required": true,
+      "constraint": "Requires 2 distinct supervisor signatures"
+    },
+    "resolve_false_positive": {
+      "allowed_roles": ["supervisor", "senior_supervisor", "mlro"],
+      "four_eyes_required": true,
+      "constraint": "Requires 2 distinct supervisor signatures"
+    },
+    "add_note": {
+      "allowed_roles": ["analyst", "investigator", "supervisor", "senior_supervisor", "compliance_officer", "mlro", "admin"],
+      "four_eyes_required": false
+    },
+    "link_alert": {
+      "allowed_roles": ["analyst", "investigator", "supervisor", "admin"],
+      "four_eyes_required": false,
+      "constraint": "Case must be in open state (not terminal)"
+    },
+    "file_sar_report": {
+      "allowed_roles": ["supervisor", "senior_supervisor", "compliance_officer", "mlro"],
+      "four_eyes_required": true,
+      "constraint": "Case must be in ESCALATED, SAR_FILED, or CLOSED_CONFIRMED"
+    },
+    "export_fincen_xml": {
+      "allowed_roles": ["supervisor", "senior_supervisor", "compliance_officer", "mlro", "admin"],
+      "four_eyes_required": false,
+      "constraint": "Read/export only"
+    }
+  }
+}

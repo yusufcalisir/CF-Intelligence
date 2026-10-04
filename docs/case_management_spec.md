@@ -205,9 +205,13 @@ Investigators can attach evidentiary documents, packet dumps, and transaction sc
 - Registers metadata in Redis (`id`, `case_id`, `evidence_type`, `title`, `file_path`, `content_hash`, `uploaded_by`, `uploaded_at`).
 - Automatically injects an `evidence_added` event into the cryptographically signed case timeline.
 
-### 3. Idempotent Case Ingestion & Tenant Isolation
-- **Idempotency**: `POST /api/v1/cases` accepts an `Idempotency-Key` HTTP header. Utilizing [`IdempotencyService`](../backend/app/application/services/idempotency.py), duplicate requests within 24 hours return the cached response with header `Idempotency-Replayed: true`. Concurrent executions return HTTP 409 Conflict.
-- **Tenant Isolation**: `GET /api/v1/cases/{case_id}` verifies that the caller's tenant identity matches the `bank_id` of all linked alerts via [`enforce_tenant_isolation()`](../backend/app/dependencies.py). Unauthorized cross-bank access attempts are rejected with HTTP 403 Forbidden.
+### 3. Idempotent Case Ingestion, Tenant Isolation & Concurrency Control
+- **Idempotency**: `POST /api/v1/cases` accepts an `Idempotency-Key` HTTP header. Utilizing [`IdempotencyService`](../backend/app/application/services/idempotency.py), duplicate requests within 24 hours return the cached response with header `Idempotency-Replayed: true`. Concurrent executions with conflicting payloads return HTTP 409 Conflict.
+- **Authoritative Tenant Isolation**: All operations under `/api/v1/cases` (retrieval, status mutations, escalations, supervisor signatures, resolutions, notes, evidence attachments, alert linking, exports, and SAR filings) enforce strict tenant boundary matching via `_enforce_case_tenant(case, caller_tenant)`. Any cross-tenant access attempt by unauthorized banks is immediately rejected with HTTP 403 Forbidden.
+- **Optimistic Concurrency Control**: `PATCH /api/v1/cases/{case_id}` accepts an optional `expected_status` precondition in [`CaseStatusRequest`](../backend/app/application/schemas/cases.py). If the authoritative case status in persistence has been modified concurrently by another investigator, the update fails closed and returns HTTP 409 Conflict (`"Precondition failed: Case status is ..., expected ..."`), eliminating race conditions and lost updates.
+- **Terminal State Immutability**: Cases finalized in `CLOSED_CONFIRMED` or `CLOSED_FALSE_POSITIVE` are strictly immutable. Any attempt to change status, reassign the case (`assign_case`), or link new alerts (`link_alert`) raises `TerminalCaseImmutableError`.
+- **Regulatory Eligibility Gating**: Generating FinCEN SAR filings via `POST /api/v1/cases/{case_id}/file-sar` enforces strict eligibility. False positive cases (`CLOSED_FALSE_POSITIVE`) and uninvestigated `OPEN`/`ASSIGNED` cases are rejected upfront with HTTP 400 Bad Request.
+- **Deterministic Webhook Replay Deduplication**: Outbound developer webhook dispatches (`WebhookService.dispatch_event`) derive a stable identifier `evt_<sha256(tenant_id:event_type:object_id)[:12]>`, ensuring identical `X-CFI-Event-Id` headers across Kafka redeliveries and transport retries.
 
 ---
 
@@ -309,7 +313,7 @@ All endpoints are hosted under prefix `/api/v1/cases` and defined in [`backend/a
 | `GET` | `/` | `status`, `priority`, `limit` (1–200) | `list[CaseSummaryResponse]` | Filter and list investigation cases. |
 | `POST` | `/` | `CaseCreateRequest`, Header `Idempotency-Key` | `CaseResponse` | Idempotently create an investigation case from linked alerts. |
 | `GET` | `/{case_id}` | `actor` (default "analyst") | `CaseResponse` | Retrieve full case details with tenant isolation verification. |
-| `PATCH` | `/{case_id}` | `CaseStatusRequest` (`status`, `actor`, `supervisor_signature`, `second_supervisor_signature`) | `CaseResponse` | Transition case status with Four-Eyes dual control enforcement. |
+| `PATCH` | `/{case_id}` | `CaseStatusRequest` (`status`, `actor`, `expected_status`, `supervisor_signature`, `second_supervisor_signature`) | `CaseResponse` | Transition case status with Four-Eyes dual control & optimistic concurrency (`expected_status`). |
 | `POST` | `/{case_id}/escalate` | `CaseEscalateRequest` (`reason`, `actor`) | `CaseResponse` | Escalate a case to PENDING_REVIEW for Four-Eyes supervisor evaluation. |
 | `POST` | `/{case_id}/sign` | `CaseSignRequest` (`supervisor_id`, `action`, `notes`) | `CaseResponse` | Record supervisor approval signature under Four-Eyes dual control. |
 | `POST` | `/{case_id}/resolve` | `CaseResolveRequest` (`resolution`, `primary_supervisor`, `secondary_supervisor`) | `CaseResponse` | Resolve and close case under strict dual supervisor signoff. |
@@ -341,10 +345,11 @@ pytest backend/tests/unit/test_case_management_workbench.py \
        backend/tests/unit/test_case_management_feedback_loop.py \
        backend/tests/unit/test_case_service_branches.py \
        backend/tests/unit/test_case_lifecycle_hardening.py \
-       backend/tests/unit/test_regulatory_reporter.py -v
+       backend/tests/unit/test_regulatory_reporter.py \
+       backend/tests/unit/test_business_logic_correctness.py -v
 ```
 
-### Verified Test Results (24 Passed in 12.80s)
+### Verified Test Results (45 Passed in 24.12s)
 
 | Test File | Test Name | Assertion / Behavior Verified | Status |
 |:---|:---|:---|:---:|
@@ -372,6 +377,14 @@ pytest backend/tests/unit/test_case_management_workbench.py \
 | [`test_regulatory_reporter.py`](../backend/tests/unit/test_regulatory_reporter.py) | `test_sar_rejected_for_unresolved_case` | Attempting to generate SAR XML for open/investigating case raises `SARValidationError` | `PASSED` |
 | [`test_regulatory_reporter.py`](../backend/tests/unit/test_regulatory_reporter.py) | `test_ai_act_pdf_contains_required_fields` | Generates EU AI Act Article 13 transparency report PDF with mandated disclosures | `PASSED` |
 | [`test_regulatory_reporter.py`](../backend/tests/unit/test_regulatory_reporter.py) | `test_human_oversight_recording` | Verifies EU AI Act Article 14 human oversight recording in audit store | `PASSED` |
+| [`test_business_logic_correctness.py`](../backend/tests/unit/test_business_logic_correctness.py) | `test_full_legal_lifecycle` | Validates end-to-end 8-state progression across all valid transitions | `PASSED` |
+| [`test_business_logic_correctness.py`](../backend/tests/unit/test_business_logic_correctness.py) | `test_terminal_states_strictly_immutable` | Ensures terminal closed states reject status changes, reassignments, and alert linking | `PASSED` |
+| [`test_business_logic_correctness.py`](../backend/tests/unit/test_business_logic_correctness.py) | `test_expected_status_mismatch_returns_409_conflict` | Validates optimistic locking precondition returning HTTP 409 Conflict on lost updates | `PASSED` |
+| [`test_business_logic_correctness.py`](../backend/tests/unit/test_business_logic_correctness.py) | `test_identity_normalization_prevents_casing_and_prefix_evasion` | Four-Eyes identity normalization prevents evasive bypasses (casing, prefixes) | `PASSED` |
+| [`test_business_logic_correctness.py`](../backend/tests/unit/test_business_logic_correctness.py) | `test_cross_tenant_case_access_and_mutation_blocked` | Enforces tenant isolation returning HTTP 403 Forbidden across all case routes | `PASSED` |
+| [`test_business_logic_correctness.py`](../backend/tests/unit/test_business_logic_correctness.py) | `test_cannot_file_sar_for_false_positive_case` | Rejects FinCEN SAR generation on false positive and uninvestigated cases (HTTP 400) | `PASSED` |
+| [`test_business_logic_correctness.py`](../backend/tests/unit/test_business_logic_correctness.py) | `test_webhook_dispatches_share_stable_event_id_on_redelivery` | Validates deterministic stable event IDs across Kafka redelivery and transport retries | `PASSED` |
+| [`test_business_logic_correctness.py`](../backend/tests/unit/test_business_logic_correctness.py) | `test_nonexistent_uuid_returns_404` | Non-existent UUIDs return truthful HTTP 404 without synthesizing fake mock objects | `PASSED` |
 
 ---
 

@@ -1,0 +1,174 @@
+{
+  "entity": "Case",
+  "states": [
+    "open",
+    "assigned",
+    "investigating",
+    "pending_review",
+    "escalated",
+    "sar_filed",
+    "closed_confirmed",
+    "closed_false_positive"
+  ],
+  "initial_state": "open",
+  "terminal_states": [
+    "closed_confirmed",
+    "closed_false_positive"
+  ],
+  "terminal_state_contract": {
+    "is_immutable": true,
+    "can_reopen": false,
+    "can_reassign": false,
+    "can_link_alerts": false,
+    "can_add_signatures": false,
+    "violation_exception": "TerminalCaseImmutableError"
+  },
+  "transitions": {
+    "open": {
+      "legal_destinations": ["assigned", "investigating", "closed_false_positive"],
+      "preconditions": {
+        "closed_false_positive": "Requires 2 distinct supervisor signatures under Four-Eyes dual control"
+      },
+      "authorized_actors": ["analyst", "investigator", "supervisor", "admin"]
+    },
+    "assigned": {
+      "legal_destinations": ["investigating", "open"],
+      "preconditions": {},
+      "authorized_actors": ["assigned_analyst", "supervisor", "admin"]
+    },
+    "investigating": {
+      "legal_destinations": [
+        "pending_review",
+        "escalated",
+        "closed_confirmed",
+        "closed_false_positive"
+      ],
+      "preconditions": {
+        "closed_confirmed": "Requires 2 distinct supervisor signatures (ApproverID != InvestigatorID)",
+        "closed_false_positive": "Requires 2 distinct supervisor signatures (ApproverID != InvestigatorID)"
+      },
+      "authorized_actors": ["assigned_analyst", "investigator", "supervisor"]
+    },
+    "pending_review": {
+      "legal_destinations": [
+        "investigating",
+        "escalated",
+        "closed_confirmed",
+        "closed_false_positive"
+      ],
+      "preconditions": {
+        "investigating": "Supervisor rejection returns case to investigating with rejection notes",
+        "closed_confirmed": "Requires 2 distinct supervisor signatures",
+        "closed_false_positive": "Requires 2 distinct supervisor signatures"
+      },
+      "authorized_actors": ["supervisor", "compliance_officer"]
+    },
+    "escalated": {
+      "legal_destinations": ["investigating", "closed_confirmed", "sar_filed"],
+      "preconditions": {
+        "sar_filed": "Requires FinCEN BSA SAR generation or compliance filing signoff",
+        "closed_confirmed": "Requires 2 distinct supervisor signatures"
+      },
+      "authorized_actors": ["senior_investigator", "supervisor", "mlro"]
+    },
+    "sar_filed": {
+      "legal_destinations": ["closed_confirmed"],
+      "preconditions": {
+        "closed_confirmed": "Requires 2 distinct supervisor signatures"
+      },
+      "authorized_actors": ["mlro", "supervisor"]
+    },
+    "closed_confirmed": {
+      "legal_destinations": [],
+      "preconditions": "Terminal state: strictly immutable.",
+      "authorized_actors": []
+    },
+    "closed_false_positive": {
+      "legal_destinations": [],
+      "preconditions": "Terminal state: strictly immutable.",
+      "authorized_actors": []
+    }
+  },
+  "transition_matrix_8x8": {
+    "open": {
+      "open": "ILLEGAL",
+      "assigned": "LEGAL",
+      "investigating": "LEGAL",
+      "pending_review": "ILLEGAL",
+      "escalated": "ILLEGAL",
+      "sar_filed": "ILLEGAL",
+      "closed_confirmed": "ILLEGAL",
+      "closed_false_positive": "LEGAL"
+    },
+    "assigned": {
+      "open": "LEGAL",
+      "assigned": "ILLEGAL",
+      "investigating": "LEGAL",
+      "pending_review": "ILLEGAL",
+      "escalated": "ILLEGAL",
+      "sar_filed": "ILLEGAL",
+      "closed_confirmed": "ILLEGAL",
+      "closed_false_positive": "ILLEGAL"
+    },
+    "investigating": {
+      "open": "ILLEGAL",
+      "assigned": "ILLEGAL",
+      "investigating": "ILLEGAL",
+      "pending_review": "LEGAL",
+      "escalated": "LEGAL",
+      "sar_filed": "ILLEGAL",
+      "closed_confirmed": "LEGAL",
+      "closed_false_positive": "LEGAL"
+    },
+    "pending_review": {
+      "open": "ILLEGAL",
+      "assigned": "ILLEGAL",
+      "investigating": "LEGAL",
+      "pending_review": "ILLEGAL",
+      "escalated": "LEGAL",
+      "sar_filed": "ILLEGAL",
+      "closed_confirmed": "LEGAL",
+      "closed_false_positive": "LEGAL"
+    },
+    "escalated": {
+      "open": "ILLEGAL",
+      "assigned": "ILLEGAL",
+      "investigating": "LEGAL",
+      "pending_review": "ILLEGAL",
+      "escalated": "ILLEGAL",
+      "sar_filed": "LEGAL",
+      "closed_confirmed": "LEGAL",
+      "closed_false_positive": "ILLEGAL"
+    },
+    "sar_filed": {
+      "open": "ILLEGAL",
+      "assigned": "ILLEGAL",
+      "investigating": "ILLEGAL",
+      "pending_review": "ILLEGAL",
+      "escalated": "ILLEGAL",
+      "sar_filed": "ILLEGAL",
+      "closed_confirmed": "LEGAL",
+      "closed_false_positive": "ILLEGAL"
+    },
+    "closed_confirmed": {
+      "open": "ILLEGAL",
+      "assigned": "ILLEGAL",
+      "investigating": "ILLEGAL",
+      "pending_review": "ILLEGAL",
+      "escalated": "ILLEGAL",
+      "sar_filed": "ILLEGAL",
+      "closed_confirmed": "ILLEGAL",
+      "closed_false_positive": "ILLEGAL"
+    },
+    "closed_false_positive": {
+      "open": "ILLEGAL",
+      "assigned": "ILLEGAL",
+      "investigating": "ILLEGAL",
+      "pending_review": "ILLEGAL",
+      "escalated": "ILLEGAL",
+      "sar_filed": "ILLEGAL",
+      "closed_confirmed": "ILLEGAL",
+      "closed_false_positive": "ILLEGAL"
+    }
+  }
+}

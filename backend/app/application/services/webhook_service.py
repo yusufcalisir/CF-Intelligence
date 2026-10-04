@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import ipaddress
 import json
@@ -141,8 +142,14 @@ class WebhookService:
         tenant_id: str,
         event_type: WebhookEventType,
         payload: dict[str, Any],
+        event_id: str | None = None,
     ) -> list[WebhookDeliveryPayload]:
-        """Signs and dispatches event notification payloads to matching subscribers."""
+        """Signs and dispatches event notification payloads to matching subscribers.
+
+        Accepts an explicit event_id or derives a stable, deterministic event ID from the
+        enclosed object identifier (alert_id, case_id, transaction_id) to ensure idempotent
+        deduplication for external webhook consumers across Kafka redeliveries and transport retries.
+        """
         with self._lock:
             tenant_subs = list(self._subscriptions.get(tenant_id, []))
         delivered: list[WebhookDeliveryPayload] = []
@@ -151,14 +158,30 @@ class WebhookService:
 
         for sub in tenant_subs:
             if event_type in sub.events:
-                event_id = f"evt_{uuid.uuid4().hex[:8]}"
+                if event_id:
+                    delivery_evt_id = event_id
+                else:
+                    obj_id = (
+                        payload.get("id")
+                        or payload.get("alert_id")
+                        or payload.get("case_id")
+                        or payload.get("transaction_id")
+                    )
+                    if obj_id:
+                        stable_hash = hashlib.sha256(
+                            f"{tenant_id}:{event_type.value}:{obj_id}".encode()
+                        ).hexdigest()[:12]
+                        delivery_evt_id = f"evt_{stable_hash}"
+                    else:
+                        delivery_evt_id = f"evt_{uuid.uuid4().hex[:8]}"
+
                 signature = self.compute_hmac_signature(
                     secret_key=sub.secret_key,
                     payload_bytes=payload_json_bytes,
                 )
 
                 delivery = WebhookDeliveryPayload(
-                    event_id=event_id,
+                    event_id=delivery_evt_id,
                     event_type=event_type,
                     payload=payload,
                     signature=signature,
@@ -167,7 +190,7 @@ class WebhookService:
 
                 logger.info(
                     "Dispatched webhook event %s (%s) to %s (Signature: %s)",
-                    event_id,
+                    delivery_evt_id,
                     event_type.value,
                     sub.target_url,
                     signature[:16],

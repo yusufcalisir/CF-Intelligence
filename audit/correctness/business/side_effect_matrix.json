@@ -1,0 +1,78 @@
+{
+  "matrix_metadata": {
+    "scope": "Side Effect, Idempotency, and Failure Semantics Matrix",
+    "version": "1.0.0"
+  },
+  "operations": [
+    {
+      "operation": "generate_alerts",
+      "internal_side_effects": [
+        "Persists Alert in RedisStore('alert')",
+        "Records sliding-window entry in AlertDeduplicationEngine"
+      ],
+      "external_side_effects": [
+        "Publishes HMAC-SHA256 salted entity hash to shared intelligence layer",
+        "Dispatches ALERT_CREATED webhook notification if subscribers exist"
+      ],
+      "idempotency_contract": "Sliding-window deduplication (300s window). Duplicate events increment count rather than inserting conflicting rows.",
+      "failure_semantics": "Atomic per alert batch; fails closed on Redis connection failure."
+    },
+    {
+      "operation": "create_case",
+      "internal_side_effects": [
+        "Persists Case in RedisStore('case')",
+        "Initializes cryptographic genesis block in timeline"
+      ],
+      "external_side_effects": [],
+      "idempotency_contract": "Bounded 24-hour IdempotencyService header key. Exact payload match returns cached JSON; payload mismatch returns HTTP 409.",
+      "failure_semantics": "Releases in-progress lock on unhandled exception; does not leave partial case."
+    },
+    {
+      "operation": "update_case_status",
+      "internal_side_effects": [
+        "Updates case.status",
+        "Appends cryptographically chained event to case.timeline"
+      ],
+      "external_side_effects": [],
+      "idempotency_contract": "Optimistic concurrency via expected_status precondition. Returns HTTP 409 Conflict if current status differs.",
+      "failure_semantics": "Fails closed if state transition is illegal or Four-Eyes signature requirement not satisfied."
+    },
+    {
+      "operation": "resolve_case",
+      "internal_side_effects": [
+        "Sets terminal status (CLOSED_CONFIRMED or CLOSED_FALSE_POSITIVE)",
+        "Sets closed_at timestamp",
+        "Appends resolution event to timeline"
+      ],
+      "external_side_effects": [
+        "Optional CASE_RESOLVED webhook event dispatch"
+      ],
+      "idempotency_contract": "Terminal states strictly immutable. Once resolved, subsequent resolution or transition attempts raise TerminalCaseImmutableError.",
+      "failure_semantics": "Atomic transition under RLock."
+    },
+    {
+      "operation": "file_sar_report",
+      "internal_side_effects": [
+        "Writes XML file to storage/regulatory_filings/sar_{case_id}.xml",
+        "Computes SHA-256 seal",
+        "Caches SARFilingRecord in _filings_cache"
+      ],
+      "external_side_effects": [
+        "None (Local generation and preparation only; no direct FIU submission gateway)"
+      ],
+      "idempotency_contract": "Atomic filesystem write using .tmp rename. Regenerating report produces verified bit-accurate package or updated timestamp.",
+      "failure_semantics": "Rejected upfront with HTTP 400 if case is in false positive or unreviewed status."
+    },
+    {
+      "operation": "dispatch_webhook",
+      "internal_side_effects": [
+        "Records delivery attempt in memory"
+      ],
+      "external_side_effects": [
+        "Outbound HTTP POST to subscriber target_url with X-CFI-Signature-256 and X-CFI-Event-Id"
+      ],
+      "idempotency_contract": "At-least-once transport with deterministic stable event ID (evt_<hash(tenant:type:id)>) enabling downstream exactly-once deduplication.",
+      "failure_semantics": "Non-blocking: delivery timeout or remote failure logs warning and does not abort caller business transaction."
+    }
+  ]
+}

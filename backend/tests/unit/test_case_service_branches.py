@@ -72,6 +72,11 @@ class TestCaseServiceBranches:
                 supervisor_signature="analyst_alice",
             )
 
+        # 7.5 Link alert to open case
+        self.service.link_alert(case.id, "ALT-003")
+        updated_case = self.service.get_case(case.id)
+        assert "ALT-003" in updated_case.alert_ids
+
         # 8. Four-Eyes Principle Success: Valid closure with distinct supervisor
         closed_case = self.service.change_status(
             case.id,
@@ -82,10 +87,11 @@ class TestCaseServiceBranches:
         assert closed_case.status == CaseStatus.CLOSED_CONFIRMED
         assert closed_case.closed_at is not None
 
-        # 9. Link alert to existing case
-        self.service.link_alert(case.id, "ALT-003")
-        updated_case = self.service.get_case(case.id)
-        assert "ALT-003" in updated_case.alert_ids
+        # 9. Terminal Immutability: Linking alert to closed case is strictly blocked
+        from app.domain.models.case import TerminalCaseImmutableError
+
+        with pytest.raises(TerminalCaseImmutableError):
+            self.service.link_alert(case.id, "ALT-004")
 
         # 10. Export markdown summary
         summary = self.service.export_summary(case.id)

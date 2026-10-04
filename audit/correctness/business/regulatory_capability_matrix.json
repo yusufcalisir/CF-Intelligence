@@ -1,0 +1,64 @@
+{
+  "matrix_metadata": {
+    "scope": "Regulatory Reporting & Submission Capability Classification",
+    "version": "1.0.0",
+    "classification_standard": "Section 42 & Section 43 of Program Specification"
+  },
+  "capabilities": [
+    {
+      "capability": "FinCEN BSA SAR 2.0 XML Export",
+      "classification": "REPORT_GENERATION",
+      "format": "XML (FinCEN BSA E-Filing Specification 2.0)",
+      "validation": "XSD schema validation via lxml with fallback structural validation",
+      "integrity_seal": "SHA-256 digital digest over XML payload",
+      "storage_path": "storage/regulatory_filings/sar_{case_id}.xml",
+      "external_transmission": false,
+      "truthful_terminology": "SAR Package Generated / Exported (Never claim 'Submitted to FinCEN' or 'Accepted by Regulator')",
+      "status_preconditions": "Requires case status to be CLOSED_CONFIRMED, ESCALATED, or SAR_FILED. Rejects CLOSED_FALSE_POSITIVE and unreviewed OPEN/ASSIGNED."
+    },
+    {
+      "capability": "FinCEN SDX/SFTP Batch Gateway Transmission",
+      "classification": "NOT_IMPLEMENTED",
+      "format": "N/A",
+      "validation": "N/A",
+      "integrity_seal": "N/A",
+      "storage_path": "N/A",
+      "external_transmission": false,
+      "truthful_terminology": "Not implemented. System produces offline compliance packages ready for authorized compliance officer batch upload.",
+      "status_preconditions": "N/A"
+    },
+    {
+      "capability": "UNODC goAML XML Export",
+      "classification": "REPORT_GENERATION",
+      "format": "XML (goAML 4.x / 5.x Schema)",
+      "validation": "goAML XSD and mandatory field validator",
+      "integrity_seal": "SHA-256 digest",
+      "storage_path": "In-memory string generation",
+      "external_transmission": false,
+      "truthful_terminology": "goAML Package Generated / Exported",
+      "status_preconditions": "Case ID and confirmed fraud context"
+    },
+    {
+      "capability": "ISO 20022 Financial Messaging (pacs.008, pacs.002, camt.053)",
+      "classification": "REPORT_GENERATION",
+      "format": "XML (ISO 20022 Standards)",
+      "validation": "ISO 20022 schema validation and negative amount rejection",
+      "integrity_seal": "SHA-256 digest",
+      "storage_path": "In-memory string generation",
+      "external_transmission": false,
+      "truthful_terminology": "ISO 20022 Message Compiled",
+      "status_preconditions": "Transaction metadata"
+    },
+    {
+      "capability": "Investigation Summary Markdown Export",
+      "classification": "EXPORT_ONLY",
+      "format": "Markdown",
+      "validation": "Case timeline compilation",
+      "integrity_seal": "None",
+      "storage_path": "In-memory string generation",
+      "external_transmission": false,
+      "truthful_terminology": "Case Summary Exported",
+      "status_preconditions": "Valid case ID"
+    }
+  ]
+}

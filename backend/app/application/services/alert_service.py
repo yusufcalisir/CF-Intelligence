@@ -670,7 +670,8 @@ class AlertIntelligenceService:
     # ── Private helpers ────────────────────────
 
     @staticmethod
-    def _classify_severity(score: float) -> AlertSeverity:
+    def classify_severity(score: float) -> AlertSeverity:
+        """Deterministically map risk score (0-1.0) to AlertSeverity level."""
         if score >= 0.9:
             return AlertSeverity.CRITICAL
         if score >= 0.75:
@@ -680,6 +681,8 @@ class AlertIntelligenceService:
         if score >= 0.3:
             return AlertSeverity.LOW
         return AlertSeverity.INFO
+
+    _classify_severity = classify_severity
 
     @staticmethod
     def _generate_reason_codes(txn: dict, score: float) -> list[str]:

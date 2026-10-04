@@ -73,12 +73,30 @@ def get_evidence_service() -> EvidenceRegistryService:
     return _evidence_service
 
 
+def _enforce_case_tenant(case: Any, caller_tenant: str | None) -> None:
+    """Enforce tenant isolation on a case and all linked alerts."""
+    if not caller_tenant:
+        return
+    case_bank = getattr(case, "bank_id", None)
+    if case_bank:
+        enforce_tenant_isolation(caller_tenant, case_bank)
+    if getattr(case, "alert_ids", None):
+        from app.presentation.routers.alerts import get_alert_service
+
+        alert_svc = get_alert_service()
+        for a_id in case.alert_ids:
+            a = alert_svc.get_alert(a_id)
+            if a and getattr(a, "bank_id", None):
+                enforce_tenant_isolation(caller_tenant, a.bank_id)
+
+
 @router.get("", response_model=list[CaseSummaryResponse])
 @api_router.get("", response_model=list[CaseSummaryResponse])
 async def list_cases(
     status: str | None = Query(None),
     priority: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
+    caller_tenant: TenantDep = None,
 ) -> list[CaseSummaryResponse]:
     """List investigation cases."""
     try:
@@ -99,6 +117,12 @@ async def list_cases(
         )
 
     cases = _case_service.get_cases(status=stat, priority=pri, limit=limit)
+    if caller_tenant:
+        cases = [
+            c
+            for c in cases
+            if not getattr(c, "bank_id", None) or c.bank_id == caller_tenant
+        ]
     return [
         CaseSummaryResponse(
             id=c.id,
@@ -191,6 +215,7 @@ async def create_case(
             alert_ids=req.alert_ids,
             total_risk_score=req.total_risk_score,
             assigned_to=req.assigned_to,
+            bank_id=tenant_id,
         )
         result = _serialize_case(case)
         idem.complete(
@@ -212,14 +237,7 @@ async def get_case(
     if not case:
         raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
 
-    if caller_tenant and case.alert_ids:
-        from app.presentation.routers.alerts import get_alert_service
-
-        alert_svc = get_alert_service()
-        for a_id in case.alert_ids:
-            a = alert_svc.get_alert(a_id)
-            if a:
-                enforce_tenant_isolation(caller_tenant, a.bank_id)
+    _enforce_case_tenant(case, caller_tenant)
 
     AuditService().log_action(actor, "access_case", case_id)
     return _serialize_case(case)
@@ -229,8 +247,17 @@ async def get_case(
 @api_router.patch("/{case_id}", response_model=CaseResponse)
 @router.put("/{case_id}/status", response_model=CaseResponse)
 @api_router.put("/{case_id}/status", response_model=CaseResponse)
-async def update_case_status(case_id: str, req: CaseStatusRequest) -> CaseResponse:
-    """Update case status with transition validation and dual-control signoff."""
+async def update_case_status(
+    case_id: str,
+    req: CaseStatusRequest,
+    caller_tenant: TenantDep = None,
+) -> CaseResponse:
+    """Update case status with transition validation, optimistic concurrency, and dual-control signoff."""
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+    _enforce_case_tenant(case, caller_tenant)
+
     try:
         new_status = CaseStatus(req.status)
         case = _case_service.change_status(
@@ -240,6 +267,7 @@ async def update_case_status(case_id: str, req: CaseStatusRequest) -> CaseRespon
             supervisor_signature=req.supervisor_signature,
             second_supervisor_signature=req.second_supervisor_signature,
             supervisor_signatures=req.supervisor_signatures,
+            expected_status=req.expected_status,
         )
         return _serialize_case(case)
     except CaseNotFoundError as e:
@@ -248,10 +276,13 @@ async def update_case_status(case_id: str, req: CaseStatusRequest) -> CaseRespon
         if "assigned investigator" in str(e).lower():
             raise HTTPException(status_code=403, detail=str(e))
         raise HTTPException(status_code=400, detail=str(e))
+    except InvalidCaseTransitionError as e:
+        if "precondition failed" in str(e).lower():
+            raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     except (
         DuplicateSupervisorSignatureError,
         FourEyesVerificationError,
-        InvalidCaseTransitionError,
         TerminalCaseImmutableError,
     ) as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -263,14 +294,22 @@ async def update_case_status(case_id: str, req: CaseStatusRequest) -> CaseRespon
 
 @router.post("/{case_id}/escalate", response_model=CaseResponse)
 @api_router.post("/{case_id}/escalate", response_model=CaseResponse)
-async def escalate_case(case_id: str, req: CaseEscalateRequest) -> CaseResponse:
+async def escalate_case(
+    case_id: str, req: CaseEscalateRequest, caller_tenant: TenantDep = None
+) -> CaseResponse:
     """Escalate a case to PENDING_REVIEW for Four-Eyes supervisor evaluation."""
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+    _enforce_case_tenant(case, caller_tenant)
     try:
         _case_service.add_note(case_id, author=req.actor, content=f"Escalation justification: {req.reason}")
         case = _case_service.change_status(case_id, CaseStatus.PENDING_REVIEW, actor=req.actor)
         return _serialize_case(case)
     except CaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except (TerminalCaseImmutableError, InvalidCaseTransitionError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except ValueError as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=str(e))
@@ -279,12 +318,15 @@ async def escalate_case(case_id: str, req: CaseEscalateRequest) -> CaseResponse:
 
 @router.post("/{case_id}/sign", response_model=CaseResponse)
 @api_router.post("/{case_id}/sign", response_model=CaseResponse)
-async def sign_case(case_id: str, req: CaseSignRequest) -> CaseResponse:
+async def sign_case(
+    case_id: str, req: CaseSignRequest, caller_tenant: TenantDep = None
+) -> CaseResponse:
     """Record a supervisor dual-control signature on a case under review."""
     try:
         case = _case_service.get_case(case_id)
         if not case:
             raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+        _enforce_case_tenant(case, caller_tenant)
 
         if not case.is_open:
             raise HTTPException(
@@ -342,11 +384,14 @@ async def sign_case(case_id: str, req: CaseSignRequest) -> CaseResponse:
 
 @router.post("/{case_id}/resolve", response_model=CaseResponse)
 @api_router.post("/{case_id}/resolve", response_model=CaseResponse)
-async def resolve_case(case_id: str, req: CaseResolveRequest) -> CaseResponse:
+async def resolve_case(
+    case_id: str, req: CaseResolveRequest, caller_tenant: TenantDep = None
+) -> CaseResponse:
     """Resolve and close a case under strict Four-Eyes dual control."""
     case = _case_service.get_case(case_id)
     if not case:
         raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+    _enforce_case_tenant(case, caller_tenant)
 
     # Check that supervisors are distinct identities
     if clean_identity(req.primary_supervisor) == clean_identity(req.secondary_supervisor):
@@ -416,8 +461,14 @@ async def validate_case_transition(
     target_status: str | None = Query(None),
     actor: str = Query("analyst"),
     supervisor_signatures: list[str] | None = Query(None),
+    caller_tenant: TenantDep = None,
 ) -> dict[str, Any]:
     """Pre-validate a proposed status transition and Four-Eyes authorization requirements."""
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+    _enforce_case_tenant(case, caller_tenant)
+
     resolved_target = (req.target_status or req.target_state if req else None) or target_status
     if not resolved_target:
         raise HTTPException(
@@ -444,8 +495,15 @@ async def validate_case_transition(
 
 @router.get("/{case_id}/timeline/verify", response_model=TimelineVerificationResponse)
 @api_router.get("/{case_id}/timeline/verify", response_model=TimelineVerificationResponse)
-async def verify_case_timeline(case_id: str) -> TimelineVerificationResponse:
+async def verify_case_timeline(
+    case_id: str, caller_tenant: TenantDep = None
+) -> TimelineVerificationResponse:
     """Verify cryptographic SHA-256 parent hash chain of the case investigation timeline."""
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+    _enforce_case_tenant(case, caller_tenant)
+
     try:
         result = _case_service.verify_timeline_integrity(case_id)
         return TimelineVerificationResponse(
@@ -464,8 +522,15 @@ async def verify_case_timeline(case_id: str) -> TimelineVerificationResponse:
 
 @router.post("/{case_id}/notes", response_model=CaseNoteResponse)
 @api_router.post("/{case_id}/notes", response_model=CaseNoteResponse)
-async def add_note(case_id: str, req: CaseNoteRequest) -> CaseNoteResponse:
+async def add_note(
+    case_id: str, req: CaseNoteRequest, caller_tenant: TenantDep = None
+) -> CaseNoteResponse:
     """Add an investigation note."""
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+    _enforce_case_tenant(case, caller_tenant)
+
     try:
         note = _case_service.add_note(case_id, author=req.author, content=req.content)
         return CaseNoteResponse(
@@ -483,11 +548,27 @@ async def add_note(case_id: str, req: CaseNoteRequest) -> CaseNoteResponse:
 
 @router.post("/{case_id}/alerts", response_model=CaseResponse)
 @api_router.post("/{case_id}/alerts", response_model=CaseResponse)
-async def link_alert(case_id: str, req: CaseLinkAlertRequest) -> CaseResponse:
+async def link_alert(
+    case_id: str, req: CaseLinkAlertRequest, caller_tenant: TenantDep = None
+) -> CaseResponse:
     """Link an alert to a case."""
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+    _enforce_case_tenant(case, caller_tenant)
+
+    if caller_tenant:
+        from app.presentation.routers.alerts import get_alert_service
+
+        alert = get_alert_service().get_alert(req.alert_id)
+        if alert and getattr(alert, "bank_id", None):
+            enforce_tenant_isolation(caller_tenant, alert.bank_id)
+
     try:
         case = _case_service.link_alert(case_id, req.alert_id)
         return _serialize_case(case)
+    except TerminalCaseImmutableError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except CaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -496,8 +577,15 @@ async def link_alert(case_id: str, req: CaseLinkAlertRequest) -> CaseResponse:
 
 @router.get("/{case_id}/timeline", response_model=list[CaseEventResponse])
 @api_router.get("/{case_id}/timeline", response_model=list[CaseEventResponse])
-async def get_timeline(case_id: str) -> list[CaseEventResponse]:
+async def get_timeline(
+    case_id: str, caller_tenant: TenantDep = None
+) -> list[CaseEventResponse]:
     """Get investigation timeline."""
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+    _enforce_case_tenant(case, caller_tenant)
+
     try:
         events = _case_service.get_timeline(case_id)
         return [
@@ -518,8 +606,15 @@ async def get_timeline(case_id: str) -> list[CaseEventResponse]:
 
 @router.get("/{case_id}/export")
 @api_router.get("/{case_id}/export")
-async def export_case(case_id: str) -> dict:
+async def export_case(
+    case_id: str, caller_tenant: TenantDep = None
+) -> dict:
     """Export investigation summary as markdown."""
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+    _enforce_case_tenant(case, caller_tenant)
+
     try:
         summary = _case_service.export_summary(case_id)
         return {"case_id": case_id, "format": "markdown", "content": summary}
@@ -531,21 +626,24 @@ async def export_case(case_id: str) -> dict:
 
 @router.get("/{case_id}/sar-report")
 @api_router.get("/{case_id}/sar-report")
-async def download_sar_report(case_id: str) -> FileResponse:
+async def download_sar_report(
+    case_id: str, caller_tenant: TenantDep = None
+) -> FileResponse:
     """Download generated FinCEN SAR XML report for the case."""
     import os
+
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Case {case_id} not found.",
+        )
+    _enforce_case_tenant(case, caller_tenant)
 
     report_dir = "storage/regulatory_filings"
     report_path = os.path.join(report_dir, f"sar_{case_id}.xml").replace("\\", "/")
 
     if not os.path.exists(report_path):
-        case = _case_service.get_case(case_id)
-        if not case:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Case {case_id} not found.",
-            )
-
         from app.application.services.alert_service import AlertIntelligenceService
         from app.application.services.regulatory_reporter import RegulatoryReporterService
 
@@ -566,8 +664,15 @@ async def download_sar_report(case_id: str) -> FileResponse:
 
 @router.post("/{case_id}/evidence", response_model=EvidenceResponse)
 @api_router.post("/{case_id}/evidence", response_model=EvidenceResponse)
-async def register_evidence(case_id: str, req: EvidenceRequest) -> EvidenceResponse:
+async def register_evidence(
+    case_id: str, req: EvidenceRequest, caller_tenant: TenantDep = None
+) -> EvidenceResponse:
     """Register new case evidence with SHA-256 hash verification."""
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+    _enforce_case_tenant(case, caller_tenant)
+
     try:
         registry = EvidenceRegistryService()
         ev = registry.register_evidence(
@@ -587,11 +692,14 @@ async def register_evidence(case_id: str, req: EvidenceRequest) -> EvidenceRespo
 
 @router.get("/{case_id}/evidence", response_model=list[EvidenceResponse])
 @api_router.get("/{case_id}/evidence", response_model=list[EvidenceResponse])
-async def get_case_evidence(case_id: str) -> list[EvidenceResponse]:
+async def get_case_evidence(
+    case_id: str, caller_tenant: TenantDep = None
+) -> list[EvidenceResponse]:
     """Retrieve all evidence registered for a case."""
     case = _case_service.get_case(case_id)
     if not case:
         raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+    _enforce_case_tenant(case, caller_tenant)
     registry = EvidenceRegistryService()
     ev_list = registry.get_case_evidence(case_id)
     return [EvidenceResponse(**ev) for ev in ev_list]
@@ -643,6 +751,7 @@ async def file_sar_report(
     case_id: str,
     institution_name: str | None = None,
     narrative_override: str | None = None,
+    caller_tenant: TenantDep = None,
 ) -> dict[str, Any]:
     """Generate and validate FinCEN BSA SAR XML payload with SHA-256 integrity hash for a confirmed fraud case."""
     from app.application.services.regulatory_reporter import (
@@ -653,6 +762,19 @@ async def file_sar_report(
     case = _case_service.get_case(case_id)
     if not case:
         raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found.")
+    _enforce_case_tenant(case, caller_tenant)
+
+    # Invariant: SAR filings cannot be generated for false positives or unreviewed open cases
+    if case.status == CaseStatus.CLOSED_FALSE_POSITIVE:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot generate SAR filing for a case resolved as CLOSED_FALSE_POSITIVE.",
+        )
+    if case.status in (CaseStatus.OPEN, CaseStatus.ASSIGNED):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot generate SAR filing for unreviewed case in status '{case.status.value}'. Must be escalated or confirmed fraud.",
+        )
 
     try:
         from app.application.services.alert_service import AlertIntelligenceService
@@ -690,7 +812,9 @@ async def file_sar_report(
 
 @router.post("/export/fincen-xml", response_model=ExportFinCENXmlResponse)
 @api_router.post("/export/fincen-xml", response_model=ExportFinCENXmlResponse)
-async def export_fincen_xml_endpoint(payload: ExportFinCENXmlRequest) -> dict[str, Any]:
+async def export_fincen_xml_endpoint(
+    payload: ExportFinCENXmlRequest, caller_tenant: TenantDep = None
+) -> dict[str, Any]:
     """Compile and validate FinCEN BSA SAR XML payload with SHA-256 hash (Developer Portal & SIEM)."""
     target_case_id = (payload.case_id or "").strip()
     if not target_case_id:
@@ -715,11 +839,13 @@ async def export_fincen_xml_endpoint(payload: ExportFinCENXmlRequest) -> dict[st
             status_code=404,
             detail=f"Case '{target_case_id}' not found. Please select an active case from: {avail_ids}",
         )
+    _enforce_case_tenant(case, caller_tenant)
 
     return await file_sar_report(
         target_case_id,
         institution_name=payload.institution_name,
         narrative_override=payload.narrative_override,
+        caller_tenant=caller_tenant,
     )
 
 
@@ -733,11 +859,13 @@ _aml_copilot = AMLAgenticCopilot()
 async def generate_copilot_narrative(
     case_id: str,
     req: CopilotQueryRequest | None = None,
+    caller_tenant: TenantDep = None,
 ) -> CopilotQueryResponse:
     """Synthesize formal FinCEN 5-paragraph SAR narrative and 4-Eyes supervisor briefing using AML Copilot."""
     c_obj = _case_service.get_case(case_id)
     if not c_obj:
         raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found.")
+    _enforce_case_tenant(c_obj, caller_tenant)
 
     title = c_obj.title or f"Case {case_id}"
     status_str = (
@@ -794,11 +922,14 @@ async def generate_copilot_narrative(
 
 @router.get("/{case_id}/copilot/summary")
 @api_router.get("/{case_id}/copilot/summary")
-async def get_copilot_summary(case_id: str) -> dict[str, Any]:
+async def get_copilot_summary(
+    case_id: str, caller_tenant: TenantDep = None
+) -> dict[str, Any]:
     """Get structured Copilot findings and 4-Eyes disposition for a case."""
     c_obj = _case_service.get_case(case_id)
     if not c_obj:
         raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found.")
+    _enforce_case_tenant(c_obj, caller_tenant)
 
     title = c_obj.title or f"Case {case_id}"
     status_str = (
@@ -840,11 +971,14 @@ async def get_copilot_summary(case_id: str) -> dict[str, Any]:
 
 @router.get("/{case_id}/copilot/evidence")
 @api_router.get("/{case_id}/copilot/evidence")
-async def get_copilot_case_evidence(case_id: str) -> dict[str, Any]:
+async def get_copilot_case_evidence(
+    case_id: str, caller_tenant: TenantDep = None
+) -> dict[str, Any]:
     """Get assembled cryptographic case evidence dossier."""
     c_obj = _case_service.get_case(case_id)
     if not c_obj:
         raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found.")
+    _enforce_case_tenant(c_obj, caller_tenant)
 
     title = c_obj.title or f"Case {case_id}"
     status_str = (

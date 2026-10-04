@@ -70,6 +70,11 @@ class CaseCreateRequest(BaseModel):
         max_length=128,
         description="Assigned investigator identity",
     )
+    bank_id: str | None = Field(
+        None,
+        max_length=64,
+        description="Authoritative bank tenant identifier",
+    )
 
     @field_validator("title")
     @classmethod
@@ -120,6 +125,10 @@ class CaseStatusRequest(BaseModel):
     supervisor_signature: str | None = Field(None, max_length=512)
     second_supervisor_signature: str | None = Field(None, max_length=512)
     supervisor_signatures: list[str] = Field(default_factory=list)
+    expected_status: _CASE_STATUSES | None = Field(  # type: ignore[valid-type]
+        None,
+        description="Optional precondition: expected current case status for optimistic concurrency control",
+    )
 
 
 class CaseEscalateRequest(BaseModel):

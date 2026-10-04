@@ -1,0 +1,182 @@
+{
+  "specification": "CF-Intelligence Business Correctness Invariants",
+  "version": "1.0.0",
+  "audit_date": "2026-10-04",
+  "invariants": [
+    {
+      "id": "BUSINESS-INV-01",
+      "name": "Alert Identity",
+      "statement": "One logical scoring event maps to exactly one alert identity. Transport retries and sliding-window duplicates aggregate into the existing record rather than creating uncoordinated duplicate rows.",
+      "enforcement_mechanism": "AlertDeduplicationEngine sliding window & AlertRepository unique constraints",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-02",
+      "name": "Tenant Isolation",
+      "statement": "Alerts, cases, decisions, assignments, reports, and timeline audits are strictly scoped to the authoritative bank_id. Object IDs cannot be accessed or mutated across tenant boundaries.",
+      "enforcement_mechanism": "enforce_tenant_isolation and _enforce_case_tenant across all API endpoints (HTTP 403)",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-03",
+      "name": "Transaction Binding",
+      "statement": "An alert referring to transaction T remains permanently bound to transaction T. No subsequent mutation may rebind it to a different transaction.",
+      "enforcement_mechanism": "Alert.transaction_id is immutable after construction",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-04",
+      "name": "Model Result Binding",
+      "statement": "Persisted risk score, classification, model version, and threshold refer to the exact inference event that generated them.",
+      "enforcement_mechanism": "Alert.risk_score and confidence bound to model prediction at inference time",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-05",
+      "name": "Explanation Binding",
+      "statement": "An explanation shown or persisted for an alert corresponds to the same transaction, feature state, and model prediction established by explainability contracts.",
+      "enforcement_mechanism": "ExplainabilityService.explain_alert bound to active alert features and model output",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-06",
+      "name": "Severity Consistency",
+      "statement": "Alert severity strictly adheres to threshold boundaries (CRITICAL >= 0.9, HIGH >= 0.75, MEDIUM >= 0.5, LOW >= 0.3, INFO < 0.3) without contradicting score.",
+      "enforcement_mechanism": "AlertIntelligenceService.classify_severity deterministic mapping oracle",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-07",
+      "name": "Case Identity",
+      "statement": "Case creation with an Idempotency-Key returns the cached case representation without creating duplicate cases.",
+      "enforcement_mechanism": "IdempotencyService acquire/complete workflow in cases.py",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-08",
+      "name": "Legal State Transition",
+      "statement": "Every case state change must belong to CASE_STATE_TRANSITIONS. Illegal state transitions fail closed.",
+      "enforcement_mechanism": "CaseManagementService.change_status raising InvalidCaseTransitionError",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-09",
+      "name": "Terminal-State Integrity",
+      "statement": "Terminal states (CLOSED_CONFIRMED, CLOSED_FALSE_POSITIVE) are strictly immutable. No transition, reassignment, or alert linking is permitted after closure.",
+      "enforcement_mechanism": "TerminalCaseImmutableError raised in change_status, assign_case, and link_alert",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-10",
+      "name": "Decision Provenance",
+      "statement": "Every business decision preserves who (actor), what (event_type), when (UTC timestamp), prior state, and cryptographic hash in the case timeline.",
+      "enforcement_mechanism": "CaseEvent hash chain: SHA256(timestamp|type|desc|actor|parent_hash)",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-11",
+      "name": "Authorization",
+      "statement": "Mutations require authorized caller context. Unauthenticated or unauthorized callers cannot mutate business state.",
+      "enforcement_mechanism": "FastAPI dependencies (TenantDep, Role checks)",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-12",
+      "name": "Dual-Control Integrity",
+      "statement": "Four-Eyes dual control requires ApproverID != InvestigatorID. The assigned investigator or analyst actor cannot self-approve their own case, regardless of casing or prefixes.",
+      "enforcement_mechanism": "clean_identity comparison and SelfApprovalProhibitedError (HTTP 403)",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-13",
+      "name": "Retry Safety",
+      "statement": "Retrying outbound webhook dispatch for the same event yields identical X-CFI-Event-Id to enable downstream deduplication.",
+      "enforcement_mechanism": "Deterministic event_id hashing: evt_<sha256(tenant:event_type:obj_id)[:12]>",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-14",
+      "name": "Conflict Detection",
+      "statement": "Submitting the same idempotency key with conflicting payload fails closed with HTTP 409 Conflict.",
+      "enforcement_mechanism": "IdempotencyService MISMATCH detection",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-15",
+      "name": "Concurrency Safety",
+      "statement": "Optimistic concurrency prevents lost updates when two analysts submit competing transitions.",
+      "enforcement_mechanism": "expected_status precondition check returning HTTP 409 Conflict",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-16",
+      "name": "Audit History Integrity",
+      "statement": "Timeline history is append-only and cryptographically chained. Corrupted blocks or history tampering are detectable via verify_timeline_integrity.",
+      "enforcement_mechanism": "CaseManagementService.verify_timeline_integrity",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-17",
+      "name": "Timestamp Integrity",
+      "statement": "All business event timestamps are server-authoritative UTC timestamps. Clients cannot spoof event times.",
+      "enforcement_mechanism": "datetime.now(UTC) enforced at server boundary",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-18",
+      "name": "Regulatory Truthfulness",
+      "statement": "FinCEN SAR generation produces a locally validated XML package with SHA-256 seal. It is classified as REPORT_GENERATION/EXPORT_ONLY, not an external submission. Cases resolved as false positives or unreviewed open cases cannot generate SAR packages.",
+      "enforcement_mechanism": "Status precondition check in file_sar_report & RegulatoryReporterService",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-19",
+      "name": "No Phantom Success",
+      "statement": "An operation cannot report success if an authoritative persistence step failed.",
+      "enforcement_mechanism": "Transactional boundary and exception propagation",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-20",
+      "name": "No Phantom Failure",
+      "statement": "Timeout on external notifications does not cause local business state to rollback if the database transaction committed.",
+      "enforcement_mechanism": "Decoupled background webhook dispatch with failure logging",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-21",
+      "name": "Historical Consistency",
+      "statement": "Case history remains monotonically consistent. Events cannot be deleted or reordered.",
+      "enforcement_mechanism": "Append-only timeline list in Case domain entity",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-22",
+      "name": "Data Immutability Where Required",
+      "statement": "Original transaction identity, initial risk score, and creator identity cannot be rewritten by update APIs.",
+      "enforcement_mechanism": "Pydantic request schemas exclude immutable fields from update payloads",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-23",
+      "name": "Business/Frontend Consistency",
+      "statement": "Frontend-visible states reflect backend CaseStatus enum values without misrepresenting false positives as confirmed fraud.",
+      "enforcement_mechanism": "_serialize_case returns exact canonical status.value",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-24",
+      "name": "Failure Atomicity",
+      "statement": "Multi-step case status updates rollback cleanly if timeline event hashing fails.",
+      "enforcement_mechanism": "RLock synchronization and atomic dictionary serialization",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "BUSINESS-INV-25",
+      "name": "Claim Precision",
+      "statement": "The term 'CONFIRMED_FRAUD' represents an operational AML team disposition under Four-Eyes dual control signoff, not a judicial finding.",
+      "enforcement_mechanism": "Documentation specification in case_management_spec.md and audit reports",
+      "status": "VERIFIED"
+    }
+  ]
+}

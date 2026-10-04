@@ -1,0 +1,117 @@
+{
+  "inventory_metadata": {
+    "scope": "CF-Intelligence Business Logic & Workflows",
+    "evaluation_date": "2026-10-04",
+    "truthful_standard": "Section 4 & Section 42 of Program Specification"
+  },
+  "capabilities": [
+    {
+      "name": "Alert Creation and Score Thresholding",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "AlertIntelligenceService.generate_alerts",
+      "notes": "Scores 0.0-1.0 mapped to risk_score (0-1000) and severity levels."
+    },
+    {
+      "name": "Sliding-Window Alert Deduplication",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "AlertDeduplicationEngine",
+      "notes": "5-minute sliding window aggregates duplicate alerts and escalates risk."
+    },
+    {
+      "name": "Shared Threat Intelligence Exchange",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "AlertIntelligenceService.publish_intelligence",
+      "notes": "HMAC-SHA256 salted entity hashing prevents raw PII leakage across institutions."
+    },
+    {
+      "name": "Case Creation with 24h Request Idempotency",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "CaseManagementService.create_case / IdempotencyService",
+      "notes": "Idempotency key bounded 24h in Redis with SHA-256 canonical payload mismatch check."
+    },
+    {
+      "name": "Cryptographic Hash-Chained Investigation Timeline",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "CaseManagementService._add_event / compute_timeline_hash",
+      "notes": "Tamper-evident parent-hash chained timeline prevents silent history rewrites."
+    },
+    {
+      "name": "Four-Eyes Dual Control (Maker-Checker)",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "CaseManagementService.change_status / sign_case / resolve_case",
+      "notes": "Strictly enforces ApproverID != InvestigatorID and requires 2 distinct supervisor signatures for terminal closure."
+    },
+    {
+      "name": "Terminal Case Immutability (Replay Resistance)",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "TerminalCaseImmutableError enforcement in case_service.py",
+      "notes": "CLOSED_CONFIRMED and CLOSED_FALSE_POSITIVE cases cannot be transitioned, reassigned, or linked."
+    },
+    {
+      "name": "Optimistic Concurrency Control",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "expected_status precondition in case_service.py",
+      "notes": "Returns HTTP 409 Conflict if current state does not match expected_status, preventing lost updates."
+    },
+    {
+      "name": "FinCEN BSA SAR 2.0 XML Generation",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "RegulatoryReporterService.generate_and_store_sar_filing",
+      "notes": "Produces valid FinCEN SAR 2.0 XML with SHA-256 seal. Rejects unreviewed/false positive cases."
+    },
+    {
+      "name": "Direct Regulator FIU Electronic Gateway Transmission",
+      "classification": "NOT_IMPLEMENTED",
+      "implementation": "None (External submission not connected)",
+      "notes": "System generates, signs, and exports SAR packages locally. Real-world FinCEN batch SDX gateway requires federal batch credentials."
+    },
+    {
+      "name": "UNODC goAML XML Export",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "SARGenerator.generate_goaml_sar_xml",
+      "notes": "Generates international standard goAML XML for UNODC jurisdictions."
+    },
+    {
+      "name": "ISO 20022 Financial Messaging XML (pacs.008, pacs.002, camt.053)",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "ISO20022XMLGenerator",
+      "notes": "Compliant interbank payment message validation and error reporting."
+    },
+    {
+      "name": "Developer Webhook Notification Gateway",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "WebhookService",
+      "notes": "SSRF-hardened fail-closed dispatch with deterministic stable event IDs for replay deduplication."
+    },
+    {
+      "name": "Agentic AML Copilot Investigation Assistant",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "AMLAgenticCopilot",
+      "notes": "Zero-PII narrative synthesis from graph topology, SHAP drivers, and timeline events."
+    },
+    {
+      "name": "Evidence Registry with SHA-256 Integrity Verification",
+      "classification": "ACTIVE_RUNTIME",
+      "implementation": "EvidenceRegistryService",
+      "notes": "Registers uploaded evidence artifacts with cryptographic digest."
+    },
+    {
+      "name": "Canonical Demo Cases (CASE-98492, CASE-2026-001, CASE-2026-004)",
+      "classification": "DEMO_ONLY",
+      "implementation": "_canonical_demo_case synthesis in case_service.py",
+      "notes": "Preserved strictly for guided demonstration flows. Arbitrary non-existent UUIDs return 404."
+    },
+    {
+      "name": "Case Merging / Linking",
+      "classification": "NOT_IMPLEMENTED",
+      "implementation": "None",
+      "notes": "Cases can link multiple alerts, but merging two existing cases is not supported."
+    },
+    {
+      "name": "Automated Human Decision Model Retraining Pipeline",
+      "classification": "NOT_IMPLEMENTED",
+      "implementation": "None",
+      "notes": "Human case resolutions do not automatically feed back into training labels, preventing training set poisoning."
+    }
+  ]
+}

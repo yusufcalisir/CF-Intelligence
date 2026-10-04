@@ -1,0 +1,73 @@
+{
+  "ledger_metadata": {
+    "scope": "Business Logic Defect Remediation Ledger",
+    "version": "1.0.0",
+    "updated_at": "2026-10-04T17:32:00Z"
+  },
+  "remediations": [
+    {
+      "finding_id": "BIZ-0001",
+      "title": "Cross-Tenant BOLA Protection on Case Mutation Endpoints",
+      "files_modified": [
+        "backend/app/presentation/routers/cases.py"
+      ],
+      "changes_summary": "Added _enforce_case_tenant(case, caller_tenant) helper and wired caller_tenant: TenantDep across list_cases, update_case_status, escalate_case, sign_case, resolve_case, validate_case_transition, verify_case_timeline, add_note, link_alert, get_timeline, export_case, download_sar_report, register_evidence, get_case_evidence, file_sar_report, export_fincen_xml_endpoint, and copilot endpoints.",
+      "verification_test": "backend/tests/unit/test_business_logic_correctness.py::TestCrossTenantObjectIsolation::test_cross_tenant_case_access_and_mutation_blocked",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "finding_id": "BIZ-0002",
+      "title": "Elimination of Arbitrary UUID Dummy Mock Case Synthesis",
+      "files_modified": [
+        "backend/app/application/services/case_service.py"
+      ],
+      "changes_summary": "Removed general is_uuid regex fallback in get_case. Non-existent UUIDs now truthfully return None (HTTP 404), preserving only explicit canonical demo cases.",
+      "verification_test": "backend/tests/unit/test_business_logic_correctness.py::TestZeroDummyMockContract::test_nonexistent_uuid_returns_404",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "finding_id": "BIZ-0003",
+      "title": "Enforcement of Terminal Case Immutability on Reassignment and Alert Linking",
+      "files_modified": [
+        "backend/app/application/services/case_service.py",
+        "backend/tests/unit/test_case_service_branches.py"
+      ],
+      "changes_summary": "Added TerminalCaseImmutableError checks in assign_case and link_alert when case is finalized in CLOSED_CONFIRMED or CLOSED_FALSE_POSITIVE status.",
+      "verification_test": "backend/tests/unit/test_business_logic_correctness.py::TestCaseStateMachineInvariants::test_terminal_states_strictly_immutable",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "finding_id": "BIZ-0004",
+      "title": "Optimistic Concurrency Control for Lost Update Prevention",
+      "files_modified": [
+        "backend/app/domain/investigation_entities.py",
+        "backend/app/application/schemas/cases.py",
+        "backend/app/application/services/case_service.py",
+        "backend/app/presentation/routers/cases.py"
+      ],
+      "changes_summary": "Added expected_status precondition to CaseStatusRequest and change_status. When current status does not match expected_status, returns HTTP 409 Conflict.",
+      "verification_test": "backend/tests/unit/test_business_logic_correctness.py::TestOptimisticConcurrency::test_expected_status_mismatch_returns_409_conflict",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "finding_id": "BIZ-0005",
+      "title": "Precondition Enforcement on FinCEN SAR XML Generation",
+      "files_modified": [
+        "backend/app/presentation/routers/cases.py"
+      ],
+      "changes_summary": "Enforced status validation in file_sar_report, rejecting CLOSED_FALSE_POSITIVE and unreviewed OPEN/ASSIGNED cases with HTTP 400 upfront.",
+      "verification_test": "backend/tests/unit/test_business_logic_correctness.py::TestRegulatoryReportingPreconditions::test_cannot_file_sar_for_false_positive_case",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "finding_id": "BIZ-0006",
+      "title": "Deterministic Stable Webhook Event ID for Replay Deduplication",
+      "files_modified": [
+        "backend/app/application/services/webhook_service.py"
+      ],
+      "changes_summary": "Derived stable event ID evt_<sha256(tenant:type:id)[:12]> from payload object identity in dispatch_event, ensuring Kafka redeliveries share identical delivery ID for external deduplication.",
+      "verification_test": "backend/tests/unit/test_business_logic_correctness.py::TestWebhookDispatchIdempotency::test_webhook_dispatches_share_stable_event_id_on_redelivery",
+      "status": "REMEDIATED_AND_VERIFIED"
+    }
+  ]
+}
