@@ -17,6 +17,7 @@ import logging
 import threading
 import time
 from collections import defaultdict
+from collections.abc import Generator
 from datetime import UTC, datetime
 from typing import Any
 
@@ -26,6 +27,10 @@ from app.application.schemas.event_schemas import (
     CloudEvent,
     DLQEnvelope,
     PublishReceipt,
+)
+from app.infrastructure.connectors.base_connector import (
+    BaseBankConnector,
+    NormalizedTransaction,
 )
 
 logger = logging.getLogger(__name__)
@@ -212,7 +217,7 @@ class IdempotencyEngine:
 
 # ── Enterprise Kafka Streaming Connector ──────────────────────────────────────
 
-class KafkaStreamingConnector:
+class KafkaStreamingConnector(BaseBankConnector):
     """Enterprise Apache Kafka Streaming Connector.
 
     Features:
@@ -239,6 +244,7 @@ class KafkaStreamingConnector:
         idempotency_ttl: int = 86400,
         in_memory_broker: InMemoryKafkaBroker | None = None,
     ) -> None:
+        super().__init__()
         self.bootstrap_servers = bootstrap_servers
         self.client_id = client_id
         self.group_id = group_id
@@ -253,6 +259,7 @@ class KafkaStreamingConnector:
 
         self._idempotency = IdempotencyEngine(ttl_seconds=idempotency_ttl)
         self._broker = in_memory_broker or _GLOBAL_IN_MEMORY_BROKER
+        self._buffered_transactions: list[NormalizedTransaction] = []
 
         # Metrics telemetry
         self._total_published = 0
@@ -503,3 +510,65 @@ class KafkaStreamingConnector:
     def clear_idempotency(self) -> None:
         """Clear idempotency cache (useful for testing)."""
         self._idempotency.clear()
+
+    # ── BankConnectorInterface Implementation ─────────────────────────────────
+
+    def consume_stream(self) -> Generator[NormalizedTransaction, None, None]:
+        """Streams real-time payment transactions continuously."""
+        while self._buffered_transactions:
+            yield self._buffered_transactions.pop(0)
+
+    def parse_batch(self, payload: Any) -> list[NormalizedTransaction]:
+        """Parses batch payloads into NormalizedTransaction list."""
+        results: list[NormalizedTransaction] = []
+        items = payload if isinstance(payload, list) else [payload]
+        for item in items:
+            if isinstance(item, NormalizedTransaction):
+                results.append(item)
+            elif isinstance(item, CloudEvent):
+                ce_data: dict[str, Any] = item.data if isinstance(item.data, dict) else {}
+                try:
+                    results.append(
+                        NormalizedTransaction(
+                            transaction_id=str(
+                                ce_data.get("transaction_id") or ce_data.get("id") or item.id or "tx_unknown"
+                            ),
+                            account_id=str(
+                                ce_data.get("account_id") or ce_data.get("debtor_account") or "acc_unknown"
+                            ),
+                            counterparty_account_id=str(
+                                ce_data.get("counterparty_account_id")
+                                or ce_data.get("creditor_account")
+                                or "acc_counterparty"
+                            ),
+                            amount=float(ce_data.get("amount", 1.0)),
+                            currency=str(ce_data.get("currency", "EUR")),
+                        )
+                    )
+                except Exception:
+                    pass
+            elif isinstance(item, dict):
+                inner = item.get("data")
+                dict_data: dict[str, Any] = inner if isinstance(inner, dict) else item
+                try:
+                    results.append(
+                        NormalizedTransaction(
+                            transaction_id=str(
+                                dict_data.get("transaction_id") or dict_data.get("id") or "tx_unknown"
+                            ),
+                            account_id=str(
+                                dict_data.get("account_id") or dict_data.get("debtor_account") or "acc_unknown"
+                            ),
+                            counterparty_account_id=str(
+                                dict_data.get("counterparty_account_id")
+                                or dict_data.get("creditor_account")
+                                or "acc_counterparty"
+                            ),
+                            amount=float(dict_data.get("amount", 1.0)),
+                            currency=str(dict_data.get("currency", "EUR")),
+                        )
+                    )
+                except Exception:
+                    pass
+        self._buffered_transactions.extend(results)
+        return results

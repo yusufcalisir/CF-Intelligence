@@ -164,6 +164,7 @@ class SimulationSummaryResponse(BaseModel):
     duration_seconds: float | None = None
     is_canonical_reference: bool = False
     provenance: str = "LIVE_RUNTIME_RUN"
+    execution_mode: str = "LIVE_RUNTIME"
 
 
 class SimulationDetailResponse(BaseModel):
