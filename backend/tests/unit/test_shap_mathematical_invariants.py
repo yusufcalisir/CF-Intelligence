@@ -215,14 +215,15 @@ class TestShapMathematicalAxioms:
         model.eval()
 
         # Input with identical normalized amount and velocity (both 0.50)
-        # raw amount: 5000 -> 5000/10000 = 0.50
-        # raw velocity: 10 -> 10/20 = 0.50
+        # Authoritative reference bounds:
+        # transaction_amount: (0.0, 5000.0) -> 2500.0 / 5000.0 = 0.50
+        # velocity: (0.0, 30.0) -> 15.0 / 30.0 = 0.50
         symmetric_txn = {
-            "transaction_amount": 5000.0,
+            "transaction_amount": 2500.0,
             "merchant_category": "retail",
             "country_code": "US",
             "device_type": "web",
-            "velocity": 10.0,
+            "velocity": 15.0,
             "hour_of_day": 12,
             "merchant_risk_score": 0.0,
             "customer_history_score": 0.0,
@@ -230,7 +231,19 @@ class TestShapMathematicalAxioms:
             "account_age_days": 100,
         }
 
-        shap_vals = explainer_service.compute_shap_values(symmetric_txn, model=model)
+        # Mathematical symmetry axiom requires symmetric background reference for features 0 and 4
+        sym_bg = np.zeros((30, 10), dtype=np.float32)
+        sym_bg[:, 0] = np.linspace(0.05, 0.20, 30)
+        sym_bg[:, 4] = np.linspace(0.05, 0.20, 30)
+        sym_bg[:, 1] = np.linspace(0.0, 0.5, 30)
+        sym_bg[:, 5] = np.linspace(0.30, 0.80, 30)
+        sym_bg[:, 6] = np.linspace(0.05, 0.25, 30)
+        sym_bg[:, 7] = np.linspace(0.70, 0.98, 30)
+        sym_bg[:, 9] = np.linspace(0.20, 1.0, 30)
+
+        shap_vals = explainer_service.compute_shap_values(
+            symmetric_txn, model=model, background_data=sym_bg
+        )
         feat_map = {f["feature"]: f["contribution"] for f in shap_vals}
 
         phi_amount = feat_map["transaction_amount"]
@@ -522,11 +535,12 @@ class TestFraudClusterTopKConsistency:
 
         model = CountrySensitiveModel().eval()
 
+        # Use authoritative high-risk jurisdiction from canonical vocabulary ("RU" in HIGH_RISK_COUNTRIES)
         cluster: list[dict[str, Any]] = [
             {
                 "transaction_amount": 1000.0 + (i * 100.0),
                 "merchant_category": "financial",
-                "country_code": "KP",  # Sanctioned country (highest index in category)
+                "country_code": "RU",  # Canonical high-risk jurisdiction
                 "device_type": "web",
                 "velocity": 2.0,
                 "hour_of_day": 15,
@@ -543,6 +557,11 @@ class TestFraudClusterTopKConsistency:
         )
 
         for i, features in enumerate(batch_shap):
+            feat_map = {f["feature"]: f["contribution"] for f in features}
+            phi_country = feat_map["country_code"]
+            assert np.isfinite(phi_country), f"Txn {i} produced non-finite country attribution"
+            # Model-faithful: positive model weight on high-risk country drives positive attribution
+            assert phi_country > 0.0, f"Txn {i} expected positive country attribution, got {phi_country}"
             top_3_features = [f["feature"] for f in features[:3]]
             assert "country_code" in top_3_features, (
                 f"Txn {i} failed sanctioned cluster consistency: top 3 were {top_3_features}"

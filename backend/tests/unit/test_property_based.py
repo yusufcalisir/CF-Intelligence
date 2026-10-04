@@ -8,6 +8,7 @@ import os
 import sys
 
 import numpy as np
+import pytest
 import torch
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
@@ -129,12 +130,12 @@ def test_coordinate_median_property(weights_list) -> None:
             min_size=12,
             max_size=12,
         ),
-        min_size=3,
+        min_size=5,  # Blanchard et al. theoretical invariant: n >= 2f + 3 = 5 for f=1 (INV-L / INV-11)
         max_size=20,
     )
 )
-def test_krum_property(weights_list) -> None:
-    """Invariants: Krum outputs one of the inputs, is deterministic, and minimizes the Krum distance score."""
+def test_krum_valid_domain_property(weights_list) -> None:
+    """Invariants: In theoretical valid domain (n >= 2f + 3), Krum matches independent oracle and minimizes distance score."""
     client_weights = [
         ModelWeights(layer_shapes=[(4, 2), (4,)], flat_weights=w) for w in weights_list
     ]
@@ -151,23 +152,38 @@ def test_krum_property(weights_list) -> None:
     # 2. Output is one of the inputs
     assert any(res1.flat_weights == w for w in weights_list)
 
-    # 3. Minimizes sum of L2 distances to closest neighbors
+    # 3. Independent oracle: minimizes sum of squared L2 distances to (n - f - 2) closest neighbors
     W = np.array(weights_list)
     n = len(weights_list)
     f = 1
-    num_closest = max(1, n - f - 2)
+    num_closest = n - f - 2
 
     scores = []
     for i in range(n):
         dists = []
         for j in range(n):
             if i != j:
-                dists.append(np.sum((W[i] - W[j]) ** 2))
+                dists.append(float(np.sum((W[i] - W[j]) ** 2)))
         dists.sort()
         scores.append(sum(dists[:num_closest]))
-    best_idx = np.argmin(scores)
 
+    best_idx = min(range(n), key=lambda i: (scores[i], tuple(W[i].tolist())))
     np.testing.assert_allclose(res1.flat_weights, W[best_idx], rtol=1e-5, atol=1e-5)
+
+
+@pytest.mark.parametrize("n", [2, 3, 4])
+def test_krum_invalid_domain_fallback(n: int, caplog: pytest.LogCaptureFixture) -> None:
+    """Verify that when n < 2f+3, Krum explicitly logs precondition violation and executes fail-safe (INV-12)."""
+    weights_list = [[float(i * 10 + j) for j in range(12)] for i in range(n)]
+    client_weights = [
+        ModelWeights(layer_shapes=[(4, 2), (4,)], flat_weights=w) for w in weights_list
+    ]
+    with caplog.at_level("WARNING"):
+        res = engine.aggregate_parameters(
+            client_weights, [100] * n, method=AggregationMethod.KRUM
+        )
+    assert any("Krum theoretical precondition violated" in r.message for r in caplog.records)
+    assert any(res.flat_weights == w for w in weights_list)
 
 
 # ── 2. Secure Aggregation Properties ──────────────────────────────

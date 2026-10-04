@@ -264,6 +264,11 @@ class IdempotencyService:
         """Persist response_body under idempotency_key for TTL seconds."""
         self.complete(idempotency_key, response_body, tenant_id=tenant_id, payload_hash=payload_hash)
 
+    def clear(self) -> None:
+        """Clear all in-memory fallback entries (for test isolation and teardown)."""
+        with self._fallback_lock:
+            self._fallback.clear()
+
     @staticmethod
     def _hash_key(raw_key: str) -> str:
         return hashlib.sha256(raw_key.encode()).hexdigest()

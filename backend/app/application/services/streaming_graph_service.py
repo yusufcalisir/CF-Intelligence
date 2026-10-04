@@ -45,6 +45,9 @@ class StreamingGraphService:
         # scoped_tx_key -> edge_record
         self._seen_transactions: dict[str, dict[str, Any]] = {}
 
+        # High watermark event timestamp observed in the stream
+        self._max_timestamp: datetime | None = None
+
     def add_transaction(self, tx: dict[str, Any]) -> None:
         """Ingest a new transaction into the streaming graph buffer with incremental indexing and idempotency."""
         from_id = (
@@ -91,6 +94,9 @@ class StreamingGraphService:
             timestamp = timestamp.replace(tzinfo=UTC)
 
         with self._lock:
+            if self._max_timestamp is None or timestamp > self._max_timestamp:
+                self._max_timestamp = timestamp
+
             # Check for duplicate redelivery under canonical transaction identity
             if scoped_tx_key and scoped_tx_key in self._seen_transactions:
                 existing = self._seen_transactions[scoped_tx_key]
@@ -164,8 +170,8 @@ class StreamingGraphService:
             self._adjacency[from_id].add(to_id)
             self._adjacency[to_id].add(from_id)
 
-            # Prune expired edges to keep sliding window size bounded relative to current stream time
-            self.prune_expired_edges(self.max_window_minutes, as_of=timestamp)
+            # Prune expired edges to keep sliding window size bounded relative to stream high watermark
+            self.prune_expired_edges(self.max_window_minutes, as_of=self._max_timestamp)
 
     def _rebuild_indices(self) -> None:
         """Rebuild mapping between node string IDs and tensor indices."""
@@ -178,7 +184,7 @@ class StreamingGraphService:
     def prune_expired_edges(self, max_age_minutes: int, as_of: datetime | None = None) -> None:
         """Prune edges outside of the sliding window and remove orphan nodes."""
         with self._lock:
-            now = as_of if as_of is not None else datetime.now(UTC)
+            now = as_of if as_of is not None else (self._max_timestamp if self._max_timestamp is not None else datetime.now(UTC))
             if now.tzinfo is None:
                 now = now.replace(tzinfo=UTC)
             cutoff_time = now - timedelta(minutes=max_age_minutes)
@@ -277,7 +283,7 @@ class StreamingGraphService:
                 return empty_features, empty_edges, []
 
             lam = decay_lambda if decay_lambda is not None else self.default_decay_lambda
-            now = as_of if as_of is not None else datetime.now(UTC)
+            now = as_of if as_of is not None else (self._max_timestamp if self._max_timestamp is not None else datetime.now(UTC))
             if now.tzinfo is None:
                 now = now.replace(tzinfo=UTC)
 

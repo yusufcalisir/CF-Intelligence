@@ -767,6 +767,7 @@ class SimulationService:
                     client_samples = []
                     per_bank_loss = {}
                     per_bank_samples = {}
+                    round_opacus_epsilons: list[float] = []
 
                     for bank in participating:
                         correlation_id = f"train_{simulation.id}_{round_num}_{bank.id}"
@@ -923,15 +924,10 @@ class SimulationService:
                                 config.dp_max_grad_norm,
                                 rng=rng,
                             )
-                            budget.spend(config.dp_epsilon, limit=config.dp_epsilon_limit)
 
                         recorded_eps = train_res.get("actual_epsilon")
                         if recorded_eps is not None and isinstance(recorded_eps, (int, float)):
-                            privacy_service.record_opacus_epsilon(
-                                simulation.id,
-                                float(recorded_eps),
-                                limit=config.dp_epsilon_limit,
-                            )
+                            round_opacus_epsilons.append(float(recorded_eps))
 
                         raw_samples = (
                             train_res.get("num_samples")
@@ -953,6 +949,21 @@ class SimulationService:
                         per_bank_samples[bank.id] = num_samples
                         # Save weights for the next round's contrastive loss
                         prev_local_weights_by_bank[bank.id] = res_w
+
+                    # Record round-level privacy spend under the Parallel Composition Theorem
+                    # (disjoint bank datasets compose in parallel; round cost = max client epsilon)
+                    if enable_dp:
+                        if dp_mode == "opacus":
+                            if round_opacus_epsilons:
+                                max_round_eps = max(round_opacus_epsilons)
+                                privacy_service.record_opacus_epsilon(
+                                    simulation.id,
+                                    max_round_eps,
+                                    limit=config.dp_epsilon_limit,
+                                )
+                        else:
+                            if budget is not None:
+                                budget.spend(config.dp_epsilon, limit=config.dp_epsilon_limit)
 
                     # Capture raw per-bank client updates before any aggregation transformations/filtering
                     raw_client_weights = list(client_weights)
@@ -1261,13 +1272,14 @@ class SimulationService:
                                 config.dp_max_grad_norm,
                                 rng=rng,
                             )
-                            if budget is not None:
-                                budget.spend(config.dp_epsilon, limit=config.dp_epsilon_limit)
 
                         client_gnn_weights.append(local_weights)
                         client_gnn_samples.append(int(local_metrics["num_nodes"]))
 
                         per_bank_gnn_loss[bank.id] = local_metrics["loss"]
+
+                    if enable_dp and budget is not None:
+                        budget.spend(config.dp_epsilon, limit=config.dp_epsilon_limit)
 
                     agg_method = AggregationMethod(config.aggregation_method)
                     global_gnn_weights = self.fl_engine.aggregate_graph_parameters(

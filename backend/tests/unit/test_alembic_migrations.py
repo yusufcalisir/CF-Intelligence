@@ -121,3 +121,38 @@ def test_alembic_schema_parity_zero_drift(temp_alembic_db: str) -> None:
             assert diff == [], f"Detected schema drift between models and migrations: {diff}"
     finally:
         sync_engine.dispose()
+
+
+def test_alembic_tenant_scoped_persistence_identity(temp_alembic_db: str) -> None:
+    """Verify tenant-scoped persistence identity (INV-I / INV-03):
+    1. Rejects duplicate (bank_id, transaction_id) within same tenant.
+    2. Allows identical transaction_id across distinct tenants (bank_id).
+    """
+    cfg = _get_alembic_config(f"sqlite+aiosqlite:///{temp_alembic_db}")
+    command.upgrade(cfg, "head")
+
+    conn = sqlite3.connect(temp_alembic_db)
+    cur = conn.cursor()
+    # 1. Insert alert for bank_alpha
+    cur.execute(
+        "INSERT INTO alerts (id, bank_id, transaction_id, risk_score, severity, status, reason_codes, confidence, involved_entity_ids, top_features, risk_factors, model_confidence, historical_evidence, triage_priority, triage_action, sla_minutes, triage_reasons, dedup_count) "
+        "VALUES ('alt_01', 'bank_alpha', 'tx_shared_100', 850.0, 'high', 'new', '[]', 0.9, '[]', '[]', '[]', 0.9, '[]', 'p1_critical', 'queue_urgent', 60, '[]', 1);"
+    )
+    conn.commit()
+
+    # 2. Cross-tenant coexistence: insert same transaction_id for bank_beta -> must succeed
+    cur.execute(
+        "INSERT INTO alerts (id, bank_id, transaction_id, risk_score, severity, status, reason_codes, confidence, involved_entity_ids, top_features, risk_factors, model_confidence, historical_evidence, triage_priority, triage_action, sla_minutes, triage_reasons, dedup_count) "
+        "VALUES ('alt_02', 'bank_beta', 'tx_shared_100', 300.0, 'low', 'new', '[]', 0.8, '[]', '[]', '[]', 0.8, '[]', 'p3_medium', 'queue_standard', 1440, '[]', 1);"
+    )
+    conn.commit()
+
+    # 3. Same-tenant duplicate rejection: insert duplicate (bank_alpha, tx_shared_100) -> must fail with IntegrityError
+    with pytest.raises(sqlite3.IntegrityError):
+        cur.execute(
+            "INSERT INTO alerts (id, bank_id, transaction_id, risk_score, severity, status, reason_codes, confidence, involved_entity_ids, top_features, risk_factors, model_confidence, historical_evidence, triage_priority, triage_action, sla_minutes, triage_reasons, dedup_count) "
+            "VALUES ('alt_03', 'bank_alpha', 'tx_shared_100', 900.0, 'critical', 'new', '[]', 0.95, '[]', '[]', '[]', 0.95, '[]', 'p1_critical', 'queue_urgent', 30, '[]', 1);"
+        )
+        conn.commit()
+
+    conn.close()

@@ -118,13 +118,15 @@ class TestStreamingGNNHardening:
     def test_gat_forward_with_temporal_edge_weights(self) -> None:
         """StreamingGATModel must accept time-decayed edge weights and modulate attention coefficients."""
         model = StreamingGATModel(in_dim=12, hidden_dim=8, num_heads=2)
-        N = 4
+        model.eval()
+        N = 3
         h = torch.randn(N, 12)
-        edge_index = torch.tensor([[0, 1, 2, 3], [1, 2, 3, 0]], dtype=torch.long)
+        # Node 0 and Node 1 both send to Node 2 (multi-neighbor incoming attention competition)
+        edge_index = torch.tensor([[0, 1], [2, 2]], dtype=torch.long)
         E = edge_index.size(1)
 
         # Distinct edge weights representing temporal recency
-        edge_weights = torch.tensor([1.0, 0.5, 0.2, 0.05], dtype=torch.float32)
+        edge_weights = torch.tensor([1.0, 0.05], dtype=torch.float32)
 
         preds_weighted, att_weighted = model(h, edge_index, edge_weights=edge_weights)
         preds_unweighted, att_unweighted = model(h, edge_index, edge_weights=None)

@@ -29,6 +29,7 @@ sys.path.insert(0, str(backend_dir))
 from fastapi.testclient import TestClient
 from hypothesis import HealthCheck, Phase, Verbosity, given, settings, strategies as st
 
+from app.application.services.idempotency import IdempotencyService
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import ModelService
 from app.config import get_settings
@@ -168,6 +169,7 @@ def test_property_enum_query_parameter_guard_invariant(severity_param):
 )
 def test_property_case_idempotency_key_invariant(title, key):
     """INVARIANT 5: Duplicate requests with identical Idempotency-Key return the exact same case_id."""
+    IdempotencyService.get().clear()
     case_payload = {"title": title, "priority": "p2_high"}
     headers = {"Idempotency-Key": key}
     r1 = client.post("/api/v1/cases", json=case_payload, headers=headers)

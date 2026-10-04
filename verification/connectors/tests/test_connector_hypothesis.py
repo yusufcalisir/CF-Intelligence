@@ -18,6 +18,9 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -48,7 +51,21 @@ from app.infrastructure.connectors.rest_connector import RESTBankConnector
 def test_property_normalized_transaction_schema(
     tx_id: str, acc_id: str, cp_acc_id: str, amount: float, currency: str
 ) -> None:
-    """Technical Invariant: Valid amount > 0 always yields NormalizedTransaction with amount > 0."""
+    """Technical Invariant: Canonical account identifiers are trimmed; whitespace-only rejected (INV-A/INV-B)."""
+    is_acc_valid = any(not ch.isspace() for ch in acc_id)
+    is_cp_valid = any(not ch.isspace() for ch in cp_acc_id)
+
+    if not is_acc_valid or not is_cp_valid:
+        with pytest.raises((ValueError, ValidationError)):
+            NormalizedTransaction(
+                transaction_id=tx_id,
+                account_id=acc_id,
+                counterparty_account_id=cp_acc_id,
+                amount=amount,
+                currency=currency,
+            )
+        return
+
     tx = NormalizedTransaction(
         transaction_id=tx_id,
         account_id=acc_id,
@@ -58,10 +75,52 @@ def test_property_normalized_transaction_schema(
     )
 
     assert tx.transaction_id == tx_id
-    assert tx.account_id == acc_id
-    assert tx.counterparty_account_id == cp_acc_id
+    assert tx.account_id == acc_id.strip()
+    assert tx.counterparty_account_id == cp_acc_id.strip()
     assert tx.amount > 0.0
     assert tx.currency == currency
+
+
+def test_identifier_canonicalization_and_rejection_matrix() -> None:
+    """Section 29: Explicit canonicalization matrix for valid & invalid whitespace identifiers."""
+    valid_variations = [
+        ("abc", "abc"),
+        (" abc", "abc"),
+        ("abc ", "abc"),
+        ("\tabc", "abc"),
+        ("abc\r", "abc"),
+        ("abc\n", "abc"),
+        ("  abc  ", "abc"),
+    ]
+    for raw, expected in valid_variations:
+        tx = NormalizedTransaction(
+            transaction_id="tx_matrix",
+            account_id=raw,
+            counterparty_account_id=raw,
+            amount=150.0,
+            currency="EUR",
+        )
+        assert tx.account_id == expected
+        assert tx.counterparty_account_id == expected
+
+    invalid_whitespace_only = ["", " ", "\t", "\r", "\n", "\r\n"]
+    for bad in invalid_whitespace_only:
+        with pytest.raises((ValueError, ValidationError)):
+            NormalizedTransaction(
+                transaction_id="tx_matrix",
+                account_id=bad,
+                counterparty_account_id="valid_acct",
+                amount=150.0,
+                currency="EUR",
+            )
+        with pytest.raises((ValueError, ValidationError)):
+            NormalizedTransaction(
+                transaction_id="tx_matrix",
+                account_id="valid_acct",
+                counterparty_account_id=bad,
+                amount=150.0,
+                currency="EUR",
+            )
 
 
 # -----------------------------------------------------------------------------

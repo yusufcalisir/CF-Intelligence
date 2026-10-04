@@ -60,18 +60,27 @@ def test_evaluate_reference_benchmark_paysim_and_ieee():
 
 
 def test_evaluate_reference_benchmark_scales_with_daily_volume():
+    """Verify volume scaling linearity and economic benefit scaling across 50k, 100k, 500k volumes."""
     pilot = DesignPartnerPilotService()
     res_50k = pilot.evaluate_reference_benchmark(dataset_name="paysim", n_samples=3000, daily_volume=50_000)
+    res_100k = pilot.evaluate_reference_benchmark(dataset_name="paysim", n_samples=3000, daily_volume=100_000)
     res_500k = pilot.evaluate_reference_benchmark(dataset_name="paysim", n_samples=3000, daily_volume=500_000)
 
     fp_50k = res_50k["performance_comparison"]["federated_learning"]["cost_report"]["false_positive_alerts_daily"]
+    fp_100k = res_100k["performance_comparison"]["federated_learning"]["cost_report"]["false_positive_alerts_daily"]
     fp_500k = res_500k["performance_comparison"]["federated_learning"]["cost_report"]["false_positive_alerts_daily"]
-    assert abs(fp_500k - fp_50k * 10) <= 5
+
+    # Independent oracle: daily FP is linear in volume with bounded integer truncation discrepancy <= 10
+    assert abs(fp_500k - fp_50k * 10) <= 10
+    assert abs(fp_100k - fp_50k * 2) <= 2
     assert fp_500k > fp_50k * 9
 
     benefit_50k = res_50k["performance_comparison"]["federated_advantage"]["net_daily_economic_benefit_dollars"]
+    benefit_100k = res_100k["performance_comparison"]["federated_advantage"]["net_daily_economic_benefit_dollars"]
     benefit_500k = res_500k["performance_comparison"]["federated_advantage"]["net_daily_economic_benefit_dollars"]
-    assert benefit_500k > benefit_50k
+    assert benefit_50k > 0
+    assert benefit_100k > benefit_50k
+    assert benefit_500k > benefit_100k
 
 
 def test_evaluate_reference_benchmark_scales_with_sample_size():

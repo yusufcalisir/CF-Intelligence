@@ -733,7 +733,11 @@ async def explain_transaction(
         for f_item in shap_features:
             name = f_item.get("feature", "unknown")
             contrib = float(f_item.get("contribution", 0.0))
-            raw_val = float(f_item.get("raw_value", f_item.get("value", 0.0)))
+            raw_cand = f_item.get("raw_value")
+            if isinstance(raw_cand, (int, float)):
+                raw_val = float(raw_cand)
+            else:
+                raw_val = float(f_item.get("value", 0.0))
             base_val = float(f_item.get("base_value", base_val))
             predicted_val = float(f_item.get("model_output", predicted_val))
             method_used = f_item.get("explanation_method", "shap_kernel_explainer")

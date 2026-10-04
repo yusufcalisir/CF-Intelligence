@@ -64,16 +64,14 @@ def test_gex1_nan_risk_score_in_alert():
 
 
 def test_gex2_nan_feature_values_in_shap():
-    """GEX2: NaN feature values in compute_shap_values — must return finite contributions."""
+    """GEX2: NaN feature values in compute_shap_values — must fail-closed deterministically (INV-C/INV-08)."""
     txn_dict = {
         "transaction_amount": float("nan"),
         "velocity": float("nan"),
         "merchant_risk_score": 0.5,
     }
-    contributions = explainer_service.compute_shap_values(txn_dict)
-    assert len(contributions) == 10
-    for f in contributions:
-        assert_finite(f["contribution"], f"contribution for {f['feature']}")
+    with pytest.raises(ValueError, match="Feature 'transaction_amount' contains non-finite value: nan"):
+        explainer_service.compute_shap_values(txn_dict)
 
 
 # =====================================================================
@@ -81,12 +79,10 @@ def test_gex2_nan_feature_values_in_shap():
 # =====================================================================
 
 def test_gex3_positive_infinity_amount():
-    """GEX3a: +Inf transaction_amount — min(1.0, inf/10000) must clamp to 1.0."""
+    """GEX3a: +Inf transaction_amount — must fail-closed deterministically (INV-C/INV-08)."""
     txn_dict = {"transaction_amount": float("inf"), "velocity": 5.0}
-    contributions = explainer_service.compute_shap_values(txn_dict)
-    assert len(contributions) == 10
-    for f in contributions:
-        assert_finite(f["contribution"], f"contribution for {f['feature']}")
+    with pytest.raises(ValueError, match="Feature 'transaction_amount' contains non-finite value: inf"):
+        explainer_service.compute_shap_values(txn_dict)
 
 
 def test_gex3_negative_infinity_risk_score():
@@ -105,14 +101,14 @@ def test_gex3_negative_infinity_risk_score():
 
 
 def test_gex7_malformed_feature_data_types():
-    """GEX7: Malformed string amount — successfully handled post-remediation (BUG-EX-02 fixed)."""
+    """GEX7: Malformed string amount — must fail-closed deterministically without coercion (INV-D/INV-09)."""
     txn_dict = {
         "transaction_amount": "invalid_string_1000",
         "velocity": [1, 2, 3],
         "merchant_risk_score": None,
     }
-    res = explainer_service.compute_shap_values(txn_dict)
-    assert len(res) == 10
+    with pytest.raises(ValueError, match="Invalid numeric value for feature 'transaction_amount'"):
+        explainer_service.compute_shap_values(txn_dict)
 
 
 # =====================================================================

@@ -41,8 +41,8 @@ def test_data_contract_validator() -> None:
             )
         )
 
-    # Empty account_id
-    with pytest.raises(DataValidationError, match="Account ID cannot be empty"):
+    # Empty account_id rejected by schema or validator
+    with pytest.raises((DataValidationError, ValidationError)):
         validator.validate_transaction(
             NormalizedTransaction(
                 transaction_id="tx_1",

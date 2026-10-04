@@ -71,7 +71,7 @@ class DesignPartnerPilotService:
 
     def __init__(self, hmac_secret_salt: bytes = b"cf-intelligence-pilot-salt-2026") -> None:
         self.salt = hmac_secret_salt
-        self._benchmark_cache: dict[tuple[str, int, int], dict[str, Any]] = {}
+        self._eval_cache: dict[tuple[str, int], dict[str, Any]] = {}
         self._checklist_cache: dict[tuple[str, str], PilotComplianceChecklist] = {}
 
     def hash_pii_identifier(self, raw_value: str, entity_type: str = "ACCOUNT") -> str:
@@ -240,120 +240,143 @@ class DesignPartnerPilotService:
         reference distributions to model institutional performance trade-offs without requiring
         multi-hour offline training runs during interactive API sessions.
         """
-        cache_key = (dataset_name, n_samples, daily_volume)
-        if cache_key in self._benchmark_cache:
-            return self._benchmark_cache[cache_key]
+        eval_key = (dataset_name, n_samples)
+        if eval_key not in self._eval_cache:
+            # Deterministic seed for reproducible scientific reference evaluation
+            torch.manual_seed(0)
+            np.random.seed(0)
 
-        from app.application.services.dataloader import load_dataset, partition_dataset_non_iid
+            from app.application.services.dataloader import load_dataset, partition_dataset_non_iid
 
-        # Load real/mock benchmark with requested sample cap for sub-second interactive response
-        data = load_dataset(dataset_name, n_mock_txns=n_samples, nrows=n_samples, n_mock_nodes=n_samples)
-        X, y = data["X"], data["y"]
-        if len(y) > n_samples:
-            X = X[:n_samples]
-            y = y[:n_samples]
+            # Load real/mock benchmark with requested sample cap for sub-second interactive response
+            data = load_dataset(dataset_name, n_mock_txns=n_samples, nrows=n_samples, n_mock_nodes=n_samples)
+            X, y = data["X"], data["y"]
+            if len(y) > n_samples:
+                X = X[:n_samples]
+                y = y[:n_samples]
 
-        # Run non-IID partition for 3 banks
-        partitions = partition_dataset_non_iid(X, y, num_banks=3, alpha=0.5)
+            # Run non-IID partition for 3 banks
+            partitions = partition_dataset_non_iid(X, y, num_banks=3, alpha=0.5)
 
-        # Real PyTorch neural network inference for FL model vs Local model
-        input_dim = int(X.shape[1])
-        model_service = ModelService(settings=get_settings())
+            # Real PyTorch neural network inference for FL model vs Local model
+            input_dim = int(X.shape[1])
+            model_service = ModelService(settings=get_settings())
 
-        # 1. Fit local isolated model on Bank 0 data (blind to cross-bank syndicates)
-        local_model = model_service.create_model(input_dim=input_dim, dp_compatible=False)
-        p0_X, p0_y = partitions[0]["X"], partitions[0]["y"]
-        local_model, _, _ = model_service.train_local(
-            model=local_model,
-            X_train=p0_X,
-            y_train=p0_y,
-            epochs=2,
-            batch_size=min(64, max(16, len(p0_y))),
-        )
+            # 1. Fit local isolated model on Bank 0 data (blind to cross-bank syndicates)
+            local_model = model_service.create_model(input_dim=input_dim, dp_compatible=False)
+            p0_X, p0_y = partitions[0]["X"], partitions[0]["y"]
+            local_model, _, _ = model_service.train_local(
+                model=local_model,
+                X_train=p0_X,
+                y_train=p0_y,
+                epochs=2,
+                batch_size=min(64, max(16, len(p0_y))),
+            )
 
-        # 2. Fit collaborative federated model across all banks
-        fl_model = model_service.create_model(input_dim=input_dim, dp_compatible=False)
-        fl_model, _, _ = model_service.train_local(
-            model=fl_model,
-            X_train=X,
-            y_train=y,
-            epochs=2,
-            batch_size=min(64, max(16, len(y))),
-        )
+            # 2. Fit collaborative federated model across all banks
+            fl_model = model_service.create_model(input_dim=input_dim, dp_compatible=False)
+            fl_model, _, _ = model_service.train_local(
+                model=fl_model,
+                X_train=X,
+                y_train=y,
+                epochs=2,
+                batch_size=min(64, max(16, len(y))),
+            )
 
-        # 3. Generate actual model inference probabilities on test set X
-        local_model.eval()
-        fl_model.eval()
-        with torch.no_grad():
-            X_tensor = torch.FloatTensor(X).to(model_service.device)
-            out_local = local_model(X_tensor)
-            out_fl = fl_model(X_tensor)
-            if hasattr(out_local, "cpu"):
-                y_prob_local = out_local.cpu().numpy().astype(np.float32).flatten()
+            # 3. Generate actual model inference probabilities on test set X
+            local_model.eval()
+            fl_model.eval()
+            with torch.no_grad():
+                X_tensor = torch.FloatTensor(X).to(model_service.device)
+                out_local = local_model(X_tensor)
+                out_fl = fl_model(X_tensor)
+                if hasattr(out_local, "cpu"):
+                    y_prob_local = out_local.cpu().numpy().astype(np.float32).flatten()
+                else:
+                    y_prob_local = np.asarray(out_local, dtype=np.float32).flatten()
+                if hasattr(out_fl, "cpu"):
+                    y_prob_fl = out_fl.cpu().numpy().astype(np.float32).flatten()
+                else:
+                    y_prob_fl = np.asarray(out_fl, dtype=np.float32).flatten()
+
+            # Compute scientific metrics
+            from sklearn.metrics import roc_auc_score
+
+            if len(np.unique(y)) >= 2:
+                roc_fl = round(float(roc_auc_score(y, y_prob_fl)), 4)
+                roc_local = round(float(roc_auc_score(y, y_prob_local)), 4)
             else:
-                y_prob_local = np.asarray(out_local, dtype=np.float32).flatten()
-            if hasattr(out_fl, "cpu"):
-                y_prob_fl = out_fl.cpu().numpy().astype(np.float32).flatten()
-            else:
-                y_prob_fl = np.asarray(out_fl, dtype=np.float32).flatten()
+                roc_fl = 0.5
+                roc_local = 0.5
 
-        # Compute scientific metrics
-        from sklearn.metrics import roc_auc_score
+            pr_fl = compute_pr_auc(y, y_prob_fl)
+            pr_local = compute_pr_auc(y, y_prob_local)
+            rec01_fl = compute_recall_at_fpr(y, y_prob_fl, target_fpr=0.001)
+            rec01_local = compute_recall_at_fpr(y, y_prob_local, target_fpr=0.001)
 
-        if len(np.unique(y)) >= 2:
-            roc_fl = round(float(roc_auc_score(y, y_prob_fl)), 4)
-            roc_local = round(float(roc_auc_score(y, y_prob_local)), 4)
-        else:
-            roc_fl = 0.5
-            roc_local = 0.5
+            # Multi-threshold confusion matrices
+            cm_fl = compute_multi_threshold_confusion_matrix(y, y_prob_fl)
 
-        pr_fl = compute_pr_auc(y, y_prob_fl)
-        pr_local = compute_pr_auc(y, y_prob_local)
-        rec01_fl = compute_recall_at_fpr(y, y_prob_fl, target_fpr=0.001)
-        rec01_local = compute_recall_at_fpr(y, y_prob_local, target_fpr=0.001)
+            # Synthetic vs Real Fidelity
+            from app.application.services.data_generator import DataGenerator
 
-        # Multi-threshold confusion matrices
-        cm_fl = compute_multi_threshold_confusion_matrix(y, y_prob_fl)
+            gen = DataGenerator(seed=42)
+            synth_data = gen.generate_bank_datasets(
+                bank_a_size=n_samples // 3, bank_b_size=n_samples // 3, bank_c_size=n_samples // 3
+            )
+            synth_features, synth_labels = synth_data["bank_a"]
+            num_cols = synth_features.select_dtypes(include="number").columns
+            X_synth = np.asarray(synth_features[num_cols].values, dtype=np.float32)
+            y_synth = np.asarray(synth_labels.values, dtype=int)
 
-        # Alert fatigue and financial cost
+            fidelity_report = audit_distribution_fidelity(
+                X_real=X,
+                y_real=y,
+                X_synth=X_synth,
+                y_synth=y_synth,
+                dataset_name=f"{dataset_name.upper()} Real World Benchmark",
+                degradation_metrics={
+                    "target_auc_design_goal": 0.950,
+                    "synthetic_auc": 0.835,
+                    "real_world_auc": roc_fl,
+                    "auc_degradation_delta": round(roc_fl - 0.835, 4),
+                    "synthetic_pr_auc": 0.820,
+                    "real_world_pr_auc": pr_fl,
+                    "pr_auc_degradation_delta": round(pr_fl - 0.820, 4),
+                    "recall_at_01_fpr_drop": round(rec01_fl - 0.780, 4),
+                },
+            )
+
+            self._eval_cache[eval_key] = {
+                "source_type": data.get("source", "real_or_mock"),
+                "X": X,
+                "y": y,
+                "y_prob_fl": y_prob_fl,
+                "y_prob_local": y_prob_local,
+                "roc_fl": roc_fl,
+                "roc_local": roc_local,
+                "pr_fl": pr_fl,
+                "pr_local": pr_local,
+                "rec01_fl": rec01_fl,
+                "rec01_local": rec01_local,
+                "cm_fl": cm_fl,
+                "fidelity_report": fidelity_report,
+                "partitions": partitions,
+            }
+
+        cached = self._eval_cache[eval_key]
+        y = cached["y"]
+        y_prob_fl = cached["y_prob_fl"]
+        y_prob_local = cached["y_prob_local"]
+
+        # Alert fatigue and financial cost scaled to requested daily_volume
         cost_fl = compute_financial_cost_utility(y, y_prob_fl, daily_volume=daily_volume)
         cost_local = compute_financial_cost_utility(y, y_prob_local, daily_volume=daily_volume)
 
-        # Synthetic vs Real Fidelity
-        from app.application.services.data_generator import DataGenerator
-
-        gen = DataGenerator(seed=42)
-        synth_data = gen.generate_bank_datasets(
-            bank_a_size=n_samples // 3, bank_b_size=n_samples // 3, bank_c_size=n_samples // 3
-        )
-        synth_features, synth_labels = synth_data["bank_a"]
-        # Select numeric columns
-        num_cols = synth_features.select_dtypes(include="number").columns
-        X_synth = np.asarray(synth_features[num_cols].values, dtype=np.float32)
-        y_synth = np.asarray(synth_labels.values, dtype=int)
-
-        fidelity_report = audit_distribution_fidelity(
-            X_real=X,
-            y_real=y,
-            X_synth=X_synth,
-            y_synth=y_synth,
-            dataset_name=f"{dataset_name.upper()} Real World Benchmark",
-            degradation_metrics={
-                "target_auc_design_goal": 0.950,
-                "synthetic_auc": 0.835,  # Measured 5-seed empirical mean
-                "real_world_auc": roc_fl,
-                "auc_degradation_delta": round(roc_fl - 0.835, 4),
-                "synthetic_pr_auc": 0.820,
-                "real_world_pr_auc": pr_fl,
-                "pr_auc_degradation_delta": round(pr_fl - 0.820, 4),
-                "recall_at_01_fpr_drop": round(rec01_fl - 0.780, 4),
-            },
-        )
-
         n_total = len(y)
-        result = {
+        return {
             "dataset_name": dataset_name,
-            "source_type": data.get("source", "real_or_mock"),
+            "source_type": cached["source_type"],
             "total_transactions_evaluated": n_total,
             "actual_fraud_count": int(np.sum(y == 1)),
             "actual_fraud_rate_percent": round(float(np.mean(y == 1) * 100), 4),
@@ -361,25 +384,25 @@ class DesignPartnerPilotService:
                 "model_type": "PYTORCH_FEDERATED_INFERENCE",
                 "probability_synthesis": "NONE_GENUINE_INFERENCE",
                 "is_synthetic_beta": False,
-                "input_features": int(X.shape[1]),
+                "input_features": int(cached["X"].shape[1]),
                 "samples_evaluated": n_total,
             },
             "performance_comparison": {
                 "federated_learning": {
-                    "roc_auc": roc_fl,
-                    "pr_auc": pr_fl,
-                    "recall_at_01_fpr": rec01_fl,
+                    "roc_auc": cached["roc_fl"],
+                    "pr_auc": cached["pr_fl"],
+                    "recall_at_01_fpr": cached["rec01_fl"],
                     "cost_report": asdict(cost_fl),
                 },
                 "isolated_local_model": {
-                    "roc_auc": roc_local,
-                    "pr_auc": pr_local,
-                    "recall_at_01_fpr": rec01_local,
+                    "roc_auc": cached["roc_local"],
+                    "pr_auc": cached["pr_local"],
+                    "recall_at_01_fpr": cached["rec01_local"],
                     "cost_report": asdict(cost_local),
                 },
                 "federated_advantage": {
-                    "pr_auc_gain": round(pr_fl - pr_local, 4),
-                    "recall_at_01_fpr_gain": round(rec01_fl - rec01_local, 4),
+                    "pr_auc_gain": round(cached["pr_fl"] - cached["pr_local"], 4),
+                    "recall_at_01_fpr_gain": round(cached["rec01_fl"] - cached["rec01_local"], 4),
                     "daily_fraud_loss_saved_dollars": round(
                         cost_local.estimated_daily_fraud_loss_dollars
                         - cost_fl.estimated_daily_fraud_loss_dollars,
@@ -395,8 +418,8 @@ class DesignPartnerPilotService:
                     ),
                 },
             },
-            "multi_threshold_confusion_matrices": [asdict(cm) for cm in cm_fl],
-            "distribution_fidelity": fidelity_report.to_dict(),
+            "multi_threshold_confusion_matrices": [asdict(cm) for cm in cached["cm_fl"]],
+            "distribution_fidelity": cached["fidelity_report"].to_dict(),
             "bank_partitions": [
                 {
                     "bank_id": p["bank_id"],
@@ -404,9 +427,7 @@ class DesignPartnerPilotService:
                     "fraud_count": p["fraud_count"],
                     "fraud_ratio": p["fraud_ratio"],
                 }
-                for p in partitions
+                for p in cached["partitions"]
             ],
         }
-        self._benchmark_cache[cache_key] = result
-        return result
 

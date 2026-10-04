@@ -99,13 +99,23 @@ def test_ddos_middleware_concurrent_burst_throttling():
 
 
 def test_websocket_telemetry_connection_and_banner():
-    """Verify live telemetry WebSocket accepts connection and delivers initial CONNECTED event."""
+    """Verify live telemetry WebSocket accepts connection and delivers initial CONNECTED event with truthful status (INV-O / INV-05)."""
     client = TestClient(app)
+    # Default unconfigured mode truthfully reports STANDBY when no live Kafka connector is active
     with client.websocket_connect("/ws/telemetry") as ws:
         banner = ws.receive_json()
         assert banner["event_type"] == "CONNECTED"
-        assert banner["payload"]["status"] == "ONLINE"
+        assert banner["payload"]["status"] == "STANDBY"
+        assert banner["payload"]["provenance"] == "NO_LIVE_CONNECTOR_CONFIGURED"
         assert "bank_alpha" in banner["payload"]["active_banks"]
+
+    # Explicit simulated mode reports ONLINE with simulated demo feed provenance
+    with client.websocket_connect("/ws/telemetry?mode=simulated") as ws_sim:
+        banner_sim = ws_sim.receive_json()
+        assert banner_sim["event_type"] == "CONNECTED"
+        assert banner_sim["payload"]["status"] == "ONLINE"
+        assert banner_sim["payload"]["stream_type"] == "SIMULATED"
+        assert "bank_alpha" in banner_sim["payload"]["active_banks"]
 
 
 def test_websocket_broadcast_manager_graceful_fanout():
