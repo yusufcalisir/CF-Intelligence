@@ -82,12 +82,23 @@ class TransactionPredictRequest(BaseModel):
     transaction_id: str | None = Field(
         None, max_length=256, description="Optional client-provided transaction identifier"
     )
+    currency: str = Field(
+        "EUR", max_length=3, description="ISO 4217 transaction currency"
+    )
 
-    @field_validator("transaction_amount", "velocity", "merchant_risk_score", "customer_history_score")
+    @field_validator("transaction_amount", "velocity", "merchant_risk_score", "customer_history_score", mode="before")
     @classmethod
-    def _validate_finite_float(cls, v: float) -> float:
-        if not math.isfinite(v):
-            raise ValueError("Numeric fields must be finite numbers (NaN, +Inf, -Inf rejected)")
+    def _validate_finite_float(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("Boolean values are not valid numeric values")
+        if v is not None:
+            try:
+                val = float(v)
+            except (ValueError, TypeError) as err:
+                raise ValueError(f"Numeric fields must be valid numbers: {v}") from err
+            if not math.isfinite(val):
+                raise ValueError("Numeric fields must be finite numbers (NaN, +Inf, -Inf rejected)")
+            return val
         return v
 
 

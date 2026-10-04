@@ -86,14 +86,27 @@ class NormalizedTransaction(BaseModel):
         default=None, description="Originating bank or institution identifier"
     )
 
-    @field_validator("amount")
+    @field_validator("amount", mode="before")
     @classmethod
-    def _validate_amount(cls, v: float) -> float:
-        if not math.isfinite(v):
+    def _validate_amount(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("Boolean values are not valid transaction amounts")
+        try:
+            val = float(v)
+        except (ValueError, TypeError) as err:
+            raise ValueError(f"Transaction amount must be a valid number: {v}") from err
+        if not math.isfinite(val):
             raise ValueError("Transaction amount must be a finite number (NaN, +Inf, -Inf rejected)")
-        if v <= 0:
+        if val <= 0:
             raise ValueError("Transaction amount must be strictly positive")
-        return v
+        return val
+
+    @field_validator("currency")
+    @classmethod
+    def _validate_currency(cls, v: str) -> str:
+        if not v or len(v.strip()) != 3:
+            raise ValueError("Currency must be a valid 3-letter ISO 4217 code (e.g., EUR, USD, GBP)")
+        return v.strip().upper()
 
     @field_validator("timestamp")
     @classmethod

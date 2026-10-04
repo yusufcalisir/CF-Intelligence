@@ -73,6 +73,42 @@
       "invariant_restored": "DATA-INV-09 (Retry Safety), DATA-INV-13 (Missing-Value Truth)",
       "verification_test": "backend/tests/unit/test_connector_correctness.py::test_feature_store_retry_deduplication",
       "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0009",
+      "target_file": "backend/app/application/services/feature_store_service.py",
+      "secondary_file": null,
+      "action": "Bound sliding window filters within [ts - W, ts] to prevent temporal lookahead leakage, and enforce 300s clock skew rejection",
+      "invariant_restored": "DATA-INV-06 (Temporal Fidelity), DATA-INV-16 (Replay Fidelity)",
+      "verification_test": "backend/tests/unit/test_data_contract_certification.py::test_sliding_window_recomputation_oracle, test_feature_store_clock_skew_tolerance",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0010",
+      "target_file": "backend/app/application/services/feature_store_service.py",
+      "secondary_file": "backend/app/presentation/routers/predict.py",
+      "action": "Add tenant_id scoping to ingest_transaction and get_online_features, namespacing customer, merchant, and transaction IDs",
+      "invariant_restored": "DATA-INV-02 (Tenant Ownership), DATA-INV-12 (Partition Fidelity)",
+      "verification_test": "backend/tests/unit/test_data_contract_certification.py::test_feature_store_cross_tenant_isolation",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0011",
+      "target_file": "backend/app/application/services/idempotency.py",
+      "secondary_file": "backend/app/presentation/routers/cases.py",
+      "action": "Bind SHA-256 payload hash in IdempotencyService envelope to detect conflicting payloads under reused keys and return HTTP 409",
+      "invariant_restored": "DATA-INV-08 (Idempotency), DATA-INV-09 (Retry Safety)",
+      "verification_test": "backend/tests/unit/test_data_contract_certification.py::test_idempotency_conflicting_payload",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0012",
+      "target_file": "backend/app/infrastructure/connectors/kafka_streaming_connector.py",
+      "secondary_file": null,
+      "action": "Bridge IdempotencyEngine to distributed IdempotencyService Redis backend with robust in-process fallback",
+      "invariant_restored": "DATA-INV-08 (Idempotency), DATA-INV-15 (Concurrency Safety)",
+      "verification_test": "backend/tests/unit/test_data_contract_certification.py::test_kafka_idempotency_semantics",
+      "verification_status": "PASSED"
     }
   ]
 }

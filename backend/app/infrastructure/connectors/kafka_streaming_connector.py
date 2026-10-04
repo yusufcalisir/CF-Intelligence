@@ -133,6 +133,19 @@ class IdempotencyEngine:
 
     def try_acquire(self, idempotency_key: str) -> bool:
         """Atomically test and reserve an idempotency key if not already processed."""
+        # Multi-worker distributed Redis coordination when available
+        try:
+            from app.application.services.idempotency import IdempotencyService
+
+            idem_svc = IdempotencyService.get()
+            if idem_svc._redis_client is not None:
+                status, _ = idem_svc.acquire(
+                    f"kafka:{idempotency_key}", in_progress_timeout=float(self._ttl_seconds)
+                )
+                return status == "ACQUIRED"
+        except Exception as exc:
+            logger.debug("IdempotencyEngine Redis check skipped (%s), using local engine", exc)
+
         with self._lock:
             self._evict_expired()
             if idempotency_key in self._processed_keys:
@@ -142,17 +155,46 @@ class IdempotencyEngine:
 
     def release(self, idempotency_key: str) -> None:
         """Release key on publish failure so it may be retried."""
+        try:
+            from app.application.services.idempotency import IdempotencyService
+
+            idem_svc = IdempotencyService.get()
+            if idem_svc._redis_client is not None:
+                idem_svc.release(f"kafka:{idempotency_key}")
+        except Exception:
+            pass
+
         with self._lock:
             self._processed_keys.pop(idempotency_key, None)
 
     def is_duplicate(self, idempotency_key: str) -> bool:
         """Check if an event key has already been processed within the TTL window."""
+        try:
+            from app.application.services.idempotency import IdempotencyService
+
+            idem_svc = IdempotencyService.get()
+            if idem_svc._redis_client is not None:
+                cached = idem_svc.get_cached(f"kafka:{idempotency_key}")
+                if cached is not None:
+                    return True
+        except Exception:
+            pass
+
         with self._lock:
             self._evict_expired()
             return idempotency_key in self._processed_keys
 
     def mark_processed(self, idempotency_key: str) -> None:
         """Record an event key as successfully processed."""
+        try:
+            from app.application.services.idempotency import IdempotencyService
+
+            idem_svc = IdempotencyService.get()
+            if idem_svc._redis_client is not None:
+                idem_svc.complete(f"kafka:{idempotency_key}", "COMMITTED")
+        except Exception:
+            pass
+
         with self._lock:
             self._evict_expired()
             self._processed_keys[idempotency_key] = time.time() + self._ttl_seconds

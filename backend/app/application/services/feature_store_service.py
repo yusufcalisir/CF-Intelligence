@@ -37,6 +37,13 @@ class FeatureStoreService:
         self.online_stats = RedisStore("feast:stats")
         self.tx_history = RedisStore("feast:tx_history")
 
+    def clear(self) -> None:
+        """Clear all online stores and sliding transaction history."""
+        self.online_customer.clear()
+        self.online_merchant.clear()
+        self.online_stats.clear()
+        self.tx_history.clear()
+
     def ingest_transaction(
         self,
         customer_id: str,
@@ -49,6 +56,7 @@ class FeatureStoreService:
         account_age_days: int,
         timestamp: float | None = None,
         transaction_id: str | None = None,
+        tenant_id: str | None = None,
     ) -> None:
         """Dynamic Streaming Ingestion Pipeline (Flink/Spark Simulation).
 
@@ -65,11 +73,37 @@ class FeatureStoreService:
             )
             return
 
-        ts = timestamp or time.time()
+        now = time.time()
+        ts = timestamp or now
+
+        # Clock-skew tolerance check: Reject transactions dated >300s into the future
+        if ts > now + 300.0:
+            logger.warning(
+                "FeatureStore rejected future-dated transaction ts=%s (exceeds 300s clock skew bound)",
+                ts,
+            )
+            return
+
+        # Multi-tenant isolation: namespace customer, merchant, and transaction IDs by tenant
+        scoped_customer_id = (
+            f"{tenant_id}:{customer_id}"
+            if tenant_id and not customer_id.startswith(f"{tenant_id}:")
+            else customer_id
+        )
+        scoped_merchant_id = (
+            f"{tenant_id}:{merchant_id}"
+            if tenant_id and not merchant_id.startswith(f"{tenant_id}:")
+            else merchant_id
+        )
+        scoped_tx_id = (
+            f"{tenant_id}:{transaction_id}"
+            if tenant_id and transaction_id and not transaction_id.startswith(f"{tenant_id}:")
+            else transaction_id
+        )
 
         # 1. Update static/profile features in the Online Store
         self.online_customer.set(
-            customer_id,
+            scoped_customer_id,
             {
                 "customer_history_score": customer_history_score,
                 "account_age_days": account_age_days,
@@ -78,7 +112,7 @@ class FeatureStoreService:
         )
 
         self.online_merchant.set(
-            merchant_id,
+            scoped_merchant_id,
             {
                 "merchant_category": merchant_category,
                 "merchant_risk_score": merchant_risk_score,
@@ -87,25 +121,25 @@ class FeatureStoreService:
 
         # 2. Update dynamic streaming features using sliding windows
         # Retrieve full window history for the customer first to check idempotency
-        history = self.tx_history.get_list(customer_id)
+        history = self.tx_history.get_list(scoped_customer_id)
 
         # Guard against double-counting on retries or duplicate delivery
-        if transaction_id and any(tx.get("tx_id") == transaction_id for tx in history):
+        if scoped_tx_id and any(tx.get("tx_id") == scoped_tx_id for tx in history):
             logger.debug(
-                "FeatureStore duplicate tx_id %s ignored for customer %s", transaction_id, customer_id
+                "FeatureStore duplicate tx_id %s ignored for customer %s", scoped_tx_id, scoped_customer_id
             )
             return
 
-        tx_event = {"timestamp": ts, "amount": amount, "tx_id": transaction_id}
-        self.tx_history.push_list(customer_id, tx_event)
+        tx_event = {"timestamp": ts, "amount": amount, "tx_id": scoped_tx_id}
+        self.tx_history.push_list(scoped_customer_id, tx_event)
         history.append(tx_event)
 
-        # Filter sliding windows
+        # Filter sliding windows strictly within [ts - W, ts] to prevent temporal lookahead leakage
         one_hour_ago = ts - 3600.0
         twenty_four_hours_ago = ts - 86400.0
 
-        tx_1h = [tx for tx in history if tx.get("timestamp", 0.0) >= one_hour_ago]
-        tx_24h = [tx for tx in history if tx.get("timestamp", 0.0) >= twenty_four_hours_ago]
+        tx_1h = [tx for tx in history if one_hour_ago <= tx.get("timestamp", 0.0) <= ts]
+        tx_24h = [tx for tx in history if twenty_four_hours_ago <= tx.get("timestamp", 0.0) <= ts]
 
         # Calculate metrics
         rolling_velocity_1h = len(tx_1h)
@@ -115,7 +149,7 @@ class FeatureStoreService:
 
         # Save to Online Store
         self.online_stats.set(
-            customer_id,
+            scoped_customer_id,
             {
                 "rolling_velocity_1h": float(rolling_velocity_1h),
                 "avg_amount_24h": avg_amount_24h,
@@ -124,7 +158,7 @@ class FeatureStoreService:
 
         logger.debug(
             "Streaming ingestion updated for customer %s: velocity_1h=%d, avg_amount_24h=%.2f",
-            customer_id,
+            scoped_customer_id,
             rolling_velocity_1h,
             avg_amount_24h,
         )
@@ -133,6 +167,7 @@ class FeatureStoreService:
         self,
         entity_rows: list[dict[str, Any]],
         features: list[str],
+        tenant_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Retrieve real-time features from the Online Store (Redis/in-memory).
 
@@ -141,6 +176,7 @@ class FeatureStoreService:
         Args:
             entity_rows: List of dicts specifying target keys (e.g. [{'customer_id': 'cust_123', 'merchant_id': 'merch_456'}])
             features: List of feature names to retrieve.
+            tenant_id: Optional institution tenant identifier for multi-tenant isolation.
 
         Returns:
             List of dicts containing the requested feature values.
@@ -154,8 +190,20 @@ class FeatureStoreService:
         results: list[dict[str, Any]] = []
 
         for row in entity_rows:
-            cust_id = row.get("customer_id", "default_customer")
-            merch_id = row.get("merchant_id", "default_merchant")
+            raw_cust = row.get("customer_id", "default_customer")
+            raw_merch = row.get("merchant_id", "default_merchant")
+            row_tenant = tenant_id or row.get("tenant_id") or row.get("bank_id")
+
+            cust_id = (
+                f"{row_tenant}:{raw_cust}"
+                if row_tenant and not raw_cust.startswith(f"{row_tenant}:")
+                else raw_cust
+            )
+            merch_id = (
+                f"{row_tenant}:{raw_merch}"
+                if row_tenant and not raw_merch.startswith(f"{row_tenant}:")
+                else raw_merch
+            )
 
             # Fetch views from online store
             cust_profile = self.online_customer.get(cust_id) or {}

@@ -93,11 +93,13 @@ class IdempotencyService:
         idempotency_key: str | None,
         in_progress_timeout: float = 30.0,
         tenant_id: str | None = None,
+        payload_hash: str | None = None,
     ) -> tuple[str, Any | None]:
         """Atomically tests whether an idempotency key is already cached, in-progress, or acquires it.
 
         Returns:
-            ("HIT", cached_response): already completed; safe to replay.
+            ("HIT", cached_response): already completed with matching payload; safe to replay.
+            ("MISMATCH", None): completed with a different payload; conflicting mutation.
             ("IN_PROGRESS", None): another concurrent request is currently processing this key.
             ("ACQUIRED", None): lock acquired; proceed to create resource, then call complete().
         """
@@ -120,9 +122,16 @@ class IdempotencyService:
                     if val_str == _IN_PROGRESS_SENTINEL:
                         return ("IN_PROGRESS", None)
                     try:
-                        return ("HIT", json.loads(val_str))
+                        parsed = json.loads(val_str)
                     except Exception:
-                        return ("HIT", val_str)
+                        parsed = val_str
+
+                    if isinstance(parsed, dict) and parsed.get("__idempotency_envelope__"):
+                        stored_hash = parsed.get("payload_hash")
+                        if payload_hash and stored_hash and stored_hash != payload_hash:
+                            return ("MISMATCH", None)
+                        return ("HIT", parsed.get("response"))
+                    return ("HIT", parsed)
                 return ("ACQUIRED", None)
             except Exception as exc:
                 logger.warning("IdempotencyService Redis acquire failed: %s -- falling back", exc)
@@ -136,6 +145,11 @@ class IdempotencyService:
                 if expires_at > now:
                     if in_prog:
                         return ("IN_PROGRESS", None)
+                    if isinstance(payload, dict) and payload.get("__idempotency_envelope__"):
+                        stored_hash = payload.get("payload_hash")
+                        if payload_hash and stored_hash and stored_hash != payload_hash:
+                            return ("MISMATCH", None)
+                        return ("HIT", payload.get("response"))
                     return ("HIT", payload)
                 else:
                     del self._fallback[redis_key]
@@ -150,12 +164,18 @@ class IdempotencyService:
         idempotency_key: str | None,
         response_body: Any,
         tenant_id: str | None = None,
+        payload_hash: str | None = None,
     ) -> None:
         """Persist final response_body under idempotency_key, clearing in-progress state."""
         if not idempotency_key:
             return
         redis_key = self._build_redis_key(idempotency_key, tenant_id=tenant_id)
-        serialized = json.dumps(response_body, default=str)
+        envelope = {
+            "__idempotency_envelope__": True,
+            "payload_hash": payload_hash,
+            "response": response_body,
+        }
+        serialized = json.dumps(envelope, default=str)
 
         if self._redis_client is not None:
             try:
@@ -167,7 +187,7 @@ class IdempotencyService:
 
         with self._fallback_lock:
             expires_at = time.monotonic() + _IDEMPOTENCY_TTL_SECONDS
-            self._fallback[redis_key] = (json.loads(serialized), expires_at, False)
+            self._fallback[redis_key] = (envelope, expires_at, False)
             self._evict_expired()
 
     def release(self, idempotency_key: str | None, tenant_id: str | None = None) -> None:
@@ -207,9 +227,12 @@ class IdempotencyService:
                     if val_str == _IN_PROGRESS_SENTINEL:
                         return None
                     try:
-                        return json.loads(val_str)
+                        parsed = json.loads(val_str)
                     except Exception:
-                        return val_str
+                        parsed = val_str
+                    if isinstance(parsed, dict) and parsed.get("__idempotency_envelope__"):
+                        return parsed.get("response")
+                    return parsed
                 return None
             except Exception as exc:
                 logger.warning("IdempotencyService Redis GET failed: %s -- falling back", exc)
@@ -224,6 +247,8 @@ class IdempotencyService:
                 else:
                     payload, expires_at, in_prog = entry
                 if expires_at > time.monotonic() and not in_prog:
+                    if isinstance(payload, dict) and payload.get("__idempotency_envelope__"):
+                        return payload.get("response")
                     return payload
                 if expires_at <= time.monotonic():
                     del self._fallback[redis_key]
@@ -234,9 +259,10 @@ class IdempotencyService:
         idempotency_key: str | None,
         response_body: Any,
         tenant_id: str | None = None,
+        payload_hash: str | None = None,
     ) -> None:
         """Persist response_body under idempotency_key for TTL seconds."""
-        self.complete(idempotency_key, response_body, tenant_id=tenant_id)
+        self.complete(idempotency_key, response_body, tenant_id=tenant_id, payload_hash=payload_hash)
 
     @staticmethod
     def _hash_key(raw_key: str) -> str:

@@ -277,6 +277,7 @@ async def predict_transaction(
                     "merchant_risk_score",
                     "merchant_category",
                 ],
+                tenant_id=bank_id,
             )
             if online_feats:
                 feats = online_feats[0]
@@ -310,6 +311,7 @@ async def predict_transaction(
                 chargeback_count=payload.chargeback_count,
                 account_age_days=payload.account_age_days,
                 transaction_id=txn_id,
+                tenant_id=bank_id,
             )
 
         network = getattr(model, "network", None)
