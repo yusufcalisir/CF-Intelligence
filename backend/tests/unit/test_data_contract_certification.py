@@ -254,6 +254,7 @@ def test_idempotency_conflicting_payload() -> None:
     # Step 3: Exact retry with Payload A produces HIT with cached response
     retry_status, cached = idem.acquire(key, tenant_id=tenant, payload_hash=hash_a)
     assert retry_status == "HIT"
+    assert cached is not None
     assert cached["case_id"] == "case_001"
 
     # Step 4: Reusing same key with conflicting Payload B produces MISMATCH
@@ -393,15 +394,15 @@ def test_sliding_window_recomputation_oracle() -> None:
     for ev in events:
         fs.ingest_transaction(
             customer_id="cust_oracle",
-            amount=ev["amount"],
+            amount=float(ev["amount"]),
             merchant_id="merch_oracle",
             merchant_category="retail",
             merchant_risk_score=0.02,
             customer_history_score=0.95,
             chargeback_count=0,
             account_age_days=365,
-            timestamp=ev["ts"],
-            transaction_id=ev["id"],
+            timestamp=float(ev["ts"]),
+            transaction_id=str(ev["id"]),
             tenant_id="bank_oracle",
         )
 
@@ -1106,8 +1107,8 @@ def test_temporal_window_exact_boundaries() -> None:
         {"tx_id": "t_future_leak", "amount": 50.0, "timestamp": ts + 0.001},
     ]
 
-    tx_1h = [tx for tx in history if one_hour_ago <= tx["timestamp"] <= ts]
-    included_ids = [tx["tx_id"] for tx in tx_1h]
+    tx_1h = [tx for tx in history if one_hour_ago <= float(tx["timestamp"]) <= ts]
+    included_ids = [str(tx["tx_id"]) for tx in tx_1h]
 
     assert "t_out_past" not in included_ids
     assert "t_exact_past" in included_ids
@@ -1115,7 +1116,7 @@ def test_temporal_window_exact_boundaries() -> None:
     assert "t_exact_anchor" in included_ids
     assert "t_future_leak" not in included_ids
     assert len(tx_1h) == 3
-    assert sum(tx["amount"] for tx in tx_1h) == 90.0
+    assert sum(float(tx["amount"]) for tx in tx_1h) == 90.0
 
 
 @pytest.mark.asyncio
