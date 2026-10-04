@@ -5,6 +5,35 @@
 
 ---
 
+### Executive Threat Architecture & Adversary Mapping
+
+CF-Intelligence operates in an adversarial environment where participating banking institutions, network observers, and external API clients may attempt to undermine system privacy, model integrity, or service availability.
+
+```mermaid
+flowchart TD
+    subgraph Adversaries ["Identified Adversary Classes"]
+        Adv1["Malicious Consortium Participant<br/>(Attempts weight poisoning or sample reconstruction)"]
+        Adv2["Compromised Client Edge Node<br/>(Submits arbitrary or inverted gradients)"]
+        Adv3["Curious Central Coordinator<br/>(Attempts gradient inspection)"]
+        Adv4["External API Adversary<br/>(Attempts BOLA/IDOR, SSRF, DoS, injection)"]
+    end
+
+    subgraph Defenses ["Defensive Controls Layer"]
+        Def1["Byzantine Defenses<br/>(Krum, Trimmed Mean, Bulyan, Spectral SVD)"]
+        Def2["Differential Privacy<br/>(Opacus DP-SGD, Rényi Accounting)"]
+        Def3["Secure Aggregation<br/>(Curve25519 Pairwise DH, Shamir Dropout)"]
+        Def4["Perimeter Security<br/>(RFC 1918/Loopback SSRF Block, ABAC, Rate Limiting)"]
+    end
+
+    Adv1 --> Def1
+    Adv1 --> Def2
+    Adv2 --> Def1
+    Adv3 --> Def3
+    Adv4 --> Def4
+```
+
+---
+
 ## 1. Formal Trust Model, Threat Personas & Master STRIDE Matrix
 
 ### 1.1 Threat Actor Personas (*Who Can Attack*)

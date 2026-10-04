@@ -31,7 +31,7 @@
 | [5. Federated Learning](#5-federated-learning-engines--non-iid-optimization) | [17. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification) | [23. AI Collaboration Methodology](#23-development-methodology--ai-collaboration) |
 | [6. Core PET Security Perimeter](#6-core-privacy-enhancing-technologies-dp--secagg) | [18. API Blueprints](#18-api-endpoint-blueprints--core-specification) | [24. Related Work & References](#24-related-work-and-references) |
 | [7. Byzantine Defense](#7-byzantine-poisoning-defense--adversarial-robustness) | [🔬 Algorithm Specifications](docs/algorithms/README.md) | [25. Citation](#25-academic-citation-and-reference-format) |
-| [8. Graph Intelligence](#8-graph-intelligence--fuzzy-entity-resolution) | [🛡️ Formal Threat Model](docs/threat-model.md) | [26. Author & Maintenance](#26-author-and-maintenance) |
+| [8. Graph Intelligence](#8-graph-intelligence--fuzzy-entity-resolution) | [🛡️ Formal Threat Model](docs/threat_model.md) | [26. Author & Maintenance](#26-author-and-maintenance) |
 | [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | [🔒 Formal Privacy Model](docs/privacy-model.md) | [📋 Engineering Audit Report](docs/engineering-audit.md) |
 | [10. Multi-Layer Defense & Gateway](#10-multi-layer-defense-gateway-broken-access-control--rate-limiting) | [📊 Benchmark Figures & Raw Data](benchmarks/results/summary.md) | [📖 Complete API Reference](docs/api_reference.md) |
 | [11. Case Management & European RegTech](#11-human-in-the-loop-workbench-european-finint--regulatory-regtech) | | |

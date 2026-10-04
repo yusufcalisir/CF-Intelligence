@@ -6,7 +6,7 @@ Implements:
 3. Rényi Differential Privacy (RDP) moments accounting and convex dual conversion
 4. Seamless integration with PyTorch Opacus PrivacyEngine for per-sample DP training
 
-See docs/threat-model.md and docs/privacy-model.md for threat boundaries and
+See docs/threat_model.md and docs/privacy-model.md for threat boundaries and
 formal privacy accounting proofs.
 """
 

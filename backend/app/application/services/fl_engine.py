@@ -650,7 +650,7 @@ class FederatedLearningEngine:
         The aggregated result is identical to plaintext FedAvg, but individual
         client parameters are obscured.
 
-        Limitations (documented in docs/threat-model.md or docs/):
+        Limitations (documented in docs/threat_model.md or docs/):
         - No key exchange protocol
         - Masks are generated centrally (defeats the purpose in production)
         - No dropout recovery (real protocols handle this with Shamir secret sharing)
