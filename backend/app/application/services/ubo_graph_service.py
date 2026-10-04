@@ -59,14 +59,14 @@ class UBOGraphService:
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
-        # tenant_id -> nx.DiGraph
-        self._graphs: dict[str, nx.DiGraph] = defaultdict(nx.DiGraph)
+        # tenant_id -> nx.MultiDiGraph (preserves parallel ownership & control edges)
+        self._graphs: dict[str, nx.MultiDiGraph] = defaultdict(nx.MultiDiGraph)
         # tenant_id -> node_id -> UBONodeCreate
         self._nodes: dict[str, dict[str, UBONodeCreate]] = defaultdict(dict)
         # tenant_id -> rel_id -> UBORelationCreate
         self._relations: dict[str, dict[str, UBORelationCreate]] = defaultdict(dict)
 
-    def _get_graph(self, tenant_id: str) -> nx.DiGraph:
+    def _get_graph(self, tenant_id: str) -> nx.MultiDiGraph:
         return self._graphs[tenant_id]
 
     def add_node(self, tenant_id: str, node: UBONodeCreate) -> UBONodeResponse:
@@ -152,6 +152,7 @@ class UBOGraphService:
             g.add_edge(
                 relation.source_id,
                 relation.target_id,
+                key=rel_id,
                 rel_id=rel_id,
                 relation_type=relation.relation_type.value,
                 ownership_percentage=relation.ownership_percentage,
@@ -223,8 +224,8 @@ class UBOGraphService:
                     return
 
                 # Find all in-edges to current_node_id (who owns current_node_id?)
-                in_edges = g.in_edges(current_node_id, data=True)
-                for parent_id, _, data in in_edges:
+                in_edges = g.in_edges(current_node_id, data=True, keys=True)
+                for parent_id, _, rel_key, data in in_edges:
                     rel_type = data.get("relation_type")
                     if rel_type not in ownership_rel_types:
                         continue
@@ -321,10 +322,11 @@ class UBOGraphService:
 
             ownership_edges = [
                 (u, v)
-                for u, v, d in g.edges(data=True)
+                for u, v, k, d in g.edges(data=True, keys=True)
                 if d.get("relation_type") in ownership_rel_types
             ]
-            sub_g = g.edge_subgraph(ownership_edges)
+            sub_g = nx.DiGraph()
+            sub_g.add_edges_from(ownership_edges)
 
             try:
                 raw_cycles = list(nx.simple_cycles(sub_g))
@@ -355,8 +357,8 @@ class UBOGraphService:
 
                 # Count directorships
                 directorship_edges = [
-                    (u, v, d)
-                    for u, v, d in g.out_edges(node_id, data=True)
+                    (u, v, k, d)
+                    for u, v, k, d in g.out_edges(node_id, data=True, keys=True)
                     if d.get("relation_type")
                     in {
                         UBORelationType.DIRECTOR_OF.value,
@@ -368,11 +370,11 @@ class UBOGraphService:
                 is_explicit_nominee = any(
                     d.get("is_nominee") is True
                     or d.get("relation_type") == UBORelationType.NOMINEE_DIRECTOR.value
-                    for _, _, d in directorship_edges
+                    for _, _, _, d in directorship_edges
                 )
 
                 if len(directorship_edges) >= min_entities or is_explicit_nominee:
-                    managed_entities = [v for _, v, _ in directorship_edges]
+                    managed_entities = list(dict.fromkeys(v for _, v, _, _ in directorship_edges))
                     nominees.append(
                         {
                             "director_id": node_id,
@@ -601,7 +603,7 @@ class UBOGraphService:
                     )
 
             sub_edges: list[UBOSubgraphEdge] = []
-            for u, v, d in sub_g.edges(data=True):
+            for u, v, k, d in sub_g.edges(data=True, keys=True):
                 sub_edges.append(
                     UBOSubgraphEdge(
                         source=u,

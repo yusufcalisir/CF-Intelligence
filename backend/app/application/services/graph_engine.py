@@ -14,7 +14,7 @@ import logging
 import re
 import threading
 from collections import defaultdict, deque
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.config import get_settings
@@ -180,250 +180,436 @@ class GraphEngine:
 
     def register_entity(self, entity: Entity) -> None:
         """Register an entity in the graph."""
-        self._entities.set(entity.id, _entity_to_dict(entity))
-        if self.db_type in ("neo4j", "memgraph") and self.driver:
-            import json
+        with self._lock:
+            self._entities.set(entity.id, _entity_to_dict(entity))
+            if self.db_type in ("neo4j", "memgraph") and self.driver:
+                import json
 
-            with self.driver.session() as session:
-                session.run(
-                    "MERGE (e:Entity {id: $id}) "
-                    "SET e.entity_type = $entity_type, "
-                    "    e.privacy_id = $privacy_id, "
-                    "    e.bank_id = $bank_id, "
-                    "    e.display_label = $display_label, "
-                    "    e.risk_level = $risk_level, "
-                    "    e.alert_count = $alert_count, "
-                    "    e.first_seen = $first_seen, "
-                    "    e.last_seen = $last_seen, "
-                    "    e.attributes = $attributes",
-                    id=entity.id,
-                    entity_type=entity.entity_type.value,
-                    privacy_id=entity.privacy_id,
-                    bank_id=entity.bank_id,
-                    display_label=entity.display_label,
-                    risk_level=entity.risk_level.value,
-                    alert_count=entity.alert_count,
-                    first_seen=entity.first_seen.isoformat(),
-                    last_seen=entity.last_seen.isoformat(),
-                    attributes=json.dumps(entity.attributes),
-                )
+                with self.driver.session() as session:
+                    session.run(
+                        "MERGE (e:Entity {id: $id}) "
+                        "SET e.entity_type = $entity_type, "
+                        "    e.privacy_id = $privacy_id, "
+                        "    e.bank_id = $bank_id, "
+                        "    e.display_label = $display_label, "
+                        "    e.risk_level = $risk_level, "
+                        "    e.alert_count = $alert_count, "
+                        "    e.first_seen = $first_seen, "
+                        "    e.last_seen = $last_seen, "
+                        "    e.attributes = $attributes",
+                        id=entity.id,
+                        entity_type=entity.entity_type.value,
+                        privacy_id=entity.privacy_id,
+                        bank_id=entity.bank_id,
+                        display_label=entity.display_label,
+                        risk_level=entity.risk_level.value,
+                        alert_count=entity.alert_count,
+                        first_seen=entity.first_seen.isoformat(),
+                        last_seen=entity.last_seen.isoformat(),
+                        attributes=json.dumps(entity.attributes),
+                    )
 
     def register_entities(self, entities: list[Entity]) -> None:
-        for entity in entities:
-            self.register_entity(entity)
+        with self._lock:
+            for entity in entities:
+                self.register_entity(entity)
 
     def add_relationship(self, relationship: Relationship) -> None:
         """Add a relationship (edge) to the graph."""
-        self._relationships.set(relationship.id, _relationship_to_dict(relationship))
-        if self.db_type in ("neo4j", "memgraph") and self.driver:
-            rel_type = relationship.relationship_type.value
-            query = (
-                f"MATCH (s:Entity {{id: $source_id}}) "
-                f"MATCH (t:Entity {{id: $target_id}}) "
-                f"MERGE (s)-[r:{rel_type} {{id: $id}}]->(t) "
-                "SET r.relationship_type = $relationship_type, "
-                "    r.confidence = $confidence, "
-                "    r.evidence = $evidence, "
-                "    r.created_at = $created_at, "
-                "    r.source_entity_id = $source_id, "
-                "    r.target_entity_id = $target_id"
+        with self._lock:
+            self._relationships.set(relationship.id, _relationship_to_dict(relationship))
+            # Incrementally update in-memory adjacency
+            self._adjacency[relationship.source_entity_id].add(
+                (relationship.target_entity_id, relationship.id)
             )
-            with self.driver.session() as session:
-                session.run(
-                    query,
-                    id=relationship.id,
-                    source_id=relationship.source_entity_id,
-                    target_id=relationship.target_entity_id,
-                    relationship_type=relationship.relationship_type.value,
-                    confidence=relationship.confidence,
-                    evidence=relationship.evidence,
-                    created_at=relationship.created_at.isoformat(),
+            self._adjacency[relationship.target_entity_id].add(
+                (relationship.source_entity_id, relationship.id)
+            )
+            if self.db_type in ("neo4j", "memgraph") and self.driver:
+                rel_type = relationship.relationship_type.value
+                query = (
+                    f"MATCH (s:Entity {{id: $source_id}}) "
+                    f"MATCH (t:Entity {{id: $target_id}}) "
+                    f"MERGE (s)-[r:{rel_type} {{id: $id}}]->(t) "
+                    "SET r.relationship_type = $relationship_type, "
+                    "    r.confidence = $confidence, "
+                    "    r.evidence = $evidence, "
+                    "    r.created_at = $created_at, "
+                    "    r.source_entity_id = $source_id, "
+                    "    r.target_entity_id = $target_id"
                 )
+                with self.driver.session() as session:
+                    session.run(
+                        query,
+                        id=relationship.id,
+                        source_id=relationship.source_entity_id,
+                        target_id=relationship.target_entity_id,
+                        relationship_type=relationship.relationship_type.value,
+                        confidence=relationship.confidence,
+                        evidence=relationship.evidence,
+                        created_at=relationship.created_at.isoformat(),
+                    )
 
     def find_neighbors(
         self,
         entity_id: str,
         depth: int = 1,
         relationship_types: set[RelationshipType] | None = None,
+        as_of: datetime | None = None,
     ) -> list[Entity]:
-        """BFS traversal to find neighbors up to a given depth."""
-        if self.db_type in ("neo4j", "memgraph") and self.driver:
-            if relationship_types:
-                rel_types_str = "|".join(rt.value for rt in relationship_types)
+        """BFS traversal to find neighbors up to a given depth.
+
+        Args:
+            entity_id: Root entity ID to find neighbors for.
+            depth: Maximum traversal depth hops.
+            relationship_types: Optional set of allowed RelationshipTypes.
+            as_of: Optional temporal cutoff. Relationships created after as_of are excluded.
+        """
+        with self._lock:
+            if self.db_type in ("neo4j", "memgraph") and self.driver:
+                rel_filter = ""
+                if relationship_types:
+                    rel_types_str = "|".join(rt.value for rt in relationship_types)
+                    rel_filter = f":{rel_types_str}"
+
+                # Exclude self-node (n.id <> $entity_id) to prevent cyclic return of root entity
                 query = (
-                    f"MATCH (s:Entity {{id: $entity_id}})-[:{rel_types_str}*1..{depth}]-(n:Entity) "
-                    "RETURN DISTINCT n"
+                    f"MATCH (s:Entity {{id: $entity_id}})-[r{rel_filter}*1..{depth}]-(n:Entity) "
+                    "WHERE n.id <> $entity_id "
                 )
-            else:
-                query = (
-                    f"MATCH (s:Entity {{id: $entity_id}})-[*1..{depth}]-(n:Entity) "
-                    "RETURN DISTINCT n"
-                )
+                params: dict[str, Any] = {"entity_id": entity_id}
+                if as_of is not None:
+                    query += "  AND all(rel IN relationships(r) WHERE rel.created_at <= $as_of) "
+                    params["as_of"] = as_of.isoformat()
+                query += "RETURN DISTINCT n"
+
+                neighbors = []
+                with self.driver.session() as session:
+                    result = session.run(query, **params)
+                    for record in result:
+                        neighbors.append(_neo4j_node_to_entity(record["n"]))
+                return neighbors
+
+            self._build_adjacency_list()
+            visited: set[str] = {entity_id}
+            queue: deque[tuple[str, int]] = deque([(entity_id, 0)])
             neighbors = []
-            with self.driver.session() as session:
-                result = session.run(query, entity_id=entity_id)
-                for record in result:
-                    neighbors.append(_neo4j_node_to_entity(record["n"]))
-            return neighbors
 
-        self._build_adjacency_list()
-        visited: set[str] = {entity_id}
-        queue: deque[tuple[str, int]] = deque([(entity_id, 0)])
-        neighbors = []
-
-        while queue:
-            current_id, current_depth = queue.popleft()
-            if current_depth >= depth:
-                continue
-
-            for neighbor_id, rel_id in self._adjacency.get(current_id, set()):
-                if neighbor_id in visited:
+            while queue:
+                current_id, current_depth = queue.popleft()
+                if current_depth >= depth:
                     continue
 
-                # Filter by relationship type if specified
-                if relationship_types:
+                for neighbor_id, rel_id in self._adjacency.get(current_id, set()):
+                    if neighbor_id in visited:
+                        continue
+
                     rel_val = self._relationships.get(rel_id)
                     rel = _dict_to_relationship(rel_val) if rel_val else None
-                    if rel and rel.relationship_type not in relationship_types:
+                    if not rel:
                         continue
 
-                visited.add(neighbor_id)
-                entity_val = self._entities.get(neighbor_id)
-                if entity_val:
-                    entity = _dict_to_entity(entity_val)
-                    neighbors.append(entity)
-                    queue.append((neighbor_id, current_depth + 1))
+                    # Filter by temporal boundary if specified
+                    if as_of is not None:
+                        rel_time = rel.created_at
+                        if rel_time.tzinfo is None:
+                            rel_time = rel_time.replace(tzinfo=UTC)
+                        cutoff = as_of if as_of.tzinfo is not None else as_of.replace(tzinfo=UTC)
+                        if rel_time > cutoff:
+                            continue
 
-        return neighbors
+                    # Filter by relationship type if specified
+                    if relationship_types and rel.relationship_type not in relationship_types:
+                        continue
 
-    def detect_clusters(self, min_size: int = 3) -> list[list[str]]:
+                    visited.add(neighbor_id)
+                    entity_val = self._entities.get(neighbor_id)
+                    if entity_val:
+                        entity = _dict_to_entity(entity_val)
+                        neighbors.append(entity)
+                        queue.append((neighbor_id, current_depth + 1))
+
+            return neighbors
+
+    def detect_clusters(self, min_size: int = 3, as_of: datetime | None = None) -> list[list[str]]:
         """Find connected components (clusters) of at least min_size."""
-        if self.db_type in ("neo4j", "memgraph") and self.driver:
-            adjacency = defaultdict(set)
-            all_nodes = set()
-            with self.driver.session() as session:
-                result = session.run(
+        with self._lock:
+            if self.db_type in ("neo4j", "memgraph") and self.driver:
+                adjacency = defaultdict(set)
+                all_nodes = set()
+                query = (
                     "MATCH (n:Entity) "
                     "OPTIONAL MATCH (n)-[r]->(m:Entity) "
-                    "RETURN n.id as source, m.id as target"
                 )
-                for record in result:
-                    s = record["source"]
-                    t = record["target"]
-                    all_nodes.add(s)
-                    if t:
-                        all_nodes.add(t)
-                        adjacency[s].add(t)
-                        adjacency[t].add(s)
+                params: dict[str, Any] = {}
+                if as_of is not None:
+                    query += "WHERE r IS NULL OR r.created_at <= $as_of "
+                    params["as_of"] = as_of.isoformat()
+                query += "RETURN n.id as source, m.id as target"
+                with self.driver.session() as session:
+                    result = session.run(query, **params)
+                    for record in result:
+                        s = record["source"]
+                        t = record["target"]
+                        all_nodes.add(s)
+                        if t:
+                            all_nodes.add(t)
+                            adjacency[s].add(t)
+                            adjacency[t].add(s)
 
-            visited = set()
-            clusters = []
-            for node_id in all_nodes:
-                if node_id in visited:
-                    continue
-                component = []
-                queue = deque([node_id])
-                while queue:
-                    curr = queue.popleft()
-                    if curr in visited:
+                visited = set()
+                clusters = []
+                for node_id in all_nodes:
+                    if node_id in visited:
                         continue
-                    visited.add(curr)
-                    component.append(curr)
-                    for neighbor in adjacency.get(curr, set()):
-                        if neighbor not in visited:
-                            queue.append(neighbor)
-                if len(component) >= min_size:
-                    clusters.append(component)
-            clusters.sort(key=len, reverse=True)
-            logger.info("Found %d clusters (min_size=%d) in graph DB", len(clusters), min_size)
-            return clusters
+                    component = []
+                    queue = deque([node_id])
+                    while queue:
+                        curr = queue.popleft()
+                        if curr in visited:
+                            continue
+                        visited.add(curr)
+                        component.append(curr)
+                        for neighbor in adjacency.get(curr, set()):
+                            if neighbor not in visited:
+                                queue.append(neighbor)
+                    if len(component) >= min_size:
+                        clusters.append(component)
+                clusters.sort(key=len, reverse=True)
+                logger.info("Found %d clusters (min_size=%d) in graph DB", len(clusters), min_size)
+                return clusters
 
-        self._build_adjacency_list()
-        fallback_visited: set[str] = set()
-        fallback_clusters: list[list[str]] = []
+            self._build_adjacency_list()
+            fallback_visited: set[str] = set()
+            fallback_clusters: list[list[str]] = []
 
-        raw_entities = [_dict_to_entity(v) for v in self._entities.list_values()]
-        for entity in raw_entities:
-            entity_id = entity.id
-            if entity_id in fallback_visited:
-                continue
+            # If as_of is specified, construct a temporally filtered adjacency view
+            if as_of is not None:
+                adj: defaultdict[str, set[str]] = defaultdict(set)
+                raw_rels = [_dict_to_relationship(v) for v in self._relationships.list_values()]
+                for rel in raw_rels:
+                    rel_time = rel.created_at
+                    if rel_time.tzinfo is None:
+                        rel_time = rel_time.replace(tzinfo=UTC)
+                    cutoff = as_of if as_of.tzinfo is not None else as_of.replace(tzinfo=UTC)
+                    if rel_time <= cutoff:
+                        adj[rel.source_entity_id].add(rel.target_entity_id)
+                        adj[rel.target_entity_id].add(rel.source_entity_id)
+            else:
+                adj = defaultdict(set)
+                for u, nbrs in self._adjacency.items():
+                    for v, _ in nbrs:
+                        adj[u].add(v)
 
-            # BFS to find the connected component
-            fallback_component: list[str] = []
-            fallback_queue: deque[str] = deque([entity_id])
-
-            while fallback_queue:
-                current = fallback_queue.popleft()
-                if current in fallback_visited:
+            raw_entities = [_dict_to_entity(v) for v in self._entities.list_values()]
+            for entity in raw_entities:
+                entity_id = entity.id
+                if entity_id in fallback_visited:
                     continue
-                fallback_visited.add(current)
-                fallback_component.append(current)
 
-                for neighbor_id, _ in self._adjacency.get(current, set()):
-                    if neighbor_id not in fallback_visited:
-                        fallback_queue.append(neighbor_id)
+                fallback_component: list[str] = []
+                fallback_queue: deque[str] = deque([entity_id])
 
-            if len(fallback_component) >= min_size:
-                fallback_clusters.append(fallback_component)
+                while fallback_queue:
+                    current = fallback_queue.popleft()
+                    if current in fallback_visited:
+                        continue
+                    fallback_visited.add(current)
+                    fallback_component.append(current)
 
-        # Sort clusters by size, largest first
-        fallback_clusters.sort(key=len, reverse=True)
-        logger.info("Found %d clusters (min_size=%d)", len(fallback_clusters), min_size)
-        return fallback_clusters
+                    for neighbor_id in adj.get(current, set()):
+                        if neighbor_id not in fallback_visited:
+                            fallback_queue.append(neighbor_id)
+
+                if len(fallback_component) >= min_size:
+                    fallback_clusters.append(fallback_component)
+
+            fallback_clusters.sort(key=len, reverse=True)
+            logger.info("Found %d clusters (min_size=%d)", len(fallback_clusters), min_size)
+            return fallback_clusters
 
     def get_subgraph(
         self,
         center_entity_id: str,
         radius: int = 2,
         max_nodes: int = 100,
+        as_of: datetime | None = None,
     ) -> GraphSubgraph:
         """Extract a subgraph centered on an entity with bounded node budget."""
-        if self.db_type in ("neo4j", "memgraph") and self.driver:
-            nodes_dict = {}
-            rels_dict = {}
-            with self.driver.session() as session:
-                result = session.run(
+        with self._lock:
+            if self.db_type in ("neo4j", "memgraph") and self.driver:
+                nodes_dict = {}
+                rels_dict = {}
+                query = (
                     "MATCH (s:Entity {id: $center_id}) "
-                    "OPTIONAL MATCH p = (s)-[*1..$radius]-(n:Entity) "
-                    "RETURN s, collect(p)[..$max_nodes] as paths",
-                    center_id=center_entity_id,
-                    radius=radius,
-                    max_nodes=max_nodes,
+                    "OPTIONAL MATCH p = (s)-[r*1..$radius]-(n:Entity) "
                 )
-                record = result.single()
-                if not record:
-                    return GraphSubgraph(center_entity_id=center_entity_id, depth=radius)
+                params: dict[str, Any] = {
+                    "center_id": center_entity_id,
+                    "radius": radius,
+                    "max_nodes": max_nodes,
+                }
+                if as_of is not None:
+                    query += "WHERE all(rel IN relationships(p) WHERE rel.created_at <= $as_of) "
+                    params["as_of"] = as_of.isoformat()
+                query += "RETURN s, collect(p)[..$max_nodes] as paths"
 
-                s_node = record["s"]
-                s_entity = _neo4j_node_to_entity(s_node)
-                nodes_dict[s_entity.id] = s_entity
+                with self.driver.session() as session:
+                    result = session.run(query, **params)
+                    record = result.single()
+                    if not record:
+                        return GraphSubgraph(center_entity_id=center_entity_id, depth=radius)
 
-                paths = record["paths"] or []
-                for path in paths:
-                    for node in path.nodes:
-                        entity = _neo4j_node_to_entity(node)
-                        nodes_dict[entity.id] = entity
-                    for rel in path.relationships:
-                        relationship = _neo4j_rel_to_relationship(rel)
-                        rels_dict[relationship.id] = relationship
+                    s_node = record["s"]
+                    s_entity = _neo4j_node_to_entity(s_node)
+                    nodes_dict[s_entity.id] = s_entity
 
-            node_ids = list(nodes_dict.keys())[:max_nodes]
+                    paths = record["paths"] or []
+                    for path in paths:
+                        for node in path.nodes:
+                            entity = _neo4j_node_to_entity(node)
+                            nodes_dict[entity.id] = entity
+                        for rel in path.relationships:
+                            relationship = _neo4j_rel_to_relationship(rel)
+                            rels_dict[relationship.id] = relationship
+
+                node_ids = list(nodes_dict.keys())[:max_nodes]
+
+                # Build React Flow nodes
+                nodes = []
+                for i, nid in enumerate(node_ids):
+                    entity = nodes_dict[nid]
+                    import math
+
+                    if nid == center_entity_id:
+                        x: float = 400.0
+                        y: float = 300.0
+                    else:
+                        angle = 2 * math.pi * (i - 1) / max(1, len(node_ids) - 1)
+                        layer = 1
+                        for depth_check in range(radius):
+                            if i > len(node_ids) * (depth_check + 1) / (radius + 1):
+                                layer = depth_check + 2
+                        r = 150 * layer
+                        x = 400 + r * math.cos(angle)
+                        y = 300 + r * math.sin(angle)
+
+                    color = _NODE_COLORS.get(entity.entity_type, "#6366f1")
+                    is_high_risk = entity.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL)
+
+                    nodes.append(
+                        {
+                            "id": nid,
+                            "type": "default",
+                            "position": {"x": round(x), "y": round(y)},
+                            "data": {
+                                "label": entity.display_label,
+                                "entityType": entity.entity_type.value,
+                                "bankId": entity.bank_id,
+                                "riskLevel": entity.risk_level.value,
+                                "alertCount": entity.alert_count,
+                                "isCenter": nid == center_entity_id,
+                            },
+                            "style": {
+                                "background": color if not is_high_risk else "#ef4444",
+                                "color": "#ffffff",
+                                "border": f"2px solid {'#ef4444' if is_high_risk else color}",
+                                "borderRadius": "8px",
+                                "padding": "8px 12px",
+                                "fontSize": "11px",
+                                "fontWeight": "600",
+                            },
+                        }
+                    )
+
+                # Build React Flow edges
+                edges = []
+                node_id_set = set(node_ids)
+                for rel in rels_dict.values():
+                    if rel.source_entity_id in node_id_set and rel.target_entity_id in node_id_set:
+                        style = _EDGE_STYLES.get(rel.relationship_type, {})
+                        edges.append(
+                            {
+                                "id": rel.id,
+                                "source": rel.source_entity_id,
+                                "target": rel.target_entity_id,
+                                "label": rel.relationship_type.value.replace("_", " "),
+                                "type": "smoothstep",
+                                "animated": rel.relationship_type == RelationshipType.LINKED_ALERT,
+                                "style": style,
+                                "data": {
+                                    "confidence": rel.confidence,
+                                    "relationshipType": rel.relationship_type.value,
+                                },
+                            }
+                        )
+
+                # Detect clusters within subgraph using local adjacency
+                sub_adj: defaultdict[str, set[tuple[str, str]]] = defaultdict(set)
+                for rel in rels_dict.values():
+                    sub_adj[rel.source_entity_id].add((rel.target_entity_id, rel.id))
+                    sub_adj[rel.target_entity_id].add((rel.source_entity_id, rel.id))
+                clusters = self._detect_subgraph_clusters(node_id_set, adjacency=sub_adj)
+
+                return GraphSubgraph(
+                    nodes=nodes,
+                    edges=edges,
+                    clusters=clusters,
+                    center_entity_id=center_entity_id,
+                    depth=radius,
+                )
+
+            self._build_adjacency_list()
+            center_entity_val = self._entities.get(center_entity_id)
+            if not center_entity_val:
+                return GraphSubgraph(center_entity_id=center_entity_id, depth=radius)
+
+            # Collect nodes via BFS bounded by max_nodes and as_of cutoff
+            fb_visited: set[str] = {center_entity_id}
+            fb_queue: deque[tuple[str, int]] = deque([(center_entity_id, 0)])
+            fb_node_ids: list[str] = [center_entity_id]
+            bounded_max_nodes = max(1, min(max_nodes, 200))
+
+            while fb_queue and len(fb_node_ids) < bounded_max_nodes:
+                current_id, current_depth = fb_queue.popleft()
+                if current_depth >= radius:
+                    continue
+                for neighbor_id, rel_id in self._adjacency.get(current_id, set()):
+                    if as_of is not None:
+                        rel_val = self._relationships.get(rel_id)
+                        if rel_val:
+                            rel_obj = _dict_to_relationship(rel_val)
+                            rel_time = rel_obj.created_at
+                            if rel_time.tzinfo is None:
+                                rel_time = rel_time.replace(tzinfo=UTC)
+                            cutoff = as_of if as_of.tzinfo is not None else as_of.replace(tzinfo=UTC)
+                            if rel_time > cutoff:
+                                continue
+                    if neighbor_id not in fb_visited:
+                        fb_visited.add(neighbor_id)
+                        fb_node_ids.append(neighbor_id)
+                        fb_queue.append((neighbor_id, current_depth + 1))
+                        if len(fb_node_ids) >= bounded_max_nodes:
+                            break
 
             # Build React Flow nodes
             nodes = []
-            for i, nid in enumerate(node_ids):
-                entity = nodes_dict[nid]
-                # Radial layout
+            for i, nid in enumerate(fb_node_ids):
+                entity_val = self._entities.get(nid)
+                if not entity_val:
+                    continue
+                entity = _dict_to_entity(entity_val)
+
                 import math
 
                 if nid == center_entity_id:
-                    x: float = 400.0
-                    y: float = 300.0
+                    x = 400.0
+                    y = 300.0
                 else:
-                    angle = 2 * math.pi * (i - 1) / max(1, len(node_ids) - 1)
+                    angle = 2 * math.pi * (i - 1) / max(1, len(fb_node_ids) - 1)
                     layer = 1
                     for depth_check in range(radius):
-                        if i > len(node_ids) * (depth_check + 1) / (radius + 1):
+                        if i > len(fb_node_ids) * (depth_check + 1) / (radius + 1):
                             layer = depth_check + 2
                     r = 150 * layer
                     x = 400 + r * math.cos(angle)
@@ -459,9 +645,22 @@ class GraphEngine:
 
             # Build React Flow edges
             edges = []
-            node_id_set = set(node_ids)
-            for rel in rels_dict.values():
+            node_id_set = set(fb_node_ids)
+
+            raw_relationships = [_dict_to_relationship(v) for v in self._relationships.list_values()]
+            sub_adj_fb: defaultdict[str, set[tuple[str, str]]] = defaultdict(set)
+            for rel in raw_relationships:
+                if as_of is not None:
+                    rel_time = rel.created_at
+                    if rel_time.tzinfo is None:
+                        rel_time = rel_time.replace(tzinfo=UTC)
+                    cutoff = as_of if as_of.tzinfo is not None else as_of.replace(tzinfo=UTC)
+                    if rel_time > cutoff:
+                        continue
+
                 if rel.source_entity_id in node_id_set and rel.target_entity_id in node_id_set:
+                    sub_adj_fb[rel.source_entity_id].add((rel.target_entity_id, rel.id))
+                    sub_adj_fb[rel.target_entity_id].add((rel.source_entity_id, rel.id))
                     style = _EDGE_STYLES.get(rel.relationship_type, {})
                     edges.append(
                         {
@@ -479,12 +678,8 @@ class GraphEngine:
                         }
                     )
 
-            # Detect clusters within subgraph
-            self._adjacency = defaultdict(set)
-            for rel in rels_dict.values():
-                self._adjacency[rel.source_entity_id].add((rel.target_entity_id, rel.id))
-                self._adjacency[rel.target_entity_id].add((rel.source_entity_id, rel.id))
-            clusters = self._detect_subgraph_clusters(node_id_set)
+            # Detect clusters within subgraph using local adjacency
+            clusters = self._detect_subgraph_clusters(node_id_set, adjacency=sub_adj_fb)
 
             return GraphSubgraph(
                 nodes=nodes,
@@ -493,117 +688,6 @@ class GraphEngine:
                 center_entity_id=center_entity_id,
                 depth=radius,
             )
-
-        self._build_adjacency_list()
-        center_entity_val = self._entities.get(center_entity_id)
-        if not center_entity_val:
-            return GraphSubgraph(center_entity_id=center_entity_id, depth=radius)
-
-        # Collect nodes via BFS bounded by max_nodes
-        fb_visited: set[str] = {center_entity_id}
-        fb_queue: deque[tuple[str, int]] = deque([(center_entity_id, 0)])
-        fb_node_ids: list[str] = [center_entity_id]
-        bounded_max_nodes = max(1, min(max_nodes, 200))
-
-        while fb_queue and len(fb_node_ids) < bounded_max_nodes:
-            current_id, current_depth = fb_queue.popleft()
-            if current_depth >= radius:
-                continue
-            for neighbor_id, _ in self._adjacency.get(current_id, set()):
-                if neighbor_id not in fb_visited:
-                    fb_visited.add(neighbor_id)
-                    fb_node_ids.append(neighbor_id)
-                    fb_queue.append((neighbor_id, current_depth + 1))
-                    if len(fb_node_ids) >= bounded_max_nodes:
-                        break
-
-        # Build React Flow nodes
-        nodes = []
-        for i, nid in enumerate(fb_node_ids):
-            entity_val = self._entities.get(nid)
-            if not entity_val:
-                continue
-            entity = _dict_to_entity(entity_val)
-
-            # Radial layout
-            import math
-
-            if nid == center_entity_id:
-                x = 400.0
-                y = 300.0
-            else:
-                angle = 2 * math.pi * (i - 1) / max(1, len(fb_node_ids) - 1)
-                layer = 1
-                for depth_check in range(radius):
-                    # Rough depth estimation
-                    if i > len(fb_node_ids) * (depth_check + 1) / (radius + 1):
-                        layer = depth_check + 2
-                r = 150 * layer
-                x = 400 + r * math.cos(angle)
-                y = 300 + r * math.sin(angle)
-
-            color = _NODE_COLORS.get(entity.entity_type, "#6366f1")
-            is_high_risk = entity.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL)
-
-            nodes.append(
-                {
-                    "id": nid,
-                    "type": "default",
-                    "position": {"x": round(x), "y": round(y)},
-                    "data": {
-                        "label": entity.display_label,
-                        "entityType": entity.entity_type.value,
-                        "bankId": entity.bank_id,
-                        "riskLevel": entity.risk_level.value,
-                        "alertCount": entity.alert_count,
-                        "isCenter": nid == center_entity_id,
-                    },
-                    "style": {
-                        "background": color if not is_high_risk else "#ef4444",
-                        "color": "#ffffff",
-                        "border": f"2px solid {'#ef4444' if is_high_risk else color}",
-                        "borderRadius": "8px",
-                        "padding": "8px 12px",
-                        "fontSize": "11px",
-                        "fontWeight": "600",
-                    },
-                }
-            )
-
-        # Build React Flow edges
-        edges = []
-        node_id_set = set(fb_node_ids)
-
-        raw_relationships = [_dict_to_relationship(v) for v in self._relationships.list_values()]
-        for rel in raw_relationships:
-            if rel.source_entity_id in node_id_set and rel.target_entity_id in node_id_set:
-                style = _EDGE_STYLES.get(rel.relationship_type, {})
-                edges.append(
-                    {
-                        "id": rel.id,
-                        "source": rel.source_entity_id,
-                        "target": rel.target_entity_id,
-                        "label": rel.relationship_type.value.replace("_", " "),
-                        "type": "smoothstep",
-                        "animated": rel.relationship_type == RelationshipType.LINKED_ALERT,
-                        "style": style,
-                        "data": {
-                            "confidence": rel.confidence,
-                            "relationshipType": rel.relationship_type.value,
-                        },
-                    }
-                )
-
-        # Detect clusters within subgraph
-        clusters = self._detect_subgraph_clusters(node_id_set)
-
-        return GraphSubgraph(
-            nodes=nodes,
-            edges=edges,
-            clusters=clusters,
-            center_entity_id=center_entity_id,
-            depth=radius,
-        )
 
     def search_nodes(
         self,
@@ -709,6 +793,7 @@ class GraphEngine:
         min_length: int = 3,
         max_length: int = 7,
         bank_id: str | None = None,
+        as_of: datetime | None = None,
     ) -> list[dict[str, Any]]:
         """Detect closed transaction cycles (mule rings) with L in [min_length, max_length].
 
@@ -721,6 +806,12 @@ class GraphEngine:
                 try:
                     query = (
                         f"MATCH path = (start:Entity)-[r*{min_length}..{max_length}]->(start) "
+                    )
+                    params: dict[str, Any] = {}
+                    if as_of is not None:
+                        query += "WHERE all(rel IN relationships(path) WHERE rel.created_at <= $as_of) "
+                        params["as_of"] = as_of.isoformat()
+                    query += (
                         "RETURN [n IN nodes(path) | n.id] AS cycle_ids, "
                         "       [n IN nodes(path) | n.bank_id] AS cycle_banks, "
                         "       [n IN nodes(path) | n.risk_level] AS cycle_risks, "
@@ -728,7 +819,7 @@ class GraphEngine:
                         "LIMIT 200"
                     )
                     with self.driver.session() as session:
-                        result = session.run(query)
+                        result = session.run(query, **params)
                         raw_rings = []
                         seen_ring_ids: set[str] = set()
                         for record in result:
@@ -781,8 +872,18 @@ class GraphEngine:
             rel_dicts = self._relationships.list_values()
             directed_adj: defaultdict[str, list[tuple[str, float]]] = defaultdict(list)
 
+            cutoff_dt = as_of if as_of is not None else None
+            if cutoff_dt is not None and cutoff_dt.tzinfo is None:
+                cutoff_dt = cutoff_dt.replace(tzinfo=UTC)
+
             for r_val in rel_dicts:
                 r = _dict_to_relationship(r_val)
+                if cutoff_dt is not None:
+                    r_time = r.created_at
+                    if r_time.tzinfo is None:
+                        r_time = r_time.replace(tzinfo=UTC)
+                    if r_time > cutoff_dt:
+                        continue
                 u = r.source_entity_id
                 v = r.target_entity_id
                 vol = 0.0
@@ -860,15 +961,27 @@ class GraphEngine:
         min_fan: int = 3,
         max_depth: int = 3,
         bank_id: str | None = None,
+        as_of: datetime | None = None,
     ) -> list[dict[str, Any]]:
         """Detect multi-hop financial smurfing patterns (fan-in, fan-out, layering)."""
         with self._lock:
+            now = as_of if as_of is not None else datetime.now(UTC)
+            if now.tzinfo is None:
+                now = now.replace(tzinfo=UTC)
+            cutoff_time = now - timedelta(hours=window_hours)
+
             rel_dicts = self._relationships.list_values()
             in_edges: defaultdict[str, list[tuple[str, float]]] = defaultdict(list)
             out_edges: defaultdict[str, list[tuple[str, float]]] = defaultdict(list)
 
             for r_val in rel_dicts:
                 r = _dict_to_relationship(r_val)
+                r_time = r.created_at
+                if r_time.tzinfo is None:
+                    r_time = r_time.replace(tzinfo=UTC)
+                if r_time < cutoff_time or r_time > now:
+                    continue
+
                 u = r.source_entity_id
                 v = r.target_entity_id
                 vol = 0.0
@@ -1077,10 +1190,15 @@ class GraphEngine:
 
     # ── Private helpers ────────────────────────
 
-    def _detect_subgraph_clusters(self, node_ids: set[str]) -> list[list[str]]:
+    def _detect_subgraph_clusters(
+        self,
+        node_ids: set[str],
+        adjacency: dict[str, set[tuple[str, str]]] | None = None,
+    ) -> list[list[str]]:
         """Find clusters within a subset of nodes."""
         visited: set[str] = set()
         clusters: list[list[str]] = []
+        adj = adjacency if adjacency is not None else self._adjacency
 
         for nid in node_ids:
             if nid in visited:
@@ -1093,7 +1211,7 @@ class GraphEngine:
                     continue
                 visited.add(current)
                 component.append(current)
-                for neighbor_id, _ in self._adjacency.get(current, set()):
+                for neighbor_id, _ in adj.get(current, set()):
                     if neighbor_id not in visited and neighbor_id in node_ids:
                         queue.append(neighbor_id)
             if len(component) >= 2:

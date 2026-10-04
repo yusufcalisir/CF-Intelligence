@@ -1,0 +1,33 @@
+{
+  "phase": "5E",
+  "name": "Phase 5E Entity and Node Identity Semantics",
+  "generated_at": "2026-10-04T04:17:00Z",
+  "entity_identity_model": {
+    "node_attributes": {
+      "id": "Canonical string identifier (e.g., UUID or deterministic hash). Unique per bank or consortium.",
+      "bank_id": "Tenant identifier establishing institutional data ownership boundary.",
+      "entity_type": "Domain entity type enumeration: customer, merchant, account, device, ip_address, card, transaction.",
+      "risk_level": "Ordinal classification: critical, high, medium, low, minimal.",
+      "privacy_id": "Type-salted HMAC-SHA256 pseudonymized token used for cross-bank matching without raw PII transmission.",
+      "display_label": "Human-readable label sanitized to prevent PII exposure (e.g., 'Cust ***1234').",
+      "alert_count": "Integer count of historical fraud alerts attributed to this entity.",
+      "first_seen": "ISO-8601 UTC timestamp of first observed activity.",
+      "last_seen": "ISO-8601 UTC timestamp of most recent observed activity."
+    },
+    "relationship_semantics": {
+      "id": "Canonical relationship string identifier.",
+      "source_entity_id": "Message sender / origin node ID.",
+      "target_entity_id": "Message recipient / destination node ID.",
+      "relationship_type": "Domain edge enumeration: owns, uses, transacts_with, shares_device, shares_ip, linked_alert, same_entity.",
+      "confidence": "Floating-point confidence score in [0.0, 1.0].",
+      "evidence": "Structured evidence dictionary containing transaction amounts, timestamps, or device fingerprints.",
+      "created_at": "ISO-8601 UTC timestamp of relationship formation."
+    },
+    "cross_bank_identity_resolution": {
+      "mechanism": "MinHash LSH Fuzzy Private Set Intersection (PSI)",
+      "pseudonymization": "HMAC-SHA256 with consortium salt and entity-type domain separator",
+      "privacy_guarantee": "Zero raw PII transmission; banks exchange only cryptographic digests and minhash sketches",
+      "multi_tenant_isolation": "Strict tenant filtering on local graphs; cross-bank links established only via authorized PSI consensus or explicit consortium alert links."
+    }
+  }
+}

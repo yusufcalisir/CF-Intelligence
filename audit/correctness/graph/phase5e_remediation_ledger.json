@@ -1,0 +1,49 @@
+{
+  "phase": "5E",
+  "name": "Phase 5E Remediation Ledger",
+  "generated_at": "2026-10-04T04:22:00Z",
+  "remediations": [
+    {
+      "finding_id": "GRAPH-0001",
+      "file": "backend/app/application/services/graph_embedding_model.py",
+      "action": "Inverted sparse tensor mapping to indices = torch.stack([dst, src]) where dst = edge_index[1] and src = edge_index[0], normalized by in-degree deg = bincount(dst). Unified isolated node behavior to return zero incoming aggregate across both edge_index and adjacency_lists representations.",
+      "verified_by": "test_directed_aggregation_source_to_target, test_isolated_node_edge_index_vs_adjacency_equivalence"
+    },
+    {
+      "finding_id": "GRAPH-0002",
+      "file": "backend/app/application/services/ubo_graph_service.py",
+      "action": "Upgraded self._graphs from defaultdict(nx.DiGraph) to defaultdict(nx.MultiDiGraph). Added key=rel_id in add_edge. Updated in_edges, out_edges, and edges queries to unpack 3-tuples (u, v, data). In detect_circular_ownership, constructed simple nx.DiGraph projection to preserve elementary cycle semantics without duplicate multi-edge permutations.",
+      "verified_by": "test_parallel_edges_preservation, test_circular_ownership_detection_multigraph"
+    },
+    {
+      "finding_id": "GRAPH-0003",
+      "file": "backend/app/application/services/graph_engine.py",
+      "action": "Replaced global self._adjacency reassignment in get_subgraph with local sub_adj dictionary. Updated _detect_subgraph_clusters to accept optional adjacency parameter.",
+      "verified_by": "test_get_subgraph_temporal_filtering"
+    },
+    {
+      "finding_id": "GRAPH-0004",
+      "file": "backend/app/application/services/graph_engine.py & streaming_graph_service.py",
+      "action": "Added as_of: datetime | None parameter across find_neighbors, get_subgraph, detect_cyclic_mule_rings, detect_smurfing_patterns, prune_expired_edges, and get_active_subgraph_tensors. Filtered relationships created after as_of in both in-memory BFS/DFS traversals and Neo4j Cypher queries. Fixed stream pruning in StreamingGraphService.add_transaction to prune relative to incoming transaction timestamp instead of machine wall-clock time.",
+      "verified_by": "TestTemporalGraphIntegrity suite (5 tests: neighbors, subgraph, rings, smurfing, streaming tensors)"
+    },
+    {
+      "finding_id": "GRAPH-0005",
+      "file": "backend/app/application/services/graph_embedding_model.py",
+      "action": "Added timezone awareness normalization in extract_node_features using .replace(tzinfo=UTC). Bounded age_days and hours_ago >= 0.0 and added finite vector sanitization np.nan_to_num.",
+      "verified_by": "test_naive_datetime_normalization_without_swallowing"
+    },
+    {
+      "finding_id": "GRAPH-0006",
+      "file": "backend/app/application/services/graph_embedding_service.py",
+      "action": "Implemented invalidate_cache(entity_id=None) method with thread locking. Added np.all(np.isfinite(...)) assertions in train_local and infer_node_embedding to reject NaNs and infinities immediately.",
+      "verified_by": "test_cache_invalidation, test_non_finite_embedding_rejection"
+    },
+    {
+      "finding_id": "GRAPH-0007",
+      "file": "backend/app/application/services/graph_engine.py",
+      "action": "Hardened Neo4j Cypher query in find_neighbors with WHERE n.id <> $entity_id to prevent cyclic return of root entity.",
+      "verified_by": "Cypher query inspection and test suite"
+    }
+  ]
+}

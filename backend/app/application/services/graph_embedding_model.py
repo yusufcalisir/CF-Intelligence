@@ -100,21 +100,28 @@ def extract_node_features(entity_dict: dict[str, Any], degree: int = 0) -> np.nd
     try:
         first_seen_str = entity_dict.get("first_seen", "")
         if first_seen_str:
-            first_seen = datetime.fromisoformat(first_seen_str)
-            age_days = (now - first_seen).total_seconds() / 86400.0
-            features[10] = min(1.0, np.log1p(age_days) / 7.0)  # log1p(1095) ≈ 7.0 (3 years)
+            first_seen = datetime.fromisoformat(str(first_seen_str))
+            if first_seen.tzinfo is None:
+                first_seen = first_seen.replace(tzinfo=UTC)
+            age_days = max(0.0, (now - first_seen).total_seconds() / 86400.0)
+            features[10] = float(min(1.0, np.log1p(age_days) / 7.0))  # log1p(1095) ≈ 7.0 (3 years)
     except (ValueError, TypeError):
         features[10] = 0.0
 
     try:
         last_seen_str = entity_dict.get("last_seen", "")
         if last_seen_str:
-            last_seen = datetime.fromisoformat(last_seen_str)
-            hours_ago = (now - last_seen).total_seconds() / 3600.0
+            last_seen = datetime.fromisoformat(str(last_seen_str))
+            if last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=UTC)
+            hours_ago = max(0.0, (now - last_seen).total_seconds() / 3600.0)
             # Invert: recently seen → high value
-            features[11] = max(0.0, 1.0 - min(1.0, hours_ago / 720.0))  # 720h = 30 days
+            features[11] = float(max(0.0, 1.0 - min(1.0, hours_ago / 720.0)))  # 720h = 30 days
     except (ValueError, TypeError):
         features[11] = 0.0
+
+    if not np.all(np.isfinite(features)):
+        features = np.nan_to_num(features, nan=0.0, posinf=1.0, neginf=0.0)
 
     return features
 
@@ -122,7 +129,7 @@ def extract_node_features(entity_dict: dict[str, Any], degree: int = 0) -> np.nd
 class GraphSAGELayer(nn.Module):
     """Single GraphSAGE message-passing layer.
 
-    Aggregation: Mean pooling of neighbor features.
+    Aggregation: Mean pooling of incoming neighbor features.
     Combination: Concatenation of self-features with aggregated neighbor
     features, followed by a linear projection and activation.
 
@@ -155,8 +162,10 @@ class GraphSAGELayer(nn.Module):
             node_features: (N, in_dim) tensor of current node representations.
             adjacency_lists: Optional list of neighbor indices for each node.
                 adjacency_lists[i] = [j, k, ...] means nodes j, k, ... are
-                neighbors of node i.
-            edge_index: Optional (2, E) PyG-style edge index tensor.
+                incoming neighbors of node i whose features node i aggregates.
+            edge_index: Optional (2, E) PyG-style edge index tensor where
+                edge_index[0] is source node (message sender) and
+                edge_index[1] is target node (message recipient/aggregator).
             num_sample: Maximum neighbors to sample per node (for scalability).
 
         Returns:
@@ -167,22 +176,23 @@ class GraphSAGELayer(nn.Module):
 
         if edge_index is not None:
             if edge_index.numel() > 0:
-                row, col = edge_index[0], edge_index[1]
-                valid = (row < num_nodes) & (col < num_nodes) & (row >= 0) & (col >= 0)
+                src, dst = edge_index[0], edge_index[1]
+                valid = (src < num_nodes) & (dst < num_nodes) & (src >= 0) & (dst >= 0)
                 if valid.any():
-                    row, col = row[valid], col[valid]
-                    deg = torch.bincount(row, minlength=num_nodes).float()
+                    src, dst = src[valid], dst[valid]
+                    # Target node dst aggregates incoming features from source node src
+                    deg = torch.bincount(dst, minlength=num_nodes).float()
                     deg_inv = torch.where(deg > 0, 1.0 / deg, torch.zeros_like(deg))
-                    weights = deg_inv[row]
-                    indices = torch.stack([row, col])
+                    weights = deg_inv[dst]
+                    indices = torch.stack([dst, src])
                     adj_sparse = torch.sparse_coo_tensor(
                         indices, weights, size=(num_nodes, num_nodes), device=device
                     )
                     agg_features = torch.sparse.mm(adj_sparse, node_features)
                 else:
-                    agg_features = node_features
+                    agg_features = torch.zeros_like(node_features)
             else:
-                agg_features = node_features
+                agg_features = torch.zeros_like(node_features)
         else:
             # Build sparse adjacency matrix for vectorized mean pooling with neighbor sampling
             adj_lists = adjacency_lists or [[] for _ in range(num_nodes)]
@@ -193,9 +203,6 @@ class GraphSAGELayer(nn.Module):
             for i in range(num_nodes):
                 neighbors = adj_lists[i] if i < len(adj_lists) else []
                 if not neighbors:
-                    rows.append(i)
-                    cols.append(i)
-                    vals.append(1.0)
                     continue
 
                 if len(neighbors) > num_sample:
@@ -204,9 +211,6 @@ class GraphSAGELayer(nn.Module):
 
                 valid_neighbors = [n for n in neighbors if 0 <= n < num_nodes]
                 if not valid_neighbors:
-                    rows.append(i)
-                    cols.append(i)
-                    vals.append(1.0)
                     continue
 
                 weight = 1.0 / len(valid_neighbors)
@@ -223,7 +227,7 @@ class GraphSAGELayer(nn.Module):
                 )
                 agg_features = torch.sparse.mm(adj_sparse, node_features)
             else:
-                agg_features = node_features
+                agg_features = torch.zeros_like(node_features)
 
         # Combine: project self + project aggregated neighbors + bias
         h_self = self.W_self(node_features)

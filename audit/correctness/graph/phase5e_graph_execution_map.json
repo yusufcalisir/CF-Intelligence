@@ -1,0 +1,75 @@
+{
+  "phase": "5E",
+  "name": "Phase 5E Graph and Network Intelligence Execution Map",
+  "generated_at": "2026-10-04T04:15:00Z",
+  "status": "CERTIFIED",
+  "execution_layers": {
+    "presentation_and_api": {
+      "fastapi_routers": [
+        "backend/app/presentation/api/v1/endpoints/graph_router.py",
+        "backend/app/presentation/api/v1/endpoints/ubo_router.py"
+      ],
+      "websocket_channels": [
+        "/ws/scenario/stream",
+        "/ws/telemetry"
+      ],
+      "frontend_consumers": [
+        "frontend/src/pages/GraphPage.tsx",
+        "frontend/src/components/dashboard/UBOExplorationPanel.tsx",
+        "frontend/src/pages/InvestigationDashboard.tsx"
+      ]
+    },
+    "application_orchestration": {
+      "services": [
+        {
+          "name": "GraphEngine",
+          "module": "backend/app/application/services/graph_engine.py",
+          "role": "Entity-relationship graph builder, BFS traversal, cluster discovery, cyclic mule ring detection, and smurfing pattern analysis."
+        },
+        {
+          "name": "UBOGraphService",
+          "module": "backend/app/application/services/ubo_graph_service.py",
+          "role": "Multi-tier corporate ownership graph, EU AMLD 25% statutory threshold compounding, circular ownership detection, and nominee director syndicate detection."
+        },
+        {
+          "name": "GraphEmbeddingService",
+          "module": "backend/app/application/services/graph_embedding_service.py",
+          "role": "Federated GNN lifecycle orchestration, local GraphSAGE training, model weights federation export/import, embedding cache management, and inductive neighbor inference."
+        },
+        {
+          "name": "StreamingGraphService",
+          "module": "backend/app/application/services/streaming_graph_service.py",
+          "role": "Sliding-window transaction stream buffering, incremental O(1) index updates, lazy sliding-window pruning, and exponential time-decayed edge weighting."
+        }
+      ]
+    },
+    "neural_and_algorithmic": {
+      "models": [
+        {
+          "name": "GraphSAGEModel",
+          "module": "backend/app/application/services/graph_embedding_model.py",
+          "role": "Multi-layer GraphSAGE architecture with mean pooling aggregation and L2 unit-norm normalization."
+        },
+        {
+          "name": "GraphSAGELayer",
+          "module": "backend/app/application/services/graph_embedding_model.py",
+          "role": "Sparse COO message-passing layer mapping incoming source features to target nodes with in-degree normalization."
+        }
+      ],
+      "algorithms": [
+        "Compounded path product indirect ownership calculation",
+        "Tarjan / NetworkX simple cycle detection over MultiDiGraph projections",
+        "Canonical rotation deduplication with deterministic SHA-256 ring hashing",
+        "Sliding-window fan-in/fan-out smurfing detection with temporal bounds",
+        "Exponential time-decayed edge weighting: w = exp(-lambda * delta_t)"
+      ]
+    },
+    "persistence_and_hardware": {
+      "primary_backends": [
+        "In-Memory Thread-Safe Dict Stores with RLock",
+        "Redis Hash/Set Store (Prefix: entity, relationship)",
+        "Neo4j / Memgraph Bolt Driver Session Queries"
+      ]
+    }
+  }
+}

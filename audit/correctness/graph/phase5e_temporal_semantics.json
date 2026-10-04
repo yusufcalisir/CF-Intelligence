@@ -1,0 +1,48 @@
+{
+  "phase": "5E",
+  "name": "Phase 5E Temporal Semantics and Future-Edge Leakage Prevention",
+  "generated_at": "2026-10-04T04:18:00Z",
+  "temporal_specifications": {
+    "timezone_standard": {
+      "format": "ISO-8601 UTC strictly enforced across all timestamps",
+      "naive_datetime_handling": "Automatically normalized with .replace(tzinfo=UTC) to prevent TypeError swallows in feature calculations"
+    },
+    "future_edge_leakage_invariants": {
+      "gate": "Gate N (Temporal Integrity & Anti-Leakage)",
+      "rule": "For any point-in-time query with cutoff as_of = T, no relationship e with created_at > T may participate in path discovery, clustering, cycle detection, or GNN tensor construction.",
+      "remediation_status": "FULLY_ENFORCED across all graph services"
+    },
+    "point_in_time_api_coverage": [
+      {
+        "method": "GraphEngine.find_neighbors",
+        "parameter": "as_of: datetime | None",
+        "enforcement": "BFS traversal drops edges with rel.created_at > as_of; Cypher adds all(rel IN relationships(r) WHERE rel.created_at <= $as_of)"
+      },
+      {
+        "method": "GraphEngine.get_subgraph",
+        "parameter": "as_of: datetime | None",
+        "enforcement": "Node discovery BFS, edge inclusion, and local cluster detection filter out any edges created after as_of"
+      },
+      {
+        "method": "GraphEngine.detect_cyclic_mule_rings",
+        "parameter": "as_of: datetime | None",
+        "enforcement": "Directed DFS cycle finder only considers edges created on or before as_of; Cypher limits path relationships"
+      },
+      {
+        "method": "GraphEngine.detect_smurfing_patterns",
+        "parameter": "as_of: datetime | None, window_hours: int",
+        "enforcement": "Strictly restricts relationships to the temporal window [as_of - window_hours, as_of], eliminating ancient edges and future bursts"
+      },
+      {
+        "method": "StreamingGraphService.get_active_subgraph_tensors",
+        "parameter": "as_of: datetime | None",
+        "enforcement": "Excludes future edges (e_time > as_of) and computes exponential decay relative to as_of: age_seconds = (as_of - e_time)"
+      },
+      {
+        "method": "StreamingGraphService.prune_expired_edges",
+        "parameter": "as_of: datetime | None",
+        "enforcement": "Prunes sliding window relative to stream timestamp (as_of) rather than wall-clock time, enabling reproducible simulation replay"
+      }
+    ]
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "phase": "5E",
+  "name": "Phase 5E Graph and Network Intelligence Invariants",
+  "generated_at": "2026-10-04T04:19:00Z",
+  "invariants": [
+    {
+      "id": "INV-GRAPH-01",
+      "name": "Directed Message Passing Invariant",
+      "formula": "h_v^{(l+1)} = \\mathrm{ReLU}(W_{\\mathrm{self}} h_v^{(l)} + W_{\\mathrm{neigh}} \\frac{1}{|\\mathcal{N}_{\\mathrm{in}}(v)|} \\sum_{u \\in \\mathcal{N}_{\\mathrm{in}}(v)} h_u^{(l)} + b)",
+      "verification": "Proved via oracle unit test: target node aggregates source node, source node receives zero incoming aggregate when in-degree=0.",
+      "status": "PROVEN_AND_ENFORCED"
+    },
+    {
+      "id": "INV-GRAPH-02",
+      "name": "Multi-Edge Structural Preservation Invariant",
+      "formula": "|E(u, v)| \\ge 1 \\implies \\forall e_i \\in E(u, v), \\mathrm{type}(e_i) \\text{ and } \\mathrm{attrs}(e_i) \\text{ preserved}",
+      "verification": "MultiDiGraph ensures parallel relationships (e.g. 50% ownership + directorship) exist concurrently without overwriting.",
+      "status": "PROVEN_AND_ENFORCED"
+    },
+    {
+      "id": "INV-GRAPH-03",
+      "name": "Elementary Cycle Determinism Invariant",
+      "formula": "C = (v_1, \\dots, v_L) \\text{ s.t. } v_1 = \\min_{i} v_i, \\quad \\mathrm{RingID} = \\mathrm{SHA256}(v_1 : \\dots : v_L)[:16]",
+      "verification": "Canonical rotation deduplication guarantees a unique, deterministic 16-character SHA-256 identifier for each directed cycle.",
+      "status": "PROVEN_AND_ENFORCED"
+    },
+    {
+      "id": "INV-GRAPH-04",
+      "name": "Local Adjacency Encapsulation Invariant",
+      "formula": "\\mathrm{adj}_{\\mathrm{subgraph}} \\cap (V \\setminus V_{\\mathrm{sub}}) = \\emptyset, \\quad \\mathrm{State}(\\mathrm{GraphEngine}) \\text{ unmutated by } \\mathrm{get\\_subgraph}",
+      "verification": "Subgraph cluster detection constructs private local adjacency dictionary, preventing global adjacency clobbering.",
+      "status": "PROVEN_AND_ENFORCED"
+    },
+    {
+      "id": "INV-GRAPH-05",
+      "name": "Metamorphic Edge Ordering Invariance",
+      "formula": "\\forall \\pi \\in S_E, \\quad \\mathrm{GNN}(X, \\mathcal{E}_\\pi) = \\mathrm{GNN}(X, \\mathcal{E})",
+      "verification": "Tested and passed with atol=1e-5 on arbitrary edge permutations.",
+      "status": "PROVEN_AND_ENFORCED"
+    },
+    {
+      "id": "INV-GRAPH-06",
+      "name": "Disconnected Component Independence",
+      "formula": "\\mathrm{dist}(A, B) = \\infty \\implies \\frac{\\partial \\mathrm{Emb}(A)}{\\partial \\mathcal{E}_B} = 0",
+      "verification": "Mutating edges in component B produces bit-for-bit identical embeddings in disconnected component A.",
+      "status": "PROVEN_AND_ENFORCED"
+    },
+    {
+      "id": "INV-GRAPH-07",
+      "name": "L2 Unit Sphere Normalization Invariant",
+      "formula": "\\forall v, \\quad \\|\\mathbf{z}_v\\|_2 = 1.0 \\pm 10^{-6}",
+      "verification": "Ensured by F.normalize(..., p=2, dim=1) across all GraphSAGELayers and post-inference DP projection.",
+      "status": "PROVEN_AND_ENFORCED"
+    },
+    {
+      "id": "INV-GRAPH-08",
+      "name": "Finite Numerical Representation Invariant",
+      "formula": "\\forall i, j, \\quad \\mathrm{isnan}(X_{i,j}) = \\mathrm{False} \\land \\mathrm{isinf}(X_{i,j}) = \\mathrm{False}",
+      "verification": "Validated via np.all(np.isfinite(...)) and np.nan_to_num in feature extraction and embedding service.",
+      "status": "PROVEN_AND_ENFORCED"
+    }
+  ]
+}

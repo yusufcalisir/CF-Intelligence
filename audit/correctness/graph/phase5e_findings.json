@@ -1,0 +1,85 @@
+{
+  "phase": "5E",
+  "name": "Phase 5E Graph and Network Intelligence Audit Findings",
+  "generated_at": "2026-10-04T04:21:00Z",
+  "summary": {
+    "total_findings": 7,
+    "critical": 2,
+    "high": 2,
+    "medium": 2,
+    "low": 1,
+    "all_resolved": true
+  },
+  "findings": [
+    {
+      "id": "GRAPH-0001",
+      "severity": "CRITICAL",
+      "module": "backend/app/application/services/graph_embedding_model.py",
+      "component": "GraphSAGELayer",
+      "description": "Message passing direction reversal in sparse matrix multiplication. Stacked [row, col] = [source, target] caused source nodes to aggregate target features instead of target nodes aggregating incoming source features.",
+      "status": "REMEDIATED",
+      "fix_commit": "Included in Phase 5E suite",
+      "verification_test": "test_directed_aggregation_source_to_target"
+    },
+    {
+      "id": "GRAPH-0002",
+      "severity": "CRITICAL",
+      "module": "backend/app/application/services/ubo_graph_service.py",
+      "component": "UBOGraphService",
+      "description": "NetworkX DiGraph initialization clobbered parallel corporate edges between the same entity pair. Adding a director relationship erased prior 50% ownership edges, causing beneficial owners to be lost.",
+      "status": "REMEDIATED",
+      "fix_commit": "Included in Phase 5E suite",
+      "verification_test": "test_parallel_edges_preservation"
+    },
+    {
+      "id": "GRAPH-0003",
+      "severity": "HIGH",
+      "module": "backend/app/application/services/graph_engine.py",
+      "component": "GraphEngine.get_subgraph",
+      "description": "Global adjacency reassignment (self._adjacency = defaultdict(set)) inside get_subgraph wiped out the entire graph's adjacency structure for subsequent callers.",
+      "status": "REMEDIATED",
+      "fix_commit": "Included in Phase 5E suite",
+      "verification_test": "test_get_subgraph_temporal_filtering"
+    },
+    {
+      "id": "GRAPH-0004",
+      "severity": "HIGH",
+      "module": "backend/app/application/services/graph_engine.py",
+      "component": "GraphEngine & StreamingGraphService",
+      "description": "Temporal point-in-time traversal was missing as_of parameters, allowing future edges to leak into neighbor discovery, subgraph boundaries, cycle detection, and GNN tensors (violating Gate N).",
+      "status": "REMEDIATED",
+      "fix_commit": "Included in Phase 5E suite",
+      "verification_test": "TestTemporalGraphIntegrity suite (5 tests)"
+    },
+    {
+      "id": "GRAPH-0005",
+      "severity": "MEDIUM",
+      "module": "backend/app/application/services/graph_embedding_model.py",
+      "component": "extract_node_features",
+      "description": "Naive ISO-8601 strings subtracted from aware datetime.now(UTC) raised TypeError, which was silently swallowed, zeroing out node age and recency features.",
+      "status": "REMEDIATED",
+      "fix_commit": "Included in Phase 5E suite",
+      "verification_test": "test_naive_datetime_normalization_without_swallowing"
+    },
+    {
+      "id": "GRAPH-0006",
+      "severity": "MEDIUM",
+      "module": "backend/app/application/services/graph_embedding_service.py",
+      "component": "GraphEmbeddingService",
+      "description": "Graph embedding service lacked explicit cache invalidation mechanisms and finite tensor assertions, allowing mutated graphs to serve stale representations and potential NaNs to propagate.",
+      "status": "REMEDIATED",
+      "fix_commit": "Included in Phase 5E suite",
+      "verification_test": "test_cache_invalidation & test_non_finite_embedding_rejection"
+    },
+    {
+      "id": "GRAPH-0007",
+      "severity": "LOW",
+      "module": "backend/app/application/services/graph_engine.py",
+      "component": "GraphEngine.find_neighbors (Neo4j)",
+      "description": "Cypher query for multi-hop neighbor search returned root entity in cyclic paths of length >= 2.",
+      "status": "REMEDIATED",
+      "fix_commit": "Included in Phase 5E suite",
+      "verification_test": "Cypher query updated with WHERE n.id <> $entity_id"
+    }
+  ]
+}

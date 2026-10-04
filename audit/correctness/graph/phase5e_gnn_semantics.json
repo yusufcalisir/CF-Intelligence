@@ -1,0 +1,55 @@
+{
+  "phase": "5E",
+  "name": "Phase 5E GNN Architecture and Semantics",
+  "generated_at": "2026-10-04T04:20:00Z",
+  "gnn_specifications": {
+    "architecture": "GraphSAGE Mean-Pooling Multi-Layer Network",
+    "layer_stack": [
+      {
+        "layer_index": 0,
+        "type": "GraphSAGELayer",
+        "in_features": 12,
+        "out_features": 128,
+        "aggregation": "Sparse COO Mean Pooling",
+        "activation": "ReLU",
+        "normalization": "L2 Unit Sphere"
+      },
+      {
+        "layer_index": 1,
+        "type": "GraphSAGELayer",
+        "in_features": 128,
+        "out_features": 64,
+        "aggregation": "Sparse COO Mean Pooling",
+        "activation": "ReLU",
+        "normalization": "L2 Unit Sphere"
+      }
+    ],
+    "classification_head": {
+      "layers": "Linear(64, 16) -> ReLU -> Dropout(0.3) -> Linear(16, 1) -> Sigmoid",
+      "purpose": "Local supervised fraud classification training signal"
+    },
+    "feature_layout_12dim": {
+      "0_to_6": "One-hot encoding of EntityType (customer, merchant, account, device, ip_address, card, transaction)",
+      "7": "RiskLevel ordinal mapping: minimal=0.0, low=0.25, medium=0.5, high=0.75, critical=1.0",
+      "8": "Alert count log-normalized: log1p(alert_count) / 5.0",
+      "9": "Node degree centrality log-normalized: log1p(degree) / 5.0",
+      "10": "Account age log-normalized: min(1.0, log1p(age_days) / 7.0)",
+      "11": "Recency normalized: max(0.0, 1.0 - min(1.0, hours_ago / 720.0))"
+    },
+    "federated_parameter_scope": {
+      "federated_tensors": [
+        "sage_layers.0.W_self.weight",
+        "sage_layers.0.W_neigh.weight",
+        "sage_layers.0.bias",
+        "sage_layers.1.W_self.weight",
+        "sage_layers.1.W_neigh.weight",
+        "sage_layers.1.bias"
+      ],
+      "non_federated_local_state": [
+        "Graph topologies (adjacency lists, edge indexes)",
+        "Node raw features and entity attributes",
+        "Calculated local node embeddings (protected via DP noise on export)"
+      ]
+    }
+  }
+}

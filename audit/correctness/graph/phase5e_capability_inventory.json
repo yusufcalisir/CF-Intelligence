@@ -1,0 +1,71 @@
+{
+  "phase": "5E",
+  "name": "Phase 5E Graph Capability Inventory",
+  "generated_at": "2026-10-04T04:16:00Z",
+  "capabilities": [
+    {
+      "id": "CAP-GRAPH-01",
+      "name": "Temporal Point-in-Time Traversal",
+      "service": "GraphEngine",
+      "status": "VERIFIED_HARDENED",
+      "description": "BFS neighbor and subgraph extraction bounded by radius and point-in-time timestamp (as_of), strictly preventing future-edge leakage (Gate N).",
+      "parameters": ["entity_id", "depth", "radius", "as_of", "relationship_types"]
+    },
+    {
+      "id": "CAP-GRAPH-02",
+      "name": "Multi-Edge Beneficial Ownership Computation",
+      "service": "UBOGraphService",
+      "status": "VERIFIED_HARDENED",
+      "description": "NetworkX MultiDiGraph preserving parallel corporate relationships (ownership, directorship, nominee status) with compounded multi-tier indirect ownership calculation and EU AMLD 25% threshold filtering.",
+      "parameters": ["tenant_id", "entity_id", "statutory_threshold"]
+    },
+    {
+      "id": "CAP-GRAPH-03",
+      "name": "Circular Ownership Detection",
+      "service": "UBOGraphService",
+      "status": "VERIFIED_HARDENED",
+      "description": "Simple directed cycle discovery identifying circular corporate shell ownership loops without parallel edge duplicate cycle inflation.",
+      "parameters": ["tenant_id"]
+    },
+    {
+      "id": "CAP-GRAPH-04",
+      "name": "Canonical Cyclic Mule Ring Detection",
+      "service": "GraphEngine",
+      "status": "VERIFIED_HARDENED",
+      "description": "Directed DFS and Cypher closed cycle detection for mule networks of length 3-7 with canonical rotation deduplication, deterministic SHA-256 ring hashing, and point-in-time temporal filtering.",
+      "parameters": ["min_length", "max_length", "bank_id", "as_of"]
+    },
+    {
+      "id": "CAP-GRAPH-05",
+      "name": "Sliding-Window Smurfing Pattern Analysis",
+      "service": "GraphEngine",
+      "status": "VERIFIED_HARDENED",
+      "description": "Multi-hop fan-in (aggregation mule) and fan-out (layering disbursement) detector enforcing temporal window_hours and point-in-time as_of cutoffs.",
+      "parameters": ["window_hours", "min_fan", "max_depth", "bank_id", "as_of"]
+    },
+    {
+      "id": "CAP-GRAPH-06",
+      "name": "Directed GraphSAGE Sparse Message Passing",
+      "service": "GraphEmbeddingModel",
+      "status": "VERIFIED_HARDENED",
+      "description": "Target-aggregates-source sparse COO message passing with in-degree normalization and L2 unit sphere normalization. Reversal defect GRAPH-0001 resolved.",
+      "parameters": ["node_features", "edge_index", "adjacency_lists", "num_sample"]
+    },
+    {
+      "id": "CAP-GRAPH-07",
+      "name": "Inductive and Transductive GNN Inference",
+      "service": "GraphEmbeddingService",
+      "status": "VERIFIED_HARDENED",
+      "description": "Local GNN training, federation weight export/import, embedding cache invalidation, and inductive unseen node inference via K-hop subgraph evaluation.",
+      "parameters": ["entity_id", "depth", "allow_inductive", "dp_noise", "noise_scale"]
+    },
+    {
+      "id": "CAP-GRAPH-08",
+      "name": "Streaming Graph Buffer with Time Decay",
+      "service": "StreamingGraphService",
+      "status": "VERIFIED_HARDENED",
+      "description": "Real-time transaction sliding window maintaining active node/edge tensors with exponential time decay w = exp(-lambda * delta_t) and stream-relative expiration pruning.",
+      "parameters": ["max_window_minutes", "default_decay_lambda", "as_of"]
+    }
+  ]
+}

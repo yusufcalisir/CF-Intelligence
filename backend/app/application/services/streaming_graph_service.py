@@ -121,8 +121,8 @@ class StreamingGraphService:
             self._adjacency[from_id].add(to_id)
             self._adjacency[to_id].add(from_id)
 
-            # Prune expired edges to keep sliding window size bounded
-            self.prune_expired_edges(self.max_window_minutes)
+            # Prune expired edges to keep sliding window size bounded relative to current stream time
+            self.prune_expired_edges(self.max_window_minutes, as_of=timestamp)
 
     def _rebuild_indices(self) -> None:
         """Rebuild mapping between node string IDs and tensor indices."""
@@ -132,10 +132,12 @@ class StreamingGraphService:
             self.node_to_index[node_id] = idx
             self.index_to_node[idx] = node_id
 
-    def prune_expired_edges(self, max_age_minutes: int) -> None:
+    def prune_expired_edges(self, max_age_minutes: int, as_of: datetime | None = None) -> None:
         """Prune edges outside of the sliding window and remove orphan nodes."""
         with self._lock:
-            now = datetime.now(UTC)
+            now = as_of if as_of is not None else datetime.now(UTC)
+            if now.tzinfo is None:
+                now = now.replace(tzinfo=UTC)
             cutoff_time = now - timedelta(minutes=max_age_minutes)
 
             if not self.edges:
@@ -154,7 +156,7 @@ class StreamingGraphService:
                 if edge_time.tzinfo is None:
                     edge_time = edge_time.replace(tzinfo=UTC)
 
-                if edge_time >= cutoff_time:
+                if cutoff_time <= edge_time <= now:
                     active_edges.append(edge)
                     f_id = edge["from_id"]
                     t_id = edge["to_id"]
@@ -181,6 +183,7 @@ class StreamingGraphService:
         self,
         return_weights: Literal[True],
         decay_lambda: float | None = ...,
+        as_of: datetime | None = ...,
     ) -> tuple[torch.Tensor, torch.Tensor, list[float], torch.Tensor]: ...
 
     @overload
@@ -188,18 +191,21 @@ class StreamingGraphService:
         self,
         return_weights: Literal[False] = ...,
         decay_lambda: float | None = ...,
+        as_of: datetime | None = ...,
     ) -> tuple[torch.Tensor, torch.Tensor, list[float]]: ...
 
     def get_active_subgraph_tensors(
         self,
         return_weights: bool = False,
         decay_lambda: float | None = None,
+        as_of: datetime | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, list[float]] | tuple[torch.Tensor, torch.Tensor, list[float], torch.Tensor]:
         """Construct PyTorch-compatible GNN tensors from the active sliding window.
 
         Args:
             return_weights: If True, also returns time-decayed edge weights tensor [E].
             decay_lambda: Exponential decay coefficient lambda (default: self.default_decay_lambda).
+            as_of: Optional point-in-time timestamp. Edges created after as_of are excluded.
 
         Returns:
             Tuple containing:
@@ -218,7 +224,9 @@ class StreamingGraphService:
                 return empty_features, empty_edges, []
 
             lam = decay_lambda if decay_lambda is not None else self.default_decay_lambda
-            now = datetime.now(UTC)
+            now = as_of if as_of is not None else datetime.now(UTC)
+            if now.tzinfo is None:
+                now = now.replace(tzinfo=UTC)
 
             # Build feature matrix and labels
             feature_list = []
@@ -240,6 +248,12 @@ class StreamingGraphService:
             edge_weights_list: list[float] = []
 
             for edge in self.edges:
+                e_time = edge["timestamp"]
+                if e_time.tzinfo is None:
+                    e_time = e_time.replace(tzinfo=UTC)
+                if e_time > now:
+                    continue
+
                 f_idx = self.node_to_index.get(edge["from_id"])
                 t_idx = self.node_to_index.get(edge["to_id"])
                 if f_idx is not None and t_idx is not None:
@@ -248,9 +262,6 @@ class StreamingGraphService:
                     edge_indices.append([t_idx, f_idx])
 
                     # Calculate exponential time decay: w = exp(-lambda * delta_t_seconds)
-                    e_time = edge["timestamp"]
-                    if e_time.tzinfo is None:
-                        e_time = e_time.replace(tzinfo=UTC)
                     age_seconds = max(0.0, (now - e_time).total_seconds())
                     decay_weight = math.exp(-lam * age_seconds)
 
@@ -271,9 +282,12 @@ class StreamingGraphService:
     def get_active_subgraph_tensors_with_weights(
         self,
         decay_lambda: float | None = None,
+        as_of: datetime | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, list[float], torch.Tensor]:
         """Convenience method to retrieve tensors with exponential time-decayed edge weights."""
-        tensors = self.get_active_subgraph_tensors(return_weights=True, decay_lambda=decay_lambda)
+        tensors = self.get_active_subgraph_tensors(
+            return_weights=True, decay_lambda=decay_lambda, as_of=as_of
+        )
         return tensors  # type: ignore[return-value]
 
     def get_node_neighbors(self, node_id: str) -> list[str]:

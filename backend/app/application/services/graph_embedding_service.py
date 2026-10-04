@@ -278,8 +278,11 @@ class GraphEmbeddingService:
             final_embeddings = model.get_embeddings(
                 features, adjacency, num_sample=self.neighbor_sample_size
             )
+            final_embeddings_np = final_embeddings.cpu().numpy()
+            if not np.all(np.isfinite(final_embeddings_np)):
+                raise ValueError("Non-finite embeddings detected during batch GNN training")
             for node_id, idx in node_id_to_index.items():
-                self._embeddings[node_id] = final_embeddings[idx].numpy()
+                self._embeddings[node_id] = final_embeddings_np[idx]
 
         metrics = {
             "loss": round(avg_loss, 6),
@@ -395,6 +398,9 @@ class GraphEmbeddingService:
                 )
                 node_emb = sub_embeddings[target_idx].cpu().numpy().astype(np.float32)
 
+            if not np.all(np.isfinite(node_emb)):
+                raise ValueError(f"Non-finite embedding generated for entity {entity_id}")
+
             # Cache the computed embedding
             self._embeddings[entity_id] = node_emb
 
@@ -406,6 +412,21 @@ class GraphEmbeddingService:
                 return (noised / norm).astype(np.float32) if norm > 1e-8 else noised.astype(np.float32)
 
             return node_emb
+
+    def invalidate_cache(self, entity_id: str | None = None) -> None:
+        """Invalidate cached embeddings globally or for a specific entity ID.
+
+        Ensures that mutated graph topology or node features do not serve stale representations.
+        """
+        with self._lock:
+            if entity_id is None:
+                self._embeddings.clear()
+                self._node_id_to_index.clear()
+                self._index_to_node_id.clear()
+                logger.info("Invalidated all cached graph embeddings")
+            else:
+                self._embeddings.pop(entity_id, None)
+                logger.info("Invalidated cached graph embedding for entity %s", entity_id)
 
     def get_embedding(
         self,
