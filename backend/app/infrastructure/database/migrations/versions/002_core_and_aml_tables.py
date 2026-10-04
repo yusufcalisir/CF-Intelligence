@@ -109,7 +109,6 @@ def upgrade() -> None:
         sa.Column("dedup_count", sa.Integer, nullable=False, server_default="1"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
-        sa.UniqueConstraint("bank_id", "transaction_id", name="uq_alerts_bank_transaction"),
     )
     op.create_index("ix_alerts_bank_id", "alerts", ["bank_id"])
 

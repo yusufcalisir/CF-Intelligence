@@ -321,3 +321,85 @@ class TestStreamingGNNHardening:
         assert "loss" in train_data
         assert "training_applied" in train_data
         assert train_data["node_count"] >= 2
+
+    def test_watermark_sliding_window_out_of_order_and_clock_skew(self) -> None:
+        """Verify streaming graph watermark behavior:
+        1. In-order event advances watermark.
+        2. Out-of-order event within retention window is accepted without regressing watermark.
+        3. Immediately expired event (> max_window_minutes older than watermark) is pruned.
+        4. Far-future / clock-skew event (> 300s in future) is rejected, preventing watermark poisoning.
+        5. Legitimate events after rejected clock skew are preserved without erroneous pruning.
+        """
+        service = StreamingGraphService(max_window_minutes=10)
+        t0 = datetime.now(UTC) - timedelta(minutes=5)
+
+        # 1. In-order event at t0
+        service.add_transaction(
+            {
+                "sender_id": "cust_in_1",
+                "receiver_id": "cust_in_2",
+                "amount": 100.0,
+                "timestamp": t0.isoformat(),
+                "transaction_id": "tx_in_1",
+            }
+        )
+        assert service._max_timestamp == t0
+        assert len(service.edges) == 1
+
+        # 2. Out-of-order event at t0 - 2 mins (still within 10-min window)
+        t_ooo = t0 - timedelta(minutes=2)
+        service.add_transaction(
+            {
+                "sender_id": "cust_ooo_1",
+                "receiver_id": "cust_ooo_2",
+                "amount": 200.0,
+                "timestamp": t_ooo.isoformat(),
+                "transaction_id": "tx_ooo_1",
+            }
+        )
+        assert service._max_timestamp == t0  # Watermark does not regress
+        assert len(service.edges) == 2
+
+        # 3. Immediately expired event at t0 - 15 mins (> 10-min window)
+        t_expired = t0 - timedelta(minutes=15)
+        service.add_transaction(
+            {
+                "sender_id": "cust_exp_1",
+                "receiver_id": "cust_exp_2",
+                "amount": 300.0,
+                "timestamp": t_expired.isoformat(),
+                "transaction_id": "tx_exp_1",
+            }
+        )
+        assert "cust_exp_1" not in service.nodes
+
+        # 4. Far-future event (> 300s into future relative to current time)
+        t_future = datetime.now(UTC) + timedelta(minutes=30)
+        service.add_transaction(
+            {
+                "sender_id": "cust_poison_1",
+                "receiver_id": "cust_poison_2",
+                "amount": 400.0,
+                "timestamp": t_future.isoformat(),
+                "transaction_id": "tx_future_poison",
+            }
+        )
+        # Watermark was NOT poisoned to t_future
+        assert service._max_timestamp == t0
+
+        # 5. Subsequent legitimate event at t0 + 1 min arrives and is preserved
+        t_subsequent = t0 + timedelta(minutes=1)
+        service.add_transaction(
+            {
+                "sender_id": "cust_sub_1",
+                "receiver_id": "cust_sub_2",
+                "amount": 500.0,
+                "timestamp": t_subsequent.isoformat(),
+                "transaction_id": "tx_sub_1",
+            }
+        )
+        assert service._max_timestamp == t_subsequent
+        assert "cust_in_1" in service.nodes
+        assert "cust_ooo_1" in service.nodes
+        assert "cust_sub_1" in service.nodes
+

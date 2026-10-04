@@ -59,7 +59,7 @@ def test_alembic_heads_is_single_linear_branch() -> None:
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
     assert len(heads) == 1, f"Expected exactly 1 migration head, found {len(heads)}: {heads}"
-    assert heads[0] == "002_core_and_aml_tables"
+    assert heads[0] == "003_alerts_unique_constraint"
 
 
 def test_alembic_migrations_upgrade_head_and_downgrade_base_cleanly(temp_alembic_db: str) -> None:
@@ -156,3 +156,65 @@ def test_alembic_tenant_scoped_persistence_identity(temp_alembic_db: str) -> Non
         conn.commit()
 
     conn.close()
+
+
+def test_alembic_upgrade_from_pre_repair_002_revision(temp_alembic_db: str) -> None:
+    """Verify that an existing database at pre-repair revision 002 upgrades cleanly
+    to 003_alerts_unique_constraint and enforces the composite unique constraint:
+    1. Upgrade to 002_core_and_aml_tables (simulating pre-repair state).
+    2. Insert cross-bank alerts with shared transaction_id.
+    3. Upgrade to head (003_alerts_unique_constraint).
+    4. Verify existing records survive and duplicate rejection is enforced.
+    5. Verify distinct-tenant insertion still succeeds.
+    """
+    cfg = _get_alembic_config(f"sqlite+aiosqlite:///{temp_alembic_db}")
+
+    # 1. Simulate pre-repair existing database at 002_core_and_aml_tables
+    command.upgrade(cfg, "002_core_and_aml_tables")
+
+    conn = sqlite3.connect(temp_alembic_db)
+    cur = conn.cursor()
+    # Insert initial valid data across two banks
+    cur.execute(
+        "INSERT INTO alerts (id, bank_id, transaction_id, risk_score, severity, status, reason_codes, confidence, involved_entity_ids, top_features, risk_factors, model_confidence, historical_evidence, triage_priority, triage_action, sla_minutes, triage_reasons, dedup_count) "
+        "VALUES ('alt_01', 'bank_alpha', 'tx_shared_100', 850.0, 'high', 'new', '[]', 0.9, '[]', '[]', '[]', 0.9, '[]', 'p1_critical', 'queue_urgent', 60, '[]', 1);"
+    )
+    cur.execute(
+        "INSERT INTO alerts (id, bank_id, transaction_id, risk_score, severity, status, reason_codes, confidence, involved_entity_ids, top_features, risk_factors, model_confidence, historical_evidence, triage_priority, triage_action, sla_minutes, triage_reasons, dedup_count) "
+        "VALUES ('alt_02', 'bank_beta', 'tx_shared_100', 300.0, 'low', 'new', '[]', 0.8, '[]', '[]', '[]', 0.8, '[]', 'p3_medium', 'queue_standard', 1440, '[]', 1);"
+    )
+    conn.commit()
+    conn.close()
+
+    # 2. Forward upgrade to head (003_alerts_unique_constraint)
+    command.upgrade(cfg, "head")
+
+    conn = sqlite3.connect(temp_alembic_db)
+    cur = conn.cursor()
+
+    # 3. Verify existing rows survived table alteration
+    cur.execute("SELECT id, bank_id, transaction_id FROM alerts ORDER BY id;")
+    rows = cur.fetchall()
+    assert len(rows) == 2
+    assert rows[0] == ("alt_01", "bank_alpha", "tx_shared_100")
+    assert rows[1] == ("alt_02", "bank_beta", "tx_shared_100")
+
+    # 4. Verify duplicate (bank_alpha, tx_shared_100) is rejected by newly added constraint
+    with pytest.raises(sqlite3.IntegrityError):
+        cur.execute(
+            "INSERT INTO alerts (id, bank_id, transaction_id, risk_score, severity, status, reason_codes, confidence, involved_entity_ids, top_features, risk_factors, model_confidence, historical_evidence, triage_priority, triage_action, sla_minutes, triage_reasons, dedup_count) "
+            "VALUES ('alt_03', 'bank_alpha', 'tx_shared_100', 900.0, 'critical', 'new', '[]', 0.95, '[]', '[]', '[]', 0.95, '[]', 'p1_critical', 'queue_urgent', 30, '[]', 1);"
+        )
+        conn.commit()
+
+    # 5. Verify distinct tenant (bank_gamma, tx_shared_100) is accepted
+    cur.execute(
+        "INSERT INTO alerts (id, bank_id, transaction_id, risk_score, severity, status, reason_codes, confidence, involved_entity_ids, top_features, risk_factors, model_confidence, historical_evidence, triage_priority, triage_action, sla_minutes, triage_reasons, dedup_count) "
+        "VALUES ('alt_04', 'bank_gamma', 'tx_shared_100', 400.0, 'medium', 'new', '[]', 0.85, '[]', '[]', '[]', 0.85, '[]', 'p2_high', 'queue_standard', 720, '[]', 1);"
+    )
+    conn.commit()
+    cur.execute("SELECT COUNT(*) FROM alerts;")
+    assert cur.fetchone()[0] == 3
+
+    conn.close()
+

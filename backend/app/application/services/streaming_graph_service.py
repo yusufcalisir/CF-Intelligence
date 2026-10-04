@@ -93,6 +93,15 @@ class StreamingGraphService:
         if timestamp.tzinfo is None:
             timestamp = timestamp.replace(tzinfo=UTC)
 
+        # Clock-skew tolerance check: Reject transactions dated >300s into future to prevent watermark poisoning
+        now_utc = datetime.now(UTC)
+        if timestamp > now_utc + timedelta(seconds=300):
+            logger.warning(
+                "StreamingGraph rejected future-dated transaction ts=%s (exceeds 300s clock skew bound)",
+                timestamp,
+            )
+            return
+
         with self._lock:
             if self._max_timestamp is None or timestamp > self._max_timestamp:
                 self._max_timestamp = timestamp
