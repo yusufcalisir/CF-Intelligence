@@ -396,9 +396,9 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                 style={{ width: `${Math.min(100, progress)}%` }}
               />
             </div>
-            <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 pt-0.5">
+            <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 pt-0.5">
               <span>Interactive launch preview animation</span>
-              <span className="text-slate-400">Verifying runtime services concurrently</span>
+              <span>Verifying runtime services concurrently</span>
             </div>
           </div>
         </motion.div>
