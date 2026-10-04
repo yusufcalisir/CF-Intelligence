@@ -9,10 +9,16 @@ import {
   useVaultSealStatus,
   useZKVerifierStatus,
   useVerifyZKProof,
+  useWebhookSubscriptionsQuery,
+  useRegisterWebhookMutation,
+  useDeleteWebhookMutation,
+  useWebhookDeliveryLogsQuery,
+  useWebhookTestDispatchMutation,
 } from '../api/queries';
+import type { WebhookEventType } from '../api/types';
 import { apiClient } from '../api/client';
 
-type SecurityTabId = 'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp' | 'unlearning' | 'pqc' | 'bridge' | 'rdp';
+type SecurityTabId = 'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp' | 'unlearning' | 'pqc' | 'bridge' | 'rdp' | 'webhooks';
 
 interface SecurityTabItem {
   id: SecurityTabId;
@@ -22,10 +28,10 @@ interface SecurityTabItem {
 }
 
 const SECURITY_CATEGORIES = [
-  { id: 'all', label: 'All Modules', count: 11, icon: '🛡️' },
+  { id: 'all', label: 'All Modules', count: 12, icon: '🛡️' },
   { id: 'identity', label: 'Identity & PKI', count: 4, icon: '🔑' },
   { id: 'crypto', label: 'Crypto Proofs', count: 3, icon: '⚡' },
-  { id: 'governance', label: 'Audit & Governance', count: 4, icon: '⛓️' },
+  { id: 'governance', label: 'Audit & Governance', count: 5, icon: '⛓️' },
 ] as const;
 
 const SECURITY_TABS: SecurityTabItem[] = [
@@ -45,6 +51,7 @@ const SECURITY_TABS: SecurityTabItem[] = [
   { id: 'unlearning', icon: '♻️', label: 'Confidential Unlearning', category: 'governance' },
   { id: 'bridge', icon: '🌉', label: 'Cross-Chain Settlement', category: 'governance' },
   { id: 'rdp', icon: '📈', label: 'Adaptive DP Auto-Scaler', category: 'governance' },
+  { id: 'webhooks', icon: '📡', label: 'Webhook Gateway & SSRF Security', category: 'governance' },
 ];
 
 export default function SecurityPage() {
@@ -191,6 +198,60 @@ export default function SecurityPage() {
       console.error('Failed to trigger unlearning', e);
     } finally {
       setIsUnlearningLoading(false);
+    }
+  };
+
+  // Webhook Gateway & Security State
+  const [webhookTenant, setWebhookTenant] = useState('bank_alpha');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookEvents, setWebhookEvents] = useState<WebhookEventType[]>(['ALERT_CREATED', 'CASE_RESOLVED']);
+  const [webhookRegError, setWebhookRegError] = useState<string | null>(null);
+  const [webhookRegSuccess, setWebhookRegSuccess] = useState<string | null>(null);
+  const [testDispatchStatus, setTestDispatchStatus] = useState<string | null>(null);
+
+  const { data: webhookSubs, isLoading: isSubsLoading } = useWebhookSubscriptionsQuery(webhookTenant);
+  const { data: webhookLogs, isLoading: isLogsLoading } = useWebhookDeliveryLogsQuery(20);
+  const registerWebhook = useRegisterWebhookMutation();
+  const deleteWebhook = useDeleteWebhookMutation();
+  const testDispatch = useWebhookTestDispatchMutation();
+
+  const handleRegisterWebhook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWebhookRegError(null);
+    setWebhookRegSuccess(null);
+    if (!webhookUrl.trim()) {
+      setWebhookRegError('Target URL is required.');
+      return;
+    }
+    try {
+      const res = await registerWebhook.mutateAsync({
+        tenant_id: webhookTenant,
+        target_url: webhookUrl.trim(),
+        events: webhookEvents,
+      });
+      setWebhookRegSuccess(`✅ Webhook registered! ID: ${res.subscription_id}. Secret: ${res.secret_key.slice(0, 8)}...`);
+      setWebhookUrl('');
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        || 'Failed to register webhook. SSRF validation or network rejection.';
+      setWebhookRegError(`❌ ${detail}`);
+    }
+  };
+
+  const handleTestDispatch = async () => {
+    setTestDispatchStatus(null);
+    try {
+      const res = await testDispatch.mutateAsync({
+        tenant_id: webhookTenant,
+        event_type: 'ALERT_CREATED',
+      });
+      setTestDispatchStatus(`✅ Dispatched to ${res.dispatched_count} subscriber(s). Event: ${res.event_type}. Signature: ${res.sample_signature ? res.sample_signature.slice(0, 16) + '...' : 'N/A'}`);
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        || 'Webhook test dispatch failed.';
+      setTestDispatchStatus(`❌ ${detail}`);
     }
   };
 
@@ -1686,6 +1747,252 @@ export default function SecurityPage() {
                 <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono col-span-1 md:col-span-2">
                   <span>Driver: adaptive_dp_autoscaler.py</span>
                   <span>Rényi DP & PRV Numerical Composition</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'webhooks' && (
+            <div className="space-y-6">
+              <div className="glass-card p-6 rounded-2xl border border-purple-500/20 bg-gradient-to-br from-[#08091a]/95 via-[#0b0d26]/90 to-[#08091a]/95 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">📡</span>
+                      <h3 className="text-base font-bold text-slate-100">
+                        Webhook Gateway & Real-Time Alert Dispatcher
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        HMAC-SHA256 Signed
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                        SSRF Protected
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                      Event-driven webhook engine for cross-bank provisional holds, SIEM integration, and AML alert dispatching with strict loopback/RFC-1918 SSRF filtering.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleTestDispatch}
+                      disabled={testDispatch.isPending}
+                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white shadow-lg shadow-purple-600/20 transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {testDispatch.isPending ? 'Dispatching...' : '🚀 Test Dispatch Event'}
+                    </button>
+                  </div>
+                </div>
+
+                {testDispatchStatus && (
+                  <div className="p-3 rounded-lg text-xs font-mono bg-purple-500/10 border border-purple-500/30 text-purple-200">
+                    {testDispatchStatus}
+                  </div>
+                )}
+
+                {/* Registration Form & SSRF Controls */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                        Register Webhook Endpoint
+                      </h4>
+                      <span className="text-[10px] text-amber-400 font-mono">
+                        RFC 1918 / 127.0.0.1 Blocked
+                      </span>
+                    </div>
+
+                    <form onSubmit={handleRegisterWebhook} className="space-y-3">
+                      <div>
+                        <label className="text-[11px] text-[var(--color-text-muted)] block mb-1">
+                          Tenant Identifier:
+                        </label>
+                        <select
+                          value={webhookTenant}
+                          onChange={(e) => setWebhookTenant(e.target.value)}
+                          className="w-full px-3 py-1.5 text-xs rounded bg-black/40 border border-[var(--color-border)] text-slate-200 focus:outline-none focus:border-purple-500/50"
+                        >
+                          <option value="bank_alpha">bank_alpha (Alpha International)</option>
+                          <option value="bank_beta">bank_beta (Beta Trust Bancorp)</option>
+                          <option value="bank_gamma">bank_gamma (Gamma Swiss Financial)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] text-[var(--color-text-muted)] block mb-1">
+                          Target Webhook URL (HTTPS required):
+                        </label>
+                        <input
+                          type="url"
+                          value={webhookUrl}
+                          onChange={(e) => setWebhookUrl(e.target.value)}
+                          placeholder="https://api.partnerbank.com/cfi-webhook"
+                          className="w-full px-3 py-1.5 text-xs rounded bg-black/40 border border-[var(--color-border)] text-slate-200 focus:outline-none focus:border-purple-500/50"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          Strict SSRF filter rejects loopback (127.0.0.1, localhost), private IP ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), AWS metadata (169.254.169.254), and non-HTTP protocols.
+                        </span>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] text-[var(--color-text-muted)] block mb-1">
+                          Subscribed Events:
+                        </label>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {(['ALERT_CREATED', 'CASE_RESOLVED', 'MODEL_PROMOTED', 'DRIFT_DETECTED'] as WebhookEventType[]).map((ev) => (
+                            <label key={ev} className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={webhookEvents.includes(ev)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setWebhookEvents([...webhookEvents, ev]);
+                                  } else {
+                                    setWebhookEvents(webhookEvents.filter((item) => item !== ev));
+                                  }
+                                }}
+                                className="rounded border-slate-700 text-purple-600 focus:ring-purple-500/50"
+                              />
+                              <span>{ev}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      {webhookRegError && (
+                        <div className="p-2.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+                          {webhookRegError}
+                        </div>
+                      )}
+                      {webhookRegSuccess && (
+                        <div className="p-2.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono">
+                          {webhookRegSuccess}
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={registerWebhook.isPending}
+                        className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                      >
+                        {registerWebhook.isPending ? 'Registering...' : 'Register Subscription'}
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Active Subscriptions */}
+                  <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                          Active Tenant Subscriptions ({webhookSubs?.subscriptions.length || 0})
+                        </h4>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          Tenant: {webhookTenant}
+                        </span>
+                      </div>
+
+                      {isSubsLoading ? (
+                        <div className="text-xs text-[var(--color-text-muted)] py-6 text-center">Loading subscriptions...</div>
+                      ) : !webhookSubs?.subscriptions.length ? (
+                        <div className="text-xs text-[var(--color-text-muted)] py-6 text-center border border-dashed border-[var(--color-border)] rounded-lg">
+                          No webhook endpoints registered for {webhookTenant}.
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                          {webhookSubs.subscriptions.map((sub) => (
+                            <div key={sub.subscription_id} className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex items-start justify-between gap-2 text-xs">
+                              <div className="min-w-0 flex-1">
+                                <div className="font-mono text-purple-300 truncate font-semibold">{sub.target_url}</div>
+                                <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
+                                  <span>ID: {sub.subscription_id.slice(0, 8)}...</span>
+                                  <span>•</span>
+                                  <span>Events: {sub.events.join(', ')}</span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => deleteWebhook.mutate(sub.subscription_id)}
+                                disabled={deleteWebhook.isPending}
+                                className="px-2 py-1 text-[10px] text-rose-300 hover:bg-rose-500/20 rounded border border-rose-500/30 transition shrink-0"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-2.5 rounded bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-200 mt-4">
+                      <strong>Delivery Semantics:</strong> Outbound webhook dispatches use <em>at-least-once</em> transport with deterministic SHA-256 event IDs for external receiver idempotency.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Delivery Audit Logs */}
+                <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                      Recent Outbound Delivery Audit Logs
+                    </h4>
+                    <span className="text-[10px] font-mono text-slate-400">
+                      Total Deliveries Logged: {webhookLogs?.total_count || 0}
+                    </span>
+                  </div>
+
+                  {isLogsLoading ? (
+                    <div className="text-xs text-[var(--color-text-muted)] py-4 text-center">Loading delivery logs...</div>
+                  ) : !webhookLogs?.deliveries.length ? (
+                    <div className="text-xs text-[var(--color-text-muted)] py-4 text-center border border-dashed border-[var(--color-border)] rounded-lg">
+                      No delivery attempts recorded yet. Click 'Test Dispatch Event' to generate synthetic notifications.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-[var(--color-border)] text-[var(--color-text-muted)] text-[10px] uppercase">
+                            <th className="py-2 px-2">Delivery ID</th>
+                            <th className="py-2 px-2">Event</th>
+                            <th className="py-2 px-2">Target URL</th>
+                            <th className="py-2 px-2">Status</th>
+                            <th className="py-2 px-2">Attempts</th>
+                            <th className="py-2 px-2">Diagnostic</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--color-border)] font-mono text-[11px]">
+                          {webhookLogs.deliveries.map((item) => (
+                            <tr key={item.delivery_id} className="hover:bg-white/5 transition-colors">
+                              <td className="py-2 px-2 text-slate-300">{item.delivery_id.slice(0, 8)}...</td>
+                              <td className="py-2 px-2 text-purple-300">{item.event_type}</td>
+                              <td className="py-2 px-2 text-slate-400 max-w-[200px] truncate" title={item.target_url}>
+                                {item.target_url}
+                              </td>
+                              <td className="py-2 px-2">
+                                {item.success ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                    {item.status_code || 200} DELIVERED
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                    {item.status_code || 'ERR'} FAILED
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-2 text-slate-400">{item.attempt_count}</td>
+                              <td className="py-2 px-2 text-slate-400 max-w-[220px] truncate" title={item.error_message || 'OK'}>
+                                {item.error_message || 'Delivered successfully'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono">
+                  <span>Driver: webhook_service.py · webhook_gateway.py</span>
+                  <span>Constant-Time HMAC-SHA256 & RFC 1918 SSRF Gate</span>
                 </div>
               </div>
             </div>

@@ -1,0 +1,105 @@
+{
+  "state_invariants_metadata": {
+    "scope": "Frontend Behavioral State Invariants Verification Matrix",
+    "version": "1.0.0",
+    "updated_at": "2026-10-04T19:15:00Z"
+  },
+  "invariants": [
+    {
+      "id": "UI-INV-01",
+      "name": "Backend Truth Preservation",
+      "statement": "Displayed authoritative business state must correspond to backend state.",
+      "implementation": "Components consume authoritative data directly from TanStack Query hooks without synthetic overrides.",
+      "verification": "test_case_concurrency_and_stale_rollback.test.tsx",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "UI-INV-02",
+      "name": "Tenant Isolation",
+      "statement": "Data cached/rendered for Tenant A must never appear under Tenant B.",
+      "implementation": "switchActiveTenant(queryClient, tenantId) sets tenant storage and invokes queryClient.clear(); apiClient injects X-Tenant-ID header.",
+      "verification": "test_case_concurrency_and_stale_rollback.test.tsx::Tenant Isolation & Storage Lifecycle",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "UI-INV-03",
+      "name": "Object Identity",
+      "statement": "Alert A, Case A, Report A must never display data belonging to another object due to stale query state.",
+      "implementation": "Queries are keyed with unique object ID (['case', id]); detail view unmounts/resets state on route change.",
+      "verification": "test_case_concurrency_and_stale_rollback.test.tsx",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "UI-INV-04",
+      "name": "Query-Key Completeness",
+      "statement": "Query/cache keys must include every identity dimension required to distinguish authoritative data.",
+      "implementation": "Filters, object IDs, and pagination participate in cache key composition; cache cleared on tenant change.",
+      "verification": "test_case_concurrency_and_stale_rollback.test.tsx",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "UI-INV-05",
+      "name": "Mutation Target Integrity",
+      "statement": "A mutation initiated from object A must not execute against object B after navigation or asynchronous state changes.",
+      "implementation": "Mutation variables bind caseId/alertId explicitly from route parameters and loaded object identity.",
+      "verification": "test_case_concurrency_and_stale_rollback.test.tsx",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "UI-INV-06",
+      "name": "Out-of-Order Response Safety",
+      "statement": "Older asynchronous responses must not overwrite newer authoritative state.",
+      "implementation": "TanStack Query automatically tracks request timestamps and query cancellation on route navigation.",
+      "verification": "test_case_concurrency_and_stale_rollback.test.tsx",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "UI-INV-07",
+      "name": "Optimistic Update Safety",
+      "statement": "Optimistic state must either be confirmed or correctly rolled back/reconciled.",
+      "implementation": "Mutations execute onError handlers that invalidate cache keys to restore authoritative backend state.",
+      "verification": "test_case_concurrency_and_stale_rollback.test.tsx::recovers from 409 Conflict",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "UI-INV-08",
+      "name": "Error Truthfulness",
+      "statement": "Failed backend operations must not appear successful.",
+      "implementation": "Component catch blocks capture server error responses, display exact HTTP details, and prevent success banners.",
+      "verification": "test_case_concurrency_and_stale_rollback.test.tsx::displays SSRF rejection truthfully",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "UI-INV-11",
+      "name": "Status Semantic Parity",
+      "statement": "Frontend labels must preserve backend business meaning.",
+      "implementation": "CASE_STATUS_LABELS maps exact CaseStatus enum values without collapsing distinct states.",
+      "verification": "CaseDetailPage.tsx & test_case_concurrency_and_stale_rollback.test.tsx",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "UI-INV-16",
+      "name": "Concurrent Conflict Recovery",
+      "statement": "409/stale-write rejection must restore/reconcile authoritative state.",
+      "implementation": "onError handlers on useUpdateCaseStatus, useSignCase, and useResolveCase invalidate ['case', caseId] and ['cases'].",
+      "verification": "test_case_concurrency_and_stale_rollback.test.tsx::recovers from 409 Conflict",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "UI-INV-19",
+      "name": "Regulatory Terminology",
+      "statement": "Generated/exported regulatory artifacts must not be displayed as externally filed unless backend state establishes that.",
+      "implementation": "Export FinCEN XML button is strictly disabled for closed_false_positive and unreviewed cases with clear explanatory tooltips.",
+      "verification": "test_case_concurrency_and_stale_rollback.test.tsx::Handoff B",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "UI-INV-20",
+      "name": "Webhook Semantics",
+      "statement": "At-least-once transport and failed test/delivery states must not be represented as exactly-once/success.",
+      "implementation": "Webhook Security UI exposes delivery audit logs with explicit DELIVERED/FAILED badges and SSRF/DNS error diagnostics.",
+      "verification": "test_case_concurrency_and_stale_rollback.test.tsx::Handoff C",
+      "status": "VERIFIED"
+    }
+  ]
+}

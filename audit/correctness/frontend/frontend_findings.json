@@ -1,0 +1,77 @@
+{
+  "findings_metadata": {
+    "scope": "Frontend Behavioral Correctness Findings Ledger",
+    "version": "1.0.0",
+    "updated_at": "2026-10-04T19:15:00Z"
+  },
+  "findings": [
+    {
+      "id": "UI-0001",
+      "severity": "HIGH",
+      "affected_route": "/cases/:caseId",
+      "affected_component": "CaseDetailPage.tsx & queries.ts",
+      "trigger": "Submitting a case status transition or Four-Eyes signoff without optimistic concurrency tokens, or receiving HTTP 409 Conflict from backend when case version changed concurrently.",
+      "expected_behavior": "Frontend must send expected_status, expected_version, and expected_timeline_hash with mutations. On HTTP 409 Conflict, optimistic state must be rolled back, ['case', caseId] and ['cases'] must be invalidated and refetched, and the user must receive truthful conflict feedback.",
+      "actual_behavior": "CaseDetailPage previously omitted expected_status, expected_version, and expected_timeline_hash. In catch blocks, queryClient cache was not invalidated, leaving stale local state un-reconciled.",
+      "first_divergence": "CaseDetailPage.tsx handleStatusChange / handleFourEyesConfirm mutation invocation.",
+      "backend_truth": "backend/app/presentation/routers/cases.py enforces strict lost update prevention (HTTP 409) and stale approval checks via expected_version and expected_timeline_hash.",
+      "user_visible_impact": "User could see out-of-sync case state after concurrent supervisor updates or failed transitions.",
+      "tenant_impact": "Isolated per case; risk of lost updates across concurrent analyst sessions.",
+      "business_impact": "Stale case decisions could conflict with authoritative backend audit trail.",
+      "root_cause": "Omission of concurrency token propagation in mutation payloads and lack of error-time cache invalidation.",
+      "repair": "Added version and timeline_hash to Case types, added expected_status, expected_version, expected_timeline_hash to CaseStatusUpdatePayload/CaseSignPayload/CaseResolvePayload, and added onError cache invalidations to useUpdateCaseStatus, useSignCase, and useResolveCase.",
+      "regression_test": "frontend/src/pages/__tests__/test_case_concurrency_and_stale_rollback.test.tsx::Handoff A"
+    },
+    {
+      "id": "UI-0002",
+      "severity": "HIGH",
+      "affected_route": "/cases/:caseId",
+      "affected_component": "CaseDetailPage.tsx",
+      "trigger": "Opening a case resolved as closed_false_positive or an unreviewed open case and viewing the SAR export button.",
+      "expected_behavior": "FinCEN SAR XML export button must be disabled for closed_false_positive and unreviewed cases with clear explanatory tooltips reflecting backend business rule BIZ-0005.",
+      "actual_behavior": "Button was only disabled during active XML export (disabled={isExportingXml}), leaving it clickable for false-positive cases.",
+      "first_divergence": "CaseDetailPage.tsx button disabled attribute check.",
+      "backend_truth": "backend/app/presentation/routers/cases.py rejects SAR filing generation for CLOSED_FALSE_POSITIVE and unreviewed cases with HTTP 400 upfront.",
+      "user_visible_impact": "Users were presented with an actionable SAR export button on false positive cases that resulted in confusing runtime failure upon click.",
+      "tenant_impact": "None (presentation alignment).",
+      "business_impact": "Contradicted AML compliance rules preventing regulatory SAR filing synthesis for confirmed non-fraud events.",
+      "root_cause": "UI button disabled condition failed to incorporate isFincenEligible check.",
+      "repair": "Updated button to disabled={isExportingXml || !isFincenEligible} with state-specific tooltips and status badges.",
+      "regression_test": "frontend/src/pages/__tests__/test_case_concurrency_and_stale_rollback.test.tsx::Handoff B"
+    },
+    {
+      "id": "UI-0003",
+      "severity": "MEDIUM",
+      "affected_route": "Global / API Client",
+      "affected_component": "client.ts & queries.ts",
+      "trigger": "Switching active tenant in browser context while query cache is populated.",
+      "expected_behavior": "Switching tenant must immediately purge cached data from Tenant A to prevent any leakage or momentary display under Tenant B.",
+      "actual_behavior": "Tenant ID was stored in localStorage without an explicit cache-clearing switch helper, relying solely on logout.",
+      "first_divergence": "client.ts lack of switchActiveTenant helper.",
+      "backend_truth": "Backend enforces strict tenant isolation and BOLA checks on all endpoints.",
+      "user_visible_impact": "Potential momentary visual leakage of Tenant A case or alert data if tenant context changed without page reload.",
+      "tenant_impact": "Cross-tenant data exposure in client memory.",
+      "business_impact": "Breach of multi-tenant bank confidentiality.",
+      "root_cause": "Absence of coordinated cache-purge helper on tenant context switch.",
+      "repair": "Exported getActiveTenantId, setClientTenant, and switchActiveTenant(queryClient, newTenantId) which invokes queryClient.clear().",
+      "regression_test": "frontend/src/pages/__tests__/test_case_concurrency_and_stale_rollback.test.tsx::Tenant Isolation & Storage Lifecycle"
+    },
+    {
+      "id": "UI-0004",
+      "severity": "MEDIUM",
+      "affected_route": "/security",
+      "affected_component": "SecurityPage.tsx & queries.ts",
+      "trigger": "Accessing Webhook Gateway controls, testing webhook dispatch, or observing SSRF validation errors.",
+      "expected_behavior": "Operators must have a dedicated security tab to register webhooks with clear SSRF warnings (RFC 1918 / loopback / cloud metadata), dispatch synthetic test events, and inspect real outbound delivery logs with truthful success/failure diagnostics.",
+      "actual_behavior": "SecurityPage lacked a dedicated Webhook Gateway tab and queries.ts lacked useWebhookTestDispatchMutation.",
+      "first_divergence": "SecurityPage.tsx tab definitions and queries.ts hook omissions.",
+      "backend_truth": "backend/app/presentation/routers/webhook_gateway.py provides /subscriptions, /test-dispatch, /deliveries, and strict SSRF filtering.",
+      "user_visible_impact": "Inability for operators to verify webhook endpoints or observe SSRF rejections in the UI.",
+      "tenant_impact": "Webhook management required direct curl calls without UI parity.",
+      "business_impact": "Reduced visibility into automated notification delivery and security filtering.",
+      "root_cause": "Omission of webhook UI surfaces from SecurityPage.",
+      "repair": "Added useWebhookTestDispatchMutation to queries.ts, added 'webhooks' security tab in SecurityPage with registration, SSRF notice, test dispatch, and delivery audit log viewer.",
+      "regression_test": "frontend/src/pages/__tests__/test_case_concurrency_and_stale_rollback.test.tsx::Handoff C"
+    }
+  ]
+}

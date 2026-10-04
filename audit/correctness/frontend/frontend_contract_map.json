@@ -1,0 +1,123 @@
+{
+  "contract_map_metadata": {
+    "scope": "Frontend Route to Backend Contract & Invalidation Mapping",
+    "version": "1.0.0",
+    "updated_at": "2026-10-04T19:15:00Z"
+  },
+  "routes": [
+    {
+      "route": "/",
+      "page": "Dashboard",
+      "query_key": "['dashboard-stats']",
+      "backend_endpoint": "GET /api/v1/cases/dashboard/stats",
+      "response_schema": "DashboardStats",
+      "mutations": [],
+      "invalidation_behavior": "Refetched on case status change, escalation, or new case creation",
+      "authorization": "Authenticated Consortium User"
+    },
+    {
+      "route": "/alerts",
+      "page": "AlertsPage",
+      "query_key": "['alerts', filters]",
+      "backend_endpoint": "GET /api/v1/alerts",
+      "response_schema": "Alert[]",
+      "mutations": [
+        {
+          "name": "useUpdateAlertStatus",
+          "endpoint": "PATCH /api/v1/alerts/{alert_id}",
+          "request_schema": "AlertStatusUpdateRequest",
+          "invalidates": ["alerts", "alert"]
+        }
+      ],
+      "invalidation_behavior": "Refetched on alert disposition change; polls every 10s",
+      "authorization": "Analyst / Senior Investigator"
+    },
+    {
+      "route": "/cases",
+      "page": "CasesPage",
+      "query_key": "['cases', filters]",
+      "backend_endpoint": "GET /api/v1/cases",
+      "response_schema": "CaseSummary[]",
+      "mutations": [
+        {
+          "name": "useCreateCase",
+          "endpoint": "POST /api/v1/cases",
+          "request_schema": "CaseCreatePayload",
+          "invalidates": ["cases", "dashboard-stats"]
+        }
+      ],
+      "invalidation_behavior": "Refetched on filter change, case creation, and background interval (5s)",
+      "authorization": "Analyst / Supervisor"
+    },
+    {
+      "route": "/cases/:caseId",
+      "page": "CaseDetailPage",
+      "query_key": "['case', caseId]",
+      "backend_endpoint": "GET /api/v1/cases/{case_id}",
+      "response_schema": "CaseResponse (Case)",
+      "mutations": [
+        {
+          "name": "useUpdateCaseStatus",
+          "endpoint": "PATCH /api/v1/cases/{case_id}",
+          "request_schema": "CaseStatusUpdatePayload (with expected_status, expected_version, expected_timeline_hash)",
+          "invalidates": ["cases", "case", "dashboard-stats"],
+          "error_behavior": "Rolls back optimistic state, invalidates case and cases cache, renders 409 conflict detail"
+        },
+        {
+          "name": "useSignCase",
+          "endpoint": "POST /api/v1/cases/{case_id}/sign",
+          "request_schema": "CaseSignPayload (with expected_version, expected_timeline_hash)",
+          "invalidates": ["cases", "case"],
+          "error_behavior": "Invalidates case cache, displays dual-control violation or stale approval conflict"
+        },
+        {
+          "name": "useResolveCase",
+          "endpoint": "POST /api/v1/cases/{case_id}/resolve",
+          "request_schema": "CaseResolvePayload (with expected_version, expected_timeline_hash)",
+          "invalidates": ["cases", "case", "dashboard-stats"],
+          "error_behavior": "Invalidates case cache, displays Four-Eyes dual control error"
+        },
+        {
+          "name": "useExportFinCENXml",
+          "endpoint": "POST /api/v1/cases/export/fincen-xml",
+          "request_schema": "ExportFinCENXmlRequest",
+          "invalidates": [],
+          "eligibility_gate": "Strictly disabled for closed_false_positive and unreviewed cases; enabled only for closed_confirmed and sar_filed"
+        }
+      ],
+      "invalidation_behavior": "Immediate invalidation on success and on error to guarantee authoritative backend synchronization",
+      "authorization": "Investigator (view/investigate), Supervisor (sign/resolve/export SAR)"
+    },
+    {
+      "route": "/security",
+      "page": "SecurityPage",
+      "query_key": "['security-status'], ['webhook-subscriptions', tenantId], ['webhook-deliveries', limit]",
+      "backend_endpoint": "GET /api/v1/security/status, GET /api/v1/webhooks/subscriptions, GET /api/v1/webhooks/deliveries",
+      "response_schema": "SecurityStatus, WebhookSubscriptionListResponse, WebhookDeliveryLogsResponse",
+      "mutations": [
+        {
+          "name": "useRegisterWebhookMutation",
+          "endpoint": "POST /api/v1/webhooks/subscriptions",
+          "request_schema": "WebhookSubscriptionRequest",
+          "invalidates": ["webhook-subscriptions", "webhook-health"],
+          "error_behavior": "Truthfully displays SSRF validation errors (RFC 1918 private IP, loopback, non-HTTP) without false success"
+        },
+        {
+          "name": "useWebhookTestDispatchMutation",
+          "endpoint": "POST /api/v1/webhooks/test-dispatch",
+          "request_schema": "QueryParams: { tenant_id, event_type }",
+          "invalidates": ["webhook-deliveries", "webhook-health"],
+          "error_behavior": "Reports dispatched count, event type, and HMAC signature truthfully"
+        },
+        {
+          "name": "useDeleteWebhookMutation",
+          "endpoint": "DELETE /api/v1/webhooks/subscriptions/{subscription_id}",
+          "request_schema": "subscription_id",
+          "invalidates": ["webhook-subscriptions", "webhook-health"]
+        }
+      ],
+      "invalidation_behavior": "Mutations trigger immediate invalidation of webhook subscription list and delivery audit logs",
+      "authorization": "Security Officer / Admin / Compliance Auditor"
+    }
+  ]
+}

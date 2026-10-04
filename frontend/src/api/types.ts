@@ -577,6 +577,8 @@ export interface Case {
   is_open: boolean;
   supervisor_signatures?: string[];
   supervisor_signature?: string | null;
+  version?: number;
+  timeline_hash?: string | null;
 }
 
 export interface CaseSummary {
@@ -588,6 +590,7 @@ export interface CaseSummary {
   alert_count: number;
   created_at: string;
   is_open: boolean;
+  version?: number;
 }
 
 export interface CaseNote {
@@ -629,6 +632,9 @@ export interface CaseStatusUpdatePayload {
   supervisor_signature?: string;
   second_supervisor_signature?: string;
   supervisor_signatures?: string[];
+  expected_status?: string;
+  expected_version?: number;
+  expected_timeline_hash?: string | null;
 }
 
 export interface CaseEscalatePayload {
@@ -642,6 +648,9 @@ export interface CaseSignPayload {
   supervisor_id: string;
   action?: 'APPROVE' | 'REJECT';
   notes?: string;
+  expected_status?: string;
+  expected_version?: number;
+  expected_timeline_hash?: string | null;
 }
 
 export interface CaseResolvePayload {
@@ -650,6 +659,9 @@ export interface CaseResolvePayload {
   primary_supervisor: string;
   secondary_supervisor: string;
   actor?: string;
+  expected_status?: string;
+  expected_version?: number;
+  expected_timeline_hash?: string | null;
 }
 
 export interface Entity {

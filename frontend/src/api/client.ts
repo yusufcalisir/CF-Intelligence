@@ -42,3 +42,26 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+export function getActiveTenantId(): string {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('cfi_tenant_id') || sessionStorage.getItem('cfi_tenant_id') || 'default';
+  }
+  return 'default';
+}
+
+export function setClientTenant(tenantId: string | null): void {
+  if (typeof window !== 'undefined') {
+    if (tenantId) {
+      localStorage.setItem('cfi_tenant_id', tenantId);
+    } else {
+      localStorage.removeItem('cfi_tenant_id');
+      sessionStorage.removeItem('cfi_tenant_id');
+    }
+  }
+}
+
+export function switchActiveTenant(queryClient: { clear: () => void }, newTenantId: string): void {
+  setClientTenant(newTenantId);
+  queryClient.clear();
+}

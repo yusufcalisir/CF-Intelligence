@@ -11,6 +11,7 @@ import type {
   ConsortiumStatusResponse,
   Case,
   CaseSummary,
+  CaseStatusUpdatePayload,
   CaseEscalatePayload,
   CaseSignPayload,
   CaseResolvePayload,
@@ -177,6 +178,7 @@ import type {
   WebhookDeliveryLogsResponse,
   WebhookDeleteResponse,
   WebhookHealthResponse,
+  WebhookTestDispatchResponse,
   TransactionPredictRequest,
   TransactionPredictResponse,
   BatchPredictionResponse,
@@ -595,20 +597,18 @@ export function useUpdateCaseStatus() {
   return useMutation<
     Case,
     Error,
-    {
-      caseId: string;
-      status: string;
-      actor?: string;
-      supervisor_signature?: string;
-      second_supervisor_signature?: string;
-      supervisor_signatures?: string[];
-    }
+    CaseStatusUpdatePayload
   >({
     mutationFn: async ({ caseId, ...body }) => {
       const { data } = await apiClient.patch(`/api/v1/cases/${caseId}`, body);
       return data;
     },
     onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    },
+    onError: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
@@ -641,6 +641,10 @@ export function useEscalateCase() {
       queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     },
+    onError: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
+    },
   });
 }
 
@@ -655,6 +659,10 @@ export function useSignCase() {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
     },
+    onError: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
+    },
   });
 }
 
@@ -666,6 +674,11 @@ export function useResolveCase() {
       return data;
     },
     onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    },
+    onError: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
@@ -2524,6 +2537,28 @@ export function useWebhookVerifyMutation() {
         payload
       );
       return data;
+    },
+  });
+}
+
+export function useWebhookTestDispatchMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    WebhookTestDispatchResponse,
+    Error,
+    { tenant_id?: string; event_type?: string }
+  >({
+    mutationFn: async (params) => {
+      const { data } = await apiClient.post<WebhookTestDispatchResponse>(
+        '/api/v1/webhooks/test-dispatch',
+        null,
+        { params }
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhook-deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['webhook-health'] });
     },
   });
 }

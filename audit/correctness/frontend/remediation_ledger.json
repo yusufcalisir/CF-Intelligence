@@ -1,0 +1,52 @@
+{
+  "ledger_metadata": {
+    "scope": "Frontend Behavioral Correctness Remediation Ledger",
+    "version": "1.0.0",
+    "updated_at": "2026-10-04T19:15:00Z"
+  },
+  "remediations": [
+    {
+      "finding_id": "UI-0001",
+      "title": "Optimistic Concurrency Token Propagation & 409 Conflict Rollback",
+      "files_modified": [
+        "frontend/src/api/types.ts",
+        "frontend/src/api/queries.ts",
+        "frontend/src/pages/CaseDetailPage.tsx"
+      ],
+      "changes_summary": "Added version and timeline_hash fields to Case and CaseSummary. Added expected_status, expected_version, and expected_timeline_hash to CaseStatusUpdatePayload, CaseSignPayload, and CaseResolvePayload. Updated useUpdateCaseStatus, useSignCase, and useResolveCase with onError cache invalidation handlers. Wired tokens through handleStatusChange and handleFourEyesConfirm in CaseDetailPage.",
+      "verification_test": "frontend/src/pages/__tests__/test_case_concurrency_and_stale_rollback.test.tsx::Handoff A",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "finding_id": "UI-0002",
+      "title": "False-Positive & Unreviewed Case SAR Report Eligibility Enforcement",
+      "files_modified": [
+        "frontend/src/pages/CaseDetailPage.tsx"
+      ],
+      "changes_summary": "Updated Export FinCEN XML button to disabled={isExportingXml || !isFincenEligible}. Added state-specific tooltips distinguishing false positives ('SAR filing prohibited: Case is resolved as False Positive') from unreviewed cases ('Regulatory SAR XML requires Closed (Confirmed) status under Four-Eyes dual control') and dynamic status badges.",
+      "verification_test": "frontend/src/pages/__tests__/test_case_concurrency_and_stale_rollback.test.tsx::Handoff B",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "finding_id": "UI-0003",
+      "title": "Active Tenant Cache Isolation and Session Context Purge",
+      "files_modified": [
+        "frontend/src/api/client.ts"
+      ],
+      "changes_summary": "Implemented and exported getActiveTenantId, setClientTenant, and switchActiveTenant(queryClient, newTenantId) which coordinates localStorage update and invokes queryClient.clear() to eliminate cross-tenant cache bleeding.",
+      "verification_test": "frontend/src/pages/__tests__/test_case_concurrency_and_stale_rollback.test.tsx::Tenant Isolation & Storage Lifecycle",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "finding_id": "UI-0004",
+      "title": "Webhook Gateway Tab, SSRF Error Presentation & Test Dispatch Hook",
+      "files_modified": [
+        "frontend/src/api/queries.ts",
+        "frontend/src/pages/SecurityPage.tsx"
+      ],
+      "changes_summary": "Implemented useWebhookTestDispatchMutation in queries.ts for POST /api/v1/webhooks/test-dispatch. Added 'webhooks' tab to SecurityPage with subscription registration, strict SSRF filtering notices (RFC 1918 / loopback / cloud metadata), synthetic test event dispatch, and delivery audit log viewer with DELIVERED/FAILED badges and at-least-once transport notes.",
+      "verification_test": "frontend/src/pages/__tests__/test_case_concurrency_and_stale_rollback.test.tsx::Handoff C",
+      "status": "REMEDIATED_AND_VERIFIED"
+    }
+  ]
+}

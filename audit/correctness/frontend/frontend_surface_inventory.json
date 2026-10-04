@@ -1,0 +1,171 @@
+{
+  "inventory_metadata": {
+    "scope": "Frontend Behavioral Surface Inventory",
+    "version": "1.0.0",
+    "created_at": "2026-10-04T19:15:00Z"
+  },
+  "surfaces": [
+    {
+      "name": "Dashboard",
+      "route": "/",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["dashboard-stats", "alert-dedup-stats", "live-kpis"],
+      "mutations": [],
+      "description": "Executive overview of consortium transaction volume, high-risk alert volume, open case counts, and federated learning round metrics."
+    },
+    {
+      "name": "AlertsPage",
+      "route": "/alerts",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["alerts", "alert", "alert-explain"],
+      "mutations": ["useUpdateAlertStatus", "useCreateCase"],
+      "description": "Cross-bank alert inbox supporting status and severity filtering, multi-dimension pagination, SHAP explanation drawer, and case escalation."
+    },
+    {
+      "name": "CasesPage",
+      "route": "/cases",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["cases", "dashboard-stats"],
+      "mutations": ["useCreateCase"],
+      "description": "Investigation cases catalog with synchronized URL/sessionStorage filtering by status and priority, search query debouncing, and modal case creation."
+    },
+    {
+      "name": "CaseDetailPage",
+      "route": "/cases/:caseId",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["case", "case-evidence", "alert"],
+      "mutations": ["useUpdateCaseStatus", "useAddCaseNote", "useEscalateCase", "useSignCase", "useResolveCase", "useAddEvidence", "useExportFinCENXml"],
+      "description": "Full investigation workbench with state machine validation, Four-Eyes dual control signoff, cryptographic timeline hash audit, suspect entity extraction, and FinCEN SAR XML generation."
+    },
+    {
+      "name": "InvestigationDashboard",
+      "route": "/investigations",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["dashboard-stats", "cases", "alerts", "audit-logs"],
+      "mutations": [],
+      "description": "Senior AML investigator analytics cockpit tracking MTTR, Four-Eyes approval velocity, case backlog, and audit trail logs."
+    },
+    {
+      "name": "GraphPage",
+      "route": "/graph",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["graph-data", "graph-stats", "mule-rings", "smurfing-patterns", "entity-profile"],
+      "mutations": [],
+      "description": "Interactive cross-institution entity-transaction graph explorer highlighting smurfing cycles, mule account syndicates, and GNN topological fraud patterns."
+    },
+    {
+      "name": "SecurityPage",
+      "route": "/security",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["security-status", "audit-chain", "vault-status", "zk-status", "webhook-subscriptions", "webhook-deliveries"],
+      "mutations": ["useEvaluateABAC", "useVerifyAuditChain", "useVerifyZKProof", "useRegisterWebhookMutation", "useDeleteWebhookMutation", "useWebhookTestDispatchMutation"],
+      "description": "Enterprise security control center covering mTLS PKI, OIDC/IAM, Dynamic ABAC, HashiCorp Vault HSM, SecAgg, zk-SNARKs, PQC Kyber-768, Audit Chain, and Webhook Gateway with SSRF protection."
+    },
+    {
+      "name": "ObservabilityPage",
+      "route": "/observability",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["gateway-metrics", "data-drift", "scoring-volume", "maintenance-window"],
+      "mutations": ["useTriggerRetraining"],
+      "description": "System telemetry, Prometheus/Alertmanager webhook integration, PSI/KS data drift tracking, and model retraining pipeline bridge."
+    },
+    {
+      "name": "PoliciesPage",
+      "route": "/policies",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["business-rules", "compliance-reports"],
+      "mutations": ["useCreateRule", "useDeleteRule", "useUpdateRule"],
+      "description": "Consortium rule engine workbench for transaction limits, velocity rules, and jurisdictional compliance controls."
+    },
+    {
+      "name": "ConsortiumPage",
+      "route": "/consortium",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["consortium-status", "consortium-members"],
+      "mutations": [],
+      "description": "Federated consortium alliance monitor displaying participating bank nodes, institutional weights, and secure governance status."
+    },
+    {
+      "name": "CoordinatorPage",
+      "route": "/coordinator",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["training-rounds", "training-metrics", "coordinator-status"],
+      "mutations": ["useStartRound", "useStopRound"],
+      "description": "FL coordinator round orchestration, secure aggregation progress monitor, and model checkpoint registry."
+    },
+    {
+      "name": "BankOnboardingPage",
+      "route": "/onboarding",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["bank-onboarding-status"],
+      "mutations": ["useOnboardBank"],
+      "description": "New financial institution mTLS certificate exchange, ABAC role provisioning, and consortium node admission wizard."
+    },
+    {
+      "name": "BenchmarkHubPage",
+      "route": "/benchmarks",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["benchmark-results", "synthetic-metrics"],
+      "mutations": [],
+      "description": "Scientific performance hub comparing Byzantine defenses (Trimmed Mean, Krum, Bulyan) and differential privacy trade-offs."
+    },
+    {
+      "name": "PsiPage",
+      "route": "/psi",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["psi-status", "psi-matches"],
+      "mutations": ["useExecutePSI"],
+      "description": "Private Set Intersection protocol studio for secure cross-bank account identifier matching without raw PII exposure."
+    },
+    {
+      "name": "ScenariosPage",
+      "route": "/scenarios",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["scenarios"],
+      "mutations": ["useStartScenario", "useStopScenario"],
+      "description": "Synthetic fraud scenario injection workbench (smurfing, credit card fraud, mule accounts) for system stress testing."
+    },
+    {
+      "name": "ApiDocsPage",
+      "route": "/api-docs",
+      "type": "PAGE",
+      "classification": "ACTIVE_RUNTIME",
+      "primary_queries": ["openapi-schema"],
+      "mutations": [],
+      "description": "Interactive developer documentation and API reference generated from backend OpenAPI 3.1 specification."
+    },
+    {
+      "name": "LandingPage",
+      "route": "/landing",
+      "type": "PAGE",
+      "classification": "ACTIVE_OPTIONAL",
+      "primary_queries": [],
+      "mutations": [],
+      "description": "SaaS presentation portal showcasing consortium value proposition, compliance features, architecture diagrams, and launch modal."
+    },
+    {
+      "name": "SimulationView",
+      "route": "/simulation",
+      "type": "PAGE",
+      "classification": "LEGACY",
+      "primary_queries": [],
+      "mutations": [],
+      "description": "Legacy simulation stub superseded by ScenariosPage and CoordinatorPage."
+    }
+  ]
+}

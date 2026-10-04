@@ -1,0 +1,101 @@
+{
+  "cache_contracts_metadata": {
+    "scope": "TanStack Query Cache Identity & Invalidation Contracts",
+    "version": "1.0.0",
+    "updated_at": "2026-10-04T19:15:00Z"
+  },
+  "contracts": [
+    {
+      "query_key_pattern": "['cases', filters]",
+      "identity_dimensions": ["filters.status", "filters.priority", "caller_tenant (via X-Tenant-ID header)"],
+      "cache_lifetime_ms": 30000,
+      "stale_time_ms": 5000,
+      "polling_interval_ms": 5000,
+      "invalidation_triggers": [
+        "useCreateCase.onSuccess",
+        "useUpdateCaseStatus.onSuccess",
+        "useUpdateCaseStatus.onError",
+        "useEscalateCase.onSuccess",
+        "useSignCase.onSuccess",
+        "useSignCase.onError",
+        "useResolveCase.onSuccess",
+        "useResolveCase.onError"
+      ],
+      "tenant_isolation_policy": "switchActiveTenant clears entire cache; logout mutation clears entire cache; request interceptor attaches X-Tenant-ID"
+    },
+    {
+      "query_key_pattern": "['case', id]",
+      "identity_dimensions": ["case_id", "caller_tenant"],
+      "cache_lifetime_ms": 60000,
+      "stale_time_ms": 0,
+      "polling_interval_ms": null,
+      "invalidation_triggers": [
+        "useUpdateCaseStatus.onSuccess",
+        "useUpdateCaseStatus.onError (409 Conflict rollback)",
+        "useAddCaseNote.onSuccess",
+        "useEscalateCase.onSuccess",
+        "useSignCase.onSuccess",
+        "useSignCase.onError",
+        "useResolveCase.onSuccess",
+        "useResolveCase.onError",
+        "useAddEvidence.onSuccess"
+      ],
+      "tenant_isolation_policy": "QueryClient cleared on tenant switch; 404 returned if case belongs to another tenant"
+    },
+    {
+      "query_key_pattern": "['alerts', filters]",
+      "identity_dimensions": ["filters.status", "filters.severity", "filters.bank_id", "filters.page", "caller_tenant"],
+      "cache_lifetime_ms": 30000,
+      "stale_time_ms": 10000,
+      "polling_interval_ms": 10000,
+      "invalidation_triggers": [
+        "useUpdateAlertStatus.onSuccess",
+        "useCreateCase.onSuccess"
+      ],
+      "tenant_isolation_policy": "Bank ID / Tenant ID enforced via backend and interceptor; cache cleared on tenant switch"
+    },
+    {
+      "query_key_pattern": "['alert', id]",
+      "identity_dimensions": ["alert_id", "caller_tenant"],
+      "cache_lifetime_ms": 60000,
+      "stale_time_ms": 5000,
+      "polling_interval_ms": null,
+      "invalidation_triggers": [
+        "useUpdateAlertStatus.onSuccess"
+      ],
+      "tenant_isolation_policy": "Cache cleared on tenant switch; cross-tenant lookup blocked by backend BOLA guard"
+    },
+    {
+      "query_key_pattern": "['alert-explain', alertId]",
+      "identity_dimensions": ["alert_id", "method (shap/lime)"],
+      "cache_lifetime_ms": 120000,
+      "stale_time_ms": 60000,
+      "polling_interval_ms": null,
+      "invalidation_triggers": [],
+      "tenant_isolation_policy": "Bound to alert identity; cleared on tenant switch"
+    },
+    {
+      "query_key_pattern": "['webhook-subscriptions', tenantId]",
+      "identity_dimensions": ["tenant_id"],
+      "cache_lifetime_ms": 60000,
+      "stale_time_ms": 0,
+      "polling_interval_ms": null,
+      "invalidation_triggers": [
+        "useRegisterWebhookMutation.onSuccess",
+        "useDeleteWebhookMutation.onSuccess"
+      ],
+      "tenant_isolation_policy": "Scoped by tenant_id query parameter and X-Tenant-ID header"
+    },
+    {
+      "query_key_pattern": "['webhook-deliveries', limit]",
+      "identity_dimensions": ["limit"],
+      "cache_lifetime_ms": 30000,
+      "stale_time_ms": 0,
+      "polling_interval_ms": null,
+      "invalidation_triggers": [
+        "useWebhookTestDispatchMutation.onSuccess"
+      ],
+      "tenant_isolation_policy": "Audit logs reflect outbound delivery execution history"
+    }
+  ]
+}

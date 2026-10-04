@@ -227,6 +227,9 @@ export default function CaseDetailPage() {
           `supervisor:${payload.primarySupervisor}`,
           `supervisor:${payload.secondarySupervisor}`,
         ],
+        expected_status: caseData?.status,
+        expected_version: caseData?.version,
+        expected_timeline_hash: caseData?.timeline_hash,
       });
       if (payload.notes) {
         await addNote.mutateAsync({
@@ -236,7 +239,10 @@ export default function CaseDetailPage() {
         });
       }
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
     } catch (err: unknown) {
+      queryClient.invalidateQueries({ queryKey: ['case', caseId] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
       const detail =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
         || 'Four-Eyes authorization failed.';
@@ -260,10 +266,16 @@ export default function CaseDetailPage() {
         status: newStatus,
         actor: 'analyst',
         ...(isClosure ? { supervisor_signature: supervisorSig } : {}),
+        expected_status: caseData?.status,
+        expected_version: caseData?.version,
+        expected_timeline_hash: caseData?.timeline_hash,
       });
       setSupervisorSig('');
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
     } catch (err: unknown) {
+      queryClient.invalidateQueries({ queryKey: ['case', caseId] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
       const detail =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
         || 'Status transition failed. Check your permissions and try again.';
@@ -446,22 +458,24 @@ export default function CaseDetailPage() {
           )}
           <button
             onClick={handleExportFinCENXml}
-            disabled={isExportingXml}
+            disabled={isExportingXml || !isFincenEligible}
             className={`px-2.5 py-1 text-xs rounded font-semibold transition-colors flex items-center gap-1 shrink-0 ${
               isFincenEligible
-                ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-[0_0_12px_rgba(217,119,6,0.35)]'
-                : 'bg-amber-700/40 hover:bg-amber-700/60 text-amber-200/80 border border-amber-500/30'
+                ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-[0_0_12px_rgba(217,119,6,0.35)] cursor-pointer'
+                : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-60'
             } disabled:opacity-50 ${!caseData.is_open && caseData.status === 'closed_confirmed' ? 'ml-auto' : ''}`}
             title={
               isFincenEligible
                 ? 'Compile and download validated FinCEN BSA SAR 2.0 XML'
-                : "Regulatory SAR XML requires 'Closed (Confirmed)' status under Four-Eyes dual control"
+                : caseData.status === 'closed_false_positive'
+                  ? 'SAR filing prohibited: Case is resolved as False Positive'
+                  : "Regulatory SAR XML requires 'Closed (Confirmed)' status under Four-Eyes dual control"
             }
           >
             {isExportingXml ? 'Compiling XML...' : '📤 Export FinCEN XML'}
             {!isFincenEligible && (
-              <span className="text-[9px] px-1 py-0.2 bg-amber-900/60 text-amber-300 rounded border border-amber-600/40 ml-1">
-                4-Eyes Reqd
+              <span className="text-[9px] px-1 py-0.2 bg-slate-900 text-slate-400 rounded border border-slate-700 ml-1">
+                {caseData.status === 'closed_false_positive' ? 'Ineligible (FP)' : '4-Eyes Reqd'}
               </span>
             )}
           </button>
