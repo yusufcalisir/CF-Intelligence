@@ -74,7 +74,7 @@ def run_reference_verifications() -> dict[str, Any]:
     except Exception:
         redis_conn = None
 
-    connectors = [
+    connectors: list[Any] = [
         RESTBankConnector(base_url="http://localhost:8000"),
         ISO20022MessagingConnector(),
         OpenBankingConnector(),
@@ -267,7 +267,7 @@ def run_reference_verifications() -> dict[str, Any]:
     # Test 9: Bank Onboarding YAML Config Rendering
     # -------------------------------------------------------------------------
     print("\n--- Test 9: Bank Onboarding YAML Config Rendering ---")
-    service = BankOnboardingService(session=None)
+    service = BankOnboardingService(session=None)  # type: ignore[arg-type]
     yaml_cfg = service.generate_connector_config("bank_alpha")
 
     yaml_ok = ('bank_id: "bank_alpha"' in yaml_cfg and 'connector_type: "PARQUET"' in yaml_cfg)
@@ -299,7 +299,7 @@ def run_reference_verifications() -> dict[str, Any]:
     # Test 11: Message Queue Payload Weight Serialization
     # -------------------------------------------------------------------------
     print("\n--- Test 11: Message Queue Weight Serialization ---")
-    weights = ModelWeights(layer_shapes=[[10, 5], [5, 1]], flat_weights=[0.1] * 55)
+    weights = ModelWeights(layer_shapes=[(10, 5), (5, 1)], flat_weights=[0.1] * 55)
     kafka_conn = KafkaBankConnector()
 
     train_res = kafka_conn.train("bank_a", weights=weights)

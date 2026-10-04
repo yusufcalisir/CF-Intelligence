@@ -438,12 +438,12 @@ def evaluate_predictions(
             "recall_at_01_fpr": 0.0,
             "recall_at_05_fpr": 0.0,
             "recall_at_10_fpr": 0.0,
-            "confusion_matrix": {"tn": int(len(y_t)), "fp": 0, "fn": 0, "tp": 0},
+            "confusion_matrix": {"tn": len(y_t), "fp": 0, "fn": 0, "tp": 0},
             "non_canonical_05": {
                 "precision": 0.0,
                 "recall": 0.0,
                 "f1_score": 0.0,
-                "confusion_matrix": {"tn": int(len(y_t)), "fp": 0, "fn": 0, "tp": 0},
+                "confusion_matrix": {"tn": len(y_t), "fp": 0, "fn": 0, "tp": 0},
             },
         }
 
@@ -454,9 +454,9 @@ def evaluate_predictions(
 
     # Binary metrics at evaluated operating threshold
     bin_preds = (y_p >= threshold).astype(int)
-    f1 = float(f1_score(y_t, bin_preds, zero_division=0))
-    prec = float(precision_score(y_t, bin_preds, zero_division=0))
-    rec = float(recall_score(y_t, bin_preds, zero_division=0))
+    f1 = float(f1_score(y_t, bin_preds, zero_division=0))  # type: ignore[arg-type]
+    prec = float(precision_score(y_t, bin_preds, zero_division=0))  # type: ignore[arg-type]
+    rec = float(recall_score(y_t, bin_preds, zero_division=0))  # type: ignore[arg-type]
 
     # Fixed-FPR operational metrics
     fixed_fprs = compute_fixed_fpr_recalls(y_t, y_p, [0.001, 0.005, 0.01])
@@ -468,9 +468,9 @@ def evaluate_predictions(
     # Secondary diagnostic at non-canonical 0.5 threshold
     bin_05 = (y_p >= 0.5).astype(int)
     cm_05 = confusion_matrix(y_t, bin_05, labels=[0, 1])
-    prec_05 = float(precision_score(y_t, bin_05, zero_division=0))
-    rec_05 = float(recall_score(y_t, bin_05, zero_division=0))
-    f1_05 = float(f1_score(y_t, bin_05, zero_division=0))
+    prec_05 = float(precision_score(y_t, bin_05, zero_division=0))  # type: ignore[arg-type]
+    rec_05 = float(recall_score(y_t, bin_05, zero_division=0))  # type: ignore[arg-type]
+    f1_05 = float(f1_score(y_t, bin_05, zero_division=0))  # type: ignore[arg-type]
 
     return {
         "pr_auc": round(pr_auc, 6),
@@ -525,7 +525,7 @@ class EllipticGraphSAGEBenchmark:
             dataset_mode = "synthetic"
         if require_real is None:
             require_real = (dataset_mode == "real")
-        self.require_real = bool(require_real and (dataset_mode == "real"))
+        self.require_real = (require_real is True) and (dataset_mode == "real")
         self.dataset_mode = dataset_mode
         self.all_rows = all_rows
         self.nrows = nrows
@@ -725,7 +725,7 @@ class EllipticGraphSAGEBenchmark:
             thresholds = np.linspace(0.01, 0.99, 99)
             best_val_f1 = -1.0
             for th in thresholds:
-                f1 = float(f1_score(val_y, (val_preds >= th).astype(int), zero_division=0))
+                f1 = float(f1_score(val_y, (val_preds >= th).astype(int), zero_division=0))  # type: ignore[arg-type]
                 if f1 > best_val_f1:
                     best_val_f1 = f1
                     best_threshold = float(th)
@@ -973,7 +973,7 @@ class EllipticGraphSAGEBenchmark:
                 temporal_breakdown.append({
                     "timestep": ts,
                     "total_nodes": int(np.sum(timesteps == ts)),
-                    "labeled_nodes": int(len(y_ts)),
+                    "labeled_nodes": len(y_ts),
                     "illicit_nodes": int(np.sum(y_ts == 1)),
                     "graphsage_pr_auc": round(sage_ts_pr, 4),
                     "tabular_mlp_pr_auc": round(mlp_ts_pr, 4),
@@ -1489,6 +1489,9 @@ class EllipticGraphSAGEBenchmark:
 
         # 4. Temporal Generalization Plot across Timesteps 35 to 49
         fig, ax = plt.subplots(figsize=(8, 4.5))
+        t_steps: list[int] = []
+        sage_prs: list[float] = []
+        mlp_prs: list[float] = []
         if temporal_breakdown:
             t_steps = [item["timestep"] for item in temporal_breakdown]
             sage_prs = [item["graphsage_pr_auc"] for item in temporal_breakdown]

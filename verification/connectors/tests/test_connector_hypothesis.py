@@ -168,6 +168,8 @@ def test_property_hmac_signature_determinism(bank_id: str, num_tx: int, mutation
     if secret:
         sig1 = headers1.get("X-Payload-Signature")
         ts1 = headers1.get("X-Payload-Timestamp")
+        assert sig1 is not None
+        assert ts1 is not None
 
         # Re-verify matching signature calculation
         expected_sig1 = hmac.new(secret.encode("utf-8"), ts1.encode("utf-8") + b"." + body1, hashlib.sha256).hexdigest()
