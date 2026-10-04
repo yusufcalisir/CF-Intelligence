@@ -245,7 +245,6 @@ class ExplainabilityService:
 
         import os
 
-        import numpy as np
         import torch
 
         input_matrix = np.array(
@@ -363,8 +362,7 @@ class ExplainabilityService:
                     else float(raw_base)
                 )
                 model_outputs = predict_fn(input_matrix)
-                if np.isscalar(model_outputs) or model_outputs.ndim == 0:
-                    model_outputs = np.array([float(model_outputs)])
+                model_outputs = np.atleast_1d(model_outputs).astype(float)
 
                 batch_results: list[list[dict[str, Any]]] = []
                 for k in range(len(txns)):
@@ -476,8 +474,6 @@ class ExplainabilityService:
 
         Returns local surrogate fidelity (R^2) and directional feature coefficients.
         """
-        import numpy as np
-
         feature_names = [
             "transaction_amount",
             "merchant_category",

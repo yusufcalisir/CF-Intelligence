@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from datetime import UTC, datetime
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -37,8 +38,8 @@ def test_model_version_binding_and_hotswapping():
     with torch.no_grad():
         for p in model_a.parameters():
             p.zero_()
-        model_a.network[0].weight[0, 0] = 5.0
-        model_a.network[8].weight[0, 0] = 1.0
+        cast("torch.nn.Linear", model_a.network[0]).weight[0, 0] = 5.0
+        cast("torch.nn.Linear", model_a.network[8]).weight[0, 0] = 1.0
     model_a.eval()
 
     # Model B: heavily weights feature 4 (velocity)
@@ -46,8 +47,8 @@ def test_model_version_binding_and_hotswapping():
     with torch.no_grad():
         for p in model_b.parameters():
             p.zero_()
-        model_b.network[0].weight[0, 4] = 5.0
-        model_b.network[8].weight[0, 0] = 1.0
+        cast("torch.nn.Linear", model_b.network[0]).weight[0, 4] = 5.0
+        cast("torch.nn.Linear", model_b.network[8]).weight[0, 0] = 1.0
     model_b.eval()
 
     txn = {
