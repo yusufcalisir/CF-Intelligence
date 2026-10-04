@@ -34,12 +34,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: true
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -95,7 +95,7 @@ jobs:
           python benchmarks/generate_master_benchmark_matrix.py --verify-only || python -m pytest backend/tests/unit/test_master_benchmark_matrix.py -v
 
       - name: Archive Benchmark JSON & Chart Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results-and-figures
           path: |
