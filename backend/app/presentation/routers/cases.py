@@ -260,6 +260,7 @@ async def update_case_status(
 
     try:
         new_status = CaseStatus(req.status)
+        expected_status = CaseStatus(req.expected_status) if req.expected_status else None
         case = _case_service.change_status(
             case_id,
             new_status,
@@ -267,7 +268,7 @@ async def update_case_status(
             supervisor_signature=req.supervisor_signature,
             second_supervisor_signature=req.second_supervisor_signature,
             supervisor_signatures=req.supervisor_signatures,
-            expected_status=req.expected_status,
+            expected_status=expected_status,
         )
         return _serialize_case(case)
     except CaseNotFoundError as e:

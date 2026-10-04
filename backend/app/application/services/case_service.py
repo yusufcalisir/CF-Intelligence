@@ -278,7 +278,7 @@ class CaseManagementService:
         supervisor_signature: str | None = None,
         second_supervisor_signature: str | None = None,
         supervisor_signatures: list[str] | None = None,
-        expected_status: CaseStatus | None = None,
+        expected_status: CaseStatus | str | None = None,
     ) -> Case:
         """Change case status with transition validation and dual-control signoff.
 
