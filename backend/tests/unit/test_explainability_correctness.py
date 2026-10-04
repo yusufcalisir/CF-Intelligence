@@ -360,7 +360,7 @@ def test_lime_surrogate_explanation_uses_canonical_preprocessing():
 
 
 # ============================================================================
-# 10. Phase 5F Certification Closure Tests
+# 10. Cache Identity and Attribution Binding Closure Tests
 # ============================================================================
 
 def test_explanation_cache_separated_by_model_version() -> None:
