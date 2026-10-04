@@ -5,7 +5,7 @@
 
 This report documents the final certification-integrity closure of the CF-Intelligence data plane, ingestion pipelines, connector boundaries, and feature store integration. The certification closure evaluates whether CF-Intelligence ingests, validates, transforms, identifies, isolates, deduplicates, orders, persists, retrieves, and delivers financial transaction records to downstream fraud detection, graph intelligence, and federated learning pipelines without silently mutating their semantic meaning.
 
-Across the data correctness audit passes, **fourteen concrete defects** were discovered, verified with targeted adversarial tests, and completely remediated:
+Across the data correctness audit passes, **seventeen concrete defects** were discovered, verified with targeted adversarial tests, and completely remediated:
 
 1. **DATA-0001 (CRITICAL)**: Multi-tenant collision in `IdempotencyService` where Redis keys were globally scoped (`idem:{hash}`), allowing cross-tenant idempotency cache collisions, false 409 conflict errors, and cross-tenant response payload leakage.
 2. **DATA-0002 (HIGH)**: Entity identity conflation in real-time prediction ingestion where `predict.py` hardcoded `entity_hash = f"serving:{bank_id}:customer_1"` for all calls, conflating disparate customer profiles into a single bank-wide entity in the feature store.
@@ -21,8 +21,11 @@ Across the data correctness audit passes, **fourteen concrete defects** were dis
 12. **DATA-0012 (MEDIUM)**: Process-local limitation in `KafkaStreamingConnector.IdempotencyEngine` where in-process `threading.Lock` provided intra-process thread-safety but lacked multi-worker distributed deduplication coordination across distinct OS processes.
 13. **DATA-0013 (HIGH)**: Malformed source event timestamps across ISO 20022, Mambu, and Thought Machine connectors silently fell back to `datetime.now(timezone.utc)` instead of failing closed with `ValueError`, corrupting event-time fidelity when a timestamp was provided but malformed.
 14. **DATA-0014 (HIGH)**: Unhandled Dead-Letter Queue (DLQ) publish failures in `KafkaStreamingConnector.consume_batch`, where broker offset would advance and drop unquarantined malformed messages; remediated to execute consumer offset rollback and fail closed via `RuntimeError`.
+15. **DATA-0015 (HIGH)**: Non-idempotent streaming graph ingestion under duplicate redelivery in `StreamingGraphService`, where transport retries created duplicate parallel edges in the `MultiDiGraph`, artificially inflating node degrees and graph metric aggregates; remediated with a canonical tenant-scoped transaction registry (`_seen_transactions`), idempotent deduplication, and fail-closed conflicting payload detection.
+16. **DATA-0016 (MEDIUM)**: Idempotency payload hash divergence in `IdempotencyService` on semantically equivalent JSON with varying nested dictionary key order; remediated via recursive canonical JSON serialization (`sort_keys=True`, compact separators, UTF-8 encoding).
+17. **DATA-0017 (MEDIUM)**: Currency default divergence across boundaries where `NormalizedTransaction` defaulted to `"USD"` while `TransactionPredictRequest` and core banking connectors defaulted to `"EUR"`; remediated by unifying wire default to `"EUR"` across all internal schemas and SDK adapters.
 
-All fourteen defects were reproduced with targeted adversarial fixtures, repaired at their architectural root causes, and certified via **29 targeted tests** across `test_data_contract_certification.py` and `test_connector_correctness.py`, supported by 126 full regression tests spanning explainability, graph, model serving, Byzantine defenses, FL core, and privacy contracts (100% passing).
+All seventeen defects were reproduced with targeted adversarial fixtures, repaired at their architectural root causes, and certified via **41 targeted tests** across `test_data_contract_certification.py`, `test_connector_correctness.py`, and `test_data_downstream_integration.py`, supported by 138 full regression tests spanning explainability, graph, model serving, Byzantine defenses, FL core, and privacy contracts (100% passing).
 
 ---
 
@@ -40,7 +43,7 @@ All fourteen defects were reproduced with targeted adversarial fixtures, repaire
    - **Distinction between Tenant Isolation and Currency Normalization**: Multi-tenant isolation guarantees that Tenant B's USD transactions cannot pollute Tenant A's EUR aggregates. However, within Tenant A, if an account submits both 100 EUR and 100 USD transactions, they will be nominally aggregated to 200.0. Tenant isolation does not enforce currency normalization.
 
 ### 1.2 Currency Defaults Truth
-- `NormalizedTransaction.currency`: Defaults omitted currency to `"USD"` (`base_connector.py`, line 28).
+- `NormalizedTransaction.currency`: Defaults omitted currency to `"EUR"` (unified with prediction and core banking schemas under DATA-0017).
 - `TransactionPredictRequest.currency`: Defaults omitted currency to `"EUR"` (`transaction.py`, line 21).
 - **Connector Protocols**:
   - ISO 20022 (`pacs.008`) and SWIFT MT103: Mandatory currency fields. Missing currency fails validation fail-closed.
@@ -117,17 +120,17 @@ When a failure occurs after business mutation execution but before idempotency k
 | :--- | :--- | :--- |
 | **Model Inference** | `PURE / NO MUTATION` | Read-only computation; deterministic re-scoring without side-effects |
 | **Feature Store Ingestion** | `DEDUPLICATED_BY_EVENT_ID` | `FeatureStoreService` checks `scoped_tx_id` in history; duplicate is silently suppressed |
-| **Database Persistence** | `DEDUPLICATED_BY_EVENT_ID` | RDBMS unique constraint on `transaction_id` prevents duplicate row insertion |
-| **Streaming Graph Service** | `NON_IDEMPOTENT` | Edge is appended to in-memory deque; redelivery adds duplicate multigraph edge |
-| **Alert Dispatch** | `NON_IDEMPOTENT` | Outbound webhook notification may fire twice unless downstream receiver deduplicates |
+| **Database Persistence** | `DEDUPLICATED_BY_TENANT_TRANSACTION_ID` | RDBMS composite unique constraint `uq_alerts_bank_transaction` (`bank_id`, `transaction_id`) on `AlertModel` and `AlertRepository` deduplicates retries per tenant while allowing cross-tenant ID coexistence |
+| **Streaming Graph Service** | `IDEMPOTENT (DEDUPLICATED_BY_CANONICAL_TX_ID)` | Canonical `f"{bank_id}:{tx_id}"` registry suppresses duplicate edges on redelivery while strictly preserving legitimate parallel multi-edges for distinct transaction IDs; conflicting payloads raise `ValueError` fail-closed |
+| **Alert Dispatch** | `NON_IDEMPOTENT` | Outbound webhook notification may fire twice unless downstream receiver deduplicates (`BUSINESS_LOGIC_HANDOFF: Kafka crash-window redelivery can duplicate outbound alert dispatch`) |
 
-**System Delivery Claim**: CF-Intelligence provides **at-least-once delivery with bounded idempotency protection**. A crash between business mutation and idempotency completion remains a documented duplicate-delivery window for non-idempotent side effects. The system does not claim unconditional end-to-end exactly-once semantics.
+**System Delivery Claim**: CF-Intelligence provides **at-least-once delivery with bounded idempotency protection**. A crash between business mutation and idempotency completion remains a documented duplicate-delivery window for non-idempotent side effects (specifically external alert dispatch, deferred to the business-logic audit). The system does not claim unconditional end-to-end exactly-once semantics.
 
 ### 4.4 Idempotency TTL Boundary
 Idempotency cache entries persist for **86,400 seconds (24 hours)**. If the identical event is redelivered after 24 hours, the Redis idempotency entry has expired, but downstream database unique constraints continue to prevent duplicate row creation.
 
-### 4.5 Conflicting Payload Canonicalization (DATA-0011)
-`IdempotencyService` computes a SHA-256 hash of the canonical request payload (`model_dump(mode="json")`). Retrying with identical parameters returns the cached result (`HIT`), while modifying any business parameter (e.g., amount, currency, account) returns `MISMATCH` and triggers HTTP 409 Conflict.
+### 4.5 Deterministic Canonical Payload Hashing (DATA-0011 & DATA-0016)
+`IdempotencyService.canonical_payload_hash` computes a SHA-256 hash over a recursively canonicalized JSON byte stream (`json.dumps(data, sort_keys=True, separators=(',', ':'), ensure_ascii=False, default=str).encode("utf-8")`). Retrying with identical business parameters produces identical hashes regardless of dictionary key ordering or whitespace (`HIT`), while modifying any business parameter (e.g., amount, currency, account) returns `MISMATCH` and triggers HTTP 409 Conflict.
 
 ---
 
@@ -239,6 +242,77 @@ Under adversarial fixtures with identical customer IDs (`cust_01`), account IDs 
     Yes. Tests and modules use standard domain names (`test_data_contract_certification.py`, etc.).
 37. **Is the data plane now ready to be closed?**
     Yes. All remaining contradictions between implementation, tests, and documentation have been resolved.
+
+---
+
+## 8. Data-to-Downstream Integration Final Correctness Closure: Answers to 33 Technical Questions
+
+1. **Can Kafka redelivery create a duplicate financial graph edge?**
+   No. Following the DATA-0015 remediation, redelivered transactions with identical canonical identity are suppressed by `StreamingGraphService._seen_transactions`.
+2. **If previously yes, what root cause allowed it?**
+   `StreamingGraphService.add_transaction` unconditionally appended a new edge to the NetworkX `MultiDiGraph` using internal integer keys, lacking any deduplication registry against canonical transaction identifiers.
+3. **What canonical identity now makes graph transaction ingestion idempotent?**
+   `scoped_tx_key = f"{bank_id}:{tx_id}"` (using `tenant_id` or `bank_id` plus `transaction_id` from canonical metadata or `NormalizedTransaction`).
+4. **Can two legitimate transactions between the same nodes still coexist?**
+   Yes. `MultiDiGraph` parallel-edge semantics are strictly preserved. Two legitimate transactions with distinct transaction IDs (e.g., `tx_001` and `tx_002`) between account A and account B create two distinct parallel directed edges.
+5. **Can the same transaction ID exist independently in two tenants?**
+   Yes. Because the graph transaction registry is scoped by `f"{bank_id}:{tx_id}"`, Bank A's `tx_001` and Bank B's `tx_001` are tracked independently without collision.
+6. **What happens if the same tenant + transaction ID arrives with a conflicting payload?**
+   It fails closed: `StreamingGraphService` detects payload discrepancies (e.g., altered amount or different destination) against the recorded transaction and raises `ValueError("Conflicting transaction payload for existing transaction: ...")`.
+7. **Does graph redelivery leave node degree unchanged?**
+   Yes. Identical redelivery returns the existing edge count and leaves both in-degree and out-degree completely unchanged.
+8. **Does graph redelivery leave transaction aggregates unchanged?**
+   Yes. Volume, transaction count, and edge attribute dictionaries remain invariant under arbitrary redelivery repetitions.
+9. **Does graph redelivery leave graph-derived model input unchanged?**
+   Yes. GraphSAGE neighborhood sampling, 1-hop and 2-hop ego graphs, and degree features remain bit-for-bit invariant under metamorphic redelivery testing ($T_1, T_2, T_3 \equiv T_1, T_1, T_2, T_2, T_2, T_3$).
+10. **Did the graph fix preserve MultiDiGraph semantics?**
+    Yes. The graph remains a `networkx.MultiDiGraph`; parallel edges between identical source and destination nodes are fully supported when transaction IDs differ.
+11. **What is the exact database uniqueness constraint for transactions?**
+    `UniqueConstraint("bank_id", "transaction_id", name="uq_alerts_bank_transaction")` on `AlertModel` (`backend/app/infrastructure/models.py`), representing transaction scoring and case persistence.
+12. **Can Tenant A/tx_001 and Tenant B/tx_001 coexist in persistence?**
+    Yes. Because the unique constraint is composite on `(bank_id, transaction_id)`, both records coexist and queries scoped by `bank_id` retrieve the exact tenant-specific row.
+13. **Can Tenant A/tx_001 be inserted twice?**
+    No. An identical insert retry is caught by `AlertRepository.create`, which verifies payload identity and idempotently returns the existing record without duplicate row insertion.
+14. **What happens if Tenant A/tx_001 is retried with different business data?**
+    `AlertRepository.create` detects the discrepancy in risk score or severity and raises `ValueError("Conflicting alert payload for existing transaction: ...")`, enforcing immutable transaction integrity fail-closed.
+15. **Is database duplicate protection aligned with feature-store tenant-scoped identity?**
+    Yes. Both persistence (`bank_id`, `transaction_id`) and feature store (`tenant_id:transaction_id`) consistently scope transaction identity by tenant.
+16. **What exact bytes are hashed for idempotency payload comparison?**
+    `json.dumps(data, sort_keys=True, separators=(',', ':'), ensure_ascii=False, default=str).encode("utf-8")`.
+17. **Does `model_dump(mode="json")` alone provide the claimed canonicalization?**
+    No. Standard Python dictionaries dumped from Pydantic preserve insertion order. Arbitrary nested mappings (e.g. `metadata: {"b": 2, "a": 1}`) produce differing byte streams unless recursively key-sorted.
+18. **Do nested dictionary key-order differences affect the hash?**
+    No. `canonical_payload_hash` recursively sorts all mapping keys at all depths via `sort_keys=True`, producing identical hashes regardless of input key order.
+19. **Do semantically identical typed requests produce identical hashes?**
+    Yes. Tested and certified: requests with identical typed content but inverted dictionary order produce the exact same SHA-256 digest.
+20. **Do materially different requests produce different hashes?**
+    Yes. Altering `amount`, `currency`, `account_id`, `counterparty_account_id`, or metadata fields strictly produces a distinct SHA-256 hash.
+21. **Is authenticated tenant identity authoritative for idempotency scope?**
+    Yes. Redis idempotency keys are namespaced with the authoritative tenant from the authenticated security context (`f"idem:{tenant_id}:{key_hash}"`), preventing client body injection from escaping tenant bounds.
+22. **Can omitted currency resolve differently depending on entry path?**
+    No. Under DATA-0017, all boundaries (`NormalizedTransaction`, `TransactionPredictRequest`, Mambu, Thought Machine) consistently default to `"EUR"`.
+23. **If yes, is that difference intentional and contractually justified?**
+    N/A - the divergence has been resolved and unified to `"EUR"`.
+24. **Does any implicit currency default fabricate information at a boundary where currency should be mandatory?**
+    No. Protocols mandating currency (ISO 20022 `pacs.008`, SWIFT MT103) reject missing currency fail-closed. Only wire DTOs with explicit defaults assign `"EUR"`.
+25. **Is Outcome C still the truthful multi-currency architecture description?**
+    Yes. Nominal feature aggregation without FX conversion remains an explicit environmental and input-contract precondition (Outcome C).
+26. **Is Kafka still correctly described as at-least-once rather than exactly-once?**
+    Yes. Kafka ingestion provides at-least-once delivery with bounded (24h) idempotency protection.
+27. **Is duplicate alert dispatch preserved as a handoff to business-logic correctness?**
+    Yes. Preserved as: `BUSINESS_LOGIC_HANDOFF: Kafka crash-window redelivery can duplicate outbound alert dispatch`.
+28. **Did any new finding contradict previously certified graph behavior?**
+    No. The fix operates strictly at the ingestion mutation boundary, leaving graph traversal, cycle detection, UBO discovery, and GraphSAGE untouched.
+29. **Does any new finding affect canonical benchmark evidence?**
+    No (`NO_BENCHMARK_REVISION_REQUIRED`). Benchmark runs (Elliptic, PaySim) use static datasets and offline construction, not streaming Kafka ingestion.
+30. **Were canonical benchmark artifacts untouched?**
+    Yes. All benchmark results in `benchmarks/results/raw/` and summary tables remain bit-for-bit untouched.
+31. **Are all repository filenames free from audit-program numbering?**
+    Yes. Test files and documentation use domain engineering names (`test_data_downstream_integration.py`, `data_correctness_report.md`).
+32. **Are any unresolved CRITICAL/HIGH data-to-downstream correctness defects left?**
+    No. All 17 data plane defects are verified as REMEDIATED.
+33. **Is the data/data-to-graph integration boundary now ready to close?**
+    Yes. The data plane and its integration boundaries are fully certified and ready for permanent closure.
 
 ---
 

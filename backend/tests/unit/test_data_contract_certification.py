@@ -90,14 +90,14 @@ def test_multi_currency_feature_semantics() -> None:
 
 def test_missing_currency_contract() -> None:
     """Certify missing currency defaults to explicit ISO 4217 code and rejects malformed codes."""
-    # NormalizedTransaction defaults to USD when omitted
+    # NormalizedTransaction defaults to EUR when omitted
     tx_default = NormalizedTransaction(
         transaction_id="tx_def",
         account_id="acc_1",
         counterparty_account_id="acc_2",
         amount=50.0,
     )
-    assert tx_default.currency == "USD"
+    assert tx_default.currency == "EUR"
 
     # Lowercase is normalized to uppercase 3-letter code
     tx_lower = NormalizedTransaction(
@@ -636,7 +636,7 @@ def test_missing_currency_semantics() -> None:
         counterparty_account_id="acc2",
         amount=50.0,
     )
-    assert tx_default.currency == "USD"
+    assert tx_default.currency == "EUR"
 
     # 2. NormalizedTransaction explicit
     tx_explicit = NormalizedTransaction(
@@ -936,8 +936,8 @@ def test_kafka_crash_window_duplicate_semantics() -> None:
     # 1. Feature store deduplicated by tx_id -> count remains 1
     assert store.online_stats.get("tenant_crash:CUST_CRASH")["rolling_velocity_1h"] == 1.0
 
-    # 2. Graph service is non-idempotent -> edge count increases to 2
-    assert len(graph.edges) == 2
+    # 2. Graph service is hardened to be idempotent -> edge count remains 1
+    assert len(graph.edges) == 1
     store.clear()
 
 

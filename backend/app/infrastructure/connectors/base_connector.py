@@ -64,7 +64,7 @@ class NormalizedTransaction(BaseModel):
         ..., description="Creditor / Destination account identifier"
     )
     amount: float = Field(..., gt=0, description="Transaction monetary amount")
-    currency: str = Field(default="USD", description="ISO 4217 currency code")
+    currency: str = Field(default="EUR", description="ISO 4217 currency code")
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(UTC), description="UTC transaction timestamp"
     )

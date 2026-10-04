@@ -7,6 +7,7 @@ Redis is populated by the write-through cache decorator in cache.py.
 from __future__ import annotations
 
 import logging
+import math
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -50,7 +51,17 @@ class AlertRepository:
         dedup_key: str | None = None,
         dedup_count: int = 1,
     ) -> AlertModel:
-        """Persist a new fraud alert and return the saved model."""
+        """Persist a new fraud alert, returning existing record on idempotent retry or raising on conflict."""
+        existing = await self.get_by_transaction_id(transaction_id, bank_id=bank_id)
+        if existing is not None:
+            if not math.isclose(existing.risk_score, risk_score, rel_tol=1e-4) or existing.severity != severity:
+                raise ValueError(
+                    f"Conflicting alert payload for transaction {transaction_id} under bank {bank_id}: "
+                    f"existing (score={existing.risk_score}, severity={existing.severity}) vs "
+                    f"incoming (score={risk_score}, severity={severity})"
+                )
+            return existing
+
         model = AlertModel(
             id=str(uuid.uuid4()),
             bank_id=bank_id,
@@ -102,12 +113,15 @@ class AlertRepository:
         result = await self.session.execute(select(AlertModel).where(AlertModel.id == alert_id))
         return result.scalar_one_or_none()
 
-    async def get_by_transaction_id(self, transaction_id: str) -> AlertModel | None:
-        """Fetch an alert by transaction ID. Returns None if not found."""
-        result = await self.session.execute(
-            select(AlertModel).where(AlertModel.transaction_id == transaction_id)
-        )
-        return result.scalar_one_or_none()
+    async def get_by_transaction_id(
+        self, transaction_id: str, bank_id: str | None = None
+    ) -> AlertModel | None:
+        """Fetch an alert by transaction ID, optionally scoped by bank ID."""
+        stmt = select(AlertModel).where(AlertModel.transaction_id == transaction_id)
+        if bank_id:
+            stmt = stmt.where(AlertModel.bank_id == bank_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
 
     async def list_by_bank(
         self,

@@ -7,7 +7,6 @@ and FinCEN SAR regulatory filings.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from typing import Any
 
@@ -154,8 +153,7 @@ async def create_case(
     the original response is returned without creating a duplicate case.
     """
     tenant_id = (caller_tenant.tenant_id if caller_tenant else None) or getattr(req, "bank_id", None)
-    payload_bytes = req.model_dump_json().encode("utf-8")
-    payload_hash = hashlib.sha256(payload_bytes).hexdigest()
+    payload_hash = IdempotencyService.canonical_payload_hash(req)
     idem = IdempotencyService.get()
     status_or_hit, cached = idem.acquire(
         idempotency_key, tenant_id=tenant_id, payload_hash=payload_hash

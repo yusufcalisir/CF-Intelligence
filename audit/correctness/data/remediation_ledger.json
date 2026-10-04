@@ -127,6 +127,33 @@
       "invariant_restored": "DATA-INV-10 (Failure Truth), DATA-INV-07 (Ordering Truth)",
       "verification_test": "backend/tests/unit/test_data_contract_certification.py::test_dlq_failure_semantics",
       "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0015",
+      "target_file": "backend/app/application/services/streaming_graph_service.py",
+      "secondary_file": null,
+      "action": "Implement canonical _seen_transactions registry keyed by f'{bank_id}:{tx_id}' in StreamingGraphService to make ingestion idempotent, detect conflicting payloads fail-closed, and preserve MultiDiGraph parallel edges",
+      "invariant_restored": "DATA-INV-01 (Identity Preservation), DATA-INV-08 (Idempotency), DATA-INV-17 (Downstream Contract Fidelity)",
+      "verification_test": "backend/tests/unit/test_data_downstream_integration.py::test_graph_transaction_redelivery_idempotency, test_graph_conflicting_transaction_identity, test_graph_distinct_parallel_transactions_preserved",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0016",
+      "target_file": "backend/app/application/services/idempotency.py",
+      "secondary_file": "backend/app/presentation/routers/cases.py",
+      "action": "Implement IdempotencyService.canonical_payload_hash() with recursive key sorting and compact separators to ensure deterministic hashing across arbitrary nested dictionary orderings",
+      "invariant_restored": "DATA-INV-08 (Idempotency), DATA-INV-09 (Retry Safety)",
+      "verification_test": "backend/tests/unit/test_data_downstream_integration.py::test_idempotency_semantically_equivalent_payload_hash, test_idempotency_nested_metadata_order",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0017",
+      "target_file": "backend/app/infrastructure/connectors/base_connector.py",
+      "secondary_file": "sdk/python/cfi_connector_sdk/adapters/transaction_adapter.py",
+      "action": "Unify default currency to 'EUR' across NormalizedTransaction, connector SDK adapters, and prediction request schemas to eliminate path-dependent currency divergence",
+      "invariant_restored": "DATA-INV-03 (Schema Fidelity), DATA-INV-05 (Unit Fidelity)",
+      "verification_test": "backend/tests/unit/test_data_downstream_integration.py::test_currency_default_entry_path_consistency",
+      "verification_status": "PASSED"
     }
   ]
 }

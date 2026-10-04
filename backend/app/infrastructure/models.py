@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, Float, Integer, String, Text
+from sqlalchemy import JSON, DateTime, Float, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.infrastructure.database import Base
@@ -86,6 +86,9 @@ class AlertModel(Base):
     """Persistent record of a fraud alert."""
 
     __tablename__ = "alerts"
+    __table_args__ = (
+        UniqueConstraint("bank_id", "transaction_id", name="uq_alerts_bank_transaction"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     bank_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)

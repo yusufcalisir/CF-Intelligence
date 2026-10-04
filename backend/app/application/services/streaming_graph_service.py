@@ -41,8 +41,12 @@ class StreamingGraphService:
         self.node_to_index: dict[str, int] = {}
         self.index_to_node: dict[int, str] = {}
 
+        # Canonical transaction registry for idempotent streaming ingestion:
+        # scoped_tx_key -> edge_record
+        self._seen_transactions: dict[str, dict[str, Any]] = {}
+
     def add_transaction(self, tx: dict[str, Any]) -> None:
-        """Ingest a new transaction into the streaming graph buffer with incremental indexing."""
+        """Ingest a new transaction into the streaming graph buffer with incremental indexing and idempotency."""
         from_id = (
             tx.get("sender_id")
             or tx.get("source_owner")
@@ -64,10 +68,13 @@ class StreamingGraphService:
         except (ValueError, TypeError):
             amount = 0.0
         timestamp_str = tx.get("timestamp")
-        bank_id = tx.get("bank_id")
+        bank_id = tx.get("bank_id") or tx.get("tenant_id")
+        tx_id = tx.get("transaction_id") or tx.get("tx_id") or tx.get("id")
 
         if not from_id or not to_id:
             return
+
+        scoped_tx_key = f"{bank_id}:{tx_id}" if bank_id and tx_id else (str(tx_id) if tx_id else None)
 
         # Parse timestamp safely
         try:
@@ -84,6 +91,23 @@ class StreamingGraphService:
             timestamp = timestamp.replace(tzinfo=UTC)
 
         with self._lock:
+            # Check for duplicate redelivery under canonical transaction identity
+            if scoped_tx_key and scoped_tx_key in self._seen_transactions:
+                existing = self._seen_transactions[scoped_tx_key]
+                # Fail-closed immutable payload conflict check
+                if (
+                    existing["from_id"] != from_id
+                    or existing["to_id"] != to_id
+                    or not math.isclose(existing["amount"], amount, rel_tol=1e-5)
+                ):
+                    raise ValueError(
+                        f"Conflicting payload for existing graph transaction {scoped_tx_key}: "
+                        f"existing (from={existing['from_id']}, to={existing['to_id']}, amt={existing['amount']}) vs "
+                        f"incoming (from={from_id}, to={to_id}, amt={amount})"
+                    )
+                # Idempotent redelivery: duplicate transport delivery suppressed
+                return
+
             # Add or update nodes in the current window
             if from_id not in self.nodes:
                 self.nodes[from_id] = {
@@ -121,16 +145,18 @@ class StreamingGraphService:
                     self.nodes[to_id]["alert_count"] += 1
                     self.nodes[to_id]["risk_level"] = "high"
 
-            # Record edge
-            self.edges.append(
-                {
-                    "from_id": from_id,
-                    "to_id": to_id,
-                    "amount": amount,
-                    "timestamp": timestamp,
-                    "bank_id": bank_id,
-                }
-            )
+            # Record edge with canonical transaction identity
+            edge_record = {
+                "from_id": from_id,
+                "to_id": to_id,
+                "amount": amount,
+                "timestamp": timestamp,
+                "bank_id": bank_id,
+                "tx_id": tx_id,
+            }
+            self.edges.append(edge_record)
+            if scoped_tx_key:
+                self._seen_transactions[scoped_tx_key] = edge_record
 
             # Update degrees and adjacency incrementally
             self.node_degrees[from_id] += 1
@@ -185,6 +211,16 @@ class StreamingGraphService:
                     self._adjacency[t_id].add(f_id)
 
             self.edges = active_edges
+
+            # Synchronize canonical transaction registry with active sliding window
+            active_tx_keys = {
+                f"{e['bank_id']}:{e['tx_id']}" if e.get("bank_id") else str(e["tx_id"])
+                for e in active_edges
+                if e.get("tx_id")
+            }
+            self._seen_transactions = {
+                k: v for k, v in self._seen_transactions.items() if k in active_tx_keys
+            }
 
             # Remove nodes no longer connected in the sliding window
             pruned_nodes = {}

@@ -268,6 +268,41 @@ class IdempotencyService:
     def _hash_key(raw_key: str) -> str:
         return hashlib.sha256(raw_key.encode()).hexdigest()
 
+    @staticmethod
+    def canonical_payload_hash(payload: Any) -> str:
+        """Compute a deterministic SHA-256 hash of a payload using canonical JSON serialization.
+
+        Recursively sorts dictionary keys and uses compact separators (',', ':')
+        to ensure semantically identical payloads produce identical hashes regardless
+        of dictionary key order or whitespace formatting.
+        """
+        if payload is None:
+            return hashlib.sha256(b"").hexdigest()
+
+        if hasattr(payload, "model_dump"):
+            data = payload.model_dump(mode="json")
+        elif isinstance(payload, bytes):
+            try:
+                data = json.loads(payload.decode("utf-8"))
+            except Exception:
+                return hashlib.sha256(payload).hexdigest()
+        elif isinstance(payload, str):
+            try:
+                data = json.loads(payload)
+            except Exception:
+                return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        else:
+            data = payload
+
+        canonical_json = json.dumps(
+            data,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            default=str,
+        )
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
     def _evict_expired(self) -> None:
         """Remove expired entries (must be called under _fallback_lock)."""
         now = time.monotonic()
