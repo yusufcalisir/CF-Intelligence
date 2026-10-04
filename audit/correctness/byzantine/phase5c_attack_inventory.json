@@ -1,0 +1,104 @@
+{
+  "phase": "Phase 5C",
+  "title": "Adversarial Byzantine Attack Inventory & Threat Models",
+  "generated_at": "2026-10-04T00:23:25Z",
+  "attacks": [
+    {
+      "name": "Scaled Sign Inversion (Sign-Flip)",
+      "canonical_reference": "Li et al., AISTATS 2019; Allen-Zhu et al.",
+      "mathematical_formula": "u_{\\mathrm{mal}} = -\\lambda \\cdot u_{\\mathrm{honest}}, \\quad \\lambda > 0",
+      "attacker_knowledge": {
+        "knows_global_model": true,
+        "knows_own_local_data": true,
+        "knows_own_update": true,
+        "knows_other_byzantine_updates": false,
+        "knows_honest_updates": false,
+        "knows_aggregation_rule": false,
+        "knows_test_data": false
+      },
+      "stealthiness": "Low to Medium (detectable by directional or norm filters unless scaled subtly)",
+      "target": "Convergence disruption / model divergence",
+      "implementation_modules": [
+        "benchmarks/byzantine/attacks.py:SignFlipAttack",
+        "backend/app/domain/attack_injector.py:AdversarialAttackInjector.inject_sign_flip"
+      ]
+    },
+    {
+      "name": "ALIE (A Little Is Enough)",
+      "canonical_reference": "Baruch, Baruch, Goldberg, NeurIPS 2019",
+      "mathematical_formula": "u_{\\mathrm{mal}, j} = \\mu_j - z^{\\max} \\cdot \\sigma_j, \\quad z^{\\max} = \\Phi^{-1}\\left(\\frac{n - f - s}{n - f}\\right)",
+      "attacker_knowledge": {
+        "knows_global_model": true,
+        "knows_own_local_data": true,
+        "knows_own_update": true,
+        "knows_other_byzantine_updates": true,
+        "knows_honest_updates": true,
+        "knows_aggregation_rule": true,
+        "knows_test_data": false
+      },
+      "stealthiness": "Very High (designed to evade coordinate-wise trimmed mean and median without norm anomaly)",
+      "target": "Subtle cumulative model degradation",
+      "implementation_modules": [
+        "benchmarks/byzantine/attacks.py:ALIEAttack"
+      ]
+    },
+    {
+      "name": "Isotropic Gaussian Noise",
+      "canonical_reference": "Blanchard et al., 2017",
+      "mathematical_formula": "u_{\\mathrm{mal}} \\sim \\mathcal{N}(0, \\sigma^2 \\mathbf{I})",
+      "attacker_knowledge": {
+        "knows_global_model": false,
+        "knows_own_local_data": false,
+        "knows_own_update": false,
+        "knows_other_byzantine_updates": false,
+        "knows_honest_updates": false,
+        "knows_aggregation_rule": false,
+        "knows_test_data": false
+      },
+      "stealthiness": "Low (high Euclidean distance and coordinate variance easily filtered by Krum)",
+      "target": "Optimization noise / disruption",
+      "implementation_modules": [
+        "benchmarks/byzantine/attacks.py:GaussianNoiseAttack",
+        "backend/app/domain/attack_injector.py:AdversarialAttackInjector.inject_gaussian_noise"
+      ]
+    },
+    {
+      "name": "Extreme Outlier Scaling",
+      "canonical_reference": "Bhagoji et al., ICML 2019",
+      "mathematical_formula": "u_{\\mathrm{mal}} = \\alpha \\cdot u_{\\mathrm{honest}}, \\quad \\alpha \\gg 1",
+      "attacker_knowledge": {
+        "knows_global_model": true,
+        "knows_own_local_data": true,
+        "knows_own_update": true,
+        "knows_other_byzantine_updates": false,
+        "knows_honest_updates": false,
+        "knows_aggregation_rule": false,
+        "knows_test_data": false
+      },
+      "stealthiness": "Zero (catastrophic norm outlier, completely eliminated by Krum, Median, and Spectral defenses)",
+      "target": "Immediate FedAvg gradient explosion",
+      "implementation_modules": [
+        "backend/app/domain/attack_injector.py:AdversarialAttackInjector.inject_scaled_update"
+      ]
+    },
+    {
+      "name": "Targeted Label Poisoning / Flipping",
+      "canonical_reference": "Biggio et al., ICML 2012; Fung et al., 2018",
+      "mathematical_formula": "y_{\\mathrm{poisoned}} = 1 - y_{\\mathrm{honest}} \\quad (\\text{fraud} \\leftrightarrow \\text{legitimate})",
+      "attacker_knowledge": {
+        "knows_global_model": true,
+        "knows_own_local_data": true,
+        "knows_own_update": true,
+        "knows_other_byzantine_updates": false,
+        "knows_honest_updates": false,
+        "knows_aggregation_rule": false,
+        "knows_test_data": false
+      },
+      "stealthiness": "High (model updates remain valid gradients on plausible, poisoned local distribution)",
+      "target": "Targeted false-negative rate inflation for fraud patterns",
+      "implementation_modules": [
+        "backend/app/domain/attack_injector.py:AdversarialAttackInjector.inject_label_poisoning"
+      ]
+    }
+  ]
+}

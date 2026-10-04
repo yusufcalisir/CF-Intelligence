@@ -3,6 +3,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -119,10 +120,12 @@ class TEEDriver:
         enclave_ctx: EnclaveContext,
         client_weights: list[ModelWeights],
         client_samples: list[int] | None = None,
+        method: Any = "fed_avg_weighted",
+        fl_engine: Any = None,
     ) -> ModelWeights:
         """Ingest model parameters, aggregate inside TEE memory, and output plaintext global parameters.
 
-        Plaintext data never leaves the enclave boundary during summation.
+        Plaintext data never leaves the enclave boundary during aggregation.
         """
         if not client_weights:
             raise ValueError("Cannot execute TEE secure aggregation on empty client_weights.")
@@ -130,15 +133,35 @@ class TEEDriver:
         start_time = time.perf_counter()
 
         n_clients = len(client_weights)
-        n_params = len(client_weights[0].flat_weights)
         layer_shapes = client_weights[0].layer_shapes
 
         # Simulate TEE memory boundaries copy operations (0.02ms per client weight array copy)
         copy_overhead = min(0.1, n_clients * 0.01)
         time.sleep(copy_overhead)
 
+        method_str = getattr(method, "value", str(method)).lower()
+        if fl_engine is not None and method_str not in ("fed_avg", "fed_avg_weighted"):
+            from app.domain.enums import AggregationMethod
+
+            target_method = AggregationMethod(method_str)
+            res = fl_engine.aggregate_parameters(
+                client_weights=client_weights,
+                client_samples=client_samples,
+                method=target_method,
+            )
+            duration = (time.perf_counter() - start_time) * 1000
+            logger.info(
+                "TEE Secure Aggregation (%s) completed inside enclave %s for %d clients in %.2fms",
+                method_str,
+                enclave_ctx.enclave_id[:8],
+                n_clients,
+                duration,
+            )
+            return res
+
         # Execute un-noised FedAvg in secure enclave memory
-        if client_samples is None:
+        n_params = len(client_weights[0].flat_weights)
+        if client_samples is None or method_str == "fed_avg":
             weights = [1.0 / n_clients] * n_clients
         else:
             total_samples = sum(client_samples)

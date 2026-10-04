@@ -1,0 +1,45 @@
+{
+  "phase": "Phase 5C",
+  "title": "Byzantine Robustness, Robust Aggregation & Poisoning Defense Execution Graph",
+  "generated_at": "2026-10-04T00:23:00Z",
+  "execution_paths": [
+    {
+      "subsystem": "application_simulation",
+      "entry_point": "backend/app/application/services/simulation_service.py:SimulationService.run_simulation",
+      "configuration_schema": "backend/app/domain/value_objects.py:SimulationConfig",
+      "flow": [
+        "SimulationConfig ingested: validate mutual privacy-defense compatibility early (SecAgg / FHE vs non-linear defense conflict guards)",
+        "Local bank training loop: each bank trains local model on non-IID data partition",
+        "Adversarial attack injection (if enabled): AdversarialAttackInjector transforms designated attacker bank update (sign flip, scaled outlier, gaussian noise)",
+        "Byzantine defense filtering (if enabled): fl_engine.apply_byzantine_defense evaluates robust aggregation (Krum, Median, Trimmed Mean, Bulyan, Spectral)",
+        "Hardware-isolated aggregation (if enabled): TEEDriver.execute_secure_aggregation evaluates robust aggregation on plaintext weights inside enclave memory boundary",
+        "Parameter aggregation: FederatedLearningEngine.aggregate_parameters performs sanitized consensus update",
+        "Consortium evaluation & breakdown verification: MetricsService logs post-round global test metrics across all bank nodes"
+      ],
+      "active_guards": [
+        "Rejection of SecAgg + Krum/Median/TrimmedMean/Bulyan (InvalidPipelineConfigurationError)",
+        "Rejection of FHE + Krum/Median/TrimmedMean/Bulyan (InvalidPipelineConfigurationError)",
+        "Sanitization of non-finite (NaN/Inf) weights before aggregation",
+        "Content-deterministic tie-breaking ensuring permutation invariance"
+      ]
+    },
+    {
+      "subsystem": "scientific_benchmark",
+      "entry_point": "benchmarks/runners/run_byzantine_federated_benchmark.py:run_byzantine_benchmark",
+      "configuration_schema": "benchmarks/byzantine/config.py:ByzantineBenchmarkConfig",
+      "flow": [
+        "Benchmark config creation: create_canonical_byzantine_config validates condition matrix hash integrity",
+        "Data loading & partitioning: DirichletNonIIDPartitioner generates isolated train/test sets across n nodes",
+        "Local client training: PyTorch CNN/MLP trains on local partition, computing model delta relative to global model",
+        "Attacker generation: BaseByzantineAttack.apply transforms honest delta into malicious delta without mutating honest copies",
+        "Zero-silent-fallback aggregation: benchmarks/byzantine/aggregators.py enforces exact mathematical preconditions (Krum: n >= 2f+3, Bulyan: n >= 4f+3, Trimmed Mean: 2k < n)",
+        "Evaluation & metric computation: evaluates global model on held-out test set, computing clean retention ratio and relative loss"
+      ],
+      "active_guards": [
+        "Strict precondition assertion (InvalidConfigurationError on n < 2f+3 or n < 4f+3)",
+        "Input validation: _validate_deltas raises ValueError on NaN, Inf, or empty delta lists",
+        "Attacker knowledge model enforcement (strict isolation from test set and other banks' private data)"
+      ]
+    }
+  ]
+}

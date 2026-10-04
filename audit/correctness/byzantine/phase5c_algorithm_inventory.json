@@ -1,0 +1,86 @@
+{
+  "phase": "Phase 5C",
+  "title": "Byzantine-Robust Aggregation Algorithm Inventory",
+  "generated_at": "2026-10-04T00:23:15Z",
+  "algorithms": [
+    {
+      "name": "Coordinate-wise Median",
+      "canonical_reference": "Yin et al., ICML 2018; McMahan et al.",
+      "mathematical_formula": "g_{j} = \\mathrm{median}(\\{u_{i, j}\\}_{i=1}^n) \\quad \\forall j \\in [1, D]",
+      "breakdown_point": "f < n / 2 (50% asymptotic tolerance)",
+      "precondition": "n >= 1",
+      "granularity": "coordinate-wise",
+      "time_complexity": "O(n \\log n \\cdot D)",
+      "space_complexity": "O(n \\cdot D)",
+      "tie_breaking": "Standard sorted array median (average of middle 2 if even, single middle if odd)",
+      "implementation_modules": [
+        "benchmarks/byzantine/aggregators.py:aggregate_coordinate_median",
+        "backend/app/domain/byzantine_defense.py:aggregate_coordinate_median",
+        "backend/app/application/services/fl_engine.py:FederatedLearningEngine.aggregate_parameters"
+      ]
+    },
+    {
+      "name": "Coordinate-wise Trimmed Mean",
+      "canonical_reference": "Yin et al., ICML 2018",
+      "mathematical_formula": "g_{j} = \\frac{1}{n - 2k} \\sum_{r=k+1}^{n-k} u_{(r), j} \\quad \\text{where } k = \\lfloor \\beta n \\rfloor",
+      "breakdown_point": "f <= \\beta n, \\beta < 0.5",
+      "precondition": "2k < n",
+      "granularity": "coordinate-wise",
+      "time_complexity": "O(n \\log n \\cdot D)",
+      "space_complexity": "O(n \\cdot D)",
+      "tie_breaking": "Preserved duplicate values in sorted order",
+      "implementation_modules": [
+        "benchmarks/byzantine/aggregators.py:aggregate_trimmed_mean",
+        "backend/app/domain/byzantine_defense.py:aggregate_trimmed_mean",
+        "backend/app/application/services/fl_engine.py:FederatedLearningEngine.aggregate_parameters"
+      ]
+    },
+    {
+      "name": "Krum",
+      "canonical_reference": "Blanchard, El Mhamdi, Guerraoui, Stainer, NeurIPS 2017",
+      "mathematical_formula": "i^* = \\arg\\min_{i \\in [n]} \\sum_{j \\in \\mathcal{N}_i} \\|u_i - u_j\\|_2^2, \\quad |\\mathcal{N}_i| = n - f - 2",
+      "breakdown_point": "2f + 2 < n \\iff n \\ge 2f + 3",
+      "precondition": "n >= 2f + 3",
+      "granularity": "full-vector (candidate update selection)",
+      "time_complexity": "O(n^2 D + n^2 \\log n)",
+      "space_complexity": "O(n^2 + n D)",
+      "tie_breaking": "Content-deterministic secondary sort: (Krum_score, tuple(weights))",
+      "implementation_modules": [
+        "benchmarks/byzantine/aggregators.py:aggregate_krum",
+        "backend/app/domain/byzantine_defense.py:aggregate_krum",
+        "backend/app/application/services/fl_engine.py:FederatedLearningEngine.aggregate_parameters",
+        "backend/app/application/services/fl_engine.py:FederatedLearningEngine.apply_byzantine_defense"
+      ]
+    },
+    {
+      "name": "Multi-Krum",
+      "canonical_reference": "Blanchard et al., NeurIPS 2017",
+      "mathematical_formula": "g = \\frac{1}{m} \\sum_{k=1}^m u_{i_k^*}, \\quad i_k^* \\in \\text{top-}m \\text{ lowest Krum scores}",
+      "breakdown_point": "n >= 2f + 3, 1 <= m <= n - f",
+      "precondition": "n >= 2f + 3",
+      "granularity": "full-vector selection followed by unweighted average",
+      "time_complexity": "O(n^2 D + n \\log n)",
+      "space_complexity": "O(n^2 + n D)",
+      "tie_breaking": "Content-deterministic ranking across full candidate pool",
+      "implementation_modules": [
+        "benchmarks/byzantine/aggregators.py:aggregate_multi_krum"
+      ]
+    },
+    {
+      "name": "Bulyan",
+      "canonical_reference": "Guerraoui, Guirguis, El Mhamdi, ICML 2018",
+      "mathematical_formula": "Stage 1: Recursive Krum selects \\theta = n - 2f candidates \\mathcal{S}; Stage 2: \\forall j \\in [D], \\text{average } \\beta = \\theta - 2f \\text{ values closest to median}",
+      "breakdown_point": "n >= 4f + 3",
+      "precondition": "n >= 4f + 3",
+      "granularity": "two-stage (full-vector recursive selection + coordinate-wise median-closest averaging)",
+      "time_complexity": "O(\\theta n^2 D + \\theta \\log \\theta \\cdot D)",
+      "space_complexity": "O(n D + n^2)",
+      "tie_breaking": "Content-deterministic recursive Krum selection",
+      "implementation_modules": [
+        "benchmarks/byzantine/aggregators.py:aggregate_bulyan",
+        "backend/app/domain/byzantine_defense.py:aggregate_bulyan",
+        "backend/app/application/services/fl_engine.py:FederatedLearningEngine.aggregate_parameters"
+      ]
+    }
+  ]
+}

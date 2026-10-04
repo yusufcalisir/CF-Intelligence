@@ -305,6 +305,13 @@ class FederatedLearningEngine:
             weights_array = np.array([w.flat_weights for w in client_weights])
             n = len(weights_array)
             f = 1
+            if n < 2 * f + 3:
+                logger.warning(
+                    "Krum theoretical precondition violated: n=%d < 2f+3=%d (f=%d); executing with available neighbors",
+                    n,
+                    2 * f + 3,
+                    f,
+                )
             num_closest = max(1, n - f - 2)
 
             scores = []
@@ -317,7 +324,8 @@ class FederatedLearningEngine:
                 dists.sort()
                 scores.append(sum(dists[:num_closest]))
 
-            best_idx = int(np.argmin(scores))
+            # Deterministic, permutation-invariant tie-breaking: primary key = score, secondary key = parameter values tuple
+            best_idx = min(range(n), key=lambda i: (scores[i], tuple(weights_array[i].tolist())))
             avg_weights = weights_array[best_idx].tolist()
             logger.info("Krum selected client %d as representative (n=%d, f=%d)", best_idx, n, f)
 
@@ -356,43 +364,82 @@ class FederatedLearningEngine:
 
         elif method == AggregationMethod.BULYAN:
             # Bulyan (El Mhamdi et al., 2018): Byzantine-robust aggregation.
-            # Dynamically bounds Byzantine clients f <= (n - 3) // 4 for n >= 7,
-            # defaulting to f = 1 for smaller consortium sizes.
+            # Two-stage: recursive Krum candidate selection + coordinate-wise median-closest averaging.
             weights_array = np.array([w.flat_weights for w in client_weights])
             n = len(weights_array)
             f = max(1, (n - 3) // 4) if n >= 7 else 1
-            selected_count = max(1, n - 2 * f)
 
-            # Krum scores
-            krum_num_closest = max(1, n - f - 2)
-            scores = []
-            for i in range(n):
-                dists = sorted(
-                    float(np.sum((weights_array[i] - weights_array[j]) ** 2))
-                    for j in range(n)
-                    if i != j
+            if n >= 4 * f + 3:
+                theta = n - 2 * f
+                beta = theta - 2 * f  # beta = n - 4f
+                pool = list(enumerate(weights_array))
+                selected_tuples = []
+
+                for _ in range(theta):
+                    m = len(pool)
+                    k = max(1, m - f - 2)
+                    scores = []
+                    for i in range(m):
+                        dists = [
+                            float(np.sum((pool[i][1] - pool[j][1]) ** 2))
+                            for j in range(m)
+                            if i != j
+                        ]
+                        dists.sort()
+                        scores.append(sum(dists[:k]))
+
+                    best_p = min(range(m), key=lambda p_idx: (scores[p_idx], tuple(pool[p_idx][1].tolist())))
+                    selected_tuples.append(pool[best_p])
+                    pool.pop(best_p)
+
+                selected_weights = np.array([s[1] for s in selected_tuples])  # shape (theta, D)
+                # Stage 2: coordinate-wise median-closest selection
+                med_vals = np.median(selected_weights, axis=0)  # shape (D,)
+                abs_diffs = np.abs(selected_weights - med_vals)  # shape (theta, D)
+                closest_indices = np.argsort(abs_diffs, axis=0)[:beta, :]  # shape (beta, D)
+                closest_vals = np.take_along_axis(selected_weights, closest_indices, axis=0)
+                avg_weights = closest_vals.mean(axis=0).tolist()
+                logger.info(
+                    "Bulyan canonical aggregation: n=%d, f=%d, theta=%d, beta=%d",
+                    n,
+                    f,
+                    theta,
+                    beta,
                 )
-                scores.append(sum(dists[:krum_num_closest]))
-
-            # Select the best `selected_count` indices (lowest Krum score)
-            selected_indices = np.argsort(scores)[:selected_count]
-            selected_weights = weights_array[selected_indices]  # (selected_count, params)
-
-            # Apply coordinate-wise trimmed mean on the selected subset
-            trim_f = max(0, (selected_count - 1) // 4)  # conservative trim
-            if selected_count <= 2 * trim_f or trim_f == 0:
-                avg_weights = selected_weights.mean(axis=0).tolist()
             else:
-                sorted_sel = np.sort(selected_weights, axis=0)
-                trimmed_sel = sorted_sel[trim_f : selected_count - trim_f]
-                avg_weights = trimmed_sel.mean(axis=0).tolist()
+                logger.warning(
+                    "Bulyan precondition violated: n=%d < 4f+3=%d (f=%d); executing small-consortium fallback",
+                    n,
+                    4 * f + 3,
+                    f,
+                )
+                selected_count = max(1, n - 2 * f)
+                krum_num_closest = max(1, n - f - 2)
+                scores = []
+                for i in range(n):
+                    dists = sorted(
+                        float(np.sum((weights_array[i] - weights_array[j]) ** 2))
+                        for j in range(n)
+                        if i != j
+                    )
+                    scores.append(sum(dists[:krum_num_closest]))
 
-            logger.info(
-                "Bulyan aggregation: %d clients → Krum selected %d → Trimmed Mean (f=%d)",
-                n,
-                selected_count,
-                trim_f,
-            )
+                selected_indices = np.argsort(scores)[:selected_count]
+                selected_weights = weights_array[selected_indices]
+
+                trim_f = max(0, (selected_count - 1) // 4)
+                if selected_count <= 2 * trim_f or trim_f == 0:
+                    avg_weights = selected_weights.mean(axis=0).tolist()
+                else:
+                    sorted_sel = np.sort(selected_weights, axis=0)
+                    trimmed_sel = sorted_sel[trim_f : selected_count - trim_f]
+                    avg_weights = trimmed_sel.mean(axis=0).tolist()
+                logger.info(
+                    "Bulyan small-consortium fallback: %d clients → Krum selected %d → Trimmed Mean (f=%d)",
+                    n,
+                    selected_count,
+                    trim_f,
+                )
 
         elif method == AggregationMethod.FED_YOGI:
             # FedYogi (Reddi et al., 2021): Adaptive server optimizer.
@@ -741,21 +788,36 @@ class FederatedLearningEngine:
                 )
                 scores.append(sum(dists[:num_closest]))
 
-            best_idx = int(np.argmin(scores))
+            best_idx = min(range(n), key=lambda i: (scores[i], tuple(weights_array[i].tolist())))
             logger.info("Byzantine defense (krum): selected client %d as representative", best_idx)
             return [client_weights[best_idx]]
 
         if defense_type == "trimmed_mean":
-            # Trimmed Mean defense: return all weights unchanged — aggregation
-            # will apply coordinate-wise trimming when TRIMMED_MEAN method is used.
-            logger.info("Byzantine defense (trimmed_mean): deferring to aggregation step")
-            return client_weights
+            # Directly execute coordinate-wise trimmed mean defense
+            logger.info("Byzantine defense (trimmed_mean): executing coordinate-wise trimming")
+            res = self.aggregate_parameters(
+                client_weights=client_weights,
+                method=AggregationMethod.TRIMMED_MEAN,
+            )
+            return [res]
 
         if defense_type == "bulyan":
-            # Bulyan defense: return all weights unchanged — aggregation
-            # will apply Krum selection + trimmed mean when BULYAN method is used.
-            logger.info("Byzantine defense (bulyan): deferring to aggregation step")
-            return client_weights
+            # Directly execute two-stage Bulyan defense
+            logger.info("Byzantine defense (bulyan): executing two-stage Bulyan aggregation")
+            res = self.aggregate_parameters(
+                client_weights=client_weights,
+                method=AggregationMethod.BULYAN,
+            )
+            return [res]
+
+        if defense_type in ("coordinate_wise_median", "median"):
+            # Directly execute coordinate-wise median defense
+            logger.info("Byzantine defense (median): executing coordinate-wise median aggregation")
+            res = self.aggregate_parameters(
+                client_weights=client_weights,
+                method=AggregationMethod.COORDINATE_WISE_MEDIAN,
+            )
+            return [res]
 
         if defense_type in ("spectral", "spectral_svd"):
             # Spectral defense: apply SVD multi-rank projection to filter low-rank backdoor poisoning

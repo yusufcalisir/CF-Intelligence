@@ -1,0 +1,67 @@
+{
+  "phase": "Phase 5C",
+  "title": "Byzantine Robustness Audit Findings & Defect Registry",
+  "generated_at": "2026-10-04T00:24:00Z",
+  "findings": [
+    {
+      "id": "BYZ-0001",
+      "severity": "CRITICAL",
+      "component": "benchmarks/byzantine/aggregators.py",
+      "symbol": "get_bulyan_selection_sequence / aggregate_bulyan",
+      "title": "Bulyan Stage 1 neighbor count calculation causes crash on f=1",
+      "description": "In recursive Krum candidate selection within Bulyan, the number of neighbors was computed as k = m - f - 2 where m is the remaining candidate pool size. In the final iteration when m = 2f + 1 (for f=1, m=3), k = 3 - 1 - 2 = 0. Passing k=0 to _compute_krum_scores raised InvalidConfigurationError: 'Krum neighbor count must be at least 1', causing Bulyan to crash on any benchmark run with f=1 despite satisfying n >= 4f + 3.",
+      "remediation": "Hardened neighbor count calculation to k = max(1, m - f - 2) and verified m >= 2 in both get_bulyan_selection_sequence and aggregate_bulyan.",
+      "status": "REMEDIATED"
+    },
+    {
+      "id": "BYZ-0002",
+      "severity": "CRITICAL",
+      "component": "benchmarks/byzantine/aggregators.py & backend/app/domain/byzantine_defense.py",
+      "symbol": "_validate_deltas / _validate_numpy_updates",
+      "title": "NaN poisoning vulnerability in robust aggregators",
+      "description": "Due to IEEE-754 floating-point semantics where comparison operations with NaN return False (e.g. float < NaN is False), an adversarial candidate update with NaN at index 0 would win the min() search in Python when scores or distances were computed without strict sanitization. This allowed an attacker to corrupt the entire consensus model with NaNs, bypassing Byzantine defenses.",
+      "remediation": "Implemented _validate_deltas in benchmarks/byzantine/aggregators.py and _validate_numpy_updates in backend/app/domain/byzantine_defense.py, validating that all updates are non-empty and contains no non-finite values (NaN, +Inf, -Inf) upfront, failing closed with ValueError.",
+      "status": "REMEDIATED"
+    },
+    {
+      "id": "BYZ-0003",
+      "severity": "HIGH",
+      "component": "backend/app/application/services/fl_engine.py",
+      "symbol": "FederatedLearningEngine.apply_byzantine_defense",
+      "title": "Phantom Byzantine Defense bypass in simulation pipeline",
+      "description": "Calling apply_byzantine_defense with defense_type in ('coordinate_wise_median', 'median', 'trimmed_mean', 'bulyan') returned all client weights unchanged, claiming in comments that the aggregation step would handle it. If simulation_service was configured with default aggregation_method='fed_avg_weighted', standard FedAvg was executed without any defense applied while logs falsely reported defense activation.",
+      "remediation": "Updated apply_byzantine_defense to directly invoke the corresponding robust aggregator and return [res], ensuring that the requested Byzantine defense is actually applied to the weights.",
+      "status": "REMEDIATED"
+    },
+    {
+      "id": "BYZ-0004",
+      "severity": "HIGH",
+      "component": "backend/app/application/services/simulation_service.py",
+      "symbol": "SimulationService.run_simulation",
+      "title": "Missing conflict guards for byzantine_defense in SecAgg and FHE modes",
+      "description": "Pipeline compatibility conflict guards only checked config.aggregation_method, completely ignoring config.byzantine_defense. A user could configure enable_secure_aggregation=True with byzantine_defense='krum', causing zero-sum masked updates to be fed into L2 distance clustering, corrupting model parameters. Similarly, in FHE mode non-linear defenses were silently bypassed and replaced with FedAvg.",
+      "remediation": "Extended conflict checks in run_simulation to evaluate both config.aggregation_method AND config.byzantine_defense against non-linear algorithms, strictly raising InvalidPipelineConfigurationError before simulation execution begins.",
+      "status": "REMEDIATED"
+    },
+    {
+      "id": "BYZ-0005",
+      "severity": "MEDIUM",
+      "component": "backend/app/infrastructure/security/tee_driver.py",
+      "symbol": "TEEDriver.execute_secure_aggregation",
+      "title": "TEE secure aggregation ignored robust defense and hardcoded FedAvg",
+      "description": "TEEDriver.execute_secure_aggregation hardcoded linear FedAvg averaging on plaintext weights inside the enclave, ignoring requested robust aggregation methods (Krum, Median, Trimmed Mean, Bulyan).",
+      "remediation": "Updated TEEDriver.execute_secure_aggregation to accept method and fl_engine, dispatching the requested robust aggregator on plaintext weights inside the enclave memory boundary.",
+      "status": "REMEDIATED"
+    },
+    {
+      "id": "BYZ-0006",
+      "severity": "MEDIUM",
+      "component": "backend/app/domain/byzantine_defense.py & fl_engine.py",
+      "symbol": "aggregate_krum / apply_byzantine_defense",
+      "title": "Index-dependent tie-breaking in Krum violated permutation invariance under ties",
+      "description": "Using np.argmin or min(range(n), key=lambda i: scores[i]) broke ties by the first appearing index in the candidate list. Shuffling client updates when multiple clients had identical Krum scores produced different winning models.",
+      "remediation": "Hardened Krum tie-breaking to use content-deterministic secondary keys: min(range(n), key=lambda i: (scores[i], tuple(arr[i].tolist()))), ensuring permutation invariance under all tie conditions.",
+      "status": "REMEDIATED"
+    }
+  ]
+}

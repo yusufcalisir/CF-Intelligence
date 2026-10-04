@@ -1,0 +1,77 @@
+{
+  "phase": "Phase 5C",
+  "title": "Byzantine Defense Precondition & Boundary Matrix",
+  "generated_at": "2026-10-04T00:23:45Z",
+  "matrix": [
+    {
+      "n": 1,
+      "f": 0,
+      "krum_condition": "Violated (1 < 3)",
+      "krum_action": "Domain: Pass-through (n=1); Benchmark: InvalidConfigurationError",
+      "bulyan_condition": "Violated (1 < 3)",
+      "bulyan_action": "Domain: Pass-through (n=1); Benchmark: InvalidConfigurationError",
+      "median_condition": "Satisfied (f < 0.5)",
+      "median_action": "Returns exact client update"
+    },
+    {
+      "n": 3,
+      "f": 1,
+      "krum_condition": "Violated (3 < 5)",
+      "krum_action": "Domain: Warning + fallback to median; Benchmark: InvalidConfigurationError",
+      "bulyan_condition": "Violated (3 < 7)",
+      "bulyan_action": "Domain: Warning + small-consortium fallback; Benchmark: InvalidConfigurationError",
+      "median_condition": "Violated (1 >= 1.5)",
+      "median_action": "Executes median (theoretical breakdown threshold)"
+    },
+    {
+      "n": 5,
+      "f": 1,
+      "krum_condition": "Satisfied (5 >= 2(1)+3 = 5)",
+      "krum_action": "Executes Krum (sums |N_i| = 5 - 1 - 2 = 2 closest neighbors)",
+      "bulyan_condition": "Violated (5 < 7)",
+      "bulyan_action": "Domain: Warning + small-consortium fallback; Benchmark: InvalidConfigurationError",
+      "median_condition": "Satisfied (1 < 2.5)",
+      "median_action": "Executes coordinate median"
+    },
+    {
+      "n": 6,
+      "f": 1,
+      "krum_condition": "Satisfied (6 >= 5)",
+      "krum_action": "Executes Krum (|N_i| = 6 - 1 - 2 = 3 closest neighbors)",
+      "bulyan_condition": "Violated (6 < 7)",
+      "bulyan_action": "Domain: Warning + small-consortium fallback; Benchmark: InvalidConfigurationError",
+      "median_condition": "Satisfied (1 < 3.0)",
+      "median_action": "Executes coordinate median"
+    },
+    {
+      "n": 7,
+      "f": 1,
+      "krum_condition": "Satisfied (7 >= 5)",
+      "krum_action": "Executes Krum (|N_i| = 4)",
+      "bulyan_condition": "Satisfied (7 >= 4(1)+3 = 7)",
+      "bulyan_action": "Executes canonical Bulyan (Stage 1 selects theta=5; Stage 2 averages beta=3 values)",
+      "median_condition": "Satisfied (1 < 3.5)",
+      "median_action": "Executes coordinate median"
+    },
+    {
+      "n": 10,
+      "f": 2,
+      "krum_condition": "Satisfied (10 >= 2(2)+3 = 7)",
+      "krum_action": "Executes Krum (|N_i| = 10 - 2 - 2 = 6 closest neighbors)",
+      "bulyan_condition": "Violated (10 < 4(2)+3 = 11)",
+      "bulyan_action": "Domain: Warning + small-consortium fallback; Benchmark: InvalidConfigurationError",
+      "median_condition": "Satisfied (2 < 5.0)",
+      "median_action": "Executes coordinate median"
+    },
+    {
+      "n": 11,
+      "f": 2,
+      "krum_condition": "Satisfied (11 >= 7)",
+      "krum_action": "Executes Krum (|N_i| = 7 closest neighbors)",
+      "bulyan_condition": "Satisfied (11 >= 4(2)+3 = 11)",
+      "bulyan_action": "Executes canonical Bulyan (Stage 1 selects theta=7; Stage 2 averages beta=3 values)",
+      "median_condition": "Satisfied (2 < 5.5)",
+      "median_action": "Executes coordinate median"
+    }
+  ]
+}

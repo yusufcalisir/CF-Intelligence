@@ -25,13 +25,22 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+def _validate_numpy_updates(updates: list[np.ndarray]) -> None:
+    """Validates that updates list is non-empty and contains no non-finite values (NaN/Inf)."""
+    if not updates:
+        raise ValueError("Cannot aggregate empty updates list")
+    for i, u in enumerate(updates):
+        arr = np.asarray(u, dtype=np.float64)
+        if not np.isfinite(arr).all():
+            raise ValueError(f"Update at index {i} contains non-finite values (NaN/Inf detected).")
+
+
 def aggregate_fedavg(updates: list[np.ndarray]) -> np.ndarray:
     """Computes unweighted coordinate-wise arithmetic mean (standard FedAvg).
 
     Vulnerable to single Byzantine client updates (breakdown point f = 0).
     """
-    if not updates:
-        raise ValueError("Cannot aggregate empty updates list")
+    _validate_numpy_updates(updates)
     arr = np.array(updates, dtype=np.float64)
     return np.mean(arr, axis=0)
 
@@ -42,8 +51,7 @@ def aggregate_coordinate_median(updates: list[np.ndarray]) -> np.ndarray:
     Robust against outliers on individual coordinate axes.
     Breakdown point: f < n / 2 (tolerates up to ~50% Byzantine nodes).
     """
-    if not updates:
-        raise ValueError("Cannot aggregate empty updates list")
+    _validate_numpy_updates(updates)
     arr = np.array(updates, dtype=np.float64)
     return np.median(arr, axis=0)
 
@@ -57,13 +65,19 @@ def aggregate_trimmed_mean(updates: list[np.ndarray], trim_ratio: float = 0.2) -
 
     Breakdown point: f <= beta * n where beta < 0.5.
     """
-    if not updates:
-        raise ValueError("Cannot aggregate empty updates list")
+    _validate_numpy_updates(updates)
     arr = np.array(updates, dtype=np.float64)
     n = arr.shape[0]
     k = int(n * trim_ratio)
 
-    if k == 0 or n <= 2 * k:
+    if k == 0:
+        return np.mean(arr, axis=0)
+    if n <= 2 * k:
+        logger.warning(
+            "Trimmed Mean precondition violated: 2k=%d >= n=%d; falling back to arithmetic mean",
+            2 * k,
+            n,
+        )
         return np.mean(arr, axis=0)
 
     arr_sorted = np.sort(arr, axis=0)
@@ -78,15 +92,19 @@ def aggregate_krum(updates: list[np.ndarray], f_byzantine: int = 1) -> np.ndarra
     to its (n - f - 2) closest neighbors.
 
     Invariant condition: 2f + 2 < n (i.e. n >= 2f + 3).
-    Fallback: If n <= 2f + 2, falls back to coordinate-wise median.
+    Fallback: If n <= 2f + 2, logs warning and falls back to coordinate-wise median.
     """
-    if not updates:
-        raise ValueError("Cannot aggregate empty updates list")
+    _validate_numpy_updates(updates)
     n = len(updates)
     arr = [np.asarray(u, dtype=np.float64) for u in updates]
 
     # Theoretical Krum condition
     if n <= 2 * f_byzantine + 2:
+        logger.warning(
+            "Krum theoretical precondition violated: n=%d <= 2f+2=%d; falling back to coordinate-wise median",
+            n,
+            2 * f_byzantine + 2,
+        )
         return aggregate_coordinate_median(arr)
 
     num_closest = max(1, n - f_byzantine - 2)
@@ -102,7 +120,7 @@ def aggregate_krum(updates: list[np.ndarray], f_byzantine: int = 1) -> np.ndarra
         score = sum(dists[:num_closest])
         scores.append(score)
 
-    best_idx = int(np.argmin(scores))
+    best_idx = min(range(n), key=lambda i: (scores[i], tuple(arr[i].tolist())))
     return arr[best_idx]
 
 
@@ -114,15 +132,19 @@ def aggregate_bulyan(updates: list[np.ndarray], f_byzantine: int = 1) -> np.ndar
       2. Computes coordinate-wise trimmed mean on the selected candidates, trimming 2f values.
 
     Theoretical requirement: n >= 4f + 3.
-    Fallback: If n < 4f + 3, falls back to trimmed mean or Krum depending on n.
+    Fallback: If n < 4f + 3, logs warning and falls back to trimmed mean or Krum depending on n.
     """
-    if not updates:
-        raise ValueError("Cannot aggregate empty updates list")
+    _validate_numpy_updates(updates)
     n = len(updates)
     arr = [np.asarray(u, dtype=np.float64) for u in updates]
 
     # Theoretical Bulyan condition
     if n < 4 * f_byzantine + 3:
+        logger.warning(
+            "Bulyan theoretical precondition violated: n=%d < 4f+3=%d; falling back to degraded defense",
+            n,
+            4 * f_byzantine + 3,
+        )
         if n > 2 * f_byzantine + 2:
             return aggregate_krum(arr, f_byzantine=f_byzantine)
         return aggregate_coordinate_median(arr)

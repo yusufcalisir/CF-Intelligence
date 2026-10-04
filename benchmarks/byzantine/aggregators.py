@@ -23,13 +23,21 @@ class InvalidConfigurationError(ValueError):
     pass
 
 
+def _validate_deltas(deltas: list[torch.Tensor]) -> None:
+    """Validates deltas list is non-empty and contains no non-finite values (NaN/Inf)."""
+    if not deltas:
+        raise ValueError("Cannot aggregate empty deltas list.")
+    for i, d in enumerate(deltas):
+        if torch.isnan(d).any() or torch.isinf(d).any():
+            raise ValueError(f"Client update {i} contains non-finite values (NaN/Inf detected).")
+
+
 def aggregate_fedavg(
     deltas: list[torch.Tensor],
     weights: list[float] | None = None,
 ) -> torch.Tensor:
     """Computes sample-weighted or unweighted arithmetic mean of client model deltas."""
-    if not deltas:
-        raise ValueError("Cannot aggregate empty deltas list.")
+    _validate_deltas(deltas)
     n = len(deltas)
     stacked = torch.stack(deltas, dim=0)  # shape (n, D)
 
@@ -51,8 +59,7 @@ def aggregate_fedavg(
 
 def aggregate_coordinate_median(deltas: list[torch.Tensor]) -> torch.Tensor:
     """Computes coordinate-wise median across client updates (breakdown point f < n/2)."""
-    if not deltas:
-        raise ValueError("Cannot aggregate empty deltas list.")
+    _validate_deltas(deltas)
     stacked = torch.stack(deltas, dim=0)  # shape (n, D)
     median_vals, _ = torch.median(stacked, dim=0)
     return median_vals
@@ -66,8 +73,7 @@ def aggregate_trimmed_mean(
 
     Precondition: 2k < n where k = floor(beta * n).
     """
-    if not deltas:
-        raise ValueError("Cannot aggregate empty deltas list.")
+    _validate_deltas(deltas)
     n = len(deltas)
     k = int(n * beta)
 
@@ -87,8 +93,9 @@ def aggregate_trimmed_mean(
 
 def _compute_krum_scores(deltas: list[torch.Tensor], f: int) -> list[float]:
     """Computes Blanchard et al. Krum score for each update vector."""
+    _validate_deltas(deltas)
     n = len(deltas)
-    num_closest = n - f - 2
+    num_closest = max(1, n - f - 2)
     stacked = torch.stack(deltas, dim=0)  # shape (n, D)
 
     # Compute pairwise squared Euclidean distances: ||u_i - u_j||^2
@@ -120,8 +127,7 @@ def aggregate_krum(
 
     Invariant Precondition: n >= 2f + 3.
     """
-    if not deltas:
-        raise ValueError("Cannot aggregate empty deltas list.")
+    _validate_deltas(deltas)
     n = len(deltas)
     required_n = 2 * f + 3
 
@@ -148,8 +154,7 @@ def aggregate_multi_krum(
 
     Invariant Precondition: n >= 2f + 3, 1 <= m <= n - f.
     """
-    if not deltas:
-        raise ValueError("Cannot aggregate empty deltas list.")
+    _validate_deltas(deltas)
     n = len(deltas)
     required_n = 2 * f + 3
 
@@ -177,6 +182,7 @@ def get_bulyan_selection_sequence(
     f: int = 1,
 ) -> list[int]:
     """Extracts the Stage 1 recursive Krum candidate selection sequence for diagnostic audit."""
+    _validate_deltas(deltas)
     n = len(deltas)
     theta = n - 2 * f
     pool: list[tuple[int, torch.Tensor]] = list(enumerate(deltas))
@@ -184,11 +190,11 @@ def get_bulyan_selection_sequence(
 
     for t in range(theta):
         m = len(pool)
-        k = m - f - 2
-        if k < 1:
+        if m < 2:
             raise InvalidConfigurationError(
-                f"Bulyan Stage 1 defect at iteration {t}: neighbor count k={k} < 1 (m={m}, f={f})."
+                f"Bulyan Stage 1 defect at iteration {t}: remaining pool size m={m} < 2 (f={f})."
             )
+        k = max(1, m - f - 2)
 
         pool_tensors = [p[1] for p in pool]
         stacked = torch.stack(pool_tensors, dim=0)
@@ -224,7 +230,7 @@ def aggregate_bulyan(
         At each step t from 0 to theta - 1:
           - Evaluates Krum on the CURRENT REMAINING candidate pool P (size m = n - t).
           - Each candidate in P is scored by the sum of squared Euclidean distances to its
-            k = m - f - 2 closest neighbors in P \\ {candidate}.
+            k = max(1, m - f - 2) closest neighbors in P \\ {candidate}.
           - The candidate with the minimum Krum score is selected (ties broken stably by original client index).
           - The selected candidate is appended to selection set S and removed from P.
       Stage 2 (Coordinate-wise Median-Closest Averaging):
@@ -237,11 +243,10 @@ def aggregate_bulyan(
     Invariant Preconditions:
       - n >= 4f + 3
       - beta = theta - 2f = n - 4f > 0
-      - k = m - f - 2 >= 1 at all selection iterations
-    ZERO SILENT FALLBACK: Fails loudly if n < 4f + 3, beta <= 0, or k < 1.
+      - m >= 2 at all selection iterations
+    ZERO SILENT FALLBACK: Fails loudly if n < 4f + 3 or beta <= 0.
     """
-    if not deltas:
-        raise ValueError("Cannot aggregate empty deltas list.")
+    _validate_deltas(deltas)
     n = len(deltas)
     required_n = 4 * f + 3
 
@@ -265,12 +270,11 @@ def aggregate_bulyan(
 
     for t in range(theta):
         m = len(pool)
-        k = m - f - 2
-        if k < 1:
+        if m < 2:
             raise InvalidConfigurationError(
-                f"Bulyan Stage 1 defect at iteration {t}: Krum neighbor count k={k} < 1 (m={m}, f={f}). "
-                f"Cannot compute neighbor distance sum with k < 1."
+                f"Bulyan Stage 1 defect at iteration {t}: remaining pool size m={m} < 2 (f={f})."
             )
+        k = max(1, m - f - 2)
 
         pool_tensors = [p[1] for p in pool]
         stacked = torch.stack(pool_tensors, dim=0)  # shape (m, D)

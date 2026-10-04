@@ -135,7 +135,8 @@ class SimulationService:
         final_round_samples: list[int] | None = None
         banks: list[Any] = []
 
-        # Validate pipeline compatibility early: SecAgg is mathematically incompatible with non-linear Byzantine defenses
+        # Validate pipeline compatibility early: SecAgg and FHE are mathematically incompatible with non-linear Byzantine defenses
+        hw_mode = getattr(config, "hardware_isolation_mode", "none")
         enable_sa = config.enable_secure_aggregation or getattr(
             config, "privacy_mechanism", None
         ) in (
@@ -148,10 +149,21 @@ class SimulationService:
             AggregationMethod.BULYAN,
             AggregationMethod.TRIMMED_MEAN,
         }
-        if enable_sa and config.aggregation_method in non_linear_byzantine_methods:
+        byz_defense_type = getattr(config, "byzantine_defense", "none").lower()
+        has_non_linear_defense = (
+            config.aggregation_method in non_linear_byzantine_methods
+            or byz_defense_type in ("krum", "coordinate_wise_median", "coordinate_median", "median", "bulyan", "trimmed_mean", "spectral", "spectral_svd")
+        )
+        if enable_sa and has_non_linear_defense:
             method_name = getattr(config.aggregation_method, "value", config.aggregation_method)
             raise InvalidPipelineConfigurationError(
-                f"Additive Secure Aggregation is mathematically incompatible with non-linear Byzantine defense '{method_name}'. Masking distorts L2 distance calculations."
+                f"Additive Secure Aggregation is mathematically incompatible with non-linear Byzantine defense '{method_name}' / '{byz_defense_type}'. Masking distorts L2 distance calculations and coordinate medians."
+            )
+
+        if hw_mode == "fhe" and has_non_linear_defense:
+            method_name = getattr(config.aggregation_method, "value", config.aggregation_method)
+            raise InvalidPipelineConfigurationError(
+                f"Homomorphic Encryption (CKKS) ciphertext evaluation only supports linear homomorphic averaging (FedAvg). Non-linear robust defense '{method_name}' / '{byz_defense_type}' cannot be evaluated over ciphertext without decryption."
             )
 
         active_simulations.add(1)
@@ -971,8 +983,13 @@ class SimulationService:
                         elif hw_mode == "tee" and enclave_ctx:
                             from app.infrastructure.security.tee_driver import TEEDriver
 
+                            agg_method = AggregationMethod(config.aggregation_method)
                             global_weights = TEEDriver.execute_secure_aggregation(
-                                enclave_ctx, client_weights, client_samples
+                                enclave_ctx,
+                                client_weights,
+                                client_samples,
+                                method=agg_method,
+                                fl_engine=self.fl_engine,
                             )
                         else:
                             if enable_sa and len(client_weights) > 1:
