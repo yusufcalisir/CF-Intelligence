@@ -100,6 +100,17 @@ class Case:
     total_risk_score: float = 0.0
     evidence_ids: list[str] = field(default_factory=list)
     supervisor_signatures: list[str] = field(default_factory=list)
+    signature_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
+    version: int = 1
+
+    @property
+    def timeline_hash(self) -> str:
+        """Returns the cryptographic SHA-256 parent hash of the latest timeline block."""
+        if self.timeline:
+            last_meta = self.timeline[-1].metadata
+            if isinstance(last_meta, dict):
+                return str(last_meta.get("hash") or "0" * 64)
+        return "0" * 64
 
     @property
     def supervisor_signature(self) -> str | None:

@@ -168,9 +168,16 @@ class WebhookService:
                         or payload.get("transaction_id")
                     )
                     if obj_id:
-                        stable_hash = hashlib.sha256(
-                            f"{tenant_id}:{event_type.value}:{obj_id}".encode()
-                        ).hexdigest()[:12]
+                        sub_disc = ":".join(
+                            f"{k}={payload[k]}"
+                            for k in sorted(payload.keys())
+                            if k in ("status", "resolution", "action", "version", "model_id", "metric")
+                            and payload[k] is not None
+                        )
+                        raw_id = f"{tenant_id}:{event_type.value}:{obj_id}"
+                        if sub_disc:
+                            raw_id = f"{raw_id}:{sub_disc}"
+                        stable_hash = hashlib.sha256(raw_id.encode()).hexdigest()[:12]
                         delivery_evt_id = f"evt_{stable_hash}"
                     else:
                         delivery_evt_id = f"evt_{uuid.uuid4().hex[:8]}"

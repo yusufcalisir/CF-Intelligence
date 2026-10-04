@@ -164,6 +164,83 @@ class RedisStore:
         with RedisStore._lock:
             self._fallback_store[key] = value
 
+    def update_conditional(
+        self,
+        key: str,
+        new_value: Any,
+        expected_status: str | None = None,
+        expected_version: int | None = None,
+        expected_timeline_hash: str | None = None,
+        ex: int | None = None,
+    ) -> bool:
+        """Atomically update a stored dictionary if preconditions match.
+
+        In production Redis, this is executed atomically via a Lua script.
+        In fallback mode, it executes under RedisStore._lock across all instances.
+        Returns True if update succeeded, False if precondition failed (CAS mismatch).
+        """
+        c = self.client
+        if c:
+            try:
+                lua_script = """
+                local raw = redis.call('GET', KEYS[1])
+                if not raw then
+                    return 0
+                end
+                local cur = cjson.decode(raw)
+                if ARGV[1] ~= "" and string.lower(tostring(cur["status"] or "")) ~= string.lower(ARGV[1]) then
+                    return 0
+                end
+                if ARGV[2] ~= "" and tostring(cur["version"] or "") ~= ARGV[2] then
+                    return 0
+                end
+                if ARGV[3] ~= "" and tostring(cur["timeline_hash"] or "") ~= ARGV[3] then
+                    return 0
+                end
+                if ARGV[5] ~= "0" then
+                    redis.call('SET', KEYS[1], ARGV[4], 'EX', tonumber(ARGV[5]))
+                else
+                    redis.call('SET', KEYS[1], ARGV[4])
+                end
+                return 1
+                """
+                exp_st = str(expected_status).lower() if expected_status is not None else ""
+                exp_ver = str(expected_version) if expected_version is not None else ""
+                exp_hash = str(expected_timeline_hash) if expected_timeline_hash is not None else ""
+                ttl_str = str(ex) if ex else "0"
+                res = c.eval(
+                    lua_script,
+                    1,
+                    self._make_key(key),
+                    exp_st,
+                    exp_ver,
+                    exp_hash,
+                    json.dumps(new_value),
+                    ttl_str,
+                )
+                return bool(res == 1)
+            except Exception as e:
+                logger.error(f"Redis update_conditional failed for {key}: {e}")
+
+        with RedisStore._lock:
+            cur = self._fallback_store.get(key)
+            if not cur or not isinstance(cur, dict):
+                return False
+            if expected_status is not None:
+                cur_status = str(cur.get("status", "")).lower()
+                if cur_status != str(expected_status).lower():
+                    return False
+            if expected_version is not None:
+                cur_ver = cur.get("version")
+                if cur_ver != expected_version:
+                    return False
+            if expected_timeline_hash is not None:
+                cur_hash = cur.get("timeline_hash")
+                if cur_hash != expected_timeline_hash:
+                    return False
+            self._fallback_store[key] = new_value
+            return True
+
     def delete(self, key: str) -> None:
         c = self.client
         if c:

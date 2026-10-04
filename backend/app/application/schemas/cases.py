@@ -129,6 +129,14 @@ class CaseStatusRequest(BaseModel):
         None,
         description="Optional precondition: expected current case status for optimistic concurrency control",
     )
+    expected_version: int | None = Field(
+        None,
+        description="Optional precondition: expected case dossier version for optimistic concurrency control",
+    )
+    expected_timeline_hash: str | None = Field(
+        None,
+        description="Optional precondition: expected timeline head hash for optimistic concurrency control",
+    )
 
 
 class CaseEscalateRequest(BaseModel):
@@ -149,6 +157,18 @@ class CaseSignRequest(BaseModel):
     supervisor_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.@:]+$")
     action: str = Field("APPROVE", pattern=r"^(APPROVE|REJECT)$")
     notes: str | None = Field(None, max_length=512)
+    expected_status: str | None = Field(
+        None,
+        description="Optional precondition: expected case status",
+    )
+    expected_version: int | None = Field(
+        None,
+        description="Optional precondition: expected case dossier version to prevent stale review approval",
+    )
+    expected_timeline_hash: str | None = Field(
+        None,
+        description="Optional precondition: expected timeline head hash to prevent stale review approval",
+    )
 
 
 class CaseResolveRequest(BaseModel):
@@ -162,6 +182,18 @@ class CaseResolveRequest(BaseModel):
         min_length=1,
         max_length=128,
         pattern=r"^[a-zA-Z0-9_\-\.@:]+$",
+    )
+    expected_status: str | None = Field(
+        None,
+        description="Optional precondition: expected case status",
+    )
+    expected_version: int | None = Field(
+        None,
+        description="Optional precondition: expected case dossier version to prevent stale review approval",
+    )
+    expected_timeline_hash: str | None = Field(
+        None,
+        description="Optional precondition: expected timeline head hash to prevent stale review approval",
     )
 
 
@@ -242,6 +274,8 @@ class CaseResponse(BaseModel):
     is_open: bool = True
     supervisor_signatures: list[str] = []
     supervisor_signature: str | None = None
+    version: int = 1
+    timeline_hash: str | None = None
 
 
 class CaseSummaryResponse(BaseModel):

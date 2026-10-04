@@ -68,6 +68,41 @@
       "changes_summary": "Derived stable event ID evt_<sha256(tenant:type:id)[:12]> from payload object identity in dispatch_event, ensuring Kafka redeliveries share identical delivery ID for external deduplication.",
       "verification_test": "backend/tests/unit/test_business_logic_correctness.py::TestWebhookDispatchIdempotency::test_webhook_dispatches_share_stable_event_id_on_redelivery",
       "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "finding_id": "BIZ-0007",
+      "title": "Storage-Level Compare-and-Set Concurrency Control",
+      "files_modified": [
+        "backend/app/infrastructure/redis_store.py",
+        "backend/app/application/services/case_service.py",
+        "backend/app/presentation/routers/cases.py"
+      ],
+      "changes_summary": "Introduced update_conditional in RedisStore (atomic Lua CAS script in Redis; class-level lock in in-memory fallback) validating expected_status, expected_version, and expected_timeline_hash at the persistence boundary. Strengthened BIZ-0004 against multi-worker races.",
+      "verification_test": "backend/tests/unit/test_case_concurrency.py::TestCaseStorageConcurrency::test_multi_worker_incompatible_terminal_decisions_race",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "finding_id": "BIZ-0008",
+      "title": "Approval Version Binding and Material Signature Staleness Invalidation",
+      "files_modified": [
+        "backend/app/domain/investigation_entities.py",
+        "backend/app/application/schemas/cases.py",
+        "backend/app/application/services/case_service.py",
+        "backend/app/presentation/routers/cases.py"
+      ],
+      "changes_summary": "Added version and timeline_hash tracking to Case, stored signed_version and signed_timeline_hash in signature_metadata, and enforced is_signature_stale checks in resolve_case and change_status to invalidate prior supervisor approvals upon subsequent material dossier mutations.",
+      "verification_test": "backend/tests/unit/test_case_concurrency.py::TestApprovalVersioningAndStaleness::test_first_supervisor_signature_invalidated_by_subsequent_material_mutation",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "finding_id": "BIZ-0009",
+      "title": "Webhook Event ID Lifecycle Sub-Discriminator Separation",
+      "files_modified": [
+        "backend/app/application/services/webhook_service.py"
+      ],
+      "changes_summary": "Enhanced stable_hash preimage generation in dispatch_event to include sorted lifecycle discriminators (status, resolution, action, version, metric), preventing event ID collisions across distinct transitions of the same object.",
+      "verification_test": "backend/tests/unit/test_case_concurrency.py::TestWebhookDeliverySemantics::test_distinct_lifecycle_events_receive_distinct_event_ids",
+      "status": "REMEDIATED_AND_VERIFIED"
     }
   ]
 }

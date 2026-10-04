@@ -79,6 +79,9 @@ def _case_to_dict(c: Case) -> dict[str, Any]:
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
         "closed_at": c.closed_at.isoformat() if c.closed_at else None,
         "total_risk_score": c.total_risk_score,
+        "version": getattr(c, "version", 1),
+        "timeline_hash": c.timeline_hash,
+        "signature_metadata": getattr(c, "signature_metadata", {}) or {},
     }
 
 
@@ -92,6 +95,11 @@ def _dict_to_case(d: dict[str, Any]) -> Case:
         d_copy["evidence_ids"] = []
     if "supervisor_signatures" not in d_copy:
         d_copy["supervisor_signatures"] = []
+    if "signature_metadata" not in d_copy:
+        d_copy["signature_metadata"] = {}
+    if "version" not in d_copy:
+        d_copy["version"] = 1
+    d_copy.pop("timeline_hash", None)
     if "bank_id" not in d_copy:
         d_copy["bank_id"] = None
     d_copy["created_at"] = datetime.fromisoformat(d_copy["created_at"])
@@ -160,6 +168,50 @@ _VALID_TRANSITIONS: dict[CaseStatus, set[CaseStatus]] = {
     CaseStatus.CLOSED_FALSE_POSITIVE: set(),
 }
 
+# Events that materially change the case dossier and invalidate prior supervisor approvals
+MATERIAL_EVENT_TYPES: set[str] = {
+    "assigned",
+    "note_added",
+    "evidence_added",
+    "alert_linked",
+    "status_changed",
+}
+
+
+def is_signature_stale(case: Case, sig: str) -> tuple[bool, str | None]:
+    """Check whether a previously recorded supervisor signature is stale.
+
+    A signature is considered stale under Four-Eyes governance if any
+    material mutation (note added, evidence registered, alert linked,
+    reassigned, or status changed) was appended to the case timeline
+    after the signature was recorded.
+    """
+    clean_target = clean_identity(sig)
+    sig_event_idx: int | None = None
+    for idx, event in enumerate(case.timeline):
+        if event.event_type == "supervisor_signed":
+            event_sup = clean_identity(
+                str(event.metadata.get("supervisor_id", "") if isinstance(event.metadata, dict) else "")
+            )
+            if event_sup == clean_target:
+                sig_event_idx = idx
+
+    if sig_event_idx is None:
+        sig_meta = getattr(case, "signature_metadata", {}).get(sig) or {}
+        signed_ver = sig_meta.get("signed_version")
+        if signed_ver is not None and getattr(case, "version", 1) > signed_ver:
+            return True, f"Dossier version advanced from {signed_ver} to {getattr(case, 'version', 1)}"
+        return False, None
+
+    for event in case.timeline[sig_event_idx + 1:]:
+        if event.event_type in MATERIAL_EVENT_TYPES:
+            return True, (
+                f"Dossier was materially modified by '{event.event_type}' "
+                f"(actor: {event.actor}) after supervisor signature was recorded."
+            )
+
+    return False, None
+
 
 class CaseManagementService:
     """Manages investigation cases linking alerts to investigation workflows.
@@ -198,6 +250,7 @@ class CaseManagementService:
         event.metadata["parent_hash"] = parent_hash
         event.metadata["hash"] = _hash_event(event, parent_hash)
         case.timeline.append(event)
+        case.version = len(case.timeline)
 
     def create_case(
         self,
@@ -226,7 +279,12 @@ class CaseManagementService:
             logger.info("Created case %s: %s (priority=%s, risk=%.1f, bank=%s)", case.id[:8], title, priority.value, total_risk_score, bank_id)
             return case
 
-    def assign_case(self, case_id: str, investigator: str) -> Case:
+    def assign_case(
+        self,
+        case_id: str,
+        investigator: str,
+        expected_version: int | None = None,
+    ) -> Case:
         """Assign a case to an investigator."""
         with self._lock:
             case = self._get_case(case_id)
@@ -235,6 +293,8 @@ class CaseManagementService:
                     f"Invalid assignment: Case '{case_id}' is finalized in terminal state '{case.status.value}' "
                     f"and cannot be reassigned (Terminal Immutability Invariant)."
                 )
+            old_version = getattr(case, "version", 1)
+            old_status = case.status.value
             old_assignee = case.assigned_to
             case.assigned_to = investigator
             case.status = CaseStatus.ASSIGNED
@@ -247,14 +307,30 @@ class CaseManagementService:
                 "system",
             )
 
+            success = self._cases.update_conditional(
+                case.id,
+                _case_to_dict(case),
+                expected_status=old_status,
+                expected_version=expected_version or old_version,
+            )
+            if not success:
+                raise InvalidCaseTransitionError(
+                    f"Precondition failed: Case '{case_id}' was concurrently modified during assignment."
+                )
             logger.info("Assigned case %s to %s", case_id[:8], investigator)
-            self._cases.set(case.id, _case_to_dict(case))
             return case
 
-    def add_note(self, case_id: str, author: str, content: str) -> CaseNote:
+    def add_note(
+        self,
+        case_id: str,
+        author: str,
+        content: str,
+        expected_version: int | None = None,
+    ) -> CaseNote:
         """Add an investigation note to a case."""
         with self._lock:
             case = self._get_case(case_id)
+            old_version = getattr(case, "version", 1)
 
             note = CaseNote(case_id=case_id, author=author, content=content)
             case.notes.append(note)
@@ -267,7 +343,15 @@ class CaseManagementService:
                 author,
             )
 
-            self._cases.set(case.id, _case_to_dict(case))
+            success = self._cases.update_conditional(
+                case.id,
+                _case_to_dict(case),
+                expected_version=expected_version or old_version,
+            )
+            if not success:
+                raise InvalidCaseTransitionError(
+                    f"Precondition failed: Case '{case_id}' was concurrently modified while adding note."
+                )
             return note
 
     def change_status(
@@ -279,6 +363,8 @@ class CaseManagementService:
         second_supervisor_signature: str | None = None,
         supervisor_signatures: list[str] | None = None,
         expected_status: CaseStatus | str | None = None,
+        expected_version: int | None = None,
+        expected_timeline_hash: str | None = None,
     ) -> Case:
         """Change case status with transition validation and dual-control signoff.
 
@@ -288,7 +374,10 @@ class CaseManagementService:
         with self._lock:
             case = self._get_case(case_id)
             old_status = case.status
-            # Optimistic concurrency check (Lost Update Prevention)
+            old_version = getattr(case, "version", 1)
+            old_timeline_hash = case.timeline_hash
+
+            # Optimistic concurrency checks (Lost Update & Stale Approval Prevention)
             if expected_status:
                 exp_val = getattr(expected_status, "value", str(expected_status)).lower()
                 old_val = getattr(old_status, "value", str(old_status)).lower()
@@ -296,6 +385,15 @@ class CaseManagementService:
                     raise InvalidCaseTransitionError(
                         f"Precondition failed: Expected case status '{exp_val}', but current status is '{old_val}' (Lost Update Prevention)."
                     )
+            if expected_version is not None and old_version != expected_version:
+                raise InvalidCaseTransitionError(
+                    f"Precondition failed: Expected case version {expected_version}, but current version is {old_version} (Lost Update / Stale Precondition)."
+                )
+            if expected_timeline_hash is not None and old_timeline_hash != expected_timeline_hash:
+                raise InvalidCaseTransitionError(
+                    f"Precondition failed: Expected timeline hash '{expected_timeline_hash}', but current timeline hash is '{old_timeline_hash}' (Stale Precondition)."
+                )
+
             # Terminal state immutability check (Replay Resistance)
             if old_status in (CaseStatus.CLOSED_CONFIRMED, CaseStatus.CLOSED_FALSE_POSITIVE):
                 raise TerminalCaseImmutableError(
@@ -353,6 +451,13 @@ class CaseManagementService:
                         raise SelfApprovalProhibitedError(
                             f"Supervisor signature '{sig}' cannot match the assigned investigator '{case.assigned_to}' "
                             f"(Four-Eyes Principle: ApproverID != InvestigatorID)."
+                        )
+                    # Check staleness: verify that no material change occurred after this signature was recorded
+                    is_stale, reason = is_signature_stale(case, sig)
+                    if is_stale:
+                        raise FourEyesVerificationError(
+                            f"Precondition failed: Supervisor signature '{sig}' is stale: {reason} "
+                            f"(Four-Eyes Material Approval Invariant)."
                         )
 
                 # If multiple signatures are provided, validate they are distinct supervisors
@@ -450,8 +555,25 @@ class CaseManagementService:
                 metadata,
             )
 
+            exp_status_str = (
+                expected_status.value
+                if isinstance(expected_status, CaseStatus)
+                else (expected_status or old_status.value)
+            )
+            success = self._cases.update_conditional(
+                case.id,
+                _case_to_dict(case),
+                expected_status=exp_status_str,
+                expected_version=expected_version or old_version,
+                expected_timeline_hash=expected_timeline_hash or old_timeline_hash,
+            )
+            if not success:
+                raise InvalidCaseTransitionError(
+                    f"Precondition failed: Case '{case_id}' was concurrently modified "
+                    f"at the persistence boundary (expected status={exp_status_str}, version={expected_version or old_version})."
+                )
+
             logger.info("Case %s status: %s → %s", case_id[:8], old_status.value, new_status.value)
-            self._cases.set(case.id, _case_to_dict(case))
             return case
 
     def validate_transition(
@@ -508,7 +630,12 @@ class CaseManagementService:
                 "requires_four_eyes": is_closure,
             }
 
-    def link_alert(self, case_id: str, alert_id: str) -> Case:
+    def link_alert(
+        self,
+        case_id: str,
+        alert_id: str,
+        expected_version: int | None = None,
+    ) -> Case:
         """Link an additional alert to an existing case."""
         with self._lock:
             case = self._get_case(case_id)
@@ -517,6 +644,7 @@ class CaseManagementService:
                     f"Invalid alert linking: Case '{case_id}' is finalized in terminal state '{case.status.value}' "
                     f"and cannot link new alerts (Terminal Immutability Invariant)."
                 )
+            old_version = getattr(case, "version", 1)
 
             if alert_id not in case.alert_ids:
                 case.alert_ids.append(alert_id)
@@ -524,7 +652,15 @@ class CaseManagementService:
 
                 self._add_event(case, "alert_linked", f"Alert {alert_id[:8]} linked to case", "system")
 
-            self._cases.set(case.id, _case_to_dict(case))
+            success = self._cases.update_conditional(
+                case.id,
+                _case_to_dict(case),
+                expected_version=expected_version or old_version,
+            )
+            if not success:
+                raise InvalidCaseTransitionError(
+                    f"Precondition failed: Case '{case_id}' was concurrently modified while linking alert."
+                )
             return case
 
     def get_timeline(self, case_id: str) -> list[CaseEvent]:
@@ -810,6 +946,12 @@ class EvidenceRegistryService:
         if not case:
             raise ValueError(f"Case not found: {case_id}")
 
+        if not case.is_open:
+            raise TerminalCaseImmutableError(
+                f"Invalid evidence registration: Case '{case_id}' is finalized in terminal state '{case.status.value}'."
+            )
+        old_version = getattr(case, "version", 1)
+
         # Compute SHA-256 content hash
         content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
@@ -843,7 +985,15 @@ class EvidenceRegistryService:
         )
 
         # Save case
-        self._case_service._cases.set(case.id, _case_to_dict(case))
+        success = self._case_service._cases.update_conditional(
+            case.id,
+            _case_to_dict(case),
+            expected_version=old_version,
+        )
+        if not success:
+            raise InvalidCaseTransitionError(
+                f"Precondition failed: Case '{case_id}' was concurrently modified while registering evidence."
+            )
         return evidence_dict
 
     def get_case_evidence(self, case_id: str) -> list[dict[str, Any]]:

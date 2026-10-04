@@ -47,9 +47,9 @@
     },
     {
       "id": "BUSINESS-INV-07",
-      "name": "Case Identity",
-      "statement": "Case creation with an Idempotency-Key returns the cached case representation without creating duplicate cases.",
-      "enforcement_mechanism": "IdempotencyService acquire/complete workflow in cases.py",
+      "name": "Case Identity & Request Idempotency",
+      "statement": "Identical case creation requests sharing the same Idempotency-Key are replay-safe within the configured 24-hour TTL window, returning the cached response without creating duplicate cases. Replays after TTL expiry or with distinct keys create separate operational cases by design.",
+      "enforcement_mechanism": "IdempotencyService acquire/complete workflow in cases.py (bounded 24-hour request idempotency)",
       "status": "VERIFIED"
     },
     {
@@ -82,16 +82,16 @@
     },
     {
       "id": "BUSINESS-INV-12",
-      "name": "Dual-Control Integrity",
-      "statement": "Four-Eyes dual control requires ApproverID != InvestigatorID. The assigned investigator or analyst actor cannot self-approve their own case, regardless of casing or prefixes.",
-      "enforcement_mechanism": "clean_identity comparison and SelfApprovalProhibitedError (HTTP 403)",
+      "name": "Dual-Control Integrity & Approval Freshness",
+      "statement": "Four-Eyes dual control requires ApproverID != InvestigatorID. The assigned investigator or analyst actor cannot self-approve their own case. Supervisor approvals bind to the reviewed dossier version and timeline hash; any subsequent material dossier modification (notes, evidence, alert links, assignment) invalidates prior supervisor signatures, requiring re-review.",
+      "enforcement_mechanism": "clean_identity comparison, is_signature_stale check, and expected_version/expected_timeline_hash preconditions",
       "status": "VERIFIED"
     },
     {
       "id": "BUSINESS-INV-13",
-      "name": "Retry Safety",
-      "statement": "Retrying outbound webhook dispatch for the same event yields identical X-CFI-Event-Id to enable downstream deduplication.",
-      "enforcement_mechanism": "Deterministic event_id hashing: evt_<sha256(tenant:event_type:obj_id)[:12]>",
+      "name": "Retry Safety & Webhook Event Identity",
+      "statement": "Outbound webhook dispatch operates under at-least-once transport delivery. Retrying dispatch for the same event yields identical X-CFI-Event-Id (including lifecycle discriminators) to enable receiver-side deduplication.",
+      "enforcement_mechanism": "Deterministic event_id hashing: evt_<sha256(tenant:event_type:obj_id:discriminators)[:12]>",
       "status": "VERIFIED"
     },
     {
@@ -104,8 +104,8 @@
     {
       "id": "BUSINESS-INV-15",
       "name": "Concurrency Safety",
-      "statement": "Optimistic concurrency prevents lost updates when two analysts submit competing transitions.",
-      "enforcement_mechanism": "expected_status precondition check returning HTTP 409 Conflict",
+      "statement": "Storage-backed optimistic concurrency prevents lost updates and dual terminal resolution across multi-worker processes when competing transitions contend on the same case.",
+      "enforcement_mechanism": "RedisStore.update_conditional Lua CAS / shared persistence atomic CAS with expected_status and expected_version",
       "status": "VERIFIED"
     },
     {
@@ -167,8 +167,8 @@
     {
       "id": "BUSINESS-INV-24",
       "name": "Failure Atomicity",
-      "statement": "Multi-step case status updates rollback cleanly if timeline event hashing fails.",
-      "enforcement_mechanism": "RLock synchronization and atomic dictionary serialization",
+      "statement": "Multi-step case status updates fail closed atomically at the persistence boundary via update_conditional compare-and-set.",
+      "enforcement_mechanism": "Storage-atomic update_conditional with version/status CAS",
       "status": "VERIFIED"
     },
     {

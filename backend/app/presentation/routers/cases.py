@@ -8,6 +8,7 @@ and FinCEN SAR regulatory filings.
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -269,6 +270,8 @@ async def update_case_status(
             second_supervisor_signature=req.second_supervisor_signature,
             supervisor_signatures=req.supervisor_signatures,
             expected_status=expected_status,
+            expected_version=req.expected_version,
+            expected_timeline_hash=req.expected_timeline_hash,
         )
         return _serialize_case(case)
     except CaseNotFoundError as e:
@@ -329,6 +332,26 @@ async def sign_case(
             raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
         _enforce_case_tenant(case, caller_tenant)
 
+        # Optimistic preconditions check
+        if req.expected_status:
+            exp_st = req.expected_status.lower()
+            cur_st = case.status.value.lower()
+            if cur_st != exp_st:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Precondition failed: Expected status '{exp_st}', got '{cur_st}' (Lost Update Prevention).",
+                )
+        if req.expected_version is not None and getattr(case, "version", 1) != req.expected_version:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Precondition failed: Expected case version {req.expected_version}, but current version is {getattr(case, 'version', 1)} (Stale Approval Invariant).",
+            )
+        if req.expected_timeline_hash is not None and case.timeline_hash != req.expected_timeline_hash:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Precondition failed: Expected timeline hash '{req.expected_timeline_hash}', but current timeline hash is '{case.timeline_hash}' (Stale Approval Invariant).",
+            )
+
         if not case.is_open:
             raise HTTPException(
                 status_code=400,
@@ -349,6 +372,8 @@ async def sign_case(
                 case_id,
                 CaseStatus.INVESTIGATING,
                 actor=req.supervisor_id,
+                expected_version=req.expected_version,
+                expected_timeline_hash=req.expected_timeline_hash,
             )
             _case_service.add_note(
                 case_id,
@@ -363,17 +388,42 @@ async def sign_case(
         if clean_sup in clean_existing:
             raise HTTPException(status_code=400, detail="Supervisor has already signed this case.")
 
+        old_version = getattr(case, "version", 1)
+        sig_data = {
+            "supervisor_id": req.supervisor_id,
+            "signed_version": old_version,
+            "signed_timeline_hash": case.timeline_hash,
+            "signed_at": datetime.now(UTC).isoformat(),
+            "notes": req.notes,
+        }
+        if not hasattr(case, "signature_metadata") or case.signature_metadata is None:
+            case.signature_metadata = {}
+        case.signature_metadata[sig] = sig_data
+
         existing_sigs.append(sig)
         case.supervisor_signatures = existing_sigs
-        _case_service._cases.set(case.id, _case_to_dict(case))
         _case_service._add_event(
             case,
             "supervisor_signed",
             f"Supervisor signature recorded by {req.supervisor_id}. Total signatures: {len(existing_sigs)}",
             req.supervisor_id,
-            {"supervisor_id": req.supervisor_id, "notes": req.notes},
+            {
+                "supervisor_id": req.supervisor_id,
+                "notes": req.notes,
+                "signed_version": old_version,
+                "signed_timeline_hash": sig_data["signed_timeline_hash"],
+            },
         )
-        _case_service._cases.set(case.id, _case_to_dict(case))
+        success = _case_service._cases.update_conditional(
+            case.id,
+            _case_to_dict(case),
+            expected_version=old_version,
+        )
+        if not success:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Precondition failed: Case '{case_id}' was concurrently modified while recording supervisor signature.",
+            )
         return _serialize_case(case)
     except CaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -393,6 +443,26 @@ async def resolve_case(
     if not case:
         raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
     _enforce_case_tenant(case, caller_tenant)
+
+    # Optimistic preconditions check
+    if req.expected_status:
+        exp_st = req.expected_status.lower()
+        cur_st = case.status.value.lower()
+        if cur_st != exp_st:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Precondition failed: Expected status '{exp_st}', got '{cur_st}' (Lost Update Prevention).",
+            )
+    if req.expected_version is not None and getattr(case, "version", 1) != req.expected_version:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Precondition failed: Expected case version {req.expected_version}, but current version is {getattr(case, 'version', 1)} (Stale Approval Invariant).",
+        )
+    if req.expected_timeline_hash is not None and case.timeline_hash != req.expected_timeline_hash:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Precondition failed: Expected timeline hash '{req.expected_timeline_hash}', but current timeline hash is '{case.timeline_hash}' (Stale Approval Invariant).",
+        )
 
     # Check that supervisors are distinct identities
     if clean_identity(req.primary_supervisor) == clean_identity(req.secondary_supervisor):
@@ -421,6 +491,19 @@ async def resolve_case(
                     f"cannot approve their own case (Four-Eyes Principle: ApproverID != InvestigatorID).",
                 )
 
+    # Check staleness of any prior supervisor signatures under Four-Eyes material dossier governance
+    from app.application.services.case_service import is_signature_stale
+
+    for s_id in (req.primary_supervisor, req.secondary_supervisor):
+        sig = f"supervisor:{clean_identity(s_id)}"
+        stale, reason = is_signature_stale(case, sig)
+        if stale:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Precondition failed: Prior approval by supervisor '{s_id}' is stale: {reason}. "
+                f"The case dossier was modified after review and must be re-evaluated under Four-Eyes governance.",
+            )
+
     try:
         target_status = (
             CaseStatus.CLOSED_CONFIRMED
@@ -433,6 +516,9 @@ async def resolve_case(
             actor=req.actor,
             supervisor_signature=f"supervisor:{req.primary_supervisor}",
             second_supervisor_signature=f"supervisor:{req.secondary_supervisor}",
+            expected_status=req.expected_status,
+            expected_version=req.expected_version,
+            expected_timeline_hash=req.expected_timeline_hash,
         )
         return _serialize_case(case)
     except CaseNotFoundError as e:
@@ -447,6 +533,8 @@ async def resolve_case(
         InvalidCaseTransitionError,
         TerminalCaseImmutableError,
     ) as e:
+        if "precondition failed" in str(e).lower():
+            raise HTTPException(status_code=409, detail=str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except ValueError as e:
         if "not found" in str(e).lower():
@@ -743,6 +831,8 @@ def _serialize_case(case: Any) -> CaseResponse:
         is_open=case.is_open,
         supervisor_signatures=getattr(case, "supervisor_signatures", []) or [],
         supervisor_signature=getattr(case, "supervisor_signature", None),
+        version=getattr(case, "version", 1),
+        timeline_hash=case.timeline_hash,
     )
 
 
