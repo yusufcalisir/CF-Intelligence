@@ -122,7 +122,7 @@ ate_limit_behavior_samples.json](./raw/rate_limit_behavior_samples.json)
 - **Status**: `CANONICAL` (Canonical 72-Condition Multi-Round Benchmark)
 - **Runner**: `benchmarks/runners/run_byzantine_federated_benchmark.py --config canonical`
 - **Scope & Protocol**: Real Credit Card Fraud tabular dataset partitioned across 12 simulated bank clients under Non-IID Dirichlet distribution ($\alpha = 0.50$, $\min(\text{samples}) = 50$, zero-positive clients permitted). Evaluated over 10 federated rounds, 1 local epoch per round, PyTorch MLP architecture, `MODEL_DELTA` aggregation space, $f=2$ Byzantine attackers ($16.7\%$), evaluated across $N=3$ seeds (`[42, 123, 456]`). Evaluates 6 aggregators across 4 attack states (18 clean conditions, 54 attacked conditions = 72 total conditions).
-- **Authoritative Canonical Artifact**: [`byzantine_federated_canonical.json`](./raw/byzantine_federated_canonical.json) (Status: `CANONICAL`, Size: 47,417 bytes, SHA-256: `c760df9912a1235f0131bd4060ab8fa274dddcb5b25c558ca4436c558723ff4d`)
+- **Authoritative Canonical Artifact**: [`byzantine_federated_canonical.json`](./raw/byzantine_federated_canonical.json) (Status: `CANONICAL`, Size: 45,763 bytes, LF-normalized, SHA-256: `75f5b3f41a08350200a2482da4a135e87c6cef36e871ccff37e0089fd6d32ee6`)
 - **Provenance Caveat**: `MACHINE_CONFIG_INCOMPLETE_BUT_INTENT_AND_EXECUTION_MATCH` (frozen protocol definition hash `d0640c8e...` vs execution-resolved config hash `f3c89626...`).
 
 ### Canonical Multi-Round Benchmark Results

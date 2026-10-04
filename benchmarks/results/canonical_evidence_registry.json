@@ -293,7 +293,7 @@
       },
       "seeds": [42, 123, 456],
       "artifact": "benchmarks/results/raw/byzantine_federated_canonical.json",
-      "artifact_sha256": "c760df9912a1235f0131bd4060ab8fa274dddcb5b25c558ca4436c558723ff4d",
+      "artifact_sha256": "75f5b3f41a08350200a2482da4a135e87c6cef36e871ccff37e0089fd6d32ee6",
       "source_commit": "be6111a7",
       "evidence_strength": "PROVEN",
       "lifecycle": "CANONICAL",

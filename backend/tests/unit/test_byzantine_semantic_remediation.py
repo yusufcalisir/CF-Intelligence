@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import torch
 from benchmarks.byzantine.attacks import ALIEAttack, create_attack
 from benchmarks.byzantine.config import (
@@ -364,10 +365,11 @@ class TestPhase313CanonicalNumericalIntegrity:
         artifact_path = REPO_ROOT / "benchmarks" / "results" / "raw" / "byzantine_federated_canonical.json"
         assert artifact_path.is_file(), f"Canonical artifact not found: {artifact_path}"
 
-        raw_bytes = artifact_path.read_bytes()
-        assert len(raw_bytes) == 47417, f"Expected 47,417 bytes, got {len(raw_bytes)}"
+        # .gitattributes pins this artifact to eol=lf; normalize so checkout line endings are irrelevant.
+        raw_bytes = artifact_path.read_bytes().replace(b"\r\n", b"\n")
+        assert len(raw_bytes) == 45763, f"Expected 45,763 LF-normalized bytes, got {len(raw_bytes)}"
         sha256 = hashlib.sha256(raw_bytes).hexdigest()
-        assert sha256 == "c760df9912a1235f0131bd4060ab8fa274dddcb5b25c558ca4436c558723ff4d"
+        assert sha256 == "75f5b3f41a08350200a2482da4a135e87c6cef36e871ccff37e0089fd6d32ee6"
 
         data = json.loads(raw_bytes.decode("utf-8"))
         per_seed = data["per_seed_results"]
@@ -479,6 +481,21 @@ class TestPhase313CanonicalNumericalIntegrity:
             assert abs(expected_ret - r["retention_of_clean"]) < 1e-5
 
 
+def _physical_creditcard_available() -> bool:
+    from benchmarks.byzantine.config import ByzantineBenchmarkConfig
+
+    cfg = ByzantineBenchmarkConfig()
+    csv_path = REPO_ROOT / cfg.dataset.data_path
+    if not csv_path.is_file():
+        return False
+    with csv_path.open("rb") as fh:
+        return not fh.read(64).startswith(b"version https://git-lfs")
+
+
+@pytest.mark.skipif(
+    not _physical_creditcard_available(),
+    reason="Physical creditcard.csv (Git LFS) required: canonical partition identity is defined on real data only",
+)
 class TestPhase313PartitionSemantics:
     """Verifies partition Dirichlet constraints and fraud-sparse client distribution."""
 
@@ -636,10 +653,10 @@ class TestByzantineCanonicalPromotionEvidence:
         artifact_path = REPO_ROOT / "benchmarks" / "results" / "raw" / "byzantine_federated_canonical.json"
         assert artifact_path.exists(), "Canonical artifact missing"
 
-        raw_bytes = artifact_path.read_bytes()
-        assert len(raw_bytes) == 47417, f"Size mismatch: {len(raw_bytes)}"
+        raw_bytes = artifact_path.read_bytes().replace(b"\r\n", b"\n")
+        assert len(raw_bytes) == 45763, f"Size mismatch: {len(raw_bytes)}"
         computed_sha = hashlib.sha256(raw_bytes).hexdigest()
-        assert computed_sha == "c760df9912a1235f0131bd4060ab8fa274dddcb5b25c558ca4436c558723ff4d"
+        assert computed_sha == "75f5b3f41a08350200a2482da4a135e87c6cef36e871ccff37e0089fd6d32ee6"
 
         data = json.loads(raw_bytes.decode("utf-8"))
         assert data["git_sha"] == "85e42a45a2ed3a18cd118ffdb254a072688444de"

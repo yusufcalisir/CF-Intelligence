@@ -512,8 +512,8 @@ class TestPhase2BProtocolScientificIntegrity:
         if canonical_dest.exists():
             import hashlib
             with open(canonical_dest, "rb") as f:
-                sha = hashlib.sha256(f.read()).hexdigest()
-            expected_sha = "c760df9912a1235f0131bd4060ab8fa274dddcb5b25c558ca4436c558723ff4d"
+                sha = hashlib.sha256(f.read().replace(b"\r\n", b"\n")).hexdigest()
+            expected_sha = "75f5b3f41a08350200a2482da4a135e87c6cef36e871ccff37e0089fd6d32ee6"
             assert sha == expected_sha, (
                 f"FATAL: Canonical artifact exists but SHA altered! {sha} != {expected_sha}"
             )

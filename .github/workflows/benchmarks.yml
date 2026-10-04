@@ -54,7 +54,7 @@ jobs:
         run: |
           python benchmarks/runners/run_fraud_benchmark.py --dataset paysim --synthetic-eval
           python benchmarks/runners/run_fraud_benchmark.py --dataset ieee_cis --synthetic-eval
-          python benchmarks/runners/run_creditcard_benchmark.py --synthetic-eval
+          python benchmarks/runners/run_creditcard_benchmark.py --synthetic-eval --output-dir experiments/credit_card/synthetic_smoke
 
       - name: Run Graph & AML Topology Benchmarks
         run: |

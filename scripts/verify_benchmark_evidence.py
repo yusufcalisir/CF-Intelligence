@@ -573,13 +573,13 @@ class BenchmarkEvidenceVerifier:
             return
 
         canonical_path = self.repo_root / byz_new.canonical_artifact_relpath
-        canonical_bytes = canonical_path.read_bytes()
-        if len(canonical_bytes) != 47417:
-            self.log_fail(f"Canonical Byzantine artifact size mismatch: expected 47417, got {len(canonical_bytes)}")
+        canonical_bytes = canonical_path.read_bytes().replace(b"\r\n", b"\n")
+        if len(canonical_bytes) != 45763:
+            self.log_fail(f"Canonical Byzantine artifact size mismatch: expected 45763 (LF), got {len(canonical_bytes)}")
             return
         import hashlib
         c_hash = hashlib.sha256(canonical_bytes).hexdigest()
-        if c_hash != "c760df9912a1235f0131bd4060ab8fa274dddcb5b25c558ca4436c558723ff4d":
+        if c_hash != "75f5b3f41a08350200a2482da4a135e87c6cef36e871ccff37e0089fd6d32ee6":
             self.log_fail(f"Canonical Byzantine artifact SHA-256 mismatch: {c_hash}")
             return
 

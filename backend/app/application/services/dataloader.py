@@ -1460,7 +1460,12 @@ def load_creditcard_fraud(
     - RobustScaler / StandardScaler on Time and Amount fit strictly on the training partition
     - Imbalance ratio quantification (0.172% fraud prevalence)
     - Backward-compatible 29-feature default or 30-feature (include_time=True) extraction
+    - Explicit synthetic evaluation mode via ``force_synthetic=True`` (never touches physical files;
+      mutually exclusive with ``require_real``)
     """
+    force_synthetic = bool(kwargs.get("force_synthetic", False))
+    if force_synthetic and require_real:
+        raise ValueError("force_synthetic and require_real are mutually exclusive.")
     rng = rng or np.random.default_rng(seed)
     target_txns = kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_txns
     n_mock_txns = int(target_txns)
@@ -1472,7 +1477,7 @@ def load_creditcard_fraud(
     chosen_file_path: Path | None = None
     df: pd.DataFrame | None = None
 
-    parquet_files = sorted(list(root.glob("*.parquet")))
+    parquet_files = [] if force_synthetic else sorted(list(root.glob("*.parquet")))
     if parquet_files:
         chosen_parquet = parquet_files[0]
         chosen_file_path = chosen_parquet
@@ -1482,7 +1487,11 @@ def load_creditcard_fraud(
             df = df.iloc[:target_nrows]
         chosen_source = "real_parquet"
     else:
-        csv_candidates = [root / "creditcard.csv"] + list(root.glob("*credit*.csv")) + list(root.glob("*.csv"))
+        csv_candidates = (
+            []
+            if force_synthetic
+            else [root / "creditcard.csv"] + list(root.glob("*credit*.csv")) + list(root.glob("*.csv"))
+        )
         for csv_path in csv_candidates:
             if csv_path.exists():
                 chosen_file_path = csv_path

@@ -180,6 +180,7 @@ class CreditCardPartitioner:
         all_rows: bool = False,
         require_real: bool = False,
         path: Path | str | None = None,
+        force_synthetic: bool = False,
     ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """Load Credit Card dataset, extract test set, and partition training set across banks."""
         p = Path(path) if path else None
@@ -188,6 +189,7 @@ class CreditCardPartitioner:
             nrows=nrows,
             all_rows=all_rows,
             require_real=require_real,
+            force_synthetic=force_synthetic,
             include_time=True,
             scale_time_amount=True,
             scaling_strategy="robust",
@@ -1017,6 +1019,7 @@ def run_creditcard_benchmark(
     test_ratio: float = 0.20,
     seed: int = 42,
     require_real: bool = False,
+    synthetic_eval: bool = False,
     output_dir: Path | str | None = None,
     centralized_epochs: int = 10,
     evaluate_legacy_centralized: bool = True,
@@ -1047,6 +1050,7 @@ def run_creditcard_benchmark(
         nrows=nrows,
         all_rows=all_rows,
         require_real=require_real,
+        force_synthetic=synthetic_eval,
     )
     X_global_test = partitioner.X_global_test
     y_global_test = partitioner.y_global_test
@@ -1408,6 +1412,11 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--centralized-epochs", type=int, default=10, help="Epochs for budget-equalized centralized training")
     parser.add_argument("--require-real", action="store_true", help="Require real physical dataset file")
+    parser.add_argument(
+        "--synthetic-eval",
+        action="store_true",
+        help="Force explicitly-labelled synthetic PCA data (ignores physical files; not a canonical result)",
+    )
     parser.add_argument("--output-dir", type=str, default=None, help="Output directory")
 
     args = parser.parse_args()
@@ -1425,6 +1434,7 @@ if __name__ == "__main__":
         test_ratio=args.test_ratio,
         seed=args.seed,
         require_real=args.require_real,
+        synthetic_eval=args.synthetic_eval,
         output_dir=args.output_dir,
         centralized_epochs=args.centralized_epochs,
     )

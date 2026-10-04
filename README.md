@@ -1558,7 +1558,7 @@ Primary metric: Average Precision (`sklearn.metrics.average_precision_score`, re
 | **Multi-Krum ($m=10$)** | 0.7118 $\pm$ 0.0253 | **0.7061 $\pm$ 0.0341** | 0.7224 $\pm$ 0.0039 | 0.7131 $\pm$ 0.0191 | **98.48% $\pm$ 6.93%** | Resilient across evaluated attacks; minor degradation on Seed 456 (0.6667) |
 | **Bulyan** | 0.7161 $\pm$ 0.0205 | 0.6961 $\pm$ 0.0363 | 0.7168 $\pm$ 0.0094 | 0.4363 $\pm$ 0.2072 | 97.09% $\pm$ 5.92% | Tolerates sign-flip; collapses under ALIE on Seed 123 (**0.2220**) |
 
-*Authoritative Canonical Artifact: [`benchmarks/results/raw/byzantine_federated_canonical.json`](benchmarks/results/raw/byzantine_federated_canonical.json) (Status: `CANONICAL`, Size: 47,417 bytes, SHA-256: `c760df99...`).*
+*Authoritative Canonical Artifact: [`benchmarks/results/raw/byzantine_federated_canonical.json`](benchmarks/results/raw/byzantine_federated_canonical.json) (Status: `CANONICAL`, Size: 45,763 bytes, LF-normalized, SHA-256: `75f5b3f4...`).*
 
 > [!WARNING]
 > **Mandatory Disclosure of Seed-Level Instability**:

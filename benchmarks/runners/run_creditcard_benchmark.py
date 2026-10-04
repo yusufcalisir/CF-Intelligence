@@ -42,6 +42,11 @@ def main() -> None:
     parser.add_argument("--test-ratio", type=float, default=0.20, help="Untouched test set ratio")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--require-real", action="store_true", help="Require real physical dataset file")
+    parser.add_argument(
+        "--synthetic-eval",
+        action="store_true",
+        help="Force explicitly-labelled synthetic PCA data (ignores physical files; not a canonical result)",
+    )
     parser.add_argument("--output-dir", type=str, default=None, help="Output directory")
 
     args = parser.parse_args()
@@ -59,6 +64,7 @@ def main() -> None:
         test_ratio=args.test_ratio,
         seed=args.seed,
         require_real=args.require_real,
+        synthetic_eval=args.synthetic_eval,
         output_dir=args.output_dir,
     )
     logger.info("Benchmark complete. Artifacts written to: %s", results["paths"])
