@@ -47,6 +47,7 @@ class MetricsService:
             pr_auc=float(eval_dict.get("pr_auc", 0.0)),
             predicted_positives=int(eval_dict.get("predicted_positives", 0)),
             threshold_provenance=str(eval_dict.get("threshold_provenance", "default_fixed_0.5")),
+            dp_provenance=eval_dict.get("dp_provenance"),
         )
 
     @staticmethod
@@ -108,4 +109,5 @@ class MetricsService:
             "pr_auc": metrics.pr_auc,
             "predicted_positives": metrics.predicted_positives,
             "threshold_provenance": metrics.threshold_provenance,
+            "dp_provenance": metrics.dp_provenance,
         }

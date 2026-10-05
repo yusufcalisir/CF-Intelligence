@@ -34,10 +34,16 @@ class SimulationConfigRequest(BaseModel):
         default=8.0, gt=0, description="Strict cumulative privacy budget epsilon limit"
     )
     dp_delta: float = Field(default=1e-5, gt=0)
-    dp_max_grad_norm: float = Field(default=1.0, gt=0)
+    dp_max_grad_norm: float = Field(default=0.5, gt=0)
     dp_mode: str = Field(
         default="post_hoc",
         description="DP implementation mode: post_hoc (clip+noise after training) or opacus (per-sample gradient privacy)",
+    )
+    dp_learning_rate: float | None = Field(
+        default=None, gt=0, le=1.0, description="Optional calibrated learning rate for DP training"
+    )
+    dp_local_epochs: int | None = Field(
+        default=None, ge=1, le=20, description="Optional local epochs for DP training"
     )
 
     # Data volume & benchmark dataset selection

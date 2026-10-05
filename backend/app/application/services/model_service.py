@@ -313,7 +313,7 @@ class ModelService:
         y_train: np.ndarray,
         target_epsilon: float,
         target_delta: float,
-        max_grad_norm: float = 1.0,
+        max_grad_norm: float = 0.5,
         epochs: int | None = None,
         learning_rate: float | None = None,
         batch_size: int | None = None,
@@ -496,6 +496,19 @@ class ModelService:
         model_final = cast(
             "FraudDetectionModel", getattr(model_private, "_module", model_private)
         )
+        model_final.dp_provenance = {
+            "mechanism": "opacus_rdp",
+            "epsilon": float(actual_epsilon),
+            "delta": float(target_delta),
+            "accountant": "rdp",
+            "noise_multiplier": float(getattr(optimizer_private, "noise_multiplier", 0.0)),
+            "clip_norm": float(max_grad_norm),
+            "sample_rate": float(getattr(loader_private, "sample_rate", (batch_size or 64) / max(len(dataset), 1))),
+            "steps": int(getattr(optimizer_private, "steps_done", (epochs or 1) * max(n_batches, 1))),
+            "dp_mode": "opacus",
+            "secure_rng": False,
+            "version": "1.0",
+        }
 
         import gc
 

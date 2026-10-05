@@ -487,6 +487,8 @@ async def create_simulation(
         "dp_delta": config.dp_delta,
         "dp_max_grad_norm": config.dp_max_grad_norm,
         "dp_mode": config.dp_mode,
+        "dp_learning_rate": getattr(config, "dp_learning_rate", None),
+        "dp_local_epochs": getattr(config, "dp_local_epochs", None),
         "enable_secure_aggregation": config.privacy_mechanism
         in (
             PrivacyMechanism.SECURE_AGGREGATION,

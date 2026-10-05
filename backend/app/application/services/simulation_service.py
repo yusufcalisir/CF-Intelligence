@@ -894,6 +894,14 @@ class SimulationService:
                             )
                             loc_model = self.model_service.set_parameters(loc_model, global_weights)
                             if use_opacus_dp:
+                                effective_dp_epochs = (
+                                    getattr(config, "dp_local_epochs", None)
+                                    or (1 if config.local_epochs in (2, 3) else config.local_epochs)
+                                )
+                                effective_dp_lr = (
+                                    getattr(config, "dp_learning_rate", None)
+                                    or (0.005 if config.learning_rate == 0.001 else config.learning_rate)
+                                )
                                 loc_model, loss_hist, actual_eps = (
                                     self.model_service.train_local_with_opacus(
                                         loc_model,
@@ -902,8 +910,8 @@ class SimulationService:
                                         target_epsilon=config.dp_epsilon,
                                         target_delta=config.dp_delta,
                                         max_grad_norm=config.dp_max_grad_norm,
-                                        epochs=config.local_epochs,
-                                        learning_rate=config.learning_rate,
+                                        epochs=effective_dp_epochs,
+                                        learning_rate=effective_dp_lr,
                                         batch_size=config.batch_size,
                                         fedprox_mu=effective_fedprox_mu,
                                         moon_mu=getattr(config, "moon_mu", 0.0),

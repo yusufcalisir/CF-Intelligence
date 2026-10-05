@@ -69,6 +69,7 @@ class EvaluationMetrics:
     pr_auc: float = 0.0
     predicted_positives: int = 0
     threshold_provenance: str = "default_fixed_0.5"
+    dp_provenance: str | None = None
 
 
 @dataclass(frozen=True)
@@ -126,9 +127,11 @@ class SimulationConfig:
     dp_epsilon: float = 0.75
     dp_epsilon_limit: float = 8.0
     dp_delta: float = 1e-5
-    dp_max_grad_norm: float = 1.0
+    dp_max_grad_norm: float = 0.5
     dp_mode: str = "post_hoc"
     enable_secure_aggregation: bool = False
+    dp_learning_rate: float | None = None
+    dp_local_epochs: int | None = None
 
     # Active Defense & Adversarial Training
     enable_adversarial_training: bool = False
