@@ -129,7 +129,7 @@ export default function LiveOperationsView() {
   const championAucRef = useRef(championAuc);
   championAucRef.current = championAuc;
   const [gradientSubmissions, setGradientSubmissions] = useState<number>(storedSession?.gradientSubmissions ?? 0);
-  const [wsStatus, setWsStatus] = useState<'CONNECTED' | 'RECONNECTING'>('CONNECTED');
+  const [wsStatus, setWsStatus] = useState<'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED'>('CONNECTED');
   const [trainingPhase, setTrainingPhase] = useState<TrainingPhase>(storedSession?.trainingPhase ?? 'pending');
   const [roundHistory, setRoundHistory] = useState<RoundData[]>(storedSession?.roundHistory ?? []);
   const [isTraining, setIsTraining] = useState(false);
@@ -176,6 +176,10 @@ export default function LiveOperationsView() {
   const { data: currentSim } = useSimulation(activeSimId);
   const { data: trainingRounds } = useTrainingRounds(activeSimId);
   const { data: arSummary } = useAssetRecoverySummary();
+  const terminalPhaseRef = useRef(trainingPhase);
+  terminalPhaseRef.current = trainingPhase;
+  const currentSimRef = useRef(currentSim);
+  currentSimRef.current = currentSim;
 
   const simBanks = currentSim?.banks && currentSim.banks.length > 0 ? currentSim.banks : [];
   const simRounds = trainingRounds && trainingRounds.length > 0 ? trainingRounds : (currentSim?.rounds || []);
@@ -403,17 +407,23 @@ export default function LiveOperationsView() {
     if (!currentSim) return;
     const s = currentSim.status;
     if (s === 'completed') {
+      terminalPhaseRef.current = 'completed';
       setTrainingPhase('completed');
       setIsTraining(false);
       if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
+      if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null; }
     } else if (s === 'failed') {
+      terminalPhaseRef.current = 'failed';
       setTrainingPhase('failed');
       setIsTraining(false);
       if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
+      if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null; }
     } else if (s === 'stopped') {
+      terminalPhaseRef.current = 'stopped';
       setTrainingPhase('stopped');
       setIsTraining(false);
       if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
+      if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null; }
     } else if (s === 'running' || s === 'training_federated') {
       // Terminal state monotonicity: do not regress completed or failed runs to running
       setTrainingPhase((prev) => (prev === 'completed' || prev === 'failed' || prev === 'stopped' ? prev : 'training_federated'));
@@ -582,15 +592,30 @@ export default function LiveOperationsView() {
     );
   };
 
-  const terminalPhaseRef = useRef(trainingPhase);
-  terminalPhaseRef.current = trainingPhase;
-  const currentSimRef = useRef(currentSim);
-  currentSimRef.current = currentSim;
-
   // WebSocket live telemetry listener with real backend telemetry binding
   useEffect(() => {
     if (!activeSimId) {
       setWsStatus('DISCONNECTED');
+      return;
+    }
+
+    const isAlreadyTerminal =
+      terminalPhaseRef.current === 'completed' ||
+      terminalPhaseRef.current === 'failed' ||
+      terminalPhaseRef.current === 'stopped' ||
+      currentSimRef.current?.status === 'completed' ||
+      currentSimRef.current?.status === 'failed' ||
+      currentSimRef.current?.status === 'stopped' ||
+      currentSim?.status === 'completed' ||
+      currentSim?.status === 'failed' ||
+      currentSim?.status === 'stopped';
+
+    if (isAlreadyTerminal) {
+      setWsStatus('DISCONNECTED');
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       return;
     }
 
@@ -696,9 +721,12 @@ export default function LiveOperationsView() {
           // Terminal state monotonicity: do not allow replayed / late-arriving non-terminal events
           // to overwrite an already terminal run (completed, failed, or stopped)
           const isCurrentlyTerminal =
-            trainingPhase === 'completed' ||
-            trainingPhase === 'failed' ||
-            trainingPhase === 'stopped' ||
+            terminalPhaseRef.current === 'completed' ||
+            terminalPhaseRef.current === 'failed' ||
+            terminalPhaseRef.current === 'stopped' ||
+            currentSimRef.current?.status === 'completed' ||
+            currentSimRef.current?.status === 'failed' ||
+            currentSimRef.current?.status === 'stopped' ||
             currentSim?.status === 'completed' ||
             currentSim?.status === 'failed' ||
             currentSim?.status === 'stopped';
@@ -779,12 +807,20 @@ export default function LiveOperationsView() {
             terminalPhaseRef.current = 'completed';
             setTrainingPhase('completed');
             setIsTraining(false);
+            if (reconnectTimerRef.current) {
+              clearTimeout(reconnectTimerRef.current);
+              reconnectTimerRef.current = null;
+            }
           } else if (eventType === 'error' || eventType === 'failed') {
             // Only set failed if run is not already completed (monotonicity)
-            if (trainingPhase !== 'completed' && currentSim?.status !== 'completed') {
+            if (terminalPhaseRef.current !== 'completed' && currentSimRef.current?.status !== 'completed' && currentSim?.status !== 'completed') {
               terminalPhaseRef.current = 'failed';
               setTrainingPhase('failed');
               setIsTraining(false);
+              if (reconnectTimerRef.current) {
+                clearTimeout(reconnectTimerRef.current);
+                reconnectTimerRef.current = null;
+              }
             }
           }
         } catch { /* ignore non-json frames */ }
@@ -795,7 +831,7 @@ export default function LiveOperationsView() {
         }
         if (!isCleanedUp) handleConnectionLost();
       };
-      ws.onclose = () => {
+      ws.onclose = (event: CloseEvent) => {
         if (!isCleanedUp) {
           const isTerminal =
             terminalPhaseRef.current === 'completed' ||
@@ -803,7 +839,11 @@ export default function LiveOperationsView() {
             terminalPhaseRef.current === 'stopped' ||
             currentSimRef.current?.status === 'completed' ||
             currentSimRef.current?.status === 'failed' ||
-            currentSimRef.current?.status === 'stopped';
+            currentSimRef.current?.status === 'stopped' ||
+            currentSim?.status === 'completed' ||
+            currentSim?.status === 'failed' ||
+            currentSim?.status === 'stopped' ||
+            event?.code === 1000;
 
           if (isTerminal) {
             setWsStatus('DISCONNECTED');
@@ -956,10 +996,13 @@ export default function LiveOperationsView() {
       setTrainingPhase('generating_data');
       setIsTraining(true);
       try {
+        const clientOpId = 'sim_op_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2));
         const resp = await createSimulation.mutateAsync({
           num_rounds: 10,
           privacy_mechanism: 'differential_privacy',
           dp_mode: 'opacus',
+          clientOperationId: clientOpId,
+          idempotencyKey: clientOpId,
         });
         if (resp && resp.id) {
           navigate(`/simulation/${resp.id}`, { replace: true });
@@ -1077,12 +1120,23 @@ export default function LiveOperationsView() {
                 Live Operations Dashboard
               </h1>
               <span
-                className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${wsStatus === 'CONNECTED' && !isOfflineDemoMode
+                className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
+                  wsStatus === 'CONNECTED' && !isOfflineDemoMode
                     ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                  }`}
+                    : wsStatus === 'RECONNECTING'
+                    ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                    : 'bg-slate-500/15 text-slate-400 border border-slate-500/30'
+                }`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${wsStatus === 'CONNECTED' && !isOfflineDemoMode ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    wsStatus === 'CONNECTED' && !isOfflineDemoMode
+                      ? 'bg-emerald-400 animate-pulse'
+                      : wsStatus === 'RECONNECTING'
+                      ? 'bg-amber-400 animate-pulse'
+                      : 'bg-slate-400'
+                  }`}
+                />
                 {isOfflineDemoMode ? 'OFFLINE' : wsStatus}
               </span>
               {isOfflineDemoMode && (
@@ -1133,9 +1187,11 @@ export default function LiveOperationsView() {
                 {/* Quick-launch with current profile */}
                 <motion.button
                   id="start-federated-training-btn"
+                  type="button"
                   whileTap={{ scale: 0.96 }}
+                  disabled={isLaunchingRef.current || createSimulation.isPending}
                   onClick={() => handleLaunchTraining(selectedProfile, trainingMode)}
-                  className="h-10 inline-flex items-center gap-1.5 px-3.5 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0"
+                  className="h-10 inline-flex items-center gap-1.5 px-3.5 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     background: `linear-gradient(135deg, ${selectedProfile.color}, #6366f1)`,
                     boxShadow: `0 4px 16px ${selectedProfile.color}35`,
@@ -1339,8 +1395,9 @@ export default function LiveOperationsView() {
               {trainingPhase === 'pending' && (
                 <button
                   type="button"
+                  disabled={isLaunchingRef.current || createSimulation.isPending}
                   onClick={() => handleLaunchTraining(selectedProfile, trainingMode)}
-                  className="mt-1 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center gap-1.5"
+                  className="mt-1 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FlaskConical size={14} />
                   <span>Start Training Run ({selectedProfile.label})</span>

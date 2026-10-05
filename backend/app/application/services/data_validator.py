@@ -65,6 +65,55 @@ logger = logging.getLogger(__name__)
 
 
 _ge_registration_lock = threading.Lock()
+_gx_thread_local = threading.local()
+
+if HAS_GREAT_EXPECTATIONS:
+    from great_expectations.data_context.data_context.context_factory import project_manager
+
+    if not getattr(project_manager, "_cf_thread_local_installed", False):
+        orig_get_project = project_manager.get_project
+
+        def _tl_get_project(*args: Any, **kwargs: Any) -> Any:
+            ctx = orig_get_project(*args, **kwargs)
+            _gx_thread_local.project = ctx
+            return ctx
+
+        project_manager.get_project = _tl_get_project  # type: ignore[method-assign]
+        if hasattr(ge, "get_context"):
+            ge.get_context = _tl_get_project
+
+        orig_set_project = project_manager.set_project
+
+        def _tl_set_project(project: Any) -> None:
+            _gx_thread_local.project = project
+            orig_set_project(project)
+
+        project_manager.set_project = _tl_set_project  # type: ignore[method-assign]
+
+        orig_get_datasources = getattr(project_manager.__class__, "get_datasources", None)
+        if callable(orig_get_datasources):
+            _orig_ds = orig_get_datasources
+
+            def _tl_get_datasources(self: Any, *args: Any, **kwargs: Any) -> Any:
+                if hasattr(_gx_thread_local, "project") and _gx_thread_local.project is not None:
+                    return _gx_thread_local.project.data_sources.all()
+                return _orig_ds(self, *args, **kwargs)
+
+            project_manager.__class__.get_datasources = _tl_get_datasources  # type: ignore[method-assign]
+            project_manager.get_datasources = lambda *args, **kwargs: _tl_get_datasources(project_manager, *args, **kwargs)  # type: ignore[method-assign]
+
+        orig_project_prop = getattr(project_manager.__class__, "_project", None)
+        orig_fget = getattr(orig_project_prop, "fget", None) if orig_project_prop is not None else None
+
+        def _tl_get_project_prop(self: Any) -> Any:
+            if hasattr(_gx_thread_local, "project") and _gx_thread_local.project is not None:
+                return _gx_thread_local.project
+            if callable(orig_fget):
+                return orig_fget(self)
+            return None
+
+        project_manager.__class__._project = property(_tl_get_project_prop)
+        project_manager._cf_thread_local_installed = True  # type: ignore[attr-defined] # pyright: ignore[reportAttributeAccessIssue]
 
 
 class DataContractValidationError(Exception):
@@ -254,10 +303,11 @@ class DataValidatorService:
         suite_name = f"contract_{purpose}_{sim_key}_{bank_id}"
         val_name = f"val_{purpose}_{sim_key}_{bank_id}"
 
-        context = ge.get_context(mode="ephemeral")
-
         # Atomic isolated registration scoped to this exact (purpose, simulation_id, bank_id)
         with _ge_registration_lock:
+            context = ge.get_context(mode="ephemeral")
+            _gx_thread_local.project = context
+
             ds = context.data_sources.add_pandas(ds_name)
             asset = ds.add_dataframe_asset(asset_name)
             bd = asset.add_batch_definition_whole_dataframe(bd_name)
@@ -293,6 +343,8 @@ class DataValidatorService:
                     context.suites.delete(suite_name)
                 with contextlib.suppress(Exception):
                     context.data_sources.delete(ds_name)
+            if getattr(_gx_thread_local, "project", None) is context:
+                _gx_thread_local.project = None
 
         if not result.success:
             failures = []

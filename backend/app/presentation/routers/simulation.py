@@ -6,6 +6,7 @@ Simulation execution runs in background threads within the web process.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -36,6 +37,7 @@ from app.application.schemas.simulation import (
     SimulationSummaryResponse,
     TrainingRoundResponse,
 )
+from app.application.services.idempotency import IdempotencyService
 from app.application.services.multi_bank_simulator import get_multi_bank_simulator
 from app.domain.enums import PrivacyMechanism, SimulationStatus
 from app.infrastructure.redis_store import RedisStore
@@ -421,8 +423,6 @@ async def create_simulation(
     )
     payload_hash = None
     if idempotency_key:
-        from app.application.services.idempotency import IdempotencyService
-
         idem_svc = IdempotencyService.get()
         payload_hash = hashlib.sha256(
             json.dumps(config.model_dump(), sort_keys=True, default=str).encode("utf-8")
@@ -432,6 +432,15 @@ async def create_simulation(
             in_progress_timeout=30.0,
             payload_hash=payload_hash,
         )
+        if state == "IN_PROGRESS":
+            state, cached = await asyncio.to_thread(
+                idem_svc.await_completion,
+                idempotency_key,
+                5.0,
+                0.05,
+                None,
+                payload_hash,
+            )
         if state == "HIT" and cached is not None:
             return JSONResponse(
                 content=cached,
@@ -505,66 +514,69 @@ async def create_simulation(
         "enable_streaming_gnn": config.enable_streaming_gnn,
     }
 
-    # Preflight Privacy Feasibility Check
-    if config_dict["enable_differential_privacy"]:
-        from app.application.services.privacy_service import (
-            PrivacyBudgetExceededError,
-            PrivacyService,
-        )
-
-        try:
-            PrivacyService.validate_preflight_budget(
-                num_rounds=config.num_rounds,
-                round_epsilon=config.dp_epsilon,
-                limit=config.dp_epsilon_limit,
+    try:
+        # Preflight Privacy Feasibility Check
+        if config_dict["enable_differential_privacy"]:
+            from app.application.services.privacy_service import (
+                PrivacyBudgetExceededError,
+                PrivacyService,
             )
-        except PrivacyBudgetExceededError as pbe:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=str(pbe),
-            ) from pbe
 
-    # Store pending status
-    _simulation_results.set(
-        simulation_id,
-        {
-            "id": simulation_id,
-            "status": SimulationStatus.PENDING.value,
-            "is_canonical_reference": False,
-            "provenance": "LIVE_ORCHESTRATED_RUN",
-            "execution_mode": "LIVE_RUNTIME",
-            "config": config_dict,
-            "current_round": 0,
-            "total_rounds": config.num_rounds,
-            "banks": [],
-            "rounds": [],
-        },
-    )
+            try:
+                PrivacyService.validate_preflight_budget(
+                    num_rounds=config.num_rounds,
+                    round_epsilon=config.dp_epsilon,
+                    limit=config.dp_epsilon_limit,
+                )
+            except PrivacyBudgetExceededError as pbe:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=str(pbe),
+                ) from pbe
 
-    # Run simulation in a background thread (no Celery worker needed)
-    thread = threading.Thread(
-        target=_run_simulation_in_process,
-        args=(simulation_id, config_dict),
-        daemon=True,
-    )
-    thread.start()
-
-    logger.info("Started in-process simulation %s", simulation_id)
-
-    resp = SimulationCreateResponse(
-        id=simulation_id,
-        status=SimulationStatus.PENDING,
-        message=f"Simulation started in-process. ID: {simulation_id}",
-    )
-    if idempotency_key:
-        from app.application.services.idempotency import IdempotencyService
-
-        IdempotencyService.get().complete(
-            idempotency_key,
-            resp.model_dump(),
-            payload_hash=payload_hash,
+        # Store pending status
+        _simulation_results.set(
+            simulation_id,
+            {
+                "id": simulation_id,
+                "status": SimulationStatus.PENDING.value,
+                "is_canonical_reference": False,
+                "provenance": "LIVE_ORCHESTRATED_RUN",
+                "execution_mode": "LIVE_RUNTIME",
+                "config": config_dict,
+                "current_round": 0,
+                "total_rounds": config.num_rounds,
+                "banks": [],
+                "rounds": [],
+            },
         )
-    return resp
+
+        # Run simulation in a background thread (no Celery worker needed)
+        thread = threading.Thread(
+            target=_run_simulation_in_process,
+            args=(simulation_id, config_dict),
+            daemon=True,
+        )
+        thread.start()
+
+        logger.info("Started in-process simulation %s", simulation_id)
+
+        resp = SimulationCreateResponse(
+            id=simulation_id,
+            status=SimulationStatus.PENDING,
+            message=f"Simulation started in-process. ID: {simulation_id}",
+        )
+        if idempotency_key:
+            IdempotencyService.get().complete(
+                idempotency_key,
+                resp.model_dump(),
+                payload_hash=payload_hash,
+            )
+        return resp
+    except Exception:
+        if idempotency_key:
+            IdempotencyService.get().release(idempotency_key)
+        raise
 
 
 @router.get("", response_model=list[SimulationSummaryResponse])

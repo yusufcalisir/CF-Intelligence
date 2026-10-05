@@ -294,19 +294,49 @@ export function useAIActComplianceReport(id: string | undefined, enabled: boolea
   });
 }
 
+export interface CreateSimulationOptions extends Partial<SimulationConfig> {
+  clientOperationId?: string;
+  idempotencyKey?: string;
+}
+
+// Module-level in-flight deduplication map: operationId -> Promise<SimulationCreateResponse>
+const activeSimulationDispatches = new Map<string, Promise<SimulationCreateResponse>>();
+
 export function useCreateSimulation() {
-  return useMutation<SimulationCreateResponse, Error, Partial<SimulationConfig>>({
+  return useMutation<SimulationCreateResponse, Error, CreateSimulationOptions>({
     mutationFn: async (config) => {
-      const idempotencyKey =
-        typeof crypto !== 'undefined' && crypto.randomUUID
+      const { clientOperationId, idempotencyKey: explicitKey, ...simPayload } = config;
+      const effectiveKey =
+        explicitKey ||
+        clientOperationId ||
+        (typeof crypto !== 'undefined' && crypto.randomUUID
           ? crypto.randomUUID()
-          : `sim_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-      const { data } = await apiClient.post('/api/v1/simulations', config, {
-        headers: {
-          'Idempotency-Key': idempotencyKey,
-        },
-      });
-      return data;
+          : `sim_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`);
+
+      // Deduplicate in-flight creation attempts carrying the same logical operation identifier
+      const existingPromise = activeSimulationDispatches.get(effectiveKey);
+      if (existingPromise) {
+        return existingPromise;
+      }
+
+      const dispatchPromise = (async () => {
+        try {
+          const { data } = await apiClient.post<SimulationCreateResponse>('/api/v1/simulations', simPayload, {
+            headers: {
+              'Idempotency-Key': effectiveKey,
+              'X-Client-Operation-ID': effectiveKey,
+            },
+          });
+          return data;
+        } finally {
+          setTimeout(() => {
+            activeSimulationDispatches.delete(effectiveKey);
+          }, 5000);
+        }
+      })();
+
+      activeSimulationDispatches.set(effectiveKey, dispatchPromise);
+      return dispatchPromise;
     },
   });
 }

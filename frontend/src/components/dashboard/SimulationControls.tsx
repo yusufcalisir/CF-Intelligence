@@ -29,7 +29,12 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
   const handleStart = () => {
     if (createMutation.isPending || isSubmittingRef.current) return;
     isSubmittingRef.current = true;
-    createMutation.mutate(config, {
+    const clientOpId = 'sim_op_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2));
+    createMutation.mutate({
+      ...config,
+      clientOperationId: clientOpId,
+      idempotencyKey: clientOpId,
+    }, {
       onSuccess: (data) => {
         onSimulationCreated(data.id);
       },
@@ -549,8 +554,9 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
 
       {/* Start Button */}
       <button
+        type="button"
         onClick={handleStart}
-        disabled={createMutation.isPending}
+        disabled={createMutation.isPending || isSubmittingRef.current}
         className="mt-auto w-full py-2.5 rounded-lg font-medium text-sm text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         style={{
           background: 'linear-gradient(135deg, var(--color-accent-indigo), var(--color-accent-teal))',

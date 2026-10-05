@@ -159,6 +159,37 @@ class IdempotencyService:
             self._evict_expired()
             return ("ACQUIRED", None)
 
+    def await_completion(
+        self,
+        idempotency_key: str | None,
+        timeout: float = 5.0,
+        poll_interval: float = 0.05,
+        tenant_id: str | None = None,
+        payload_hash: str | None = None,
+    ) -> tuple[str, Any | None]:
+        """Awaits terminal resolution of an in-progress idempotency reservation.
+
+        Returns:
+            ("HIT", cached_response): in-progress request completed successfully.
+            ("MISMATCH", None): in-progress request completed with different payload.
+            ("IN_PROGRESS", None): timed out while still in progress.
+            ("ACQUIRED", None): reservation was released/aborted; safe to acquire.
+        """
+        if not idempotency_key:
+            return ("ACQUIRED", None)
+
+        start = time.monotonic()
+        while time.monotonic() - start < timeout:
+            time.sleep(poll_interval)
+            state, cached = self.acquire(
+                idempotency_key,
+                tenant_id=tenant_id,
+                payload_hash=payload_hash,
+            )
+            if state != "IN_PROGRESS":
+                return state, cached
+        return "IN_PROGRESS", None
+
     def complete(
         self,
         idempotency_key: str | None,

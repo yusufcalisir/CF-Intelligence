@@ -27,11 +27,11 @@ describe('LiveOperationsView Component', () => {
       isLoading: false,
     } as any);
     vi.spyOn(queries, 'useSimulations').mockReturnValue({
-      data: [],
+      data: [{ id: 'sim_default_test', status: 'running' }],
       isLoading: false,
     } as any);
     vi.spyOn(queries, 'useSimulation').mockReturnValue({
-      data: null,
+      data: { id: 'sim_default_test', status: 'running', current_round: 1, total_rounds: 10 },
       isLoading: false,
     } as any);
     vi.spyOn(queries, 'useTrainingRounds').mockReturnValue({
@@ -41,6 +41,14 @@ describe('LiveOperationsView Component', () => {
   });
 
   it('renders dashboard title, active champion AUC, and empty round telemetry CTA', () => {
+    vi.spyOn(queries, 'useSimulations').mockReturnValue({
+      data: [],
+      isLoading: false,
+    } as any);
+    vi.spyOn(queries, 'useSimulation').mockReturnValue({
+      data: null,
+      isLoading: false,
+    } as any);
     render(<LiveOperationsView />, { wrapper: createWrapper() });
 
     expect(screen.getByText(/Live Operations Dashboard/i)).toBeInTheDocument();
@@ -50,6 +58,14 @@ describe('LiveOperationsView Component', () => {
   });
 
   it('renders dataset configuration and import buttons', () => {
+    vi.spyOn(queries, 'useSimulations').mockReturnValue({
+      data: [],
+      isLoading: false,
+    } as any);
+    vi.spyOn(queries, 'useSimulation').mockReturnValue({
+      data: null,
+      isLoading: false,
+    } as any);
     render(<LiveOperationsView />, { wrapper: createWrapper() });
 
     expect(screen.getByRole('button', { name: /Import Dataset/i })).toBeInTheDocument();
@@ -58,6 +74,14 @@ describe('LiveOperationsView Component', () => {
   });
 
   it('handles offline demo fallback banner and retry button click', async () => {
+    vi.spyOn(queries, 'useSimulations').mockReturnValue({
+      data: [],
+      isLoading: false,
+    } as any);
+    vi.spyOn(queries, 'useSimulation').mockReturnValue({
+      data: null,
+      isLoading: false,
+    } as any);
     render(<LiveOperationsView />, { wrapper: createWrapper() });
 
     // In jsdom environment without live WebSocket server, ws will fail and trigger offline demo mode
@@ -507,13 +531,17 @@ describe('LiveOperationsView Component', () => {
 
     vi.stubGlobal('WebSocket', TestWebSocket);
 
+    vi.spyOn(queries, 'useSimulations').mockReturnValue({
+      data: [{ id: 'sim_terminal_mono_789', status: 'training_federated' }],
+      isLoading: false,
+    } as any);
     vi.spyOn(queries, 'useSimulation').mockReturnValue({
       data: {
         id: 'sim_terminal_mono_789',
-        status: 'completed',
-        current_round: 10,
+        status: 'training_federated',
+        current_round: 9,
         total_rounds: 10,
-        progress_pct: 100,
+        progress_pct: 90,
       },
       isLoading: false,
     } as any);
@@ -522,6 +550,16 @@ describe('LiveOperationsView Component', () => {
 
     act(() => {
       instance.onopen();
+    });
+
+    // Receive completion event
+    act(() => {
+      instance.onmessage({
+        data: JSON.stringify({
+          event_type: 'completed',
+          simulation_id: 'sim_terminal_mono_789',
+        }),
+      });
     });
 
     // Send a stale / replayed round_started event arriving after completion
@@ -596,6 +634,297 @@ describe('LiveOperationsView Component', () => {
     expect(screen.queryByText(/Fatal error in other run/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Federated Training Failed/i)).not.toBeInTheDocument();
 
+    vi.unstubAllGlobals();
+  });
+
+  it('allows reconnect when simulation is RUNNING and socket connection is lost', () => {
+    vi.useFakeTimers();
+    let socketCount = 0;
+    let instance: any = null;
+
+    class TestWebSocket {
+      static OPEN = 1;
+      static CLOSED = 3;
+      readyState = 1;
+      send = vi.fn();
+      close = vi.fn();
+      onopen: (() => void) | null = null;
+      onclose: ((e?: any) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((e: { data: string }) => void) | null = null;
+
+      constructor(public url: string) {
+        socketCount++;
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        instance = this;
+      }
+    }
+
+    vi.stubGlobal('WebSocket', TestWebSocket);
+
+    vi.spyOn(queries, 'useSimulation').mockReturnValue({
+      data: {
+        id: 'sim_running_01',
+        status: 'training_federated',
+        current_round: 2,
+        total_rounds: 10,
+      },
+      isLoading: false,
+    } as any);
+
+    render(<LiveOperationsView />, { wrapper: createWrapper() });
+    expect(socketCount).toBe(1);
+
+    // Socket drops while running (code 1006 abnormal closure)
+    act(() => {
+      instance.readyState = 3;
+      instance.onclose({ code: 1006 });
+    });
+
+    // Advance 3000ms timer
+    act(() => {
+      vi.advanceTimersByTime(3100);
+    });
+
+    // Reconnection is allowed for RUNNING simulation
+    expect(socketCount).toBe(2);
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('does NOT reconnect when simulation is COMPLETED and socket closes', () => {
+    vi.useFakeTimers();
+    let socketCount = 0;
+
+    class TestWebSocket {
+      static OPEN = 1;
+      static CLOSED = 3;
+      readyState = 1;
+      send = vi.fn();
+      close = vi.fn();
+      onopen: (() => void) | null = null;
+      onclose: ((e?: any) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((e: { data: string }) => void) | null = null;
+
+      constructor(public url: string) {
+        socketCount++;
+      }
+    }
+
+    vi.stubGlobal('WebSocket', TestWebSocket);
+
+    vi.spyOn(queries, 'useSimulation').mockReturnValue({
+      data: {
+        id: 'sim_completed_01',
+        status: 'completed',
+        current_round: 10,
+        total_rounds: 10,
+      },
+      isLoading: false,
+    } as any);
+
+    render(<LiveOperationsView />, { wrapper: createWrapper() });
+    // Since simulation is already completed, no WebSocket is opened
+    expect(socketCount).toBe(0);
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('does NOT reconnect when simulation receives completed event followed by socket close', () => {
+    vi.useFakeTimers();
+    let socketCount = 0;
+    let instance: any = null;
+
+    class TestWebSocket {
+      static OPEN = 1;
+      static CLOSED = 3;
+      readyState = 1;
+      send = vi.fn();
+      close = vi.fn();
+      onopen: (() => void) | null = null;
+      onclose: ((e?: any) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((e: { data: string }) => void) | null = null;
+
+      constructor(public url: string) {
+        socketCount++;
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        instance = this;
+      }
+    }
+
+    vi.stubGlobal('WebSocket', TestWebSocket);
+
+    vi.spyOn(queries, 'useSimulation').mockReturnValue({
+      data: {
+        id: 'sim_to_complete_01',
+        status: 'training_federated',
+        current_round: 10,
+        total_rounds: 10,
+      },
+      isLoading: false,
+    } as any);
+
+    render(<LiveOperationsView />, { wrapper: createWrapper() });
+    expect(socketCount).toBe(1);
+
+    // Backend sends completed event
+    act(() => {
+      instance.onmessage({
+        data: JSON.stringify({
+          event_type: 'completed',
+          simulation_id: 'sim_to_complete_01',
+        }),
+      });
+    });
+
+    // Backend terminates Redis WS with code 1000
+    act(() => {
+      instance.readyState = 3;
+      instance.onclose({ code: 1000 });
+    });
+
+    // Advance 5000ms
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    // No new socket must be opened!
+    expect(socketCount).toBe(1);
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('cancels scheduled reconnect timer when simulation becomes COMPLETED before timer fires', () => {
+    vi.useFakeTimers();
+    let socketCount = 0;
+    let instance: any = null;
+
+    class TestWebSocket {
+      static OPEN = 1;
+      static CLOSED = 3;
+      readyState = 1;
+      send = vi.fn();
+      close = vi.fn();
+      onopen: (() => void) | null = null;
+      onclose: ((e?: any) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((e: { data: string }) => void) | null = null;
+
+      constructor(public url: string) {
+        socketCount++;
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        instance = this;
+      }
+    }
+
+    vi.stubGlobal('WebSocket', TestWebSocket);
+
+    let simStatus = 'training_federated';
+    const mockUseSim = vi.spyOn(queries, 'useSimulation').mockImplementation(() => ({
+      data: {
+        id: 'sim_transition_01',
+        status: simStatus,
+        current_round: 9,
+        total_rounds: 10,
+      },
+      isLoading: false,
+    } as any));
+
+    const { rerender } = render(<LiveOperationsView />, { wrapper: createWrapper() });
+    expect(socketCount).toBe(1);
+
+    // Socket drops while running
+    act(() => {
+      instance.readyState = 3;
+      instance.onclose({ code: 1006 });
+    });
+
+    // 1000ms later (before 3000ms reconnect timer fires), REST query updates status to completed
+    simStatus = 'completed';
+    mockUseSim.mockReturnValue({
+      data: {
+        id: 'sim_transition_01',
+        status: 'completed',
+        current_round: 10,
+        total_rounds: 10,
+      },
+      isLoading: false,
+    } as any);
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+      rerender(<LiveOperationsView />);
+    });
+
+    // Advance past the original 3000ms reconnect deadline
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+
+    // Reconnect timer was cancelled; socketCount remains 1
+    expect(socketCount).toBe(1);
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('does NOT reconnect when simulation is FAILED or STOPPED', () => {
+    vi.useFakeTimers();
+    let socketCount = 0;
+
+    class TestWebSocket {
+      static OPEN = 1;
+      static CLOSED = 3;
+      readyState = 1;
+      send = vi.fn();
+      close = vi.fn();
+      onopen: (() => void) | null = null;
+      onclose: ((e?: any) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((e: { data: string }) => void) | null = null;
+
+      constructor(public url: string) {
+        socketCount++;
+      }
+    }
+
+    vi.stubGlobal('WebSocket', TestWebSocket);
+
+    // For FAILED
+    vi.spyOn(queries, 'useSimulation').mockReturnValue({
+      data: {
+        id: 'sim_failed_01',
+        status: 'failed',
+        current_round: 4,
+        total_rounds: 10,
+      },
+      isLoading: false,
+    } as any);
+
+    const { unmount } = render(<LiveOperationsView />, { wrapper: createWrapper() });
+    expect(socketCount).toBe(0);
+    unmount();
+
+    // For STOPPED
+    vi.spyOn(queries, 'useSimulation').mockReturnValue({
+      data: {
+        id: 'sim_stopped_01',
+        status: 'stopped',
+        current_round: 5,
+        total_rounds: 10,
+      },
+      isLoading: false,
+    } as any);
+
+    render(<LiveOperationsView />, { wrapper: createWrapper() });
+    expect(socketCount).toBe(0);
+
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 });
