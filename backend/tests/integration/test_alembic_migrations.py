@@ -27,7 +27,7 @@ class TestAlembicMigrationFramework:
         """Verify current head revision script can be resolved."""
         heads = get_current_head_revision()
         assert len(heads) > 0
-        assert "002_core_and_aml_tables" in heads[0]
+        assert "003_alerts_unique_constraint" in heads[0]
 
     def test_offline_migration_sql_generation(self):
         """Verify offline mode config generates valid DDL statements."""

@@ -231,20 +231,51 @@ class TestComparativeBenchmarkEngine:
 class TestComparativeBaselinesEndpoint:
     """Test FastAPI endpoint for comparative baseline dashboard data."""
 
-    def test_get_comparative_baselines_route(self):
+    def test_get_comparative_baselines_route(self, synthetic_fraud_data, tmp_path, monkeypatch):
         from fastapi.testclient import TestClient
 
         from app.main import app
+
+        X_train, y_train, X_test, y_test = synthetic_fraud_data
+        n = len(y_train)
+        s1, s2 = n // 3, 2 * (n // 3)
+        bank_partitions = {
+            "bank_a": (X_train[:s1], y_train[:s1]),
+            "bank_b": (X_train[s1:s2], y_train[s1:s2]),
+            "bank_c": (X_train[s2:], y_train[s2:]),
+        }
+
+        # Produce genuine benchmark evidence where the endpoint looks for it
+        # (relative to the working directory), instead of depending on a
+        # git-ignored artifact left behind by a previous manual run.
+        results_dir = tmp_path / "experiments" / "results"
+        results_dir.mkdir(parents=True)
+        engine = ComparativeBenchmarkEngine(random_state=42, output_dir=str(results_dir))
+        report = engine.run_full_comparative_suite(
+            bank_train_partitions=bank_partitions,
+            X_global_test=X_test,
+            y_global_test=y_test,
+            dataset_name="EndpointEvidenceSynthetic",
+            train_neural=False,
+        )
+        assert (results_dir / "comparative_baselines.json").exists()
+        monkeypatch.chdir(tmp_path)
 
         client = TestClient(app)
         response = client.get("/api/v1/dashboard/comparative-baselines")
         assert response.status_code == 200
         payload = response.json()
 
-        assert "comparison_matrix" in payload
-        assert len(payload["comparison_matrix"]) >= 4
+        assert payload["dataset_name"] == "EndpointEvidenceSynthetic"
+        assert len(payload["comparison_matrix"]) == len(report["comparison_matrix"])
         assert "centralization_gap_analysis" in payload
         assert "silo_deficit_analysis" in payload
-        assert payload["centralization_gap_analysis"]["federated_efficiency_pct"] > 80.0
+        assert (
+            payload["centralization_gap_analysis"]["federated_efficiency_pct"]
+            == report["centralization_gap_analysis"]["federated_efficiency_pct"]
+        )
         assert payload["silo_deficit_analysis"]["silo_count"] >= 1
+        # Endpoint must label this surface as a benchmark reference, not live runtime.
+        assert payload["provenance"] == "CANONICAL_BENCHMARK_REFERENCE"
+        assert payload["is_live_runtime"] is False
 

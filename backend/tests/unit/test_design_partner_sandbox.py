@@ -1,6 +1,7 @@
 """Unit tests for Design Partner Pilot Service and API Router."""
 
 import pandas as pd
+import pytest
 
 from app.application.services.design_partner_service import DesignPartnerPilotService
 
@@ -112,7 +113,14 @@ def test_evaluate_reference_benchmark_fastapi_endpoints():
     data1 = resp1.json()
     assert data1["dataset_name"] == "elliptic"
     assert data1["total_transactions_evaluated"] == 2500
-    assert data1["performance_comparison"]["federated_advantage"]["net_daily_economic_benefit_dollars"] > 0
+    perf = data1["performance_comparison"]
+    adv = perf["federated_advantage"]
+    expected_net = round(
+        adv["daily_fraud_loss_saved_dollars"] + adv["daily_investigation_saved_dollars"],
+        2,
+    )
+    assert isinstance(adv["net_daily_economic_benefit_dollars"], float)
+    assert adv["net_daily_economic_benefit_dollars"] == pytest.approx(expected_net, abs=0.011)
 
     # Test short /v1 prefix
     resp2 = client.get(

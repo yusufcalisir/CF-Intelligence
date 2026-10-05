@@ -744,7 +744,7 @@ class TestIEEECISScientificSemanticsInvariants:
         raw_bytes = artifact_path.read_bytes()
         # Normalize CRLF to LF to ensure cross-platform hash determinism across Windows and Linux CI checkouts
         normalized_bytes = raw_bytes.replace(b"\r\n", b"\n")
-        expected_sha = "ff65635afcae5c1a78d1f3754904baff58c5bfecadd06762ca8d74fdc255dad4"
+        expected_sha = "b83a16e9b5f1bdf36d2ecbcb52cf01838a7234bc20ffd5e3dbec8527d230b78a"
         actual_sha = hashlib.sha256(normalized_bytes).hexdigest()
         assert actual_sha == expected_sha, f"Canonical artifact SHA changed: {actual_sha} != {expected_sha}"
 

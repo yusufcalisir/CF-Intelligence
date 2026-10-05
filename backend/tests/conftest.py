@@ -110,12 +110,36 @@ def canonical_alert() -> dict[str, Any]:
 
 @pytest.fixture(autouse=True)
 def clear_fallback_stores():
-    """Clear shared in-memory fallback stores between tests."""
+    """Clear shared in-memory fallback stores and dedup caches between tests."""
     from app.infrastructure.redis_store import RedisStore
 
     RedisStore._shared_fallback_stores.clear()
+    try:
+        from app.presentation.routers.predict import _alert_service as p_svc
+
+        p_svc.reset_dedup_records()
+    except Exception:
+        pass
+    try:
+        from app.presentation.routers.alerts import _alert_service as a_svc
+
+        a_svc.reset_dedup_records()
+    except Exception:
+        pass
     yield
     RedisStore._shared_fallback_stores.clear()
+    try:
+        from app.presentation.routers.predict import _alert_service as p_svc
+
+        p_svc.reset_dedup_records()
+    except Exception:
+        pass
+    try:
+        from app.presentation.routers.alerts import _alert_service as a_svc
+
+        a_svc.reset_dedup_records()
+    except Exception:
+        pass
 
 
 # ── Clean C++ Extension Interpreter Teardown ──────────────────────────────────

@@ -236,6 +236,13 @@ class AlertDeduplicationEngine:
                 del self._records[k]
             return len(expired_keys)
 
+    def reset(self) -> None:
+        """Clear all deduplication records and reset counters."""
+        with self._lock:
+            self._records.clear()
+            self._total_processed = 0
+            self._duplicates_detected = 0
+
     def get_stats(self) -> dict[str, Any]:
         """Return real-time deduplication metrics."""
         with self._lock:
@@ -517,6 +524,11 @@ class AlertIntelligenceService:
     def get_dedup_stats(self) -> dict[str, Any]:
         """Retrieve real-time deduplication engine metrics."""
         return self._dedup_engine.get_stats()
+
+    def reset_dedup_records(self) -> None:
+        """Clear all deduplication sliding window records."""
+        with self._lock:
+            self._dedup_engine.reset()
 
     def publish_intelligence(self, alert: Alert) -> SharedIntelligence:
         """Convert an alert to shared intelligence with privacy hashing."""

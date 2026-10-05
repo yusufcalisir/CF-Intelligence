@@ -439,6 +439,7 @@ async def predict_transaction(
         try:
             features_dict = {
                 "transaction_id": txn_id,
+                "customer_id": payload.customer_id or payload.account_id or customer_ref,
                 "merchant_category": payload.merchant_category,
                 "country_code": payload.country_code,
                 "device_type": payload.device_type,

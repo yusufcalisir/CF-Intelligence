@@ -272,7 +272,7 @@ def test_migration_manager_configuration_and_head() -> None:
 
     heads = get_current_head_revision()
     assert len(heads) == 1
-    assert heads[0] == "002_core_and_aml_tables"
+    assert heads[0] == "003_alerts_unique_constraint"
 
 
 # ── 5. Distributed Locking in CacheService ─────────────────────────────────────

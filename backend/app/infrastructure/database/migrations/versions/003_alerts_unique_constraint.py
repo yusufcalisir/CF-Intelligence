@@ -12,7 +12,8 @@ Create Date: 2026-10-05
 
 from __future__ import annotations
 
-from alembic import op  # type: ignore[attr-defined]
+import sqlalchemy as sa
+from alembic import context, op  # type: ignore[attr-defined]
 
 # Alembic revision identifiers
 revision: str = "003_alerts_unique_constraint"
@@ -21,9 +22,51 @@ branch_labels: tuple[str, ...] | None = None
 depends_on: str | None = None
 
 
+def _alerts_table_at_revision_002() -> sa.Table:
+    """Schema of ``alerts`` exactly as created by revision 002.
+
+    Used only in offline (--sql) mode, where SQLite batch operations cannot
+    reflect the table from a live database.
+    """
+    return sa.Table(
+        "alerts",
+        sa.MetaData(),
+        sa.Column("id", sa.String(36), primary_key=True, nullable=False),
+        sa.Column("bank_id", sa.String(36), nullable=False),
+        sa.Column("transaction_id", sa.String(36), nullable=False),
+        sa.Column("risk_score", sa.Float, nullable=False, server_default="0.0"),
+        sa.Column("severity", sa.String(20), nullable=False, server_default="medium"),
+        sa.Column("status", sa.String(32), nullable=False, server_default="new"),
+        sa.Column("reason_codes", sa.JSON, nullable=False, server_default="[]"),
+        sa.Column("confidence", sa.Float, nullable=False, server_default="0.0"),
+        sa.Column("involved_entity_ids", sa.JSON, nullable=False, server_default="[]"),
+        sa.Column("top_features", sa.JSON, nullable=False, server_default="[]"),
+        sa.Column("risk_factors", sa.JSON, nullable=False, server_default="[]"),
+        sa.Column("model_confidence", sa.Float, nullable=False, server_default="0.0"),
+        sa.Column("historical_evidence", sa.JSON, nullable=False, server_default="[]"),
+        sa.Column("triage_priority", sa.String(20), nullable=False, server_default="p3_medium"),
+        sa.Column("triage_action", sa.String(32), nullable=False, server_default="queue_standard"),
+        sa.Column("sla_minutes", sa.Integer, nullable=False, server_default="1440"),
+        sa.Column("triage_reasons", sa.JSON, nullable=False, server_default="[]"),
+        sa.Column("dedup_key", sa.String(64), nullable=True),
+        sa.Column("dedup_count", sa.Integer, nullable=False, server_default="1"),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Index("ix_alerts_bank_id", "bank_id"),
+    )
+
+
+def _batch_kwargs() -> dict[str, sa.Table]:
+    if context.is_offline_mode():
+        return {"copy_from": _alerts_table_at_revision_002()}
+    return {}
+
+
 def upgrade() -> None:
     """Add uq_alerts_bank_transaction composite unique constraint."""
-    with op.batch_alter_table("alerts") as batch_op:
+    with op.batch_alter_table("alerts", **_batch_kwargs()) as batch_op:
         batch_op.create_unique_constraint(
             "uq_alerts_bank_transaction",
             ["bank_id", "transaction_id"],
@@ -32,5 +75,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Remove uq_alerts_bank_transaction composite unique constraint."""
-    with op.batch_alter_table("alerts") as batch_op:
+    with op.batch_alter_table("alerts", **_batch_kwargs()) as batch_op:
         batch_op.drop_constraint("uq_alerts_bank_transaction", type_="unique")

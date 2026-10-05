@@ -52,6 +52,18 @@ def clean_redis_stores(monkeypatch: pytest.MonkeyPatch) -> None:
     with RedisStore._lock:
         RedisStore._shared_fallback_stores.clear()
         RedisStore._global_redis_unavailable = True
+    try:
+        from app.presentation.routers.predict import _alert_service as p_svc
+
+        p_svc.reset_dedup_records()
+    except Exception:
+        pass
+    try:
+        from app.presentation.routers.alerts import _alert_service as a_svc
+
+        a_svc.reset_dedup_records()
+    except Exception:
+        pass
     settings = get_settings()
     monkeypatch.setattr(settings, "feature_store_enabled", False)
 
@@ -390,6 +402,7 @@ class TestTransactionLifecycleAndSystemInvariants:
             "/api/v1/predict",
             json={
                 "transaction_id": "tx_human_vs_machine_01",
+                "customer_id": "cust_human_vs_machine_01",
                 "transaction_amount": 15000.0,
                 "merchant_category": "crypto",
                 "country_code": "NG",
