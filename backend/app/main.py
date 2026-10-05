@@ -448,11 +448,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         try:
             import redis.asyncio as _aioredis
 
-            _r = _aioredis.from_url(_redis_url, socket_connect_timeout=1.0)
+            from app.config import redact_redis_url
+
+            _r = _aioredis.from_url(_redis_url, socket_connect_timeout=2.0)
             try:
                 await _r.ping()
                 _redis_available = True
-                logger.info("Redis: available at %s", _redis_url)
+                logger.info("Redis: available via %s", redact_redis_url(_redis_url))
             except Exception:
                 # In development, try auto-healing candidates if host=redis or password differs
                 if getattr(settings, "app_env", "development") == "development":
@@ -483,13 +485,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                                 continue
                             try:
                                 _alt_r = _aioredis.from_url(
-                                    cand_url, socket_connect_timeout=0.5
+                                    cand_url, socket_connect_timeout=1.0
                                 )
                                 await _alt_r.ping()
                                 await _alt_r.aclose()
                                 _redis_available = True
                                 _redis_url = cand_url
-                                logger.info("Redis: auto-recovered at %s", cand_url)
+                                logger.info("Redis: auto-recovered via %s", redact_redis_url(cand_url))
                                 break
                             except Exception:
                                 continue

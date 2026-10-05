@@ -97,6 +97,7 @@ def test_tenant_logging_storage_path_isolation() -> None:
 async def test_stream_via_redis_delivers_replayed_and_live_events() -> None:
     """Verify Redis list replay and pub/sub live event streaming over WebSocket."""
     mock_ws = AsyncMock()
+    mock_ws.receive_text = AsyncMock(side_effect=TimeoutError())
     mock_redis = MagicMock()
 
     # 1. Past events replay via Redis list
@@ -118,6 +119,115 @@ async def test_stream_via_redis_delivers_replayed_and_live_events() -> None:
 
     mock_redis.lrange.assert_called_once_with("simulation:sim_test_123:events", 0, -1)
     mock_pubsub.subscribe.assert_called_once_with("training:sim_test_123")
-    assert mock_ws.send_text.call_count == 2
+    assert mock_ws.send_text.call_count >= 2
     mock_ws.send_text.assert_any_call('{"event": "round_1_complete"}')
     mock_ws.send_text.assert_any_call('{"event": "round_2_complete"}')
+
+
+def test_redact_redis_url_masks_credentials() -> None:
+    """Verify that redact_redis_url strips passwords/tokens while preserving connection endpoints."""
+    from app.config import redact_redis_url
+
+    # 1. Cloud managed Redis with username and password
+    cloud_url = "rediss://default:upstash_token_secret@us1-fast-cat.upstash.io:6379/0"
+    redacted = redact_redis_url(cloud_url)
+    assert "upstash_token_secret" not in redacted
+    assert "default:***@" in redacted
+    assert "us1-fast-cat.upstash.io:6379/0" in redacted
+    assert redacted.startswith("rediss://")
+
+    # 2. Local Redis with password only
+    local_pwd = "redis://:cfi_local_secret@127.0.0.1:6379/1"
+    redacted_local = redact_redis_url(local_pwd)
+    assert "cfi_local_secret" not in redacted_local
+    assert ":***@" in redacted_local
+
+    # 3. Plain unauthenticated Redis
+    plain = "redis://localhost:6379/0"
+    assert redact_redis_url(plain) == "redis://localhost:6379/0"
+
+    # 4. None / empty
+    assert redact_redis_url(None) == "not configured"
+    assert redact_redis_url("") == "not configured"
+
+    # 5. Settings property integration
+    s = Settings(
+        redis_host="managed.redis.net",
+        redis_port=6380,
+        redis_password="super_secret_pwd",
+        redis_tls=True,
+    )
+    assert "super_secret_pwd" not in s.redacted_redis_url
+    assert ":***@" in s.redacted_redis_url
+
+
+@pytest.mark.asyncio
+async def test_training_ws_handles_connect_timeout_with_diagnostic_precision() -> None:
+    """Verify that TimeoutError during initial connect ping triggers CONNECT_TIMEOUT and in-process fallback."""
+    from app.presentation.websockets.training_ws import _handle_training_ws
+
+    mock_ws = AsyncMock()
+    mock_ws.receive_text = AsyncMock(side_effect=asyncio.CancelledError())
+
+    mock_redis = MagicMock()
+    mock_redis.ping = AsyncMock(side_effect=TimeoutError("Connection probe timed out"))
+    mock_redis.aclose = AsyncMock()
+
+    with (
+        patch("app.presentation.websockets.training_ws.get_settings") as mock_settings,
+        patch("redis.asyncio.from_url", return_value=mock_redis),
+        patch("app.presentation.websockets.training_ws.training_ws_manager.connect", return_value=True),
+        patch("app.presentation.websockets.training_ws.training_ws_manager.disconnect", return_value=None),
+        patch("app.presentation.websockets.training_ws.training_ws_manager.get_room_history", return_value=[]),
+    ):
+        settings_instance = MagicMock()
+        settings_instance.redis_url = "rediss://default:cloud_token@us1.upstash.io:6379/0"
+        mock_settings.return_value = settings_instance
+
+        with pytest.raises(asyncio.CancelledError):
+            await _handle_training_ws(mock_ws, simulation_id="live_prod_v2")
+
+        # Ping was attempted
+        mock_redis.ping.assert_called_once()
+        # Redis client was cleanly closed upon timeout
+        mock_redis.aclose.assert_called_once()
+        # WebSocket sent the connected fallback event
+        assert any(
+            '"mode": "in_process"' in call.args[0]
+            for call in mock_ws.send_text.call_args_list
+            if call.args
+        )
+
+
+@pytest.mark.asyncio
+async def test_stream_via_redis_handles_lrange_timeout_gracefully() -> None:
+    """Verify that TimeoutError during lrange replay doesn't abort pub/sub streaming."""
+    mock_ws = AsyncMock()
+    mock_ws.receive_text = AsyncMock(side_effect=TimeoutError())
+    mock_redis = MagicMock()
+
+    # Replay times out (REPLAY_READ_TIMEOUT)
+    mock_redis.lrange = MagicMock(side_effect=TimeoutError("Lrange timed out"))
+
+    mock_pubsub = MagicMock()
+    mock_pubsub.subscribe = AsyncMock()
+    mock_pubsub.get_message = AsyncMock(
+        side_effect=[
+            None,  # Idle polling
+            {"type": "message", "data": '{"event": "live_event"}'},
+            asyncio.CancelledError(),
+        ]
+    )
+    mock_pubsub.unsubscribe = AsyncMock()
+    mock_pubsub.close = AsyncMock()
+    mock_redis.pubsub.return_value = mock_pubsub
+
+    with pytest.raises(asyncio.CancelledError):
+        await _stream_via_redis(mock_ws, "sim_test_timeout", mock_redis)
+
+    # Should still have subscribed and received live event despite replay timeout
+    mock_pubsub.subscribe.assert_called_once_with("training:sim_test_timeout")
+    mock_ws.send_text.assert_any_call('{"event": "live_event"}')
+    mock_pubsub.unsubscribe.assert_called_once_with("training:sim_test_timeout")
+    mock_pubsub.close.assert_called_once()
+

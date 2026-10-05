@@ -214,6 +214,11 @@ class Settings(BaseSettings):
         return f"{scheme}://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
     @property
+    def redacted_redis_url(self) -> str:
+        """Safe Redis URL with credentials redacted for logging and telemetry."""
+        return redact_redis_url(self.redis_url)
+
+    @property
     def bank_urls(self) -> dict[str, str]:
         """HTTP endpoints for the distributed bank containers."""
         if self.app_env != "development":
@@ -266,8 +271,32 @@ class Settings(BaseSettings):
             raise ValueError(msg)
 
 
+def redact_redis_url(url: str | None) -> str:
+    """Redact passwords and tokens from a Redis connection URL for safe logging and telemetry.
+
+    Example:
+        rediss://default:secret_token@us1-fast-cat.upstash.io:6379/0
+        -> rediss://default:***@us1-fast-cat.upstash.io:6379/0
+    """
+    if not url:
+        return "not configured"
+    try:
+        import urllib.parse
+
+        parsed = urllib.parse.urlparse(url)
+        scheme = parsed.scheme or "redis"
+        port_part = f":{parsed.port}" if parsed.port else ""
+        if parsed.password or parsed.username:
+            user_part = f"{parsed.username}:***@" if parsed.username else ":***@"
+            return f"{scheme}://{user_part}{parsed.hostname}{port_part}{parsed.path}"
+        return f"{scheme}://{parsed.hostname}{port_part}{parsed.path}"
+    except Exception:
+        return "configured-redis-endpoint"
+
+
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Return cached settings instance. Parsed once at startup."""
     return Settings()
+
 

@@ -26,7 +26,7 @@ from typing import Any
 import redis.asyncio as aioredis
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from app.config import get_settings
+from app.config import get_settings, redact_redis_url
 from app.presentation.websockets.manager import training_ws_manager
 
 logger = logging.getLogger(__name__)
@@ -68,13 +68,30 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
             if not redis_url.startswith(("redis://", "rediss://", "unix://")):
                 redis_url = f"redis://{redis_url}"
 
+            # Cloud Redis over TLS requires realistic connect timeout (>200ms)
             redis_client = aioredis.from_url(
-                redis_url, decode_responses=True, socket_connect_timeout=0.2
+                redis_url,
+                decode_responses=True,
+                socket_connect_timeout=2.0,
+                socket_timeout=5.0,
             )
-            # Probe connectivity with a lightweight ping
-            await asyncio.wait_for(redis_client.ping(), timeout=0.2)
+            # Operation-appropriate timeout for initial connectivity check
+            await asyncio.wait_for(redis_client.ping(), timeout=2.0)
             redis_available = True
-            logger.debug("Redis available for simulation %s — using primary path", simulation_id)
+            logger.debug(
+                "Redis available for simulation %s via %s — using primary path",
+                simulation_id,
+                redact_redis_url(redis_url),
+            )
+        except TimeoutError:
+            logger.info(
+                "Redis CONNECT_TIMEOUT for simulation %s — switching to in-process event bus",
+                simulation_id,
+            )
+            if redis_client is not None:
+                with contextlib.suppress(Exception):
+                    await redis_client.aclose()
+                redis_client = None
         except Exception as exc:
             logger.info(
                 "Redis connection failed for simulation %s (%s) — switching to in-process event bus",
@@ -93,7 +110,17 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
 
     try:
         if redis_available and redis_client is not None:
-            await _stream_via_redis(websocket, simulation_id, redis_client)
+            try:
+                await _stream_via_redis(websocket, simulation_id, redis_client)
+            except WebSocketDisconnect:
+                raise
+            except Exception as stream_exc:
+                logger.warning(
+                    "Redis streaming failed for simulation %s (%s) — activating in-process fallback",
+                    simulation_id,
+                    type(stream_exc).__name__,
+                )
+                await _stream_via_inprocess(websocket, simulation_id, room_name)
         else:
             await _stream_via_inprocess(websocket, simulation_id, room_name)
     except WebSocketDisconnect:
@@ -121,9 +148,27 @@ async def _stream_via_redis(
     """Primary streaming path: Redis list replay + pub/sub live events."""
     events_key = f"simulation:{simulation_id}:events"
 
-    # Replay past events stored in Redis list
-    lrange_res: Any = redis_client.lrange(events_key, 0, -1)
-    past_events = await lrange_res if _is_awaitable(lrange_res) else lrange_res
+    # Step 1: Replay past events stored in Redis list
+    try:
+        lrange_res: Any = redis_client.lrange(events_key, 0, -1)
+        past_events = (
+            await asyncio.wait_for(lrange_res, timeout=2.0)
+            if _is_awaitable(lrange_res)
+            else lrange_res
+        )
+    except TimeoutError:
+        logger.warning(
+            "Redis REPLAY_READ_TIMEOUT reading %s (>2.0s) — continuing to live pub/sub",
+            events_key,
+        )
+        past_events = []
+    except Exception as exc:
+        logger.warning(
+            "Redis replay read failed for %s (%s) — continuing to live pub/sub",
+            events_key,
+            type(exc).__name__,
+        )
+        past_events = []
 
     if isinstance(past_events, (list, tuple)):
         for raw_event in past_events:
@@ -131,38 +176,108 @@ async def _stream_via_redis(
                 await websocket.send_text(raw_event)
                 training_ws_manager.record_client_activity(websocket)
 
-    # Subscribe to live events channel
+    # Step 2: Subscribe to live events channel
     pubsub = redis_client.pubsub()
-    await pubsub.subscribe(f"training:{simulation_id}")
-
-    while True:
-        message = await pubsub.get_message(
-            ignore_subscribe_messages=True,
-            timeout=1.0,
+    try:
+        await asyncio.wait_for(pubsub.subscribe(f"training:{simulation_id}"), timeout=2.0)
+    except TimeoutError:
+        logger.error(
+            "Redis SUBSCRIBE_TIMEOUT for channel training:%s (>2.0s)",
+            simulation_id,
         )
+        with contextlib.suppress(Exception):
+            await pubsub.close()
+        raise
 
-        if isinstance(message, dict) and message.get("type") == "message":
-            data = message.get("data")
-            if isinstance(data, str):
-                await websocket.send_text(data)
+    last_heartbeat = time.time()
+    heartbeat_interval = 5.0
+
+    try:
+        while True:
+            # Check for inbound frames (pings, heartbeats, validation)
+            try:
+                inbound = await asyncio.wait_for(websocket.receive_text(), timeout=0.05)
                 training_ws_manager.record_client_activity(websocket)
-
-                try:
-                    event = json.loads(data)
-                    if (
-                        isinstance(event, dict)
-                        and event.get("event_type") in ("completed", "error")
-                        and simulation_id not in ("live_prod_v2", "default", "simulation_live")
-                    ):
-                        logger.info(
-                            "Simulation %s ended, closing WebSocket (Redis path)",
-                            simulation_id,
-                        )
+                if isinstance(inbound, str):
+                    if not training_ws_manager.validate_frame_size(inbound):
+                        with contextlib.suppress(Exception):
+                            await websocket.close(code=1009, reason="Payload too large")
                         return
-                except (json.JSONDecodeError, TypeError):
-                    pass
+                    if not training_ws_manager.check_inbound_rate_limit(websocket):
+                        with contextlib.suppress(Exception):
+                            await websocket.close(code=1008, reason="Rate limit exceeded")
+                        return
+                    if "ping" in inbound.lower():
+                        await websocket.send_text(
+                            json.dumps({
+                                "event": "pong",
+                                "simulation_id": simulation_id,
+                                "timestamp": time.time(),
+                            })
+                        )
+            except TimeoutError:
+                pass  # Normal idle wait on inbound WebSocket frame
+            except WebSocketDisconnect:
+                raise
 
-        await asyncio.sleep(0.05)
+            # Read next pub/sub message (0.5s polling timeout)
+            # A timeout here is normal idle wait (APPLICATION_IDLE_WAIT), NOT an infrastructure failure.
+            try:
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True,
+                    timeout=0.5,
+                )
+            except TimeoutError:
+                # Normal idle polling timeout — no message currently available
+                message = None
+            except Exception as read_exc:
+                logger.warning(
+                    "Redis PUBSUB_READ_ERROR on channel training:%s: %s",
+                    simulation_id,
+                    type(read_exc).__name__,
+                )
+                raise
+
+            if isinstance(message, dict) and message.get("type") == "message":
+                data = message.get("data")
+                if isinstance(data, str):
+                    await websocket.send_text(data)
+                    training_ws_manager.record_client_activity(websocket)
+
+                    try:
+                        event = json.loads(data)
+                        if (
+                            isinstance(event, dict)
+                            and event.get("event_type") in ("completed", "error")
+                            and simulation_id not in ("live_prod_v2", "default", "simulation_live")
+                        ):
+                            logger.info(
+                                "Simulation %s ended, closing WebSocket (Redis path)",
+                                simulation_id,
+                            )
+                            return
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
+            # Send periodic heartbeat to keep cloud reverse proxy connection alive
+            now = time.time()
+            if now - last_heartbeat >= heartbeat_interval:
+                last_heartbeat = now
+                await websocket.send_text(
+                    json.dumps({
+                        "event": "heartbeat",
+                        "status": "streaming",
+                        "mode": "redis",
+                        "simulation_id": simulation_id,
+                        "timestamp": now,
+                    })
+                )
+
+            await asyncio.sleep(0.01)
+    finally:
+        with contextlib.suppress(Exception):
+            await pubsub.unsubscribe(f"training:{simulation_id}")
+            await pubsub.close()
 
 
 async def _stream_via_inprocess(
