@@ -264,7 +264,8 @@ class FlagshipConsortiumExperiment:
             fed_state = self._aggregate(local_models, weights)
 
         fed_champion = FlagshipMLPClassifier(input_dim=len(FEATURE_COLUMNS))
-        fed_champion.load_state_dict(fed_state)
+        if fed_state is not None:
+            fed_champion.load_state_dict(fed_state)
 
         # 6. Paradigm C: Global Pooled Oracle Upper Bound
         pooled_model = self._train_local_model(scaler.transform(X_train_raw), df_train["is_laundering"].to_numpy(dtype=int))
