@@ -64,6 +64,12 @@ class EvaluationMetrics:
     fgsm_evasion_rate: float = 0.0
     pgd_evasion_rate: float = 0.0
 
+    # Operating point and threshold provenance
+    threshold: float = 0.5
+    pr_auc: float = 0.0
+    predicted_positives: int = 0
+    threshold_provenance: str = "default_fixed_0.5"
+
 
 @dataclass(frozen=True)
 class RoundMetrics:
@@ -151,6 +157,10 @@ class SimulationConfig:
     poisoning_bank_id: str = "bank_c"
     poisoning_scale: float = 5.0
     byzantine_defense: str = "none"  # "none", "krum", "coordinate_wise_median"
+
+    # Operating point threshold calibration
+    threshold_policy: str = "max_f1"  # "max_f1", "youden", "fixed_0.5"
+    validation_split_ratio: float = 0.15
 
     # Federated Graph Embedding (FedGNN)
     enable_graph_embedding: bool = False

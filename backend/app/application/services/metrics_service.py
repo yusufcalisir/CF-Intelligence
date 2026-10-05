@@ -38,6 +38,15 @@ class MetricsService:
             equal_opportunity_diff=eval_dict.get("equal_opportunity_diff", 0.0),
             protected_selection_rate=eval_dict.get("protected_selection_rate", 1.0),
             reference_selection_rate=eval_dict.get("reference_selection_rate", 1.0),
+            adversarial_robustness_score=eval_dict.get("adversarial_robustness_score", 1.0),
+            clean_accuracy=eval_dict.get("clean_accuracy", 0.0),
+            robust_accuracy=eval_dict.get("robust_accuracy", 0.0),
+            fgsm_evasion_rate=eval_dict.get("fgsm_evasion_rate", 0.0),
+            pgd_evasion_rate=eval_dict.get("pgd_evasion_rate", 0.0),
+            threshold=float(eval_dict.get("threshold", 0.5)),
+            pr_auc=float(eval_dict.get("pr_auc", 0.0)),
+            predicted_positives=int(eval_dict.get("predicted_positives", 0)),
+            threshold_provenance=str(eval_dict.get("threshold_provenance", "default_fixed_0.5")),
         )
 
     @staticmethod
@@ -90,4 +99,13 @@ class MetricsService:
             "equal_opportunity_diff": metrics.equal_opportunity_diff,
             "protected_selection_rate": metrics.protected_selection_rate,
             "reference_selection_rate": metrics.reference_selection_rate,
+            "adversarial_robustness_score": metrics.adversarial_robustness_score,
+            "clean_accuracy": metrics.clean_accuracy,
+            "robust_accuracy": metrics.robust_accuracy,
+            "fgsm_evasion_rate": metrics.fgsm_evasion_rate,
+            "pgd_evasion_rate": metrics.pgd_evasion_rate,
+            "threshold": metrics.threshold,
+            "pr_auc": metrics.pr_auc,
+            "predicted_positives": metrics.predicted_positives,
+            "threshold_provenance": metrics.threshold_provenance,
         }

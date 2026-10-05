@@ -512,6 +512,8 @@ async def create_simulation(
         "fairness_lambda": config.fairness_lambda,
         "hardware_isolation_mode": config.hardware_isolation_mode,
         "enable_streaming_gnn": config.enable_streaming_gnn,
+        "threshold_policy": getattr(config, "threshold_policy", "max_f1"),
+        "validation_split_ratio": getattr(config, "validation_split_ratio", 0.15),
     }
 
     try:

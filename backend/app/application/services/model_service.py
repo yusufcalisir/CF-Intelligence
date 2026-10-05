@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import (
     accuracy_score,
+    average_precision_score,
     confusion_matrix,
     f1_score,
     precision_score,
@@ -504,11 +505,14 @@ class ModelService:
         X_test: np.ndarray,
         y_test: np.ndarray,
         sens_attr: np.ndarray | None = None,
+        threshold: float = 0.5,
+        threshold_provenance: str = "default_fixed_0.5",
     ) -> dict[str, Any]:
-        """Evaluate model on test data.
+        """Evaluate model on test data using a specified classification threshold.
 
-        Returns a dict with accuracy, precision, recall, f1, auc_roc, loss,
-        confusion_matrix, roc_fpr, roc_tpr, roc_thresholds, and fairness_counts.
+        Returns a dict with accuracy, precision, recall, f1, auc_roc, pr_auc, loss,
+        confusion_matrix, roc_fpr, roc_tpr, roc_thresholds, threshold provenance,
+        and fairness/robustness counts.
         """
         model.eval()
         with torch.no_grad():
@@ -525,17 +529,23 @@ class ModelService:
 
             gc.collect()
 
-        preds = (probs >= 0.5).astype(int)
+        preds = (probs >= threshold).astype(int)
+
+        score_min = float(np.min(probs)) if len(probs) > 0 else 0.0
+        score_max = float(np.max(probs)) if len(probs) > 0 else 0.0
+        score_mean = float(np.mean(probs)) if len(probs) > 0 else 0.0
 
         # Handle edge case where test set has only one class (mathematically undefined)
         is_defined = len(np.unique(y_test)) >= 2
         if is_defined:
             try:
                 auc = float(roc_auc_score(y_test, probs))
+                pr_auc = float(average_precision_score(y_test, probs))
                 fpr, tpr, thresholds = roc_curve(y_test, probs)
                 auc_status = "defined"
             except Exception:
                 auc = 0.5
+                pr_auc = 0.0
                 fpr = np.array([0.0, 1.0])
                 tpr = np.array([0.0, 1.0])
                 thresholds = np.array([1.0, 0.0])
@@ -543,6 +553,7 @@ class ModelService:
                 auc_status = "undefined_computation_error"
         else:
             auc = 0.5
+            pr_auc = 0.0
             fpr = np.array([0.0, 1.0])
             tpr = np.array([0.0, 1.0])
             thresholds = np.array([1.0, 0.0])
@@ -633,7 +644,71 @@ class ModelService:
             "robust_accuracy": adv_report["robust_accuracy"],
             "fgsm_evasion_rate": adv_report["fgsm_evasion_rate"],
             "pgd_evasion_rate": adv_report["pgd_evasion_rate"],
+            "threshold": float(threshold),
+            "threshold_provenance": threshold_provenance,
+            "pr_auc": float(pr_auc),
+            "predicted_positives": int(preds.sum()),
+            "score_min": score_min,
+            "score_max": score_max,
+            "score_mean": score_mean,
         }
+
+    def select_operating_threshold(
+        self,
+        y_val: np.ndarray,
+        probs_val: np.ndarray,
+        policy: str = "max_f1",
+        n_candidates: int = 200,
+    ) -> tuple[float, float, str]:
+        """Select an authoritative operating threshold using validation data only.
+
+        Strictly leak-free: never consumes holdout test labels.
+
+        Supported policies:
+        - 'max_f1': maximize F1 score on validation distribution
+        - 'youden': maximize Youden's J statistic (TPR - FPR)
+        - 'fixed_0.5': uncalibrated legacy default
+
+        Returns:
+            (selected_threshold, validation_metric_value, policy_provenance)
+        """
+        if policy == "fixed_0.5" or len(np.unique(y_val)) < 2:
+            return 0.5, 0.0, "fixed_0.5"
+
+        p_min, p_max = float(np.min(probs_val)), float(np.max(probs_val))
+        if p_min >= p_max:
+            return 0.5, 0.0, f"{policy}_degenerate_probs"
+
+        candidates = np.linspace(p_min, p_max, n_candidates)
+        scores: list[float] = []
+
+        for th in candidates:
+            preds = (probs_val >= th).astype(int)
+            if policy == "max_f1":
+                score = float(f1_score(y_val, preds, zero_division=0))
+            elif policy == "youden":
+                tn, fp, fn, tp = confusion_matrix(y_val, preds, labels=[0, 1]).ravel()
+                tpr = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+                fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
+                score = float(tpr - fpr)
+            else:
+                score = float(f1_score(y_val, preds, zero_division=0))
+            scores.append(score)
+
+        scores_arr = np.array(scores)
+        best_score = float(np.max(scores_arr)) if len(scores_arr) > 0 else 0.0
+
+        if best_score > 0.0:
+            # Place decision boundary in the robust center of the optimal validation plateau/margin
+            optimal_candidates = [
+                th for th, s in zip(candidates, scores_arr) if np.isclose(s, best_score, atol=1e-5)
+            ]
+            best_th = float(np.median(optimal_candidates))
+        else:
+            best_th = 0.5
+
+        provenance = f"validation_calibrated_{policy}_val_{best_score:.4f}"
+        return best_th, best_score, provenance
 
     def get_parameters(self, model: FraudDetectionModel) -> ModelWeights:
         """Extract model parameters as a serializable ModelWeights object."""

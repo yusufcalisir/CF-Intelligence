@@ -27,6 +27,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+import torch
 from sklearn.model_selection import train_test_split
 
 from app.application.services.data_generator import DataGenerator
@@ -371,30 +372,51 @@ class SimulationService:
 
                     sensitive_array = (df["country_code"] != "US").astype(int).values
 
+                    # Stratified 70% Train, 15% Validation, 15% Test split
+                    val_ratio = getattr(config, "validation_split_ratio", 0.15)
+                    test_rem_ratio = 0.30
                     try:
-                        X_train, X_test, y_train, y_test, sens_train, sens_test = train_test_split(
+                        X_train, X_rem, y_train, y_rem, sens_train, sens_rem = train_test_split(
                             X,
                             y,
                             sensitive_array,
-                            test_size=0.2,
+                            test_size=test_rem_ratio,
                             random_state=42,
                             stratify=cast("Any", y),
                         )
+                        X_val, X_test, y_val, y_test, sens_val, sens_test = train_test_split(
+                            X_rem,
+                            y_rem,
+                            sens_rem,
+                            test_size=0.50,
+                            random_state=42,
+                            stratify=cast("Any", y_rem),
+                        )
                     except ValueError:
-                        X_train, X_test, y_train, y_test, sens_train, sens_test = train_test_split(
+                        X_train, X_rem, y_train, y_rem, sens_train, sens_rem = train_test_split(
                             X,
                             y,
                             sensitive_array,
-                            test_size=0.2,
+                            test_size=test_rem_ratio,
+                            random_state=42,
+                        )
+                        X_val, X_test, y_val, y_test, sens_val, sens_test = train_test_split(
+                            X_rem,
+                            y_rem,
+                            sens_rem,
+                            test_size=0.50,
                             random_state=42,
                         )
 
                     bank_data[bank_id] = {
                         "X_train": X_train,
+                        "X_val": X_val,
                         "X_test": X_test,
                         "y_train": y_train,
+                        "y_val": y_val,
                         "y_test": y_test,
                         "sens_train": sens_train,
+                        "sens_val": sens_val,
                         "sens_test": sens_test,
                     }
 
@@ -418,9 +440,13 @@ class SimulationService:
                 },
             )
 
-            # Create a global validation/test set by concatenating all bank test sets
-            X_val_global = np.concatenate([data["X_test"] for data in bank_data.values()], axis=0)
-            y_val_global = np.concatenate([data["y_test"] for data in bank_data.values()], axis=0)
+            # Create a global validation partition (strictly leak-free calibration & intermediate check)
+            X_val_global = np.concatenate([data["X_val"] for data in bank_data.values()], axis=0)
+            y_val_global = np.concatenate([data["y_val"] for data in bank_data.values()], axis=0)
+
+            # Create a global holdout test partition (untouched final evaluation)
+            X_test_global = np.concatenate([data["X_test"] for data in bank_data.values()], axis=0)
+            y_test_global = np.concatenate([data["y_test"] for data in bank_data.values()], axis=0)
             feature_dim = int(X_val_global.shape[1])
 
             # Phase 2: Train local models (baseline)
@@ -450,11 +476,26 @@ class SimulationService:
                     fairness_lambda=config.fairness_lambda,
                 )
 
+                # Select local operating threshold on validation split (strictly leak-free)
+                model.eval()
+                with torch.no_grad():
+                    val_t = torch.FloatTensor(data["X_val"]).to(self.model_service.device)
+                    loc_val_probs = model(val_t).cpu().numpy()
+                    del val_t
+
+                loc_th, loc_val_f1, loc_prov = self.model_service.select_operating_threshold(
+                    data["y_val"],
+                    loc_val_probs,
+                    policy=getattr(config, "threshold_policy", "max_f1"),
+                )
+
                 eval_dict = self.model_service.evaluate(
                     model,
                     data["X_test"],
                     data["y_test"],
                     sens_attr=data["sens_test"],
+                    threshold=loc_th,
+                    threshold_provenance=f"local_{loc_prov}",
                 )
 
                 feat_imp = self.model_service.get_feature_importance(
@@ -1095,7 +1136,7 @@ class SimulationService:
                     # Load aggregated weights into global structure
                     global_model = self.model_service.set_parameters(global_model, global_weights)
 
-                    # Evaluate global model on participating client nodes test partitions
+                    # Evaluate global model on participating client nodes validation partitions
                     eval_losses = []
                     eval_aucs: dict[str, float] = {}
                     for bank in participating:
@@ -1104,9 +1145,9 @@ class SimulationService:
                             eval_m = self.model_service.set_parameters(eval_m, global_weights)
                             bank_eval = self.model_service.evaluate(
                                 eval_m,
-                                bank_data[bank.id]["X_test"],
-                                bank_data[bank.id]["y_test"],
-                                sens_attr=bank_data[bank.id]["sens_test"],
+                                bank_data[bank.id]["X_val"],
+                                bank_data[bank.id]["y_val"],
+                                sens_attr=bank_data[bank.id]["sens_val"],
                             )
                             eval_losses.append(bank_eval["loss"])
                             eval_aucs[bank.id] = bank_eval["auc_roc"]
@@ -1127,13 +1168,25 @@ class SimulationService:
 
                     round_loss = sum(eval_losses) / len(eval_losses) if eval_losses else 0.0
 
-                    # Global validation evaluation across concatenated bank test sets
+                    # Global validation evaluation across concatenated bank validation sets
                     global_eval_m = self.model_service.create_model(input_dim=feature_dim)
                     global_eval_m = self.model_service.set_parameters(global_eval_m, global_weights)
+                    with torch.no_grad():
+                        val_t = torch.FloatTensor(X_val_global).to(self.model_service.device)
+                        round_val_probs = global_eval_m(val_t).cpu().numpy()
+                        del val_t
+
+                    round_th, round_val_f1, round_prov = self.model_service.select_operating_threshold(
+                        y_val_global,
+                        round_val_probs,
+                        policy=getattr(config, "threshold_policy", "max_f1"),
+                    )
                     global_eval = self.model_service.evaluate(
                         global_eval_m,
                         X_val_global,
                         y_val_global,
+                        threshold=round_th,
+                        threshold_provenance=f"round_{round_num}_{round_prov}",
                     )
                     global_auc = global_eval["auc_roc"]
                     global_f1 = global_eval["f1_score"]
@@ -1152,8 +1205,6 @@ class SimulationService:
                     if streaming_graph is not None and streaming_gnn is not None:
                         h, edge_index, y_labels = streaming_graph.get_active_subgraph_tensors()
                         if h.size(0) > 0 and edge_index.size(1) > 0:
-                            import torch
-
                             y_tensor = torch.tensor(y_labels, dtype=torch.float32)
                             loss_val = streaming_gnn.online_train_step(h, edge_index, y_tensor)
                             simulation.streaming_gnn_loss_history.append(loss_val)
@@ -1427,6 +1478,28 @@ class SimulationService:
                 },
             )
 
+            # Authoritative Operating Point Calibration:
+            # Calibrate threshold on global validation partition (strictly leak-free)
+            global_model.eval()
+            with torch.no_grad():
+                val_t = torch.FloatTensor(X_val_global).to(self.model_service.device)
+                final_val_probs = global_model(val_t).cpu().numpy()
+                del val_t
+
+            operating_threshold, val_metric_val, threshold_prov = (
+                self.model_service.select_operating_threshold(
+                    y_val_global,
+                    final_val_probs,
+                    policy=getattr(config, "threshold_policy", "max_f1"),
+                )
+            )
+            logger.info(
+                "Calibrated federated operating threshold on validation split: %.6f (Val metric: %.4f, policy: %s)",
+                operating_threshold,
+                val_metric_val,
+                threshold_prov,
+            )
+
             client_counts = []
             eval_dicts = {}
             for bank in banks:
@@ -1437,6 +1510,8 @@ class SimulationService:
                         data["X_test"],
                         data["y_test"],
                         sens_attr=data["sens_test"],
+                        threshold=operating_threshold,
+                        threshold_provenance=threshold_prov,
                     )
                     eval_dicts[bank.id] = fed_eval
                     fed_feat_imp = self.model_service.get_feature_importance(global_model)
@@ -1452,6 +1527,8 @@ class SimulationService:
                             data["X_test"],
                             data["y_test"],
                             sens_attr=data.get("sens_test"),
+                            threshold=operating_threshold,
+                            threshold_provenance=threshold_prov,
                         )
                         eval_dicts[bank.id] = fed_eval
                         fed_feat_imp = self.model_service.get_feature_importance(
@@ -1569,6 +1646,8 @@ class SimulationService:
                         global_model,
                         X_val_global,
                         y_val_global,
+                        threshold=operating_threshold,
+                        threshold_provenance=threshold_prov,
                     )
                     base_f1 = base_eval.get("f1_score", 0.8)
 
@@ -1596,6 +1675,8 @@ class SimulationService:
                             loo_model,
                             X_val_global,
                             y_val_global,
+                            threshold=operating_threshold,
+                            threshold_provenance=threshold_prov,
                         )
                         loo_f1 = loo_eval.get("f1_score", 0.0)
 
