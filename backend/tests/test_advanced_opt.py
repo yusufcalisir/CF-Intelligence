@@ -61,64 +61,69 @@ def _make_client_weights(n: int = 3, dim: int = 100, noise: float = 0.1) -> list
 
 class TestEllipticLoader:
     def test_mock_returns_correct_shape(self, tmp_path):
+        from app.application.services.synthetic_dataset_generators import generate_synthetic_elliptic
+
         rng = np.random.default_rng(0)
-        result = load_elliptic(path=tmp_path / "nonexistent", n_mock_nodes=500, rng=rng)
+        result = generate_synthetic_elliptic(n_mock_nodes=500, rng=rng)
         assert result["source"] == "mock"
         assert result["X"].shape == (500, 166)
         assert result["y"].shape == (500,)
         assert isinstance(result["edges"], list)
 
     def test_mock_labels_are_binary(self, tmp_path):
-        result = load_elliptic(path=tmp_path / "nonexistent", n_mock_nodes=1000, rng=np.random.default_rng(1))
+        from app.application.services.synthetic_dataset_generators import generate_synthetic_elliptic
+
+        result = generate_synthetic_elliptic(n_mock_nodes=1000, rng=np.random.default_rng(1))
         unique = set(result["y"].tolist())
         assert unique <= {0, 1}
 
     def test_mock_illicit_ratio_approximately_correct(self, tmp_path):
-        result = load_elliptic(path=tmp_path / "nonexistent", n_mock_nodes=5000, rng=np.random.default_rng(2))
+        from app.application.services.synthetic_dataset_generators import generate_synthetic_elliptic
+
+        result = generate_synthetic_elliptic(n_mock_nodes=5000, rng=np.random.default_rng(2))
         illicit_frac = result["y"].mean()
         # Within ±1% of the stated 2% ratio
         assert abs(illicit_frac - 0.021) < 0.015
 
     def test_mock_has_edges(self, tmp_path):
-        result = load_elliptic(path=tmp_path / "nonexistent", n_mock_nodes=200, rng=np.random.default_rng(3))
+        from app.application.services.synthetic_dataset_generators import generate_synthetic_elliptic
+
+        result = generate_synthetic_elliptic(n_mock_nodes=200, rng=np.random.default_rng(3))
         assert len(result["edges"]) > 0
 
 
 class TestAMLSimLoader:
     def test_mock_returns_correct_shape(self, tmp_path):
-        result = load_amlsim(path=tmp_path / "nonexistent", n_mock_txns=300, rng=np.random.default_rng(0))
+        from app.application.services.synthetic_dataset_generators import generate_synthetic_amlsim
+
+        result = generate_synthetic_amlsim(n_mock_txns=300, rng=np.random.default_rng(0))
         assert result["source"] == "mock"
         assert result["X"].shape == (300, 6)
         assert result["y"].shape == (300,)
 
     def test_mock_amounts_are_positive(self, tmp_path):
-        result = load_amlsim(path=tmp_path / "nonexistent", n_mock_txns=500, rng=np.random.default_rng(4))
+        from app.application.services.synthetic_dataset_generators import generate_synthetic_amlsim
+
+        result = generate_synthetic_amlsim(n_mock_txns=500, rng=np.random.default_rng(4))
         amounts = result["X"][:, 1]  # amount column
         assert (amounts >= 0).all()
 
 
 class TestPaySimLoader:
     def test_mock_returns_correct_shape(self, tmp_path):
-        result = load_paysim(path=tmp_path / "nonexistent", n_mock_txns=400, rng=np.random.default_rng(0))
+        from app.application.services.synthetic_dataset_generators import generate_synthetic_paysim
+
+        result = generate_synthetic_paysim(n_mock_txns=400, rng=np.random.default_rng(0))
         assert "mock" in result["source"]
         assert result["X"].shape == (400, 13)
         assert result["y"].shape == (400,)
 
 
 class TestLoadDatasetRegistry:
-    def test_known_datasets(self, tmp_path):
-        # Elliptic takes n_mock_nodes, others take n_mock_txns
-        d1 = load_dataset("elliptic", path=tmp_path / "nonexistent", n_mock_nodes=100, rng=np.random.default_rng(0))
-        assert d1["X"].shape == (100, 166)
-
-        d2 = load_dataset("amlsim", path=tmp_path / "nonexistent", n_mock_txns=100, rng=np.random.default_rng(0))
-        assert d2["X"].shape == (100, 6)
-
-        d3 = load_dataset("paysim", path=tmp_path / "nonexistent", n_mock_txns=100, rng=np.random.default_rng(0))
-        assert d3["X"].shape == (100, 13)
-
-        d4 = load_dataset("creditcard", path=tmp_path / "nonexistent", n_mock_txns=100, rng=np.random.default_rng(0))
-        assert d4["X"].shape == (100, 29)
+    def test_known_datasets_fail_closed_when_missing(self, tmp_path):
+        for name in ("elliptic", "amlsim", "paysim", "creditcard"):
+            with pytest.raises(FileNotFoundError):
+                load_dataset(name, path=tmp_path / "nonexistent")
 
     def test_unknown_dataset_raises(self):
         with pytest.raises(ValueError, match="Unknown dataset"):

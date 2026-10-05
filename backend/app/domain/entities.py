@@ -11,7 +11,13 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from app.domain.enums import BankTier, ClientStatus, SimulationStatus
+from app.domain.enums import (
+    BankTier,
+    ClientStatus,
+    DatasetMode,
+    DatasetProvenance,
+    SimulationStatus,
+)
 from app.domain.value_objects import BankDataProfile, EvaluationMetrics, SimulationConfig
 
 
@@ -88,9 +94,14 @@ class SimulationRun:
     settlement_status: str | None = None
     on_chain_payouts: list[dict[str, Any]] = field(default_factory=list)
 
-    # Dataset Mode & Provenance Telemetry
-    dataset_mode: str = "synthetic"
-    dataset_provenance: str = "SYNTHETIC_EVIDENCE"
+    # Dataset Mode & Provenance Telemetry (unresolved until data is loaded)
+    dataset_mode: DatasetMode | str | None = None
+    dataset_provenance: DatasetProvenance | str | None = None
+
+    @property
+    def is_provenance_resolved(self) -> bool:
+        """Returns True only when both dataset mode and provenance have been authoritatively resolved."""
+        return self.dataset_mode is not None and self.dataset_provenance is not None
 
     @property
     def duration_seconds(self) -> float | None:

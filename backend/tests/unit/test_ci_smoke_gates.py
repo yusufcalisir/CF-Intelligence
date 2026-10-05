@@ -44,13 +44,13 @@ class TestDataloaderSmokeGates:
 
     def test_dataloader_smoke_paysim_and_ieeecis(self) -> None:
         """Verify PaySim and IEEE-CIS load rapidly with correct shapes and binary labels."""
-        paysim_data = load_paysim(n_mock_txns=50)
+        paysim_data = load_paysim(nrows=50)
         assert isinstance(paysim_data, dict)
         assert "X" in paysim_data and "y" in paysim_data
         assert len(paysim_data["X"]) > 0
         assert len(paysim_data["y"]) == len(paysim_data["X"])
 
-        ieee_data = load_ieee_cis(n_mock_txns=50)
+        ieee_data = load_ieee_cis(nrows=50)
         assert isinstance(ieee_data, dict)
         assert "X" in ieee_data and "y" in ieee_data
         assert len(ieee_data["X"]) > 0
@@ -58,27 +58,27 @@ class TestDataloaderSmokeGates:
 
     def test_dataloader_smoke_creditcard_and_elliptic(self) -> None:
         """Verify CreditCard and Elliptic graph datasets load with valid schema parity."""
-        cc_data = load_creditcard_fraud(n_mock_txns=50)
+        cc_data = load_creditcard_fraud(nrows=50)
         assert isinstance(cc_data, dict)
         assert "X" in cc_data and "y" in cc_data
         assert len(cc_data["X"]) > 0
 
-        elliptic_data = load_elliptic(n_mock_nodes=50, force_mock=True)
+        elliptic_data = load_elliptic(nrows=50)
         assert isinstance(elliptic_data, dict)
         assert "X" in elliptic_data and "y" in elliptic_data
         assert len(elliptic_data["X"]) > 0
 
     def test_dataloader_smoke_amlsim_synthaml_amlnet(self) -> None:
         """Verify specialized AML topology datasets initialize in smoke mode."""
-        amlsim_data = load_amlsim(n_mock_txns=50)
+        amlsim_data = load_amlsim(nrows=50)
         assert isinstance(amlsim_data, dict)
         assert "X" in amlsim_data or "df" in amlsim_data or "transactions" in amlsim_data
 
-        synthaml_data = load_synthaml(n_mock_alerts=50)
+        synthaml_data = load_synthaml(nrows=50)
         assert isinstance(synthaml_data, dict)
         assert "X" in synthaml_data or "df" in synthaml_data or "alerts" in synthaml_data
 
-        amlnet_data = load_amlnet(n_mock_txns=50)
+        amlnet_data = load_amlnet(nrows=50)
         assert isinstance(amlnet_data, dict)
         assert "X" in amlnet_data or "df" in amlnet_data or "transactions" in amlnet_data
 

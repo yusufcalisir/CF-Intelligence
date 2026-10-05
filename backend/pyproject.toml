@@ -66,5 +66,4 @@ filterwarnings = [
     "ignore::DeprecationWarning:typer.*:",
     "ignore:.*pythonjsonlogger.*:DeprecationWarning:",
     "ignore:.*Valid config keys have changed in V2.*:UserWarning:",
-    "ignore:.*statistically inadequate for reporting p99.*:UserWarning",
 ]

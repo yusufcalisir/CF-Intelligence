@@ -82,13 +82,18 @@ class TestIEEECISLoader:
         empty_dir = tmp_path / "no_ieee_cis"
         empty_dir.mkdir()
 
-        # Strict mode must raise FileNotFoundError
+        # Strict mode and non-strict mode both raise FileNotFoundError on real loader
         with pytest.raises(FileNotFoundError, match="Real IEEE-CIS Fraud Detection dataset files not found"):
             load_ieee_cis(path=empty_dir, nrows=500, require_real=True)
 
-        # Non-strict mode generates synthetic mock
-        mock_data = load_ieee_cis(path=empty_dir, n_mock_txns=500, require_real=False)
-        assert mock_data["source"] == "mock_ieee_cis"
+        with pytest.raises(FileNotFoundError, match="Real IEEE-CIS Fraud Detection dataset files not found"):
+            load_ieee_cis(path=empty_dir, nrows=500, require_real=False)
+
+        # Explicit synthetic generator produces controlled test fixture
+        from app.application.services.synthetic_dataset_generators import generate_synthetic_ieee_cis
+
+        mock_data = generate_synthetic_ieee_cis(n_mock_txns=500)
+        assert mock_data["is_synthetic"] is True
         assert mock_data["X"].shape[0] == 500
         assert mock_data["X"].shape[1] >= 40
         assert len(mock_data["y"]) == 500

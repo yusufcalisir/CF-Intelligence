@@ -77,7 +77,7 @@ class EllipticBenchmarkService:
             rng = np.random.default_rng(random_seed)
             torch.manual_seed(random_seed)
 
-            data = load_elliptic(path=self.data_path, n_mock_nodes=n_samples, rng=rng)
+            data = load_elliptic(path=self.data_path, nrows=n_samples, n_mock_nodes=n_samples, rng=rng)
 
             X: np.ndarray = data["X"]
             y: np.ndarray = data["y"]

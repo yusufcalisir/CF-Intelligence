@@ -36,6 +36,8 @@ from app.domain.enums import (
     AggregationMethod,
     BankTier,
     ClientStatus,
+    DatasetMode,
+    DatasetProvenance,
     PrivacyMechanism,
     SimulationStatus,
 )
@@ -235,17 +237,19 @@ class SimulationService:
                 )
 
                 dataset_mode_req = getattr(config, "dataset_mode", None)
-                if dataset_mode_req is None:
-                    dataset_mode_req = "real"
+                if dataset_mode_req == "synthetic":
+                    raise ValueError(
+                        f"Conflict: requested registered benchmark dataset '{dataset_choice}' with "
+                        f"dataset_mode='synthetic'. Registered benchmark datasets cannot be loaded in synthetic mode."
+                    )
 
-                is_strict_real = (dataset_mode_req == "real")
                 self._notify(
                     progress_callback,
                     simulation.id,
                     "status",
                     {
                         "status": simulation.status,
-                        "message": f"Loading benchmark dataset: {dataset_choice.upper()} (mode: {dataset_mode_req})",
+                        "message": f"Loading benchmark dataset: {dataset_choice.upper()} (mode: real)",
                     },
                 )
                 n_samples_req = max(
@@ -257,22 +261,16 @@ class SimulationService:
                 real_data = load_dataset(
                     dataset_choice,
                     nrows=n_samples_req,
-                    require_real=is_strict_real,
-                    dataset_mode=dataset_mode_req,
                 )
                 X_full = np.nan_to_num(real_data["X"], nan=0.0, posinf=0.0, neginf=0.0).astype(
                     np.float32
                 )
                 y_full = np.asarray(real_data["y"], dtype=int)
                 feature_names = real_data.get("feature_names")
-                dataset_is_synth = bool(real_data.get("is_synthetic", False))
-                dataset_prov = (
-                    "SYNTHETIC_EVIDENCE"
-                    if dataset_is_synth or dataset_mode_req == "synthetic"
-                    else real_data.get("provenance", "REAL_DATA_EVIDENCE")
+                simulation.dataset_mode = DatasetMode.REAL.value
+                simulation.dataset_provenance = real_data.get(
+                    "provenance", DatasetProvenance.REAL_DATA_EVIDENCE.value
                 )
-                simulation.dataset_mode = "synthetic" if dataset_is_synth else "real"
-                simulation.dataset_provenance = dataset_prov
 
                 # Non-IID Dirichlet partition across 3 banks
                 partitions = partition_dataset_non_iid(
@@ -375,9 +373,9 @@ class SimulationService:
                     }
                 simulation.banks = banks
                 datasets = {}
-            else:
-                simulation.dataset_mode = "synthetic"
-                simulation.dataset_provenance = "SYNTHETIC_EVIDENCE"
+            elif dataset_choice == "synthetic":
+                simulation.dataset_mode = DatasetMode.SYNTHETIC.value
+                simulation.dataset_provenance = DatasetProvenance.DEMO_DATA.value
                 self._notify(
                     progress_callback,
                     simulation.id,
@@ -482,6 +480,10 @@ class SimulationService:
                         "sens_val": sens_val,
                         "sens_test": sens_test,
                     }
+            else:
+                raise ValueError(
+                    f"Unknown dataset '{config.dataset}'. Available: {list(DATASET_REGISTRY)} or 'synthetic'."
+                )
 
             # Notify progress callback of the generated banks early
             self._notify(
@@ -784,6 +786,8 @@ class SimulationService:
                     )
                     for r in flower_result.get("rounds", [])
                 ]
+                simulation.rounds = rounds
+                simulation.rounds_run = len(rounds)
 
             else:
                 # â”€â”€ Bank Connector-driven Engine Branch (distributed, event-driven, or custom/in-memory) â”€â”€
@@ -1946,9 +1950,14 @@ class SimulationService:
                 active_simulations.add(-1)
                 active_sim_decremented = True
 
-            # Persist the accumulated training rounds onto the simulation entity
-            simulation.rounds = rounds if "rounds" in locals() else []
-            simulation.rounds_run = len(simulation.rounds)
+            # Verify resolved dataset provenance before completing simulation
+            if not simulation.is_provenance_resolved:
+                raise ValueError(
+                    f"Simulation {simulation.id} cannot complete: dataset provenance is unresolved. "
+                    f"Provenance must be explicitly established (mode={simulation.dataset_mode}, "
+                    f"provenance={simulation.dataset_provenance})."
+                )
+
             simulation.status = SimulationStatus.COMPLETED
             simulation.completed_at = _now()
 

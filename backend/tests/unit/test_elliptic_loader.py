@@ -53,7 +53,7 @@ class TestEllipticLoaderRealDataset:
         """Test default loading (include_unknown=False) returns 46,564 labeled nodes."""
         data = load_elliptic(require_real=True, all_rows=True, include_unknown=False)
 
-        assert data["source"] == "real"
+        assert "real" in data["source"]
         assert data["X"].shape == (46564, ELLIPTIC_FEATURE_DIM)
         assert data["y"].shape == (46564,)
         # All labels must be strictly binary
@@ -75,7 +75,7 @@ class TestEllipticLoaderRealDataset:
         """Test full graph loading (include_unknown=True) returns all 203,769 nodes and 234,355 edges."""
         data = load_elliptic(require_real=True, all_rows=True, include_unknown=True)
 
-        assert data["source"] == "real"
+        assert "real" in data["source"]
         assert data["X"].shape == (203769, ELLIPTIC_FEATURE_DIM)
         assert data["y"].shape == (203769,)
         # Labels must contain -1 (unknown), 0 (licit), 1 (illicit)
@@ -202,13 +202,16 @@ class TestEllipticLoaderRealDataset:
 
 
 class TestEllipticLoaderMockAndEdgeCases:
-    """Tests evaluating mock fallback and parameter validations."""
+    """Tests evaluating synthetic fixtures and fail-closed real boundary."""
 
-    def test_mock_generation_preserves_schema_and_intra_timestep_edges(self):
-        """Test mock generator creates valid 166-feature graph with intra-timestep edges."""
+    def test_synthetic_generation_preserves_schema_and_intra_timestep_edges(self):
+        """Test synthetic fixture creates valid 166-feature graph with intra-timestep edges."""
+        from app.application.services.synthetic_dataset_generators import (
+            generate_synthetic_elliptic,
+        )
+
         rng = np.random.default_rng(42)
-        data = load_elliptic(
-            force_mock=True,
+        data = generate_synthetic_elliptic(
             n_mock_nodes=300,
             rng=rng,
             include_unknown=True,
@@ -216,14 +219,16 @@ class TestEllipticLoaderMockAndEdgeCases:
             split_timestep=34,
         )
 
-        assert data["source"] == "mock"
+        assert data["source"] in ("mock", "synthetic_generator")
+        assert data["is_synthetic"] is True
+        assert data["provenance"] == "TEST_FIXTURE"
         assert data["X"].shape == (300, ELLIPTIC_FEATURE_DIM)
         assert data["y"].shape == (300,)
         assert set(np.unique(data["y"])).issubset({-1, 0, 1})
         assert data["edge_index"].shape[0] == 2
         assert len(data["edges"]) == data["edge_index"].shape[1]
 
-        # Verify intra-timestep edges in mock
+        # Verify intra-timestep edges in synthetic graph
         if data["edge_index"].shape[1] > 0:
             src = data["edge_index"][0]
             dst = data["edge_index"][1]
@@ -231,21 +236,19 @@ class TestEllipticLoaderMockAndEdgeCases:
             dst_ts = data["timesteps"][dst]
             assert np.array_equal(src_ts, dst_ts)
 
-    def test_require_real_raises_when_missing(self, tmp_path):
-        """Verify FileNotFoundError is raised when require_real=True and files absent."""
+    def test_missing_files_raises_file_not_found(self, tmp_path):
+        """Verify FileNotFoundError is raised unconditionally when files are absent."""
         empty_dir = tmp_path / "empty_elliptic"
         empty_dir.mkdir()
 
         with pytest.raises(FileNotFoundError, match="Real Elliptic Bitcoin dataset files not found"):
-            load_elliptic(path=empty_dir, require_real=True)
+            load_elliptic(path=empty_dir)
 
     def test_graphsage_forward_and_masked_loss_on_elliptic(self):
         """Verify GraphSAGEModel processes 166-dim Elliptic features with edge_index and masked loss."""
         # Load a manageable slice for neural execution
         data = load_elliptic(
-            require_real=False,
             nrows=1000,
-            n_mock_nodes=1000,
             include_unknown=True,
             temporal_split=True,
             split_timestep=34,

@@ -158,16 +158,22 @@ class TestAMLNetLoader:
         with pytest.raises(FileNotFoundError, match="Real AMLNet dataset files not found"):
             load_amlnet(require_real=True, data_dir=empty_dir)
 
-    def test_amlnet_synthetic_fallback_generation(self, tmp_path: Path) -> None:
-        """Verify synthetic fallback generates high-fidelity mock matching exact schema."""
-        empty_dir = tmp_path / "empty_amlnet"
-        data = load_amlnet(require_real=False, data_dir=empty_dir, n_mock_txns=60, seed=123)
+    def test_amlnet_synthetic_generation(self) -> None:
+        """Verify explicit synthetic generation matches exact AMLNet schema."""
+        from app.application.services.synthetic_dataset_generators import generate_synthetic_amlnet
 
-        assert data["source"] == "synthetic_fallback"
+        data = generate_synthetic_amlnet(n_mock_txns=60)
+        assert data["is_synthetic"] is True
         assert len(data["y"]) == 60
         assert data["X"].shape == (60, 18)
         assert np.all(np.isin(data["y"], [0, 1]))
         assert data["feature_names"] == AMLNET_FEATURE_COLS
+
+    def test_amlnet_fails_closed_on_missing_dir(self, tmp_path: Path) -> None:
+        """Verify real loader fails closed on missing files even if require_real=False."""
+        empty_dir = tmp_path / "empty_amlnet"
+        with pytest.raises(FileNotFoundError, match="Real AMLNet dataset files not found"):
+            load_amlnet(require_real=False, data_dir=empty_dir)
 
     def test_amlnet_registry_routing(self) -> None:
         """Verify convenience DATASET_REGISTRY resolves amlnet and aml_net."""

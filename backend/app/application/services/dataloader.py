@@ -1,15 +1,14 @@
-"""Public Dataset Loaders for AML Benchmark Evaluation (Item 20).
+"""Authoritative Real-World and External Dataset Loaders for Fraud & AML Benchmarks.
 
-Supports three canonical AML/fraud datasets:
-- Elliptic Bitcoin Dataset (graph-based, node classification)
-- AMLSim (IBM agent-based synthetic transaction graph)
-- PaySim / IEEE-CIS / Kaggle Credit Card Fraud (tabular)
+Strict Real-Data Runtime Boundary:
+Each loader (load_paysim, load_ieee_cis, load_elliptic, load_creditcard_fraud,
+load_amlsim, load_synthaml, load_amlnet) loads and validates real physical
+dataset files from storage. If physical files are absent or unparseable,
+the loader fails closed (raises FileNotFoundError / ValueError).
 
-If real data files are not found under ``storage/datasets/<name>/``,
-each loader generates a high-fidelity synthetic mock that preserves
-the exact feature dimensions, label ratios, and column schemas of the
-real dataset so that the benchmark runner produces valid metric numbers
-regardless of whether the files are downloaded.
+Silent synthetic fallbacks, mock generation, and fabricated runtime truth
+are strictly prohibited in all real loader paths.
+Synthetic test fixtures are isolated in `synthetic_dataset_generators.py`.
 """
 
 from __future__ import annotations
@@ -24,7 +23,25 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.domain.enums import DatasetProvenance
 from app.infrastructure.storage.storage_utils import get_storage_dir
+from app.application.services.synthetic_dataset_generators import (
+    generate_synthetic_amlnet,
+    generate_synthetic_amlsim,
+    generate_synthetic_creditcard,
+    generate_synthetic_elliptic,
+    generate_synthetic_ieee_cis,
+    generate_synthetic_paysim,
+    generate_synthetic_synthaml,
+)
+
+# Compatibility aliases for non-runtime test code
+_generate_mock_elliptic = generate_synthetic_elliptic
+_generate_mock_amlsim = generate_synthetic_amlsim
+_generate_mock_paysim = generate_synthetic_paysim
+_generate_mock_ieee_cis = generate_synthetic_ieee_cis
+_generate_mock_synthaml = generate_synthetic_synthaml
+_generate_mock_amlnet = generate_synthetic_amlnet
 
 logger = logging.getLogger(__name__)
 
@@ -178,154 +195,9 @@ def _make_elliptic_networkx_graph(
     return G
 
 
-def _generate_mock_elliptic(
-    n_mock_nodes: int,
-    rng: np.random.Generator,
-    include_unknown: bool = False,
-    temporal_split: bool = False,
-    split_timestep: int = 34,
-) -> dict[str, Any]:
-    """Generate high-fidelity synthetic mock Elliptic graph."""
-    logger.info(
-        "[Elliptic] Generating synthetic mock (%d nodes, %d features)",
-        n_mock_nodes,
-        ELLIPTIC_FEATURE_DIM,
-    )
-
-    timesteps = rng.integers(1, 50, size=n_mock_nodes).astype(int)
-    steps = timesteps.reshape(-1, 1).astype(np.float32)
-    rest = rng.standard_normal((n_mock_nodes, ELLIPTIC_FEATURE_DIM - 1)).astype(np.float32)
-    X = np.hstack([steps, rest])
-
-    if include_unknown:
-        rand_vals = rng.random(n_mock_nodes)
-        y = np.where(rand_vals < 0.05, 1, np.where(rand_vals < 0.35, 0, -1)).astype(int)
-        if temporal_split:
-            test_indices = np.where(timesteps > split_timestep)[0]
-            if len(test_indices) >= 4:
-                y[test_indices[0]] = 1
-                y[test_indices[1]] = 1
-                y[test_indices[2]] = 0
-                y[test_indices[3]] = 0
-            train_indices = np.where(timesteps <= split_timestep)[0]
-            if len(train_indices) >= 4:
-                y[train_indices[0]] = 1
-                y[train_indices[1]] = 1
-                y[train_indices[2]] = 0
-                y[train_indices[3]] = 0
-    else:
-        y = (rng.random(n_mock_nodes) < ELLIPTIC_ILLICIT_RATIO).astype(int)
-        if temporal_split:
-            test_indices = np.where(timesteps > split_timestep)[0]
-            if len(test_indices) >= 2:
-                y[test_indices[0]] = 1
-                y[test_indices[1]] = 0
-
-    # Generate intra-timestep directed edges (~3 out-edges per node)
-    edges: list[tuple[int, int]] = []
-    nodes_by_ts: dict[int, list[int]] = {}
-    for idx_node, ts in enumerate(timesteps):
-        nodes_by_ts.setdefault(int(ts), []).append(idx_node)
-
-    for ts_nodes in nodes_by_ts.values():
-        if len(ts_nodes) > 1:
-            n_ts_edges = min(len(ts_nodes) * 3, len(ts_nodes) * (len(ts_nodes) - 1))
-            src_sample = rng.choice(ts_nodes, size=n_ts_edges, replace=True)
-            dst_sample = rng.choice(ts_nodes, size=n_ts_edges, replace=True)
-            for s, d in zip(src_sample, dst_sample, strict=False):
-                if s != d:
-                    edges.append((int(s), int(d)))
-
-    if not edges:
-        edges = [(0, 1)] if n_mock_nodes > 1 else []
-
-    edge_index = (
-        np.array([[e[0] for e in edges], [e[1] for e in edges]], dtype=np.int64)
-        if edges
-        else np.zeros((2, 0), dtype=np.int64)
-    )
-
-    adjacency_lists: list[list[int]] = [[] for _ in range(n_mock_nodes)]
-    for u, v in edges:
-        if 0 <= u < n_mock_nodes and 0 <= v < n_mock_nodes:
-            adjacency_lists[u].append(v)
-            adjacency_lists[v].append(u)
-
-    tx_ids = np.array([f"mock_tx_{i}" for i in range(n_mock_nodes)])
-    tx_to_idx = {tx_id: idx for idx, tx_id in enumerate(tx_ids)}
-    idx_to_tx = {idx: tx_id for idx, tx_id in enumerate(tx_ids)}
-
-    labeled_mask = y != -1
-    fraud_ratio = float(np.mean(y[labeled_mask] == 1)) if np.any(labeled_mask) else 0.0
-
-    train_mask = timesteps <= split_timestep if temporal_split else None
-    test_mask = timesteps > split_timestep if temporal_split else None
-    train_labeled_mask = (train_mask & (y != -1)) if (temporal_split and train_mask is not None and include_unknown) else train_mask
-    test_labeled_mask = (test_mask & (y != -1)) if (temporal_split and test_mask is not None and include_unknown) else test_mask
-
-    def to_pyg_data() -> Any:
-        return _make_elliptic_pyg_data(
-            X=X,
-            y=y,
-            edge_index=edge_index,
-            timesteps=timesteps,
-            temporal_split=temporal_split,
-            train_mask=train_mask,
-            test_mask=test_mask,
-            train_labeled_mask=train_labeled_mask,
-            test_labeled_mask=test_labeled_mask,
-        )
-
-    def to_networkx(max_nodes: int | None = None) -> Any:
-        return _make_elliptic_networkx_graph(
-            y=y,
-            tx_ids=tx_ids,
-            timesteps=timesteps,
-            edges=edges,
-            max_nodes=max_nodes,
-        )
-
-    mock_res: dict[str, Any] = {
-        "X": X,
-        "y": y,
-        "edges": edges,
-        "edge_index": edge_index,
-        "adjacency_lists": adjacency_lists,
-        "timesteps": timesteps,
-        "tx_ids": tx_ids,
-        "tx_to_idx": tx_to_idx,
-        "idx_to_tx": idx_to_tx,
-        "source": "mock",
-        "provenance": "EXPLICIT_SYNTHETIC_DEMO",
-        "is_synthetic": True,
-        "fraud_ratio": fraud_ratio,
-        "to_pyg_data": to_pyg_data,
-        "to_networkx": to_networkx,
-    }
-
-    if temporal_split and train_mask is not None and test_mask is not None and train_labeled_mask is not None and test_labeled_mask is not None:
-        mock_res.update({
-            "train_mask": train_mask,
-            "test_mask": test_mask,
-            "train_labeled_mask": train_labeled_mask,
-            "test_labeled_mask": test_labeled_mask,
-            "split_timestep": split_timestep,
-            "n_train": int(np.sum(train_mask)),
-            "n_test": int(np.sum(test_mask)),
-            "n_train_labeled": int(np.sum(train_labeled_mask)),
-            "n_test_labeled": int(np.sum(test_labeled_mask)),
-        })
-
-    return mock_res
-
-
 def load_elliptic(
     path: Path | None = None,
     nrows: int | None = None,
-    n_mock_nodes: int = 2_000,
-    rng: np.random.Generator | None = None,
-    require_real: bool = False,
-    allow_synthetic: bool | None = None,
     all_rows: bool = False,
     include_unknown: bool = False,
     temporal_split: bool = False,
@@ -333,17 +205,12 @@ def load_elliptic(
     max_timesteps: int | None = None,
     construct_graph: bool = True,
     use_cache: bool = True,
-    force_mock: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Load the Elliptic Bitcoin Transaction Graph Dataset.
+    """Load the real Elliptic Bitcoin Transaction Graph Dataset.
 
-    Supports:
-    - Real dataset loading via accelerated Parquet cache or raw CSVs.
-    - Zero future-leakage temporal split (timesteps 1..split_timestep train, split_timestep+1..49 test).
-    - Inclusion or exclusion of unknown background transactions (y = -1).
-    - PyTorch Geometric compatible edge_index (2, E) and undirected/directed adjacency lists.
-    - Export helpers to_pyg_data() and to_networkx().
+    Fails closed with FileNotFoundError if physical dataset files are missing.
+    No synthetic generator fallback.
 
     Returns
     -------
@@ -357,25 +224,16 @@ def load_elliptic(
         ``tx_ids``          : np.ndarray (N,)     — original transaction IDs
         ``tx_to_idx``       : dict[str, int]      — map from transaction ID to node index
         ``idx_to_tx``       : dict[int, str]      — map from node index to transaction ID
-        ``source``          : str                 — "real" | "mock"
+        ``source``          : str                 — "real_parquet" | "real_csv"
+        ``provenance``      : str                 — "EMPIRICAL_EXTERNAL_DATA"
+        ``artifact_origin`` : str                 — "external_physical_file"
+        ``scientific_origin``: str                — "empirical"
+        ``is_synthetic``    : bool                — False
         ``fraud_ratio``     : float               — ratio of illicit nodes among labeled nodes
         ``to_pyg_data``     : callable            — exports graph to PyTorch Geometric Data object or dict
         ``to_networkx``     : callable            — exports graph to NetworkX DiGraph
-        (If temporal_split=True):
-        ``train_mask``      : np.ndarray (N,) bool — True for timestep <= split_timestep
-        ``test_mask``       : np.ndarray (N,) bool — True for timestep > split_timestep
-        ``train_labeled_mask``: np.ndarray (N,) bool — True for train nodes with y in {0, 1}
-        ``test_labeled_mask`` : np.ndarray (N,) bool — True for test nodes with y in {0, 1}
-        ``split_timestep``  : int
-        ``n_train``         : int
-        ``n_test``          : int
-        ``n_train_labeled`` : int
-        ``n_test_labeled``  : int
     """
-    rng = rng or np.random.default_rng(42)
-    target_nodes = kwargs.get("n_mock_nodes") or kwargs.get("n_mock_txns") or kwargs.get("nrows") or nrows or n_mock_nodes
-    n_mock_nodes = int(target_nodes)
-    target_nrows = None if all_rows else (nrows or (int(kwargs["nrows"]) if "nrows" in kwargs and kwargs["nrows"] is not None else None))
+    target_nrows = None if all_rows else (nrows or (int(kwargs["nrows"]) if "nrows" in kwargs and kwargs["nrows"] is not None else (kwargs.get("n_samples") or kwargs.get("n_mock_nodes"))))
     root = resolve_dataset_dir("elliptic", path)
 
     features_csv = root / "elliptic_txs_features.csv"
@@ -401,194 +259,168 @@ def load_elliptic(
             parquet_cache = cand_pq[0]
 
     has_real_files = parquet_cache.exists() or (features_csv.exists() and classes_csv.exists())
-
-    # Decide real vs mock
-    dataset_mode = kwargs.get("dataset_mode")
-    force_synthetic = bool(
-        kwargs.get("force_synthetic", False)
-        or force_mock
-        or (dataset_mode == "synthetic")
-    )
-    if force_synthetic and require_real:
-        raise ValueError("force_synthetic/force_mock and require_real are mutually exclusive.")
-
-    should_load_real = not force_synthetic and has_real_files
-
-    if should_load_real:
-        logger.info("[Elliptic] Loading real dataset from %s (use_cache=%s)", root, use_cache)
-        df: pd.DataFrame | None = None
-
-        if use_cache and parquet_cache.exists():
-            try:
-                df = pd.read_parquet(parquet_cache)
-                logger.info("[Elliptic] Loaded Parquet cache with shape %s", df.shape)
-            except Exception as e:
-                logger.warning("[Elliptic] Failed reading Parquet cache (%s), falling back to CSV", e)
-                df = None
-
-        if df is None:
-            read_nrows = max(target_nrows * 5, 2000) if (target_nrows and not all_rows) else None
-            feat_df = pd.read_csv(features_csv, header=None, nrows=read_nrows)
-            feat_df.rename(columns={0: "txId"}, inplace=True)
-            feat_df["txId"] = feat_df["txId"].astype(str)
-
-            cls_df = pd.read_csv(classes_csv, nrows=read_nrows)
-            cls_df["txId"] = cls_df["txId"].astype(str)
-
-            merged_df = pd.merge(cls_df, feat_df, on="txId", how="inner")
-            # In raw CSV, column 1 is timestep
-            if 1 in merged_df.columns:
-                merged_df.rename(columns={1: "timestep"}, inplace=True)
-            df = merged_df
-
-        # Filter max timesteps if requested
-        if max_timesteps is not None and "timestep" in df.columns:
-            df = df[df["timestep"] <= max_timesteps].copy()
-
-        # Class handling: 1=illicit, 2=licit, unknown
-        class_col = "class" if "class" in df.columns else ("label" if "label" in df.columns else None)
-        if class_col is not None:
-            c_str = df[class_col].astype(str)
-            if not include_unknown:
-                df = df[c_str.isin(["1", "2"])].copy()
-                c_str = df[class_col].astype(str)
-                y: np.ndarray = np.asarray((c_str == "1").to_numpy(dtype=int))
-            else:
-                c_arr = c_str.to_numpy()
-                y = np.where(c_arr == "1", 1, np.where(c_arr == "2", 0, -1)).astype(int)
-        else:
-            y = np.zeros(len(df), dtype=int)
-
-        if target_nrows is not None and not all_rows and len(df) > target_nrows:
-            df = df.iloc[:target_nrows].copy()
-            y = y[:target_nrows]
-
-        # Extract features X: timestep (col 0) + 165 numeric features
-        feature_cols = [c for c in df.columns if c not in ("txId", "class", "label")]
-        X: np.ndarray = np.asarray(df[feature_cols].to_numpy(), dtype=np.float32)
-
-        # Timesteps
-        if "timestep" in df.columns:
-            timesteps: np.ndarray = np.asarray(df["timestep"].to_numpy(), dtype=int)
-        elif X.shape[1] > 0:
-            timesteps = np.asarray(X[:, 0], dtype=int)
-        else:
-            timesteps = np.ones(len(y), dtype=int)
-
-        tx_ids: np.ndarray = np.asarray(df["txId"].astype(str).to_numpy(), dtype=str) if "txId" in df.columns else np.array([str(i) for i in range(len(y))])
-        tx_to_idx = {tx_id: idx for idx, tx_id in enumerate(tx_ids)}
-        idx_to_tx = {idx: tx_id for idx, tx_id in enumerate(tx_ids)}
-
-        # Build graph topology
-        edges: list[tuple[int, int]] = []
-        if construct_graph and edges_csv.exists():
-            read_edge_rows = None if all_rows else (max(target_nrows * 10, 5000) if target_nrows else None)
-            edge_df = pd.read_csv(edges_csv, nrows=read_edge_rows)
-            src_col = edge_df.columns[0]
-            dst_col = edge_df.columns[1]
-
-            src_mapped = edge_df[src_col].astype(str).map(tx_to_idx)
-            dst_mapped = edge_df[dst_col].astype(str).map(tx_to_idx)
-            valid = src_mapped.notna() & dst_mapped.notna()
-
-            src_arr = np.asarray(src_mapped[valid].to_numpy(), dtype=np.int64)
-            dst_arr = np.asarray(dst_mapped[valid].to_numpy(), dtype=np.int64)
-            edges = [(int(u), int(v)) for u, v in zip(src_arr, dst_arr, strict=False)]
-            edge_index = np.vstack([src_arr, dst_arr]).astype(np.int64) if len(edges) > 0 else np.zeros((2, 0), dtype=np.int64)
-        else:
-            edge_index = np.zeros((2, 0), dtype=np.int64)
-
-        # Build adjacency lists for message passing
-        adjacency_lists: list[list[int]] = [[] for _ in range(len(y))]
-        for u, v in edges:
-            if 0 <= u < len(y) and 0 <= v < len(y):
-                adjacency_lists[u].append(v)
-                adjacency_lists[v].append(u)
-
-        labeled_mask = y != -1
-        fraud_ratio = float(np.mean(y[labeled_mask] == 1)) if np.any(labeled_mask) else 0.0
-
-        train_mask: np.ndarray | None = np.asarray(timesteps <= split_timestep) if temporal_split else None
-        test_mask: np.ndarray | None = np.asarray(timesteps > split_timestep) if temporal_split else None
-        train_labeled_mask: np.ndarray | None = (train_mask & (y != -1)) if (temporal_split and train_mask is not None and include_unknown) else train_mask
-        test_labeled_mask: np.ndarray | None = (test_mask & (y != -1)) if (temporal_split and test_mask is not None and include_unknown) else test_mask
-
-        def to_pyg_data() -> Any:
-            return _make_elliptic_pyg_data(
-                X=X,
-                y=y,
-                edge_index=edge_index,
-                timesteps=timesteps,
-                temporal_split=temporal_split,
-                train_mask=train_mask,
-                test_mask=test_mask,
-                train_labeled_mask=train_labeled_mask,
-                test_labeled_mask=test_labeled_mask,
-            )
-
-        def to_networkx(max_nodes: int | None = None) -> Any:
-            return _make_elliptic_networkx_graph(
-                y=y,
-                tx_ids=tx_ids,
-                timesteps=timesteps,
-                edges=edges,
-                max_nodes=max_nodes,
-            )
-
-        result: dict[str, Any] = {
-            "X": X,
-            "y": y,
-            "edges": edges,
-            "edge_index": edge_index,
-            "adjacency_lists": adjacency_lists,
-            "timesteps": timesteps,
-            "tx_ids": tx_ids,
-            "tx_to_idx": tx_to_idx,
-            "idx_to_tx": idx_to_tx,
-            "source": "real",
-            "provenance": "REAL_OFFICIAL_DATASET",
-            "is_synthetic": False,
-            "fraud_ratio": fraud_ratio,
-            "to_pyg_data": to_pyg_data,
-            "to_networkx": to_networkx,
-        }
-
-        if temporal_split and train_mask is not None and test_mask is not None and train_labeled_mask is not None and test_labeled_mask is not None:
-            result.update({
-                "train_mask": train_mask,
-                "test_mask": test_mask,
-                "train_labeled_mask": train_labeled_mask,
-                "test_labeled_mask": test_labeled_mask,
-                "split_timestep": split_timestep,
-                "n_train": int(np.sum(train_mask)),
-                "n_test": int(np.sum(test_mask)),
-                "n_train_labeled": int(np.sum(train_labeled_mask)),
-                "n_test_labeled": int(np.sum(test_labeled_mask)),
-            })
-
-        logger.info(
-            "[Elliptic] Successfully loaded real dataset: %d nodes, %d edges, fraud_ratio=%.4f",
-            len(y),
-            len(edges),
-            fraud_ratio,
-        )
-        return result
-
-    allow_synth = allow_synthetic if allow_synthetic is not None else force_synthetic
-    if require_real or dataset_mode == "real" or not allow_synth:
+    if not has_real_files:
         raise FileNotFoundError(
             f"Real Elliptic Bitcoin dataset files not found in '{root}'. "
             f"Expected 'elliptic_cache.parquet' or ('elliptic_txs_features.csv' and 'elliptic_txs_classes.csv'). "
-            f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_mock=True for synthetic demo."
+            f"Real dataset loaders fail closed; synthetic substitutes are prohibited."
         )
 
-    return _generate_mock_elliptic(
-        n_mock_nodes=n_mock_nodes,
-        rng=rng,
-        include_unknown=include_unknown,
-        temporal_split=temporal_split,
-        split_timestep=split_timestep,
+    logger.info("[Elliptic] Loading real dataset from %s (use_cache=%s)", root, use_cache)
+    df: pd.DataFrame | None = None
+
+    if use_cache and parquet_cache.exists():
+        try:
+            df = pd.read_parquet(parquet_cache)
+            logger.info("[Elliptic] Loaded Parquet cache with shape %s", df.shape)
+        except Exception as e:
+            logger.warning("[Elliptic] Failed reading Parquet cache (%s), falling back to CSV", e)
+            df = None
+
+    if df is None:
+        read_nrows = max(target_nrows * 5, 2000) if (target_nrows and not all_rows) else None
+        feat_df = pd.read_csv(features_csv, header=None, nrows=read_nrows)
+        feat_df.rename(columns={0: "txId"}, inplace=True)
+        feat_df["txId"] = feat_df["txId"].astype(str)
+
+        cls_df = pd.read_csv(classes_csv, nrows=read_nrows)
+        cls_df["txId"] = cls_df["txId"].astype(str)
+
+        merged_df = pd.merge(cls_df, feat_df, on="txId", how="inner")
+        if 1 in merged_df.columns:
+            merged_df.rename(columns={1: "timestep"}, inplace=True)
+        df = merged_df
+
+    if max_timesteps is not None and "timestep" in df.columns:
+        df = df[df["timestep"] <= max_timesteps].copy()
+
+    class_col = "class" if "class" in df.columns else ("label" if "label" in df.columns else None)
+    if class_col is not None:
+        c_str = df[class_col].astype(str)
+        if not include_unknown:
+            df = df[c_str.isin(["1", "2"])].copy()
+            c_str = df[class_col].astype(str)
+            y: np.ndarray = np.asarray((c_str == "1").to_numpy(dtype=int))
+        else:
+            c_arr = c_str.to_numpy()
+            y = np.where(c_arr == "1", 1, np.where(c_arr == "2", 0, -1)).astype(int)
+    else:
+        y = np.zeros(len(df), dtype=int)
+
+    if target_nrows is not None and not all_rows and len(df) > target_nrows:
+        df = df.iloc[:target_nrows].copy()
+        y = y[:target_nrows]
+
+    feature_cols = [c for c in df.columns if c not in ("txId", "class", "label")]
+    X: np.ndarray = np.asarray(df[feature_cols].to_numpy(), dtype=np.float32)
+
+    if "timestep" in df.columns:
+        timesteps: np.ndarray = np.asarray(df["timestep"].to_numpy(), dtype=int)
+    elif X.shape[1] > 0:
+        timesteps = np.asarray(X[:, 0], dtype=int)
+    else:
+        timesteps = np.ones(len(y), dtype=int)
+
+    tx_ids: np.ndarray = np.asarray(df["txId"].astype(str).to_numpy(), dtype=str) if "txId" in df.columns else np.array([str(i) for i in range(len(y))])
+    tx_to_idx = {tx_id: idx for idx, tx_id in enumerate(tx_ids)}
+    idx_to_tx = {idx: tx_id for idx, tx_id in enumerate(tx_ids)}
+
+    edges: list[tuple[int, int]] = []
+    if construct_graph and edges_csv.exists():
+        read_edge_rows = None if all_rows else (max(target_nrows * 10, 5000) if target_nrows else None)
+        edge_df = pd.read_csv(edges_csv, nrows=read_edge_rows)
+        src_col = edge_df.columns[0]
+        dst_col = edge_df.columns[1]
+
+        src_mapped = edge_df[src_col].astype(str).map(tx_to_idx)
+        dst_mapped = edge_df[dst_col].astype(str).map(tx_to_idx)
+        valid = src_mapped.notna() & dst_mapped.notna()
+
+        src_arr = np.asarray(src_mapped[valid].to_numpy(), dtype=np.int64)
+        dst_arr = np.asarray(dst_mapped[valid].to_numpy(), dtype=np.int64)
+        edges = [(int(u), int(v)) for u, v in zip(src_arr, dst_arr, strict=False)]
+        edge_index = np.vstack([src_arr, dst_arr]).astype(np.int64) if len(edges) > 0 else np.zeros((2, 0), dtype=np.int64)
+    else:
+        edge_index = np.zeros((2, 0), dtype=np.int64)
+
+    adjacency_lists: list[list[int]] = [[] for _ in range(len(y))]
+    for u, v in edges:
+        if 0 <= u < len(y) and 0 <= v < len(y):
+            adjacency_lists[u].append(v)
+            adjacency_lists[v].append(u)
+
+    labeled_mask = y != -1
+    fraud_ratio = float(np.mean(y[labeled_mask] == 1)) if np.any(labeled_mask) else 0.0
+
+    train_mask: np.ndarray | None = np.asarray(timesteps <= split_timestep) if temporal_split else None
+    test_mask: np.ndarray | None = np.asarray(timesteps > split_timestep) if temporal_split else None
+    train_labeled_mask: np.ndarray | None = (train_mask & (y != -1)) if (temporal_split and train_mask is not None and include_unknown) else train_mask
+    test_labeled_mask: np.ndarray | None = (test_mask & (y != -1)) if (temporal_split and test_mask is not None and include_unknown) else test_mask
+
+    def to_pyg_data() -> Any:
+        return _make_elliptic_pyg_data(
+            X=X,
+            y=y,
+            edge_index=edge_index,
+            timesteps=timesteps,
+            temporal_split=temporal_split,
+            train_mask=train_mask,
+            test_mask=test_mask,
+            train_labeled_mask=train_labeled_mask,
+            test_labeled_mask=test_labeled_mask,
+        )
+
+    def to_networkx(max_nodes: int | None = None) -> Any:
+        return _make_elliptic_networkx_graph(
+            y=y,
+            tx_ids=tx_ids,
+            timesteps=timesteps,
+            edges=edges,
+            max_nodes=max_nodes,
+        )
+
+    source_desc = "real"
+
+    result: dict[str, Any] = {
+        "X": X,
+        "y": y,
+        "edges": edges,
+        "edge_index": edge_index,
+        "adjacency_lists": adjacency_lists,
+        "timesteps": timesteps,
+        "tx_ids": tx_ids,
+        "tx_to_idx": tx_to_idx,
+        "idx_to_tx": idx_to_tx,
+        "source": source_desc,
+        "provenance": DatasetProvenance.EMPIRICAL_EXTERNAL_DATA.value,
+        "artifact_origin": "external_physical_file",
+        "scientific_origin": "empirical",
+        "is_synthetic": False,
+        "fraud_ratio": fraud_ratio,
+        "to_pyg_data": to_pyg_data,
+        "to_networkx": to_networkx,
+    }
+
+    if temporal_split and train_mask is not None and test_mask is not None and train_labeled_mask is not None and test_labeled_mask is not None:
+        result.update({
+            "train_mask": train_mask,
+            "test_mask": test_mask,
+            "train_labeled_mask": train_labeled_mask,
+            "test_labeled_mask": test_labeled_mask,
+            "split_timestep": split_timestep,
+            "n_train": int(np.sum(train_mask)),
+            "n_test": int(np.sum(test_mask)),
+            "n_train_labeled": int(np.sum(train_labeled_mask)),
+            "n_test_labeled": int(np.sum(test_labeled_mask)),
+        })
+
+    logger.info(
+        "[Elliptic] Successfully loaded real dataset: %d nodes, %d edges, fraud_ratio=%.4f",
+        len(y),
+        len(edges),
+        fraud_ratio,
     )
+    return result
 
 
 # ===========================================================================
@@ -797,7 +629,9 @@ def _process_amlsim_dataframe(
         "alerts": alerts_df,
         "accounts": accounts_df,
         "source": source,
-        "provenance": "REAL_OFFICIAL_DATASET",
+        "provenance": DatasetProvenance.PUBLIC_SIMULATED_DATASET.value,
+        "artifact_origin": "external_physical_file",
+        "scientific_origin": "simulated",
         "is_synthetic": False,
         "fraud_ratio": fraud_ratio,
         "to_pyg_data": to_pyg_data,
@@ -805,7 +639,7 @@ def _process_amlsim_dataframe(
     }
 
     if temporal_split:
-        clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "dataset_mode", "force_synthetic")}
+        clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "all_rows", "temporal_split", "dataset_mode")}
         return temporal_split_dataset(res, time_col="step", **clean_kwargs)
 
     return res
@@ -814,122 +648,73 @@ def _process_amlsim_dataframe(
 def load_amlsim(
     path: Path | None = None,
     nrows: int | None = None,
-    n_mock_txns: int = 5_000,
-    rng: np.random.Generator | None = None,
-    require_real: bool = False,
     all_rows: bool = False,
     temporal_split: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Load the IBM AMLSim transaction dataset.
 
+    Fails closed with FileNotFoundError if physical dataset files are missing.
+    No synthetic generator fallback.
+
     Returns
     -------
     dict with keys:
-        ``X``           : np.ndarray (N, 6) — transaction feature matrix
-        ``y``           : np.ndarray (N,)   — binary label (1=SAR / fraud, 0=legit)
-        ``feature_names``: list[str]         — column names of X
-        ``edges``       : list[tuple[int, int]] — graph edge pairs
-        ``edge_index``  : np.ndarray (2, E) — PyTorch Geometric compatible edge index
-        ``source``      : str               — 'real_parquet', 'real_csv', or 'mock'
-        ``fraud_ratio`` : float             — fraud class prevalence
-        ``to_pyg_data`` : Callable          — export to PyTorch Geometric Data
-        ``to_networkx`` : Callable          — export to NetworkX DiGraph
+        ``X``               : np.ndarray (N, 6) — transaction feature matrix
+        ``y``               : np.ndarray (N,)   — binary label (1=SAR / fraud, 0=legit)
+        ``feature_names``   : list[str]         — column names of X
+        ``edges``           : list[tuple[int, int]] — graph edge pairs
+        ``edge_index``      : np.ndarray (2, E) — PyTorch Geometric compatible edge index
+        ``source``          : str               — 'real_parquet' or 'real_csv'
+        ``provenance``      : str               — 'PUBLIC_SIMULATED_DATASET'
+        ``artifact_origin`` : str               — 'external_physical_file'
+        ``scientific_origin``: str              — 'simulated'
+        ``is_synthetic``    : bool              — False
+        ``fraud_ratio``     : float             — fraud class prevalence
+        ``to_pyg_data``     : Callable          — export to PyTorch Geometric Data
+        ``to_networkx``     : Callable          — export to NetworkX DiGraph
     """
-    rng = rng or np.random.default_rng(42)
     if all_rows:
         target_nrows = None
     elif nrows is not None:
         target_nrows = None if nrows <= 0 else nrows
-    elif "nrows" in kwargs:
-        kw_nrows = kwargs.get("nrows")
-        target_nrows = None if (kw_nrows is None or kw_nrows <= 0) else int(kw_nrows)
+    elif "nrows" in kwargs and kwargs["nrows"] is not None:
+        kw_nrows = int(kwargs["nrows"])
+        target_nrows = None if kw_nrows <= 0 else kw_nrows
     else:
-        target_nrows = int(kwargs.get("n_mock_txns") or n_mock_txns)
-    n_mock_txns = target_nrows or n_mock_txns
+        target_nrows = None
+
     root = resolve_dataset_dir("amlsim", path)
 
-    dataset_mode = kwargs.get("dataset_mode")
-    force_synthetic = bool(kwargs.get("force_synthetic", False) or dataset_mode == "synthetic")
-    if force_synthetic and require_real:
-        raise ValueError("force_synthetic and require_real are mutually exclusive.")
+    # 1. Parquet cache check
+    parquet_cache = root / "transactions.parquet"
+    if parquet_cache.exists():
+        logger.info("[AMLSim] Loading from Parquet cache %s (nrows=%s)", parquet_cache, target_nrows)
+        df = pd.read_parquet(parquet_cache)
+        if target_nrows is not None and len(df) > target_nrows:
+            df = df.iloc[:target_nrows]
+        return _process_amlsim_dataframe(df, root=root, source="real_parquet", temporal_split=temporal_split, **kwargs)
 
-    if not force_synthetic:
-        # 1. Parquet cache check
-        parquet_cache = root / "transactions.parquet"
-        if parquet_cache.exists():
-            logger.info("[AMLSim] Loading from Parquet cache %s (nrows=%s)", parquet_cache, target_nrows)
-            df = pd.read_parquet(parquet_cache)
-            if target_nrows is not None and len(df) > target_nrows:
-                df = df.iloc[:target_nrows]
-            return _process_amlsim_dataframe(df, root=root, source="real_parquet", temporal_split=temporal_split, **kwargs)
+    # 2. CSV candidates
+    csv_candidates = [root / "transactions.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
+    for csv_path in csv_candidates:
+        if csv_path.exists() and not csv_path.name.endswith(".parquet"):
+            logger.info("[AMLSim] Loading real dataset from %s (nrows=%s)", csv_path, target_nrows)
+            df = pd.read_csv(csv_path, nrows=target_nrows)
+            if target_nrows is None and not parquet_cache.exists():
+                try:
+                    df.to_parquet(parquet_cache, index=False)
+                    logger.info("[AMLSim] Cached %d transactions to %s", len(df), parquet_cache)
+                except Exception as exc:
+                    logger.debug("[AMLSim] Skipping parquet caching: %s", exc)
+            return _process_amlsim_dataframe(df, root=root, source="real_csv", temporal_split=temporal_split, **kwargs)
 
-        # 2. CSV candidates
-        csv_candidates = [root / "transactions.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
-        for csv_path in csv_candidates:
-            if csv_path.exists() and not csv_path.name.endswith(".parquet"):
-                logger.info("[AMLSim] Loading real dataset from %s (nrows=%s)", csv_path, target_nrows)
-                df = pd.read_csv(csv_path, nrows=target_nrows)
-                if target_nrows is None and not parquet_cache.exists():
-                    try:
-                        df.to_parquet(parquet_cache, index=False)
-                        logger.info("[AMLSim] Cached %d transactions to %s", len(df), parquet_cache)
-                    except Exception as exc:
-                        logger.debug("[AMLSim] Skipping parquet caching: %s", exc)
-                return _process_amlsim_dataframe(df, root=root, source="real_csv", temporal_split=temporal_split, **kwargs)
-
-    if require_real or dataset_mode == "real":
-        raise FileNotFoundError(
-            f"Real AMLSim dataset export not found in '{root}'. "
-            f"AMLSim is an IBM synthetic transaction generator; provide transactions.csv or generate records. "
-            f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_synthetic=True for synthetic demo."
-        )
-
-    # ---- Mock generation ----
-    logger.info(
-        "[AMLSim] Dataset not found at %s — generating synthetic mock (%d txns)",
-        root,
-        n_mock_txns,
+    raise FileNotFoundError(
+        f"Real AMLSim dataset export not found in '{root}'. "
+        f"Expected 'transactions.parquet' or 'transactions.csv'. "
+        f"Real dataset loaders fail closed; synthetic substitutes are prohibited."
     )
-    amounts = rng.exponential(scale=5_000, size=n_mock_txns).astype(np.float32)
-    bal_orig = rng.uniform(0, 50_000, size=n_mock_txns).astype(np.float32)
-    new_bal_orig = np.maximum(bal_orig - amounts, 0).astype(np.float32)
-    bal_dest = rng.uniform(0, 50_000, size=n_mock_txns).astype(np.float32)
-    new_bal_dest = (bal_dest + amounts).astype(np.float32)
-    steps = rng.integers(1, 720, size=n_mock_txns).astype(np.float32)
 
-    X = np.column_stack([steps, amounts, bal_orig, new_bal_orig, bal_dest, new_bal_dest])
-    y = (rng.random(n_mock_txns) < AMLSIM_FRAUD_RATIO).astype(int)
-
-    senders = rng.integers(0, 1000, size=n_mock_txns)
-    receivers = rng.integers(0, 1000, size=n_mock_txns)
-    edges = list(zip(senders, receivers))
-    edge_index = np.stack([senders, receivers], axis=0)
-
-    def to_pyg_data() -> Any:
-        return _make_amlsim_pyg_data(X=X, y=y, edge_index=edge_index, timesteps=steps.astype(int))
-
-    def to_networkx(max_edges: int | None = None) -> Any:
-        return _make_amlsim_networkx_graph(edges=edges, y=y, amounts=amounts, timesteps=steps.astype(int), max_edges=max_edges)
-
-    return {
-        "X": X,
-        "y": y,
-        "feature_names": AMLSIM_FEATURE_COLS,
-        "edges": edges,
-        "edge_index": edge_index,
-        "tx_ids": np.arange(n_mock_txns),
-        "timesteps": steps.astype(int),
-        "alert_types": np.array(["none"] * n_mock_txns, dtype=object),
-        "alerts": None,
-        "accounts": None,
-        "source": "mock",
-        "provenance": "EXPLICIT_SYNTHETIC_DEMO",
-        "is_synthetic": True,
-        "fraud_ratio": AMLSIM_FRAUD_RATIO,
-        "to_pyg_data": to_pyg_data,
-        "to_networkx": to_networkx,
-    }
 
 
 
@@ -960,163 +745,6 @@ PAYSIM_FEATURE_COLS = [
 PAYSIM_REAL_FRAUD_RATIO = 0.00129  # 8,213 frauds out of 6.36M txns (~0.129%)
 
 
-def load_paysim(
-    path: Path | None = None,
-    nrows: int | None = None,
-    n_mock_txns: int = 10_000,
-    rng: np.random.Generator | None = None,
-    require_real: bool = False,
-    all_rows: bool = False,
-    temporal_split: bool = False,
-    **kwargs: Any,
-) -> dict[str, Any]:
-    """Load PaySim (Kenya M-Pesa Mobile Money Fraud) dataset."""
-    rng = rng or np.random.default_rng(42)
-    if all_rows:
-        target_nrows = None
-    elif nrows is not None:
-        target_nrows = None if nrows <= 0 else nrows
-    elif "nrows" in kwargs:
-        kw_nrows = kwargs.get("nrows")
-        target_nrows = None if (kw_nrows is None or kw_nrows <= 0) else int(kw_nrows)
-    else:
-        target_nrows = int(kwargs.get("n_mock_txns") or n_mock_txns)
-    n_mock_txns = target_nrows or n_mock_txns
-    root = resolve_dataset_dir("paysim", path)
-
-    dataset_mode = kwargs.get("dataset_mode")
-    force_synthetic = bool(kwargs.get("force_synthetic", False) or dataset_mode == "synthetic")
-    if force_synthetic and require_real:
-        raise ValueError("force_synthetic and require_real are mutually exclusive.")
-
-    if not force_synthetic:
-        # Check possible filenames for PaySim
-        possible_csvs = [
-            root / "paysim.csv",
-            root / "PS_20174392719_1491204439457_log.csv",
-            root / "paysim1.csv",
-        ]
-        parquet_files = sorted(list(root.glob("*.parquet")))
-
-        if parquet_files:
-            logger.info("[PaySim] Loading %d Parquet partition files from %s", len(parquet_files), root)
-            dfs = [pd.read_parquet(f) for f in parquet_files]
-            full_df = pd.concat(dfs, ignore_index=True)
-            if target_nrows:
-                full_df = full_df.iloc[:target_nrows]
-            res = _process_paysim_dataframe(full_df, source="real_parquet")
-            if temporal_split or kwargs.get("temporal_split"):
-                clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "dataset_mode", "force_synthetic")}
-                return temporal_split_dataset(res, **clean_kwargs)
-            return res
-
-        for csv_file in possible_csvs:
-            if csv_file.exists():
-                logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
-                df = pd.read_csv(csv_file, nrows=target_nrows)
-                res = _process_paysim_dataframe(df, source="real_csv")
-                if temporal_split or kwargs.get("temporal_split"):
-                    clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "dataset_mode", "force_synthetic")}
-                    return temporal_split_dataset(res, **clean_kwargs)
-                return res
-
-        all_csvs = list(root.glob("*paysim*.csv")) + list(root.glob("*PS*.csv")) + list(root.glob("*.csv"))
-        for csv_file in all_csvs:
-            if csv_file.exists():
-                logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
-                df = pd.read_csv(csv_file, nrows=target_nrows)
-                res = _process_paysim_dataframe(df, source="real_csv")
-                if temporal_split or kwargs.get("temporal_split"):
-                    clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "dataset_mode", "force_synthetic")}
-                    return temporal_split_dataset(res, **clean_kwargs)
-                return res
-
-    if require_real or dataset_mode == "real" or not force_synthetic:
-        raise FileNotFoundError(
-            f"Real PaySim dataset files not found in '{root}'. "
-            f"Expected 'PS_20174392719_1491204439457_log.csv' or partitioned Parquet files. "
-            f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_synthetic=True for synthetic demo."
-        )
-
-    # ---- High-Fidelity Synthetic Mock of M-Pesa PaySim ----
-    logger.info(
-        "[PaySim] Dataset not found at %s — generating high-fidelity mock (%d txns, M-Pesa schema)",
-        root,
-        n_mock_txns,
-    )
-    # Fraud only happens in TRANSFER and CASH_OUT in PaySim
-    n_fraud = max(1, int(n_mock_txns * PAYSIM_REAL_FRAUD_RATIO))
-    n_legit = n_mock_txns - n_fraud
-
-    # Transaction types: ~35% CASH_OUT, 33% PAYMENT, 22% CASH_IN, 8% TRANSFER, 1% DEBIT
-    type_probs = [0.338, 0.084, 0.351, 0.007, 0.220]
-    types_legit = rng.choice(PAYSIM_TYPES, size=n_legit, p=type_probs)
-    # Fraud is 50% TRANSFER, 50% CASH_OUT
-    types_fraud = rng.choice(["TRANSFER", "CASH_OUT"], size=n_fraud, p=[0.5, 0.5])
-    types_all = np.concatenate([types_legit, types_fraud])
-
-    steps = rng.integers(1, 744, size=n_mock_txns).astype(np.float32)  # 30 days
-    # Log-normal distribution for amounts (M-Pesa transaction scale)
-    amounts_legit = rng.lognormal(mean=9.5, sigma=1.5, size=n_legit).astype(np.float32)
-    # Fraud transactions usually drain entire accounts (higher amounts)
-    amounts_fraud = rng.lognormal(mean=13.0, sigma=1.2, size=n_fraud).astype(np.float32)
-    amounts = np.concatenate([amounts_legit, amounts_fraud])
-
-    old_bal_orig = np.abs(rng.lognormal(mean=10.0, sigma=2.0, size=n_mock_txns)).astype(np.float32)
-    # In fraud, newbalanceOrig is often zero (account emptied)
-    new_bal_orig = np.maximum(0, old_bal_orig - amounts)
-    new_bal_orig[n_legit:] = 0.0  # emptied
-
-    old_bal_dest = np.abs(rng.lognormal(mean=9.0, sigma=2.2, size=n_mock_txns)).astype(np.float32)
-    new_bal_dest = (old_bal_dest + amounts).astype(np.float32)
-
-    # One-hot encode types
-    type_transfer = (types_all == "TRANSFER").astype(np.float32)
-    type_cash_out = (types_all == "CASH_OUT").astype(np.float32)
-    type_payment = (types_all == "PAYMENT").astype(np.float32)
-    type_debit = (types_all == "DEBIT").astype(np.float32)
-    type_cash_in = (types_all == "CASH_IN").astype(np.float32)
-
-    err_orig = (new_bal_orig + amounts - old_bal_orig).astype(np.float32)
-    err_dest = (old_bal_dest + amounts - new_bal_dest).astype(np.float32)
-
-    X = np.column_stack(
-        [
-            steps,
-            type_transfer,
-            type_cash_out,
-            type_payment,
-            type_debit,
-            type_cash_in,
-            amounts,
-            old_bal_orig,
-            new_bal_orig,
-            old_bal_dest,
-            new_bal_dest,
-            err_orig,
-            err_dest,
-        ]
-    )
-    y = np.array([0] * n_legit + [1] * n_fraud, dtype=int)
-
-    # Shuffle
-    idx = rng.permutation(n_mock_txns)
-    res = {
-        "X": X[idx],
-        "y": y[idx],
-        "feature_names": PAYSIM_FEATURE_COLS,
-        "source": "mock_mpesa",
-        "provenance": "EXPLICIT_SYNTHETIC_DEMO",
-        "is_synthetic": True,
-        "fraud_ratio": float(np.mean(y)),
-        "steps": X[idx, 0],
-    }
-    if temporal_split or kwargs.get("temporal_split"):
-        clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "dataset_mode", "force_synthetic")}
-        return temporal_split_dataset(res, **clean_kwargs)
-    return res
-
-
 def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
     """Process a raw PaySim dataframe into numerical feature matrix."""
     df = df.copy()
@@ -1125,20 +753,24 @@ def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
     elif "is_fraud" in df.columns:
         y = df["is_fraud"].values.astype(int)
     else:
-        y = np.zeros(len(df), dtype=int)
+        raise ValueError("Malformed PaySim dataset: missing required label column 'isFraud' or 'is_fraud'")
 
     # Check if this is already an engineered/partitioned feature dataframe without raw PaySim columns
     has_raw_signals = any(c in df.columns for c in ("amount", "step", "oldbalanceOrg", "type"))
     if not has_raw_signals:
         drop_set = {"isFraud", "is_fraud", "isFlaggedFraud", "nameOrig", "nameDest", "type"}
         available_cols = [c for c in df.columns if c not in drop_set and pd.api.types.is_numeric_dtype(df[c])]
+        if not available_cols:
+            raise ValueError("Malformed PaySim dataset: no valid feature columns found")
         X = df[available_cols].fillna(0).values.astype(np.float32)
         return {
             "X": X,
             "y": y,
             "feature_names": available_cols,
             "source": source,
-            "provenance": "REAL_OFFICIAL_DATASET",
+            "provenance": DatasetProvenance.PUBLIC_SIMULATED_DATASET.value,
+            "artifact_origin": "external_physical_file",
+            "scientific_origin": "simulated",
             "is_synthetic": False,
             "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))) if len(y) > 0 else 0.0,
         }
@@ -1179,11 +811,112 @@ def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
         "y": y,
         "feature_names": available_cols,
         "source": source,
-        "provenance": "REAL_OFFICIAL_DATASET",
+        "provenance": DatasetProvenance.PUBLIC_SIMULATED_DATASET.value,
+        "artifact_origin": "external_physical_file",
+        "scientific_origin": "simulated",
         "is_synthetic": False,
         "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))) if len(y) > 0 else 0.0,
         "steps": X[:, 0] if (len(available_cols) > 0 and available_cols[0] == "step") else None,
     }
+
+
+def load_paysim(
+    path: Path | None = None,
+    nrows: int | None = None,
+    all_rows: bool = False,
+    temporal_split: bool = False,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Load PaySim (Kenya M-Pesa Mobile Money Fraud) dataset.
+
+    Fails closed with FileNotFoundError if physical dataset files are missing.
+    No synthetic generator fallback.
+
+    Returns
+    -------
+    dict with keys:
+        ``X``               : np.ndarray (N, 13) — transaction feature matrix
+        ``y``               : np.ndarray (N,)    — binary label (1=fraud, 0=legit)
+        ``feature_names``   : list[str]          — column names of X
+        ``source``          : str                — 'real_parquet' or 'real_csv'
+        ``provenance``      : str                — 'PUBLIC_SIMULATED_DATASET'
+        ``artifact_origin`` : str                — 'external_physical_file'
+        ``scientific_origin``: str               — 'simulated'
+        ``is_synthetic``    : bool               — False
+        ``fraud_ratio``     : float              — fraud class prevalence
+        ``steps``           : np.ndarray | None  — simulation step / timestep
+    """
+    if all_rows:
+        target_nrows = None
+    elif nrows is not None:
+        target_nrows = None if nrows <= 0 else nrows
+    elif "nrows" in kwargs and kwargs["nrows"] is not None:
+        kw_nrows = int(kwargs["nrows"])
+        target_nrows = None if kw_nrows <= 0 else kw_nrows
+    elif "n_mock_txns" in kwargs and kwargs["n_mock_txns"] is not None:
+        target_nrows = int(kwargs["n_mock_txns"])
+    elif "n_samples" in kwargs and kwargs["n_samples"] is not None:
+        target_nrows = int(kwargs["n_samples"])
+    else:
+        target_nrows = None
+
+    root = resolve_dataset_dir("paysim", path)
+
+    if root.is_file():
+        logger.info("[PaySim] Loading real dataset from explicit file %s (nrows=%s)", root, target_nrows)
+        df = pd.read_csv(root, nrows=target_nrows)
+        res = _process_paysim_dataframe(df, source="real_csv")
+        if temporal_split:
+            clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "all_rows", "temporal_split", "dataset_mode")}
+            return temporal_split_dataset(res, **clean_kwargs)
+        return res
+
+    # Check possible filenames for PaySim
+    possible_csvs = [
+        root / "paysim.csv",
+        root / "PS_20174392719_1491204439457_log.csv",
+        root / "paysim1.csv",
+    ]
+    parquet_files = sorted(list(root.glob("*.parquet")))
+
+    if parquet_files:
+        logger.info("[PaySim] Loading %d Parquet partition files from %s", len(parquet_files), root)
+        dfs = [pd.read_parquet(f) for f in parquet_files]
+        full_df = pd.concat(dfs, ignore_index=True)
+        if target_nrows:
+            full_df = full_df.iloc[:target_nrows]
+        res = _process_paysim_dataframe(full_df, source="real_parquet")
+        if temporal_split:
+            clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "all_rows", "temporal_split", "dataset_mode")}
+            return temporal_split_dataset(res, **clean_kwargs)
+        return res
+
+    for csv_file in possible_csvs:
+        if csv_file.exists():
+            logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
+            df = pd.read_csv(csv_file, nrows=target_nrows)
+            res = _process_paysim_dataframe(df, source="real_csv")
+            if temporal_split:
+                clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "all_rows", "temporal_split", "dataset_mode")}
+                return temporal_split_dataset(res, **clean_kwargs)
+            return res
+
+    all_csvs = list(root.glob("*paysim*.csv")) + list(root.glob("*PS*.csv")) + list(root.glob("*.csv"))
+    for csv_file in all_csvs:
+        if csv_file.exists():
+            logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
+            df = pd.read_csv(csv_file, nrows=target_nrows)
+            res = _process_paysim_dataframe(df, source="real_csv")
+            if temporal_split:
+                clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "all_rows", "temporal_split", "dataset_mode")}
+                return temporal_split_dataset(res, **clean_kwargs)
+            return res
+
+    raise FileNotFoundError(
+        f"Real PaySim dataset files not found in '{root}'. "
+        f"Expected 'PS_20174392719_1491204439457_log.csv' or partitioned Parquet files. "
+        f"Real dataset loaders fail closed; synthetic substitutes are prohibited."
+    )
 
 
 # ===========================================================================
@@ -1219,155 +952,6 @@ def load_ieee_cis(
     3. Temporal feature engineering on 'TransactionDT' (day, hour, zero future leakage).
     """
     rng = rng or np.random.default_rng(42)
-    if all_rows:
-        target_nrows = None
-    elif nrows is not None:
-        target_nrows = None if nrows <= 0 else nrows
-    elif "nrows" in kwargs:
-        kw_nrows = kwargs.get("nrows")
-        target_nrows = None if (kw_nrows is None or kw_nrows <= 0) else int(kw_nrows)
-    else:
-        target_nrows = int(kwargs.get("n_mock_txns") or n_mock_txns)
-    n_mock_txns = target_nrows or n_mock_txns
-    root = resolve_dataset_dir("ieee_cis", path)
-
-    dataset_mode = kwargs.get("dataset_mode")
-    force_synthetic = bool(kwargs.get("force_synthetic", False) or dataset_mode == "synthetic")
-    if force_synthetic and require_real:
-        raise ValueError("force_synthetic and require_real are mutually exclusive.")
-
-    if not force_synthetic:
-        parquet_files = sorted(list(root.glob("*.parquet")))
-        if parquet_files:
-            chosen_parquet = parquet_files[0]
-            logger.info("[IEEE-CIS] Loading preprocessed Parquet from %s", chosen_parquet)
-            df = pd.read_parquet(chosen_parquet)
-            if target_nrows:
-                df = df.iloc[:target_nrows]
-            res = _process_ieee_cis_dataframe(df, source="real_parquet")
-            if temporal_split or kwargs.get("temporal_split"):
-                clean_kwargs = {
-                    k: v
-                    for k, v in kwargs.items()
-                    if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "join_identity", "dataset_mode", "force_synthetic")
-                }
-                return temporal_split_dataset(res, time_col="TransactionDT", **clean_kwargs)
-            return res
-
-        txn_csv_candidates = [root / "train_transaction.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
-        # Exclude identity csv from transaction candidates
-        txn_csv_candidates = [c for c in txn_csv_candidates if "identity" not in c.name.lower()]
-
-        for txn_csv in txn_csv_candidates:
-            if txn_csv.exists():
-                logger.info("[IEEE-CIS] Loading real transaction CSV from %s (nrows=%s)", txn_csv, target_nrows)
-                txn_df = pd.read_csv(txn_csv, nrows=target_nrows)
-
-                # Check if identity join is requested and available
-                id_csv_candidates = [root / "train_identity.csv"] + list(root.glob("*identity*.csv"))
-                id_csv = next((c for c in id_csv_candidates if c.exists()), None)
-
-                if join_identity and id_csv is not None and "TransactionID" in txn_df.columns:
-                    logger.info("[IEEE-CIS] Joining identity data from %s", id_csv)
-                    id_df = pd.read_csv(id_csv)
-                    target_ids = set(txn_df["TransactionID"].unique())
-                    id_df_sub = id_df[id_df["TransactionID"].isin(target_ids)]
-                    merged_df = pd.merge(txn_df, id_df_sub, on="TransactionID", how="left")
-                else:
-                    merged_df = txn_df
-
-                res = _process_ieee_cis_dataframe(merged_df, source="real_csv")
-                if temporal_split or kwargs.get("temporal_split"):
-                    clean_kwargs = {
-                        k: v
-                        for k, v in kwargs.items()
-                        if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "join_identity", "dataset_mode", "force_synthetic")
-                    }
-                    return temporal_split_dataset(res, time_col="TransactionDT", **clean_kwargs)
-                return res
-
-    if require_real or dataset_mode == "real" or not force_synthetic:
-        raise FileNotFoundError(
-            f"Real IEEE-CIS Fraud Detection dataset files not found in '{root}'. "
-            f"Expected 'train_transaction.csv'. "
-            f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_synthetic=True for synthetic demo."
-        )
-
-    # ---- High-Fidelity Synthetic Mock of IEEE-CIS / Vesta ----
-    logger.info(
-        "[IEEE-CIS] Dataset not found at %s — generating high-fidelity mock (%d txns, %d features)",
-        root,
-        n_mock_txns,
-        IEEE_CIS_FEATURE_DIM,
-    )
-    n_fraud = max(2 if n_mock_txns >= 20 else 1, int(n_mock_txns * IEEE_CIS_REAL_FRAUD_RATIO))
-    n_legit = n_mock_txns - n_fraud
-
-    # TransactionAmt (log-normal, higher skew for fraud)
-    amt_legit = rng.lognormal(mean=4.5, sigma=1.1, size=n_legit).astype(np.float32)
-    amt_fraud = rng.lognormal(mean=5.2, sigma=1.3, size=n_fraud).astype(np.float32)
-    amts = np.concatenate([amt_legit, amt_fraud])
-
-    # C-features (counts of addresses/cards related to transaction)
-    c_features = rng.poisson(lam=1.5, size=(n_mock_txns, 14)).astype(np.float32)
-    c_features[n_legit:, :] += rng.poisson(lam=5.0, size=(n_fraud, 14)).astype(np.float32)
-
-    # D-features (timedelta since previous transaction)
-    d_features = rng.exponential(scale=100.0, size=(n_mock_txns, 10)).astype(np.float32)
-    d_features[n_legit:, :] = rng.exponential(scale=15.0, size=(n_fraud, 10)).astype(np.float32)
-
-    # V-features (Vesta engineered risk/match indicators)
-    v_features = rng.standard_normal((n_mock_txns, IEEE_CIS_FEATURE_DIM - 25)).astype(np.float32)
-    v_features[n_legit:, :] += 1.8  # Elevated risk offset
-
-    X = np.column_stack([amts.reshape(-1, 1), c_features, d_features, v_features])
-    y = np.array([0] * n_legit + [1] * n_fraud, dtype=int)
-
-    # Permute X and y so fraud is distributed uniformly across the temporal timeline
-    idx = rng.permutation(n_mock_txns)
-    X = X[idx]
-    y = y[idx]
-
-    # Guarantee both temporal partitions (train ~80% and test ~20%) contain fraud samples
-    if n_mock_txns >= 20 and n_fraud >= 2:
-        split_point = int(n_mock_txns * 0.8)
-        train_frauds = np.where(y[:split_point] == 1)[0]
-        test_frauds = np.where(y[split_point:] == 1)[0]
-        if len(train_frauds) == 0 and len(test_frauds) > 0:
-            legit_train = np.where(y[:split_point] == 0)[0][0]
-            fraud_test = split_point + test_frauds[0]
-            y[legit_train], y[fraud_test] = y[fraud_test], y[legit_train]
-            X[[legit_train, fraud_test]] = X[[fraud_test, legit_train]]
-        elif len(test_frauds) == 0 and len(train_frauds) > 1:
-            fraud_train = train_frauds[-1]
-            legit_test = split_point + np.where(y[split_point:] == 0)[0][0]
-            y[fraud_train], y[legit_test] = y[legit_test], y[fraud_train]
-            X[[fraud_train, legit_test]] = X[[legit_test, fraud_train]]
-
-    # TransactionDT (seconds, strictly monotonic simulation matching chronological order)
-    mock_dt = np.sort(rng.integers(86400, 86400 * 180, size=n_mock_txns)).astype(np.float64)
-
-    feature_names = [f"feat_{i}" for i in range(X.shape[1])]
-    res = {
-        "X": X,
-        "y": y,
-        "feature_names": feature_names,
-        "source": "mock_ieee_cis",
-        "provenance": "EXPLICIT_SYNTHETIC_DEMO",
-        "is_synthetic": True,
-        "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
-        "transaction_dt": mock_dt,
-    }
-    if temporal_split or kwargs.get("temporal_split"):
-        clean_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "join_identity", "dataset_mode", "force_synthetic")
-        }
-        return temporal_split_dataset(res, time_col="TransactionDT", **clean_kwargs)
-    return res
-
-
 def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
     """Process a raw or merged IEEE-CIS dataframe into numerical feature matrix."""
     df = df.copy()
@@ -1453,11 +1037,99 @@ def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]
         "y": y,
         "feature_names": num_cols,
         "source": source,
-        "provenance": "REAL_OFFICIAL_DATASET",
+        "provenance": DatasetProvenance.EMPIRICAL_EXTERNAL_DATA.value,
+        "artifact_origin": "external_physical_file",
+        "scientific_origin": "empirical",
         "is_synthetic": False,
         "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))) if len(y) > 0 else 0.0,
         "transaction_dt": transaction_dt,
     }
+
+
+def load_ieee_cis(
+    path: Path | None = None,
+    nrows: int | None = None,
+    all_rows: bool = False,
+    join_identity: bool = True,
+    temporal_split: bool = False,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Load IEEE-CIS Fraud Detection (Vesta Corporation) benchmark dataset.
+
+    Fails closed with FileNotFoundError if physical dataset files are missing.
+    No synthetic generator fallback.
+
+    Performs:
+    1. Transaction and identity left join on 'TransactionID'.
+    2. Missing value imputation and categorical encoding (ProductCD, card4, card6, DeviceType, M1-M9).
+    3. Temporal feature engineering on 'TransactionDT' (day, hour, zero future leakage).
+    """
+    if all_rows:
+        target_nrows = None
+    elif nrows is not None:
+        target_nrows = None if nrows <= 0 else nrows
+    elif "nrows" in kwargs and kwargs["nrows"] is not None:
+        kw_nrows = int(kwargs["nrows"])
+        target_nrows = None if kw_nrows <= 0 else kw_nrows
+    else:
+        target_nrows = None
+
+    root = resolve_dataset_dir("ieee_cis", path)
+
+    parquet_files = sorted(list(root.glob("*.parquet")))
+    if parquet_files:
+        chosen_parquet = parquet_files[0]
+        logger.info("[IEEE-CIS] Loading preprocessed Parquet from %s", chosen_parquet)
+        df = pd.read_parquet(chosen_parquet)
+        if target_nrows:
+            df = df.iloc[:target_nrows]
+        res = _process_ieee_cis_dataframe(df, source="real_parquet")
+        if temporal_split:
+            clean_kwargs = {
+                k: v
+                for k, v in kwargs.items()
+                if k not in ("nrows", "all_rows", "temporal_split", "join_identity", "dataset_mode")
+            }
+            return temporal_split_dataset(res, time_col="TransactionDT", **clean_kwargs)
+        return res
+
+    txn_csv_candidates = [root / "train_transaction.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
+    # Exclude identity csv from transaction candidates
+    txn_csv_candidates = [c for c in txn_csv_candidates if "identity" not in c.name.lower()]
+
+    for txn_csv in txn_csv_candidates:
+        if txn_csv.exists():
+            logger.info("[IEEE-CIS] Loading real transaction CSV from %s (nrows=%s)", txn_csv, target_nrows)
+            txn_df = pd.read_csv(txn_csv, nrows=target_nrows)
+
+            # Check if identity join is requested and available
+            id_csv_candidates = [root / "train_identity.csv"] + list(root.glob("*identity*.csv"))
+            id_csv = next((c for c in id_csv_candidates if c.exists()), None)
+
+            if join_identity and id_csv is not None and "TransactionID" in txn_df.columns:
+                logger.info("[IEEE-CIS] Joining identity data from %s", id_csv)
+                id_df = pd.read_csv(id_csv)
+                target_ids = set(txn_df["TransactionID"].unique())
+                id_df_sub = id_df[id_df["TransactionID"].isin(target_ids)]
+                merged_df = pd.merge(txn_df, id_df_sub, on="TransactionID", how="left")
+            else:
+                merged_df = txn_df
+
+            res = _process_ieee_cis_dataframe(merged_df, source="real_csv")
+            if temporal_split:
+                clean_kwargs = {
+                    k: v
+                    for k, v in kwargs.items()
+                    if k not in ("nrows", "all_rows", "temporal_split", "join_identity", "dataset_mode")
+                }
+                return temporal_split_dataset(res, time_col="TransactionDT", **clean_kwargs)
+            return res
+
+    raise FileNotFoundError(
+        f"Real IEEE-CIS Fraud Detection dataset files not found in '{root}'. "
+        f"Expected 'train_transaction.csv' or partitioned Parquet files. "
+        f"Real dataset loaders fail closed; synthetic substitutes are prohibited."
+    )
 
 
 # ===========================================================================
@@ -1467,9 +1139,6 @@ def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]
 
 def load_creditcard_fraud(
     path: Path | None = None,
-    n_mock_txns: int = 5_000,
-    rng: np.random.Generator | None = None,
-    require_real: bool = False,
     include_time: bool = False,
     scale_time_amount: bool = True,
     scaling_strategy: str = "robust",
@@ -1480,102 +1149,121 @@ def load_creditcard_fraud(
     stratified: bool = True,
     temporal_split: bool = False,
     seed: int = 42,
+    nrows: int | None = None,
+    all_rows: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Load European Credit Card Fraud Detection benchmark (V1-V28 PCA, Time, Amount).
+
+    Fails closed with FileNotFoundError if physical dataset files are missing.
+    No synthetic generator fallback.
 
     Supports:
     - Zero-leakage train/validation/test 3-way splitting (stratified or temporal)
     - RobustScaler / StandardScaler on Time and Amount fit strictly on the training partition
     - Imbalance ratio quantification (0.172% fraud prevalence)
     - Backward-compatible 29-feature default or 30-feature (include_time=True) extraction
-    - Explicit synthetic evaluation mode via ``force_synthetic=True`` (never touches physical files;
-      mutually exclusive with ``require_real``)
     """
-    dataset_mode = kwargs.get("dataset_mode")
-    if dataset_mode == "real":
-        require_real = True
-    elif dataset_mode == "synthetic":
-        kwargs["force_synthetic"] = True
-
-    force_synthetic = bool(kwargs.get("force_synthetic", False) or dataset_mode == "synthetic")
-    if force_synthetic and require_real:
-        raise ValueError("force_synthetic and require_real are mutually exclusive.")
-    rng = rng or np.random.default_rng(seed)
-    target_txns = kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_txns
-    n_mock_txns = int(target_txns)
     root = resolve_dataset_dir("creditcard", path)
+    target_nrows = None if all_rows else (nrows or kwargs.get("nrows") or kwargs.get("n_mock_txns") or kwargs.get("n_samples") or None)
 
-    target_nrows = None if kwargs.get("all_rows", False) else (kwargs.get("nrows") or None)
-
-    chosen_source = "mock_pca"
+    chosen_source = "real_csv"
     chosen_file_path: Path | None = None
     df: pd.DataFrame | None = None
 
-    parquet_files = [] if force_synthetic else sorted(list(root.glob("*.parquet")))
-    if parquet_files:
-        chosen_parquet = parquet_files[0]
-        chosen_file_path = chosen_parquet
-        logger.info("[CreditCard] Loading preprocessed Parquet from %s", chosen_parquet)
-        df = pd.read_parquet(chosen_parquet)
-        if target_nrows is not None:
+    if root.is_file():
+        chosen_file_path = root
+        if root.suffix.lower() == ".parquet":
+            df = pd.read_parquet(root)
+            chosen_source = "real_parquet"
+        else:
+            df = pd.read_csv(root, nrows=target_nrows)
+            chosen_source = "real_csv"
+        if target_nrows is not None and df is not None:
             df = df.iloc[:target_nrows]
-        chosen_source = "real_parquet"
     else:
-        csv_candidates = (
-            []
-            if force_synthetic
-            else [root / "creditcard.csv"] + list(root.glob("*credit*.csv")) + list(root.glob("*.csv"))
+        parquet_files = sorted(list(root.glob("*.parquet")))
+        if parquet_files:
+            chosen_parquet = parquet_files[0]
+            chosen_file_path = chosen_parquet
+            logger.info("[CreditCard] Loading preprocessed Parquet from %s", chosen_parquet)
+            df = pd.read_parquet(chosen_parquet)
+            if target_nrows is not None:
+                df = df.iloc[:target_nrows]
+            chosen_source = "real_parquet"
+        else:
+            csv_candidates = [root / "creditcard.csv"] + list(root.glob("*credit*.csv")) + list(root.glob("*.csv"))
+            for csv_path in csv_candidates:
+                if csv_path.exists() and not csv_path.name.endswith(".parquet"):
+                    chosen_file_path = csv_path
+                    logger.info("[CreditCard] Loading real dataset from %s", csv_path)
+                    df = pd.read_csv(csv_path, nrows=target_nrows)
+                    chosen_source = "real_csv"
+                    break
+
+    if df is None:
+        raise FileNotFoundError(
+            f"Real Credit Card Fraud dataset files not found in '{root}'. "
+            f"Expected 'creditcard.csv' or Parquet cache. "
+            f"Real dataset loaders fail closed; synthetic substitutes are prohibited."
         )
-        for csv_path in csv_candidates:
-            if csv_path.exists():
-                chosen_file_path = csv_path
-                logger.info("[CreditCard] Loading real dataset from %s", csv_path)
-                df = pd.read_csv(csv_path, nrows=target_nrows)
-                chosen_source = "real_csv"
-                break
 
     dataset_sha256: str | None = None
     if chosen_file_path is not None and chosen_file_path.is_file():
         dataset_sha256 = compute_file_sha256(chosen_file_path)
 
-    if df is not None:
-        if include_time and "Time" in df.columns:
-            pca_cols = [c for c in df.columns if c.startswith("V")]
-            amount_col = ["Amount"] if "Amount" in df.columns else []
-            feature_cols = ["Time"] + pca_cols + amount_col
-        else:
-            feature_cols = [c for c in df.columns if c not in ("Time", "Class", "is_fraud", "isFraud") and pd.api.types.is_numeric_dtype(df[c])]
+    return _process_creditcard_dataframe(
+        df=df,
+        include_time=include_time,
+        scale_time_amount=scale_time_amount,
+        scaling_strategy=scaling_strategy,
+        split_data=split_data,
+        train_ratio=train_ratio,
+        val_ratio=val_ratio,
+        test_ratio=test_ratio,
+        stratified=stratified,
+        temporal_split=temporal_split,
+        seed=seed,
+        source=chosen_source,
+        provenance=DatasetProvenance.EMPIRICAL_EXTERNAL_DATA.value,
+        artifact_origin="external_physical_file",
+        scientific_origin="empirical",
+        is_synthetic=False,
+        chosen_file_path=chosen_file_path,
+        dataset_sha256=dataset_sha256,
+    )
 
-        X = np.asarray(df[feature_cols].fillna(0).values, dtype=np.float32)
-        raw_y = df["Class"].values if "Class" in df.columns else df["is_fraud"].values
-        y = np.asarray(raw_y, dtype=int)
+
+def _process_creditcard_dataframe(
+    df: pd.DataFrame,
+    include_time: bool = True,
+    scale_time_amount: bool = True,
+    scaling_strategy: str = "robust",
+    split_data: bool = False,
+    train_ratio: float = 0.70,
+    val_ratio: float = 0.15,
+    test_ratio: float = 0.15,
+    stratified: bool = True,
+    temporal_split: bool = False,
+    seed: int = 42,
+    source: str = "real_csv",
+    provenance: str = DatasetProvenance.EMPIRICAL_EXTERNAL_DATA.value,
+    artifact_origin: str = "external_physical_file",
+    scientific_origin: str = "empirical",
+    is_synthetic: bool = False,
+    chosen_file_path: Path | None = None,
+    dataset_sha256: str | None = None,
+) -> dict[str, Any]:
+    if include_time and "Time" in df.columns:
+        pca_cols = [c for c in df.columns if c.startswith("V")]
+        amount_col = ["Amount"] if "Amount" in df.columns else []
+        feature_cols = ["Time"] + pca_cols + amount_col
     else:
-        if require_real or dataset_mode == "real" or not force_synthetic:
-            raise FileNotFoundError(
-                f"Real Credit Card Fraud dataset files not found in '{root}'. "
-                f"Expected 'creditcard.csv'. "
-                f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_synthetic=True for synthetic demo."
-            )
-        logger.warning("[CreditCard] Generating PCA mock dataset (%d txns)", n_mock_txns)
-        # Ensure at least 6 frauds in small mock datasets so train, val, and test splits
-        # each contain positive samples under extreme imbalance scenarios.
-        n_fraud = max(6, int(n_mock_txns * 0.01)) if n_mock_txns < 5_000 else max(1, int(n_mock_txns * 0.00172))
-        n_legit = n_mock_txns - n_fraud
-        y_raw = np.array([0] * n_legit + [1] * n_fraud, dtype=int)
-        idx_perm = rng.permutation(n_mock_txns)
-        y = y_raw[idx_perm]
+        feature_cols = [c for c in df.columns if c not in ("Time", "Class", "is_fraud", "isFraud") and pd.api.types.is_numeric_dtype(df[c])]
 
-        pca_features = rng.standard_normal((n_mock_txns, 28)).astype(np.float32)
-        amount_vals = np.abs(rng.exponential(scale=88.0, size=n_mock_txns)).astype(np.float32)
-        time_vals = rng.uniform(0.0, 172800.0, size=n_mock_txns).astype(np.float32)
-
-        if include_time:
-            X = np.column_stack([time_vals, pca_features, amount_vals]).astype(np.float32)
-            feature_cols = ["Time"] + [f"V{i}" for i in range(1, 29)] + ["Amount"]
-        else:
-            X = np.column_stack([pca_features, amount_vals]).astype(np.float32)
-            feature_cols = [f"V{i}" for i in range(1, 29)] + ["Amount"]
+    X = np.asarray(df[feature_cols].fillna(0).values, dtype=np.float32)
+    raw_y = df["Class"].values if "Class" in df.columns else df["is_fraud"].values
+    y = np.asarray(raw_y, dtype=int)
 
     if split_data:
         n_samples = len(y)
@@ -1668,9 +1356,6 @@ def load_creditcard_fraud(
                     X_test[:, c_idx] = (X_test[:, c_idx] - c_center) / c_scale
                     X[:, c_idx] = (X[:, c_idx] - c_center) / c_scale
 
-        is_synthetic = (chosen_source == "mock_pca")
-        provenance = "EXPLICIT_SYNTHETIC_DEMO" if is_synthetic else "REAL_OFFICIAL_DATASET"
-
         return {
             "X": X,
             "y": y,
@@ -1678,8 +1363,10 @@ def load_creditcard_fraud(
             "val": {"X": X_val, "y": y_val, "indices": val_idx},
             "test": {"X": X_test, "y": y_test, "indices": test_idx},
             "feature_names": feature_cols,
-            "source": chosen_source,
+            "source": source,
             "provenance": provenance,
+            "artifact_origin": artifact_origin,
+            "scientific_origin": scientific_origin,
             "is_synthetic": is_synthetic,
             "file_path": str(chosen_file_path) if chosen_file_path else None,
             "sha256_hash": dataset_sha256,
@@ -1710,15 +1397,14 @@ def load_creditcard_fraud(
                 c_scale = scaling_params_unsplit[col]["scale"]
                 X[:, c_idx] = (X[:, c_idx] - c_center) / c_scale
 
-    is_synthetic = (chosen_source == "mock_pca")
-    provenance = "EXPLICIT_SYNTHETIC_DEMO" if is_synthetic else "REAL_OFFICIAL_DATASET"
-
     return {
         "X": X,
         "y": y,
         "feature_names": feature_cols,
-        "source": chosen_source,
+        "source": source,
         "provenance": provenance,
+        "artifact_origin": artifact_origin,
+        "scientific_origin": scientific_origin,
         "is_synthetic": is_synthetic,
         "file_path": str(chosen_file_path) if chosen_file_path else None,
         "sha256_hash": dataset_sha256,
@@ -1986,23 +1672,22 @@ def _generate_mock_synthaml(
 
 
 def load_synthaml(
-    require_real: bool = False,
     data_dir: Path | str | None = None,
     all_rows: bool = False,
     nrows: int | None = None,
-    n_mock_alerts: int = 500,
-    seed: int = 42,
+    path: Path | str | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Load the SynthAML Spar Nord Bank synthetic AML alert and transaction dataset.
 
+    Fails closed with FileNotFoundError if physical dataset files are missing.
+    No synthetic generator fallback.
+
     Args:
-        require_real: If True, raise FileNotFoundError when real dataset files are missing.
         data_dir: Explicit dataset path, or resolved automatically via resolve_dataset_dir.
         all_rows: If True, load all rows without truncation.
         nrows: Maximum number of alerts to ingest (useful for fast testing).
-        n_mock_alerts: Number of alerts to generate in synthetic fallback mode.
-        seed: Random seed for mock generator.
+        path: Alias for data_dir.
 
     Returns:
         dict containing:
@@ -2013,10 +1698,14 @@ def load_synthaml(
         - transactions_df: DataFrame of lookback transaction sequences.
         - alert_ids: Array of alert IDs.
         - timestamps: Array of alert timestamps.
-        - source: 'real_parquet', 'real_csv', or 'synthetic_fallback'.
+        - source: 'real_parquet' or 'real_csv'.
+        - provenance: 'CONTROLLED_PROJECT_SYNTHETIC'.
         - fraud_ratio: Prevalence of reported SAR alerts.
     """
-    root = resolve_dataset_dir("synthaml", explicit_path=data_dir)
+    target_dir = path if path is not None else data_dir
+    root = resolve_dataset_dir("synthaml", explicit_path=target_dir)
+    target_nrows = None if all_rows else (nrows or (int(kwargs["nrows"]) if "nrows" in kwargs and kwargs["nrows"] is not None else None))
+
     alerts_parquet = root / "alerts.parquet"
     tx_parquet = root / "transactions.parquet"
 
@@ -2028,8 +1717,8 @@ def load_synthaml(
         logger.info("[SynthAML] Ingesting columnar Parquet cache from '%s'...", root)
         alerts_df = pd.read_parquet(alerts_parquet)
         tx_df = pd.read_parquet(tx_parquet)
-        if not all_rows and nrows is not None and len(alerts_df) > nrows:
-            alerts_df = alerts_df.iloc[:nrows].copy()
+        if target_nrows is not None and len(alerts_df) > target_nrows:
+            alerts_df = alerts_df.iloc[:target_nrows].copy()
             valid_aids = set(alerts_df["ALERT_ID"].values)
             tx_df = tx_df[tx_df["ALERT_ID"].isin(valid_aids)].copy()
 
@@ -2045,6 +1734,10 @@ def load_synthaml(
             "timestamps": alerts_df["TIMESTAMP"].values if "TIMESTAMP" in alerts_df.columns else np.zeros(len(y), dtype=int),
             "dates": alerts_df["DATE"].values if "DATE" in alerts_df.columns else np.array([""] * len(y)),
             "source": "real_parquet",
+            "provenance": DatasetProvenance.CONTROLLED_PROJECT_SYNTHETIC.value,
+            "artifact_origin": "external_physical_file",
+            "scientific_origin": "synthetic",
+            "is_synthetic": False,
             "fraud_ratio": float(np.mean(y == 1)),
             "n_alerts": len(y),
             "n_transactions": len(tx_df),
@@ -2055,8 +1748,8 @@ def load_synthaml(
         logger.info("[SynthAML] Ingesting CSV files from '%s'...", root)
         alerts_df = pd.read_csv(alerts_csv)
         tx_df = pd.read_csv(tx_csv)
-        if not all_rows and nrows is not None and len(alerts_df) > nrows:
-            alerts_df = alerts_df.iloc[:nrows].copy()
+        if target_nrows is not None and len(alerts_df) > target_nrows:
+            alerts_df = alerts_df.iloc[:target_nrows].copy()
             valid_aids = set(alerts_df["ALERT_ID"].values)
             tx_df = tx_df[tx_df["ALERT_ID"].isin(valid_aids)].copy()
 
@@ -2080,27 +1773,20 @@ def load_synthaml(
             "timestamps": alerts_df["TIMESTAMP"].values if "TIMESTAMP" in alerts_df.columns else np.zeros(len(y), dtype=int),
             "dates": alerts_df["DATE"].values if "DATE" in alerts_df.columns else np.array([""] * len(y)),
             "source": "real_csv",
-            "provenance": "REAL_OFFICIAL_DATASET",
+            "provenance": DatasetProvenance.CONTROLLED_PROJECT_SYNTHETIC.value,
+            "artifact_origin": "external_physical_file",
+            "scientific_origin": "synthetic",
             "is_synthetic": False,
             "fraud_ratio": float(np.mean(y == 1)),
             "n_alerts": len(y),
             "n_transactions": len(tx_df),
         }
 
-    # 3. Missing file handling
-    dataset_mode = kwargs.get("dataset_mode")
-    if require_real or dataset_mode == "real":
-        raise FileNotFoundError(
-            f"Real SynthAML dataset files not found in '{root}'. "
-            f"Expected 'synthetic_alerts.csv' and 'synthetic_transactions.csv' (or 'alerts.parquet'/'transactions.parquet'). "
-            f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_synthetic=True for synthetic demo."
-        )
-
-    rng = np.random.default_rng(seed)
-    mock_res = _generate_mock_synthaml(n_mock_alerts=nrows or n_mock_alerts, rng=rng)
-    mock_res["provenance"] = "EXPLICIT_SYNTHETIC_DEMO"
-    mock_res["is_synthetic"] = True
-    return mock_res
+    raise FileNotFoundError(
+        f"Real SynthAML dataset files not found in '{root}'. "
+        f"Expected 'synthetic_alerts.csv' and 'synthetic_transactions.csv' (or 'alerts.parquet'/'transactions.parquet'). "
+        f"Real dataset loaders fail closed; synthetic substitutes are prohibited."
+    )
 
 
 # ===========================================================================
@@ -2214,9 +1900,6 @@ def _process_amlnet_dataframe(
     step_default = pd.Series(range(len(df)))
     steps = np.asarray(pd.to_numeric(df.get("step", step_default), errors="coerce").fillna(0).values, dtype=np.float64)
 
-    is_synthetic = (source == "synthetic_fallback")
-    provenance = "EXPLICIT_SYNTHETIC_DEMO" if is_synthetic else "REAL_OFFICIAL_DATASET"
-
     return {
         "X": X,
         "y": y,
@@ -2225,53 +1908,32 @@ def _process_amlnet_dataframe(
         "typologies": typologies,
         "steps": steps,
         "source": source,
-        "provenance": provenance,
-        "is_synthetic": is_synthetic,
+        "provenance": DatasetProvenance.CONTROLLED_PROJECT_SYNTHETIC.value,
+        "artifact_origin": "external_physical_file",
+        "scientific_origin": "synthetic",
+        "is_synthetic": False,
         "fraud_ratio": float(np.mean(y == 1)) if len(y) > 0 else 0.0,
         "n_samples": len(y),
     }
 
 
-def _generate_mock_amlnet(
-    n_mock_txns: int = 2000,
-    rng: np.random.Generator | None = None,
-) -> dict[str, Any]:
-    """Generate high-fidelity synthetic mock of the AMLNet benchmark."""
-    logger.warning("[AMLNet] Generating synthetic fallback mock (%d txns)...", n_mock_txns)
-    import sys
-    import tempfile
-
-    repo_root = Path(__file__).resolve().parents[4]
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
-
-    from scripts.generate_amlnet_dataset import generate_amlnet
-
-    seed = int(rng.integers(0, 100000)) if rng is not None else 42
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        df = generate_amlnet(tmp_dir, n_transactions=n_mock_txns, seed=seed)
-
-    return _process_amlnet_dataframe(df, source="synthetic_fallback")
-
-
 def load_amlnet(
-    require_real: bool = False,
     data_dir: Path | str | None = None,
     all_rows: bool = False,
     nrows: int | None = None,
-    n_mock_txns: int = 2000,
-    seed: int = 42,
+    path: Path | str | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Load the AUSTRAC-aligned AMLNet multi-agent synthetic AML transaction dataset.
 
+    Fails closed with FileNotFoundError if physical dataset files are missing.
+    No synthetic generator fallback.
+
     Args:
-        require_real: If True, raise FileNotFoundError when real dataset files are missing.
         data_dir: Explicit dataset path, or resolved automatically via resolve_dataset_dir.
         all_rows: If True, load all rows without truncation.
         nrows: Maximum number of transactions to ingest (useful for fast testing).
-        n_mock_txns: Number of transactions to generate in synthetic fallback mode.
-        seed: Random seed for mock generator.
+        path: Alias for data_dir.
 
     Returns:
         dict containing:
@@ -2281,11 +1943,15 @@ def load_amlnet(
         - raw_df: Underlying pandas DataFrame.
         - typologies: Array of AML typologies ('normal', 'structuring', 'layering', 'integration').
         - steps: Array of simulation timesteps.
-        - source: 'real_parquet', 'real_csv', or 'synthetic_fallback'.
+        - source: 'real_parquet' or 'real_csv'.
+        - provenance: 'CONTROLLED_PROJECT_SYNTHETIC'.
         - fraud_ratio: Class prevalence of money laundering.
         - n_samples: Total number of ingested records.
     """
-    root = resolve_dataset_dir("amlnet", explicit_path=data_dir)
+    target_dir = path if path is not None else data_dir
+    root = resolve_dataset_dir("amlnet", explicit_path=target_dir)
+    target_nrows = None if all_rows else (nrows or (int(kwargs["nrows"]) if "nrows" in kwargs and kwargs["nrows"] is not None else None))
+
     parquet_cache = root / "transactions.parquet"
     csv_candidates = [
         root / "transactions.csv",
@@ -2296,17 +1962,17 @@ def load_amlnet(
     if parquet_cache.exists():
         logger.info("[AMLNet] Ingesting columnar Parquet cache from '%s'...", parquet_cache)
         df = pd.read_parquet(parquet_cache)
-        if not all_rows and nrows is not None and len(df) > nrows:
-            df = df.iloc[:nrows].copy()
+        if target_nrows is not None and len(df) > target_nrows:
+            df = df.iloc[:target_nrows].copy()
         return _process_amlnet_dataframe(df, source="real_parquet")
 
     # 2. Raw CSV loader
     for csv_file in csv_candidates:
         if csv_file.exists() and not csv_file.name.endswith(".parquet"):
             logger.info("[AMLNet] Ingesting CSV from '%s'...", csv_file)
-            df = pd.read_csv(csv_file, nrows=nrows if (not all_rows and nrows is not None) else None)
+            df = pd.read_csv(csv_file, nrows=target_nrows)
             # Cache to Parquet for accelerated future reads
-            if not parquet_cache.exists() and (all_rows or nrows is None):
+            if not parquet_cache.exists() and target_nrows is None:
                 try:
                     df.to_parquet(parquet_cache, index=False)
                     logger.info("[AMLNet] Cached Parquet to '%s'", parquet_cache)
@@ -2314,17 +1980,11 @@ def load_amlnet(
                     logger.debug("[AMLNet] Skipping Parquet cache write: %s", exc)
             return _process_amlnet_dataframe(df, source="real_csv")
 
-    # 3. Missing file handling
-    dataset_mode = kwargs.get("dataset_mode")
-    if require_real or dataset_mode == "real":
-        raise FileNotFoundError(
-            f"Real AMLNet dataset files not found in '{root}'. "
-            f"Expected 'transactions.csv' or 'transactions.parquet'. "
-            f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_synthetic=True for synthetic demo."
-        )
-
-    rng = np.random.default_rng(seed)
-    return _generate_mock_amlnet(n_mock_txns=nrows or n_mock_txns, rng=rng)
+    raise FileNotFoundError(
+        f"Real AMLNet dataset files not found in '{root}'. "
+        f"Expected 'transactions.csv' or 'transactions.parquet'. "
+        f"Real dataset loaders fail closed; synthetic substitutes are prohibited."
+    )
 
 
 # ===========================================================================
@@ -2473,43 +2133,46 @@ def temporal_split_dataset(
 
 def load_dataset(
     name: str,
-    require_real: bool = False,
     temporal_split: bool = False,
     preprocess: bool = False,
-    dataset_mode: str | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Load a benchmark dataset by registry name, optionally applying temporal split and preprocessing."""
+    """Load a registered real benchmark dataset, optionally applying temporal split and preprocessing."""
     clean_name = name.lower().replace("-", "_").strip()
     if clean_name not in DATASET_REGISTRY:
         raise ValueError(f"Unknown dataset '{name}'. Available: {list(DATASET_REGISTRY)}")
 
-    if dataset_mode == "real":
-        require_real = True
-    elif dataset_mode == "synthetic":
-        kwargs["force_synthetic"] = True
+    clean_kwargs = {
+        k: v
+        for k, v in kwargs.items()
+        if k not in (
+            "require_real",
+            "force_synthetic",
+            "force_mock",
+            "allow_synthetic",
+            "n_mock_txns",
+            "n_mock_alerts",
+            "temporal_split",
+            "preprocess",
+        )
+    }
 
-    data = DATASET_REGISTRY[clean_name](
-        require_real=require_real,
-        dataset_mode=dataset_mode,
-        **kwargs,
-    )
+    loader = DATASET_REGISTRY[clean_name]
+    data = loader(temporal_split=temporal_split, **clean_kwargs)
 
-    if temporal_split:
-        clean_kwargs = {
+    # If the loader did not already perform temporal splitting, apply it here
+    if temporal_split and "train" not in data and "train_mask" not in data and "X_train" not in data:
+        ts_kwargs = {
             k: v
             for k, v in kwargs.items()
             if k not in (
                 "nrows",
-                "n_mock_txns",
                 "all_rows",
-                "require_real",
                 "temporal_split",
                 "dataset_mode",
-                "force_synthetic",
             )
         }
-        return temporal_split_dataset(data, preprocess=preprocess, **clean_kwargs)
+        return temporal_split_dataset(data, preprocess=preprocess, **ts_kwargs)
 
     return data
 

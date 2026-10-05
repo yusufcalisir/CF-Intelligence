@@ -81,22 +81,26 @@ def test_invariant_6_software_tee_never_claims_hardware_attestation():
 
 
 def test_invariant_7_missing_real_dataset_raises_file_not_found(tmp_path):
-    """Invariant 7: Missing real dataset must raise FileNotFoundError when synthetic fallback is disabled."""
+    """Invariant 7: Missing real dataset must raise FileNotFoundError unconditionally without fallback."""
     empty_dir = tmp_path / "empty_elliptic_dir"
     empty_dir.mkdir()
 
-    # Strict real-data request
+    # Calling load_elliptic on missing dataset raises FileNotFoundError
     with pytest.raises(FileNotFoundError, match="Real Elliptic Bitcoin dataset files not found"):
-        load_elliptic(path=empty_dir, require_real=True)
+        load_elliptic(path=empty_dir)
 
-    # Calling with allow_synthetic=False
-    with pytest.raises(FileNotFoundError):
-        load_elliptic(path=empty_dir, allow_synthetic=False)
+    # Calling with any kwargs still fails closed
+    with pytest.raises(FileNotFoundError, match="Real Elliptic Bitcoin dataset files not found"):
+        load_elliptic(path=empty_dir, nrows=50)
 
-    # Calling with explicit allow_synthetic=True returns mock with explicit provenance
-    mock_data = load_elliptic(path=empty_dir, allow_synthetic=True, n_mock_nodes=50)
-    assert mock_data["source"] == "mock"
-    assert mock_data["provenance"] == "EXPLICIT_SYNTHETIC_DEMO"
+    # Synthetic generator is a separate explicit entry point
+    from app.application.services.synthetic_dataset_generators import (
+        generate_synthetic_elliptic,
+    )
+
+    mock_data = generate_synthetic_elliptic(n_mock_nodes=50)
+    assert mock_data["source"] in ("mock", "synthetic_generator")
+    assert mock_data["provenance"] == "TEST_FIXTURE"
     assert mock_data["is_synthetic"] is True
 
 

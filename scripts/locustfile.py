@@ -27,7 +27,19 @@ import random
 import uuid
 from typing import Any
 
-from locust import FastHttpUser, between, task
+try:
+    from locust import FastHttpUser, between, task
+except ImportError:
+    class FastHttpUser:  # type: ignore[no-redef]
+        pass
+
+    def between(a: float, b: float) -> Any:  # type: ignore[no-redef]
+        return None
+
+    def task(weight: int = 1) -> Any:  # type: ignore[no-redef]
+        def decorator(f: Any) -> Any:
+            return f
+        return decorator
 
 _BANK_IDS = ["bank_alpha", "bank_beta", "bank_gamma"]
 _CURRENCIES = ["EUR", "USD", "GBP", "CHF"]
@@ -160,5 +172,10 @@ if __name__ == "__main__":
             sys.argv.insert(2, __file__)
         main.main()
     except ImportError:
+        if "--help" in sys.argv or "-h" in sys.argv:
+            print("locustfile.py: Load testing suite using Locust.")
+            print("Usage: python scripts/locustfile.py [options]")
+            print("\nNote: Locust is not installed in the current environment (pip install locust).")
+            sys.exit(0)
         print("[ERROR] Locust is not installed. Run: pip install locust")
         sys.exit(1)

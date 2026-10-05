@@ -1,6 +1,6 @@
 {
   "benchmark_id": "CFI-CrossBank-01-Value-Quantification",
-  "timestamp": "2026-10-02T18:54:46.201887+00:00",
+  "timestamp": "2026-10-05T21:32:26.456442+00:00",
   "n_transactions": 500,
   "seed": 42,
   "information_horizons": {

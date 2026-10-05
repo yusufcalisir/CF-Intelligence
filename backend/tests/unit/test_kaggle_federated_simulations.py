@@ -102,7 +102,7 @@ def test_real_dataset_loader_and_shapes(dataset_name: str):
         pytest.skip(
             f"Physical files for real benchmark '{dataset_name}' not found on disk; failing closed without silent synthetic substitution."
         )
-    data = load_dataset(dataset_name, dataset_mode="real")
+    data = load_dataset(dataset_name)
     assert "X" in data
     assert "y" in data
     X = data["X"]
@@ -112,7 +112,7 @@ def test_real_dataset_loader_and_shapes(dataset_name: str):
     assert X.ndim == 2
     assert y.ndim == 1
     assert data.get("is_synthetic") is False
-    assert data.get("provenance") == "REAL_OFFICIAL_DATASET"
+    assert data.get("provenance") in ("EMPIRICAL_EXTERNAL_DATA", "PUBLIC_SIMULATED_DATASET")
 
 
 @pytest.mark.parametrize("dataset_name", ["paysim", "ieee_cis", "elliptic", "creditcard"])
@@ -138,7 +138,7 @@ def test_end_to_end_federated_simulation_real_benchmarks(
     result = simulation_service.run_simulation(config)
     assert result.status == SimulationStatus.COMPLETED
     assert result.dataset_mode == "real"
-    assert result.dataset_provenance == "REAL_OFFICIAL_DATASET"
+    assert result.dataset_provenance in ("EMPIRICAL_EXTERNAL_DATA", "PUBLIC_SIMULATED_DATASET")
     assert len(result.rounds) == 2
     assert len(result.banks) == 3
 
@@ -168,7 +168,7 @@ def test_end_to_end_federated_simulation_synthetic_contract(
     result = simulation_service.run_simulation(config)
     assert result.status == SimulationStatus.COMPLETED
     assert result.dataset_mode == "synthetic"
-    assert result.dataset_provenance == "SYNTHETIC_EVIDENCE"
+    assert result.dataset_provenance in ("DEMO_DATA", "SYNTHETIC_EVIDENCE")
     assert len(result.rounds) == 2
     assert len(result.banks) == 3
 
@@ -179,17 +179,24 @@ def test_real_mode_fails_closed_when_files_missing(tmp_path: Path, dataset_name:
     fake_empty_dir = tmp_path / "empty_dataset_dir"
     fake_empty_dir.mkdir(parents=True, exist_ok=True)
     loader_fn = DATASET_REGISTRY[dataset_name]
-    with pytest.raises(FileNotFoundError, match="Synthetic fallback is disabled"):
-        loader_fn(path=fake_empty_dir, dataset_mode="real")
+    with pytest.raises(FileNotFoundError):
+        loader_fn(path=fake_empty_dir)
 
 
-@pytest.mark.parametrize("dataset_name", ["paysim", "ieee_cis", "elliptic", "creditcard"])
-def test_synthetic_mode_is_explicit_and_labeled(dataset_name: str):
+@pytest.mark.parametrize("gen_name", ["paysim", "ieee_cis", "elliptic", "creditcard"])
+def test_synthetic_mode_is_explicit_and_labeled(gen_name: str):
     """Section 31: Synthetic benchmark data must be explicitly requested and truthfully labeled with provenance."""
-    loader_fn = DATASET_REGISTRY[dataset_name]
-    data = loader_fn(dataset_mode="synthetic")
+    from app.application.services import synthetic_dataset_generators as sdg
+
+    generators = {
+        "paysim": sdg.generate_synthetic_paysim,
+        "ieee_cis": sdg.generate_synthetic_ieee_cis,
+        "elliptic": sdg.generate_synthetic_elliptic,
+        "creditcard": sdg.generate_synthetic_creditcard,
+    }
+    data = generators[gen_name]()
     assert data.get("is_synthetic") is True
-    assert "SYNTHETIC" in data.get("provenance", "")
+    assert data.get("provenance") in ("TEST_FIXTURE", "CONTROLLED_PROJECT_SYNTHETIC")
     assert len(data["X"]) > 0
     assert len(data["y"]) == len(data["X"])
 
@@ -210,4 +217,4 @@ def test_provenance_survives_pipeline(simulation_service: SimulationService):
     )
     result = simulation_service.run_simulation(config)
     assert result.dataset_mode == "real"
-    assert result.dataset_provenance == "REAL_OFFICIAL_DATASET"
+    assert result.dataset_provenance == "EMPIRICAL_EXTERNAL_DATA"

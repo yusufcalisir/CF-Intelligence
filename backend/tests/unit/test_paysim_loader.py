@@ -96,12 +96,17 @@ class TestPaySimLoader:
         assert np.max(val_steps) <= np.min(test_steps)
 
     def test_paysim_synthetic_fallback_matches_schema(self, tmp_path: Path) -> None:
-        """Verify mock fallback reproduces identical 13-feature schema when real data is absent."""
+        """Verify explicit synthetic generation reproduces identical 13-feature schema."""
         empty_dir = tmp_path / "no_paysim"
         empty_dir.mkdir()
 
-        data = load_paysim(path=empty_dir, n_mock_txns=300, require_real=False)
-        assert data["source"] == "mock_mpesa"
+        with pytest.raises(FileNotFoundError, match="Real PaySim dataset files not found"):
+            load_paysim(path=empty_dir, nrows=300, require_real=False)
+
+        from app.application.services.synthetic_dataset_generators import generate_synthetic_paysim
+
+        data = generate_synthetic_paysim(n_mock_txns=300)
+        assert data["is_synthetic"] is True
         assert data["X"].shape == (300, 13)
         assert len(data["y"]) == 300
         assert data["feature_names"] == PAYSIM_FEATURE_COLS

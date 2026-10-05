@@ -162,18 +162,18 @@ class TestCreditCardDataLoader:
         assert t_train_max <= t_val_min, "Lookahead leakage between train and val"
         assert t_val_max <= t_test_min, "Lookahead leakage between val and test"
 
-    def test_creditcard_synthetic_fallback_schema(self, tmp_path: Path) -> None:
-        """Verify synthetic generation fallback produces expected schema when real data is absent."""
-        empty_dir = tmp_path / "no_data"
-        empty_dir.mkdir()
+    def test_creditcard_synthetic_generation_schema(self) -> None:
+        """Verify explicit synthetic generation produces expected schema."""
+        from app.application.services.synthetic_dataset_generators import (
+            generate_synthetic_creditcard,
+        )
 
-        data = load_creditcard_fraud(
-            path=empty_dir,
+        data = generate_synthetic_creditcard(
             n_mock_txns=800,
-            require_real=False,
             include_time=True,
             split_data=True,
         )
+        assert data["is_synthetic"] is True
         assert data["source"] == "mock_pca"
         assert data["X"].shape == (800, 30)
         assert len(data["y"]) == 800
@@ -181,6 +181,14 @@ class TestCreditCardDataLoader:
         assert "train" in data
         assert "val" in data
         assert "test" in data
+
+    def test_creditcard_fails_closed_when_missing(self, tmp_path: Path) -> None:
+        """Verify real loader fails closed on missing files even if require_real=False."""
+        empty_dir = tmp_path / "no_data"
+        empty_dir.mkdir()
+
+        with pytest.raises(FileNotFoundError, match="Real Credit Card Fraud dataset files not found"):
+            load_creditcard_fraud(path=empty_dir, nrows=800, require_real=False)
 
     def test_creditcard_dataset_registry_integration(self) -> None:
         """Verify convenience DATASET_REGISTRY resolves creditcard and credit_card aliases."""

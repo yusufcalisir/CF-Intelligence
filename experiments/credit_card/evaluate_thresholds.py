@@ -35,7 +35,7 @@ if str(REPO_ROOT) not in sys.path:
 if str(REPO_ROOT / "backend") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "backend"))
 
-from app.application.services.dataloader import load_creditcard_fraud  # noqa: E402
+from app.application.services.dataloader import load_creditcard_fraud, resolve_dataset_dir  # noqa: E402
 
 logger = logging.getLogger("experiments.credit_card.evaluate_thresholds")
 
@@ -221,22 +221,44 @@ class CreditCardThresholdEvaluator:
             include_time,
             scaling_strategy,
         )
-        self.data = load_creditcard_fraud(
-            path=path,
-            nrows=nrows,
-            all_rows=all_rows,
-            require_real=require_real,
-            include_time=include_time,
-            scale_time_amount=scale_time_amount,
-            scaling_strategy=scaling_strategy,
-            split_data=True,
-            train_ratio=train_ratio,
-            val_ratio=val_ratio,
-            test_ratio=test_ratio,
-            stratified=stratified,
-            temporal_split=temporal_split,
-            seed=self.seed,
-        )
+        root = Path(path) if path else resolve_dataset_dir("creditcard")
+        has_real_files = (root.is_file() and root.exists()) or (root / "creditcard.csv").exists() or bool(list(root.glob("*.parquet")))
+        use_synthetic = not require_real and not has_real_files
+
+        if use_synthetic:
+            from app.application.services.synthetic_dataset_generators import (
+                generate_synthetic_creditcard,
+            )
+
+            self.data = generate_synthetic_creditcard(
+                n_mock_txns=nrows or 5000,
+                include_time=include_time,
+                scale_time_amount=scale_time_amount,
+                scaling_strategy=scaling_strategy,
+                split_data=True,
+                train_ratio=train_ratio,
+                val_ratio=val_ratio,
+                test_ratio=test_ratio,
+                stratified=stratified,
+                temporal_split=temporal_split,
+                seed=self.seed,
+            )
+        else:
+            self.data = load_creditcard_fraud(
+                path=path,
+                nrows=nrows,
+                all_rows=all_rows,
+                include_time=include_time,
+                scale_time_amount=scale_time_amount,
+                scaling_strategy=scaling_strategy,
+                split_data=True,
+                train_ratio=train_ratio,
+                val_ratio=val_ratio,
+                test_ratio=test_ratio,
+                stratified=stratified,
+                temporal_split=temporal_split,
+                seed=self.seed,
+            )
         logger.info(
             "[CreditCardEvaluator] Preprocessed data: Train=%d txns (%d fraud), Val=%d txns (%d fraud), Test=%d txns (%d fraud)",
             len(self.data["train"]["y"]),

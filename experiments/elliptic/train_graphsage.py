@@ -577,17 +577,30 @@ class EllipticGraphSAGEBenchmark:
                 f"Silent synthetic fallback is strictly disabled in canonical real-data mode."
             )
 
-        raw_data = load_elliptic(
-            require_real=self.require_real,
-            include_unknown=True,
-            temporal_split=True,
-            split_timestep=self.split_timestep,
-            construct_graph=True,
-            all_rows=self.all_rows,
-            nrows=self.nrows,
-            target_nodes=self.nrows or 5000,
-            force_mock=(self.dataset_mode == "synthetic"),
-        )
+        if self.dataset_mode == "synthetic":
+            from app.application.services.synthetic_dataset_generators import (
+                generate_synthetic_elliptic,
+            )
+
+            raw_data = generate_synthetic_elliptic(
+                target_nodes=self.nrows or 5000,
+                include_unknown=True,
+                temporal_split=True,
+                split_timestep=self.split_timestep,
+                construct_graph=True,
+                all_rows=self.all_rows,
+                nrows=self.nrows,
+            )
+        else:
+            raw_data = load_elliptic(
+                path=self.data_dir,
+                include_unknown=True,
+                temporal_split=True,
+                split_timestep=self.split_timestep,
+                construct_graph=True,
+                all_rows=self.all_rows,
+                nrows=self.nrows,
+            )
 
         X_raw = raw_data["X"]
         y = raw_data["y"]

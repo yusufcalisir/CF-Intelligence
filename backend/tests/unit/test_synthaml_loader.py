@@ -134,9 +134,13 @@ class TestSynthAMLLoader:
     def test_synthaml_synthetic_fallback_generation(self, tmp_path: Path) -> None:
         """Verify synthetic fallback generates high-fidelity mock matching exact schema."""
         empty_dir = tmp_path / "empty_synthaml"
-        data = load_synthaml(require_real=False, data_dir=empty_dir, n_mock_alerts=50, seed=123)
+        with pytest.raises(FileNotFoundError, match="Real SynthAML dataset files not found"):
+            load_synthaml(require_real=False, data_dir=empty_dir, n_mock_alerts=50, seed=123)
 
-        assert data["source"] == "synthetic_fallback"
+        from app.application.services.synthetic_dataset_generators import generate_synthetic_synthaml
+
+        data = generate_synthetic_synthaml(n_mock_alerts=50)
+        assert data["is_synthetic"] is True
         assert len(data["y"]) == 50
         assert data["X"].shape == (50, 14)
         assert np.all(np.isin(data["y"], [0, 1]))

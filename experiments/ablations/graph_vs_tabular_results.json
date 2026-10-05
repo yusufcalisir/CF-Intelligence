@@ -1,6 +1,6 @@
 {
   "benchmark_id": "CFI-GRAPH-VS-TABULAR-01",
-  "timestamp_utc": "2026-10-02T18:58:00.977230+00:00",
+  "timestamp_utc": "2026-10-05T21:38:35.174823+00:00",
   "config": {
     "n_samples": 500,
     "fraud_prevalence": 0.03,
@@ -29,8 +29,8 @@
       "recall_at_fpr_1_0": 0.0,
       "ece": 0.3708,
       "brier_score": 0.1785,
-      "training_time_ms": 20.47,
-      "inference_latency_ms": 0.26
+      "training_time_ms": 16.17,
+      "inference_latency_ms": 0.23
     },
     "GRAPH_ONLY": {
       "paradigm": "GRAPH_ONLY",
@@ -45,8 +45,8 @@
       "recall_at_fpr_1_0": 1.0,
       "ece": 0.3309,
       "brier_score": 0.1431,
-      "training_time_ms": 20.77,
-      "inference_latency_ms": 0.2
+      "training_time_ms": 15.26,
+      "inference_latency_ms": 0.18
     },
     "TABULAR_PLUS_GRAPH": {
       "paradigm": "TABULAR_PLUS_GRAPH",
@@ -61,8 +61,8 @@
       "recall_at_fpr_1_0": 1.0,
       "ece": 0.3148,
       "brier_score": 0.1442,
-      "training_time_ms": 20.52,
-      "inference_latency_ms": 0.19
+      "training_time_ms": 14.89,
+      "inference_latency_ms": 0.16
     }
   },
   "uplift": {

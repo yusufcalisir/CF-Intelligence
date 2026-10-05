@@ -477,3 +477,31 @@ class UBOAnomalyType(StrEnum):
     OPAQUE_MULTI_TIER_LAYERING = "OPAQUE_MULTI_TIER_LAYERING"
 
 
+# ── Dataset Provenance & Execution Mode Enums ────────────────────────────────
+
+class DatasetMode(StrEnum):
+    """Dataset execution mode declaring whether data source is physical or synthetic."""
+
+    REAL = "real"
+    SYNTHETIC = "synthetic"
+
+
+class DatasetProvenance(StrEnum):
+    """Authoritative taxonomy for dataset provenance and scientific origin."""
+
+    EMPIRICAL_EXTERNAL_DATA = "EMPIRICAL_EXTERNAL_DATA"
+    PUBLIC_SIMULATED_DATASET = "PUBLIC_SIMULATED_DATASET"
+    CONTROLLED_PROJECT_SYNTHETIC = "CONTROLLED_PROJECT_SYNTHETIC"
+    TEST_FIXTURE = "TEST_FIXTURE"
+    DEMO_DATA = "DEMO_DATA"
+
+    # Canonical aliases for legacy consumers
+    REAL_OFFICIAL_DATASET = "REAL_OFFICIAL_DATASET"
+    REAL_DATA = "EMPIRICAL_EXTERNAL_DATA"
+    REAL_DATA_EVIDENCE = "EMPIRICAL_EXTERNAL_DATA"
+    EXTERNALLY_SIMULATED = "PUBLIC_SIMULATED_DATASET"
+    PROJECT_SYNTHETIC = "CONTROLLED_PROJECT_SYNTHETIC"
+    EXPLICIT_SYNTHETIC_DEMO = "DEMO_DATA"
+    SYNTHETIC_EVIDENCE = "CONTROLLED_PROJECT_SYNTHETIC"
+
+

@@ -47,7 +47,7 @@ BACKEND_DIR = REPO_ROOT / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.application.services.dataloader import load_creditcard_fraud
+from app.application.services.dataloader import load_creditcard_fraud, resolve_dataset_dir
 from experiments.credit_card.evaluate_thresholds import CreditCardImbalanceMLP
 from experiments.harness.schema import (
     CalibrationData,
@@ -182,24 +182,42 @@ class CreditCardPartitioner:
         path: Path | str | None = None,
         force_synthetic: bool = False,
     ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
-        """Load Credit Card dataset, extract test set, and partition training set across banks."""
-        p = Path(path) if path else None
-        self.raw_data = load_creditcard_fraud(
-            path=p,
-            nrows=nrows,
-            all_rows=all_rows,
-            require_real=require_real,
-            force_synthetic=force_synthetic,
-            include_time=True,
-            scale_time_amount=True,
-            scaling_strategy="robust",
-            split_data=True,
-            train_ratio=1.0 - self.test_ratio,
-            val_ratio=0.0,
-            test_ratio=self.test_ratio,
-            stratified=True,
-            seed=self.seed,
-        )
+        root = Path(path) if path else resolve_dataset_dir("creditcard")
+        has_real_files = (root.is_file() and root.exists()) or (root / "creditcard.csv").exists() or bool(list(root.glob("*.parquet")))
+        use_synthetic = force_synthetic or (not require_real and not has_real_files)
+
+        if use_synthetic:
+            from app.application.services.synthetic_dataset_generators import (
+                generate_synthetic_creditcard,
+            )
+
+            self.raw_data = generate_synthetic_creditcard(
+                n_mock_txns=nrows or 5000,
+                include_time=True,
+                scale_time_amount=True,
+                scaling_strategy="robust",
+                split_data=True,
+                train_ratio=1.0 - self.test_ratio,
+                val_ratio=0.0,
+                test_ratio=self.test_ratio,
+                stratified=True,
+                seed=self.seed,
+            )
+        else:
+            self.raw_data = load_creditcard_fraud(
+                path=path,
+                nrows=nrows,
+                all_rows=all_rows,
+                include_time=True,
+                scale_time_amount=True,
+                scaling_strategy="robust",
+                split_data=True,
+                train_ratio=1.0 - self.test_ratio,
+                val_ratio=0.0,
+                test_ratio=self.test_ratio,
+                stratified=True,
+                seed=self.seed,
+            )
 
         X_train_pool = self.raw_data["train"]["X"]
         y_train_pool = self.raw_data["train"]["y"]

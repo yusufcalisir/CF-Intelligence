@@ -1,9 +1,9 @@
 {
-  "timestamp_utc": "2026-10-05T21:38:41.244330+00:00",
+  "timestamp_utc": "2026-10-05T21:38:41.362813+00:00",
   "benchmark": "GraphSAGE Elliptic Bitcoin Inductive Node Classification",
   "model": "GraphSAGE (2-layer Mean Aggregator)",
   "dataset": "Elliptic Bitcoin Transaction Graph (Real)",
-  "dataset_mode": "synthetic",
+  "dataset_mode": "real",
   "git_commit": "5dc1d495704bd43117927a70aa0e83831642cd23",
   "dataset_metadata": {
     "name": "Elliptic Bitcoin Transaction Graph (Weber et al., 2019)",

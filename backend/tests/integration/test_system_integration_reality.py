@@ -302,17 +302,21 @@ def test_tee_hardware_attestation_honesty() -> None:
 
 
 def test_elliptic_dataset_provenance_fail_truthful(tmp_path) -> None:
-    """Gate K: Missing real Elliptic dataset raises FileNotFoundError."""
+    """Gate K: Missing real Elliptic dataset raises FileNotFoundError unconditionally."""
     empty_dir = tmp_path / "empty_dir"
     empty_dir.mkdir()
 
     with pytest.raises(FileNotFoundError, match="Real Elliptic Bitcoin dataset files not found"):
-        load_elliptic(path=empty_dir, require_real=True)
+        load_elliptic(path=empty_dir)
 
-    # Calling with explicit allow_synthetic=True returns explicit provenance
-    synthetic_data = load_elliptic(path=empty_dir, allow_synthetic=True, n_mock_nodes=40)
+    # Synthetic generator is separate explicit entry point
+    from app.application.services.synthetic_dataset_generators import (
+        generate_synthetic_elliptic,
+    )
+
+    synthetic_data = generate_synthetic_elliptic(n_mock_nodes=40)
     assert synthetic_data["is_synthetic"] is True
-    assert synthetic_data["provenance"] == "EXPLICIT_SYNTHETIC_DEMO"
+    assert synthetic_data["provenance"] == "TEST_FIXTURE"
 
 
 def test_economic_roi_metrics_truthful_calculation() -> None:

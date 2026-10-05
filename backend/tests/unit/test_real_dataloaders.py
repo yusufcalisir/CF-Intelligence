@@ -90,8 +90,16 @@ def test_load_amlsim_pyg_and_networkx():
     assert nx_graph.number_of_edges() <= 100
 
 
-def test_load_amlsim_mock_fallback(tmp_path):
-    data = load_amlsim(path=tmp_path / "nonexistent", n_mock_txns=300)
+def test_load_amlsim_fails_closed_when_missing(tmp_path):
+    with pytest.raises(FileNotFoundError, match="Real AMLSim dataset export not found"):
+        load_amlsim(path=tmp_path / "nonexistent")
+
+
+def test_generate_synthetic_amlsim():
+    from app.application.services.synthetic_dataset_generators import generate_synthetic_amlsim
+
+    data = generate_synthetic_amlsim(n_mock_txns=300)
+    assert data["is_synthetic"] is True
     assert data["source"] == "mock"
     assert data["X"].shape == (300, 6)
     assert len(data["y"]) == 300

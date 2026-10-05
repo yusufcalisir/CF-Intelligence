@@ -1,6 +1,6 @@
 {
   "dataset_name": "Elliptic Bitcoin Transaction Graph",
-  "evaluated_at_utc": "2026-10-05T21:38:41.244330+00:00",
+  "evaluated_at_utc": "2026-10-05T21:38:41.362813+00:00",
   "temporal_split": "Timesteps 1-30 Train, 31-34 Val, 35-49 Test",
   "models": [
     {

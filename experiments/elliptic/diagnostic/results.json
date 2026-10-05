@@ -37,7 +37,7 @@
       "checkpoint_criterion": "validation_pr_auc",
       "threshold_criterion": "validation_f1_maximization"
     },
-    "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic"
+    "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\diagnostic"
   },
   "hardware": {
     "os_platform": "Windows",
@@ -71,8 +71,8 @@
   "git_commit": "5dc1d495704bd43117927a70aa0e83831642cd23",
   "git_branch": "main",
   "status": "COMPLETED",
-  "start_time_utc": "2026-10-05T21:38:41.234801+00:00",
-  "end_time_utc": "2026-10-05T21:38:41.244330+00:00",
+  "start_time_utc": "2026-10-05T21:38:41.354060+00:00",
+  "end_time_utc": "2026-10-05T21:38:41.362813+00:00",
   "total_duration_seconds": 0.01,
   "final_metrics": {
     "pr_auc": 0.5,
@@ -98,7 +98,7 @@
       "precision": null,
       "recall": null,
       "duration_seconds": 0.001,
-      "timestamp_utc": "2026-10-05T21:38:41.288669+00:00",
+      "timestamp_utc": "2026-10-05T21:38:41.397546+00:00",
       "extra": {}
     }
   ],
@@ -133,9 +133,9 @@
   },
   "calibration": null,
   "artifact_paths": {
-    "results_json": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic\\results.json",
-    "comparative_baselines": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic\\comparative_baselines.json",
-    "audit_dossier": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic\\audit_dossier.md",
-    "benchmark_raw": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic\\graphsage_elliptic_benchmark.json"
+    "results_json": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\diagnostic\\results.json",
+    "comparative_baselines": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\diagnostic\\comparative_baselines.json",
+    "audit_dossier": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\diagnostic\\audit_dossier.md",
+    "benchmark_raw": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\diagnostic\\graphsage_elliptic_benchmark.json"
   }
 }

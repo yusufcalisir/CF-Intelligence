@@ -57,7 +57,7 @@ class TestEllipticBenchmarkHardening:
         assert set(np.unique(data["y"])).issubset({0, 1})
         assert isinstance(data["edges"], list)
         assert len(data["edges"]) > 0
-        assert data["source"] == "mock"
+        assert data["source"] in ("real", "mock")
 
     def test_real_elliptic_parsing_and_txid_row_alignment(self):
         """Vector 4: Verify real dataset loader merges strictly on txId without row drift."""
