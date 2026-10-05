@@ -11,7 +11,9 @@ import warnings
 from threading import Lock
 
 # Suppress third-party legacy Pydantic v1 config deprecation warnings (e.g. Great Expectations / MLflow)
-warnings.filterwarnings("ignore", message=r".*Valid config keys have changed in V2.*", category=UserWarning)
+warnings.filterwarnings(
+    "ignore", message=r".*Valid config keys have changed in V2.*", category=UserWarning
+)
 warnings.filterwarnings("ignore", message=r".*schema_extra.*", category=UserWarning)
 
 # Configure CPU threading limits to 2 cores for maximum performance
@@ -420,7 +422,9 @@ def seed_mock_data() -> None:
     from app.application.services.coordinator_service import coordinator_service
 
     coordinator_service.seed_consortium_nodes()
-    logger.info("Successfully seeded initial demonstration data and consortium nodes for local environment")
+    logger.info(
+        "Successfully seeded initial demonstration data and consortium nodes for local environment"
+    )
 
 
 @asynccontextmanager
@@ -478,20 +482,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                                 if p
                                 else f"{h}:{parsed.port or 6379}"
                             )
-                            cand_url = urllib.parse.urlunparse(
-                                parsed._replace(netloc=netloc)
-                            )
+                            cand_url = urllib.parse.urlunparse(parsed._replace(netloc=netloc))
                             if cand_url == _redis_url:
                                 continue
                             try:
-                                _alt_r = _aioredis.from_url(
-                                    cand_url, socket_connect_timeout=1.0
-                                )
+                                _alt_r = _aioredis.from_url(cand_url, socket_connect_timeout=1.0)
                                 await _alt_r.ping()
                                 await _alt_r.aclose()
                                 _redis_available = True
                                 _redis_url = cand_url
-                                logger.info("Redis: auto-recovered via %s", redact_redis_url(cand_url))
+                                logger.info(
+                                    "Redis: auto-recovered via %s", redact_redis_url(cand_url)
+                                )
                                 break
                             except Exception:
                                 continue
@@ -561,6 +563,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await listener.stop()
         except Exception as exc:
             logger.error("Failed to stop Redis Bank Client Listener cleanly: %s", exc)
+
+    # Close training WebSocket Redis connection pool
+    try:
+        from app.presentation.websockets.training_ws import close_training_redis_pool
+
+        await close_training_redis_pool()
+    except Exception as exc:
+        logger.debug("Failed to close training Redis pool cleanly: %s", exc)
 
     logger.info("Shutting down")
 
@@ -655,9 +665,7 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) 
 # Wildcard origins are strictly prohibited to prevent cross-origin browser abuse.
 # Only authenticated platform frontend domains and verified preview regexes are allowed.
 _cors_origins = [
-    origin.strip()
-    for origin in settings.cors_allowed_origins.split(",")
-    if origin.strip()
+    origin.strip() for origin in settings.cors_allowed_origins.split(",") if origin.strip()
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -925,7 +933,9 @@ class DDoSProtectionMiddleware:
     _WINDOW_SECONDS = 10.0
     _MAX_REQUESTS_PER_WINDOW = 100
     _MAX_TRACKED_IPS = 1000  # Threshold to trigger expired IP pruning
-    _HARD_CEILING_TRACKED_IPS = 5000  # Hard ceiling: oldest active IPs evicted if active count exceeds ceiling
+    _HARD_CEILING_TRACKED_IPS = (
+        5000  # Hard ceiling: oldest active IPs evicted if active count exceeds ceiling
+    )
     _requests: dict[str, list[float]] = {}
     _lock = Lock()
 
@@ -1013,11 +1023,19 @@ class DDoSProtectionMiddleware:
         # Bypass throttling in test environments only for standard testclient/loopback
         # to prevent cross-test 429 accumulation while allowing real burst testing on explicit IPs.
         import os
-        if os.environ.get("TESTING") == "1" and client_ip in ("testclient", "127.0.0.1", "unknown", "localhost"):
+
+        if os.environ.get("TESTING") == "1" and client_ip in (
+            "testclient",
+            "127.0.0.1",
+            "unknown",
+            "localhost",
+        ):
             await self.app(scope, receive, send)
             return
 
-        is_throttled, throttled_resp, remaining = self._evaluate_rate_limit(client_ip, request.url.path)
+        is_throttled, throttled_resp, remaining = self._evaluate_rate_limit(
+            client_ip, request.url.path
+        )
         if is_throttled and throttled_resp is not None:
             await throttled_resp(scope, receive, send)
             return
@@ -1052,10 +1070,18 @@ class DDoSProtectionMiddleware:
         )
 
         import os
-        if os.environ.get("TESTING") == "1" and client_ip in ("testclient", "127.0.0.1", "unknown", "localhost"):
+
+        if os.environ.get("TESTING") == "1" and client_ip in (
+            "testclient",
+            "127.0.0.1",
+            "unknown",
+            "localhost",
+        ):
             return await call_next(request)
 
-        is_throttled, throttled_resp, remaining = self._evaluate_rate_limit(client_ip, request.url.path)
+        is_throttled, throttled_resp, remaining = self._evaluate_rate_limit(
+            client_ip, request.url.path
+        )
         if is_throttled and throttled_resp is not None:
             return throttled_resp
 
@@ -1136,7 +1162,8 @@ class TenantAccessControlMiddleware:
 
         # 2. If caller tenant is bound, verify against target bank_id query param
         if caller_tenant and not any(
-            r in caller_roles for r in ("super_admin", "cross_bank_investigator", "compliance_auditor")
+            r in caller_roles
+            for r in ("super_admin", "cross_bank_investigator", "compliance_auditor")
         ):
             norm_caller = caller_tenant.lower().replace("-", "_").strip()
 
@@ -1173,7 +1200,6 @@ class TenantAccessControlMiddleware:
 app.add_middleware(TenantAccessControlMiddleware)
 
 
-
 # ── Observability ─────────────────────────────
 from app.infrastructure.telemetry import setup_telemetry
 
@@ -1195,7 +1221,6 @@ app.include_router(copilot.router)
 app.include_router(copilot.api_router)
 app.include_router(feedback.router)
 app.include_router(feedback.api_router)
-
 
 
 # ── Service Mode Specific Routers ──────────────
@@ -1265,15 +1290,11 @@ elif service_name == "fraud-alert":
     app.include_router(
         entities.router
     )  # Mounted for read access of entities within streaming engine if queried directly
-    app.include_router(
-        entities.api_router
-    )
+    app.include_router(entities.api_router)
     app.include_router(
         graph.router
     )  # Mounted for read access of graph within streaming engine if queried directly
-    app.include_router(
-        graph.api_router
-    )
+    app.include_router(graph.api_router)
     app.include_router(scenarios.router)
     app.include_router(dashboard.router)
     app.include_router(streaming_ws.router)
@@ -1524,7 +1545,11 @@ async def swagger_ui_html() -> HTMLResponse:
     """Serve customized dark-mode Swagger UI documentation."""
     from app.infrastructure.security.security_headers import _DOCS_CSP_DIRECTIVES
 
-    topbar = _CFI_DOCS_TOPBAR_HTML.replace("{docs_active}", "active").replace("{redoc_active}", "").replace("{scalar_active}", "")
+    topbar = (
+        _CFI_DOCS_TOPBAR_HTML.replace("{docs_active}", "active")
+        .replace("{redoc_active}", "")
+        .replace("{scalar_active}", "")
+    )
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1800,7 +1825,11 @@ async def redoc_html() -> HTMLResponse:
     """Serve customized dark-mode ReDoc technical documentation."""
     from app.infrastructure.security.security_headers import _DOCS_CSP_DIRECTIVES
 
-    topbar = _CFI_DOCS_TOPBAR_HTML.replace("{docs_active}", "").replace("{redoc_active}", "active").replace("{scalar_active}", "")
+    topbar = (
+        _CFI_DOCS_TOPBAR_HTML.replace("{docs_active}", "")
+        .replace("{redoc_active}", "active")
+        .replace("{scalar_active}", "")
+    )
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2084,7 +2113,11 @@ async def scalar_api_reference() -> HTMLResponse:
     """Serve modern dark-themed Scalar API Reference documentation in responsive modern layout."""
     from app.infrastructure.security.security_headers import _DOCS_CSP_DIRECTIVES
 
-    topbar = _CFI_DOCS_TOPBAR_HTML.replace("{docs_active}", "").replace("{redoc_active}", "").replace("{scalar_active}", "active")
+    topbar = (
+        _CFI_DOCS_TOPBAR_HTML.replace("{docs_active}", "")
+        .replace("{redoc_active}", "")
+        .replace("{scalar_active}", "active")
+    )
     html_content = f"""<!doctype html>
 <html lang="en">
   <head>
@@ -2145,7 +2178,6 @@ async def scalar_api_reference() -> HTMLResponse:
     )
 
 
-
 _STATIC_DIR = pathlib.Path(__file__).parent / "static"
 _FRONTEND_PUBLIC_DIR = pathlib.Path(__file__).parent.parent.parent / "frontend" / "public"
 
@@ -2195,7 +2227,3 @@ async def favicon() -> Response:
         media_type = "image/png" if p.suffix == ".png" else "image/svg+xml"
         return Response(content=p.read_bytes(), media_type=media_type)
     return Response(status_code=204)
-
-
-
-

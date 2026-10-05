@@ -119,6 +119,11 @@ class WebSocketConnectionManager:
                         del self._rooms[room]
                 if websocket in self._ws_rooms:
                     self._ws_rooms[websocket].discard(room)
+                    if not self._ws_rooms[websocket]:
+                        del self._ws_rooms[websocket]
+                        self._active_connections.discard(websocket)
+                        self._client_last_seen.pop(websocket, None)
+                        self._inbound_counters.pop(websocket, None)
             else:
                 # Full teardown of client across all rooms
                 self._active_connections.discard(websocket)
@@ -242,9 +247,7 @@ class WebSocketConnectionManager:
 
         # Persist to in-process history ring-buffer (thread-safe via lock)
         async with self._lock:
-            buf = self._room_history.setdefault(
-                room, collections.deque(maxlen=ROOM_HISTORY_LIMIT)
-            )
+            buf = self._room_history.setdefault(room, collections.deque(maxlen=ROOM_HISTORY_LIMIT))
             buf.append(msg_str)
             clients = list(self._rooms.get(room, set()))
 
@@ -341,7 +344,9 @@ class WebSocketConnectionManager:
                 with contextlib.suppress(Exception):
                     await ws.close(code=1000, reason="Inactivity timeout")
 
-        logger.info("Evicted %d idle WebSocket connections (idle > %.1fs)", len(to_evict), max_idle_seconds)
+        logger.info(
+            "Evicted %d idle WebSocket connections (idle > %.1fs)", len(to_evict), max_idle_seconds
+        )
         return len(to_evict)
 
     def get_stats(self) -> dict[str, Any]:
@@ -394,7 +399,9 @@ class WebSocketConnectionManager:
 
 
 # Global singleton manager instances
-global_telemetry_ws_manager = WebSocketConnectionManager(max_connections=250, send_timeout_seconds=1.5)
+global_telemetry_ws_manager = WebSocketConnectionManager(
+    max_connections=250, send_timeout_seconds=1.5
+)
 training_ws_manager = WebSocketConnectionManager(max_connections=250, send_timeout_seconds=1.5)
 streaming_ws_manager = WebSocketConnectionManager(max_connections=250, send_timeout_seconds=1.5)
 
@@ -402,4 +409,3 @@ streaming_ws_manager = WebSocketConnectionManager(max_connections=250, send_time
 def broadcast_telemetry_event(event: dict[str, Any] | str) -> None:
     """Thread-safe convenience bridge to dispatch live platform telemetry to connected clients."""
     global_telemetry_ws_manager.broadcast_to_room_sync("telemetry:global", event)
-

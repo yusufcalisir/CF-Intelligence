@@ -171,14 +171,25 @@ async def test_training_ws_handles_connect_timeout_with_diagnostic_precision() -
 
     mock_redis = MagicMock()
     mock_redis.ping = AsyncMock(side_effect=TimeoutError("Connection probe timed out"))
-    mock_redis.aclose = AsyncMock()
 
     with (
         patch("app.presentation.websockets.training_ws.get_settings") as mock_settings,
-        patch("redis.asyncio.from_url", return_value=mock_redis),
-        patch("app.presentation.websockets.training_ws.training_ws_manager.connect", return_value=True),
-        patch("app.presentation.websockets.training_ws.training_ws_manager.disconnect", return_value=None),
-        patch("app.presentation.websockets.training_ws.training_ws_manager.get_room_history", return_value=[]),
+        patch(
+            "app.presentation.websockets.training_ws.get_training_redis_pool",
+            return_value=MagicMock(),
+        ),
+        patch("redis.asyncio.Redis", return_value=mock_redis),
+        patch(
+            "app.presentation.websockets.training_ws.training_ws_manager.connect", return_value=True
+        ),
+        patch(
+            "app.presentation.websockets.training_ws.training_ws_manager.disconnect",
+            return_value=None,
+        ),
+        patch(
+            "app.presentation.websockets.training_ws.training_ws_manager.get_room_history",
+            return_value=[],
+        ),
     ):
         settings_instance = MagicMock()
         settings_instance.redis_url = "rediss://default:cloud_token@us1.upstash.io:6379/0"
@@ -189,8 +200,6 @@ async def test_training_ws_handles_connect_timeout_with_diagnostic_precision() -
 
         # Ping was attempted
         mock_redis.ping.assert_called_once()
-        # Redis client was cleanly closed upon timeout
-        mock_redis.aclose.assert_called_once()
         # WebSocket sent the connected fallback event
         assert any(
             '"mode": "in_process"' in call.args[0]
@@ -219,6 +228,7 @@ async def test_stream_via_redis_handles_lrange_timeout_gracefully() -> None:
         ]
     )
     mock_pubsub.unsubscribe = AsyncMock()
+    mock_pubsub.aclose = AsyncMock()
     mock_pubsub.close = AsyncMock()
     mock_redis.pubsub.return_value = mock_pubsub
 
@@ -229,5 +239,162 @@ async def test_stream_via_redis_handles_lrange_timeout_gracefully() -> None:
     mock_pubsub.subscribe.assert_called_once_with("training:sim_test_timeout")
     mock_ws.send_text.assert_any_call('{"event": "live_event"}')
     mock_pubsub.unsubscribe.assert_called_once_with("training:sim_test_timeout")
-    mock_pubsub.close.assert_called_once()
+    assert mock_pubsub.aclose.call_count == 1 or mock_pubsub.close.call_count == 1
 
+
+@pytest.mark.asyncio
+async def test_manager_disconnect_cleans_active_connections_when_leaving_room() -> None:
+    """Verify that manager disconnect(websocket, room=...) removes the socket from _active_connections
+
+    when no other rooms remain, preventing stale connection accumulation.
+    """
+    from app.presentation.websockets.manager import WebSocketConnectionManager
+
+    manager = WebSocketConnectionManager()
+    mock_ws = AsyncMock()
+
+    # Connect to a room
+    await manager.connect(mock_ws, room="simulation:test_sim_1")
+    assert mock_ws in manager._active_connections
+    assert mock_ws in manager._rooms["simulation:test_sim_1"]
+
+    # Disconnect with room specified
+    await manager.disconnect(mock_ws, room="simulation:test_sim_1")
+    assert mock_ws not in manager._active_connections
+    assert "simulation:test_sim_1" not in manager._rooms
+    assert mock_ws not in manager._ws_rooms
+    assert mock_ws not in manager._client_last_seen
+
+
+@pytest.mark.asyncio
+async def test_client_disconnect_does_not_activate_inprocess_fallback() -> None:
+    """Verify that WebSocketDisconnect during streaming does NOT trigger in-process fallback or send-after-close."""
+    from fastapi import WebSocketDisconnect
+
+    from app.presentation.websockets.training_ws import _handle_training_ws
+
+    mock_ws = AsyncMock()
+    mock_redis = MagicMock()
+    mock_redis.ping = AsyncMock(return_value=True)
+
+    with (
+        patch("app.presentation.websockets.training_ws.get_settings") as mock_settings,
+        patch(
+            "app.presentation.websockets.training_ws.get_training_redis_pool",
+            return_value=MagicMock(),
+        ),
+        patch("redis.asyncio.Redis", return_value=mock_redis),
+        patch(
+            "app.presentation.websockets.training_ws.training_ws_manager.connect", return_value=True
+        ),
+        patch(
+            "app.presentation.websockets.training_ws.training_ws_manager.disconnect",
+            return_value=None,
+        ),
+        patch(
+            "app.presentation.websockets.training_ws._stream_via_redis",
+            side_effect=WebSocketDisconnect(code=1000),
+        ),
+        patch("app.presentation.websockets.training_ws._stream_via_inprocess") as mock_inprocess,
+    ):
+        settings_instance = MagicMock()
+        settings_instance.redis_url = "rediss://default:cloud_token@us1.upstash.io:6379/0"
+        mock_settings.return_value = settings_instance
+
+        # Client disconnect should exit cleanly without raising or calling fallback
+        await _handle_training_ws(mock_ws, simulation_id="live_prod_v2")
+
+        # In-process fallback MUST NOT be activated for client disconnect
+        mock_inprocess.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_genuine_redis_failure_activates_inprocess_fallback() -> None:
+    """Verify that genuine Redis transport failure while client is alive activates in-process fallback."""
+    from app.presentation.websockets.training_ws import _handle_training_ws
+
+    mock_ws = AsyncMock()
+    # Client is still connected
+    mock_ws.client_state = 1  # CONNECTED
+    mock_redis = MagicMock()
+    mock_redis.ping = AsyncMock(return_value=True)
+
+    with (
+        patch("app.presentation.websockets.training_ws.get_settings") as mock_settings,
+        patch(
+            "app.presentation.websockets.training_ws.get_training_redis_pool",
+            return_value=MagicMock(),
+        ),
+        patch("redis.asyncio.Redis", return_value=mock_redis),
+        patch(
+            "app.presentation.websockets.training_ws.training_ws_manager.connect", return_value=True
+        ),
+        patch(
+            "app.presentation.websockets.training_ws.training_ws_manager.disconnect",
+            return_value=None,
+        ),
+        patch(
+            "app.presentation.websockets.training_ws._stream_via_redis",
+            side_effect=ConnectionError("Redis dropped"),
+        ),
+        patch("app.presentation.websockets.training_ws._stream_via_inprocess") as mock_inprocess,
+    ):
+        settings_instance = MagicMock()
+        settings_instance.redis_url = "rediss://default:cloud_token@us1.upstash.io:6379/0"
+        mock_settings.return_value = settings_instance
+
+        await _handle_training_ws(mock_ws, simulation_id="sim_live_123")
+
+        # In-process fallback MUST be activated because socket is still connected
+        mock_inprocess.assert_called_once_with(mock_ws, "sim_live_123", "simulation:sim_live_123")
+
+
+@pytest.mark.asyncio
+async def test_training_ws_query_param_simulation_id_extraction() -> None:
+    """Verify that /ws/training extracts simulation_id from query parameters if provided."""
+    from app.presentation.websockets.training_ws import training_websocket_default
+
+    mock_ws = AsyncMock()
+    mock_ws.query_params = {"simulation_id": "sim_custom_uuid_888"}
+
+    with patch("app.presentation.websockets.training_ws._handle_training_ws") as mock_handle:
+        await training_websocket_default(mock_ws)
+        mock_handle.assert_called_once_with(mock_ws, "sim_custom_uuid_888")
+
+    # Also test camelCase simulationId
+    mock_ws2 = AsyncMock()
+    mock_ws2.query_params = {"simulationId": "sim_custom_uuid_999"}
+    with patch("app.presentation.websockets.training_ws._handle_training_ws") as mock_handle:
+        await training_websocket_default(mock_ws2)
+        mock_handle.assert_called_once_with(mock_ws2, "sim_custom_uuid_999")
+
+    # Fallback to default
+    mock_ws3 = AsyncMock()
+    mock_ws3.query_params = {}
+    with patch("app.presentation.websockets.training_ws._handle_training_ws") as mock_handle:
+        await training_websocket_default(mock_ws3)
+        mock_handle.assert_called_once_with(mock_ws3, "live_prod_v2")
+
+
+@pytest.mark.asyncio
+async def test_get_training_redis_pool_reuses_connection_pool() -> None:
+    """Verify that get_training_redis_pool returns the singleton pool instance across calls."""
+    from app.presentation.websockets.training_ws import (
+        close_training_redis_pool,
+        get_training_redis_pool,
+    )
+
+    await close_training_redis_pool()
+    with patch("redis.asyncio.ConnectionPool.from_url") as mock_from_url:
+        mock_pool = MagicMock()
+        mock_pool.disconnect = AsyncMock()
+        mock_from_url.return_value = mock_pool
+
+        pool1 = await get_training_redis_pool("redis://localhost:6379")
+        pool2 = await get_training_redis_pool("redis://localhost:6379")
+
+        assert pool1 is pool2
+        # Only one pool should be initialized
+        assert mock_from_url.call_count == 1
+
+    await close_training_redis_pool()

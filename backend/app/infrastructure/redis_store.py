@@ -62,8 +62,8 @@ class RedisStore:
                 r_client: redis.Redis = redis.Redis.from_url(
                     url,
                     decode_responses=True,
-                    socket_connect_timeout=0.5,
-                    socket_timeout=0.5,
+                    socket_connect_timeout=2.5,
+                    socket_timeout=3.0,
                 )
                 # Test connection
                 r_client.ping()
