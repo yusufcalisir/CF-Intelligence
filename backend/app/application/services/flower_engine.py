@@ -447,8 +447,6 @@ class FlowerFLEngine:
             os.environ.get("TESTING") == "1"
             or os.environ.get("CI") == "true"
             or os.environ.get("FLWR_SIMULATION_NATIVE") == "1"
-            or "pytest" in sys.modules
-            or "PYTEST_CURRENT_TEST" in os.environ
         ):
             return self._run_native_production_fl(
                 config=sim_config,

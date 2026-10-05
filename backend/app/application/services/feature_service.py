@@ -53,6 +53,8 @@ KNOWN_OUTCOME_FEATURE_PATTERNS: list[str] = [
     r"^dispute_status.*",
     r"^fraud_confirmed.*",
     r"^investigation_result.*",
+    r"^risk_level.*",
+    r"^target_risk_level.*",
 ]
 
 # Identifier patterns that leak transaction/customer memorization

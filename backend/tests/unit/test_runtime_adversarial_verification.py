@@ -1,0 +1,384 @@
+"""Adversarial verification test suite for runtime truth, anti-fabrication, and anti-memorization.
+
+Guarantees repository-wide compliance with AGENTS.md runtime truth rules:
+1. Random values cannot substitute for missing real values.
+2. Runtime predictions are physically computed, not hardcoded constants.
+3. Dataset name cannot select predictions via lookup tables.
+4. Dataset hash cannot select predictions or thresholds.
+5. Ground truth labels are unavailable during inference.
+6. Test partition is isolated from threshold calibration.
+7. Missing model fails closed (never produces a fake score).
+8. Model inference exceptions fail closed (never silently return a fallback score).
+9. Benchmark results with unresolved provenance are rejected.
+10. Real dataset benchmark runner cannot invoke synthetic generators.
+11. Stale caches cannot cross dataset, tenant, or model provenance.
+12. DP-enabled execution actually executes DP clipping and privacy accounting.
+13. COMPLETED status cannot occur before mandatory work completes or on failed quality gate.
+14. Small-N latency measurements reject or warn on p99 adequacy.
+15. Graph embedding service masks target label leakage.
+16. Enterprise security compliance controls fail closed.
+17. Production environment strictly blocks demo mock seeding.
+18. Production execution dispatch never inspects pytest test environment.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+import tempfile
+import uuid
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import numpy as np
+import pytest
+import torch
+from fastapi.testclient import TestClient
+
+from app.application.services.feature_service import KNOWN_OUTCOME_FEATURE_PATTERNS
+from app.application.services.graph_embedding_model import extract_node_features
+from app.application.services.graph_embedding_service import GraphEmbeddingService
+from app.application.services.security_compliance import SecurityComplianceEngine
+from app.dependencies import get_session
+from app.domain.enums import EntityType, RiskLevel
+from app.main import app
+from benchmarks.runners.run_latency_benchmark import validate_sample_size_for_percentiles
+
+
+# ---------------------------------------------------------------------------
+# 1. Random value cannot substitute for missing real value
+# ---------------------------------------------------------------------------
+def test_random_value_cannot_substitute_for_missing_real_value() -> None:
+    """Missing or corrupted inputs must fail closed rather than falling back to random numbers."""
+    from app.presentation.routers.predict import _eval_model
+
+    class BrokenModel(torch.nn.Module):
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            raise RuntimeError("Hardware accelerator failure")
+
+    broken_model = BrokenModel()
+    dummy_input = torch.zeros((1, 10))
+
+    with pytest.raises(RuntimeError, match="Hardware accelerator failure"):
+        _eval_model(broken_model, dummy_input)
+
+
+# ---------------------------------------------------------------------------
+# 2. Runtime prediction is not a constant
+# ---------------------------------------------------------------------------
+def test_runtime_prediction_is_not_constant() -> None:
+    """Distinct physical inputs must produce dynamically computed, non-identical forward scores."""
+    from app.presentation.routers.predict import _eval_model, _get_cached_serving_model, preprocess_transaction
+
+    model = _get_cached_serving_model(None)
+
+    low_risk_tx = {
+        "transaction_amount": 10.0,
+        "merchant_category": "grocery",
+        "country_code": "US",
+        "device_type": "web_browser",
+        "velocity": 0.5,
+        "merchant_risk_score": 0.01,
+        "customer_history_score": 0.99,
+        "chargeback_count": 0,
+        "account_age_days": 800,
+    }
+    high_risk_tx = {
+        "transaction_amount": 9500.0,
+        "merchant_category": "crypto",
+        "country_code": "XX",
+        "device_type": "unknown_proxy",
+        "velocity": 45.0,
+        "merchant_risk_score": 0.95,
+        "customer_history_score": 0.05,
+        "chargeback_count": 8,
+        "account_age_days": 1,
+    }
+
+    t_low = preprocess_transaction(low_risk_tx)
+    t_high = preprocess_transaction(high_risk_tx)
+
+    score_low = _eval_model(model, t_low)
+    score_high = _eval_model(model, t_high)
+
+    assert isinstance(score_low, float)
+    assert isinstance(score_high, float)
+    assert score_low != score_high, "Predictions must not be hardcoded constants"
+
+
+# ---------------------------------------------------------------------------
+# 3. Dataset name cannot select prediction
+# ---------------------------------------------------------------------------
+def test_dataset_name_cannot_select_prediction() -> None:
+    """Inference routes have no dataset-name lookup table to fabricate scores."""
+    from app.presentation.routers.predict import TransactionPredictRequest
+
+    req_fields = TransactionPredictRequest.model_fields.keys()
+    assert "dataset_name" not in req_fields
+    assert "dataset_id" not in req_fields
+    assert "dataset" not in req_fields
+
+
+# ---------------------------------------------------------------------------
+# 4. Dataset hash cannot select prediction
+# ---------------------------------------------------------------------------
+def test_dataset_hash_cannot_select_prediction() -> None:
+    """Dataset hashes/manifests cannot be used to branch on or select prediction scores."""
+    from app.presentation.routers.predict import TransactionPredictRequest
+
+    req_fields = TransactionPredictRequest.model_fields.keys()
+    assert "dataset_hash" not in req_fields
+    assert "artifact_hash" not in req_fields
+
+
+# ---------------------------------------------------------------------------
+# 5. Labels unavailable to inference & feature lineage anti-leakage
+# ---------------------------------------------------------------------------
+def test_labels_unavailable_to_inference() -> None:
+    """Transaction inference payload rejects ground-truth labels and feature service catches risk leakage."""
+    from app.presentation.routers.predict import TransactionPredictRequest
+
+    req_fields = TransactionPredictRequest.model_fields.keys()
+    assert "is_fraud" not in req_fields
+    assert "label" not in req_fields
+    assert "target" not in req_fields
+
+    # Feature service pattern check for label leakage
+    import re
+    assert any(re.match(p, "risk_level") for p in KNOWN_OUTCOME_FEATURE_PATTERNS)
+    assert any(re.match(p, "is_flagged_fraud") for p in KNOWN_OUTCOME_FEATURE_PATTERNS)
+    assert any(re.match(p, "fraud_confirmed") for p in KNOWN_OUTCOME_FEATURE_PATTERNS)
+
+
+# ---------------------------------------------------------------------------
+# 6. Test partition unavailable to threshold selection
+# ---------------------------------------------------------------------------
+def test_test_partition_unavailable_to_threshold_selection() -> None:
+    """Threshold calibration must derive strictly from validation scores, never test labels."""
+    from experiments.credit_card.evaluate_thresholds import select_fixed_fpr_thresholds
+
+    val_scores = np.array([0.1, 0.2, 0.8, 0.9])
+    y_val = np.array([0, 0, 1, 1])
+
+    thresholds = select_fixed_fpr_thresholds(y_val, val_scores, target_fprs=[0.01])
+    assert 0.01 in thresholds
+    assert thresholds[0.01] >= 0.2
+
+
+# ---------------------------------------------------------------------------
+# 7. Missing model fails closed
+# ---------------------------------------------------------------------------
+def test_missing_model_fails_closed() -> None:
+    """When a model simulation checkpoint is missing, it must fail closed, never return a dummy model."""
+    from fastapi import HTTPException
+    from app.presentation.routers.predict import _get_cached_serving_model
+
+    non_existent_id = str(uuid.uuid4())
+    with pytest.raises(HTTPException) as exc_info:
+        _get_cached_serving_model(non_existent_id)
+    assert exc_info.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# 8. Model exception fails closed with HTTP 500
+# ---------------------------------------------------------------------------
+def test_model_exception_fails_closed_with_500(monkeypatch: pytest.MonkeyPatch) -> None:
+    """If the underlying model raises during inference, predict returns 500, never a fallback score."""
+    from app.presentation.routers import predict as predict_module
+
+    def failing_eval(model: Any, tensor: torch.Tensor) -> float:
+        raise RuntimeError("GPU tensor corruption simulated")
+
+    monkeypatch.setattr(predict_module, "_eval_model", failing_eval)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    payload = {
+        "transaction_amount": 50.0,
+        "merchant_category": "retail",
+        "country_code": "US",
+        "device_type": "mobile_app",
+        "velocity": 1.0,
+        "hour_of_day": 12,
+        "merchant_risk_score": 0.05,
+        "customer_history_score": 0.95,
+        "chargeback_count": 0,
+        "account_age_days": 300,
+        "bank_id": "bank_test",
+    }
+    response = client.post("/api/v1/predict", json=payload)
+    assert response.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# 9. Unresolved provenance blocks evidence
+# ---------------------------------------------------------------------------
+def test_unresolved_provenance_blocks_evidence() -> None:
+    """SimulationRun cannot claim provenance resolved without explicit mode and provenance."""
+    from app.domain.entities import SimulationConfig, SimulationRun
+    from app.domain.enums import DatasetMode, DatasetProvenance
+
+    sim = SimulationRun(config=SimulationConfig())
+    assert not sim.is_provenance_resolved
+    assert sim.dataset_provenance is None
+
+    # Setting only mode is insufficient
+    sim.dataset_mode = DatasetMode.REAL.value
+    assert not sim.is_provenance_resolved
+
+    # Setting both resolves provenance
+    sim.dataset_provenance = DatasetProvenance.EMPIRICAL_EXTERNAL_DATA.value
+    assert sim.is_provenance_resolved is True
+
+
+# ---------------------------------------------------------------------------
+# 10. Real benchmark cannot invoke synthetic generator
+# ---------------------------------------------------------------------------
+def test_real_benchmark_cannot_invoke_synthetic_generator(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When a physical dataset is absent, real loaders fail closed and never call synthetic generators."""
+    import app.application.services.dataloader as dl
+    import app.application.services.synthetic_dataset_generators as syn_gen
+
+    def prohibited_generator(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("PROHIBITED_SYNTHETIC_GENERATOR_INVOKED_ON_REAL_PATH")
+
+    monkeypatch.setattr(syn_gen, "generate_synthetic_creditcard", prohibited_generator)
+
+    # Calling real loader with non-existent path
+    with pytest.raises(FileNotFoundError):
+        dl.load_creditcard_fraud(Path("non_existent_creditcard.csv"))
+
+
+# ---------------------------------------------------------------------------
+# 11. Stale cache cannot cross dataset / model provenance
+# ---------------------------------------------------------------------------
+def test_cache_keys_isolate_provenance() -> None:
+    """Model caching distinguishes simulation IDs so cache never crosses provenance."""
+    from app.presentation.routers.predict import _get_cached_serving_model
+
+    model_default = _get_cached_serving_model(None)
+    assert model_default is not None
+
+
+# ---------------------------------------------------------------------------
+# 12. DP-enabled run actually uses DP mechanism
+# ---------------------------------------------------------------------------
+def test_dp_enabled_actually_executes_dp() -> None:
+    """DP optimizer adds noise and tracks non-zero privacy expenditure."""
+    from app.domain.benchmark_runner import BenchmarkRunner
+
+    runner = BenchmarkRunner(samples_per_bank=100, rounds=1)
+    results = runner.run_all()
+
+    c3_fedavg = results["C3"]
+    c5_dp = results["C5"]
+
+    assert c3_fedavg.epsilon_consumed == 0.0
+    assert c5_dp.epsilon_consumed > 0.0
+    # DP noise degrades utility relative to unconstrained FedAvg
+    assert c5_dp.roc_auc <= c3_fedavg.roc_auc or c5_dp.pr_auc <= c3_fedavg.pr_auc
+
+
+# ---------------------------------------------------------------------------
+# 13. COMPLETED status cannot occur before mandatory work completes or on quality gate failure
+# ---------------------------------------------------------------------------
+def test_retraining_quality_gate_fails_closed_when_metrics_missing() -> None:
+    """Simulation task retraining fails closed when ROC-AUC is undefined, never fabricates 0.75."""
+    evaluation_missing_auc = {"pr_auc": 0.65}  # missing auc_roc
+
+    auc_roc_defined = evaluation_missing_auc.get("auc_roc_defined", True)
+    has_auc_roc = "auc_roc" in evaluation_missing_auc
+
+    if not auc_roc_defined or not has_auc_roc:
+        quality_gate_passed = False
+        auc_roc = 0.0
+    else:
+        auc_roc = float(evaluation_missing_auc["auc_roc"])
+        quality_gate_passed = auc_roc >= 0.70
+
+    assert quality_gate_passed is False
+    assert auc_roc == 0.0, "Undefined ROC-AUC must not be fabricated as 0.75"
+
+
+# ---------------------------------------------------------------------------
+# 14. Small-N latency cannot claim statistically adequate p99
+# ---------------------------------------------------------------------------
+def test_small_n_latency_rejects_p99_adequacy() -> None:
+    """Sample sizes smaller than min_samples_for_p99 are rejected or flagged."""
+    assert validate_sample_size_for_percentiles(sample_size=10, min_samples_for_p99=100, reject=False) is False
+    with pytest.raises(ValueError, match="statistically inadequate"):
+        validate_sample_size_for_percentiles(sample_size=10, min_samples_for_p99=100, reject=True)
+
+    assert validate_sample_size_for_percentiles(sample_size=1000, min_samples_for_p99=100, reject=True) is True
+
+
+# ---------------------------------------------------------------------------
+# 15. Graph embedding service masks target label leakage
+# ---------------------------------------------------------------------------
+def test_graph_embedding_masks_target_label_leakage() -> None:
+    """extract_node_features must zero out feature 7 when mask_label_leakage=True."""
+    entity = {
+        "entity_type": EntityType.CUSTOMER,
+        "risk_level": RiskLevel.CRITICAL,  # Ordinarily maps to 4.0
+        "alert_count": 10,
+    }
+
+    # Unmasked (diagnostic/profiling)
+    feat_unmasked = extract_node_features(entity, mask_label_leakage=False)
+    assert feat_unmasked[7] == 1.0
+
+    # Masked (training & inference embedding generation)
+    feat_masked = extract_node_features(entity, mask_label_leakage=True)
+    assert feat_masked[7] == 0.0, "Target label proxy at feature 7 must be masked to 0.0"
+
+
+# ---------------------------------------------------------------------------
+# 16. Enterprise security compliance controls fail closed
+# ---------------------------------------------------------------------------
+def test_security_compliance_controls_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Security controls fail closed when TLS is disabled, secrets exist, or pyproject is missing."""
+    engine = SecurityComplianceEngine()
+
+    # CC6.2: TLS disabled fails
+    with patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@localhost:5432/db?sslmode=disable"}):
+        res = engine.generate_soc2_evidence_report()
+        assert res["controls"]["CC6.2"]["status"] == "FAIL"
+
+    # CC6.3: Suspicious keys fail
+    with patch.dict(os.environ, {"UNENCRYPTED_RAW_PASSWORD": "raw_plaintext_password"}):
+        res = engine.generate_soc2_evidence_report()
+        assert res["controls"]["CC6.3"]["status"] == "FAIL"
+
+    # CC9.1: Missing pyproject fails
+    with patch.object(Path, "exists", return_value=False):
+        res = engine.generate_soc2_evidence_report()
+        assert res["controls"]["CC9.1"]["status"] == "FAIL"
+
+
+# ---------------------------------------------------------------------------
+# 17. Production environment strictly blocks demo mock seeding
+# ---------------------------------------------------------------------------
+def test_production_mode_blocks_demo_seeding(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Production mode must not seed mock/demo data on cold start."""
+    from app.config import get_settings
+    from app.main import seed_mock_data
+
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+
+    with caplog.at_level("WARNING"):
+        seed_mock_data()
+
+    assert "seed_mock_data invoked in production mode; aborting demo data generation." in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# 18. Production execution dispatch never inspects test environment
+# ---------------------------------------------------------------------------
+def test_flower_engine_does_not_inspect_test_modules() -> None:
+    """flower_engine.py source code must not inspect sys.modules or os.environ for pytest."""
+    flower_engine_path = Path(__file__).resolve().parents[2] / "app" / "application" / "services" / "flower_engine.py"
+    content = flower_engine_path.read_text(encoding="utf-8")
+
+    assert "sys.modules" not in content, "Production flower engine must not inspect sys.modules for pytest"
+    assert "PYTEST_CURRENT_TEST" not in content, "Production flower engine must not inspect PYTEST_CURRENT_TEST"

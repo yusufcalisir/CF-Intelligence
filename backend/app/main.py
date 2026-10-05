@@ -228,6 +228,9 @@ def _acquire_seed_right() -> bool:
 
 def seed_mock_data() -> None:
     """Seed initial demonstration data for AML financial crime intelligence platform."""
+    if getattr(get_settings(), "app_env", "development").lower() == "production":
+        logging.getLogger(__name__).warning("seed_mock_data invoked in production mode; aborting demo data generation.")
+        return
     from app.application.services.alert_service import _alert_to_dict, _intel_to_dict
     from app.application.services.case_service import _case_to_dict
     from app.domain.enums import (
@@ -513,8 +516,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "(single-instance deployment mode)",
         )
 
-    # Seed mock data — only the first worker/process to acquire the sentinel runs this
-    if _acquire_seed_right():
+    # Seed mock data — only in non-production environments and only the first worker to acquire the sentinel
+    is_production = getattr(settings, "app_env", "development").lower() == "production"
+    if is_production:
+        logger.info("Mock demo data seeding strictly disabled in production environment.")
+    elif _acquire_seed_right():
         try:
             seed_mock_data()
         except Exception as exc:

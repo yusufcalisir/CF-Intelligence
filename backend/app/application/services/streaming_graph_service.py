@@ -302,7 +302,8 @@ class StreamingGraphService:
             for node_id in self.nodes:
                 attrs = self.nodes[node_id]
                 degree = self.node_degrees[node_id]
-                feat = extract_node_features(attrs, degree=degree)
+                # Mask label feature at position 7 to prevent target risk_level leakage
+                feat = extract_node_features(attrs, degree=degree, mask_label_leakage=True)
                 feature_list.append(feat)
 
                 risk = attrs.get("risk_level", "minimal")

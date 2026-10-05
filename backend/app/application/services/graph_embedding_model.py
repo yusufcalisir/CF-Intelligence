@@ -57,12 +57,16 @@ RISK_LEVEL_ORDINAL: dict[str, float] = {
 NODE_FEATURE_DIM = 12
 
 
-def extract_node_features(entity_dict: dict[str, Any], degree: int = 0) -> np.ndarray:
+def extract_node_features(
+    entity_dict: dict[str, Any],
+    degree: int = 0,
+    mask_label_leakage: bool = False,
+) -> np.ndarray:
     """Convert an entity dictionary into a fixed-size numerical feature vector.
 
     Feature layout (12 dimensions):
         [0:7]   Entity type one-hot encoding
-        [7]     Risk level ordinal (0.0 - 1.0)
+        [7]     Risk level ordinal (0.0 - 1.0) (masked to 0.0 when mask_label_leakage=True)
         [8]     Alert count (log-normalized)
         [9]     Degree centrality (log-normalized)
         [10]    Account age (days since first_seen, log-normalized)
@@ -71,6 +75,8 @@ def extract_node_features(entity_dict: dict[str, Any], degree: int = 0) -> np.nd
     Args:
         entity_dict: Dictionary representation of an Entity dataclass.
         degree: Number of edges connected to this node.
+        mask_label_leakage: If True, zeroes out position 7 to prevent post-investigation
+            or target-derived risk_level from leaking ground-truth labels into GNN inputs.
 
     Returns:
         numpy array of shape (12,) with float32 features.
@@ -82,9 +88,12 @@ def extract_node_features(entity_dict: dict[str, Any], degree: int = 0) -> np.nd
     type_idx = ENTITY_TYPE_INDEX.get(entity_type, 0)
     features[type_idx] = 1.0
 
-    # Risk level ordinal
-    risk_level = entity_dict.get("risk_level", "minimal")
-    features[7] = RISK_LEVEL_ORDINAL.get(risk_level, 0.0)
+    # Risk level ordinal (fail-closed against label leakage during training/eval)
+    if mask_label_leakage:
+        features[7] = 0.0
+    else:
+        risk_level = entity_dict.get("risk_level", "minimal")
+        features[7] = RISK_LEVEL_ORDINAL.get(risk_level, 0.0)
 
     # Alert count (log-normalized to prevent outlier domination)
     alert_count = entity_dict.get("alert_count", 0)

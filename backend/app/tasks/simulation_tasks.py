@@ -218,10 +218,14 @@ def execute_automated_retraining_task(
     clipped_params = noised_weights.flat_weights
 
     # Step 3: Verify ROC-AUC Quality Gate (> 0.70)
-    # Simulated evaluation metrics on holdout set
+    # Evaluation metrics on holdout set — fail closed if undefined or missing
     evaluation = model_service.evaluate(model, X_val, y_val)
-    auc_roc = float(evaluation.get("auc_roc", 0.75))
-    quality_gate_passed = auc_roc >= auc_gate_threshold
+    if not evaluation.get("auc_roc_defined", True) or "auc_roc" not in evaluation:
+        quality_gate_passed = False
+        auc_roc = float(evaluation.get("auc_roc", 0.0))
+    else:
+        auc_roc = float(evaluation["auc_roc"])
+        quality_gate_passed = auc_roc >= auc_gate_threshold
 
     if not quality_gate_passed:
         logger.warning(

@@ -169,7 +169,8 @@ class GraphEmbeddingService:
 
         for idx, entity in enumerate(entities):
             degree = degree_count.get(idx, 0)
-            features[idx] = extract_node_features(entity, degree=degree)
+            # Mask label feature in position 7 since target labels are derived from entity risk_level
+            features[idx] = extract_node_features(entity, degree=degree, mask_label_leakage=True)
 
             # Binary fraud label: HIGH/CRITICAL = fraud, else = legitimate
             risk = entity.get("risk_level", "minimal")
