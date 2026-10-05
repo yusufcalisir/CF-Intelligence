@@ -32,6 +32,7 @@ ENV PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
     PYTHONPATH="/app/backend" \
     APP_ENV="production" \
+    APP_DEBUG="false" \
     HOME="/home/user" \
     CFI_STORAGE_DIR="/app/storage"
 

@@ -76,6 +76,81 @@ def test_production_invariants_noop_in_development() -> None:
     dev_settings.validate_production_invariants()
 
 
+def test_production_config_environment_variable_and_alias_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies environment variables and platform aliases correctly populate Settings."""
+    # Test standard environment variables
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("APP_DEBUG", "false")
+    monkeypatch.setenv("PAYLOAD_SIGNING_SECRET", "high_entropy_ephemeral_test_secret_2026_64hex")
+    s1 = Settings()
+    assert s1.app_env == "production"
+    assert s1.app_debug is False
+    assert s1.payload_signing_secret == "high_entropy_ephemeral_test_secret_2026_64hex"
+
+    # Test platform alias environment variables (ENVIRONMENT, DEBUG, CFI_PAYLOAD_SIGNING_SECRET)
+    monkeypatch.delenv("APP_ENV", raising=False)
+    monkeypatch.delenv("APP_DEBUG", raising=False)
+    monkeypatch.delenv("PAYLOAD_SIGNING_SECRET", raising=False)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("DEBUG", "false")
+    monkeypatch.setenv("CFI_PAYLOAD_SIGNING_SECRET", "high_entropy_ephemeral_test_secret_2026_64hex")
+    s2 = Settings()
+    assert s2.app_env == "production"
+    assert s2.app_debug is False
+    assert s2.payload_signing_secret == "high_entropy_ephemeral_test_secret_2026_64hex"
+
+
+def test_production_invariants_fails_on_debug_enabled() -> None:
+    """Verifies that production validation strictly fails when app_debug is True."""
+    s = Settings(
+        app_env="production",
+        app_debug=True,
+        payload_signing_secret="high_entropy_ephemeral_test_secret_2026_64hex",
+    )
+    with pytest.raises(ValueError, match="app_debug must be False in production"):
+        s.validate_production_invariants()
+
+
+def test_production_invariants_fails_on_placeholder_secret() -> None:
+    """Verifies that production validation strictly fails when payload_signing_secret is placeholder."""
+    s = Settings(
+        app_env="production",
+        app_debug=False,
+        payload_signing_secret="cfi_local_secret_key_2026_change_me_in_production",
+    )
+    with pytest.raises(
+        ValueError,
+        match="payload_signing_secret must be set to a high-entropy secret in production",
+    ):
+        s.validate_production_invariants()
+
+
+@pytest.mark.asyncio
+async def test_production_lifespan_proceeds_with_valid_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that the FastAPI lifespan startup hook executes successfully under valid production configuration."""
+    from app.main import app, lifespan
+
+    monkeypatch.setattr(
+        "app.main.settings",
+        Settings(
+            app_env="production",
+            app_debug=False,
+            payload_signing_secret="high_entropy_ephemeral_test_secret_2026_64hex",
+            cors_allowed_origins="https://cfi-platform.internal,https://cf-intelligence.vercel.app",
+        ),
+    )
+    # Mock network/db calls during lifespan probe to keep test hermetic
+    monkeypatch.setattr("app.main._acquire_seed_right", lambda: False)
+
+    async with lifespan(app):
+        # Startup completed without ValueError
+        pass
+
+
 def test_fast_inference_explainer_domain_isolation() -> None:
     """Verifies FastInferenceExplainer operates without hard top-level infrastructure dependencies."""
     explainer = FastInferenceExplainer()

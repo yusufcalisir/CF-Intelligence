@@ -7,6 +7,7 @@ Fails fast if required variables are missing.
 import os
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,8 +22,14 @@ class Settings(BaseSettings):
     )
 
     # ── Application ───────────────────────────
-    app_env: str = "development"
-    app_debug: bool = True
+    app_env: str = Field(
+        default="development",
+        validation_alias=AliasChoices("app_env", "environment"),
+    )
+    app_debug: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("app_debug", "debug"),
+    )
     app_log_level: str = "INFO"
 
     # ── FastAPI & CORS ────────────────────────
@@ -84,7 +91,10 @@ class Settings(BaseSettings):
     gateway_require_auth: bool = False
     gateway_rate_limit: int = 120  # requests per minute
     gateway_api_keys: str = "key_bank_a:bank_a:bank,key_bank_b:bank_b:bank,key_bank_c:bank_c:bank,key_analyst:analyst:analyst"
-    payload_signing_secret: str = "cfi_local_secret_key_2026_change_me_in_production"
+    payload_signing_secret: str = Field(
+        default="cfi_local_secret_key_2026_change_me_in_production",
+        validation_alias=AliasChoices("payload_signing_secret", "cfi_payload_signing_secret"),
+    )
 
     # ── Enterprise Security Suite ─────────────
     mtls_enabled: bool = True
