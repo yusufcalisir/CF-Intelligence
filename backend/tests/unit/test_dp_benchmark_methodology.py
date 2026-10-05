@@ -13,6 +13,7 @@ import contextlib
 import inspect
 import json
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -165,9 +166,10 @@ def test_per_sample_dp_semantics() -> None:
     loader = torch.utils.data.DataLoader(dataset, batch_size=16)
 
     engine = PrivacyEngine(accountant="prv")
+    priv_res: Any
     try:
-        model_p, opt_p, loader_p = engine.make_private(
-            module=model,
+        priv_res = engine.make_private(
+            module=cast("Any", model),
             optimizer=optimizer,
             data_loader=loader,
             noise_multiplier=1.0,
@@ -175,14 +177,17 @@ def test_per_sample_dp_semantics() -> None:
             grad_sample_mode="ew",
         )
     except Exception:
-        model_p, opt_p, loader_p = engine.make_private(
-            module=model,
+        priv_res = engine.make_private(
+            module=cast("Any", model),
             optimizer=optimizer,
             data_loader=loader,
             noise_multiplier=1.0,
             max_grad_norm=MAX_GRAD_NORM,
             grad_sample_mode="hooks",
         )
+    model_p: Any = priv_res[0]
+    opt_p: Any = priv_res[1]
+    loader_p: Any = priv_res[2]
 
     try:
         # Opacus wraps model in GradSampleModule to compute per-sample gradients
