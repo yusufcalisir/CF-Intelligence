@@ -59,28 +59,37 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
     redis_client = None
     redis_available = False
 
-    try:
-        redis_url: str = settings.redis_url or "redis://localhost:6379"
-        if not redis_url.startswith(("redis://", "rediss://", "unix://")):
-            redis_url = f"redis://{redis_url}"
+    redis_url: str | None = settings.redis_url
+    if not redis_url and getattr(settings, "app_env", "development") == "development":
+        redis_url = "redis://localhost:6379"
 
-        redis_client = aioredis.from_url(
-            redis_url, decode_responses=True, socket_connect_timeout=0.2
-        )
-        # Probe connectivity with a lightweight ping
-        await asyncio.wait_for(redis_client.ping(), timeout=0.2)
-        redis_available = True
-        logger.debug("Redis available for simulation %s — using primary path", simulation_id)
-    except Exception as exc:
-        logger.info(
-            "Redis not available for simulation %s (%s) — switching to in-process event bus",
+    if redis_url:
+        try:
+            if not redis_url.startswith(("redis://", "rediss://", "unix://")):
+                redis_url = f"redis://{redis_url}"
+
+            redis_client = aioredis.from_url(
+                redis_url, decode_responses=True, socket_connect_timeout=0.2
+            )
+            # Probe connectivity with a lightweight ping
+            await asyncio.wait_for(redis_client.ping(), timeout=0.2)
+            redis_available = True
+            logger.debug("Redis available for simulation %s — using primary path", simulation_id)
+        except Exception as exc:
+            logger.info(
+                "Redis connection failed for simulation %s (%s) — switching to in-process event bus",
+                simulation_id,
+                type(exc).__name__,
+            )
+            if redis_client is not None:
+                with contextlib.suppress(Exception):
+                    await redis_client.aclose()
+                redis_client = None
+    else:
+        logger.debug(
+            "Redis not configured for simulation %s — using in-process event bus",
             simulation_id,
-            type(exc).__name__,
         )
-        if redis_client is not None:
-            with contextlib.suppress(Exception):
-                await redis_client.aclose()
-            redis_client = None
 
     try:
         if redis_available and redis_client is not None:

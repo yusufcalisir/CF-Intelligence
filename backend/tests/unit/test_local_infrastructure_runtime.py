@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -9,6 +10,7 @@ import pytest
 
 from app.config import Settings
 from app.presentation.messaging.redis_listener import RedisBankClientListener
+from app.presentation.websockets.training_ws import _stream_via_redis
 
 
 def test_settings_redis_url_construction() -> None:
@@ -34,6 +36,20 @@ def test_settings_redis_url_construction() -> None:
     # 4. REDIS_URL override
     with patch.dict(os.environ, {"REDIS_URL": "redis://custom-redis:6380/2"}):
         assert s1.redis_url == "redis://custom-redis:6380/2"
+
+    # 5. TLS URL construction with rediss:// scheme
+    s4 = Settings(
+        redis_host="managed-redis.cloud",
+        redis_port=6380,
+        redis_db=0,
+        redis_password="secure_tls_pass",
+        redis_tls=True,
+    )
+    assert s4.redis_url == "rediss://:secure_tls_pass@managed-redis.cloud:6380/0"
+
+    # 6. Direct REDIS_URL env var override with rediss:// scheme
+    with patch.dict(os.environ, {"REDIS_URL": "rediss://default:cloud_secret@upstash.io:6379/0"}):
+        assert s1.redis_url == "rediss://default:cloud_secret@upstash.io:6379/0"
 
 
 @pytest.mark.asyncio
@@ -75,3 +91,33 @@ def test_tenant_logging_storage_path_isolation() -> None:
     logs_dir = os.path.join(storage_dir, "logs")
     os.makedirs(logs_dir, exist_ok=True)
     assert os.path.isdir(logs_dir)
+
+
+@pytest.mark.asyncio
+async def test_stream_via_redis_delivers_replayed_and_live_events() -> None:
+    """Verify Redis list replay and pub/sub live event streaming over WebSocket."""
+    mock_ws = AsyncMock()
+    mock_redis = MagicMock()
+
+    # 1. Past events replay via Redis list
+    mock_redis.lrange = MagicMock(return_value=['{"event": "round_1_complete"}'])
+
+    # 2. Live event via Redis pubsub channel
+    mock_pubsub = MagicMock()
+    mock_pubsub.subscribe = AsyncMock()
+    mock_pubsub.get_message = AsyncMock(
+        side_effect=[
+            {"type": "message", "data": '{"event": "round_2_complete"}'},
+            asyncio.CancelledError(),
+        ]
+    )
+    mock_redis.pubsub.return_value = mock_pubsub
+
+    with pytest.raises(asyncio.CancelledError):
+        await _stream_via_redis(mock_ws, "sim_test_123", mock_redis)
+
+    mock_redis.lrange.assert_called_once_with("simulation:sim_test_123:events", 0, -1)
+    mock_pubsub.subscribe.assert_called_once_with("training:sim_test_123")
+    assert mock_ws.send_text.call_count == 2
+    mock_ws.send_text.assert_any_call('{"event": "round_1_complete"}')
+    mock_ws.send_text.assert_any_call('{"event": "round_2_complete"}')

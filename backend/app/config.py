@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     redis_db: int = 0
     redis_password: str = ""
+    redis_tls: bool = False
 
     # ── Celery ────────────────────────────────
     celery_broker_url: str = "redis://localhost:6379/0"
@@ -207,9 +208,10 @@ class Settings(BaseSettings):
             return env_url
         if not self.redis_host:
             return None
+        scheme = "rediss" if self.redis_tls else "redis"
         if self.redis_password:
-            return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
-        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
+            return f"{scheme}://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
+        return f"{scheme}://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
     @property
     def bank_urls(self) -> dict[str, str]:
