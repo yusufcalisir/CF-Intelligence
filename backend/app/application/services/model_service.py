@@ -7,6 +7,7 @@ is the federated learning architecture, not model complexity.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import math
 from typing import TYPE_CHECKING, Any, cast
@@ -374,16 +375,35 @@ class ModelService:
 
         privacy_engine = PrivacyEngine()
 
-        # Cast to Any to prevent IDE type checker errors caused by Opacus overloading definitions
-        res: Any = privacy_engine.make_private_with_epsilon(
-            module=model,
-            optimizer=optimizer,
-            data_loader=loader,
-            target_epsilon=target_epsilon,
-            target_delta=target_delta,
-            epochs=epochs,
-            max_grad_norm=max_grad_norm,
-        )
+        # Prefer PyTorch native ExpandedWeights ('ew') mode to compute per-sample
+        # gradients directly on the autograd graph without registering full backward hooks
+        # on the input layer (which triggers PyTorch UserWarning when inputs do not require grad).
+        # Fall back to 'hooks' mode if ExpandedWeights is unsupported for the current architecture.
+        try:
+            res: Any = privacy_engine.make_private_with_epsilon(
+                module=model,
+                optimizer=optimizer,
+                data_loader=loader,
+                target_epsilon=target_epsilon,
+                target_delta=target_delta,
+                epochs=epochs,
+                max_grad_norm=max_grad_norm,
+                grad_sample_mode="ew",
+            )
+        except Exception as e:
+            logger.debug(
+                "ExpandedWeights grad sample mode unavailable, falling back to hooks: %s", e
+            )
+            res = privacy_engine.make_private_with_epsilon(
+                module=model,
+                optimizer=optimizer,
+                data_loader=loader,
+                target_epsilon=target_epsilon,
+                target_delta=target_delta,
+                epochs=epochs,
+                max_grad_norm=max_grad_norm,
+                grad_sample_mode="hooks",
+            )
         model_private: Any = res[0]
         optimizer_private: Any = res[1]
         loader_private: Any = res[2]
@@ -392,80 +412,85 @@ class ModelService:
 
         loss_history: list[float] = []
 
-        for epoch in range(epochs):
-            epoch_loss = 0.0
-            n_batches = 0
+        try:
+            for epoch in range(epochs):
+                epoch_loss = 0.0
+                n_batches = 0
 
-            for X_batch, y_batch, sens_batch in loader_private:
-                optimizer_private.zero_grad()
+                for X_batch, y_batch, sens_batch in loader_private:
+                    optimizer_private.zero_grad()
 
-                # Check if we need representation features for MOON
-                if moon_mu > 0.0 and global_model is not None and prev_local_model is not None:
-                    predictions, feats = model_private(X_batch, return_features=True)
-                else:
-                    predictions = model_private(X_batch)
-                    feats = None
+                    # Check if we need representation features for MOON
+                    if moon_mu > 0.0 and global_model is not None and prev_local_model is not None:
+                        predictions, feats = model_private(X_batch, return_features=True)
+                    else:
+                        predictions = model_private(X_batch)
+                        feats = None
 
-                loss = criterion(predictions, y_batch)
+                    loss = criterion(predictions, y_batch)
 
-                # Bias mitigation: penalize covariance between predictions and protected group
-                if enable_bias_mitigation:
-                    p_mean = torch.mean(predictions)
-                    a_mean = torch.mean(sens_batch)
-                    cov = torch.mean((predictions - p_mean) * (sens_batch - a_mean))
-                    fair_loss = fairness_lambda * (cov**2)
-                    loss = loss + fair_loss
+                    # Bias mitigation: penalize covariance between predictions and protected group
+                    if enable_bias_mitigation:
+                        p_mean = torch.mean(predictions)
+                        a_mean = torch.mean(sens_batch)
+                        cov = torch.mean((predictions - p_mean) * (sens_batch - a_mean))
+                        fair_loss = fairness_lambda * (cov**2)
+                        loss = loss + fair_loss
 
-                # FedProx proximal term
-                if fedprox_mu > 0.0 and global_model is not None:
-                    proximal_term: float | torch.Tensor = 0.0
-                    for param, g_param in zip(
-                        model_private.parameters(), global_model.parameters()
+                    # FedProx proximal term
+                    if fedprox_mu > 0.0 and global_model is not None:
+                        proximal_term: float | torch.Tensor = 0.0
+                        for param, g_param in zip(
+                            model_private.parameters(), global_model.parameters()
+                        ):
+                            proximal_term += (param - g_param).pow(2).sum()
+                        loss = loss + (fedprox_mu / 2.0) * proximal_term
+
+                    # MOON model-contrastive loss
+                    if (
+                        moon_mu > 0.0
+                        and feats is not None
+                        and global_model is not None
+                        and prev_local_model is not None
                     ):
-                        proximal_term += (param - g_param).pow(2).sum()
-                    loss = loss + (fedprox_mu / 2.0) * proximal_term
+                        with torch.no_grad():
+                            _, g_feats = global_model(X_batch, return_features=True)
+                            _, p_feats = prev_local_model(X_batch, return_features=True)
 
-                # MOON model-contrastive loss
-                if (
-                    moon_mu > 0.0
-                    and feats is not None
-                    and global_model is not None
-                    and prev_local_model is not None
-                ):
-                    with torch.no_grad():
-                        _, g_feats = global_model(X_batch, return_features=True)
-                        _, p_feats = prev_local_model(X_batch, return_features=True)
+                        cos = nn.CosineSimilarity(dim=-1)
+                        sim_global = cos(feats, g_feats) / moon_temperature
+                        sim_prev = cos(feats, p_feats) / moon_temperature
 
-                    cos = nn.CosineSimilarity(dim=-1)
-                    sim_global = cos(feats, g_feats) / moon_temperature
-                    sim_prev = cos(feats, p_feats) / moon_temperature
+                        logits = torch.cat([sim_global.unsqueeze(1), sim_prev.unsqueeze(1)], dim=1)
+                        targets = torch.zeros(feats.size(0), dtype=torch.long, device=self.device)
+                        con_loss = nn.CrossEntropyLoss()(logits, targets)
+                        loss = loss + moon_mu * con_loss
 
-                    logits = torch.cat([sim_global.unsqueeze(1), sim_prev.unsqueeze(1)], dim=1)
-                    targets = torch.zeros(feats.size(0), dtype=torch.long, device=self.device)
-                    con_loss = nn.CrossEntropyLoss()(logits, targets)
-                    loss = loss + moon_mu * con_loss
+                    loss.backward()
+                    optimizer_private.step()
 
-                loss.backward()
-                optimizer_private.step()
+                    epoch_loss += loss.item()
+                    n_batches += 1
 
-                epoch_loss += loss.item()
-                n_batches += 1
+                    # Yield control to prevent GIL starvation
+                    time.sleep(0.005)
 
-                # Yield control to prevent GIL starvation
-                time.sleep(0.005)
+                avg_loss = epoch_loss / max(n_batches, 1)
+                loss_history.append(avg_loss)
+                logger.debug("Opacus Epoch %d/%d — loss: %.4f", epoch + 1, epochs, avg_loss)
 
-            avg_loss = epoch_loss / max(n_batches, 1)
-            loss_history.append(avg_loss)
-            logger.debug("Opacus Epoch %d/%d — loss: %.4f", epoch + 1, epochs, avg_loss)
+                time.sleep(0.02)
 
-            time.sleep(0.02)
+            actual_epsilon = privacy_engine.get_epsilon(delta=target_delta)
+        finally:
+            # Exception-safe cleanup: guaranteed de-wrapping and hook removal
+            if hasattr(model_private, "remove_hooks"):
+                with contextlib.suppress(Exception):
+                    model_private.remove_hooks()
 
-        actual_epsilon = privacy_engine.get_epsilon(delta=target_delta)
-
-        # De-wrap the module and remove Opacus hooks before returning it
-        if hasattr(model_private, "remove_hooks"):
-            model_private.remove_hooks()
-        model_final = cast("FraudDetectionModel", model_private._module)
+        model_final = cast(
+            "FraudDetectionModel", getattr(model_private, "_module", model_private)
+        )
 
         import gc
 
