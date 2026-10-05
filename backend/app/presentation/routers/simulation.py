@@ -959,6 +959,7 @@ def _run_simulation_in_process(simulation_id: str, config_dict: dict) -> None:
         simulation = simulation_service.run_simulation(
             config=config,
             progress_callback=progress_cb,
+            simulation_id=simulation_id,
         )
 
         # Serialize and store results
@@ -967,6 +968,13 @@ def _run_simulation_in_process(simulation_id: str, config_dict: dict) -> None:
             "status": simulation.status.value,
             "current_round": simulation.current_round,
             "total_rounds": simulation.total_rounds,
+            "progress_pct": _calc_progress(
+                {
+                    "status": simulation.status.value,
+                    "current_round": simulation.current_round,
+                    "total_rounds": simulation.total_rounds,
+                }
+            ),
             "created_at": simulation.created_at.isoformat() if simulation.created_at else None,
             "started_at": simulation.started_at.isoformat() if simulation.started_at else None,
             "completed_at": simulation.completed_at.isoformat()

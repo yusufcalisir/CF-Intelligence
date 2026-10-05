@@ -109,6 +109,7 @@ class SimulationService:
         self,
         config: SimulationConfig,
         progress_callback: ProgressCallback = None,
+        simulation_id: str | None = None,
     ) -> SimulationRun:
         """Execute the full simulation pipeline.
 
@@ -123,6 +124,8 @@ class SimulationService:
         )
 
         simulation = SimulationRun(config=config, total_rounds=config.num_rounds)
+        if simulation_id:
+            simulation.id = simulation_id
         simulation.started_at = _now()
         rng = np.random.default_rng(42)
 
@@ -167,6 +170,7 @@ class SimulationService:
             )
 
         active_simulations.add(1)
+        active_sim_decremented = False
 
         # Initialize MLflow experiment run
         mlflow_run = self._init_mlflow(simulation.id, config)
@@ -1726,7 +1730,10 @@ class SimulationService:
                 simulation.streaming_gnn_node_count = summary["node_count"]
                 simulation.streaming_gnn_edge_count = summary["edge_count"]
 
-            active_simulations.add(-1)
+            if not active_sim_decremented:
+                active_simulations.add(-1)
+                active_sim_decremented = True
+
             # Persist the accumulated training rounds onto the simulation entity
             simulation.rounds = rounds if "rounds" in locals() else []
             simulation.rounds_run = len(simulation.rounds)
@@ -1788,56 +1795,84 @@ class SimulationService:
                 logger.warning("Failed to save versioned global model in registry: %s", e)
 
             # Log final parameters/metrics and complete MLflow run
-            self._finalize_mlflow(mlflow_run, banks, "completed")
+            try:
+                self._finalize_mlflow(mlflow_run, banks, "completed")
+            except Exception as e:
+                logger.warning("Failed to finalize MLflow for completed simulation %s: %s", simulation.id, e)
 
-            self._notify(
-                progress_callback,
-                simulation.id,
-                "completed",
-                {
-                    "duration_seconds": simulation.duration_seconds,
-                    "banks": [
-                        {
-                            "id": b.id,
-                            "name": b.name,
-                            "improvement": b.improvement,
-                        }
-                        for b in banks
-                    ],
-                },
-            )
+            try:
+                self._notify(
+                    progress_callback,
+                    simulation.id,
+                    "completed",
+                    {
+                        "duration_seconds": simulation.duration_seconds,
+                        "banks": [
+                            {
+                                "id": b.id,
+                                "name": b.name,
+                                "improvement": b.improvement,
+                            }
+                            for b in banks
+                        ],
+                    },
+                )
+            except Exception as e:
+                logger.warning("Failed to notify completion for simulation %s: %s", simulation.id, e)
 
             # Prune in-memory server optimizer states for this completed simulation
-            self.fl_engine.clear_simulation_state(simulation.id)
+            try:
+                self.fl_engine.clear_simulation_state(simulation.id)
+            except Exception as e:
+                logger.warning("Failed to clear simulation state in FL engine: %s", e)
 
             return simulation
 
         except Exception as e:
-            active_simulations.add(-1)
-            simulation.status = SimulationStatus.FAILED
-            simulation.error_message = str(e)
-            simulation.completed_at = _now()
-            logger.exception("Simulation %s failed: %s", simulation.id, e)
+            if not active_sim_decremented:
+                active_simulations.add(-1)
+                active_sim_decremented = True
 
-            # Log final parameters/metrics and mark MLflow run as failed
-            self._finalize_mlflow(
-                mlflow_run if "mlflow_run" in locals() else None,
-                banks if "banks" in locals() else [],
-                "failed",
-                error_message=str(e),
-            )
+            # Monotonicity check: Never regress an already completed simulation to failed
+            if simulation.status != SimulationStatus.COMPLETED:
+                simulation.status = SimulationStatus.FAILED
+                simulation.error_message = str(e)
+                simulation.completed_at = _now()
+                logger.exception("Simulation %s failed: %s", simulation.id, e)
 
-            self._notify(
-                progress_callback,
-                simulation.id,
-                "error",
-                {
-                    "error": str(e),
-                },
-            )
+                # Log final parameters/metrics and mark MLflow run as failed
+                try:
+                    self._finalize_mlflow(
+                        mlflow_run if "mlflow_run" in locals() else None,
+                        banks if "banks" in locals() else [],
+                        "failed",
+                        error_message=str(e),
+                    )
+                except Exception as ml_err:
+                    logger.warning("Failed to mark MLflow run as failed: %s", ml_err)
 
-            # Prune in-memory server optimizer states for this failed simulation
-            self.fl_engine.clear_simulation_state(simulation.id)
+                try:
+                    self._notify(
+                        progress_callback,
+                        simulation.id,
+                        "error",
+                        {
+                            "error": str(e),
+                        },
+                    )
+                except Exception as notify_err:
+                    logger.warning("Failed to notify error for simulation %s: %s", simulation.id, notify_err)
+
+                try:
+                    self.fl_engine.clear_simulation_state(simulation.id)
+                except Exception as clr_err:
+                    logger.warning("Failed to clear simulation state on error: %s", clr_err)
+            else:
+                logger.warning(
+                    "Late auxiliary exception in simulation %s after COMPLETED state: %s",
+                    simulation.id,
+                    e,
+                )
 
             return simulation
 

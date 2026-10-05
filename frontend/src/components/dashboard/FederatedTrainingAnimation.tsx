@@ -22,6 +22,7 @@ const PHASE_INFO: Record<string, { label: string; description: string }> = {
   evaluating: { label: 'Evaluation', description: 'Comparing local vs federated model performance...' },
   completed: { label: 'Complete', description: 'Training finished! View results below.' },
   failed: { label: 'Failed', description: 'An error occurred during training.' },
+  stopped: { label: 'Stopped', description: 'Simulation was stopped by operator.' },
 };
 
 // Bank positions in SVG: triangle layout with server in center
@@ -45,7 +46,8 @@ export default function FederatedTrainingAnimation({
   const isEvaluating = status === 'evaluating';
   const isCompleted = status === 'completed';
   const isFailed = status === 'failed';
-  const isActive = !isCompleted && !isFailed;
+  const isStopped = status === 'stopped';
+  const isActive = !isCompleted && !isFailed && !isStopped;
 
   return (
     <motion.div

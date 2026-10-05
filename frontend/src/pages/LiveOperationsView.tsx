@@ -56,7 +56,9 @@ type TrainingPhase =
   | 'training_local'
   | 'training_federated'
   | 'evaluating'
-  | 'completed';
+  | 'completed'
+  | 'failed'
+  | 'stopped';
 
 const DEFAULT_BANKS: BankNode[] = [
   { id: 'bank_alpha', name: 'Bank Alpha', status: 'ACTIVE', tier: 'Tier 1', lastHeartbeat: 'Just now' },
@@ -399,18 +401,28 @@ export default function LiveOperationsView() {
   // Synchronize training phase and mode with active backend simulation state
   useEffect(() => {
     if (!currentSim) return;
-    if (currentSim.status === 'completed') {
+    const s = currentSim.status;
+    if (s === 'completed') {
       setTrainingPhase('completed');
       setIsTraining(false);
       if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
-    } else if (currentSim.status === 'running' || currentSim.status === 'training_federated') {
-      setTrainingPhase('training_federated');
-      setIsTraining(true);
+    } else if (s === 'failed') {
+      setTrainingPhase('failed');
+      setIsTraining(false);
+      if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
+    } else if (s === 'stopped') {
+      setTrainingPhase('stopped');
+      setIsTraining(false);
+      if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
+    } else if (s === 'running' || s === 'training_federated') {
+      // Terminal state monotonicity: do not regress completed or failed runs to running
+      setTrainingPhase((prev) => (prev === 'completed' || prev === 'failed' || prev === 'stopped' ? prev : 'training_federated'));
+      setIsTraining(!(trainingPhase === 'completed' || trainingPhase === 'failed' || trainingPhase === 'stopped'));
       setTrainingMode('real');
       if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
-    } else if (currentSim.status === 'generating_data') {
-      setTrainingPhase('generating_data');
-      setIsTraining(true);
+    } else if (s === 'generating_data') {
+      setTrainingPhase((prev) => (prev === 'completed' || prev === 'failed' || prev === 'stopped' ? prev : 'generating_data'));
+      setIsTraining(!(trainingPhase === 'completed' || trainingPhase === 'failed' || trainingPhase === 'stopped'));
       setTrainingMode('real');
       if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
     }
@@ -418,9 +430,19 @@ export default function LiveOperationsView() {
 
   // Derive genuine simulation telemetry object for hardware isolation & deep panels
   const effectiveSim: SimulationDetail = useMemo(() => {
+    const rawStatus = currentSim?.status;
+    const derivedStatus = rawStatus || (
+      trainingPhase === 'completed' ? 'completed' :
+      trainingPhase === 'failed' ? 'failed' :
+      trainingPhase === 'stopped' ? 'stopped' :
+      isTraining ? 'running' : 'completed'
+    );
+    const isTerminal = derivedStatus === 'completed' || derivedStatus === 'failed' || derivedStatus === 'stopped';
+    const computedProgress = isTerminal ? 100 : (effectiveCurrentRound > 0 ? (effectiveCurrentRound / TOTAL_ROUNDS) * 100 : 0);
+
     return {
       id: activeSimId,
-      status: currentSim?.status || (trainingPhase === 'completed' ? 'completed' : isTraining ? 'running' : 'completed'),
+      status: derivedStatus,
       config: {
         hardware_isolation_mode: currentSim?.config?.hardware_isolation_mode || 'tee',
         num_rounds: currentSim?.config?.num_rounds || TOTAL_ROUNDS,
@@ -432,7 +454,7 @@ export default function LiveOperationsView() {
       },
       current_round: currentSim?.current_round ?? effectiveCurrentRound,
       total_rounds: currentSim?.total_rounds ?? TOTAL_ROUNDS,
-      progress_pct: currentSim?.progress_pct ?? (effectiveCurrentRound > 0 ? (effectiveCurrentRound / TOTAL_ROUNDS) * 100 : (trainingPhase === 'completed' ? 100 : 0)),
+      progress_pct: currentSim?.progress_pct ?? computedProgress,
       created_at: currentSim?.created_at || new Date().toISOString(),
       started_at: currentSim?.started_at || null,
       completed_at: currentSim?.completed_at || null,
@@ -526,9 +548,10 @@ export default function LiveOperationsView() {
 
   // Persist session state scoped to the current simulation ID
   useEffect(() => {
+    const simTargetId = activeSimId || id;
     if (trainingPhase !== 'pending' || unifiedRoundHistory.length > 0) {
       const payload: StoredLiveOpsState = {
-        simId: id,
+        simId: simTargetId,
         currentRound: effectiveCurrentRound,
         championAuc: effectiveChampionAuc,
         trainingPhase,
@@ -536,9 +559,9 @@ export default function LiveOperationsView() {
         gradientSubmissions,
         selectedProfileKey: selectedProfile.id,
       };
-      saveStoredSession(id, payload);
+      saveStoredSession(simTargetId, payload);
     }
-  }, [id, effectiveCurrentRound, effectiveChampionAuc, trainingPhase, unifiedRoundHistory, gradientSubmissions, selectedProfile]);
+  }, [activeSimId, id, effectiveCurrentRound, effectiveChampionAuc, trainingPhase, unifiedRoundHistory, gradientSubmissions, selectedProfile]);
 
   const handleQuarantineChange = (bankId: string | null) => {
     setBankNodes((prev) =>
@@ -562,18 +585,22 @@ export default function LiveOperationsView() {
   // WebSocket live telemetry listener with real backend telemetry binding
   useEffect(() => {
     const getWsUrl = () => {
-      if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+      const queryParam = activeSimId ? `?simulation_id=${encodeURIComponent(activeSimId)}` : '';
+      if (import.meta.env.VITE_WS_URL) {
+        const base = import.meta.env.VITE_WS_URL;
+        return base.includes('?') ? base : `${base}${queryParam}`;
+      }
       if (import.meta.env.VITE_API_URL) {
         const apiUrl = import.meta.env.VITE_API_URL;
         const wsProto = apiUrl.startsWith('https') ? 'wss:' : 'ws:';
         const host = apiUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-        return `${wsProto}//${host}/ws/training`;
+        return `${wsProto}//${host}/ws/training${queryParam}`;
       }
       if (window.location.hostname.includes('hf.space') || window.location.hostname === 'localhost') {
         const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        return `${proto}//${window.location.host}/ws/training`;
+        return `${proto}//${window.location.host}/ws/training${queryParam}`;
       }
-      return 'wss://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/ws/training';
+      return `wss://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/ws/training${queryParam}`;
     };
 
     let ws: WebSocket | null = null;
@@ -635,9 +662,28 @@ export default function LiveOperationsView() {
 
           const eventSimId = raw.simulation_id || data.simulation_id;
 
+          // Cross-run isolation: ignore WebSocket messages targeted for a different simulation
+          if (eventSimId && activeSimId && eventSimId !== activeSimId) {
+            return;
+          }
+
           // If simulated (mock) training mode is selected AND no active training session exists,
           // ignore unprompted background WS events so background streams don't interrupt mock testing
           if (trainingModeRef.current === 'mock' && !isTrainingRef.current && !eventSimId) {
+            return;
+          }
+
+          // Terminal state monotonicity: do not allow replayed / late-arriving non-terminal events
+          // to overwrite an already terminal run (completed, failed, or stopped)
+          const isCurrentlyTerminal =
+            trainingPhase === 'completed' ||
+            trainingPhase === 'failed' ||
+            trainingPhase === 'stopped' ||
+            currentSim?.status === 'completed' ||
+            currentSim?.status === 'failed' ||
+            currentSim?.status === 'stopped';
+
+          if (isCurrentlyTerminal && (eventType === 'round_started' || eventType === 'round_start' || eventType === 'evaluating')) {
             return;
           }
 
@@ -652,10 +698,12 @@ export default function LiveOperationsView() {
           }
 
           if (eventType === 'round_started' || eventType === 'round_start') {
-            setCurrentRound(data.round || data.round_number || 1);
-            setGradientSubmissions(0);
-            setTrainingPhase('training_federated');
-            setIsTraining(true);
+            if (!isCurrentlyTerminal) {
+              setCurrentRound(data.round || data.round_number || 1);
+              setGradientSubmissions(0);
+              setTrainingPhase('training_federated');
+              setIsTraining(true);
+            }
           } else if (eventType === 'gradient_received') {
             setGradientSubmissions((prev) => prev + 1);
           } else if (eventType === 'round_complete' || eventType === 'round_completed') {
@@ -704,10 +752,18 @@ export default function LiveOperationsView() {
               return [...prev, newPoint];
             });
           } else if (eventType === 'evaluating') {
-            setTrainingPhase('evaluating');
+            if (!isCurrentlyTerminal) {
+              setTrainingPhase('evaluating');
+            }
           } else if (eventType === 'completed' || eventType === 'training_completed') {
             setTrainingPhase('completed');
             setIsTraining(false);
+          } else if (eventType === 'error' || eventType === 'failed') {
+            // Only set failed if run is not already completed (monotonicity)
+            if (trainingPhase !== 'completed' && currentSim?.status !== 'completed') {
+              setTrainingPhase('failed');
+              setIsTraining(false);
+            }
           }
         } catch { /* ignore non-json frames */ }
       };
@@ -745,7 +801,7 @@ export default function LiveOperationsView() {
         try { ws.close(); } catch { /* ignore */ }
       }
     };
-  }, [wsRetryCount]);
+  }, [wsRetryCount, activeSimId]);
 
   // Poll bank node heartbeats every 30s
   useEffect(() => {
@@ -932,9 +988,9 @@ export default function LiveOperationsView() {
     const isNewSimulationRun = (hasAutostartParam && !sessionForCurrentId) || (Boolean(id) && !sessionForCurrentId);
     const isAutoStart = id || location.pathname.startsWith('/simulation') || hasAutostartParam;
 
-    // Guard: If backend already has training rounds or active running simulation, do NOT start client-side mock!
+    // Guard: If backend already has training rounds or active running/terminal simulation, do NOT start client-side mock!
     const backendHasData = (simRounds && simRounds.length > 0) ||
-      (currentSim && (currentSim.status === 'running' || currentSim.status === 'training_federated' || currentSim.status === 'completed'));
+      (currentSim && (currentSim.status === 'running' || currentSim.status === 'training_federated' || currentSim.status === 'completed' || currentSim.status === 'failed' || currentSim.status === 'stopped'));
 
     if (backendHasData) {
       hasAutoStartedRef.current = true;
@@ -1028,7 +1084,7 @@ export default function LiveOperationsView() {
             </div>
 
             {/* Training control buttons */}
-            {!isTraining && trainingPhase !== 'completed' ? (
+            {!isTraining && trainingPhase !== 'completed' && trainingPhase !== 'failed' && trainingPhase !== 'stopped' ? (
               <div className="flex items-center gap-2">
                 {/* Import Custom Dataset button */}
                 <button
@@ -1063,13 +1119,17 @@ export default function LiveOperationsView() {
                   {trainingMode === 'mock' ? 'Start Offline Demo' : 'Start Simulation'}
                 </motion.button>
               </div>
-            ) : trainingPhase === 'completed' ? (
+            ) : trainingPhase === 'completed' || trainingPhase === 'failed' || trainingPhase === 'stopped' ? (
               <button
                 id="reset-simulation-btn"
                 onClick={resetTraining}
-                className="h-10 inline-flex items-center px-4 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0"
+                className={`h-10 inline-flex items-center px-4 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0 ${
+                  trainingPhase === 'failed'
+                    ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:opacity-90'
+                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90'
+                }`}
               >
-                🔄 Reset Simulation
+                🔄 {trainingPhase === 'failed' ? 'Reset Failed Run' : 'Reset Simulation'}
               </button>
             ) : (
               <div
@@ -1150,6 +1210,23 @@ export default function LiveOperationsView() {
             <span>Retry Live Stream</span>
           </button>
         </div>
+      )}
+
+      {/* Diagnostic Failure Banner */}
+      {(effectiveSim.status === 'failed' || trainingPhase === 'failed') && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-300 flex items-start gap-3 shadow-sm"
+        >
+          <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm font-bold text-rose-200">Federated Training Failed</h4>
+            <p className="text-xs text-rose-300/90 mt-0.5 break-words">
+              {currentSim?.error_message || 'An error occurred during federated training. Inspect telemetry or reset the simulation.'}
+            </p>
+          </div>
+        </motion.div>
       )}
 
       {/* Top Telemetry KPI Cards */}

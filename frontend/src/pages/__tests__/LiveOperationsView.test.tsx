@@ -430,6 +430,174 @@ describe('LiveOperationsView Component', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('rehydrates COMPLETED simulation state consistently on navigation return without bank animations or failure banners', () => {
+    vi.spyOn(queries, 'useSimulation').mockReturnValue({
+      data: {
+        id: 'sim_test_completed_123',
+        status: 'completed',
+        current_round: 10,
+        total_rounds: 10,
+        progress_pct: 100,
+        created_at: '2026-03-01T10:00:00Z',
+        completed_at: '2026-03-01T10:05:00Z',
+        banks: [
+          { id: 'bank_alpha', name: 'Bank Alpha', status: 'ACTIVE', tier: 'Tier 1' },
+          { id: 'bank_beta', name: 'Bank Beta', status: 'ACTIVE', tier: 'Tier 1' },
+          { id: 'bank_gamma', name: 'Bank Gamma', status: 'ACTIVE', tier: 'Tier 2' },
+        ],
+        rounds: [
+          { round_number: 10, total_rounds: 10, auc: 0.88, global_loss: 0.12, per_bank_auc: { alpha: 0.87, beta: 0.89, gamma: 0.88 } },
+        ],
+      },
+      isLoading: false,
+    } as any);
+
+    render(<LiveOperationsView />, { wrapper: createWrapper() });
+
+    // Must show Complete, Reset Simulation button, and no Failure banner
+    expect(screen.getByText(/^Complete$/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reset Simulation/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Federated Training Failed/i)).not.toBeInTheDocument();
+  });
+
+  it('rehydrates FAILED simulation state with diagnostic error message and stopped animations', () => {
+    vi.spyOn(queries, 'useSimulation').mockReturnValue({
+      data: {
+        id: 'sim_test_failed_456',
+        status: 'failed',
+        current_round: 7,
+        total_rounds: 10,
+        progress_pct: 100,
+        error_message: 'Gradient divergence detected in Bank Beta local model',
+        banks: [
+          { id: 'bank_alpha', name: 'Bank Alpha', status: 'ACTIVE', tier: 'Tier 1' },
+        ],
+      },
+      isLoading: false,
+    } as any);
+
+    render(<LiveOperationsView />, { wrapper: createWrapper() });
+
+    // Must display Failure banner with real error message
+    expect(screen.getByText(/Federated Training Failed/i)).toBeInTheDocument();
+    expect(screen.getByText(/Gradient divergence detected in Bank Beta local model/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reset Failed Run/i })).toBeInTheDocument();
+  });
+
+  it('enforces terminal monotonicity against late or replayed WebSocket events', () => {
+    let instance: any = null;
+
+    class TestWebSocket {
+      static OPEN = 1;
+      static CLOSED = 3;
+      readyState = 1;
+      send = vi.fn();
+      close = vi.fn();
+      onopen: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((e: { data: string }) => void) | null = null;
+
+      constructor(public url: string) {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        instance = this;
+      }
+    }
+
+    vi.stubGlobal('WebSocket', TestWebSocket);
+
+    vi.spyOn(queries, 'useSimulation').mockReturnValue({
+      data: {
+        id: 'sim_terminal_mono_789',
+        status: 'completed',
+        current_round: 10,
+        total_rounds: 10,
+        progress_pct: 100,
+      },
+      isLoading: false,
+    } as any);
+
+    render(<LiveOperationsView />, { wrapper: createWrapper() });
+
+    act(() => {
+      instance.onopen();
+    });
+
+    // Send a stale / replayed round_started event arriving after completion
+    act(() => {
+      instance.onmessage({
+        data: JSON.stringify({
+          event_type: 'round_started',
+          simulation_id: 'sim_terminal_mono_789',
+          data: { round: 2, total: 10 },
+        }),
+      });
+    });
+
+    // The UI must remain in completed state and not regress to in-progress
+    expect(screen.getByText(/^Complete$/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reset Simulation/i })).toBeInTheDocument();
+    expect(screen.queryByText(/⚡ Real Training…/i)).not.toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('drops foreign WebSocket events to isolate simulation identity', () => {
+    let instance: any = null;
+
+    class TestWebSocket {
+      static OPEN = 1;
+      static CLOSED = 3;
+      readyState = 1;
+      send = vi.fn();
+      close = vi.fn();
+      onopen: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((e: { data: string }) => void) | null = null;
+
+      constructor(public url: string) {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        instance = this;
+      }
+    }
+
+    vi.stubGlobal('WebSocket', TestWebSocket);
+
+    vi.spyOn(queries, 'useSimulation').mockReturnValue({
+      data: {
+        id: 'sim_active_abc',
+        status: 'running',
+        current_round: 3,
+        total_rounds: 10,
+      },
+      isLoading: false,
+    } as any);
+
+    render(<LiveOperationsView />, { wrapper: createWrapper() });
+
+    act(() => {
+      instance.onopen();
+    });
+
+    // Send an event intended for a completely different simulation run
+    act(() => {
+      instance.onmessage({
+        data: JSON.stringify({
+          event_type: 'error',
+          simulation_id: 'sim_other_foreign_xyz',
+          data: { error: 'Fatal error in other run' },
+        }),
+      });
+    });
+
+    // Active simulation must NOT be contaminated by the foreign error
+    expect(screen.queryByText(/Fatal error in other run/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Federated Training Failed/i)).not.toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
 });
 
 
