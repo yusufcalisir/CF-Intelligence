@@ -6,6 +6,7 @@ Simulation execution runs in background threads within the web process.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -15,6 +16,7 @@ from datetime import UTC, datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Path, Query, Request, status
+from fastapi.responses import JSONResponse
 
 from app.application.schemas.simulation import (
     AIActReportResponse,
@@ -408,12 +410,45 @@ if os.environ.get("CF_SEED_CANONICAL_BENCHMARK", "0").lower() in ("1", "true"):
 async def create_simulation(
     request: Request,
     config: SimulationConfigRequest,
-) -> SimulationCreateResponse:
+) -> SimulationCreateResponse | JSONResponse:
     """Start a new federated learning simulation.
 
     Runs the simulation in a background thread within the web process.
     Poll GET /simulations/{id} or GET /simulation/{id}/status for progress.
     """
+    idempotency_key = request.headers.get("Idempotency-Key") or request.headers.get(
+        "X-Idempotency-Key"
+    )
+    payload_hash = None
+    if idempotency_key:
+        from app.application.services.idempotency import IdempotencyService
+
+        idem_svc = IdempotencyService.get()
+        payload_hash = hashlib.sha256(
+            json.dumps(config.model_dump(), sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+        state, cached = idem_svc.acquire(
+            idempotency_key,
+            in_progress_timeout=30.0,
+            payload_hash=payload_hash,
+        )
+        if state == "HIT" and cached is not None:
+            return JSONResponse(
+                content=cached,
+                status_code=status.HTTP_202_ACCEPTED,
+                headers={"Idempotency-Replayed": "true"},
+            )
+        if state == "IN_PROGRESS":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A simulation creation request with this Idempotency-Key is currently in progress",
+            )
+        if state == "MISMATCH":
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Idempotency-Key payload mismatch with previously completed request",
+            )
+
     simulation_id = str(uuid.uuid4())
     with _stop_events_lock:
         if len(_stop_events) > 500:
@@ -516,11 +551,20 @@ async def create_simulation(
 
     logger.info("Started in-process simulation %s", simulation_id)
 
-    return SimulationCreateResponse(
+    resp = SimulationCreateResponse(
         id=simulation_id,
         status=SimulationStatus.PENDING,
         message=f"Simulation started in-process. ID: {simulation_id}",
     )
+    if idempotency_key:
+        from app.application.services.idempotency import IdempotencyService
+
+        IdempotencyService.get().complete(
+            idempotency_key,
+            resp.model_dump(),
+            payload_hash=payload_hash,
+        )
+    return resp
 
 
 @router.get("", response_model=list[SimulationSummaryResponse])

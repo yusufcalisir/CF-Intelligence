@@ -297,7 +297,15 @@ export function useAIActComplianceReport(id: string | undefined, enabled: boolea
 export function useCreateSimulation() {
   return useMutation<SimulationCreateResponse, Error, Partial<SimulationConfig>>({
     mutationFn: async (config) => {
-      const { data } = await apiClient.post('/api/v1/simulations', config);
+      const idempotencyKey =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `sim_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const { data } = await apiClient.post('/api/v1/simulations', config, {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      });
       return data;
     },
   });

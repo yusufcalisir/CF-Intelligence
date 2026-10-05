@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useCreateSimulation } from '../../api/queries';
 import { DEFAULT_SIMULATION_CONFIG } from '../../utils/constants';
@@ -15,6 +15,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
   });
   const [isExpanded, setIsExpanded] = useState(false);
   const createMutation = useCreateSimulation();
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -26,9 +27,14 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
   }, []);
 
   const handleStart = () => {
+    if (createMutation.isPending || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     createMutation.mutate(config, {
       onSuccess: (data) => {
         onSimulationCreated(data.id);
+      },
+      onSettled: () => {
+        isSubmittingRef.current = false;
       },
     });
   };

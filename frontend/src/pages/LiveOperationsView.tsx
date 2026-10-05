@@ -582,10 +582,20 @@ export default function LiveOperationsView() {
     );
   };
 
+  const terminalPhaseRef = useRef(trainingPhase);
+  terminalPhaseRef.current = trainingPhase;
+  const currentSimRef = useRef(currentSim);
+  currentSimRef.current = currentSim;
+
   // WebSocket live telemetry listener with real backend telemetry binding
   useEffect(() => {
+    if (!activeSimId) {
+      setWsStatus('DISCONNECTED');
+      return;
+    }
+
     const getWsUrl = () => {
-      const queryParam = activeSimId ? `?simulation_id=${encodeURIComponent(activeSimId)}` : '';
+      const queryParam = `?simulation_id=${encodeURIComponent(activeSimId)}`;
       if (import.meta.env.VITE_WS_URL) {
         const base = import.meta.env.VITE_WS_URL;
         return base.includes('?') ? base : `${base}${queryParam}`;
@@ -636,11 +646,21 @@ export default function LiveOperationsView() {
               }
 
               // Detect half-open / zombie connections if no frame received for > 30s
-              const silenceElapsed = Date.now() - lastTelemetryTimeRef.current;
-              if (silenceElapsed > 30000) {
-                console.warn(`[LiveOperationsView] Telemetry liveness timeout (${silenceElapsed}ms). Cycling connection.`);
-                handleConnectionLost();
-                try { ws.close(); } catch { /* ignore */ }
+              const isTerminal =
+                terminalPhaseRef.current === 'completed' ||
+                terminalPhaseRef.current === 'failed' ||
+                terminalPhaseRef.current === 'stopped' ||
+                currentSimRef.current?.status === 'completed' ||
+                currentSimRef.current?.status === 'failed' ||
+                currentSimRef.current?.status === 'stopped';
+
+              if (!isTerminal) {
+                const silenceElapsed = Date.now() - lastTelemetryTimeRef.current;
+                if (silenceElapsed > 30000) {
+                  console.warn(`[LiveOperationsView] Telemetry liveness timeout (${silenceElapsed}ms). Cycling connection.`);
+                  handleConnectionLost();
+                  try { ws.close(); } catch { /* ignore */ }
+                }
               }
             }
           }, 10000);
@@ -756,11 +776,13 @@ export default function LiveOperationsView() {
               setTrainingPhase('evaluating');
             }
           } else if (eventType === 'completed' || eventType === 'training_completed') {
+            terminalPhaseRef.current = 'completed';
             setTrainingPhase('completed');
             setIsTraining(false);
           } else if (eventType === 'error' || eventType === 'failed') {
             // Only set failed if run is not already completed (monotonicity)
             if (trainingPhase !== 'completed' && currentSim?.status !== 'completed') {
+              terminalPhaseRef.current = 'failed';
               setTrainingPhase('failed');
               setIsTraining(false);
             }
@@ -775,6 +797,23 @@ export default function LiveOperationsView() {
       };
       ws.onclose = () => {
         if (!isCleanedUp) {
+          const isTerminal =
+            terminalPhaseRef.current === 'completed' ||
+            terminalPhaseRef.current === 'failed' ||
+            terminalPhaseRef.current === 'stopped' ||
+            currentSimRef.current?.status === 'completed' ||
+            currentSimRef.current?.status === 'failed' ||
+            currentSimRef.current?.status === 'stopped';
+
+          if (isTerminal) {
+            setWsStatus('DISCONNECTED');
+            if (reconnectTimerRef.current) {
+              clearTimeout(reconnectTimerRef.current);
+              reconnectTimerRef.current = null;
+            }
+            return;
+          }
+
           handleConnectionLost();
           if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
           reconnectTimerRef.current = setTimeout(() => {
@@ -894,7 +933,12 @@ export default function LiveOperationsView() {
   };
 
   // ── Config panel launch handler ────────────────────────────────────────────
+  const isLaunchingRef = useRef(false);
   const handleLaunchTraining = async (profile: DatasetProfile, mode: TrainingMode) => {
+    if (isLaunchingRef.current || createSimulation.isPending) {
+      return;
+    }
+    isLaunchingRef.current = true;
     setSelectedProfile(profile);
     setTrainingMode(mode);
     setIsConfigOpen(false);
@@ -902,7 +946,11 @@ export default function LiveOperationsView() {
     setChampionAuc(profile.championAucDefault);
 
     if (mode === 'mock') {
-      startSimulatedTraining(profile);
+      try {
+        startSimulatedTraining(profile);
+      } finally {
+        isLaunchingRef.current = false;
+      }
     } else {
       // Real mode: dispatch actual federated training simulation run to backend
       setTrainingPhase('generating_data');
@@ -918,8 +966,11 @@ export default function LiveOperationsView() {
         }
         setTrainingPhase('training_federated');
       } catch (err) {
-        console.warn('Real training simulation dispatched to live WebSocket telemetry:', err);
-        setTrainingPhase('training_federated');
+        console.warn('Real training simulation dispatch error:', err);
+        setTrainingPhase('failed');
+        setIsTraining(false);
+      } finally {
+        isLaunchingRef.current = false;
       }
     }
   };
@@ -977,49 +1028,24 @@ export default function LiveOperationsView() {
     setTimeout(() => { isResettingIdRef.current = false; }, 0);
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-start simulation when navigated from Dashboard or via simulation route
+  // Clean up URL parameters and handle openIngest modal trigger without creating simulations
   useEffect(() => {
-    // If the ID-change reset is still in progress, skip — auto-start will re-evaluate next render
-    if (isResettingIdRef.current) return;
     const hasAutostartParam = location.search.includes('autostart=true');
-    // Always check stored session WITHOUT the autostart flag — if data already exists, don't restart
-    const sessionForCurrentId = loadStoredSession(id);
-    // Only treat as "new" if autostart AND no stored session exists, or the ID has no session at all
-    const isNewSimulationRun = (hasAutostartParam && !sessionForCurrentId) || (Boolean(id) && !sessionForCurrentId);
-    const isAutoStart = id || location.pathname.startsWith('/simulation') || hasAutostartParam;
+    const hasOpenIngestParam = location.search.includes('openIngest=true');
 
-    // Guard: If backend already has training rounds or active running/terminal simulation, do NOT start client-side mock!
-    const backendHasData = (simRounds && simRounds.length > 0) ||
-      (currentSim && (currentSim.status === 'running' || currentSim.status === 'training_federated' || currentSim.status === 'completed' || currentSim.status === 'failed' || currentSim.status === 'stopped'));
-
-    if (backendHasData) {
-      hasAutoStartedRef.current = true;
-      return;
+    if (hasOpenIngestParam) {
+      setIsIngestModalOpen(true);
     }
 
-    if ((isNewSimulationRun || (isAutoStart && trainingPhase === 'pending')) && !isTraining && !hasAutoStartedRef.current) {
-      hasAutoStartedRef.current = true;
-      // Auto-start dispatches real federated training run
-      handleLaunchTraining(DATASET_PROFILES.paysim, 'real');
-    }
-
-    // Strip ?autostart=true from URL after first use so page refresh doesn't re-trigger
-    if (hasAutostartParam) {
+    // Strip ?autostart=true / ?openIngest=true from URL after mount so refresh doesn't retain parameters
+    if (hasAutostartParam || hasOpenIngestParam) {
       const cleanSearch = location.search
         .replace(/[?&]autostart=true/, '')
-        .replace(/^&/, '?');
-      navigate(`${location.pathname}${cleanSearch || ''}`, { replace: true });
-    }
-    if (location.search.includes('openIngest=true')) {
-      setIsIngestModalOpen(true);
-      // Also strip openIngest from URL
-      const cleanSearch = location.search
         .replace(/[?&]openIngest=true/, '')
         .replace(/^&/, '?');
       navigate(`${location.pathname}${cleanSearch || ''}`, { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, location.pathname, location.search, trainingPhase, isTraining]);
+  }, [id, location.pathname, location.search, navigate]);
 
   // Tooltip style shared across charts
   const tooltipStyle = {

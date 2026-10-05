@@ -338,7 +338,9 @@ class SimulationService:
                 validated_datasets = {}
                 for bank_id, (features_df, labels) in datasets.items():
                     validated_df = validator_service.validate_streaming_batch(features_df, bank_id)
-                    validator_service.gate_data_contract(validated_df, bank_id)
+                    validator_service.gate_data_contract(
+                        validated_df, bank_id, simulation_id=simulation.id
+                    )
                     validated_datasets[bank_id] = (validated_df, labels)
                 datasets = validated_datasets
 

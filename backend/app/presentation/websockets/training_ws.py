@@ -211,7 +211,7 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
                 exc,
             )
     finally:
-        await training_ws_manager.disconnect(websocket, room=room_name)
+        await training_ws_manager.disconnect(websocket)
         with contextlib.suppress(Exception):
             if getattr(websocket, "client_state", None) != WebSocketState.DISCONNECTED:
                 await websocket.close()

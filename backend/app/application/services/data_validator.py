@@ -6,7 +6,9 @@ Great Expectations (v1.x) for data contract statistical stability checks.
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import threading
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -60,6 +62,9 @@ else:
 import pandas as pd  # noqa: TC002
 
 logger = logging.getLogger(__name__)
+
+
+_ge_registration_lock = threading.Lock()
 
 
 class DataContractValidationError(Exception):
@@ -129,7 +134,10 @@ class DataValidatorService:
         detected_pii_cols = [
             c
             for c in df.columns
-            if any(term in c.lower().replace("_", "").replace("-", "") for term in self.FORBIDDEN_PII_TERMS)
+            if any(
+                term in c.lower().replace("_", "").replace("-", "")
+                for term in self.FORBIDDEN_PII_TERMS
+            )
         ]
         if detected_pii_cols:
             error_msg = f"Zero Raw PII violation: forbidden cleartext PII column(s) detected: {', '.join(detected_pii_cols)}"
@@ -179,10 +187,13 @@ class DataValidatorService:
         bank_id: str,
         amount_mean_min: float = 10.0,
         amount_mean_max: float = 1000.0,
+        simulation_id: str | None = None,
     ) -> None:
         """Run Great Expectations checks on bank data prior to model training.
 
         Uses GE 1.x ephemeral context and ValidationDefinition API.
+        Deterministic resource keys derived from (purpose, simulation_id, bank_id)
+        guarantee complete collision safety under concurrent multi-bank or multi-simulation execution.
 
         Verifies statistical properties:
         1. Null value ratios are 0 on critical numeric columns.
@@ -235,33 +246,53 @@ class DataValidatorService:
                 )
             return
 
+        sim_key = simulation_id or "standalone"
+        purpose = "ingestion"
+        ds_name = f"ds_{purpose}_{sim_key}_{bank_id}"
+        asset_name = f"asset_{purpose}_{sim_key}_{bank_id}"
+        bd_name = f"bd_{purpose}_{sim_key}_{bank_id}"
+        suite_name = f"contract_{purpose}_{sim_key}_{bank_id}"
+        val_name = f"val_{purpose}_{sim_key}_{bank_id}"
+
         context = ge.get_context(mode="ephemeral")
 
-        # Register datasource, asset, and batch definition
-        ds = context.data_sources.add_pandas(f"ds_{bank_id}")
-        asset = ds.add_dataframe_asset(f"asset_{bank_id}")
-        bd = asset.add_batch_definition_whole_dataframe(f"bd_{bank_id}")
+        # Atomic isolated registration scoped to this exact (purpose, simulation_id, bank_id)
+        with _ge_registration_lock:
+            ds = context.data_sources.add_pandas(ds_name)
+            asset = ds.add_dataframe_asset(asset_name)
+            bd = asset.add_batch_definition_whole_dataframe(bd_name)
 
-        # Build expectation suite
-        suite = ExpectationSuite(name=f"contract_{bank_id}")
-        suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="transaction_amount"))
-        suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="velocity"))
-        suite.add_expectation(
-            gxe.ExpectColumnMeanToBeBetween(
-                column="transaction_amount",
-                min_value=amount_mean_min,
-                max_value=amount_mean_max,
+            suite = ExpectationSuite(name=suite_name)
+            suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="transaction_amount"))
+            suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="velocity"))
+            suite.add_expectation(
+                gxe.ExpectColumnMeanToBeBetween(
+                    column="transaction_amount",
+                    min_value=amount_mean_min,
+                    max_value=amount_mean_max,
+                )
             )
-        )
-        suite.add_expectation(
-            gxe.ExpectColumnValuesToBeInSet(column="device_type", value_set=self.ALLOWED_DEVICES)
-        )
-        suite = context.suites.add(suite)
+            suite.add_expectation(
+                gxe.ExpectColumnValuesToBeInSet(
+                    column="device_type", value_set=self.ALLOWED_DEVICES
+                )
+            )
+            suite = context.suites.add(suite)
 
-        # Register and run validation
-        val_def = ValidationDefinition(name=f"val_{bank_id}", data=bd, suite=suite)
-        val_def = context.validation_definitions.add(val_def)
-        result = val_def.run(batch_parameters={"dataframe": df})
+            val_def = ValidationDefinition(name=val_name, data=bd, suite=suite)
+            val_def = context.validation_definitions.add(val_def)
+
+        # Run validation outside lock to allow true concurrent evaluation across simulations/banks
+        try:
+            result = val_def.run(batch_parameters={"dataframe": df})
+        finally:
+            with _ge_registration_lock:
+                with contextlib.suppress(Exception):
+                    context.validation_definitions.delete(val_name)
+                with contextlib.suppress(Exception):
+                    context.suites.delete(suite_name)
+                with contextlib.suppress(Exception):
+                    context.data_sources.delete(ds_name)
 
         if not result.success:
             failures = []

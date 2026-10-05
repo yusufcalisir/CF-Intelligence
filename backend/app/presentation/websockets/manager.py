@@ -22,6 +22,8 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
+from starlette.websockets import WebSocketDisconnect, WebSocketState
+
 if TYPE_CHECKING:
     from fastapi import WebSocket
 
@@ -179,24 +181,43 @@ class WebSocketConnectionManager:
             return {"total": 0, "delivered": 0, "dropped": 0}
 
         delivered = 0
-        dropped_clients: list[WebSocket] = []
+        timed_out_clients: list[WebSocket] = []
+        disconnected_clients: list[WebSocket] = []
 
-        async def _send_one(ws: WebSocket) -> bool:
+        async def _send_one(ws: WebSocket) -> tuple[WebSocket, str]:
+            if getattr(ws, "client_state", None) == WebSocketState.DISCONNECTED:
+                return ws, "disconnected"
             try:
                 await asyncio.wait_for(ws.send_text(msg_str), timeout=self.send_timeout)
-                return True
-            except Exception:
-                return False
+                return ws, "delivered"
+            except TimeoutError:
+                return ws, "timeout"
+            except Exception as exc:
+                exc_str = str(exc).lower()
+                if (
+                    isinstance(exc, WebSocketDisconnect)
+                    or "disconnect" in exc_str
+                    or "close frame has been sent" in exc_str
+                    or "close message has been sent" in exc_str
+                    or "not connected" in exc_str
+                ):
+                    return ws, "disconnected"
+                return ws, "error"
 
         results = await asyncio.gather(*[_send_one(ws) for ws in clients], return_exceptions=True)
 
-        for ws, success in zip(clients, results):
-            if success is True:
-                delivered += 1
-                self._client_last_seen[ws] = time.time()
-            else:
-                dropped_clients.append(ws)
+        for res in results:
+            if isinstance(res, tuple):
+                ws, status = res
+                if status == "delivered":
+                    delivered += 1
+                    self._client_last_seen[ws] = time.time()
+                elif status == "timeout":
+                    timed_out_clients.append(ws)
+                else:
+                    disconnected_clients.append(ws)
 
+        dropped_clients = timed_out_clients + disconnected_clients
         if dropped_clients:
             async with self._lock:
                 for dead_ws in dropped_clients:
@@ -210,13 +231,22 @@ class WebSocketConnectionManager:
                     self._client_last_seen.pop(dead_ws, None)
                     self._inbound_counters.pop(dead_ws, None)
                     self._dropped_client_count += 1
-                    with contextlib.suppress(Exception):
-                        await dead_ws.close()
-            logger.warning(
-                "Broadcast evicted %d stale/slow WebSocket clients. Remaining active: %d",
-                len(dropped_clients),
-                len(self._active_connections),
-            )
+                    if getattr(dead_ws, "client_state", None) != WebSocketState.DISCONNECTED:
+                        with contextlib.suppress(Exception):
+                            await dead_ws.close()
+
+            if timed_out_clients:
+                logger.warning(
+                    "Broadcast evicted %d slow/unresponsive WebSocket clients. Remaining active: %d",
+                    len(timed_out_clients),
+                    len(self._active_connections),
+                )
+            if disconnected_clients:
+                logger.debug(
+                    "Broadcast pruned %d disconnected WebSocket clients. Remaining active: %d",
+                    len(disconnected_clients),
+                    len(self._active_connections),
+                )
 
         self._total_broadcast_count += 1
         return {
