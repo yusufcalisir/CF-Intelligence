@@ -174,3 +174,93 @@ class TestCrossBankGraphIntelligence:
         # 2. Raw account number is irreversible without salt / one-way
         assert raw_account not in token
         assert len(token) == 64  # SHA-256 hex digest length
+
+    def test_identity_relabeling_invariance(self) -> None:
+        """Verifies that relational feature extraction is invariant to uniform entity relabeling."""
+        gen = CrossBankNetworkGenerator(seed=42)
+        df = gen.generate_benchmark_dataset(n_total_transactions=300)
+        df_feats_orig = gen._enrich_features(df)
+
+        # Create bijective pseudonym mapping (fresh tokens for each account)
+        unique_accs = list(set(df["source_account"]).union(set(df["target_account"])))
+        acc_map = {acc: f"pseudonym_{idx:05d}" for idx, acc in enumerate(unique_accs)}
+
+        df_relabeled = df.copy()
+        df_relabeled["source_account"] = df_relabeled["source_account"].map(acc_map)
+        df_relabeled["target_account"] = df_relabeled["target_account"].map(acc_map)
+
+        df_feats_relabeled = gen._enrich_features(df_relabeled)
+
+        # Relational metrics (degrees, rapid hop indicator, velocity) must match exactly
+        relational_cols = [
+            "source_out_degree",
+            "target_in_degree",
+            "rapid_hop_indicator",
+            "velocity_burst",
+        ]
+        for col in relational_cols:
+            diff = (df_feats_orig[col] - df_feats_relabeled[col]).abs().max()
+            assert diff == 0.0, f"Graph feature {col} changed under entity relabeling!"
+
+    def test_graph_rewired_edge_negative_control(self) -> None:
+        """Proves random cross-bank edge permutation disrupts structured fraud motifs while preserving edge counts."""
+        import numpy as np
+
+        gen = CrossBankNetworkGenerator(seed=42)
+        # Generate raw transaction traffic before feature enrichment
+        records = []
+        records.extend(gen._generate_benign_traffic(300, 168))
+        for sc in ["SCENARIO_1", "SCENARIO_2", "SCENARIO_3"]:
+            records.extend(gen._generate_scenario_traffic(sc, 168))
+        import pandas as pd
+        df_raw = pd.DataFrame(records).sort_values(by=["step", "transaction_id"]).reset_index(drop=True)
+
+        df_orig = gen._enrich_features(df_raw)
+        fraud_orig = df_orig[df_orig["is_laundering"] == 1]
+        orig_rapid_hops = fraud_orig["rapid_hop_indicator"].sum()
+
+        # Randomly shuffle target accounts of cross-bank edges
+        rng = np.random.default_rng(42)
+        df_perm = df_raw.copy()
+        cb_mask = df_perm["source_bank"] != df_perm["target_bank"]
+        targets_list: list[str] = [str(x) for x in df_perm.loc[cb_mask, "target_account"]]
+        rng.shuffle(targets_list)
+        df_perm.loc[cb_mask, "target_account"] = targets_list
+
+        df_perm_feats = gen._enrich_features(df_perm)
+        fraud_perm = df_perm_feats[df_perm_feats["is_laundering"] == 1]
+        perm_rapid_hops = fraud_perm["rapid_hop_indicator"].sum()
+
+        # Random rewiring must disrupt coordinated multi-hop timing links
+        assert perm_rapid_hops < orig_rapid_hops, (
+            f"Edge rewiring failed to disrupt rapid hop motifs (orig: {orig_rapid_hops}, perm: {perm_rapid_hops})"
+        )
+
+    def test_component_isolation_disjointness_invariant(self) -> None:
+        """Verifies connected component graph partitioning ensures zero node overlap between splits."""
+        import networkx as nx
+
+        gen = CrossBankNetworkGenerator(seed=42)
+        df = gen.generate_benchmark_dataset(n_total_transactions=400)
+
+        # Build undirected graph of transactions
+        g = nx.Graph()
+        for _, row in df.iterrows():
+            g.add_edge(row["source_account"], row["target_account"])
+
+        components = list(nx.connected_components(g))
+        assert len(components) > 1, "Graph must have multiple connected components for disjoint evaluation"
+
+        # Split components 70/30
+        n_train = max(1, int(len(components) * 0.70))
+        train_nodes = set().union(*components[:n_train])
+        test_nodes = set().union(*components[n_train:])
+
+        # Invariant: Disjoint node sets
+        assert train_nodes.isdisjoint(test_nodes), "Component disjoint split leaked shared nodes!"
+
+        # Invariant: No edge in df spans across train and test
+        for _, row in df.iterrows():
+            s, t = row["source_account"], row["target_account"]
+            cross_split = (s in train_nodes and t in test_nodes) or (s in test_nodes and t in train_nodes)
+            assert not cross_split, "Found edge bridging component-disjoint splits!"
