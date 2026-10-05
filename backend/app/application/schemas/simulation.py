@@ -29,7 +29,7 @@ class SimulationConfigRequest(BaseModel):
 
     # Privacy
     privacy_mechanism: PrivacyMechanism = PrivacyMechanism.NONE
-    dp_epsilon: float = Field(default=1.0, gt=0)
+    dp_epsilon: float = Field(default=0.75, gt=0)
     dp_epsilon_limit: float = Field(
         default=8.0, gt=0, description="Strict cumulative privacy budget epsilon limit"
     )
@@ -415,9 +415,13 @@ class AIActReportResponse(BaseModel):
 class POCReplayRequest(BaseModel):
     """Request payload to execute an interactive POC sandbox replay."""
 
-    preset_id: str = Field(default="poc-enterprise-standard", description="Preset ID for replay scenario")
+    preset_id: str = Field(
+        default="poc-enterprise-standard", description="Preset ID for replay scenario"
+    )
     seed: int = Field(default=42, ge=0, description="Deterministic random seed")
-    async_mode: bool = Field(default=False, description="Whether to run asynchronously or return completed session")
+    async_mode: bool = Field(
+        default=False, description="Whether to run asynchronously or return completed session"
+    )
 
 
 class POCPresetsResponse(BaseModel):
@@ -430,5 +434,3 @@ class POCPresetsResponse(BaseModel):
 
 # Rebuild models to resolve forward references
 SimulationDetailResponse.model_rebuild()
-
-

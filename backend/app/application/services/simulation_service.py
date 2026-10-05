@@ -30,7 +30,6 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 from app.application.services.data_generator import DataGenerator
-from app.application.services.privacy_service import PrivacyService
 from app.domain.entities import Bank, SimulationRun, TrainingRound
 from app.domain.enums import (
     AggregationMethod,
@@ -92,6 +91,7 @@ class SimulationService:
         fl_engine: FederatedLearningEngine,
         metrics_service: MetricsService,
         model_service: ModelService,
+        privacy_service: Any = None,
     ) -> None:
         self.settings = settings
         self.simulation_repo = simulation_repo
@@ -101,6 +101,14 @@ class SimulationService:
         self.fl_engine = fl_engine
         self.metrics_service = metrics_service
         self.model_service = model_service
+        if privacy_service is not None:
+            self.privacy_service = privacy_service
+        elif hasattr(fl_engine, "privacy_service") and fl_engine.privacy_service is not None:
+            self.privacy_service = fl_engine.privacy_service
+        else:
+            from app.application.services.privacy_service import PrivacyService
+
+            self.privacy_service = PrivacyService()
         from app.application.services.model_registry import ModelRegistry
 
         self.model_registry = ModelRegistry()
@@ -155,7 +163,17 @@ class SimulationService:
         byz_defense_type = getattr(config, "byzantine_defense", "none").lower()
         has_non_linear_defense = (
             config.aggregation_method in non_linear_byzantine_methods
-            or byz_defense_type in ("krum", "coordinate_wise_median", "coordinate_median", "median", "bulyan", "trimmed_mean", "spectral", "spectral_svd")
+            or byz_defense_type
+            in (
+                "krum",
+                "coordinate_wise_median",
+                "coordinate_median",
+                "median",
+                "bulyan",
+                "trimmed_mean",
+                "spectral",
+                "spectral_svd",
+            )
         )
         if enable_sa and has_non_linear_defense:
             method_name = getattr(config.aggregation_method, "value", config.aggregation_method)
@@ -176,6 +194,22 @@ class SimulationService:
         mlflow_run = self._init_mlflow(simulation.id, config)
 
         try:
+            # Preflight Privacy Feasibility Check
+            enable_dp = config.enable_differential_privacy or getattr(
+                config, "privacy_mechanism", None
+            ) in (
+                PrivacyMechanism.DIFFERENTIAL_PRIVACY,
+                PrivacyMechanism.BOTH,
+            )
+            if enable_dp:
+                from app.application.services.privacy_service import PrivacyService
+
+                PrivacyService.validate_preflight_budget(
+                    num_rounds=config.num_rounds,
+                    round_epsilon=config.dp_epsilon,
+                    limit=config.dp_epsilon_limit,
+                )
+
             # Phase 1: Ingest or generate data
             simulation.status = SimulationStatus.GENERATING_DATA
             dataset_choice = getattr(config, "dataset", "synthetic")
@@ -482,7 +516,7 @@ class SimulationService:
                 input_dim=feature_dim, dp_compatible=use_opacus_dp
             )
             global_weights = self.model_service.get_parameters(global_model)
-            privacy_service = PrivacyService()
+            privacy_service = self.privacy_service
 
             # Initialize hardware/cryptographic isolation if configured
             hw_mode = getattr(config, "hardware_isolation_mode", "none")
@@ -773,6 +807,14 @@ class SimulationService:
                     per_bank_samples = {}
                     round_opacus_epsilons: list[float] = []
 
+                    # Atomic round admission: verify budget before initiating local DP training
+                    if enable_dp and budget is not None:
+                        privacy_service.check_round_admission(
+                            simulation.id,
+                            config.dp_epsilon,
+                            limit=config.dp_epsilon_limit,
+                        )
+
                     for bank in participating:
                         correlation_id = f"train_{simulation.id}_{round_num}_{bank.id}"
                         logger.info("Triggering training for %s via connector", bank.id)
@@ -787,7 +829,10 @@ class SimulationService:
                         prev_w = prev_local_weights_by_bank.get(bank.id)
 
                         effective_fedprox_mu = getattr(config, "fedprox_mu", 0.0)
-                        if getattr(config, "aggregation_method", "") == "fed_prox" and effective_fedprox_mu == 0.0:
+                        if (
+                            getattr(config, "aggregation_method", "") == "fed_prox"
+                            and effective_fedprox_mu == 0.0
+                        ):
                             effective_fedprox_mu = 0.01
 
                         if bank.id in bank_data:
@@ -1181,9 +1226,7 @@ class SimulationService:
                             "auc": round(global_auc, 4),
                             "f1": round(global_f1, 4),
                             "per_bank_auc": {k: round(v, 4) for k, v in eval_aucs.items()},
-                            "per_bank_loss": {
-                                k: round(v, 4) for k, v in per_bank_loss.items()
-                            },
+                            "per_bank_loss": {k: round(v, 4) for k, v in per_bank_loss.items()},
                             "participants": [b.id for b in participating],
                             "dropped": dropped_this_round,
                             "duration_ms": round_duration,
@@ -1798,7 +1841,9 @@ class SimulationService:
             try:
                 self._finalize_mlflow(mlflow_run, banks, "completed")
             except Exception as e:
-                logger.warning("Failed to finalize MLflow for completed simulation %s: %s", simulation.id, e)
+                logger.warning(
+                    "Failed to finalize MLflow for completed simulation %s: %s", simulation.id, e
+                )
 
             try:
                 self._notify(
@@ -1818,7 +1863,9 @@ class SimulationService:
                     },
                 )
             except Exception as e:
-                logger.warning("Failed to notify completion for simulation %s: %s", simulation.id, e)
+                logger.warning(
+                    "Failed to notify completion for simulation %s: %s", simulation.id, e
+                )
 
             # Prune in-memory server optimizer states for this completed simulation
             try:
@@ -1833,12 +1880,23 @@ class SimulationService:
                 active_simulations.add(-1)
                 active_sim_decremented = True
 
+            from app.application.services.privacy_service import PrivacyBudgetExceededError
+
+            is_privacy_error = isinstance(e, PrivacyBudgetExceededError)
+
             # Monotonicity check: Never regress an already completed simulation to failed
             if simulation.status != SimulationStatus.COMPLETED:
                 simulation.status = SimulationStatus.FAILED
-                simulation.error_message = str(e)
+                simulation.error_message = (
+                    f"Privacy Budget Boundary Enforced: {e}" if is_privacy_error else str(e)
+                )
                 simulation.completed_at = _now()
-                logger.exception("Simulation %s failed: %s", simulation.id, e)
+                if is_privacy_error:
+                    logger.warning(
+                        "Simulation %s privacy budget boundary enforced: %s", simulation.id, e
+                    )
+                else:
+                    logger.exception("Simulation %s failed: %s", simulation.id, e)
 
                 # Log final parameters/metrics and mark MLflow run as failed
                 try:
@@ -1846,7 +1904,7 @@ class SimulationService:
                         mlflow_run if "mlflow_run" in locals() else None,
                         banks if "banks" in locals() else [],
                         "failed",
-                        error_message=str(e),
+                        error_message=simulation.error_message,
                     )
                 except Exception as ml_err:
                     logger.warning("Failed to mark MLflow run as failed: %s", ml_err)
@@ -1857,11 +1915,17 @@ class SimulationService:
                         simulation.id,
                         "error",
                         {
-                            "error": str(e),
+                            "error": simulation.error_message,
+                            "error_type": (
+                                "privacy_budget_exceeded" if is_privacy_error else "system_error"
+                            ),
+                            "is_privacy_exhaustion": is_privacy_error,
                         },
                     )
                 except Exception as notify_err:
-                    logger.warning("Failed to notify error for simulation %s: %s", simulation.id, notify_err)
+                    logger.warning(
+                        "Failed to notify error for simulation %s: %s", simulation.id, notify_err
+                    )
 
                 try:
                     self.fl_engine.clear_simulation_state(simulation.id)

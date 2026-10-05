@@ -108,6 +108,20 @@ class PrivacyBudget:
                 f"Cumulative privacy budget exceeded! Total: {self.total_epsilon:.4f} > Limit: {limit:.4f}"
             )
 
+    def check_admission(self, epsilon: float, limit: float = 8.0) -> None:
+        """Verify whether an upcoming round expenditure can be admitted without exceeding budget.
+
+        Raises:
+            PrivacyBudgetExceededError: if admitting this round would exceed the cumulative limit.
+        """
+        if epsilon <= 0:
+            raise ValueError(f"Epsilon must be positive, got {epsilon}")
+        projected = self.total_epsilon + epsilon
+        if projected > limit:
+            raise PrivacyBudgetExceededError(
+                f"Cumulative privacy budget exceeded! Projected: {projected:.4f} > Limit: {limit:.4f}"
+            )
+
     @property
     def history(self) -> list[float]:
         return list(self._epsilon_history)
@@ -219,7 +233,9 @@ class PrivacyService:
             rdp_sum = sum(self.compute_rdp_gaussian(s, q=q, alpha=alpha) for s in sigmas)
             rdp_map[alpha] = rdp_sum
 
-        best_eps, best_alpha = self.convert_rdp_to_approx_dp(rdp_map, delta=delta, orders=eval_orders)
+        best_eps, best_alpha = self.convert_rdp_to_approx_dp(
+            rdp_map, delta=delta, orders=eval_orders
+        )
         return best_eps, best_alpha, rdp_map
 
     def get_or_create_budget(
@@ -240,6 +256,11 @@ class PrivacyService:
             else:
                 self._budgets.move_to_end(simulation_id)
             return self._budgets[simulation_id]
+
+    def get_budget(self, simulation_id: str) -> PrivacyBudget | None:
+        """Retrieve existing privacy budget for simulation, or None if not found."""
+        with self._lock:
+            return self._budgets.get(simulation_id)
 
     def add_noise_to_weights(
         self,
@@ -364,6 +385,52 @@ class PrivacyService:
             epsilon,
             budget.total_epsilon,
         )
+
+    @staticmethod
+    def validate_preflight_budget(
+        num_rounds: int,
+        round_epsilon: float,
+        limit: float = 8.0,
+    ) -> float:
+        """Validate whether the requested training rounds can legitimately fit within the privacy limit.
+
+        Under parallel composition across disjoint bank clients and sequential composition
+        across repeated rounds, the minimum projected cumulative privacy loss is:
+            projected_total = num_rounds * round_epsilon
+
+        Raises:
+            PrivacyBudgetExceededError: if projected expenditure exceeds the configured cumulative limit.
+            ValueError: if num_rounds or round_epsilon are non-positive.
+        """
+        if num_rounds <= 0:
+            raise ValueError(f"num_rounds must be positive, got {num_rounds}")
+        if round_epsilon <= 0:
+            raise ValueError(f"round_epsilon must be positive, got {round_epsilon}")
+        if limit <= 0:
+            raise ValueError(f"limit must be positive, got {limit}")
+
+        projected_total = round(num_rounds * round_epsilon, 6)
+        if projected_total > limit:
+            raise PrivacyBudgetExceededError(
+                f"Requested DP training configuration is not feasible: "
+                f"projected cumulative ε = {projected_total:.4f} exceeds configured limit = {limit:.4f} "
+                f"across {num_rounds} rounds (per-round target ε = {round_epsilon:.4f})"
+            )
+        return projected_total
+
+    def check_round_admission(
+        self,
+        simulation_id: str,
+        round_epsilon: float,
+        limit: float = 8.0,
+    ) -> None:
+        """Atomically check whether the upcoming round can be admitted before training begins.
+
+        Guarantees that no local DP training is executed, no compute is wasted, and no
+        unbudgeted gradients are produced if the round would breach the cumulative privacy limit.
+        """
+        budget = self.get_or_create_budget(simulation_id)
+        budget.check_admission(round_epsilon, limit=limit)
 
     def clear_budget(self, simulation_id: str) -> None:
         """Remove privacy budget for a completed simulation."""

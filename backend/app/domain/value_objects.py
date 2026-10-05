@@ -117,7 +117,7 @@ class SimulationConfig:
 
     # Privacy
     enable_differential_privacy: bool = False
-    dp_epsilon: float = 1.0
+    dp_epsilon: float = 0.75
     dp_epsilon_limit: float = 8.0
     dp_delta: float = 1e-5
     dp_max_grad_norm: float = 1.0

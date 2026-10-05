@@ -12,7 +12,7 @@ export const DEFAULT_SIMULATION_CONFIG = {
   dropout_probability: 0.2,
   enable_reconnect_simulation: true,
   privacy_mechanism: 'none' as const,
-  dp_epsilon: 1.0,
+  dp_epsilon: 0.75,
   dp_delta: 1e-5,
   dp_max_grad_norm: 1.0,
   dp_mode: 'post_hoc' as const,

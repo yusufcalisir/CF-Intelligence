@@ -470,6 +470,25 @@ async def create_simulation(
         "enable_streaming_gnn": config.enable_streaming_gnn,
     }
 
+    # Preflight Privacy Feasibility Check
+    if config_dict["enable_differential_privacy"]:
+        from app.application.services.privacy_service import (
+            PrivacyBudgetExceededError,
+            PrivacyService,
+        )
+
+        try:
+            PrivacyService.validate_preflight_budget(
+                num_rounds=config.num_rounds,
+                round_epsilon=config.dp_epsilon,
+                limit=config.dp_epsilon_limit,
+            )
+        except PrivacyBudgetExceededError as pbe:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(pbe),
+            ) from pbe
+
     # Store pending status
     _simulation_results.set(
         simulation_id,
@@ -574,7 +593,9 @@ async def get_simulation_status(
 @singular_api_router.post("/{simulation_id}/stop", response_model=SimulationStopResponse)
 async def stop_simulation(
     simulation_id: str = Path(..., min_length=1, description="Simulation run identifier"),
-    reason: str | None = Query(default=None, max_length=255, description="Optional cancellation reason"),
+    reason: str | None = Query(
+        default=None, max_length=255, description="Optional cancellation reason"
+    ),
 ) -> SimulationStopResponse:
     """Gracefully terminate a running federated learning simulation."""
     sim = _simulation_results.get(simulation_id)
@@ -897,7 +918,9 @@ def _run_simulation_in_process(simulation_id: str, config_dict: dict) -> None:
             with _stop_events_lock:
                 stop_evt = _stop_events.get(simulation_id)
             if stop_evt and stop_evt.is_set():
-                logger.info("Simulation %s received stop signal. Aborting progress callback.", simulation_id)
+                logger.info(
+                    "Simulation %s received stop signal. Aborting progress callback.", simulation_id
+                )
                 return
 
             sim = _simulation_results.get(simulation_id)
@@ -931,16 +954,18 @@ def _run_simulation_in_process(simulation_id: str, config_dict: dict) -> None:
                 _simulation_results.set(simulation_id, sim)
 
             # Store every event so the training router can serve them
-            event_envelope = {"event_type": event_type, "data": data, "simulation_id": simulation_id}
+            event_envelope = {
+                "event_type": event_type,
+                "data": data,
+                "simulation_id": simulation_id,
+            }
             _simulation_events.push_list(simulation_id, event_envelope)
 
             # Always broadcast in-process so clients receive events without Redis
             training_ws_manager.broadcast_to_room_sync(
                 f"simulation:{simulation_id}", event_envelope
             )
-            training_ws_manager.broadcast_to_room_sync(
-                "simulation:live_prod_v2", event_envelope
-            )
+            training_ws_manager.broadcast_to_room_sync("simulation:live_prod_v2", event_envelope)
 
             # Also publish to Redis pub/sub when available (primary path)
             c = _simulation_events.client
@@ -1252,7 +1277,9 @@ def execute_poc_replay(req: POCReplayRequest) -> dict[str, Any]:
     "/poc/status/{session_id}",
     summary="Get POC replay status and telemetry",
 )
-def get_poc_status(session_id: str = Path(..., description="POC session identifier")) -> dict[str, Any]:
+def get_poc_status(
+    session_id: str = Path(..., description="POC session identifier"),
+) -> dict[str, Any]:
     sim = get_multi_bank_simulator()
     status_data = sim.get_session_status(session_id)
     if not status_data:
@@ -1279,7 +1306,9 @@ def get_poc_status(session_id: str = Path(..., description="POC session identifi
     "/poc/summary/{session_id}",
     summary="Get final executive POC evaluation report",
 )
-def get_poc_summary(session_id: str = Path(..., description="POC session identifier")) -> dict[str, Any]:
+def get_poc_summary(
+    session_id: str = Path(..., description="POC session identifier"),
+) -> dict[str, Any]:
     sim = get_multi_bank_simulator()
     status_data = sim.get_session_status(session_id)
     if not status_data:
@@ -1288,4 +1317,3 @@ def get_poc_summary(session_id: str = Path(..., description="POC session identif
             detail=f"POC session '{session_id}' not found",
         )
     return status_data
-
