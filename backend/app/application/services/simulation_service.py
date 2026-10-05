@@ -147,6 +147,15 @@ class SimulationService:
         final_round_samples: list[int] | None = None
         banks: list[Any] = []
 
+        # Validate aggregation method
+        try:
+            AggregationMethod(config.aggregation_method)
+        except ValueError as e:
+            raise InvalidPipelineConfigurationError(
+                f"Unsupported aggregation method '{config.aggregation_method}'. "
+                f"Must be one of {[m.value for m in AggregationMethod]}"
+            ) from e
+
         # Validate pipeline compatibility early: SecAgg and FHE are mathematically incompatible with non-linear Byzantine defenses
         hw_mode = getattr(config, "hardware_isolation_mode", "none")
         enable_sa = config.enable_secure_aggregation or getattr(

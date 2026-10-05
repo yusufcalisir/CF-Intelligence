@@ -146,15 +146,17 @@ class ModelService:
         prev_local_model = None
         dp_comp = any(isinstance(m, nn.GroupNorm) for m in model.modules())
 
+        in_dim = int(X_train.shape[1]) if len(X_train.shape) > 1 else NUM_FEATURES
+
         if (fedprox_mu > 0.0 or moon_mu > 0.0) and global_weights is not None:
-            global_model = self.create_model(dp_compatible=dp_comp)
+            global_model = self.create_model(input_dim=in_dim, dp_compatible=dp_comp)
             global_model = self.set_parameters(global_model, global_weights)
             global_model.eval()
             for p in global_model.parameters():
                 p.requires_grad = False
 
         if moon_mu > 0.0 and prev_local_weights is not None:
-            prev_local_model = self.create_model(dp_compatible=dp_comp)
+            prev_local_model = self.create_model(input_dim=in_dim, dp_compatible=dp_comp)
             prev_local_model = self.set_parameters(prev_local_model, prev_local_weights)
             prev_local_model.eval()
             for p in prev_local_model.parameters():
@@ -343,15 +345,17 @@ class ModelService:
         prev_local_model = None
         dp_comp = any(isinstance(m, nn.GroupNorm) for m in model.modules())
 
+        in_dim = int(X_train.shape[1]) if len(X_train.shape) > 1 else NUM_FEATURES
+
         if (fedprox_mu > 0.0 or moon_mu > 0.0) and global_weights is not None:
-            global_model = self.create_model(dp_compatible=dp_comp)
+            global_model = self.create_model(input_dim=in_dim, dp_compatible=dp_comp)
             global_model = self.set_parameters(global_model, global_weights)
             global_model.eval()
             for p in global_model.parameters():
                 p.requires_grad = False
 
         if moon_mu > 0.0 and prev_local_weights is not None:
-            prev_local_model = self.create_model(dp_compatible=dp_comp)
+            prev_local_model = self.create_model(input_dim=in_dim, dp_compatible=dp_comp)
             prev_local_model = self.set_parameters(prev_local_model, prev_local_weights)
             prev_local_model.eval()
             for p in prev_local_model.parameters():
