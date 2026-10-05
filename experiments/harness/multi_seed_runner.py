@@ -284,7 +284,7 @@ class MultiSeedBenchmarkRunner:
         for s in self.seeds:
             res = run_fraud_benchmark(
                 dataset_name=dataset_name,
-                synthetic_eval=True,
+                dataset_mode="synthetic",
                 rounds=rounds,
                 seed=s,
                 save_artifact=False,

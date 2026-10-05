@@ -88,6 +88,10 @@ class SimulationRun:
     settlement_status: str | None = None
     on_chain_payouts: list[dict[str, Any]] = field(default_factory=list)
 
+    # Dataset Mode & Provenance Telemetry
+    dataset_mode: str = "synthetic"
+    dataset_provenance: str = "SYNTHETIC_EVIDENCE"
+
     @property
     def duration_seconds(self) -> float | None:
         """Wall-clock duration of the simulation."""

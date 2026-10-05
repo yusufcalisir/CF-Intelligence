@@ -9,6 +9,7 @@ fixtures, and emits verifiable canonical artifacts without metric hardcoding.
 
 from __future__ import annotations
 
+import contextlib
 import inspect
 import json
 from pathlib import Path
@@ -164,32 +165,48 @@ def test_per_sample_dp_semantics() -> None:
     loader = torch.utils.data.DataLoader(dataset, batch_size=16)
 
     engine = PrivacyEngine(accountant="prv")
-    model_p, opt_p, loader_p = engine.make_private(
-        module=model,
-        optimizer=optimizer,
-        data_loader=loader,
-        noise_multiplier=1.0,
-        max_grad_norm=MAX_GRAD_NORM,
-    )
+    try:
+        model_p, opt_p, loader_p = engine.make_private(
+            module=model,
+            optimizer=optimizer,
+            data_loader=loader,
+            noise_multiplier=1.0,
+            max_grad_norm=MAX_GRAD_NORM,
+            grad_sample_mode="ew",
+        )
+    except Exception:
+        model_p, opt_p, loader_p = engine.make_private(
+            module=model,
+            optimizer=optimizer,
+            data_loader=loader,
+            noise_multiplier=1.0,
+            max_grad_norm=MAX_GRAD_NORM,
+            grad_sample_mode="hooks",
+        )
 
-    # Opacus wraps model in GradSampleModule to compute per-sample gradients
-    assert hasattr(model_p, "_module") or hasattr(model_p, "forbid_grad_accumulation")
+    try:
+        # Opacus wraps model in GradSampleModule to compute per-sample gradients
+        assert hasattr(model_p, "_module") or hasattr(model_p, "forbid_grad_accumulation")
 
-    # Run one batch forward + backward
-    criterion = torch.nn.BCELoss()
-    for xb, yb in loader_p:
-        opt_p.zero_grad()
-        out = model_p(xb)
-        loss = criterion(out, yb)
-        loss.backward()
-        # Ensure per-sample gradient samples exist on linear layers
-        for param in model_p.parameters():
-            if param.requires_grad:
-                assert hasattr(param, "grad_sample"), "Missing per-sample grad_sample attribute"
-                assert param.grad_sample.shape[0] == xb.shape[0], (
-                    "grad_sample batch dimension mismatch"
-                )
-        break
+        # Run one batch forward + backward
+        criterion = torch.nn.BCELoss()
+        for xb, yb in loader_p:
+            opt_p.zero_grad()
+            out = model_p(xb)
+            loss = criterion(out, yb)
+            loss.backward()
+            # Ensure per-sample gradient samples exist on linear layers
+            for param in model_p.parameters():
+                if param.requires_grad:
+                    assert hasattr(param, "grad_sample"), "Missing per-sample grad_sample attribute"
+                    assert param.grad_sample.shape[0] == xb.shape[0], (
+                        "grad_sample batch dimension mismatch"
+                    )
+            break
+    finally:
+        if hasattr(model_p, "remove_hooks"):
+            with contextlib.suppress(Exception):
+                model_p.remove_hooks()
 
 
 def test_accountant_correspondence() -> None:

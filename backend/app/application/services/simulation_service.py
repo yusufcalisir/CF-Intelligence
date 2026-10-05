@@ -226,19 +226,26 @@ class SimulationService:
             feature_names: list[str] | None = None
             bank_data: dict[str, dict[str, np.ndarray]] = {}
 
-            if dataset_choice in ("paysim", "ieee_cis", "elliptic", "creditcard"):
+            from app.application.services.dataloader import DATASET_REGISTRY
+
+            if dataset_choice in DATASET_REGISTRY:
                 from app.application.services.dataloader import (
                     load_dataset,
                     partition_dataset_non_iid,
                 )
 
+                dataset_mode_req = getattr(config, "dataset_mode", None)
+                if dataset_mode_req is None:
+                    dataset_mode_req = "real"
+
+                is_strict_real = (dataset_mode_req == "real")
                 self._notify(
                     progress_callback,
                     simulation.id,
                     "status",
                     {
                         "status": simulation.status,
-                        "message": f"Loading real benchmark dataset: {dataset_choice.upper()}",
+                        "message": f"Loading benchmark dataset: {dataset_choice.upper()} (mode: {dataset_mode_req})",
                     },
                 )
                 n_samples_req = max(
@@ -247,12 +254,25 @@ class SimulationService:
                     + config.bank_b_transactions
                     + config.bank_c_transactions,
                 )
-                real_data = load_dataset(dataset_choice, nrows=n_samples_req)
+                real_data = load_dataset(
+                    dataset_choice,
+                    nrows=n_samples_req,
+                    require_real=is_strict_real,
+                    dataset_mode=dataset_mode_req,
+                )
                 X_full = np.nan_to_num(real_data["X"], nan=0.0, posinf=0.0, neginf=0.0).astype(
                     np.float32
                 )
                 y_full = np.asarray(real_data["y"], dtype=int)
                 feature_names = real_data.get("feature_names")
+                dataset_is_synth = bool(real_data.get("is_synthetic", False))
+                dataset_prov = (
+                    "SYNTHETIC_EVIDENCE"
+                    if dataset_is_synth or dataset_mode_req == "synthetic"
+                    else real_data.get("provenance", "REAL_DATA_EVIDENCE")
+                )
+                simulation.dataset_mode = "synthetic" if dataset_is_synth else "real"
+                simulation.dataset_provenance = dataset_prov
 
                 # Non-IID Dirichlet partition across 3 banks
                 partitions = partition_dataset_non_iid(
@@ -262,6 +282,9 @@ class SimulationService:
                 bank_names = ["Bank A (Alpha)", "Bank B (Beta)", "Bank C (Gamma)"]
                 bank_tiers = [BankTier.LARGE, BankTier.MEDIUM, BankTier.SMALL]
                 banks = []
+
+                # Canonical 3-way partition: 70% Train, 15% Validation, 15% Test
+                test_rem_ratio = 0.30
 
                 for idx, bank_id in enumerate(bank_keys):
                     p_info = partitions[idx]
@@ -281,49 +304,80 @@ class SimulationService:
                     banks.append(bank_obj)
 
                     sensitive_array = np.zeros(n_tx, dtype=int)
-                    if n_tx >= 5:
+                    if n_tx >= 10:
                         try:
                             unique_cls, counts = np.unique(y_bank, return_counts=True)
-                            can_stratify = len(unique_cls) > 1 and int(np.min(counts)) >= 2
-                            X_train, X_test, y_train, y_test, sens_train, sens_test = (
+                            can_stratify = len(unique_cls) > 1 and int(np.min(counts)) >= 4
+                            X_train, X_rem, y_train, y_rem, sens_train, sens_rem = (
                                 train_test_split(
                                     X_bank,
                                     y_bank,
                                     sensitive_array,
-                                    test_size=0.2,
+                                    test_size=test_rem_ratio,
                                     random_state=42,
                                     stratify=cast("Any", y_bank) if can_stratify else None,
                                 )
                             )
+                            unique_rem, counts_rem = np.unique(y_rem, return_counts=True)
+                            can_stratify_rem = len(unique_rem) > 1 and int(np.min(counts_rem)) >= 2
+                            X_val, X_test, y_val, y_test, sens_val, sens_test = (
+                                train_test_split(
+                                    X_rem,
+                                    y_rem,
+                                    sens_rem,
+                                    test_size=0.50,
+                                    random_state=42,
+                                    stratify=cast("Any", y_rem) if can_stratify_rem else None,
+                                )
+                            )
                         except Exception:
-                            X_train, X_test, y_train, y_test, sens_train, sens_test = (
+                            X_train, X_rem, y_train, y_rem, sens_train, sens_rem = (
                                 train_test_split(
                                     X_bank,
                                     y_bank,
                                     sensitive_array,
-                                    test_size=0.2,
+                                    test_size=test_rem_ratio,
                                     random_state=42,
                                 )
                             )
+                            X_val, X_test, y_val, y_test, sens_val, sens_test = (
+                                train_test_split(
+                                    X_rem,
+                                    y_rem,
+                                    sens_rem,
+                                    test_size=0.50,
+                                    random_state=42,
+                                )
+                            )
+                    elif n_tx >= 3:
+                        n_te = max(1, n_tx // 3)
+                        n_va = max(1, n_tx // 3)
+                        n_tr = max(1, n_tx - n_te - n_va)
+                        X_train, y_train, sens_train = X_bank[:n_tr], y_bank[:n_tr], sensitive_array[:n_tr]
+                        X_val, y_val, sens_val = X_bank[n_tr:n_tr+n_va], y_bank[n_tr:n_tr+n_va], sensitive_array[n_tr:n_tr+n_va]
+                        X_test, y_test, sens_test = X_bank[n_tr+n_va:], y_bank[n_tr+n_va:], sensitive_array[n_tr+n_va:]
                     else:
-                        X_train = X_bank
-                        X_test = X_bank
-                        y_train = y_bank
-                        y_test = y_bank
-                        sens_train = sensitive_array
-                        sens_test = sensitive_array
+                        raise ValueError(
+                            f"Simulation dataset contract violation for bank '{bank_id}': "
+                            f"insufficient samples ({n_tx}) to form disjoint train, validation, and test partitions."
+                        )
 
                     bank_data[bank_id] = {
                         "X_train": X_train,
+                        "X_val": X_val,
                         "X_test": X_test,
                         "y_train": y_train,
+                        "y_val": y_val,
                         "y_test": y_test,
                         "sens_train": sens_train,
+                        "sens_val": sens_val,
                         "sens_test": sens_test,
                     }
                 simulation.banks = banks
                 datasets = {}
             else:
+                simulation.dataset_mode = "synthetic"
+                simulation.dataset_provenance = "SYNTHETIC_EVIDENCE"
                 self._notify(
                     progress_callback,
                     simulation.id,
@@ -449,7 +503,22 @@ class SimulationService:
                 },
             )
 
-            # Create a global validation partition (strictly leak-free calibration & intermediate check)
+            # Enforce canonical dataset contract across all banks
+            canonical_keys = {"X_train", "X_val", "X_test", "y_train", "y_val", "y_test"}
+            for b_id, d in bank_data.items():
+                missing_keys = canonical_keys - set(d.keys())
+                if missing_keys:
+                    raise ValueError(
+                        f"Bank {b_id} data partition violates canonical dataset contract. Missing keys: {missing_keys}"
+                    )
+
+            # ARCHITECTURAL PRIVACY BOUNDARY NOTE:
+            # Concatenating X_val and X_test across banks into X_val_global / X_test_global is an
+            # in-memory research simulation harness evaluation convenience used solely for global calibration
+            # and intermediate evaluation within local single-process benchmarks.
+            # In production distributed federation (e.g. BankConnector / gRPC), banks evaluate locally
+            # on their private validation partitions and only exchange encrypted/differentially private
+            # model weights or aggregate metrics without pooling raw transaction records.
             X_val_global = np.concatenate([data["X_val"] for data in bank_data.values()], axis=0)
             y_val_global = np.concatenate([data["y_val"] for data in bank_data.values()], axis=0)
 

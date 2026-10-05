@@ -23,6 +23,7 @@ Outputs
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import logging
 import sys
@@ -194,28 +195,44 @@ def train_and_evaluate_single_run(
     eval_model: Any
     if sigma > 0.0:
         privacy_engine = PrivacyEngine(accountant="prv")
-        priv_res: Any = privacy_engine.make_private(
-            module=cast("Any", model),
-            optimizer=optimizer,
-            data_loader=loader,
-            noise_multiplier=sigma,
-            max_grad_norm=max_grad_norm,
-        )
+        try:
+            priv_res: Any = privacy_engine.make_private(
+                module=cast("Any", model),
+                optimizer=optimizer,
+                data_loader=loader,
+                noise_multiplier=sigma,
+                max_grad_norm=max_grad_norm,
+                grad_sample_mode="ew",
+            )
+        except Exception:
+            priv_res = privacy_engine.make_private(
+                module=cast("Any", model),
+                optimizer=optimizer,
+                data_loader=loader,
+                noise_multiplier=sigma,
+                max_grad_norm=max_grad_norm,
+                grad_sample_mode="hooks",
+            )
         model_p: Any = priv_res[0]
         opt_p: Any = priv_res[1]
         loader_p: Any = priv_res[2]
-        model_p.train()
-        for _ep in range(epochs):
-            for xb, yb in loader_p:
-                opt_p.zero_grad()
-                pred = model_p(xb)
-                loss = criterion(pred, yb)
-                loss.backward()
-                opt_p.step()
+        try:
+            model_p.train()
+            for _ep in range(epochs):
+                for xb, yb in loader_p:
+                    opt_p.zero_grad()
+                    pred = model_p(xb)
+                    loss = criterion(pred, yb)
+                    loss.backward()
+                    opt_p.step()
 
-        accounted_eps = float(privacy_engine.get_epsilon(delta=delta))
-        eval_model = model_p
-        steps = len(loader_p) * epochs
+            accounted_eps = float(privacy_engine.get_epsilon(delta=delta))
+            eval_model = getattr(model_p, "_module", model_p)
+            steps = len(loader_p) * epochs
+        finally:
+            if hasattr(model_p, "remove_hooks"):
+                with contextlib.suppress(Exception):
+                    model_p.remove_hooks()
     else:
         model.train()
         for _ep in range(epochs):

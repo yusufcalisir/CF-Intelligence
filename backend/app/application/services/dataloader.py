@@ -403,19 +403,16 @@ def load_elliptic(
     has_real_files = parquet_cache.exists() or (features_csv.exists() and classes_csv.exists())
 
     # Decide real vs mock
-    should_load_real = (
-        not force_mock
-        and (
-            require_real
-            or all_rows
-            or temporal_split
-            or path is not None
-            or ("nrows" in kwargs and kwargs["nrows"] is not None)
-            or (nrows is not None and not kwargs.get("n_mock_nodes"))
-            or kwargs.get("use_real", False)
-        )
-        and has_real_files
+    dataset_mode = kwargs.get("dataset_mode")
+    force_synthetic = bool(
+        kwargs.get("force_synthetic", False)
+        or force_mock
+        or (dataset_mode == "synthetic")
     )
+    if force_synthetic and require_real:
+        raise ValueError("force_synthetic/force_mock and require_real are mutually exclusive.")
+
+    should_load_real = not force_synthetic and has_real_files
 
     if should_load_real:
         logger.info("[Elliptic] Loading real dataset from %s (use_cache=%s)", root, use_cache)
@@ -577,12 +574,12 @@ def load_elliptic(
         )
         return result
 
-    allow_synth = allow_synthetic if allow_synthetic is not None else (force_mock or not require_real)
-    if require_real or not allow_synth:
+    allow_synth = allow_synthetic if allow_synthetic is not None else force_synthetic
+    if require_real or dataset_mode == "real" or not allow_synth:
         raise FileNotFoundError(
             f"Real Elliptic Bitcoin dataset files not found in '{root}'. "
             f"Expected 'elliptic_cache.parquet' or ('elliptic_txs_features.csv' and 'elliptic_txs_classes.csv'). "
-            f"Synthetic fallback is disabled under strict real-data mode. Set allow_synthetic=True or force_mock=True for synthetic demo."
+            f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_mock=True for synthetic demo."
         )
 
     return _generate_mock_elliptic(
@@ -800,13 +797,15 @@ def _process_amlsim_dataframe(
         "alerts": alerts_df,
         "accounts": accounts_df,
         "source": source,
+        "provenance": "REAL_OFFICIAL_DATASET",
+        "is_synthetic": False,
         "fraud_ratio": fraud_ratio,
         "to_pyg_data": to_pyg_data,
         "to_networkx": to_networkx,
     }
 
     if temporal_split:
-        clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split")}
+        clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "dataset_mode", "force_synthetic")}
         return temporal_split_dataset(res, time_col="step", **clean_kwargs)
 
     return res
@@ -850,34 +849,40 @@ def load_amlsim(
     n_mock_txns = target_nrows or n_mock_txns
     root = resolve_dataset_dir("amlsim", path)
 
-    # 1. Parquet cache check
-    parquet_cache = root / "transactions.parquet"
-    if parquet_cache.exists():
-        logger.info("[AMLSim] Loading from Parquet cache %s (nrows=%s)", parquet_cache, target_nrows)
-        df = pd.read_parquet(parquet_cache)
-        if target_nrows is not None and len(df) > target_nrows:
-            df = df.iloc[:target_nrows]
-        return _process_amlsim_dataframe(df, root=root, source="real_parquet", temporal_split=temporal_split, **kwargs)
+    dataset_mode = kwargs.get("dataset_mode")
+    force_synthetic = bool(kwargs.get("force_synthetic", False) or dataset_mode == "synthetic")
+    if force_synthetic and require_real:
+        raise ValueError("force_synthetic and require_real are mutually exclusive.")
 
-    # 2. CSV candidates
-    csv_candidates = [root / "transactions.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
-    for csv_path in csv_candidates:
-        if csv_path.exists() and not csv_path.name.endswith(".parquet"):
-            logger.info("[AMLSim] Loading real dataset from %s (nrows=%s)", csv_path, target_nrows)
-            df = pd.read_csv(csv_path, nrows=target_nrows)
-            if target_nrows is None and not parquet_cache.exists():
-                try:
-                    df.to_parquet(parquet_cache, index=False)
-                    logger.info("[AMLSim] Cached %d transactions to %s", len(df), parquet_cache)
-                except Exception as exc:
-                    logger.debug("[AMLSim] Skipping parquet caching: %s", exc)
-            return _process_amlsim_dataframe(df, root=root, source="real_csv", temporal_split=temporal_split, **kwargs)
+    if not force_synthetic:
+        # 1. Parquet cache check
+        parquet_cache = root / "transactions.parquet"
+        if parquet_cache.exists():
+            logger.info("[AMLSim] Loading from Parquet cache %s (nrows=%s)", parquet_cache, target_nrows)
+            df = pd.read_parquet(parquet_cache)
+            if target_nrows is not None and len(df) > target_nrows:
+                df = df.iloc[:target_nrows]
+            return _process_amlsim_dataframe(df, root=root, source="real_parquet", temporal_split=temporal_split, **kwargs)
 
-    if require_real:
+        # 2. CSV candidates
+        csv_candidates = [root / "transactions.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
+        for csv_path in csv_candidates:
+            if csv_path.exists() and not csv_path.name.endswith(".parquet"):
+                logger.info("[AMLSim] Loading real dataset from %s (nrows=%s)", csv_path, target_nrows)
+                df = pd.read_csv(csv_path, nrows=target_nrows)
+                if target_nrows is None and not parquet_cache.exists():
+                    try:
+                        df.to_parquet(parquet_cache, index=False)
+                        logger.info("[AMLSim] Cached %d transactions to %s", len(df), parquet_cache)
+                    except Exception as exc:
+                        logger.debug("[AMLSim] Skipping parquet caching: %s", exc)
+                return _process_amlsim_dataframe(df, root=root, source="real_csv", temporal_split=temporal_split, **kwargs)
+
+    if require_real or dataset_mode == "real":
         raise FileNotFoundError(
             f"Real AMLSim dataset export not found in '{root}'. "
             f"AMLSim is an IBM synthetic transaction generator; provide transactions.csv or generate records. "
-            f"Synthetic fallback is disabled under strict real-data mode."
+            f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_synthetic=True for synthetic demo."
         )
 
     # ---- Mock generation ----
@@ -919,6 +924,8 @@ def load_amlsim(
         "alerts": None,
         "accounts": None,
         "source": "mock",
+        "provenance": "EXPLICIT_SYNTHETIC_DEMO",
+        "is_synthetic": True,
         "fraud_ratio": AMLSIM_FRAUD_RATIO,
         "to_pyg_data": to_pyg_data,
         "to_networkx": to_networkx,
@@ -977,52 +984,58 @@ def load_paysim(
     n_mock_txns = target_nrows or n_mock_txns
     root = resolve_dataset_dir("paysim", path)
 
-    # Check possible filenames for PaySim
-    possible_csvs = [
-        root / "paysim.csv",
-        root / "PS_20174392719_1491204439457_log.csv",
-        root / "paysim1.csv",
-    ]
-    parquet_files = sorted(list(root.glob("*.parquet")))
+    dataset_mode = kwargs.get("dataset_mode")
+    force_synthetic = bool(kwargs.get("force_synthetic", False) or dataset_mode == "synthetic")
+    if force_synthetic and require_real:
+        raise ValueError("force_synthetic and require_real are mutually exclusive.")
 
-    if parquet_files:
-        logger.info("[PaySim] Loading %d Parquet partition files from %s", len(parquet_files), root)
-        dfs = [pd.read_parquet(f) for f in parquet_files]
-        full_df = pd.concat(dfs, ignore_index=True)
-        if target_nrows:
-            full_df = full_df.iloc[:target_nrows]
-        res = _process_paysim_dataframe(full_df, source="real_parquet")
-        if temporal_split or kwargs.get("temporal_split"):
-            clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split")}
-            return temporal_split_dataset(res, **clean_kwargs)
-        return res
+    if not force_synthetic:
+        # Check possible filenames for PaySim
+        possible_csvs = [
+            root / "paysim.csv",
+            root / "PS_20174392719_1491204439457_log.csv",
+            root / "paysim1.csv",
+        ]
+        parquet_files = sorted(list(root.glob("*.parquet")))
 
-    for csv_file in possible_csvs:
-        if csv_file.exists():
-            logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
-            df = pd.read_csv(csv_file, nrows=target_nrows)
-            res = _process_paysim_dataframe(df, source="real_csv")
+        if parquet_files:
+            logger.info("[PaySim] Loading %d Parquet partition files from %s", len(parquet_files), root)
+            dfs = [pd.read_parquet(f) for f in parquet_files]
+            full_df = pd.concat(dfs, ignore_index=True)
+            if target_nrows:
+                full_df = full_df.iloc[:target_nrows]
+            res = _process_paysim_dataframe(full_df, source="real_parquet")
             if temporal_split or kwargs.get("temporal_split"):
-                clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split")}
+                clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "dataset_mode", "force_synthetic")}
                 return temporal_split_dataset(res, **clean_kwargs)
             return res
 
-    all_csvs = list(root.glob("*paysim*.csv")) + list(root.glob("*PS*.csv")) + list(root.glob("*.csv"))
-    for csv_file in all_csvs:
-        if csv_file.exists():
-            logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
-            df = pd.read_csv(csv_file, nrows=target_nrows)
-            res = _process_paysim_dataframe(df, source="real_csv")
-            if temporal_split or kwargs.get("temporal_split"):
-                clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split")}
-                return temporal_split_dataset(res, **clean_kwargs)
-            return res
+        for csv_file in possible_csvs:
+            if csv_file.exists():
+                logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
+                df = pd.read_csv(csv_file, nrows=target_nrows)
+                res = _process_paysim_dataframe(df, source="real_csv")
+                if temporal_split or kwargs.get("temporal_split"):
+                    clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "dataset_mode", "force_synthetic")}
+                    return temporal_split_dataset(res, **clean_kwargs)
+                return res
 
-    if require_real:
+        all_csvs = list(root.glob("*paysim*.csv")) + list(root.glob("*PS*.csv")) + list(root.glob("*.csv"))
+        for csv_file in all_csvs:
+            if csv_file.exists():
+                logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
+                df = pd.read_csv(csv_file, nrows=target_nrows)
+                res = _process_paysim_dataframe(df, source="real_csv")
+                if temporal_split or kwargs.get("temporal_split"):
+                    clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "dataset_mode", "force_synthetic")}
+                    return temporal_split_dataset(res, **clean_kwargs)
+                return res
+
+    if require_real or dataset_mode == "real" or not force_synthetic:
         raise FileNotFoundError(
             f"Real PaySim dataset files not found in '{root}'. "
             f"Expected 'PS_20174392719_1491204439457_log.csv' or partitioned Parquet files. "
-            f"Synthetic fallback is disabled under strict real-data mode."
+            f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_synthetic=True for synthetic demo."
         )
 
     # ---- High-Fidelity Synthetic Mock of M-Pesa PaySim ----
@@ -1093,11 +1106,13 @@ def load_paysim(
         "y": y[idx],
         "feature_names": PAYSIM_FEATURE_COLS,
         "source": "mock_mpesa",
+        "provenance": "EXPLICIT_SYNTHETIC_DEMO",
+        "is_synthetic": True,
         "fraud_ratio": float(np.mean(y)),
         "steps": X[idx, 0],
     }
     if temporal_split or kwargs.get("temporal_split"):
-        clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split")}
+        clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "dataset_mode", "force_synthetic")}
         return temporal_split_dataset(res, **clean_kwargs)
     return res
 
@@ -1123,6 +1138,8 @@ def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
             "y": y,
             "feature_names": available_cols,
             "source": source,
+            "provenance": "REAL_OFFICIAL_DATASET",
+            "is_synthetic": False,
             "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))) if len(y) > 0 else 0.0,
         }
 
@@ -1162,6 +1179,8 @@ def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
         "y": y,
         "feature_names": available_cols,
         "source": source,
+        "provenance": "REAL_OFFICIAL_DATASET",
+        "is_synthetic": False,
         "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))) if len(y) > 0 else 0.0,
         "steps": X[:, 0] if (len(available_cols) > 0 and available_cols[0] == "step") else None,
     }
@@ -1212,60 +1231,66 @@ def load_ieee_cis(
     n_mock_txns = target_nrows or n_mock_txns
     root = resolve_dataset_dir("ieee_cis", path)
 
-    parquet_files = sorted(list(root.glob("*.parquet")))
-    if parquet_files:
-        chosen_parquet = parquet_files[0]
-        logger.info("[IEEE-CIS] Loading preprocessed Parquet from %s", chosen_parquet)
-        df = pd.read_parquet(chosen_parquet)
-        if target_nrows:
-            df = df.iloc[:target_nrows]
-        res = _process_ieee_cis_dataframe(df, source="real_parquet")
-        if temporal_split or kwargs.get("temporal_split"):
-            clean_kwargs = {
-                k: v
-                for k, v in kwargs.items()
-                if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "join_identity")
-            }
-            return temporal_split_dataset(res, time_col="TransactionDT", **clean_kwargs)
-        return res
+    dataset_mode = kwargs.get("dataset_mode")
+    force_synthetic = bool(kwargs.get("force_synthetic", False) or dataset_mode == "synthetic")
+    if force_synthetic and require_real:
+        raise ValueError("force_synthetic and require_real are mutually exclusive.")
 
-    txn_csv_candidates = [root / "train_transaction.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
-    # Exclude identity csv from transaction candidates
-    txn_csv_candidates = [c for c in txn_csv_candidates if "identity" not in c.name.lower()]
-
-    for txn_csv in txn_csv_candidates:
-        if txn_csv.exists():
-            logger.info("[IEEE-CIS] Loading real transaction CSV from %s (nrows=%s)", txn_csv, target_nrows)
-            txn_df = pd.read_csv(txn_csv, nrows=target_nrows)
-
-            # Check if identity join is requested and available
-            id_csv_candidates = [root / "train_identity.csv"] + list(root.glob("*identity*.csv"))
-            id_csv = next((c for c in id_csv_candidates if c.exists()), None)
-
-            if join_identity and id_csv is not None and "TransactionID" in txn_df.columns:
-                logger.info("[IEEE-CIS] Joining identity data from %s", id_csv)
-                id_df = pd.read_csv(id_csv)
-                target_ids = set(txn_df["TransactionID"].unique())
-                id_df_sub = id_df[id_df["TransactionID"].isin(target_ids)]
-                merged_df = pd.merge(txn_df, id_df_sub, on="TransactionID", how="left")
-            else:
-                merged_df = txn_df
-
-            res = _process_ieee_cis_dataframe(merged_df, source="real_csv")
+    if not force_synthetic:
+        parquet_files = sorted(list(root.glob("*.parquet")))
+        if parquet_files:
+            chosen_parquet = parquet_files[0]
+            logger.info("[IEEE-CIS] Loading preprocessed Parquet from %s", chosen_parquet)
+            df = pd.read_parquet(chosen_parquet)
+            if target_nrows:
+                df = df.iloc[:target_nrows]
+            res = _process_ieee_cis_dataframe(df, source="real_parquet")
             if temporal_split or kwargs.get("temporal_split"):
                 clean_kwargs = {
                     k: v
                     for k, v in kwargs.items()
-                    if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "join_identity")
+                    if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "join_identity", "dataset_mode", "force_synthetic")
                 }
                 return temporal_split_dataset(res, time_col="TransactionDT", **clean_kwargs)
             return res
 
-    if require_real:
+        txn_csv_candidates = [root / "train_transaction.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
+        # Exclude identity csv from transaction candidates
+        txn_csv_candidates = [c for c in txn_csv_candidates if "identity" not in c.name.lower()]
+
+        for txn_csv in txn_csv_candidates:
+            if txn_csv.exists():
+                logger.info("[IEEE-CIS] Loading real transaction CSV from %s (nrows=%s)", txn_csv, target_nrows)
+                txn_df = pd.read_csv(txn_csv, nrows=target_nrows)
+
+                # Check if identity join is requested and available
+                id_csv_candidates = [root / "train_identity.csv"] + list(root.glob("*identity*.csv"))
+                id_csv = next((c for c in id_csv_candidates if c.exists()), None)
+
+                if join_identity and id_csv is not None and "TransactionID" in txn_df.columns:
+                    logger.info("[IEEE-CIS] Joining identity data from %s", id_csv)
+                    id_df = pd.read_csv(id_csv)
+                    target_ids = set(txn_df["TransactionID"].unique())
+                    id_df_sub = id_df[id_df["TransactionID"].isin(target_ids)]
+                    merged_df = pd.merge(txn_df, id_df_sub, on="TransactionID", how="left")
+                else:
+                    merged_df = txn_df
+
+                res = _process_ieee_cis_dataframe(merged_df, source="real_csv")
+                if temporal_split or kwargs.get("temporal_split"):
+                    clean_kwargs = {
+                        k: v
+                        for k, v in kwargs.items()
+                        if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "join_identity", "dataset_mode", "force_synthetic")
+                    }
+                    return temporal_split_dataset(res, time_col="TransactionDT", **clean_kwargs)
+                return res
+
+    if require_real or dataset_mode == "real" or not force_synthetic:
         raise FileNotFoundError(
             f"Real IEEE-CIS Fraud Detection dataset files not found in '{root}'. "
             f"Expected 'train_transaction.csv'. "
-            f"Synthetic fallback is disabled under strict real-data mode."
+            f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_synthetic=True for synthetic demo."
         )
 
     # ---- High-Fidelity Synthetic Mock of IEEE-CIS / Vesta ----
@@ -1328,6 +1353,8 @@ def load_ieee_cis(
         "y": y,
         "feature_names": feature_names,
         "source": "mock_ieee_cis",
+        "provenance": "EXPLICIT_SYNTHETIC_DEMO",
+        "is_synthetic": True,
         "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
         "transaction_dt": mock_dt,
     }
@@ -1335,7 +1362,7 @@ def load_ieee_cis(
         clean_kwargs = {
             k: v
             for k, v in kwargs.items()
-            if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "join_identity")
+            if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "join_identity", "dataset_mode", "force_synthetic")
         }
         return temporal_split_dataset(res, time_col="TransactionDT", **clean_kwargs)
     return res
@@ -1426,6 +1453,8 @@ def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]
         "y": y,
         "feature_names": num_cols,
         "source": source,
+        "provenance": "REAL_OFFICIAL_DATASET",
+        "is_synthetic": False,
         "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))) if len(y) > 0 else 0.0,
         "transaction_dt": transaction_dt,
     }
@@ -1463,7 +1492,13 @@ def load_creditcard_fraud(
     - Explicit synthetic evaluation mode via ``force_synthetic=True`` (never touches physical files;
       mutually exclusive with ``require_real``)
     """
-    force_synthetic = bool(kwargs.get("force_synthetic", False))
+    dataset_mode = kwargs.get("dataset_mode")
+    if dataset_mode == "real":
+        require_real = True
+    elif dataset_mode == "synthetic":
+        kwargs["force_synthetic"] = True
+
+    force_synthetic = bool(kwargs.get("force_synthetic", False) or dataset_mode == "synthetic")
     if force_synthetic and require_real:
         raise ValueError("force_synthetic and require_real are mutually exclusive.")
     rng = rng or np.random.default_rng(seed)
@@ -1516,11 +1551,11 @@ def load_creditcard_fraud(
         raw_y = df["Class"].values if "Class" in df.columns else df["is_fraud"].values
         y = np.asarray(raw_y, dtype=int)
     else:
-        if require_real:
+        if require_real or dataset_mode == "real" or not force_synthetic:
             raise FileNotFoundError(
                 f"Real Credit Card Fraud dataset files not found in '{root}'. "
                 f"Expected 'creditcard.csv'. "
-                f"Synthetic fallback is disabled under strict real-data mode."
+                f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_synthetic=True for synthetic demo."
             )
         logger.warning("[CreditCard] Generating PCA mock dataset (%d txns)", n_mock_txns)
         # Ensure at least 6 frauds in small mock datasets so train, val, and test splits
@@ -1633,6 +1668,9 @@ def load_creditcard_fraud(
                     X_test[:, c_idx] = (X_test[:, c_idx] - c_center) / c_scale
                     X[:, c_idx] = (X[:, c_idx] - c_center) / c_scale
 
+        is_synthetic = (chosen_source == "mock_pca")
+        provenance = "EXPLICIT_SYNTHETIC_DEMO" if is_synthetic else "REAL_OFFICIAL_DATASET"
+
         return {
             "X": X,
             "y": y,
@@ -1641,6 +1679,8 @@ def load_creditcard_fraud(
             "test": {"X": X_test, "y": y_test, "indices": test_idx},
             "feature_names": feature_cols,
             "source": chosen_source,
+            "provenance": provenance,
+            "is_synthetic": is_synthetic,
             "file_path": str(chosen_file_path) if chosen_file_path else None,
             "sha256_hash": dataset_sha256,
             "fraud_ratio": float(np.mean(y)),
@@ -1670,11 +1710,16 @@ def load_creditcard_fraud(
                 c_scale = scaling_params_unsplit[col]["scale"]
                 X[:, c_idx] = (X[:, c_idx] - c_center) / c_scale
 
+    is_synthetic = (chosen_source == "mock_pca")
+    provenance = "EXPLICIT_SYNTHETIC_DEMO" if is_synthetic else "REAL_OFFICIAL_DATASET"
+
     return {
         "X": X,
         "y": y,
         "feature_names": feature_cols,
         "source": chosen_source,
+        "provenance": provenance,
+        "is_synthetic": is_synthetic,
         "file_path": str(chosen_file_path) if chosen_file_path else None,
         "sha256_hash": dataset_sha256,
         "fraud_ratio": float(np.mean(y)),
@@ -1947,6 +1992,7 @@ def load_synthaml(
     nrows: int | None = None,
     n_mock_alerts: int = 500,
     seed: int = 42,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Load the SynthAML Spar Nord Bank synthetic AML alert and transaction dataset.
 
@@ -2034,21 +2080,27 @@ def load_synthaml(
             "timestamps": alerts_df["TIMESTAMP"].values if "TIMESTAMP" in alerts_df.columns else np.zeros(len(y), dtype=int),
             "dates": alerts_df["DATE"].values if "DATE" in alerts_df.columns else np.array([""] * len(y)),
             "source": "real_csv",
+            "provenance": "REAL_OFFICIAL_DATASET",
+            "is_synthetic": False,
             "fraud_ratio": float(np.mean(y == 1)),
             "n_alerts": len(y),
             "n_transactions": len(tx_df),
         }
 
     # 3. Missing file handling
-    if require_real:
+    dataset_mode = kwargs.get("dataset_mode")
+    if require_real or dataset_mode == "real":
         raise FileNotFoundError(
             f"Real SynthAML dataset files not found in '{root}'. "
             f"Expected 'synthetic_alerts.csv' and 'synthetic_transactions.csv' (or 'alerts.parquet'/'transactions.parquet'). "
-            f"Synthetic fallback is disabled under strict real-data mode."
+            f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_synthetic=True for synthetic demo."
         )
 
     rng = np.random.default_rng(seed)
-    return _generate_mock_synthaml(n_mock_alerts=nrows or n_mock_alerts, rng=rng)
+    mock_res = _generate_mock_synthaml(n_mock_alerts=nrows or n_mock_alerts, rng=rng)
+    mock_res["provenance"] = "EXPLICIT_SYNTHETIC_DEMO"
+    mock_res["is_synthetic"] = True
+    return mock_res
 
 
 # ===========================================================================
@@ -2162,6 +2214,9 @@ def _process_amlnet_dataframe(
     step_default = pd.Series(range(len(df)))
     steps = np.asarray(pd.to_numeric(df.get("step", step_default), errors="coerce").fillna(0).values, dtype=np.float64)
 
+    is_synthetic = (source == "synthetic_fallback")
+    provenance = "EXPLICIT_SYNTHETIC_DEMO" if is_synthetic else "REAL_OFFICIAL_DATASET"
+
     return {
         "X": X,
         "y": y,
@@ -2170,6 +2225,8 @@ def _process_amlnet_dataframe(
         "typologies": typologies,
         "steps": steps,
         "source": source,
+        "provenance": provenance,
+        "is_synthetic": is_synthetic,
         "fraud_ratio": float(np.mean(y == 1)) if len(y) > 0 else 0.0,
         "n_samples": len(y),
     }
@@ -2258,11 +2315,12 @@ def load_amlnet(
             return _process_amlnet_dataframe(df, source="real_csv")
 
     # 3. Missing file handling
-    if require_real:
+    dataset_mode = kwargs.get("dataset_mode")
+    if require_real or dataset_mode == "real":
         raise FileNotFoundError(
             f"Real AMLNet dataset files not found in '{root}'. "
             f"Expected 'transactions.csv' or 'transactions.parquet'. "
-            f"Synthetic fallback is disabled under strict real-data mode."
+            f"Synthetic fallback is disabled under strict real-data mode. Set dataset_mode='synthetic' or force_synthetic=True for synthetic demo."
         )
 
     rng = np.random.default_rng(seed)
@@ -2418,16 +2476,39 @@ def load_dataset(
     require_real: bool = False,
     temporal_split: bool = False,
     preprocess: bool = False,
+    dataset_mode: str | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Load a benchmark dataset by registry name, optionally applying temporal split and preprocessing."""
     clean_name = name.lower().replace("-", "_").strip()
     if clean_name not in DATASET_REGISTRY:
         raise ValueError(f"Unknown dataset '{name}'. Available: {list(DATASET_REGISTRY)}")
-    data = DATASET_REGISTRY[clean_name](require_real=require_real, **kwargs)
+
+    if dataset_mode == "real":
+        require_real = True
+    elif dataset_mode == "synthetic":
+        kwargs["force_synthetic"] = True
+
+    data = DATASET_REGISTRY[clean_name](
+        require_real=require_real,
+        dataset_mode=dataset_mode,
+        **kwargs,
+    )
 
     if temporal_split:
-        clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split")}
+        clean_kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k not in (
+                "nrows",
+                "n_mock_txns",
+                "all_rows",
+                "require_real",
+                "temporal_split",
+                "dataset_mode",
+                "force_synthetic",
+            )
+        }
         return temporal_split_dataset(data, preprocess=preprocess, **clean_kwargs)
 
     return data

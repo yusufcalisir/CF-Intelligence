@@ -143,6 +143,7 @@ class SimulationConfig:
 
     # Data
     dataset: str = "synthetic"  # "synthetic", "paysim", "ieee_cis", "elliptic", "creditcard"
+    dataset_mode: str | None = None  # "real", "synthetic", or None (auto: 'real' for registered benchmark, 'synthetic' for generator)
     bank_a_transactions: int = 50000
     bank_b_transactions: int = 30000
     bank_c_transactions: int = 20000
