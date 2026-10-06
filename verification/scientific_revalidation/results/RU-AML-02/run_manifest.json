@@ -1,0 +1,38 @@
+{
+  "run_id": "RUN-RU-AML-02-1791309263",
+  "unit_id": "RU-AML-02",
+  "protocol_version": "1.0",
+  "git_commit": "6eeb3f39e0dd1d94c89f777a16b3879ab0039984",
+  "start_time_utc": "2026-10-06T17:54:23.423039+00:00",
+  "end_time_utc": "2026-10-06T17:54:45.250714+00:00",
+  "duration_seconds": 21.7681,
+  "status": "PASS_VALID_REVALIDATION",
+  "exit_code": 0,
+  "output_artifacts": [
+    "audit_dossier.md",
+    "comparative_baselines.json",
+    "metrics.json",
+    "model_checkpoint.pt",
+    "predictions.parquet",
+    "results.json",
+    "plots/benchmark_amlsim_comparison.png",
+    "plots/hop_ablation.png",
+    "plots/pr_curves.png",
+    "plots/roc_curves.png",
+    "plots/typology_detection.png",
+    "artifact_hashes.json"
+  ],
+  "artifact_hashes": {
+    "audit_dossier.md": "d343f52dd32be0eec274c03f3d513da7c69667b47f23b36051c3862bf218c906",
+    "comparative_baselines.json": "04c9fceba75de961c3364eb9cd927ab6d101978f82ed1d5d525186223454eeff",
+    "metrics.json": "b0e1aa4367e07fc7b006bd241426a7225b8297b803a90c77f95a32d2814ce719",
+    "model_checkpoint.pt": "a2a589581e19f2110c505dce0157f2f2fbdf6abed16d48b88c916ccc2fb29f81",
+    "predictions.parquet": "df83dabafc4ae230b76cf61d651ae7d737d60841df31cdb144d654f9f17425ba",
+    "results.json": "63a9057d2d3f7a05d4f77d4c2657b5a324f6eaaf6d51982688c74ba3eef4be16",
+    "plots/benchmark_amlsim_comparison.png": "b8cebd38c18d45a35201785aa156bdb77ab90ce0674a64e569fc3189cb2b7d33",
+    "plots/hop_ablation.png": "7d12f5f3499a06db7a984823b86f2b5b9c62b3d1a026803b1540a389872b0d4e",
+    "plots/pr_curves.png": "98f6c6663b33c2d4f29a1e4aa55c37a7fb7d46e4cca2f066df274df431b93ba6",
+    "plots/roc_curves.png": "eb5886dbd7cff572c1f69b435c9f8ede2a99654993f9ac068095ca712fef0a9a",
+    "plots/typology_detection.png": "3bc1734310ebd0caeb6af078aa2694381d124531ddd44cd2ca3d0ec344283a8a"
+  }
+}

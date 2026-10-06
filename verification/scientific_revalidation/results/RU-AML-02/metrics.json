@@ -1,0 +1,73 @@
+{
+  "unit_id": "RU-AML-02",
+  "parent_unit": "RU-AML-01",
+  "status": "PASS_VALID_REVALIDATION",
+  "scientific_origin": "SIMULATED",
+  "dataset_name": "IBM AMLSim Agent-Based Multi-Hop Transaction Graph",
+  "dataset_sha256": "b3dc9b72f985e7247198f81df8d4db7c559d93dfd7d00fb4ec18a6b0b368647c",
+  "evaluation_population": {
+    "total_transactions": 1323234,
+    "train_transactions": 930465,
+    "test_transactions": 392769,
+    "test_positive_count": 549,
+    "test_negative_count": 392220,
+    "test_prevalence": 0.0013977681538003253,
+    "test_cycle_count": 288,
+    "test_fan_in_count": 261
+  },
+  "primary_metrics": {
+    "pr_auc": 0.6527,
+    "roc_auc": 0.9509
+  },
+  "secondary_metrics": {
+    "recall_at_01_fpr": 0.6412,
+    "recall_at_05_fpr": 0.6758,
+    "recall_at_10_fpr": 0.6922,
+    "cycle_recall": 0.6736,
+    "fan_in_recall": 0.705,
+    "precision": 0.0962,
+    "recall": 0.6885,
+    "f1_score": 0.1689,
+    "brier_score": 0.0047,
+    "operating_threshold": 0.1715
+  },
+  "tabular_mlp_baseline": {
+    "pr_auc": 0.6093,
+    "roc_auc": 0.9578,
+    "recall_at_01_fpr": 0.5993,
+    "cycle_recall": 0.6528,
+    "fan_in_recall": 0.6475,
+    "f1_score": 0.1595
+  },
+  "neighborhood_aggregation_uplift": {
+    "delta_pr_auc_vs_tabular": 0.0434,
+    "delta_roc_auc_vs_tabular": -0.0069,
+    "delta_recall_01_fpr_vs_tabular": 0.0419,
+    "delta_cycle_recall_vs_tabular": 0.0208,
+    "delta_fan_in_recall_vs_tabular": 0.0575
+  },
+  "independent_recomputation": {
+    "recomputed_pr_auc": 0.652671,
+    "recomputed_roc_auc": 0.950867,
+    "abs_diff_pr_auc": 2.911e-05,
+    "abs_diff_roc_auc": 3.254e-05,
+    "match_within_tolerance": true
+  },
+  "model_checkpoint": {
+    "path": "model_checkpoint.pt",
+    "sha256": "a2a589581e19f2110c505dce0157f2f2fbdf6abed16d48b88c916ccc2fb29f81"
+  },
+  "raw_predictions": {
+    "path": "predictions.parquet",
+    "sha256": "df83dabafc4ae230b76cf61d651ae7d737d60841df31cdb144d654f9f17425ba",
+    "row_count": 392769
+  },
+  "guards_validated": {
+    "DATA-006": "PASSED (Labels strictly validated binary {0, 1}, zero NaN boolean coercion)",
+    "temporal_split": "PASSED (Timestep <= 140 train, > 140 test with zero lookahead)",
+    "graph_leakage": "PASSED (Graph topology constructed strictly from training transactions)",
+    "no_synthetic_fallback": "PASSED (require_real=True enforced, physical parquet loaded)"
+  },
+  "supersedes_unit": "RU-AML-01",
+  "historical_result_not_rewritten": true
+}

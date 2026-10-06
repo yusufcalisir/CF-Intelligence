@@ -142,7 +142,8 @@ def execute_ru_aml_02(
     plots_dir = output_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
-    dataset_path = REPO_ROOT / "backend" / "storage" / "datasets" / "amlsim" / "transactions.parquet"
+    dataset_dir = REPO_ROOT / "backend" / "storage" / "datasets" / "amlsim"
+    dataset_path = dataset_dir / "transactions.parquet"
     preflight = run_ru_aml_02_preflight(dataset_path)
 
     torch.manual_seed(seed)
@@ -150,7 +151,7 @@ def execute_ru_aml_02(
 
     # 1. Load dataset through canonical loader
     logger.info("Loading AMLSim transaction graph with all_rows=True, require_real=True...")
-    data = load_amlsim(path=dataset_path, all_rows=True, require_real=True)
+    data = load_amlsim(path=dataset_dir, all_rows=True, require_real=True)
 
     X_raw = data["X"]
     y = np.asarray(data["y"], dtype=int)
