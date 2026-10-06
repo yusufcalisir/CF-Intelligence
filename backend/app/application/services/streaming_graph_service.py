@@ -127,8 +127,8 @@ class StreamingGraphService:
             if from_id not in self.nodes:
                 self.nodes[from_id] = {
                     "entity_type": "customer",
-                    "risk_level": "high" if tx.get("is_fraud") else "minimal",
-                    "alert_count": 1 if tx.get("is_fraud") else 0,
+                    "risk_level": "minimal",
+                    "alert_count": 0,
                     "first_seen": timestamp.isoformat(),
                     "last_seen": timestamp.isoformat(),
                 }
@@ -138,15 +138,12 @@ class StreamingGraphService:
                 self.index_to_node[idx] = from_id
             else:
                 self.nodes[from_id]["last_seen"] = timestamp.isoformat()
-                if tx.get("is_fraud"):
-                    self.nodes[from_id]["alert_count"] += 1
-                    self.nodes[from_id]["risk_level"] = "high"
 
             if to_id not in self.nodes:
                 self.nodes[to_id] = {
                     "entity_type": "customer",
-                    "risk_level": "high" if tx.get("is_fraud") else "minimal",
-                    "alert_count": 1 if tx.get("is_fraud") else 0,
+                    "risk_level": "minimal",
+                    "alert_count": 0,
                     "first_seen": timestamp.isoformat(),
                     "last_seen": timestamp.isoformat(),
                 }
@@ -156,9 +153,6 @@ class StreamingGraphService:
                 self.index_to_node[idx] = to_id
             else:
                 self.nodes[to_id]["last_seen"] = timestamp.isoformat()
-                if tx.get("is_fraud"):
-                    self.nodes[to_id]["alert_count"] += 1
-                    self.nodes[to_id]["risk_level"] = "high"
 
             # Record edge with canonical transaction identity
             edge_record = {

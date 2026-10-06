@@ -71,11 +71,15 @@ class TestDriftRetrainingPipelineIntegration:
         assert len(trigger_reasons) >= 2
 
         # 4. Dispatch automated retraining worker task synchronously via Celery apply
+        X_val_alpha = rng.normal(size=(50, 10)).astype(np.float32)
+        y_val_alpha = np.array([0] * 25 + [1] * 25, dtype=np.float32)
         retrain_result = execute_automated_retraining_task.apply(
             kwargs={
                 "bank_id": "bank_alpha",
                 "trigger_reasons": trigger_reasons,
                 "auc_gate_threshold": 0.40,
+                "X_val": X_val_alpha,
+                "y_val": y_val_alpha,
             }
         ).result
 
@@ -90,12 +94,18 @@ class TestDriftRetrainingPipelineIntegration:
 
     def test_retraining_quality_gate_rejection_on_subpar_model(self) -> None:
         """Verifies that the retraining pipeline rejects models that fail the quality gate."""
+        rng = np.random.default_rng(99)
+        X_val_beta = rng.normal(size=(50, 10)).astype(np.float32)
+        y_val_beta = np.array([0] * 25 + [1] * 25, dtype=np.float32)
+
         # Set an impossible quality gate (AUC >= 0.9999) to force rejection
         retrain_result = execute_automated_retraining_task.apply(
             kwargs={
                 "bank_id": "bank_beta",
                 "trigger_reasons": ["Drift threshold breached"],
                 "auc_gate_threshold": 0.9999,
+                "X_val": X_val_beta,
+                "y_val": y_val_beta,
             }
         ).result
 

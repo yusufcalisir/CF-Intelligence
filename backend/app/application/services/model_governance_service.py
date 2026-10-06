@@ -9,6 +9,7 @@ Implements Federal Reserve SR 11-7 / OCC 2011-12 standards:
 from __future__ import annotations
 
 import logging
+import math
 import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -45,44 +46,105 @@ class CanaryQualityGate:
         checks: dict[str, bool] = {}
 
         # 1. Disparate Impact Check (EEOC 80% Rule)
-        di_ratio = float(candidate_metrics.get("disparate_impact_ratio", 1.0))
-        di_pass = self.min_di_ratio <= di_ratio <= self.max_di_ratio
+        raw_di = candidate_metrics.get("disparate_impact_ratio")
+        di_ratio: float | None = None
+        if raw_di is None:
+            di_pass = False
+            reasons.append("Disparate Impact ratio ('disparate_impact_ratio') is missing or undefined.")
+        else:
+            try:
+                di_ratio = float(raw_di)
+                di_pass = math.isfinite(di_ratio) and self.min_di_ratio <= di_ratio <= self.max_di_ratio
+                if not di_pass:
+                    reasons.append(
+                        f"Disparate Impact ratio ({di_ratio:.3f}) violates EEOC 80% rule [{self.min_di_ratio}, {self.max_di_ratio}]."
+                    )
+            except (ValueError, TypeError):
+                di_pass = False
+                reasons.append(f"Disparate Impact ratio ({raw_di}) is not a valid finite number.")
         checks["disparate_impact"] = di_pass
-        if not di_pass:
-            reasons.append(
-                f"Disparate Impact ratio ({di_ratio:.3f}) violates EEOC 80% rule [{self.min_di_ratio}, {self.max_di_ratio}]."
-            )
 
         # 2. Predictive Quality (ROC-AUC / PR-AUC Delta)
-        cand_auc = float(candidate_metrics.get("auc_roc", candidate_metrics.get("pr_auc", 0.0)))
-        champ_auc = float(champ.get("auc_roc", champ.get("pr_auc", cand_auc)))
-        auc_delta = cand_auc - champ_auc
-        auc_pass = auc_delta >= self.min_auc_delta
+        raw_cand_auc = candidate_metrics.get("auc_roc") if candidate_metrics.get("auc_roc") is not None else candidate_metrics.get("pr_auc")
+        cand_auc: float | None = None
+        champ_auc: float | None = None
+        auc_delta: float | None = None
+        if raw_cand_auc is None:
+            auc_pass = False
+            reasons.append("Predictive performance metric ('auc_roc' or 'pr_auc') is missing or undefined.")
+        else:
+            try:
+                cand_auc = float(raw_cand_auc)
+                if not math.isfinite(cand_auc) or not (0.0 <= cand_auc <= 1.0):
+                    auc_pass = False
+                    reasons.append(f"Candidate AUC ({raw_cand_auc}) is not a valid finite float in [0.0, 1.0].")
+                else:
+                    raw_champ_auc = champ.get("auc_roc") if champ.get("auc_roc") is not None else champ.get("pr_auc")
+                    if raw_champ_auc is not None:
+                        try:
+                            champ_auc = float(raw_champ_auc)
+                            if math.isfinite(champ_auc) and 0.0 <= champ_auc <= 1.0:
+                                auc_delta = cand_auc - champ_auc
+                                auc_pass = auc_delta >= self.min_auc_delta
+                                if not auc_pass:
+                                    reasons.append(
+                                        f"Predictive performance delta ({auc_delta:+.4f}) fell below minimum required improvement ({self.min_auc_delta:+.4f})."
+                                    )
+                            else:
+                                auc_pass = False
+                                reasons.append(f"Champion AUC ({raw_champ_auc}) is not a valid finite float.")
+                        except (ValueError, TypeError):
+                            auc_pass = False
+                            reasons.append(f"Champion AUC ({raw_champ_auc}) is invalid.")
+                    else:
+                        # Baseline evaluation when no previous champion exists
+                        auc_pass = cand_auc >= 0.70
+                        if not auc_pass:
+                            reasons.append(f"Candidate AUC ({cand_auc:.4f}) is below the baseline threshold 0.70.")
+            except (ValueError, TypeError):
+                auc_pass = False
+                reasons.append(f"Candidate AUC ({raw_cand_auc}) is not a valid float.")
         checks["predictive_performance"] = auc_pass
-        if not auc_pass:
-            reasons.append(
-                f"Predictive performance delta ({auc_delta:+.4f}) fell below minimum required improvement ({self.min_auc_delta:+.4f})."
-            )
 
         # 3. Latency Check (p99 inference latency)
-        p99_latency = float(candidate_metrics.get("p99_latency_ms", 50.0))
-        latency_pass = p99_latency <= self.max_p99_latency_ms
+        raw_lat = candidate_metrics.get("p99_latency_ms")
+        p99_latency: float | None = None
+        if raw_lat is None:
+            latency_pass = False
+            reasons.append("p99 inference latency metric ('p99_latency_ms') is missing or undefined.")
+        else:
+            try:
+                p99_latency = float(raw_lat)
+                latency_pass = math.isfinite(p99_latency) and p99_latency <= self.max_p99_latency_ms
+                if not latency_pass:
+                    reasons.append(
+                        f"p99 inference latency ({p99_latency:.1f}ms) exceeded maximum SLA threshold ({self.max_p99_latency_ms:.1f}ms)."
+                    )
+            except (ValueError, TypeError):
+                latency_pass = False
+                reasons.append(f"p99 inference latency ({raw_lat}) is not a valid finite number.")
         checks["latency_sla"] = latency_pass
-        if not latency_pass:
-            reasons.append(
-                f"p99 inference latency ({p99_latency:.1f}ms) exceeded maximum SLA threshold ({self.max_p99_latency_ms:.1f}ms)."
-            )
 
         # 4. False Positive Rate (FPR)
-        fpr = float(candidate_metrics.get("fpr", 0.01))
-        fpr_pass = fpr <= self.max_fpr
+        raw_fpr = candidate_metrics.get("fpr")
+        fpr: float | None = None
+        if raw_fpr is None:
+            fpr_pass = False
+            reasons.append("False Positive Rate metric ('fpr') is missing or undefined.")
+        else:
+            try:
+                fpr = float(raw_fpr)
+                fpr_pass = math.isfinite(fpr) and 0.0 <= fpr <= self.max_fpr
+                if not fpr_pass:
+                    reasons.append(
+                        f"False Positive Rate ({fpr:.4f}) exceeded maximum tolerable threshold ({self.max_fpr:.4f})."
+                    )
+            except (ValueError, TypeError):
+                fpr_pass = False
+                reasons.append(f"False Positive Rate ({raw_fpr}) is not a valid finite number.")
         checks["false_positive_rate"] = fpr_pass
-        if not fpr_pass:
-            reasons.append(
-                f"False Positive Rate ({fpr:.4f}) exceeded maximum tolerable threshold ({self.max_fpr:.4f})."
-            )
 
-        overall_passed = all(checks.values())
+        overall_passed = len(checks) == 4 and all(checks.values())
         decision = "APPROVE_CANARY_PROMOTION" if overall_passed else "REJECT_CANARY_PROMOTION"
 
         return {

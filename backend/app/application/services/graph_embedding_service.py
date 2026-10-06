@@ -386,7 +386,7 @@ class GraphEmbeddingService:
             features = np.zeros((len(all_subgraph_entities), NODE_FEATURE_DIM), dtype=np.float32)
             for idx, e in enumerate(all_subgraph_entities):
                 deg = degree_counts.get(idx, 0)
-                features[idx] = extract_node_features(e, degree=deg)
+                features[idx] = extract_node_features(e, degree=deg, mask_label_leakage=True)
 
             features_tensor = torch.tensor(features, dtype=torch.float32)
 

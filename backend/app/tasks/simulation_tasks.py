@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from dataclasses import asdict
 from typing import Any
 
@@ -168,13 +169,15 @@ def execute_automated_retraining_task(
     bank_id: str = "bank_alpha",
     trigger_reasons: list[str] | None = None,
     auc_gate_threshold: float = 0.70,
+    X_val: Any = None,
+    y_val: Any = None,
 ) -> dict[str, Any]:
     """Executes asynchronous automated background model retraining workflow.
 
     Workflow:
     1. Fetches normalized training batch from StreamingFeatureStore.
     2. Executes PyTorch model training loop with Opacus Differential Privacy (DP-SGD).
-    3. Evaluates model accuracy and ROC-AUC quality gate (> 0.70).
+    3. Evaluates model accuracy and ROC-AUC quality gate (> 0.70) against empirical validation data.
     4. Compresses encrypted parameter update payload for gRPC streaming transport.
     """
     import zlib
@@ -203,10 +206,42 @@ def execute_automated_retraining_task(
     latest_feature = feature_store.get_latest_account_features(bank_id)
     logger.debug("Feature Store batch retrieved for %s: %s", bank_id, latest_feature is not None)
 
-    # Step 2: Execute PyTorch local training loop with DP
+    # Step 2: Validate presence of empirical validation data (AGENTS.md: Never fabricate random data)
+    if X_val is None or y_val is None:
+        logger.warning(
+            "Automated retraining candidate for %s lacks validation data. Quality gate REJECTED (fail-closed).",
+            bank_id,
+        )
+        return {
+            "task_id": task_id,
+            "bank_id": bank_id,
+            "status": "REJECTED_MISSING_VALIDATION_DATA",
+            "quality_gate_passed": False,
+            "auc_roc": None,
+            "auc_roc_defined": False,
+            "auc_gate_threshold": auc_gate_threshold,
+            "trigger_reasons": trigger_reasons,
+        }
+
+    try:
+        X_val_arr = np.asarray(X_val, dtype=np.float32)
+        y_val_arr = np.asarray(y_val, dtype=np.float32)
+        if len(X_val_arr) == 0 or len(y_val_arr) == 0 or len(X_val_arr) != len(y_val_arr):
+            raise ValueError("Validation data arrays must be non-empty and matching in length.")
+    except Exception as exc:
+        logger.warning("Invalid validation data provided to retraining task for %s: %s", bank_id, exc)
+        return {
+            "task_id": task_id,
+            "bank_id": bank_id,
+            "status": "REJECTED_INVALID_VALIDATION_DATA",
+            "quality_gate_passed": False,
+            "auc_roc": None,
+            "auc_roc_defined": False,
+            "auc_gate_threshold": auc_gate_threshold,
+            "trigger_reasons": trigger_reasons,
+        }
+
     model = model_service.create_model(dp_compatible=True)
-    X_val = np.random.randn(100, 10).astype(np.float32)
-    y_val = np.random.randint(0, 2, size=(100,)).astype(np.float32)
 
     # Apply Differential Privacy (Post-Hoc L2 clip + noise)
     noised_weights = privacy_service.add_noise_to_weights(
@@ -217,21 +252,31 @@ def execute_automated_retraining_task(
     )
     clipped_params = noised_weights.flat_weights
 
-    # Step 3: Verify ROC-AUC Quality Gate (> 0.70)
-    # Evaluation metrics on holdout set — fail closed if undefined or missing
-    evaluation = model_service.evaluate(model, X_val, y_val)
-    if not evaluation.get("auc_roc_defined", True) or "auc_roc" not in evaluation:
+    # Step 3: Verify ROC-AUC Quality Gate
+    # Evaluation metrics on holdout set — fail closed if undefined, missing, or non-finite
+    evaluation = model_service.evaluate(model, X_val_arr, y_val_arr)
+    raw_auc = evaluation.get("auc_roc")
+    is_defined = evaluation.get("auc_roc_defined", False) is True
+    auc_roc: float | None = None
+    if not is_defined or raw_auc is None:
         quality_gate_passed = False
-        auc_roc = float(evaluation.get("auc_roc", 0.0))
     else:
-        auc_roc = float(evaluation["auc_roc"])
-        quality_gate_passed = auc_roc >= auc_gate_threshold
+        try:
+            val = float(raw_auc)
+            if math.isfinite(val) and 0.0 <= val <= 1.0:
+                auc_roc = val
+                quality_gate_passed = auc_roc >= auc_gate_threshold
+            else:
+                quality_gate_passed = False
+        except (ValueError, TypeError):
+            quality_gate_passed = False
 
     if not quality_gate_passed:
+        auc_str = f"{auc_roc:.4f}" if auc_roc is not None else "UNDEFINED"
         logger.warning(
-            "Automated retraining candidate for %s REJECTED by quality gate: AUC-ROC %.4f < %.2f limit.",
+            "Automated retraining candidate for %s REJECTED by quality gate: AUC-ROC %s < %.2f limit.",
             bank_id,
-            auc_roc,
+            auc_str,
             auc_gate_threshold,
         )
         return {
@@ -239,7 +284,8 @@ def execute_automated_retraining_task(
             "bank_id": bank_id,
             "status": "REJECTED_QUALITY_GATE",
             "quality_gate_passed": False,
-            "auc_roc": round(auc_roc, 4),
+            "auc_roc": round(auc_roc, 4) if auc_roc is not None else None,
+            "auc_roc_defined": auc_roc is not None,
             "auc_gate_threshold": auc_gate_threshold,
             "trigger_reasons": trigger_reasons,
         }
@@ -261,7 +307,9 @@ def execute_automated_retraining_task(
         "bank_id": bank_id,
         "status": "COMPLETED",
         "quality_gate_passed": True,
-        "auc_roc": round(auc_roc, 4),
+        "auc_roc": round(auc_roc, 4) if auc_roc is not None else None,
+        "auc_roc_defined": auc_roc is not None,
+        "auc_gate_threshold": auc_gate_threshold,
         "compressed_payload_bytes": len(compressed_payload),
         "trigger_reasons": trigger_reasons,
     }

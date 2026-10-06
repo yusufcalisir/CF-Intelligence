@@ -31,6 +31,11 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("app_debug", "debug"),
     )
     app_log_level: str = "INFO"
+    enable_demo_data_seeding: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("enable_demo_data_seeding", "cfi_enable_demo_seeding"),
+        description="Explicit opt-in required to generate mock/demo data. Never runs by default.",
+    )
 
     # ── FastAPI & CORS ────────────────────────
     api_host: str = "0.0.0.0"  # nosec B104

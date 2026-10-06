@@ -352,7 +352,6 @@ class CoordinatorService:
         self,
         round_id: int,
         min_auc_threshold: float = 0.70,
-        mock_auc: float | None = None,
         eval_auc: float | None = None,
         validation_labels: list[int] | None = None,
         validation_preds: list[float] | None = None,
@@ -371,40 +370,47 @@ class CoordinatorService:
         )
 
         # 2. Evaluate Holdout AUC
-        # Priority: explicit eval_auc > legacy mock_auc override > validation sample metrics > consensus stability
+        # Holdout AUC must derive strictly from empirical validation measurements.
+        # Fallback constants or volume-synthesized scores are strictly forbidden (AGENTS.md).
+        auc_score: float | None = None
         if eval_auc is not None:
-            auc_score = eval_auc
-        elif mock_auc is not None:
-            auc_score = mock_auc
+            if math.isfinite(eval_auc) and 0.0 <= eval_auc <= 1.0:
+                auc_score = float(eval_auc)
+            else:
+                logger.warning("Invalid eval_auc provided for round %d: %s. Metric rejected.", round_id, eval_auc)
         elif validation_labels is not None and validation_preds is not None:
-            from app.domain.metrics_service import compute_pr_auc
+            if len(validation_labels) > 0 and len(validation_labels) == len(validation_preds):
+                from app.domain.metrics_service import compute_pr_auc
 
-            auc_score = compute_pr_auc(validation_labels, validation_preds)
-        elif submissions:
-            # Empirical consensus score derived from participant submission volume and stability
-            auc_score = round(min(0.95, 0.80 + (min(5, len(submissions)) * 0.025)), 4)
-        else:
-            auc_score = 0.85
+                computed = compute_pr_auc(validation_labels, validation_preds)
+                if math.isfinite(computed) and 0.0 <= computed <= 1.0:
+                    auc_score = float(computed)
 
         now_iso = datetime.now(UTC).isoformat()
-        is_champion = auc_score >= min_auc_threshold
-
-        model_status = "CHAMPION" if is_champion else "REJECTED_LOW_AUC"
-
-        if is_champion:
-            logger.info(
-                "Aggregated model round %d passed Quality Gate (AUC=%.4f >= %.4f). Promoted to CHAMPION.",
+        if auc_score is None:
+            is_champion = False
+            model_status = "UNVERIFIED_NO_EVALUATION"
+            logger.warning(
+                "Aggregated model round %d has NO valid evaluation metrics. Quality gate REJECTED (champion promotion blocked).",
                 round_id,
-                auc_score,
-                min_auc_threshold,
             )
         else:
-            logger.warning(
-                "Aggregated model round %d FAILED Quality Gate (AUC=%.4f < %.4f). Promotion BLOCKED.",
-                round_id,
-                auc_score,
-                min_auc_threshold,
-            )
+            is_champion = auc_score >= min_auc_threshold
+            model_status = "CHAMPION" if is_champion else "REJECTED_LOW_AUC"
+            if is_champion:
+                logger.info(
+                    "Aggregated model round %d passed Quality Gate (AUC=%.4f >= %.4f). Promoted to CHAMPION.",
+                    round_id,
+                    auc_score,
+                    min_auc_threshold,
+                )
+            else:
+                logger.warning(
+                    "Aggregated model round %d FAILED Quality Gate (AUC=%.4f < %.4f). Promotion BLOCKED.",
+                    round_id,
+                    auc_score,
+                    min_auc_threshold,
+                )
 
         # 3. Update Round Record
         self.rounds[round_id]["status"] = "COMPLETED"
@@ -427,12 +433,13 @@ class CoordinatorService:
 
         # 5. Log SIEM Audit Event
         siem = SIEMLogExporter()
+        auc_str = f"{auc_score:.4f}" if auc_score is not None else "UNAVAILABLE"
         event = SIEMAuditEvent(
             event_id=f"fl_round_comp_r{round_id}",
             event_type="FL_ROUND_COMPLETED",
             severity="INFO" if is_champion else "WARNING",
             source_bank="coordinator",
-            message=f"FL Round {round_id} complete. AUC={auc_score:.4f}, Champion={is_champion}",
+            message=f"FL Round {round_id} complete. AUC={auc_str}, Champion={is_champion}",
         )
         siem.export_event(event)
 
@@ -573,4 +580,4 @@ class CoordinatorService:
             return len(to_prune)
 
 
-coordinator_service = CoordinatorService(auto_seed=True)
+coordinator_service = CoordinatorService(auto_seed=False)

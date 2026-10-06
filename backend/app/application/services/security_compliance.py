@@ -140,15 +140,20 @@ class SecurityComplianceEngine:
         db_url = os.getenv(
             "DATABASE_URL", "postgresql://localhost:5432/cfi_db?sslmode=require"  # no credentials in default
         )
-        cc6_2_status = (
-            "PASS"
-            if "sslmode=require" in db_url or "ssl=true" in db_url or "sqlite" in db_url
-            else "FAIL"
-        )
+        if "sqlite" in db_url:
+            cc6_2_status = "NOT_APPLICABLE"
+            cc6_2_evidence = "In-process SQLite database detected; network transport TLS is not applicable or attested."
+        elif "sslmode=require" in db_url or "ssl=true" in db_url:
+            cc6_2_status = "PASS"
+            cc6_2_evidence = f"Database URL specifies encrypted TLS transport option ({db_url.split('@')[-1] if '@' in db_url else 'local'}). Live socket handshake requires runtime transport audit."
+        else:
+            cc6_2_status = "FAIL"
+            cc6_2_evidence = f"Database URL does not configure mandatory TLS transport ({db_url.split('@')[-1] if '@' in db_url else 'local'})."
+
         controls_results["CC6.2"] = {
             "title": "Data Transmission Encryption (TLS/SSL)",
             "status": cc6_2_status,
-            "evidence": f"Database URL specifies encrypted TLS transport ({db_url.split('@')[-1] if '@' in db_url else 'local'}).",
+            "evidence": cc6_2_evidence,
         }
 
         # CC6.3: Secrets stored in Vault/KMS, not literal secrets in env
@@ -159,10 +164,14 @@ class SecurityComplianceEngine:
             and not v.startswith(("vault://", "kms://", "changeme", "test", "secret", "Super", "whsec_", "sk_"))
         ]
         cc6_3_status = "FAIL" if suspicious_keys else "PASS"
+        if suspicious_keys:
+            cc6_3_evidence = f"Unmanaged plaintext secrets detected in environment ({len(suspicious_keys)} suspicious keys: {', '.join(suspicious_keys[:3])})."
+        else:
+            cc6_3_evidence = f"Local environment scan detected 0 unmanaged plaintext credentials among {len(os.environ)} inspected variables. Hardware KMS/Vault attestation requires external audit."
         controls_results["CC6.3"] = {
             "title": "Secrets Management & Vault/KMS Envelope Encryption",
             "status": cc6_3_status,
-            "evidence": f"All credentials managed via Vault PKI or AWS KMS envelope encryption ({len(suspicious_keys)} suspicious keys detected). Inspected {len(os.environ)} env vars.",
+            "evidence": cc6_3_evidence,
         }
 
         # CC7.1: Audit log exists for all data access
@@ -183,22 +192,34 @@ class SecurityComplianceEngine:
 
         # CC9.1: Vendor risk — all third-party dependencies pinned in pyproject.toml
         pyproject_path = Path(__file__).parents[3] / "pyproject.toml"
-        cc9_1_status = "PASS" if pyproject_path.exists() else "FAIL"
+        if not pyproject_path.exists():
+            cc9_1_status = "FAIL"
+            cc9_1_evidence = "Dependency manifest pyproject.toml not found; dependency versions cannot be verified."
+        else:
+            content = pyproject_path.read_text(encoding="utf-8")
+            has_deps = "dependencies = [" in content or "[project.dependencies]" in content or "[tool.poetry.dependencies]" in content
+            if has_deps:
+                cc9_1_status = "PASS"
+                cc9_1_evidence = f"Dependencies and version constraints defined in {pyproject_path.name}; exact cryptographic hash pinning requires lockfile audit."
+            else:
+                cc9_1_status = "FAIL"
+                cc9_1_evidence = f"Dependency manifest {pyproject_path.name} exists but contains no declared dependency section."
         controls_results["CC9.1"] = {
             "title": "Vendor Risk & Dependency Version Pinning",
             "status": cc9_1_status,
-            "evidence": f"Dependency versions pinned in {pyproject_path.name if pyproject_path.exists() else 'pyproject.toml'}.",
+            "evidence": cc9_1_evidence,
         }
 
-        all_passed = all(c["status"] == "PASS" for c in controls_results.values())
+        all_passed = all(c["status"] == "PASS" for c in controls_results.values() if c["status"] != "NOT_APPLICABLE")
 
         report = {
             "report_id": f"soc2_evidence_{datetime.now(UTC).strftime('%Y%m%d_%H%M')}",
             "timestamp": datetime.now(UTC).isoformat(),
-            "compliance_status": "COMPLIANT" if all_passed else "NON_COMPLIANT",
+            "compliance_status": "LOCAL_CHECKS_PASS" if all_passed else "NON_COMPLIANT",
             "total_controls_audited": len(controls_results),
             "passed_controls": sum(1 for c in controls_results.values() if c["status"] == "PASS"),
             "failed_controls": sum(1 for c in controls_results.values() if c["status"] == "FAIL"),
+            "not_applicable_controls": sum(1 for c in controls_results.values() if c["status"] == "NOT_APPLICABLE"),
             "controls": controls_results,
         }
 

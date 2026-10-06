@@ -315,14 +315,18 @@ def test_small_n_latency_rejects_p99_adequacy() -> None:
 # 15. Graph embedding service masks target label leakage
 # ---------------------------------------------------------------------------
 def test_graph_embedding_masks_target_label_leakage() -> None:
-    """extract_node_features must zero out feature 7 when mask_label_leakage=True."""
+    """extract_node_features must zero out feature 7 by default and when mask_label_leakage=True."""
     entity = {
         "entity_type": EntityType.CUSTOMER,
         "risk_level": RiskLevel.CRITICAL,  # Ordinarily maps to 4.0
         "alert_count": 10,
     }
 
-    # Unmasked (diagnostic/profiling)
+    # Masked by default!
+    feat_default = extract_node_features(entity)
+    assert feat_default[7] == 0.0, "Target label proxy at feature 7 must be masked by default"
+
+    # Explicit unmasked (diagnostic/profiling only)
     feat_unmasked = extract_node_features(entity, mask_label_leakage=False)
     assert feat_unmasked[7] == 1.0
 
@@ -343,6 +347,11 @@ def test_security_compliance_controls_fail_closed(monkeypatch: pytest.MonkeyPatc
         res = engine.generate_soc2_evidence_report()
         assert res["controls"]["CC6.2"]["status"] == "FAIL"
 
+    # CC6.2: SQLite is NOT network TLS (must be NOT_APPLICABLE, never PASS)
+    with patch.dict(os.environ, {"DATABASE_URL": "sqlite:///local.db"}):
+        res_sqlite = engine.generate_soc2_evidence_report()
+        assert res_sqlite["controls"]["CC6.2"]["status"] == "NOT_APPLICABLE"
+
     # CC6.3: Suspicious keys fail
     with patch.dict(os.environ, {"UNENCRYPTED_RAW_PASSWORD": "raw_plaintext_password"}):
         res = engine.generate_soc2_evidence_report()
@@ -360,16 +369,22 @@ def test_security_compliance_controls_fail_closed(monkeypatch: pytest.MonkeyPatc
 def test_production_mode_blocks_demo_seeding(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Production mode must not seed mock/demo data on cold start."""
+    """Production mode and non-opted development mode must not seed demo data."""
     from app.config import get_settings
     from app.main import seed_mock_data
 
+    # Production blocked
     monkeypatch.setattr(get_settings(), "app_env", "production")
-
     with caplog.at_level("WARNING"):
         seed_mock_data()
-
     assert "seed_mock_data invoked in production mode; aborting demo data generation." in caplog.text
+
+    # Development without opt-in blocked
+    monkeypatch.setattr(get_settings(), "app_env", "development")
+    monkeypatch.setattr(get_settings(), "enable_demo_data_seeding", False)
+    with caplog.at_level("WARNING"):
+        seed_mock_data()
+    assert "seed_mock_data invoked without explicit opt-in" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -382,3 +397,122 @@ def test_flower_engine_does_not_inspect_test_modules() -> None:
 
     assert "sys.modules" not in content, "Production flower engine must not inspect sys.modules for pytest"
     assert "PYTEST_CURRENT_TEST" not in content, "Production flower engine must not inspect PYTEST_CURRENT_TEST"
+
+
+# ---------------------------------------------------------------------------
+# 19. CoordinatorService never fabricates consensus AUC
+# ---------------------------------------------------------------------------
+def test_coordinator_cannot_fabricate_consensus_auc() -> None:
+    """CoordinatorService.aggregate_and_deploy fails closed without validation metrics."""
+    from app.application.services.coordinator_service import CoordinatorService
+
+    coord = CoordinatorService(auto_seed=False)
+    assert len(coord.registry) == 0, "Coordinator must not auto-seed by default"
+
+    coord.current_round_id = 1
+    coord.rounds[1] = {
+        "round_id": 1,
+        "status": "RUNNING",
+        "participating_banks": ["bank_1", "bank_2"],
+    }
+    coord.gradient_submissions[1] = {
+        "bank_1": b"grad1",
+        "bank_2": b"grad2",
+    }
+
+    # Aggregate without validation metrics: must be None and unverified
+    res = coord.aggregate_and_deploy(round_id=1, min_auc_threshold=0.70)
+    assert res["auc_score"] is None, "AUC score must be None when no empirical validation data provided"
+    assert res["is_champion"] is False
+    assert res["model_status"] == "UNVERIFIED_NO_EVALUATION"
+
+
+# ---------------------------------------------------------------------------
+# 20. CanaryQualityGate fails closed on empty metrics
+# ---------------------------------------------------------------------------
+def test_canary_quality_gate_rejects_empty_metrics() -> None:
+    """Empty candidate metrics must fail all gates, never fabricate passing defaults."""
+    from app.application.services.model_governance_service import CanaryQualityGate
+
+    gate = CanaryQualityGate()
+    eval_res = gate.evaluate(candidate_metrics={})
+
+    assert eval_res["passed"] is False
+    assert eval_res["decision"] == "REJECT_CANARY_PROMOTION"
+    assert eval_res["checks"]["disparate_impact"] is False
+    assert eval_res["checks"]["predictive_performance"] is False
+    assert eval_res["checks"]["latency_sla"] is False
+    assert eval_res["checks"]["false_positive_rate"] is False
+    assert len(eval_res["reasons"]) >= 4
+
+
+# ---------------------------------------------------------------------------
+# 21. AutoRollback triggers on non-finite health metrics
+# ---------------------------------------------------------------------------
+def test_auto_rollback_triggers_on_non_finite_metric_anomaly() -> None:
+    """Non-finite metrics (NaN/Inf) must trigger safety rollback, never be suppressed."""
+    from app.application.services.auto_rollback import AutoRollbackManager, RollbackCause
+
+    manager = AutoRollbackManager()
+    triggered, record = manager.evaluate_model_health_and_rollback(
+        active_model_version="v2.0.0",
+        current_auc=float("nan"),
+        current_latency_ms=10.0,
+        current_fpr=0.01,
+        fallback_model_version="v1.0.0",
+    )
+
+    assert triggered is True
+    assert record is not None
+    assert record.cause == RollbackCause.NON_FINITE_METRIC_ANOMALY
+    assert record.restored_model_version == "v1.0.0"
+
+
+# ---------------------------------------------------------------------------
+# 22. Streaming graph transaction ingestion does not leak target label
+# ---------------------------------------------------------------------------
+def test_streaming_graph_ingestion_does_not_leak_is_fraud() -> None:
+    """Streaming graph ingestion must not mutate node risk_level or alert_count from is_fraud."""
+    from datetime import UTC, datetime
+    from app.application.services.streaming_graph_service import StreamingGraphService
+
+    engine = StreamingGraphService(max_window_minutes=60)
+    tx = {
+        "transaction_id": "tx_fraud_123",
+        "sender_id": "acc_sender",
+        "receiver_id": "acc_receiver",
+        "amount": 5000.0,
+        "timestamp": datetime.now(UTC),
+        "bank_id": "bank_alpha",
+        "is_fraud": True,  # Ground-truth target label
+    }
+
+    engine.add_transaction(tx)
+    node_sender = engine.nodes["acc_sender"]
+    node_receiver = engine.nodes["acc_receiver"]
+
+    assert node_sender["risk_level"] == "minimal", "Node risk_level must not leak is_fraud label"
+    assert node_sender["alert_count"] == 0, "Node alert_count must not leak is_fraud label"
+    assert node_receiver["risk_level"] == "minimal"
+    assert node_receiver["alert_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# 23. ModelService returns None for mathematically undefined AUC
+# ---------------------------------------------------------------------------
+def test_model_service_undefined_auc_returns_none() -> None:
+    """When test set is single-class, AUC must be returned as None, never 0.5."""
+    from app.application.services.model_service import ModelService
+    from app.config import get_settings
+
+    ms = ModelService(get_settings())
+    model = ms.create_model()
+
+    X_single = np.ones((10, 10), dtype=np.float32)
+    y_single = np.zeros(10, dtype=np.float32)  # Single class: all 0s
+
+    metrics = ms.evaluate(model, X_single, y_single)
+    assert metrics["auc_roc"] is None, "Undefined ROC-AUC must be None, never 0.5"
+    assert metrics["pr_auc"] is None, "Undefined PR-AUC must be None, never 0.0"
+    assert metrics["auc_roc_defined"] is False
+    assert metrics["auc_roc_status"] == "undefined_single_class"

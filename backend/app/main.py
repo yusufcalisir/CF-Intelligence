@@ -228,8 +228,14 @@ def _acquire_seed_right() -> bool:
 
 def seed_mock_data() -> None:
     """Seed initial demonstration data for AML financial crime intelligence platform."""
-    if getattr(get_settings(), "app_env", "development").lower() == "production":
+    settings = get_settings()
+    if getattr(settings, "app_env", "development").lower() == "production":
         logging.getLogger(__name__).warning("seed_mock_data invoked in production mode; aborting demo data generation.")
+        return
+    if not getattr(settings, "enable_demo_data_seeding", False):
+        logging.getLogger(__name__).warning(
+            "seed_mock_data invoked without explicit opt-in (enable_demo_data_seeding=False); aborting demo data generation."
+        )
         return
     from app.application.services.alert_service import _alert_to_dict, _intel_to_dict
     from app.application.services.case_service import _case_to_dict
@@ -516,10 +522,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "(single-instance deployment mode)",
         )
 
-    # Seed mock data — only in non-production environments and only the first worker to acquire the sentinel
+    # Seed mock data — strictly requires explicit opt-in via enable_demo_data_seeding=True AND non-production
     is_production = getattr(settings, "app_env", "development").lower() == "production"
+    enable_seeding = getattr(settings, "enable_demo_data_seeding", False)
     if is_production:
         logger.info("Mock demo data seeding strictly disabled in production environment.")
+    elif not enable_seeding:
+        logger.info("Mock demo data seeding disabled by default (enable_demo_data_seeding=False).")
     elif _acquire_seed_right():
         try:
             seed_mock_data()

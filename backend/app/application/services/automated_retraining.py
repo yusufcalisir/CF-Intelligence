@@ -50,14 +50,20 @@ class DriftTriggeredRetrainingService:
         self,
         psi_score: float,
         concept_drift_score: float = 0.0,
-        current_auc: float = 0.85,
+        current_auc: float | None = None,
     ) -> RetrainingJobRecord | None:
         """Evaluates drift metrics and dispatches a retraining job if thresholds are exceeded."""
-        if not math.isfinite(psi_score) or not math.isfinite(concept_drift_score) or not math.isfinite(current_auc):
+        if not math.isfinite(psi_score) or not math.isfinite(concept_drift_score):
             logger.warning(
-                "Non-finite metrics encountered in retraining evaluation: psi=%s, concept=%s, auc=%s",
+                "Non-finite metrics encountered in retraining evaluation: psi=%s, concept=%s",
                 psi_score,
                 concept_drift_score,
+            )
+            return None
+
+        if current_auc is not None and not math.isfinite(current_auc):
+            logger.warning(
+                "Non-finite current_auc encountered in retraining evaluation: auc=%s",
                 current_auc,
             )
             return None
@@ -68,7 +74,7 @@ class DriftTriggeredRetrainingService:
             cause = RetrainingCause.PSI_DRIFT_EXCEEDED
         elif concept_drift_score >= 0.15:
             cause = RetrainingCause.CONCEPT_DRIFT_DETECTED
-        elif current_auc < self.min_auc_threshold:
+        elif current_auc is not None and current_auc < self.min_auc_threshold:
             cause = RetrainingCause.ACCURACY_DEGRADATION
 
         if not cause:

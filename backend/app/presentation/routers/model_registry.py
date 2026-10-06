@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 from typing import Any
 
@@ -364,7 +365,24 @@ async def promote_model_version(
     sr11_7_result = None
     if payload.enforce_sr11_7 and payload.target_status == "champion":
         metrics = entry.get("metrics", {})
-        auc_val = float(metrics.get("auc_roc") or metrics.get("auc") or 0.5)
+        auc_raw = metrics.get("auc_roc") if metrics.get("auc_roc") is not None else metrics.get("auc")
+        if auc_raw is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=(
+                    "SR 11-7 Quality Gate Rejection: Model performance metrics missing or undefined "
+                    "(neither 'auc_roc' nor 'auc' is present in registry entry)."
+                ),
+            )
+        try:
+            auc_val = float(auc_raw)
+            if not math.isfinite(auc_val) or not (0.0 <= auc_val <= 1.0):
+                raise ValueError
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"SR 11-7 Quality Gate Rejection: Model AUC ({auc_raw}) is not a valid finite float in [0.0, 1.0].",
+            )
 
         # 1. Performance Gate: Holdout AUC validation
         if auc_val < payload.min_auc:
@@ -379,7 +397,21 @@ async def promote_model_version(
         # 2. Fairness Gate: EEOC 80% four-fifths rule
         sign_offs = entry.get("sign_offs", [])
         for so in sign_offs:
-            fairness = float(so.get("fairness_score", 1.0))
+            fairness_raw = so.get("fairness_score")
+            if fairness_raw is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="SR 11-7 Quality Gate Rejection: Sign-off record is missing required 'fairness_score'.",
+                )
+            try:
+                fairness = float(fairness_raw)
+                if not math.isfinite(fairness):
+                    raise ValueError
+            except (ValueError, TypeError):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail=f"SR 11-7 Quality Gate Rejection: Disparate impact ratio ({fairness_raw}) is not a valid finite float.",
+                )
             if fairness < payload.min_fairness_score:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

@@ -20,6 +20,7 @@ class RollbackCause(str, Enum):
     AUC_DROP_CRITICAL = "AUC_DROP_CRITICAL"
     LATENCY_SLA_VIOLATION = "LATENCY_SLA_VIOLATION"
     FPR_SPIKE = "FPR_SPIKE"
+    NON_FINITE_METRIC_ANOMALY = "NON_FINITE_METRIC_ANOMALY"
     MANUAL_OVERRIDE = "MANUAL_OVERRIDE"
 
 
@@ -58,18 +59,17 @@ class AutoRollbackManager:
         fallback_model_version: str,
     ) -> tuple[bool, RollbackExecutionRecord | None]:
         """Evaluates live performance SLA and executes rollback if bounds are violated."""
+        cause: RollbackCause | None = None
+
         if not math.isfinite(current_auc) or not math.isfinite(current_latency_ms) or not math.isfinite(current_fpr):
             logger.warning(
-                "Non-finite model health metrics received: AUC=%s, Latency=%s, FPR=%s. Suppressing rollback.",
+                "Non-finite model health metrics received: AUC=%s, Latency=%s, FPR=%s. Triggering safety rollback.",
                 current_auc,
                 current_latency_ms,
                 current_fpr,
             )
-            return False, None
-
-        cause: RollbackCause | None = None
-
-        if current_auc < self.min_auc:
+            cause = RollbackCause.NON_FINITE_METRIC_ANOMALY
+        elif current_auc < self.min_auc:
             cause = RollbackCause.AUC_DROP_CRITICAL
         elif current_latency_ms > self.max_latency_ms:
             cause = RollbackCause.LATENCY_SLA_VIOLATION

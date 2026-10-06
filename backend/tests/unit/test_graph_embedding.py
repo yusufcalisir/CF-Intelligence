@@ -57,9 +57,12 @@ class TestNodeFeatureExtraction:
                     assert features[i] == 0.0
 
     def test_risk_level_ordinal(self) -> None:
-        """Risk level should map to ordinal value in position 7."""
-        features_min = extract_node_features({"risk_level": "minimal"})
-        features_crit = extract_node_features({"risk_level": "critical"})
+        """Risk level should be masked to 0.0 by default and map to ordinal only when explicitly unmasked."""
+        features_masked = extract_node_features({"risk_level": "critical"})
+        assert features_masked[7] == 0.0, "Risk level ordinal must be masked to 0.0 by default"
+
+        features_min = extract_node_features({"risk_level": "minimal"}, mask_label_leakage=False)
+        features_crit = extract_node_features({"risk_level": "critical"}, mask_label_leakage=False)
         assert features_min[7] == 0.0
         assert features_crit[7] == 1.0
 

@@ -554,26 +554,37 @@ class ModelService:
 
         # Handle edge case where test set has only one class (mathematically undefined)
         is_defined = len(np.unique(y_test)) >= 2
+        auc: float | None = None
+        pr_auc: float | None = None
         if is_defined:
             try:
-                auc = float(roc_auc_score(y_test, probs))
-                pr_auc = float(average_precision_score(y_test, probs))
-                fpr, tpr, thresholds = roc_curve(y_test, probs)
-                auc_status = "defined"
+                calc_auc = float(roc_auc_score(y_test, probs))
+                calc_pr = float(average_precision_score(y_test, probs))
+                if math.isfinite(calc_auc) and 0.0 <= calc_auc <= 1.0 and math.isfinite(calc_pr) and 0.0 <= calc_pr <= 1.0:
+                    auc = calc_auc
+                    pr_auc = calc_pr
+                    fpr, tpr, thresholds = roc_curve(y_test, probs)
+                    auc_status = "defined"
+                else:
+                    is_defined = False
+                    auc_status = "undefined_non_finite_metric"
+                    fpr = np.array([])
+                    tpr = np.array([])
+                    thresholds = np.array([])
             except Exception:
-                auc = 0.5
-                pr_auc = 0.0
-                fpr = np.array([0.0, 1.0])
-                tpr = np.array([0.0, 1.0])
-                thresholds = np.array([1.0, 0.0])
+                auc = None
+                pr_auc = None
+                fpr = np.array([])
+                tpr = np.array([])
+                thresholds = np.array([])
                 is_defined = False
                 auc_status = "undefined_computation_error"
         else:
-            auc = 0.5
-            pr_auc = 0.0
-            fpr = np.array([0.0, 1.0])
-            tpr = np.array([0.0, 1.0])
-            thresholds = np.array([1.0, 0.0])
+            auc = None
+            pr_auc = None
+            fpr = np.array([])
+            tpr = np.array([])
+            thresholds = np.array([])
             auc_status = "undefined_single_class"
 
         cm = confusion_matrix(y_test, preds, labels=[0, 1])
@@ -663,7 +674,7 @@ class ModelService:
             "pgd_evasion_rate": adv_report["pgd_evasion_rate"],
             "threshold": float(threshold),
             "threshold_provenance": threshold_provenance,
-            "pr_auc": float(pr_auc),
+            "pr_auc": float(pr_auc) if pr_auc is not None else None,
             "predicted_positives": int(preds.sum()),
             "score_min": score_min,
             "score_max": score_max,

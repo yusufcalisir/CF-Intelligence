@@ -60,7 +60,7 @@ NODE_FEATURE_DIM = 12
 def extract_node_features(
     entity_dict: dict[str, Any],
     degree: int = 0,
-    mask_label_leakage: bool = False,
+    mask_label_leakage: bool = True,
 ) -> np.ndarray:
     """Convert an entity dictionary into a fixed-size numerical feature vector.
 

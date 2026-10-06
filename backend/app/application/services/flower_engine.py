@@ -455,6 +455,7 @@ class FlowerFLEngine:
                 progress_callback=progress_callback,
                 simulation_id=simulation_id,
                 use_opacus_dp=use_opacus_dp,
+                backend_provenance="NATIVE_FEDAVG",
             )
 
         try:
@@ -504,6 +505,7 @@ class FlowerFLEngine:
             return {
                 "rounds": round_results,
                 "history": history,
+                "execution_backend": "FLOWER_RAY",
             }
         except Exception as exc:
             logger.warning(
@@ -517,6 +519,8 @@ class FlowerFLEngine:
                 progress_callback=progress_callback,
                 simulation_id=simulation_id,
                 use_opacus_dp=use_opacus_dp,
+                backend_provenance="NATIVE_FEDAVG_FALLBACK",
+                fallback_reason=str(exc),
             )
         finally:
             try:
@@ -535,6 +539,8 @@ class FlowerFLEngine:
         progress_callback: ProgressCallback,
         simulation_id: str,
         use_opacus_dp: bool,
+        backend_provenance: str = "NATIVE_FEDAVG",
+        fallback_reason: str | None = None,
     ) -> dict[str, Any]:
         """Zero-mock native production FL execution when external Ray cluster is unavailable.
 
@@ -677,7 +683,11 @@ class FlowerFLEngine:
             _cleanup_pytorch_memory()
 
         _cleanup_pytorch_memory()
-        return {
+        res = {
             "rounds": fallback_rounds,
             "history": None,
+            "execution_backend": backend_provenance,
         }
+        if fallback_reason is not None:
+            res["fallback_reason"] = fallback_reason
+        return res

@@ -29,7 +29,8 @@ class TestStreamingGNN(unittest.TestCase):
         self.assertEqual(len(self.graph_service.nodes), 2)
         self.assertEqual(len(self.graph_service.edges), 1)
         self.assertEqual(self.graph_service.node_degrees["cust_A"], 1)
-        self.assertEqual(self.graph_service.nodes["cust_A"]["risk_level"], "high")
+        # Anti-leakage invariant: streaming ingestion must not leak target is_fraud into node risk_level
+        self.assertEqual(self.graph_service.nodes["cust_A"]["risk_level"], "minimal")
 
     def test_sliding_window_pruning(self) -> None:
         """Test that expired edges and orphan nodes are pruned from the window."""
