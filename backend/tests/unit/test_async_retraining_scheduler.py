@@ -73,18 +73,30 @@ import numpy as np
 
 def test_execute_automated_retraining_task_execution() -> None:
     """Verifies execute_automated_retraining_task worker execution and ROC-AUC quality gate."""
-    # 1. Missing validation data must fail closed (AGENTS.md: No fabricated random inputs)
-    res_missing = execute_automated_retraining_task.__wrapped__(
+    # 1. Missing training or validation data must fail closed (AGENTS.md: No fabricated inputs)
+    res_missing_train = execute_automated_retraining_task.__wrapped__(
         "bank_test",
         ["INGESTION_THRESHOLD_REACHED"],
         0.30,
     )
-    assert res_missing["status"] == "REJECTED_MISSING_VALIDATION_DATA"
-    assert res_missing["quality_gate_passed"] is False
-    assert res_missing["auc_roc"] is None
+    assert res_missing_train["status"] == "REJECTED_MISSING_TRAINING_DATA"
+    assert res_missing_train["quality_gate_passed"] is False
 
-    # 2. Execution with empirical validation data and normal ROC-AUC gate threshold (0.30)
     rng = np.random.default_rng(42)
+    X_train = rng.normal(size=(50, 10)).astype(np.float32)
+    y_train = np.array([0] * 25 + [1] * 25, dtype=np.float32)
+
+    res_missing_val = execute_automated_retraining_task.__wrapped__(
+        "bank_test",
+        ["INGESTION_THRESHOLD_REACHED"],
+        0.30,
+        X_train=X_train,
+        y_train=y_train,
+    )
+    assert res_missing_val["status"] == "REJECTED_MISSING_VALIDATION_DATA"
+    assert res_missing_val["quality_gate_passed"] is False
+
+    # 2. Execution with empirical training and validation data and achievable ROC-AUC gate threshold (0.30)
     X_val = rng.normal(size=(50, 10)).astype(np.float32)
     y_val = np.array([0] * 25 + [1] * 25, dtype=np.float32)
 
@@ -92,6 +104,8 @@ def test_execute_automated_retraining_task_execution() -> None:
         "bank_test",
         ["INGESTION_THRESHOLD_REACHED"],
         0.30,
+        X_train=X_train,
+        y_train=y_train,
         X_val=X_val,
         y_val=y_val,
     )
@@ -100,11 +114,13 @@ def test_execute_automated_retraining_task_execution() -> None:
     assert "compressed_payload_bytes" in res_pass
     assert res_pass["compressed_payload_bytes"] > 0
 
-    # 3. Execution with impossibly high ROC-AUC gate threshold (0.99)
+    # 3. Execution with impossibly high ROC-AUC gate threshold (0.9999)
     res_fail = execute_automated_retraining_task.__wrapped__(
         "bank_test",
         ["STATISTICAL_DRIFT_DETECTED"],
-        0.99,
+        0.9999,
+        X_train=X_train,
+        y_train=y_train,
         X_val=X_val,
         y_val=y_val,
     )

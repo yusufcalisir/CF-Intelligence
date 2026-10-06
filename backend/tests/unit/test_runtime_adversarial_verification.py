@@ -315,24 +315,27 @@ def test_small_n_latency_rejects_p99_adequacy() -> None:
 # 15. Graph embedding service masks target label leakage
 # ---------------------------------------------------------------------------
 def test_graph_embedding_masks_target_label_leakage() -> None:
-    """extract_node_features must zero out feature 7 by default and when mask_label_leakage=True."""
+    """extract_node_features must zero out feature 7 and fail closed if unmasking is requested."""
     entity = {
         "entity_type": EntityType.CUSTOMER,
-        "risk_level": RiskLevel.CRITICAL,  # Ordinarily maps to 4.0
+        "risk_level": RiskLevel.CRITICAL,
         "alert_count": 10,
+        "is_fraud": 1,
+        "target": 1,
     }
 
     # Masked by default!
     feat_default = extract_node_features(entity)
     assert feat_default[7] == 0.0, "Target label proxy at feature 7 must be masked by default"
 
-    # Explicit unmasked (diagnostic/profiling only)
-    feat_unmasked = extract_node_features(entity, mask_label_leakage=False)
-    assert feat_unmasked[7] == 1.0
+    # Invariance to ground-truth label perturbations
+    entity_benign = {**entity, "is_fraud": 0, "target": 0, "risk_level": RiskLevel.MINIMAL}
+    feat_benign = extract_node_features(entity_benign)
+    assert np.array_equal(feat_default, feat_benign), "Prediction features must remain strictly label-blind"
 
-    # Masked (training & inference embedding generation)
-    feat_masked = extract_node_features(entity, mask_label_leakage=True)
-    assert feat_masked[7] == 0.0, "Target label proxy at feature 7 must be masked to 0.0"
+    # Explicit unmasked request fails closed
+    with pytest.raises(ValueError, match="Unmasked label leakage"):
+        extract_node_features(entity, mask_label_leakage=False)
 
 
 # ---------------------------------------------------------------------------
@@ -516,3 +519,252 @@ def test_model_service_undefined_auc_returns_none() -> None:
     assert metrics["pr_auc"] is None, "Undefined PR-AUC must be None, never 0.0"
     assert metrics["auc_roc_defined"] is False
     assert metrics["auc_roc_status"] == "undefined_single_class"
+
+
+# ---------------------------------------------------------------------------
+# 24. Flower backend fails closed when required or native fallback disabled
+# ---------------------------------------------------------------------------
+def test_flower_backend_fails_closed_when_required(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When require_flower_backend=True, unavailable Ray must raise RuntimeError (AGENTS.md Rule 5)."""
+    from app.application.services.flower_engine import FlowerFLEngine
+    from app.application.services.model_service import ModelService
+    from app.config import get_settings
+    from app.domain.value_objects import SimulationConfig
+
+    ms = ModelService(get_settings())
+    engine = FlowerFLEngine(model_service=ms)
+    config = SimulationConfig(num_rounds=1, require_flower_backend=True, allow_native_fallback=False)
+
+    # Force Ray failure
+    import ray
+
+    monkeypatch.setattr(ray, "init", lambda **kw: (_ for _ in ()).throw(RuntimeError("Simulated Ray cluster unavailable")))
+
+    with pytest.raises(RuntimeError, match="Required execution backend 'FLOWER_RAY' failed to initialize"):
+        engine.run_federated_training(
+            config=config,
+            bank_data={"bank_a": {"X_train": np.ones((5, 10)), "y_train": np.ones(5)}},
+            global_model=ms.create_model(),
+        )
+
+
+# ---------------------------------------------------------------------------
+# 25. Flower backend rejects native fallback when SecAgg is requested
+# ---------------------------------------------------------------------------
+def test_flower_backend_rejects_native_fallback_when_secagg_requested(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When enable_secure_aggregation=True, native plaintext fallback must be rejected (AGENTS.md Rule 11)."""
+    from app.application.services.flower_engine import FlowerFLEngine
+    from app.application.services.model_service import ModelService
+    from app.config import get_settings
+    from app.domain.value_objects import SimulationConfig
+
+    ms = ModelService(get_settings())
+    engine = FlowerFLEngine(model_service=ms)
+    config = SimulationConfig(num_rounds=1, enable_secure_aggregation=True, allow_native_fallback=True)
+
+    import ray
+
+    monkeypatch.setattr(ray, "init", lambda **kw: (_ for _ in ()).throw(RuntimeError("Simulated Ray failure")))
+
+    with pytest.raises(RuntimeError, match="Secure Aggregation"):
+        engine.run_federated_training(
+            config=config,
+            bank_data={"bank_a": {"X_train": np.ones((5, 10)), "y_train": np.ones(5)}},
+            global_model=ms.create_model(),
+        )
+
+
+# ---------------------------------------------------------------------------
+# 26. ModelRegistry /promote rejects bool and string, distinguishes validity vs quality
+# ---------------------------------------------------------------------------
+def test_model_registry_promote_distinguishes_validity_from_quality() -> None:
+    """Model promotion must reject bool/str AUC and distinguish valid 0.0 from threshold failure."""
+    import asyncio
+    from fastapi import HTTPException
+    from app.presentation.routers.model_registry import (
+        ModelPromoteRequest,
+        promote_model_version,
+        registry,
+    )
+
+    sim_id = "sim_test_audit"
+    v0_meta = registry.save_version(
+        simulation_id=sim_id,
+        state_dict={},
+        metrics={"auc_roc": 0.0},  # Mathematically valid, but fails quality threshold
+    )
+    v0 = v0_meta["version"]
+
+    # 1. Valid 0.0 passes validity check but fails performance threshold (> 0.75)
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            promote_model_version(
+                simulation_id=sim_id,
+                version=v0,
+                payload=ModelPromoteRequest(
+                    target_status="champion",
+                    enforce_sr11_7=True,
+                    min_auc=0.75,
+                ),
+            )
+        )
+    assert exc_info.value.status_code == 422
+    assert "below the required production threshold" in exc_info.value.detail
+
+    # 2. Boolean True must not masquerade as numeric 1.0
+    v1_meta = registry.save_version(
+        simulation_id=sim_id,
+        state_dict={},
+        metrics={"auc_roc": True},
+    )
+    v1 = v1_meta["version"]
+    with pytest.raises(HTTPException) as exc_info_bool:
+        asyncio.run(
+            promote_model_version(
+                simulation_id=sim_id,
+                version=v1,
+                payload=ModelPromoteRequest(
+                    target_status="champion",
+                    enforce_sr11_7=True,
+                    min_auc=0.75,
+                ),
+            )
+        )
+    assert exc_info_bool.value.status_code == 422
+    assert "must be a numeric float, not bool" in exc_info_bool.value.detail
+
+    # 3. String '0.95' must not be silently accepted
+    v2_meta = registry.save_version(
+        simulation_id=sim_id,
+        state_dict={},
+        metrics={"auc_roc": "0.95"},
+    )
+    v2 = v2_meta["version"]
+    with pytest.raises(HTTPException) as exc_info_str:
+        asyncio.run(
+            promote_model_version(
+                simulation_id=sim_id,
+                version=v2,
+                payload=ModelPromoteRequest(
+                    target_status="champion",
+                    enforce_sr11_7=True,
+                    min_auc=0.75,
+                ),
+            )
+        )
+    assert exc_info_str.value.status_code == 422
+    assert "must be a numeric float, not str" in exc_info_str.value.detail
+
+
+# ---------------------------------------------------------------------------
+# 27. FederatedLearningEngine fails closed on all-corrupted client updates
+# ---------------------------------------------------------------------------
+def test_fl_engine_all_non_finite_weights_fails_closed() -> None:
+    """When all client updates contain NaN/Inf and no prior global weights exist, aggregate_parameters must raise ValueError."""
+    from app.application.services.fl_engine import FederatedLearningEngine
+    from app.application.services.model_service import ModelService
+    from app.application.services.privacy_service import PrivacyService
+    from app.config import get_settings
+    from app.domain.enums import AggregationMethod
+    from app.domain.value_objects import ModelWeights
+
+    settings = get_settings()
+    engine = FederatedLearningEngine(
+        settings=settings,
+        model_service=ModelService(settings),
+        privacy_service=PrivacyService(),
+    )
+
+    corrupt_a = ModelWeights(layer_shapes=[(2, 2)], flat_weights=[float("nan"), 1.0, 0.0, 0.0])
+    corrupt_b = ModelWeights(layer_shapes=[(2, 2)], flat_weights=[float("inf"), 1.0, 0.0, 0.0])
+
+    with pytest.raises(ValueError, match="All client updates contained non-finite weights"):
+        engine.aggregate_parameters(
+            client_weights=[corrupt_a, corrupt_b],
+            method=AggregationMethod.FED_AVG,
+            global_weights=None,
+        )
+
+
+# ---------------------------------------------------------------------------
+# 28. Drift status tracks incomplete AUC truthfully without fabricating health
+# ---------------------------------------------------------------------------
+def test_drift_status_tracks_incomplete_auc_truthfully() -> None:
+    """When current_auc is None, evaluate_drift_status reports METRIC_UNAVAILABLE and MONITORING_INCOMPLETE."""
+    from app.application.services.automated_retraining import (
+        DriftTriggeredRetrainingService,
+    )
+
+    svc = DriftTriggeredRetrainingService(psi_threshold=0.20, min_auc_threshold=0.70)
+
+    # 1. Without AUC: does not trigger on healthy statistical metrics, but marks monitoring incomplete
+    status = svc.evaluate_drift_status(psi_score=0.05, concept_drift_score=0.02, current_auc=None)
+    assert status.is_triggered is False
+    assert status.auc_monitoring_status == "METRIC_UNAVAILABLE"
+    assert status.accuracy_degradation_status == "MONITORING_INCOMPLETE"
+    assert status.monitoring_complete is False
+
+    # 2. With degraded AUC: triggers accuracy degradation
+    status_degraded = svc.evaluate_drift_status(psi_score=0.05, concept_drift_score=0.02, current_auc=0.62)
+    assert status_degraded.is_triggered is True
+    assert status_degraded.auc_monitoring_status == "METRIC_AVAILABLE"
+    assert status_degraded.accuracy_degradation_status == "DEGRADATION_DETECTED"
+    assert status_degraded.monitoring_complete is True
+
+
+# ---------------------------------------------------------------------------
+# 29. MetricsService handles None AUC without crashing or zero-substitution
+# ---------------------------------------------------------------------------
+def test_metrics_service_handles_none_auc_without_crashing_or_zero_substitution() -> None:
+    """from_eval_dict and compute_aggregate_improvement must preserve None without crashing."""
+    from app.application.services.metrics_service import MetricsService
+
+    eval_dict = {
+        "accuracy": 0.85,
+        "precision": 0.80,
+        "recall": 0.75,
+        "f1_score": 0.77,
+        "auc_roc": None,
+        "pr_auc": None,
+        "loss": 0.35,
+        "auc_roc_defined": False,
+        "auc_roc_status": "undefined_single_class",
+    }
+
+    metrics = MetricsService.from_eval_dict(eval_dict)
+    assert metrics.auc_roc is None
+    assert metrics.pr_auc is None
+    assert metrics.auc_roc_defined is False
+    assert metrics.auc_roc_status == "undefined_single_class"
+
+    # Aggregate improvement handles None without crash
+    improvement = MetricsService.compute_aggregate_improvement(
+        local_metrics=[metrics],
+        federated_metrics=[metrics],
+    )
+    assert improvement["auc_roc"] is None
+    assert improvement["accuracy"] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# 30. CanaryQualityGate rejects boolean and string metrics
+# ---------------------------------------------------------------------------
+def test_canary_gate_rejects_bool_and_string_metrics() -> None:
+    """Canary gate must fail closed when metrics contain boolean or string masquerading as float."""
+    from app.application.services.model_governance_service import (
+        CanaryQualityGate,
+    )
+
+    gate = CanaryQualityGate()
+
+    # Boolean candidate AUC must be rejected
+    cand_metrics = {
+        "disparate_impact_ratio": 0.95,
+        "auc_roc": True,  # bool!
+        "p99_latency_ms": 40.0,
+        "fpr": 0.01,
+    }
+    decision = gate.evaluate(candidate_metrics=cand_metrics)
+    assert decision["passed"] is False
+    assert any("must be a numeric float, not bool" in r for r in decision["reasons"])
+

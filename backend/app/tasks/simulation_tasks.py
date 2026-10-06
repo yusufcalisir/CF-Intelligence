@@ -171,14 +171,17 @@ def execute_automated_retraining_task(
     auc_gate_threshold: float = 0.70,
     X_val: Any = None,
     y_val: Any = None,
+    X_train: Any = None,
+    y_train: Any = None,
 ) -> dict[str, Any]:
     """Executes asynchronous automated background model retraining workflow.
 
     Workflow:
-    1. Fetches normalized training batch from StreamingFeatureStore.
-    2. Executes PyTorch model training loop with Opacus Differential Privacy (DP-SGD).
-    3. Evaluates model accuracy and ROC-AUC quality gate (> 0.70) against empirical validation data.
-    4. Compresses encrypted parameter update payload for gRPC streaming transport.
+    1. Validates presence and schema of training and holdout validation partitions.
+    2. Executes PyTorch model training loop (optimizer steps).
+    3. Applies Differential Privacy (L2 clipping + calibrated noise).
+    4. Evaluates model accuracy and ROC-AUC quality gate against empirical validation data.
+    5. Compresses encrypted parameter update payload for gRPC streaming transport.
     """
     import zlib
 
@@ -202,9 +205,40 @@ def execute_automated_retraining_task(
     privacy_service = PrivacyService()
     feature_store = StreamingFeatureStore()
 
-    # Step 1: Fetch normalized batch from Feature Store
-    latest_feature = feature_store.get_latest_account_features(bank_id)
-    logger.debug("Feature Store batch retrieved for %s: %s", bank_id, latest_feature is not None)
+    # Step 1: Validate presence of training data (AGENTS.md Rule 11: No training reported without optimizer steps)
+    if X_train is None or y_train is None:
+        logger.warning(
+            "Automated retraining candidate for %s lacks training data. Task REJECTED (fail-closed).",
+            bank_id,
+        )
+        return {
+            "task_id": task_id,
+            "bank_id": bank_id,
+            "status": "REJECTED_MISSING_TRAINING_DATA",
+            "quality_gate_passed": False,
+            "auc_roc": None,
+            "auc_roc_defined": False,
+            "auc_gate_threshold": auc_gate_threshold,
+            "trigger_reasons": trigger_reasons,
+        }
+
+    try:
+        X_train_arr = np.asarray(X_train, dtype=np.float32)
+        y_train_arr = np.asarray(y_train, dtype=np.float32)
+        if len(X_train_arr) == 0 or len(y_train_arr) == 0 or len(X_train_arr) != len(y_train_arr):
+            raise ValueError("Training data arrays must be non-empty and matching in length.")
+    except Exception as exc:
+        logger.warning("Invalid training data provided to retraining task for %s: %s", bank_id, exc)
+        return {
+            "task_id": task_id,
+            "bank_id": bank_id,
+            "status": "REJECTED_INVALID_TRAINING_DATA",
+            "quality_gate_passed": False,
+            "auc_roc": None,
+            "auc_roc_defined": False,
+            "auc_gate_threshold": auc_gate_threshold,
+            "trigger_reasons": trigger_reasons,
+        }
 
     # Step 2: Validate presence of empirical validation data (AGENTS.md: Never fabricate random data)
     if X_val is None or y_val is None:
@@ -241,7 +275,17 @@ def execute_automated_retraining_task(
             "trigger_reasons": trigger_reasons,
         }
 
+    # Step 3: Execute real model initialization and training loop
     model = model_service.create_model(dp_compatible=True)
+    batch_size = max(1, min(64, len(X_train_arr)))
+    model, _, _ = model_service.train_local(
+        model,
+        X_train_arr,
+        y_train_arr,
+        epochs=1,
+        learning_rate=0.001,
+        batch_size=batch_size,
+    )
 
     # Apply Differential Privacy (Post-Hoc L2 clip + noise)
     noised_weights = privacy_service.add_noise_to_weights(

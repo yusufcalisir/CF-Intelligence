@@ -24,6 +24,20 @@ class RetrainingCause(str, Enum):
     SCHEDULED_CADENCE = "SCHEDULED_CADENCE"
 
 
+@dataclass(frozen=True)
+class DriftEvaluationStatus:
+    """Comprehensive evaluation outcome of multi-signal drift monitoring."""
+
+    is_triggered: bool
+    cause: RetrainingCause | None
+    psi_status: str  # "DRIFT_DETECTED" | "NO_DRIFT"
+    concept_status: str  # "DRIFT_DETECTED" | "NO_DRIFT"
+    auc_monitoring_status: str  # "METRIC_AVAILABLE" | "METRIC_UNAVAILABLE"
+    accuracy_degradation_status: str  # "DEGRADATION_DETECTED" | "NO_DEGRADATION_DETECTED" | "MONITORING_INCOMPLETE"
+    monitoring_complete: bool  # True strictly when all candidate signals (including empirical AUC) are evaluated
+    details: dict[str, Any] = field(default_factory=dict)
+
+
 @dataclass
 class RetrainingJobRecord:
     """Record container tracking an automated retraining job execution."""
@@ -45,6 +59,53 @@ class DriftTriggeredRetrainingService:
         self.min_auc_threshold = min_auc_threshold
         self._jobs: dict[str, RetrainingJobRecord] = {}
         self._lock = threading.RLock()
+
+    def evaluate_drift_status(
+        self,
+        psi_score: float,
+        concept_drift_score: float = 0.0,
+        current_auc: float | None = None,
+    ) -> DriftEvaluationStatus:
+        """Audits all drift signals and determines comprehensive status without fabricating health."""
+        psi_drift = math.isfinite(psi_score) and psi_score >= self.psi_threshold
+        concept_drift = math.isfinite(concept_drift_score) and concept_drift_score >= 0.15
+
+        auc_avail = current_auc is not None and math.isfinite(current_auc)
+        if auc_avail:
+            auc_mon_status = "METRIC_AVAILABLE"
+            acc_status = (
+                "DEGRADATION_DETECTED"
+                if current_auc < self.min_auc_threshold
+                else "NO_DEGRADATION_DETECTED"
+            )
+        else:
+            auc_mon_status = "METRIC_UNAVAILABLE"
+            acc_status = "MONITORING_INCOMPLETE"
+
+        cause: RetrainingCause | None = None
+        if psi_drift:
+            cause = RetrainingCause.PSI_DRIFT_EXCEEDED
+        elif concept_drift:
+            cause = RetrainingCause.CONCEPT_DRIFT_DETECTED
+        elif acc_status == "DEGRADATION_DETECTED":
+            cause = RetrainingCause.ACCURACY_DEGRADATION
+
+        return DriftEvaluationStatus(
+            is_triggered=cause is not None,
+            cause=cause,
+            psi_status="DRIFT_DETECTED" if psi_drift else "NO_DRIFT",
+            concept_status="DRIFT_DETECTED" if concept_drift else "NO_DRIFT",
+            auc_monitoring_status=auc_mon_status,
+            accuracy_degradation_status=acc_status,
+            monitoring_complete=auc_avail,
+            details={
+                "psi_score": psi_score,
+                "concept_drift_score": concept_drift_score,
+                "current_auc": current_auc,
+                "psi_threshold": self.psi_threshold,
+                "min_auc_threshold": self.min_auc_threshold,
+            },
+        )
 
     def evaluate_drift_and_trigger(
         self,
@@ -68,18 +129,16 @@ class DriftTriggeredRetrainingService:
             )
             return None
 
-        cause: RetrainingCause | None = None
+        eval_status = self.evaluate_drift_status(
+            psi_score=psi_score,
+            concept_drift_score=concept_drift_score,
+            current_auc=current_auc,
+        )
 
-        if psi_score >= self.psi_threshold:
-            cause = RetrainingCause.PSI_DRIFT_EXCEEDED
-        elif concept_drift_score >= 0.15:
-            cause = RetrainingCause.CONCEPT_DRIFT_DETECTED
-        elif current_auc is not None and current_auc < self.min_auc_threshold:
-            cause = RetrainingCause.ACCURACY_DEGRADATION
-
-        if not cause:
+        if not eval_status.is_triggered or eval_status.cause is None:
             return None
 
+        cause = eval_status.cause
         job_id = f"retrain_{uuid.uuid4().hex[:8]}"
         record = RetrainingJobRecord(
             job_id=job_id,
@@ -89,16 +148,20 @@ class DriftTriggeredRetrainingService:
             details={
                 "concept_drift_score": concept_drift_score,
                 "current_auc": current_auc,
+                "auc_monitoring_status": eval_status.auc_monitoring_status,
+                "accuracy_degradation_status": eval_status.accuracy_degradation_status,
+                "monitoring_complete": eval_status.monitoring_complete,
             },
         )
         with self._lock:
             self._jobs[job_id] = record
 
         logger.info(
-            "Dispatched retraining job %s (Cause: %s, PSI: %.4f)",
+            "Dispatched retraining job %s (Cause: %s, PSI: %.4f, AUC Status: %s)",
             job_id,
             cause.value,
             psi_score,
+            eval_status.auc_monitoring_status,
         )
         return record
 

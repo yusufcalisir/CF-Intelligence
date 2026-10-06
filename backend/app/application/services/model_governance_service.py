@@ -51,6 +51,9 @@ class CanaryQualityGate:
         if raw_di is None:
             di_pass = False
             reasons.append("Disparate Impact ratio ('disparate_impact_ratio') is missing or undefined.")
+        elif isinstance(raw_di, (bool, str, bytes)):
+            di_pass = False
+            reasons.append(f"Disparate Impact ratio ({raw_di!r}) must be a numeric float, not {type(raw_di).__name__}.")
         else:
             try:
                 di_ratio = float(raw_di)
@@ -72,6 +75,9 @@ class CanaryQualityGate:
         if raw_cand_auc is None:
             auc_pass = False
             reasons.append("Predictive performance metric ('auc_roc' or 'pr_auc') is missing or undefined.")
+        elif isinstance(raw_cand_auc, (bool, str, bytes)):
+            auc_pass = False
+            reasons.append(f"Candidate AUC ({raw_cand_auc!r}) must be a numeric float, not {type(raw_cand_auc).__name__}.")
         else:
             try:
                 cand_auc = float(raw_cand_auc)
@@ -80,7 +86,7 @@ class CanaryQualityGate:
                     reasons.append(f"Candidate AUC ({raw_cand_auc}) is not a valid finite float in [0.0, 1.0].")
                 else:
                     raw_champ_auc = champ.get("auc_roc") if champ.get("auc_roc") is not None else champ.get("pr_auc")
-                    if raw_champ_auc is not None:
+                    if raw_champ_auc is not None and not isinstance(raw_champ_auc, (bool, str, bytes)):
                         try:
                             champ_auc = float(raw_champ_auc)
                             if math.isfinite(champ_auc) and 0.0 <= champ_auc <= 1.0:
@@ -112,6 +118,9 @@ class CanaryQualityGate:
         if raw_lat is None:
             latency_pass = False
             reasons.append("p99 inference latency metric ('p99_latency_ms') is missing or undefined.")
+        elif isinstance(raw_lat, (bool, str, bytes)):
+            latency_pass = False
+            reasons.append(f"p99 inference latency ({raw_lat!r}) must be a numeric float, not {type(raw_lat).__name__}.")
         else:
             try:
                 p99_latency = float(raw_lat)
@@ -131,6 +140,9 @@ class CanaryQualityGate:
         if raw_fpr is None:
             fpr_pass = False
             reasons.append("False Positive Rate metric ('fpr') is missing or undefined.")
+        elif isinstance(raw_fpr, (bool, str, bytes)):
+            fpr_pass = False
+            reasons.append(f"False Positive Rate ({raw_fpr!r}) must be a numeric float, not {type(raw_fpr).__name__}.")
         else:
             try:
                 fpr = float(raw_fpr)

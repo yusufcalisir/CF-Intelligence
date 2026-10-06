@@ -37,16 +37,16 @@ class EvaluationMetrics:
     precision: float
     recall: float
     f1_score: float
-    auc_roc: float
-    loss: float
+    auc_roc: float | None = None
+    loss: float = 0.0
 
     # Confusion matrix: [[TN, FP], [FN, TP]]
-    confusion_matrix: list[list[int]]
+    confusion_matrix: list[list[int]] = field(default_factory=lambda: [[0, 0], [0, 0]])
 
     # ROC curve data points for plotting
-    roc_fpr: list[float]
-    roc_tpr: list[float]
-    roc_thresholds: list[float]
+    roc_fpr: list[float] = field(default_factory=list)
+    roc_tpr: list[float] = field(default_factory=list)
+    roc_thresholds: list[float] = field(default_factory=list)
 
     # Feature importance (absolute weight magnitude from first layer)
     feature_importance: dict[str, float] = field(default_factory=dict)
@@ -66,10 +66,12 @@ class EvaluationMetrics:
 
     # Operating point and threshold provenance
     threshold: float = 0.5
-    pr_auc: float = 0.0
+    pr_auc: float | None = None
     predicted_positives: int = 0
     threshold_provenance: str = "default_fixed_0.5"
     dp_provenance: str | None = None
+    auc_roc_defined: bool = True
+    auc_roc_status: str = "defined"
 
 
 @dataclass(frozen=True)
@@ -153,6 +155,8 @@ class SimulationConfig:
 
     # FL engine selection
     fl_engine_type: str = "custom"
+    require_flower_backend: bool = False
+    allow_native_fallback: bool = True
     p2p_mode: bool = False
     topology: str = "RING"  # "RING" or "MESH"
 

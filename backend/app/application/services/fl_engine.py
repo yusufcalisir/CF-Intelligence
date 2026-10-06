@@ -191,15 +191,16 @@ class FederatedLearningEngine:
 
         if not clean_weights:
             logger.error(
-                "All %d client updates contained non-finite weights (NaN/Inf). Fallback to previous global weights.",
+                "All %d client updates contained non-finite weights (NaN/Inf).",
                 len(client_weights),
             )
             if global_weights is not None:
+                logger.warning("Falling back to verified prior round global weights.")
                 return global_weights
-            # Clean zero-fallback to prevent poisoning
-            return ModelWeights(
-                layer_shapes=ref_shapes,
-                flat_weights=[0.0] * ref_len,
+            # Fail closed: never fabricate zero-weights when no prior valid state exists (AGENTS.md Rule 6)
+            raise ValueError(
+                "All client updates contained non-finite weights (NaN/Inf) and no prior global "
+                "weights exist. Aggregation failed closed to prevent fabricated parameter initialization."
             )
 
         client_weights = clean_weights

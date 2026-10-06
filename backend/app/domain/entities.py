@@ -42,16 +42,20 @@ class Bank:
     quarantined: bool = False
 
     @property
-    def improvement(self) -> dict[str, float] | None:
+    def improvement(self) -> dict[str, float | None] | None:
         """Calculate metric improvements from local to federated model."""
         if not self.local_metrics or not self.federated_metrics:
             return None
+        auc_delta: float | None = None
+        if self.federated_metrics.auc_roc is not None and self.local_metrics.auc_roc is not None:
+            auc_delta = self.federated_metrics.auc_roc - self.local_metrics.auc_roc
+
         return {
             "accuracy": self.federated_metrics.accuracy - self.local_metrics.accuracy,
             "precision": self.federated_metrics.precision - self.local_metrics.precision,
             "recall": self.federated_metrics.recall - self.local_metrics.recall,
             "f1_score": self.federated_metrics.f1_score - self.local_metrics.f1_score,
-            "auc_roc": self.federated_metrics.auc_roc - self.local_metrics.auc_roc,
+            "auc_roc": auc_delta,
         }
 
 

@@ -22,12 +22,34 @@ class MetricsService:
         feature_importance: dict[str, float] | None = None,
     ) -> EvaluationMetrics:
         """Convert ModelService evaluation output to a domain value object."""
+        import math
+
+        raw_auc = eval_dict.get("auc_roc") if eval_dict.get("auc_roc") is not None else eval_dict.get("auc")
+        auc_roc: float | None = None
+        if raw_auc is not None and not isinstance(raw_auc, (bool, str, bytes)):
+            try:
+                val = float(raw_auc)
+                if math.isfinite(val) and 0.0 <= val <= 1.0:
+                    auc_roc = val
+            except (ValueError, TypeError):
+                auc_roc = None
+
+        raw_pr = eval_dict.get("pr_auc")
+        pr_auc: float | None = None
+        if raw_pr is not None and not isinstance(raw_pr, (bool, str, bytes)):
+            try:
+                val_pr = float(raw_pr)
+                if math.isfinite(val_pr) and 0.0 <= val_pr <= 1.0:
+                    pr_auc = val_pr
+            except (ValueError, TypeError):
+                pr_auc = None
+
         return EvaluationMetrics(
             accuracy=float(eval_dict.get("accuracy", 0.0)),
             precision=float(eval_dict.get("precision", eval_dict.get("prec", 0.0))),
             recall=float(eval_dict.get("recall", eval_dict.get("rec", 0.0))),
             f1_score=float(eval_dict.get("f1_score", eval_dict.get("f1", 0.0))),
-            auc_roc=float(eval_dict.get("auc_roc", eval_dict.get("auc", 0.0))),
+            auc_roc=auc_roc,
             loss=float(eval_dict.get("loss", 0.0)),
             confusion_matrix=eval_dict.get("confusion_matrix", [[0, 0], [0, 0]]),
             roc_fpr=eval_dict.get("roc_fpr", []),
@@ -44,17 +66,19 @@ class MetricsService:
             fgsm_evasion_rate=eval_dict.get("fgsm_evasion_rate", 0.0),
             pgd_evasion_rate=eval_dict.get("pgd_evasion_rate", 0.0),
             threshold=float(eval_dict.get("threshold", 0.5)),
-            pr_auc=float(eval_dict.get("pr_auc", 0.0)),
+            pr_auc=pr_auc,
             predicted_positives=int(eval_dict.get("predicted_positives", 0)),
             threshold_provenance=str(eval_dict.get("threshold_provenance", "default_fixed_0.5")),
             dp_provenance=eval_dict.get("dp_provenance"),
+            auc_roc_defined=eval_dict.get("auc_roc_defined", auc_roc is not None),
+            auc_roc_status=str(eval_dict.get("auc_roc_status", "defined" if auc_roc is not None else "undefined")),
         )
 
     @staticmethod
     def compute_aggregate_improvement(
         local_metrics: list[EvaluationMetrics],
         federated_metrics: list[EvaluationMetrics],
-    ) -> dict[str, float]:
+    ) -> dict[str, float | None]:
         """Compute average improvement across all banks.
 
         Returns the mean delta for each metric (federated - local).
@@ -69,17 +93,20 @@ class MetricsService:
             "precision": 0.0,
             "recall": 0.0,
             "f1_score": 0.0,
-            "auc_roc": 0.0,
         }
 
+        auc_deltas: list[float] = []
         for local, federated in zip(local_metrics, federated_metrics, strict=False):
             improvements["accuracy"] += federated.accuracy - local.accuracy
             improvements["precision"] += federated.precision - local.precision
             improvements["recall"] += federated.recall - local.recall
             improvements["f1_score"] += federated.f1_score - local.f1_score
-            improvements["auc_roc"] += federated.auc_roc - local.auc_roc
+            if federated.auc_roc is not None and local.auc_roc is not None:
+                auc_deltas.append(federated.auc_roc - local.auc_roc)
 
-        return {k: round(v / n, 4) for k, v in improvements.items()}
+        res: dict[str, float | None] = {k: round(v / n, 4) for k, v in improvements.items()}
+        res["auc_roc"] = round(sum(auc_deltas) / len(auc_deltas), 4) if auc_deltas else None
+        return res
 
     @staticmethod
     def metrics_to_dict(metrics: EvaluationMetrics) -> dict:

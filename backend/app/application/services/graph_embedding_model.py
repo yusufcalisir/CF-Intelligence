@@ -88,12 +88,13 @@ def extract_node_features(
     type_idx = ENTITY_TYPE_INDEX.get(entity_type, 0)
     features[type_idx] = 1.0
 
-    # Risk level ordinal (fail-closed against label leakage during training/eval)
-    if mask_label_leakage:
-        features[7] = 0.0
-    else:
-        risk_level = entity_dict.get("risk_level", "minimal")
-        features[7] = RISK_LEVEL_ORDINAL.get(risk_level, 0.0)
+    # Feature position 7: Strictly blinded by construction to prevent target/label leakage
+    if not mask_label_leakage:
+        raise ValueError(
+            "Unmasked label leakage in graph features is strictly prohibited by repository "
+            "scientific integrity policy (AGENTS.md). Prediction features must remain label-blind."
+        )
+    features[7] = 0.0  # Reserved blinded feature position for 12-dim checkpoint compatibility
 
     # Alert count (log-normalized to prevent outlier domination)
     alert_count = entity_dict.get("alert_count", 0)

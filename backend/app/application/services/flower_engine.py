@@ -439,15 +439,22 @@ class FlowerFLEngine:
             sim_config.num_rounds,
         )
 
-        # In testing environments, CI runners, or when explicitly requested,
-        # dispatch directly to the zero-mock native production FL engine.
-        # This prevents Ray C++ actor thread-unwinding SIGABRT (exit code 134)
-        # in Python 3.12 on Linux and eliminates multi-minute test execution hangs.
-        if (
-            os.environ.get("TESTING") == "1"
-            or os.environ.get("CI") == "true"
-            or os.environ.get("FLWR_SIMULATION_NATIVE") == "1"
-        ):
+        # When native simulation is explicitly configured via FLWR_SIMULATION_NATIVE,
+        # verify capability requirements before dispatching to native execution.
+        if os.environ.get("FLWR_SIMULATION_NATIVE") == "1":
+            if getattr(sim_config, "require_flower_backend", False) or not getattr(
+                sim_config, "allow_native_fallback", True
+            ):
+                raise RuntimeError(
+                    "Required execution backend 'FLOWER_RAY' failed to initialize: Native simulation "
+                    "requested via FLWR_SIMULATION_NATIVE but Flower backend is strictly required by configuration."
+                )
+            if getattr(sim_config, "enable_secure_aggregation", False):
+                raise RuntimeError(
+                    "Required execution backend 'FLOWER_RAY' failed: Native simulation requested via "
+                    "FLWR_SIMULATION_NATIVE does not implement cryptographically masked Secure Aggregation (SecAgg). "
+                    "Execution rejected to prevent unencrypted parameter aggregation (AGENTS.md Rule 11)."
+                )
             return self._run_native_production_fl(
                 config=sim_config,
                 bank_data=bank_data,
@@ -508,8 +515,24 @@ class FlowerFLEngine:
                 "execution_backend": "FLOWER_RAY",
             }
         except Exception as exc:
+            # Check backend authorization and capability requirements (AGENTS.md Rules 5 & 11)
+            if getattr(sim_config, "require_flower_backend", False) or not getattr(
+                sim_config, "allow_native_fallback", True
+            ):
+                raise RuntimeError(
+                    f"Required execution backend 'FLOWER_RAY' failed to initialize: {exc}. "
+                    "Fallback to native simulation is unauthorized by configuration."
+                ) from exc
+
+            if getattr(sim_config, "enable_secure_aggregation", False):
+                raise RuntimeError(
+                    f"Required execution backend 'FLOWER_RAY' failed: {exc}. Native production fallback "
+                    "does not implement cryptographically masked Secure Aggregation (SecAgg). "
+                    "Execution rejected to prevent unencrypted parameter aggregation (AGENTS.md Rule 11)."
+                ) from exc
+
             logger.warning(
-                "[Flower] Simulation runtime initialization failed: %s. Executing zero-downtime native production fallback...",
+                "[Flower] Simulation runtime initialization failed: %s. Executing authorized native fallback...",
                 exc,
             )
             return self._run_native_production_fl(
