@@ -681,6 +681,8 @@ class SimulationService:
                 simulation.fhe_poly_degree = fhe_keyring.poly_degree
                 simulation.fhe_key_id = fhe_keyring.key_id
                 simulation.fhe_noise_bound = 1e-9
+                simulation.fhe_is_emulated = fhe_keyring.is_emulated
+                simulation.fhe_driver_mode = fhe_keyring.driver_mode
 
                 try:
                     from app.infrastructure.security.immutable_audit_chain import (
@@ -695,6 +697,8 @@ class SimulationService:
                         details={
                             "key_id": fhe_keyring.key_id,
                             "poly_degree": fhe_keyring.poly_degree,
+                            "is_emulated": fhe_keyring.is_emulated,
+                            "driver_mode": fhe_keyring.driver_mode,
                         },
                     )
                 except Exception as e:

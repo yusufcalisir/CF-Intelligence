@@ -24,6 +24,14 @@ class BankConfigItem(BaseModel):
     fraud_pattern: str = Field(..., description="Primary fraud topology or modus operandi")
     characteristics: list[str] = Field(default_factory=list, description="Operational characteristics")
     hardware_enclave: str = Field("Intel SGX-v2", description="Hardware enclave isolation platform")
+    hardware_enclave_mode: str = Field(
+        default="SOFTWARE_EMULATION_SANDBOX",
+        description="Underlying runtime mode: INTEL_SGX_HARDWARE or SOFTWARE_EMULATION_SANDBOX",
+    )
+    is_hardware_enclave_backed: bool = Field(
+        default=False,
+        description="True only when physical SGX or Nitro Enclave device node is mounted on the host",
+    )
     mtls_status: str = Field("ACTIVE", description="Mutual TLS certificate enrollment status")
     status: str = Field("ONLINE", description="Node runtime status: ONLINE, OFFLINE, DEGRADED")
 
@@ -56,6 +64,14 @@ class ConsortiumStatusResponse(BaseModel):
     total_registered_nodes: int
     active_nodes_count: int
     hardware_enclave_enabled: bool = True
+    hardware_enclave_mode: str = Field(
+        default="SOFTWARE_EMULATION_SANDBOX",
+        description="Underlying runtime mode: INTEL_SGX_HARDWARE or SOFTWARE_EMULATION_SANDBOX",
+    )
+    hardware_enclave_hardware_backed: bool = Field(
+        default=False,
+        description="True only when physical SGX or Nitro Enclave hardware device is present",
+    )
     mtls_status: str = "ACTIVE"
     nodes: list[ConsortiumNodeSummary]
 

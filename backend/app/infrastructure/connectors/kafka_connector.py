@@ -85,17 +85,16 @@ class KafkaBankConnector(BankConnectorInterface):
                 "flat_weights": weights.flat_weights[:10],
             },
         }
-        logger.info("Kafka published training event to %s for bank %s", topic, bank_id)
+        logger.info("Kafka published training command to %s for bank %s", topic, bank_id)
         return {
             "bank_id": bank_id,
-            "status": "TRAINED",
+            "status": "COMMAND_PUBLISHED",
             "correlation_id": correlation_id,
-            "weights": weights.flat_weights,
-            "loss": 0.25,
-            "metrics": {"accuracy": 0.94, "precision": 0.92, "recall": 0.91, "f1": 0.915},
-            "num_samples": 5000,
             "topic": topic,
             "raw_payload": json.dumps(payload),
+            "loss": None,
+            "metrics": None,
+            "num_samples": None,
         }
 
     def evaluate(
@@ -110,14 +109,14 @@ class KafkaBankConnector(BankConnectorInterface):
             "bank_id": bank_id,
             "correlation_id": correlation_id,
         }
-        logger.info("Kafka published evaluation event to %s for bank %s", topic, bank_id)
+        logger.info("Kafka published evaluation command to %s for bank %s", topic, bank_id)
         return {
             "bank_id": bank_id,
-            "status": "EVALUATED",
+            "status": "COMMAND_PUBLISHED",
             "correlation_id": correlation_id,
-            "loss": 0.22,
-            "metrics": {"accuracy": 0.95, "precision": 0.93, "recall": 0.92, "f1": 0.925},
-            "num_samples": 1000,
             "topic": topic,
             "raw_payload": json.dumps(payload),
+            "loss": None,
+            "metrics": None,
+            "num_samples": None,
         }

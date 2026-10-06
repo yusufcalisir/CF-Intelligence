@@ -19,11 +19,15 @@ from app.application.schemas.banks import (
     ScoringVolumePointResponse,
 )
 from app.application.services.data_generator import DataGenerator
+from app.infrastructure.security.tee_driver import is_sgx_hardware_available
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/banks", tags=["banks"])
 api_router = APIRouter(prefix="/v1/banks", tags=["banks"])
+
+_sgx_hw_available = is_sgx_hardware_available()
+_enclave_mode = "INTEL_SGX_HARDWARE" if _sgx_hw_available else "SOFTWARE_EMULATION_SANDBOX"
 
 # Default bank configurations (static reference data)
 BANK_CONFIGS: list[dict[str, Any]] = [
@@ -42,6 +46,8 @@ BANK_CONFIGS: list[dict[str, Any]] = [
             "Low baseline fraud rate",
         ],
         "hardware_enclave": "Intel SGX-v2",
+        "hardware_enclave_mode": _enclave_mode,
+        "is_hardware_enclave_backed": _sgx_hw_available,
         "mtls_status": "ACTIVE",
         "status": "ONLINE",
     },
@@ -60,6 +66,8 @@ BANK_CONFIGS: list[dict[str, Any]] = [
             "Higher baseline fraud rate due to onboarding velocity",
         ],
         "hardware_enclave": "Intel SGX-v2",
+        "hardware_enclave_mode": _enclave_mode,
+        "is_hardware_enclave_backed": _sgx_hw_available,
         "mtls_status": "ACTIVE",
         "status": "ONLINE",
     },
@@ -78,6 +86,8 @@ BANK_CONFIGS: list[dict[str, Any]] = [
             "Moderate fraud rate with distinct testing patterns",
         ],
         "hardware_enclave": "Intel SGX-v2",
+        "hardware_enclave_mode": _enclave_mode,
+        "is_hardware_enclave_backed": _sgx_hw_available,
         "mtls_status": "ACTIVE",
         "status": "ONLINE",
     },
@@ -517,6 +527,8 @@ async def get_consortium_status() -> ConsortiumStatusResponse:
         total_registered_nodes=len(BANK_CONFIGS),
         active_nodes_count=len([b for b in BANK_CONFIGS if b.get("status") == "ONLINE"]),
         hardware_enclave_enabled=True,
+        hardware_enclave_mode=_enclave_mode,
+        hardware_enclave_hardware_backed=_sgx_hw_available,
         mtls_status="ACTIVE",
         nodes=node_summaries,
     )

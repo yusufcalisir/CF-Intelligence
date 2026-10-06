@@ -305,7 +305,10 @@ def load_elliptic(
             c_arr = c_str.to_numpy()
             y = np.where(c_arr == "1", 1, np.where(c_arr == "2", 0, -1)).astype(int)
     else:
-        y = np.zeros(len(df), dtype=int)
+        raise ValueError(
+            f"Elliptic dataset missing required label/class column ('class' or 'label'). "
+            f"Available columns: {list(df.columns)}. Missing labels must not be fabricated."
+        )
 
     if target_nrows is not None and not all_rows and len(df) > target_nrows:
         df = df.iloc[:target_nrows].copy()
@@ -523,7 +526,10 @@ def _process_amlsim_dataframe(
     if label_col is not None:
         y: np.ndarray = np.asarray(df[label_col].astype(bool).astype(int).to_numpy(), dtype=int)
     else:
-        y = np.zeros(len(df), dtype=int)
+        raise ValueError(
+            f"AMLSim dataset missing required fraud/laundering label column. "
+            f"Available columns: {list(df.columns)}. Missing labels must not be fabricated."
+        )
 
     # 2. Check for alerts.csv
     alerts_csv = root / "alerts.csv"
@@ -933,25 +939,6 @@ IEEE_CIS_FEATURE_DIM = 40  # Curated top numerical/engineered features
 IEEE_CIS_REAL_FRAUD_RATIO = 0.035  # ~3.5% in real IEEE-CIS
 
 
-def load_ieee_cis(
-    path: Path | None = None,
-    nrows: int | None = None,
-    n_mock_txns: int = 8_000,
-    rng: np.random.Generator | None = None,
-    require_real: bool = False,
-    all_rows: bool = False,
-    join_identity: bool = True,
-    temporal_split: bool = False,
-    **kwargs: Any,
-) -> dict[str, Any]:
-    """Load IEEE-CIS Fraud Detection (Vesta Corporation) benchmark dataset.
-
-    Performs:
-    1. Transaction and identity left join on 'TransactionID'.
-    2. Missing value imputation and categorical encoding (ProductCD, card4, card6, DeviceType, M1-M9).
-    3. Temporal feature engineering on 'TransactionDT' (day, hour, zero future leakage).
-    """
-    rng = rng or np.random.default_rng(42)
 def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
     """Process a raw or merged IEEE-CIS dataframe into numerical feature matrix."""
     df = df.copy()
@@ -964,7 +951,10 @@ def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]
     elif "label" in df.columns:
         y = df["label"].values.astype(int)
     else:
-        y = np.zeros(len(df), dtype=int)
+        raise ValueError(
+            f"IEEE-CIS dataset missing required fraud label column ('isFraud', 'is_fraud', or 'label'). "
+            f"Available columns: {list(df.columns)}. Missing labels must not be fabricated."
+        )
 
     # 2. Identity indicators
     if "id_01" in df.columns:
@@ -1143,9 +1133,9 @@ def load_creditcard_fraud(
     scale_time_amount: bool = True,
     scaling_strategy: str = "robust",
     split_data: bool = False,
-    train_ratio: float = 0.60,
-    val_ratio: float = 0.20,
-    test_ratio: float = 0.20,
+    train_ratio: float = 0.70,
+    val_ratio: float = 0.15,
+    test_ratio: float = 0.15,
     stratified: bool = True,
     temporal_split: bool = False,
     seed: int = 42,
@@ -1262,7 +1252,13 @@ def _process_creditcard_dataframe(
         feature_cols = [c for c in df.columns if c not in ("Time", "Class", "is_fraud", "isFraud") and pd.api.types.is_numeric_dtype(df[c])]
 
     X = np.asarray(df[feature_cols].fillna(0).values, dtype=np.float32)
-    raw_y = df["Class"].values if "Class" in df.columns else df["is_fraud"].values
+    label_col = next((c for c in ["Class", "class", "is_fraud", "isFraud", "label"] if c in df.columns), None)
+    if label_col is None:
+        raise ValueError(
+            f"CreditCard dataset missing required label column ('Class'). "
+            f"Available columns: {list(df.columns)}. Missing labels must not be fabricated."
+        )
+    raw_y = df[label_col].values
     y = np.asarray(raw_y, dtype=int)
 
     if split_data:
@@ -1543,7 +1539,10 @@ def _aggregate_synthaml_alert_features(
     if label_col is not None:
         y: np.ndarray = np.asarray(alerts_df[label_col].astype(bool).astype(int).to_numpy(), dtype=int)
     else:
-        y = np.zeros(len(alerts_df), dtype=int)
+        raise ValueError(
+            f"SynthAML alerts table missing required label column ('OUTCOME' or 'is_fraud'). "
+            f"Available columns: {list(alerts_df.columns)}. Missing labels must not be fabricated."
+        )
 
     alert_id_col = next((c for c in ["ALERT_ID", "alert_id", "id"] if c in alerts_df.columns), "ALERT_ID")
     tx_alert_col = next((c for c in ["ALERT_ID", "alert_id", "id"] if c in tx_df.columns), "ALERT_ID")
@@ -1832,7 +1831,10 @@ def _process_amlnet_dataframe(
     if label_col:
         y = np.asarray(df[label_col].fillna(0).astype(int).values, dtype=int)
     else:
-        y = np.zeros(len(df), dtype=int)
+        raise ValueError(
+            f"AMLNet dataset missing required laundering label column. "
+            f"Available columns: {list(df.columns)}. Missing labels must not be fabricated."
+        )
 
     typology_col = next((c for c in ["laundering_typology", "typology", "laundering_phase"] if c in df.columns), None)
     if typology_col:

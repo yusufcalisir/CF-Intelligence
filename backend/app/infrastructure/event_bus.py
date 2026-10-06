@@ -103,10 +103,15 @@ class EventBus:
         self._handlers: dict[str, list[EventHandler]] = defaultdict(list)
         self._event_log: list[DomainEvent] = []
         self._redis_client = None
+        self._kafka_producer = None
 
     def set_redis_client(self, client: Any) -> None:
         """Set Redis client for cross-process event forwarding."""
         self._redis_client = client
+
+    def set_kafka_producer(self, producer: Any) -> None:
+        """Set Kafka producer client for broker event forwarding."""
+        self._kafka_producer = producer
 
     def subscribe(self, event_type: str, handler: EventHandler) -> None:
         """Register a handler for a specific event type."""
@@ -152,34 +157,50 @@ class EventBus:
 
         app_settings = get_settings()
         if app_settings.use_kafka:
-            try:
-                # Kafka topic and partition resolution
-                topic = f"domain_events.{event.event_type}"
-                # Partition key by bank_id if present in metadata/event
-                bank_id = getattr(
-                    event, "bank_id", event.metadata.get("bank_id", "default_partition")
-                )
-                partition = hash(bank_id) % 3
-                offset = len(self._event_log)
-
-                logger.info(
-                    "EventBus dispatched event to Kafka topic '%s' (Partition: %d, Offset: %d, Bootstrap: %s)",
-                    topic,
-                    partition,
-                    offset,
+            topic = f"domain_events.{event.event_type}"
+            if self._kafka_producer is not None:
+                try:
+                    bank_id = getattr(
+                        event, "bank_id", event.metadata.get("bank_id", "default_partition")
+                    )
+                    payload_bytes = json.dumps(asdict(event)).encode("utf-8")
+                    if hasattr(self._kafka_producer, "send"):
+                        future = self._kafka_producer.send(
+                            topic, key=str(bank_id).encode("utf-8"), value=payload_bytes
+                        )
+                        if hasattr(future, "get"):
+                            rm = future.get(timeout=2.0)
+                            event.metadata["kafka_publish"] = {
+                                "status": "PUBLISHED",
+                                "topic": getattr(rm, "topic", topic),
+                                "partition": getattr(rm, "partition", None),
+                                "offset": getattr(rm, "offset", None),
+                                "broker": app_settings.kafka_bootstrap_servers,
+                            }
+                        else:
+                            event.metadata["kafka_publish"] = {
+                                "status": "DISPATCHED",
+                                "topic": topic,
+                                "broker": app_settings.kafka_bootstrap_servers,
+                            }
+                except Exception as exc:
+                    logger.warning("Failed to forward event to Kafka: %s", exc)
+                    event.metadata["kafka_publish"] = {
+                        "status": "FAILED",
+                        "error": str(exc),
+                        "topic": topic,
+                    }
+            else:
+                logger.debug(
+                    "Kafka is enabled in settings (bootstrap=%s), but no active Kafka producer client is connected. Event logged locally without fabricated offset.",
                     app_settings.kafka_bootstrap_servers,
                 )
-
-                # Inject broker metadata to event log
                 event.metadata["kafka_publish"] = {
+                    "status": "UNAVAILABLE",
+                    "reason": "NO_ACTIVE_KAFKA_PRODUCER_CLIENT",
                     "topic": topic,
-                    "partition": partition,
-                    "offset": offset,
                     "broker": app_settings.kafka_bootstrap_servers,
-                    "timestamp_ms": int(datetime.now(UTC).timestamp() * 1000),
                 }
-            except Exception:
-                logger.warning("Failed to forward event to Kafka", exc_info=True)
 
         logger.debug("Published %s (%d handlers)", event.event_type, len(handlers))
 

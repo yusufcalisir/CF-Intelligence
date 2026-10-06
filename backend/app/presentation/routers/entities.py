@@ -304,9 +304,31 @@ async def tokenize_raw_identifier(
     """Tokenize raw identifier into tenant-salted HMAC token enforcing Zero Raw PII policy."""
     import hashlib
     import hmac
+    import os
 
     raw_id = (payload.identifier if payload else None) or identifier
-    salt = (payload.tenant_salt if payload else None) or tenant_salt
+    raw_salt = (payload.tenant_salt if payload else None) or tenant_salt
+
+    env_salt = os.environ.get("CFI_HMAC_SALT")
+    if (raw_salt == "default_consortium_salt" or not raw_salt) and env_salt:
+        salt = env_salt.strip()
+        salt_provenance = "ENVIRONMENT_CFI_HMAC_SALT"
+    elif raw_salt and raw_salt != "default_consortium_salt":
+        salt = raw_salt.strip()
+        salt_provenance = "EXPLICIT_TENANT_SALT"
+    else:
+        is_prod = (
+            os.environ.get("ENVIRONMENT", "development").lower() == "production"
+            or os.environ.get("CFI_STRICT_SECURITY") == "1"
+        )
+        if is_prod:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Insecure default consortium salt is forbidden in production. Explicit tenant_salt or CFI_HMAC_SALT environment variable required.",
+            )
+        salt = "default_consortium_salt"
+        salt_provenance = "INSECURE_DEFAULT_DEV_SALT"
+        logger.warning("HMAC tokenization executed with insecure default_consortium_salt in development environment.")
 
     if not raw_id or not raw_id.strip():
         raise HTTPException(
@@ -321,6 +343,7 @@ async def tokenize_raw_identifier(
         hmac_token=token,
         policy="Zero Raw PII Policy Enforced",
         algorithm="HMAC-SHA256",
+        salt_provenance=salt_provenance,
     )
 
 

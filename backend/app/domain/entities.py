@@ -86,6 +86,8 @@ class SimulationRun:
     fhe_poly_degree: int | None = None
     fhe_noise_bound: float | None = None
     fhe_key_id: str | None = None
+    fhe_is_emulated: bool = False
+    fhe_driver_mode: str | None = None
 
     # Streaming GNN Telemetry
     streaming_gnn_node_count: int = 0

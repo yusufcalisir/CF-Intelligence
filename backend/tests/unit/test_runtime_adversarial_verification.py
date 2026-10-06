@@ -769,3 +769,142 @@ def test_canary_gate_rejects_bool_and_string_metrics() -> None:
     assert decision["passed"] is False
     assert any("must be a numeric float, not bool" in r for r in decision["reasons"])
 
+
+# ---------------------------------------------------------------------------
+# 31. Dataloader missing label fail-closed tests (DEF-19)
+# ---------------------------------------------------------------------------
+def test_dataloader_missing_label_fails_closed() -> None:
+    """Loaders must fail closed with ValueError when target label column is missing, never fabricating zeros."""
+    import pandas as pd
+    from app.application.services.dataloader import (
+        _process_amlnet_dataframe,
+        _process_amlsim_dataframe,
+        _process_creditcard_dataframe,
+        _process_ieee_cis_dataframe,
+    )
+
+    unlabeled_df = pd.DataFrame({"V1": [1.0, 2.0], "V2": [3.0, 4.0]})
+
+    with pytest.raises(ValueError, match="IEEE-CIS dataset missing required fraud label column"):
+        _process_ieee_cis_dataframe(unlabeled_df, source="test")
+
+    with pytest.raises(ValueError, match="AMLSim dataset missing required fraud/laundering label column"):
+        _process_amlsim_dataframe(unlabeled_df, root=Path("."), source="test")
+
+    with pytest.raises(ValueError, match="CreditCard dataset missing required label column"):
+        _process_creditcard_dataframe(unlabeled_df)
+
+    with pytest.raises(ValueError, match="AMLNet dataset missing required laundering label column"):
+        _process_amlnet_dataframe(unlabeled_df)
+
+
+# ---------------------------------------------------------------------------
+# 32. FHE driver emulation transparency & SimulationRun tracking (DEF-22)
+# ---------------------------------------------------------------------------
+def test_fhe_emulation_provenance_truth() -> None:
+    """FHEDriver and SimulationRun must truthfully reflect whether FHE is real TenSEAL or software emulated."""
+    from app.domain.entities import SimulationConfig, SimulationRun
+    from app.domain.value_objects import ModelWeights
+    from app.infrastructure.security.fhe_driver import FHEDriver, TENSEAL_AVAILABLE
+
+    keyring = FHEDriver.generate_keys("sim_test_fhe")
+    assert hasattr(keyring, "is_emulated")
+    assert hasattr(keyring, "driver_mode")
+
+    if not TENSEAL_AVAILABLE:
+        assert keyring.is_emulated is True
+        assert keyring.driver_mode == "SOFTWARE_EMULATED"
+
+    weights = ModelWeights(layer_shapes=[(2, 2)], flat_weights=[0.1, 0.2, 0.3, 0.4])
+    enc = FHEDriver.encrypt_weights(weights, keyring)
+    assert enc.is_emulated == keyring.is_emulated
+    assert enc.driver_mode == keyring.driver_mode
+
+    # SimulationRun stores FHE emulation fields
+    sim = SimulationRun(config=SimulationConfig())
+    assert sim.fhe_is_emulated is False
+    assert sim.fhe_driver_mode is None
+
+
+# ---------------------------------------------------------------------------
+# 33. Bank enclave hardware truth transparency (DEF-23)
+# ---------------------------------------------------------------------------
+def test_bank_hardware_enclave_truth() -> None:
+    """Bank configurations and ConsortiumStatusResponse must declare hardware enclave backing accurately."""
+    from app.presentation.routers.banks import BANK_CONFIGS
+    from app.infrastructure.security.tee_driver import is_sgx_hardware_available
+
+    hw_avail = is_sgx_hardware_available()
+    for bank in BANK_CONFIGS:
+        assert "hardware_enclave_mode" in bank
+        assert "is_hardware_enclave_backed" in bank
+        assert bank["is_hardware_enclave_backed"] == hw_avail
+
+
+# ---------------------------------------------------------------------------
+# 34. HMAC Tokenize salt provenance and security (DEF-24)
+# ---------------------------------------------------------------------------
+def test_hmac_tokenize_salt_provenance_and_security(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tokenize must reject default salt in production and record salt provenance."""
+    import asyncio
+    from fastapi import HTTPException
+    from app.presentation.routers.entities import tokenize_raw_identifier
+    from app.application.schemas.entities import HMACTokenizeRequest
+
+    # Development mode: allows default salt with warning and provenance marker
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.delenv("CFI_STRICT_SECURITY", raising=False)
+    monkeypatch.delenv("CFI_HMAC_SALT", raising=False)
+    res_dev = asyncio.run(tokenize_raw_identifier(payload=HMACTokenizeRequest(identifier="user@bank.com")))
+    assert res_dev.salt_provenance == "INSECURE_DEFAULT_DEV_SALT"
+
+    # Production mode: rejects default salt
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(tokenize_raw_identifier(payload=HMACTokenizeRequest(identifier="user@bank.com")))
+    assert exc_info.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# 35. EventBus Kafka truth (DEF-25)
+# ---------------------------------------------------------------------------
+def test_event_bus_kafka_no_fake_metadata_when_producer_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """EventBus must NOT fabricate partition and offset when Kafka producer is not connected."""
+    from app.infrastructure.event_bus import AlertCreated, EventBus
+    from app.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "use_kafka", True)
+
+    bus = EventBus()
+    event = AlertCreated(alert_id="alt-1", bank_id="bank_a", severity="HIGH", risk_score=0.9)
+    bus.publish(event)
+
+    assert "kafka_publish" in event.metadata
+    assert event.metadata["kafka_publish"]["status"] == "UNAVAILABLE"
+    assert event.metadata["kafka_publish"]["reason"] == "NO_ACTIVE_KAFKA_PRODUCER_CLIENT"
+    assert "offset" not in event.metadata["kafka_publish"]
+
+
+# ---------------------------------------------------------------------------
+# 36. KafkaBankConnector no fabricated metrics (DEF-26)
+# ---------------------------------------------------------------------------
+def test_kafka_connector_no_fabricated_metrics() -> None:
+    """KafkaBankConnector must return COMMAND_PUBLISHED and None for unmeasured metrics."""
+    from app.infrastructure.connectors.kafka_connector import KafkaBankConnector
+    from app.domain.value_objects import ModelWeights
+
+    connector = KafkaBankConnector(bootstrap_servers="localhost:9092")
+    weights = ModelWeights(layer_shapes=[(2, 2)], flat_weights=[0.1, 0.2, 0.3, 0.4])
+
+    train_res = connector.train("bank_a", weights)
+    assert train_res["status"] == "COMMAND_PUBLISHED"
+    assert train_res["metrics"] is None
+    assert train_res["loss"] is None
+
+    eval_res = connector.evaluate("bank_a", weights)
+    assert eval_res["status"] == "COMMAND_PUBLISHED"
+    assert eval_res["metrics"] is None
+    assert eval_res["loss"] is None
+
+

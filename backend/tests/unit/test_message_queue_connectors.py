@@ -53,9 +53,13 @@ def test_message_queue_stream_batch_parsing() -> None:
 
     weights = ModelWeights(layer_shapes=[(2, 2)], flat_weights=[0.1, 0.2, 0.3, 0.4])
     train_res = connector.train(bank_id="bank_a", weights=weights, epochs=2)
-    assert train_res["status"] == "TRAINED"
-    assert train_res["metrics"]["f1"] > 0.90
+    assert train_res["status"] == "COMMAND_PUBLISHED"
+    assert train_res["topic"] == "cfi.payments.bank_a.train"
+    assert train_res["metrics"] is None
+    assert train_res["loss"] is None
 
     eval_res = connector.evaluate(bank_id="bank_a", weights=weights)
-    assert eval_res["status"] == "EVALUATED"
-    assert eval_res["metrics"]["accuracy"] > 0.90
+    assert eval_res["status"] == "COMMAND_PUBLISHED"
+    assert eval_res["topic"] == "cfi.payments.bank_a.evaluate"
+    assert eval_res["metrics"] is None
+    assert eval_res["loss"] is None

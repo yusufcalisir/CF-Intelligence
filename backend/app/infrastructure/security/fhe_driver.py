@@ -36,6 +36,8 @@ class FHEKeyRing:
         context: Any | None = None,
         public_context_bytes: bytes | None = None,
         secret_context_bytes: bytes | None = None,
+        is_emulated: bool = False,
+        driver_mode: str = "TENSEAL_CKKS",
     ) -> None:
         self.key_id = key_id
         self.poly_degree = poly_degree
@@ -45,6 +47,8 @@ class FHEKeyRing:
         self.public_key = f"fhe_pub_key_{key_id[:8]}"
         self.secret_key = f"fhe_sec_key_{key_id[:8]}"
         self.eval_key = f"fhe_eval_key_{key_id[:8]}"
+        self.is_emulated = is_emulated
+        self.driver_mode = driver_mode
 
 
 class EncryptedWeights:
@@ -57,6 +61,8 @@ class EncryptedWeights:
         noise_bound: float,
         param_count: int,
         raw_float_sim: list[float] | None = None,
+        is_emulated: bool = False,
+        driver_mode: str = "TENSEAL_CKKS",
     ) -> None:
         self.ciphertext_bytes = ciphertext_bytes
         self.key_id = key_id
@@ -64,6 +70,8 @@ class EncryptedWeights:
         self.param_count = param_count
         # Fallback simulation vector if TenSEAL is unavailable in environment
         self._raw_float_sim = raw_float_sim or []
+        self.is_emulated = is_emulated
+        self.driver_mode = driver_mode
 
     @property
     def ciphertexts(self) -> list[float]:
@@ -119,6 +127,8 @@ class FHEDriver:
                 context=ctx,
                 public_context_bytes=public_bytes,
                 secret_context_bytes=secret_bytes,
+                is_emulated=False,
+                driver_mode="TENSEAL_CKKS",
             )
         else:
             time.sleep(0.05)
@@ -129,6 +139,8 @@ class FHEDriver:
                 poly_degree=poly_degree,
                 public_context_bytes=b"SIMULATED_FHE_PUBLIC_KEY",
                 secret_context_bytes=b"SIMULATED_FHE_SECRET_KEY",
+                is_emulated=True,
+                driver_mode="SOFTWARE_EMULATED",
             )
 
     @staticmethod
@@ -162,6 +174,8 @@ class FHEDriver:
                 noise_bound=1e-9,
                 param_count=param_count,
                 raw_float_sim=flat_arr.tolist(),
+                is_emulated=False,
+                driver_mode="TENSEAL_CKKS",
             )
         else:
             if rng is None:
@@ -176,6 +190,8 @@ class FHEDriver:
                 noise_bound=1e-9,
                 param_count=param_count,
                 raw_float_sim=sim_ciphertexts,
+                is_emulated=True,
+                driver_mode="SOFTWARE_EMULATED",
             )
 
     @staticmethod
@@ -233,6 +249,8 @@ class FHEDriver:
                 key_id=key_id,
                 noise_bound=1e-9,
                 param_count=n_params,
+                is_emulated=False,
+                driver_mode="TENSEAL_CKKS",
             )
         else:
             # Fallback simulated aggregation
@@ -247,6 +265,8 @@ class FHEDriver:
                 noise_bound=1e-9,
                 param_count=n_params,
                 raw_float_sim=accumulated.tolist(),
+                is_emulated=True,
+                driver_mode="SOFTWARE_EMULATED",
             )
 
     @staticmethod

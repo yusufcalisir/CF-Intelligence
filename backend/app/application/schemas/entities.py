@@ -118,6 +118,7 @@ class HMACTokenizeResponse(BaseModel):
     hmac_token: str
     policy: str = "Zero Raw PII Policy Enforced"
     algorithm: str = "HMAC-SHA256"
+    salt_provenance: str = "EXPLICIT_OR_ENV"
 
 
 class PSIRequest(BaseModel):
