@@ -121,13 +121,57 @@ def safe_roc_auc_score(
         return default
 
 
+def compute_pr_auc_with_status(
+    y_true: list[int] | np.ndarray,
+    y_pred: list[float] | np.ndarray,
+    default: float = 0.0,
+) -> tuple[float, bool, str]:
+    """Compute PR-AUC with explicit mathematical definedness status.
+
+    Returns:
+        tuple[float, bool, str]: (score, is_defined, status_code)
+        where status_code is 'defined', 'undefined_single_class', 'undefined_empty', or 'computation_error'.
+    """
+    y_t = np.asarray(y_true)
+    y_p = np.asarray(y_pred)
+    if y_t.size == 0 or y_p.size == 0:
+        return default, False, "undefined_empty"
+    if len(np.unique(y_t)) < 2:
+        return default, False, "undefined_single_class"
+    try:
+        from sklearn.metrics import auc, precision_recall_curve
+
+        y_t_sub, y_p_sub = _subsample_for_curve(y_t, y_p)
+        precision, recall, _ = precision_recall_curve(y_t_sub, y_p_sub)
+        val = float(auc(recall, precision))
+        if np.isnan(val):
+            return default, False, "computation_error"
+        return round(val, 4), True, "defined"
+    except Exception:
+        return default, False, "computation_error"
+
+
 def safe_pr_auc_score(
     y_true: list[int] | np.ndarray,
     y_pred: list[float] | np.ndarray,
-    default: float = 0.5,
+    default: float = 0.0,
 ) -> float:
     """Safely compute PR-AUC score, guarding against single-class, empty, or NaN inputs."""
-    return compute_pr_auc(y_true, y_pred)
+    return compute_pr_auc(y_true, y_pred, default=default)
+
+
+def compute_pr_auc(
+    y_true: list[int] | np.ndarray,
+    y_pred: list[float] | np.ndarray,
+    default: float = 0.0,
+) -> float:
+    """Computes Precision-Recall Area Under Curve (PR-AUC) using sklearn.
+
+    Returns `default` (0.0) when single-class, empty, or ill-defined, preventing
+    fabrication of arbitrary positive scores (e.g. 0.5).
+    """
+    score, _, _ = compute_pr_auc_with_status(y_true, y_pred, default=default)
+    return score
 
 
 def safe_precision_recall_curve(
@@ -167,24 +211,6 @@ def safe_f1_score(
         return default if np.isnan(val) else val
     except Exception:
         return default
-
-
-def compute_pr_auc(y_true: list[int] | np.ndarray, y_pred: list[float] | np.ndarray) -> float:
-    """Computes Precision-Recall Area Under Curve (PR-AUC) using sklearn."""
-    from sklearn.metrics import auc, precision_recall_curve
-
-    y_t = np.asarray(y_true)
-    y_p = np.asarray(y_pred)
-
-    if y_t.size == 0 or y_p.size == 0 or len(np.unique(y_t)) < 2:
-        return 0.5
-
-    y_t, y_p = _subsample_for_curve(y_t, y_p)
-    try:
-        precision, recall, _ = precision_recall_curve(y_t, y_p)
-        return round(float(auc(recall, precision)), 4)
-    except Exception:
-        return 0.5
 
 
 def compute_recall_at_fpr(

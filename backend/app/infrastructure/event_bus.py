@@ -123,11 +123,15 @@ class EventBus:
         if handler in self._handlers.get(event_type, []):
             self._handlers[event_type].remove(handler)
 
-    def publish(self, event: DomainEvent) -> None:
-        """Publish a domain event to all registered handlers.
+    def publish(
+        self,
+        event: DomainEvent,
+        capability_mode: Any = None,
+    ) -> None:
+        """Publish a domain event to all registered handlers and external brokers.
 
-        Events are logged for audit purposes and optionally forwarded
-        to Redis pub/sub.
+        Respects explicit Kafka capability mode contract: fails closed on KAFKA_REQUIRED
+        when broker client is absent or delivery fails.
         """
         self._event_log.append(event)
         handlers = self._handlers.get(event.event_type, [])
@@ -152,11 +156,29 @@ class EventBus:
             except Exception:
                 logger.warning("Failed to forward event to Redis", exc_info=True)
 
-        # Forward to Kafka/Redpanda if enabled
+        # Forward to Kafka/Redpanda respecting capability contract
         from app.config import get_settings
+        from app.domain.enums import KafkaCapabilityMode
 
         app_settings = get_settings()
-        if app_settings.use_kafka:
+        if capability_mode is not None:
+            req_mode = capability_mode
+        elif event.metadata.get("kafka_capability_mode"):
+            req_mode = event.metadata["kafka_capability_mode"]
+        elif app_settings.use_kafka:
+            req_mode = KafkaCapabilityMode.KAFKA_OPTIONAL_WITH_FALLBACK
+        else:
+            req_mode = KafkaCapabilityMode.IN_MEMORY_EXPLICIT
+
+        req_mode_str = req_mode.value if isinstance(req_mode, KafkaCapabilityMode) else str(req_mode).upper()
+
+        if req_mode_str == KafkaCapabilityMode.IN_MEMORY_EXPLICIT.value:
+            event.metadata["kafka_publish"] = {
+                "status": "IN_MEMORY_EVENT_BUS",
+                "provenance": "IN_MEMORY",
+                "broker": None,
+            }
+        elif req_mode_str in (KafkaCapabilityMode.KAFKA_REQUIRED.value, KafkaCapabilityMode.KAFKA_OPTIONAL_WITH_FALLBACK.value) or app_settings.use_kafka:
             topic = f"domain_events.{event.event_type}"
             if self._kafka_producer is not None:
                 try:
@@ -190,9 +212,12 @@ class EventBus:
                         "error": str(exc),
                         "topic": topic,
                     }
+                    if req_mode_str == KafkaCapabilityMode.KAFKA_REQUIRED.value:
+                        raise RuntimeError(f"Kafka delivery required (KAFKA_REQUIRED) but send failed: {exc}") from exc
             else:
                 logger.debug(
-                    "Kafka is enabled in settings (bootstrap=%s), but no active Kafka producer client is connected. Event logged locally without fabricated offset.",
+                    "Kafka delivery requested (%s, bootstrap=%s), but no active Kafka producer client is connected.",
+                    req_mode_str,
                     app_settings.kafka_bootstrap_servers,
                 )
                 event.metadata["kafka_publish"] = {
@@ -201,6 +226,11 @@ class EventBus:
                     "topic": topic,
                     "broker": app_settings.kafka_bootstrap_servers,
                 }
+                if req_mode_str == KafkaCapabilityMode.KAFKA_REQUIRED.value:
+                    raise RuntimeError(
+                        f"Kafka delivery required ({KafkaCapabilityMode.KAFKA_REQUIRED.value}) but no active "
+                        f"Kafka producer client is connected. Fail-closed: refusing in-memory fallback."
+                    )
 
         logger.debug("Published %s (%d handlers)", event.event_type, len(handlers))
 

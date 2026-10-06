@@ -56,7 +56,41 @@ class FHEKeyRing:
         self.backend_provenance = backend_provenance
 
 
-class EncryptedWeights:
+class BaseWeightsPayload:
+    """Base payload container for FHE operations."""
+
+    def __init__(
+        self,
+        key_id: str,
+        noise_bound: float,
+        param_count: int,
+        is_emulated: bool,
+        is_cryptographic: bool,
+        driver_mode: str,
+        backend_provenance: str,
+    ) -> None:
+        self.key_id = key_id
+        self.noise_bound = noise_bound
+        self.param_count = param_count
+        self.is_emulated = is_emulated
+        self.is_cryptographic = is_cryptographic
+        self.driver_mode = driver_mode
+        self.backend_provenance = backend_provenance
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize payload metadata for persistence and transmission."""
+        return {
+            "key_id": self.key_id,
+            "noise_bound": self.noise_bound,
+            "param_count": self.param_count,
+            "is_emulated": self.is_emulated,
+            "is_cryptographic": self.is_cryptographic,
+            "driver_mode": self.driver_mode,
+            "backend_provenance": self.backend_provenance,
+        }
+
+
+class EncryptedWeights(BaseWeightsPayload):
     """Represents authentic cryptographically encrypted model parameters using TenSEAL CKKS ciphertexts."""
 
     def __init__(
@@ -65,34 +99,46 @@ class EncryptedWeights:
         key_id: str,
         noise_bound: float,
         param_count: int,
-        is_emulated: bool = False,
         driver_mode: str = "TENSEAL_CKKS",
-        is_cryptographic: bool = True,
-        backend_provenance: str = FHEBackendProvenance.REAL_CKKS.value,
-        raw_float_sim: list[float] | None = None,
     ) -> None:
+        super().__init__(
+            key_id=key_id,
+            noise_bound=noise_bound,
+            param_count=param_count,
+            is_emulated=False,
+            is_cryptographic=True,
+            driver_mode=driver_mode,
+            backend_provenance=FHEBackendProvenance.REAL_CKKS.value,
+        )
         self.ciphertext_bytes = ciphertext_bytes
-        self.key_id = key_id
-        self.noise_bound = noise_bound
-        self.param_count = param_count
-        self.is_emulated = is_emulated
-        self.driver_mode = driver_mode
-        self.is_cryptographic = is_cryptographic
-        self.backend_provenance = backend_provenance
-        self._raw_float_sim = raw_float_sim or []
 
-    @property
-    def ciphertexts(self) -> list[float]:
-        """Convenience accessor for backward-compatibility with simulation pipelines."""
-        if self._raw_float_sim:
-            return self._raw_float_sim
-        return [0.0] * self.param_count
+    def to_dict(self) -> dict[str, Any]:
+        import base64
+
+        data = super().to_dict()
+        data["ciphertext_b64"] = base64.b64encode(self.ciphertext_bytes).decode("ascii")
+        data["payload_type"] = "CRYPTOGRAPHIC_ENCRYPTED_WEIGHTS"
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EncryptedWeights:
+        import base64
+
+        if data.get("payload_type") != "CRYPTOGRAPHIC_ENCRYPTED_WEIGHTS" or data.get("is_emulated") is True:
+            raise ValueError("Cannot deserialize non-cryptographic payload as EncryptedWeights.")
+        return cls(
+            ciphertext_bytes=base64.b64decode(data["ciphertext_b64"]),
+            key_id=data["key_id"],
+            noise_bound=data["noise_bound"],
+            param_count=data["param_count"],
+            driver_mode=data.get("driver_mode", "TENSEAL_CKKS"),
+        )
 
 
-class EmulatedWeights(EncryptedWeights):
+class EmulatedWeights(BaseWeightsPayload):
     """Represents non-cryptographic software-emulated weights with added Gaussian noise.
 
-    Explicitly labeled as non-cryptographic and non-ciphertext.
+    Structurally separated from EncryptedWeights. Does NOT inherit from EncryptedWeights.
     """
 
     def __init__(
@@ -105,24 +151,50 @@ class EmulatedWeights(EncryptedWeights):
         driver_mode: str = "SOFTWARE_EMULATED",
     ) -> None:
         super().__init__(
-            ciphertext_bytes=ciphertext_bytes or (b"SOFTWARE_EMULATED_VECTOR_" + str(param_count).encode()),
             key_id=key_id,
             noise_bound=noise_bound,
             param_count=param_count,
             is_emulated=True,
-            driver_mode=driver_mode,
             is_cryptographic=False,
+            driver_mode=driver_mode,
             backend_provenance=FHEBackendProvenance.SOFTWARE_EMULATED.value,
-            raw_float_sim=simulated_plaintext_vector,
         )
         self.simulated_plaintext_vector = simulated_plaintext_vector
+        self.emulated_vector_bytes = ciphertext_bytes or (b"SOFTWARE_EMULATED_VECTOR_" + str(param_count).encode())
+
+    @property
+    def ciphertexts(self) -> list[float]:
+        """Convenience property for accessing simulated vector."""
+        return self.simulated_plaintext_vector
+
+    def to_dict(self) -> dict[str, Any]:
+        data = super().to_dict()
+        data["simulated_plaintext_vector"] = self.simulated_plaintext_vector
+        data["payload_type"] = "SOFTWARE_EMULATED_WEIGHTS"
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EmulatedWeights:
+        if data.get("payload_type") != "SOFTWARE_EMULATED_WEIGHTS" and not data.get("is_emulated"):
+            raise ValueError("Cannot deserialize cryptographic payload as EmulatedWeights.")
+        return cls(
+            key_id=data["key_id"],
+            param_count=data["param_count"],
+            simulated_plaintext_vector=data["simulated_plaintext_vector"],
+            noise_bound=data.get("noise_bound", 1e-9),
+            driver_mode=data.get("driver_mode", "SOFTWARE_EMULATED"),
+        )
 
 
-def verify_cryptographic_fhe(weights: EncryptedWeights) -> bool:
-    """Verify that an EncryptedWeights object is backed by genuine cryptographic FHE.
+def verify_cryptographic_fhe(weights: Any) -> bool:
+    """Verify that a weights payload object is backed by genuine cryptographic FHE.
 
-    Rejects software-emulated vectors.
+    Rejects software-emulated vectors and non-EncryptedWeights types.
     """
+    if isinstance(weights, EmulatedWeights) or not isinstance(weights, EncryptedWeights):
+        raise TypeError(
+            "Cryptographic FHE gate rejected: weights object is not an authentic EncryptedWeights instance."
+        )
     if getattr(weights, "is_emulated", False) or not getattr(weights, "is_cryptographic", False):
         raise ValueError(
             "Cryptographic FHE gate rejected: weights object is SOFTWARE_EMULATED and lacks real CKKS encryption."
@@ -223,7 +295,7 @@ class FHEDriver:
         weights: ModelWeights,
         key_ring: FHEKeyRing,
         rng: np.random.Generator | None = None,
-    ) -> EncryptedWeights:
+    ) -> BaseWeightsPayload:
         """Encrypt float weights into TenSEAL CKKS ciphertext bytes or EmulatedWeights."""
         start_time = time.perf_counter()
         flat_arr = np.array(weights.flat_weights, dtype=np.float64)
@@ -248,10 +320,7 @@ class FHEDriver:
                 key_id=key_ring.key_id,
                 noise_bound=1e-9,
                 param_count=param_count,
-                is_emulated=False,
                 driver_mode="TENSEAL_CKKS",
-                is_cryptographic=True,
-                backend_provenance=FHEBackendProvenance.REAL_CKKS.value,
             )
         else:
             if rng is None:
@@ -271,10 +340,10 @@ class FHEDriver:
 
     @staticmethod
     def homomorphic_average(
-        encrypted_updates: list[EncryptedWeights],
+        encrypted_updates: list[BaseWeightsPayload],
         client_samples: list[int] | None = None,
         public_context_bytes: bytes | None = None,
-    ) -> EncryptedWeights:
+    ) -> BaseWeightsPayload:
         """Perform server-side homomorphic weighted addition directly over ciphertexts."""
         if not encrypted_updates:
             raise ValueError("Cannot perform homomorphic average on empty update list.")
@@ -298,17 +367,23 @@ class FHEDriver:
                 else [1.0 / n_clients] * n_clients
             )
 
-        any_emulated = any(getattr(enc, "is_emulated", False) for enc in encrypted_updates)
+        any_emulated = any(isinstance(enc, EmulatedWeights) or getattr(enc, "is_emulated", False) for enc in encrypted_updates)
         if not any_emulated and TENSEAL_AVAILABLE and ts is not None and public_context_bytes:
             # Reconstruct public context without secret key
             ctx_pub = ts.context_from(public_context_bytes)
 
             # Homomorphic weighted sum: c_total = sum(c_i * w_i)
+            first_enc = encrypted_updates[0]
+            if not isinstance(first_enc, EncryptedWeights):
+                raise TypeError("Expected EncryptedWeights for cryptographic aggregation.")
             v_total = (
-                ts.ckks_vector_from(ctx_pub, encrypted_updates[0].ciphertext_bytes) * weights[0]
+                ts.ckks_vector_from(ctx_pub, first_enc.ciphertext_bytes) * weights[0]
             )
             for i in range(1, n_clients):
-                v_i = ts.ckks_vector_from(ctx_pub, encrypted_updates[i].ciphertext_bytes)
+                client_enc = encrypted_updates[i]
+                if not isinstance(client_enc, EncryptedWeights):
+                    raise TypeError("Expected EncryptedWeights for cryptographic aggregation.")
+                v_i = ts.ckks_vector_from(ctx_pub, client_enc.ciphertext_bytes)
                 v_total += v_i * weights[i]
 
             res_bytes = v_total.serialize()
@@ -325,16 +400,14 @@ class FHEDriver:
                 key_id=key_id,
                 noise_bound=1e-9,
                 param_count=n_params,
-                is_emulated=False,
                 driver_mode="TENSEAL_CKKS",
-                is_cryptographic=True,
-                backend_provenance=FHEBackendProvenance.REAL_CKKS.value,
             )
         else:
             # Software emulated aggregation
             accumulated = np.zeros(n_params)
             for i, enc in enumerate(encrypted_updates):
-                accumulated += np.array(enc.ciphertexts) * weights[i]
+                vec = enc.simulated_plaintext_vector if isinstance(enc, EmulatedWeights) else getattr(enc, "ciphertexts", [0.0] * n_params)
+                accumulated += np.array(vec) * weights[i]
 
             duration = (time.perf_counter() - start_time) * 1000
             return EmulatedWeights(
@@ -348,48 +421,58 @@ class FHEDriver:
 
     @staticmethod
     def decrypt_weights(
-        encrypted_weights: EncryptedWeights,
+        encrypted_weights: BaseWeightsPayload,
         key_ring: FHEKeyRing,
         layer_shapes: list[tuple[int, ...]],
+        require_cryptographic: bool = False,
     ) -> ModelWeights:
         """Decrypt TenSEAL CKKS ciphertext or decode EmulatedWeights to ModelWeights."""
-        if encrypted_weights.key_id != key_ring.key_id:
-            raise ValueError("Invalid secret key for decryption.")
-
         start_time = time.perf_counter()
 
-        if (
-            not encrypted_weights.is_emulated
-            and TENSEAL_AVAILABLE
-            and ts is not None
-            and key_ring.secret_context_bytes
-            and key_ring.context is not None
-        ):
-            ctx_sec = ts.context_from(key_ring.secret_context_bytes)
-            vec = ts.ckks_vector_from(ctx_sec, encrypted_weights.ciphertext_bytes)
-            flat_weights = vec.decrypt()
-
-            duration = (time.perf_counter() - start_time) * 1000
-            logger.info(
-                "Decrypted %d TenSEAL CKKS parameters in %.2fms",
-                len(flat_weights),
-                duration,
-            )
-
-            return ModelWeights(
-                layer_shapes=layer_shapes,
-                flat_weights=[float(x) for x in flat_weights],
-            )
-        else:
-            flat_weights = getattr(
-                encrypted_weights,
-                "simulated_plaintext_vector",
-                encrypted_weights.ciphertexts,
-            )
+        if isinstance(encrypted_weights, EmulatedWeights):
+            if require_cryptographic or not key_ring.is_emulated:
+                raise ValueError(
+                    "Cryptographic decryption rejected: cannot decrypt EmulatedWeights with authentic CKKS key ring."
+                )
+            if encrypted_weights.key_id != key_ring.key_id:
+                raise ValueError("Invalid secret key for decryption.")
+            flat_weights = encrypted_weights.simulated_plaintext_vector
             duration = (time.perf_counter() - start_time) * 1000
 
             return ModelWeights(
                 layer_shapes=layer_shapes,
                 flat_weights=flat_weights,
             )
+
+        if encrypted_weights.key_id != key_ring.key_id:
+            raise ValueError("Invalid secret key for decryption.")
+
+        if not isinstance(encrypted_weights, EncryptedWeights):
+            raise TypeError("Unsupported weights payload type for decryption.")
+
+        if key_ring.is_emulated:
+            raise ValueError(
+                "Cannot decrypt authentic EncryptedWeights using an emulated FHEKeyRing."
+            )
+
+        if not TENSEAL_AVAILABLE or ts is None or not key_ring.secret_context_bytes or key_ring.context is None:
+            raise RuntimeError(
+                "Cannot decrypt authentic EncryptedWeights: TenSEAL backend or secret context is unavailable."
+            )
+
+        ctx_sec = ts.context_from(key_ring.secret_context_bytes)
+        vec = ts.ckks_vector_from(ctx_sec, encrypted_weights.ciphertext_bytes)
+        flat_weights = vec.decrypt()
+
+        duration = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            "Decrypted %d TenSEAL CKKS parameters in %.2fms",
+            len(flat_weights),
+            duration,
+        )
+
+        return ModelWeights(
+            layer_shapes=layer_shapes,
+            flat_weights=[float(x) for x in flat_weights],
+        )
 

@@ -299,12 +299,21 @@ def load_elliptic(
 
     class_col = "class" if "class" in df.columns else ("label" if "label" in df.columns else None)
     if class_col is not None:
-        c_str = df[class_col].astype(str)
+        if df[class_col].isna().any():
+            raise ValueError("Elliptic dataset contains NaN or missing values in label column. Missing labels must not be fabricated.")
+        c_str = df[class_col].astype(str).str.strip()
+        valid_elliptic_labels = {"1", "2", "unknown"}
+        invalid_labels = set(c_str.unique()) - valid_elliptic_labels
+        if invalid_labels:
+            raise ValueError(
+                f"Elliptic dataset contains invalid label encodings: {invalid_labels}. "
+                f"Expected subset of {valid_elliptic_labels} ('1'=illicit, '2'=licit, 'unknown'=unlabeled)."
+            )
         if not include_unknown:
             df = df[c_str.isin(["1", "2"])].copy()
             if len(df) == 0:
                 raise ValueError("Elliptic dataset has 0 labeled samples (class 1 or 2) after filtering unknown.")
-            c_str = df[class_col].astype(str)
+            c_str = df[class_col].astype(str).str.strip()
             y: np.ndarray = np.asarray((c_str == "1").to_numpy(dtype=int))
         else:
             c_arr = c_str.to_numpy()

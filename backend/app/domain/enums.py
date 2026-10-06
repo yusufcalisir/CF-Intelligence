@@ -551,3 +551,11 @@ class KafkaDeliveryStatus(StrEnum):
     UNAVAILABLE = "UNAVAILABLE"
 
 
+class KafkaCapabilityMode(StrEnum):
+    """Capability requirements for Kafka message streaming."""
+
+    KAFKA_REQUIRED = "KAFKA_REQUIRED"
+    KAFKA_OPTIONAL_WITH_FALLBACK = "KAFKA_OPTIONAL_WITH_FALLBACK"
+    IN_MEMORY_EXPLICIT = "IN_MEMORY_EXPLICIT"
+
+

@@ -940,16 +940,30 @@ def test_fhe_capability_semantics_and_emulation_separation(monkeypatch: pytest.M
 
     emul_weights = FHEDriver.encrypt_weights(weights, emul_kr)
     assert isinstance(emul_weights, EmulatedWeights)
+    # Critical Type Invariant: EmulatedWeights must NOT be an instance of EncryptedWeights
+    assert not isinstance(emul_weights, EncryptedWeights)
     assert emul_weights.is_emulated is True
     assert emul_weights.is_cryptographic is False
     assert hasattr(emul_weights, "simulated_plaintext_vector")
     assert emul_weights.backend_provenance == FHEBackendProvenance.SOFTWARE_EMULATED.value
 
+    # Serialization preserves non-cryptographic emulated provenance
+    emul_dict = emul_weights.to_dict()
+    assert emul_dict["payload_type"] == "SOFTWARE_EMULATED_WEIGHTS"
+    assert emul_dict["is_cryptographic"] is False
+    restored_emul = EmulatedWeights.from_dict(emul_dict)
+    assert isinstance(restored_emul, EmulatedWeights)
+    assert not isinstance(restored_emul, EncryptedWeights)
+
+    # Cannot deserialize emulated payload as EncryptedWeights
+    with pytest.raises(ValueError, match="Cannot deserialize non-cryptographic payload"):
+        EncryptedWeights.from_dict(emul_dict)
+
     # Case D: Emulated result cannot pass cryptographic FHE gate
-    with pytest.raises(ValueError, match="Cryptographic FHE gate rejected"):
+    with pytest.raises((ValueError, TypeError), match="Cryptographic FHE gate rejected"):
         verify_cryptographic_fhe(emul_weights)
 
-    # Case E: Decryption succeeds for emulated weights back to ModelWeights
+    # Case E: Decryption succeeds for emulated weights back to ModelWeights when using emulated key ring
     dec = FHEDriver.decrypt_weights(emul_weights, emul_kr, [(2, 2)])
     assert isinstance(dec, ModelWeights)
     assert len(dec.flat_weights) == 4
@@ -964,9 +978,21 @@ def test_fhe_capability_semantics_and_emulation_separation(monkeypatch: pytest.M
         assert real_kr.backend_provenance == FHEBackendProvenance.REAL_CKKS.value
 
         real_enc = FHEDriver.encrypt_weights(weights, real_kr)
-        assert real_enc.is_cryptographic is True
+        assert isinstance(real_enc, EncryptedWeights)
         assert not isinstance(real_enc, EmulatedWeights)
+        assert real_enc.is_cryptographic is True
         assert verify_cryptographic_fhe(real_enc) is True
+
+        # Real serialized payload remains cryptographic
+        real_dict = real_enc.to_dict()
+        assert real_dict["payload_type"] == "CRYPTOGRAPHIC_ENCRYPTED_WEIGHTS"
+        restored_real = EncryptedWeights.from_dict(real_dict)
+        assert isinstance(restored_real, EncryptedWeights)
+        assert not isinstance(restored_real, EmulatedWeights)
+
+        # Emulated weights cannot enter real decrypt path with require_cryptographic=True
+        with pytest.raises(ValueError, match="cannot decrypt EmulatedWeights with authentic CKKS key ring"):
+            FHEDriver.decrypt_weights(emul_weights, real_kr, [(2, 2)], require_cryptographic=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1185,6 +1211,131 @@ def test_loader_fail_closed_contract_matrix(tmp_path: Path) -> None:
     df_amlnet_nan = pd.DataFrame({"isMoneyLaundering": [0.0, np.nan], "amount": [50.0, 100.0]})
     with pytest.raises(ValueError, match="contains missing or NaN labels"):
         _process_amlnet_dataframe(df_amlnet_nan)
+
+
+# ---------------------------------------------------------------------------
+# 42. Kafka Capability Mode Fail-Closed & In-Memory Distinction (Part III)
+# ---------------------------------------------------------------------------
+def test_kafka_capability_mode_fail_closed_and_in_memory_distinction() -> None:
+    """Verify KAFKA_REQUIRED fails closed when producer is absent, and IN_MEMORY is explicitly distinct."""
+    from app.domain.enums import KafkaCapabilityMode
+    from app.infrastructure.event_bus import EventBus, AlertCreated
+
+    bus = EventBus()
+    event = AlertCreated(alert_id="alt_999", bank_id="bank_a", risk_score=0.9)
+
+    # Case A: KAFKA_REQUIRED + No producer -> FAIL CLOSED
+    with pytest.raises(RuntimeError, match="Kafka delivery required .* but no active Kafka producer client is connected"):
+        bus.publish(event, capability_mode=KafkaCapabilityMode.KAFKA_REQUIRED)
+
+    # Case B: IN_MEMORY_EXPLICIT -> Succeeds with explicit in-memory status
+    event2 = AlertCreated(alert_id="alt_1000", bank_id="bank_b", risk_score=0.5)
+    bus.publish(event2, capability_mode=KafkaCapabilityMode.IN_MEMORY_EXPLICIT)
+    assert event2.metadata["kafka_publish"]["status"] == "IN_MEMORY_EVENT_BUS"
+    assert event2.metadata["kafka_publish"]["provenance"] == "IN_MEMORY"
+    assert event2.metadata["kafka_publish"]["broker"] is None
+
+    # Case C: Fake producer with genuine RecordMetadata ack
+    class FakeAck:
+        topic = "domain_events.alert.created"
+        partition = 2
+        offset = 42
+
+    class FakeFuture:
+        def get(self, timeout: float = 2.0):
+            return FakeAck()
+
+    class FakeProducer:
+        def send(self, topic: str, key: bytes, value: bytes):
+            return FakeFuture()
+
+    bus.set_kafka_producer(FakeProducer())
+    event3 = AlertCreated(alert_id="alt_1001", bank_id="bank_c", risk_score=0.8)
+    bus.publish(event3, capability_mode=KafkaCapabilityMode.KAFKA_REQUIRED)
+    assert event3.metadata["kafka_publish"]["status"] == "BROKER_ACKNOWLEDGED"
+    assert event3.metadata["kafka_publish"]["partition"] == 2
+    assert event3.metadata["kafka_publish"]["offset"] == 42
+
+
+# ---------------------------------------------------------------------------
+# 43. PR-AUC Truth & No Fabricated 0.5 Score (Part VII)
+# ---------------------------------------------------------------------------
+def test_pr_auc_truth_no_fabricated_half_score() -> None:
+    """Verify PR-AUC computation does not invent a plausible 0.5 score for degenerate inputs."""
+    from app.domain.metrics_service import (
+        compute_pr_auc,
+        compute_pr_auc_with_status,
+        safe_pr_auc_score,
+    )
+
+    # Single-class labels: PR-AUC is mathematically undefined
+    y_single = [0, 0, 0, 0]
+    y_pred = [0.1, 0.2, 0.3, 0.4]
+
+    score, is_def, status = compute_pr_auc_with_status(y_single, y_pred, default=0.0)
+    assert is_def is False
+    assert status == "undefined_single_class"
+    assert score == 0.0
+
+    # compute_pr_auc returns 0.0, NOT 0.5
+    raw_score = compute_pr_auc(y_single, y_pred, default=0.0)
+    assert raw_score == 0.0
+
+    # safe_pr_auc_score returns default (0.0)
+    safe_score = safe_pr_auc_score(y_single, y_pred, default=0.0)
+    assert safe_score == 0.0
+
+    # Empty inputs
+    score_empty, is_def_e, status_e = compute_pr_auc_with_status([], [], default=0.0)
+    assert is_def_e is False
+    assert status_e == "undefined_empty"
+    assert score_empty == 0.0
+
+    # Two-class legitimate input
+    y_two = [0, 1, 0, 1]
+    y_pred_two = [0.1, 0.9, 0.2, 0.8]
+    score_two, is_def_t, status_t = compute_pr_auc_with_status(y_two, y_pred_two)
+    assert is_def_t is True
+    assert status_t == "defined"
+    assert score_two == 1.0
+
+
+# ---------------------------------------------------------------------------
+# 44. Elliptic Deterministic Label Contract & Invalid Encoding Rejection (Part IV)
+# ---------------------------------------------------------------------------
+def test_elliptic_loader_deterministic_contract_and_invalid_encoding_rejection(tmp_path: Path) -> None:
+    """Verify Elliptic loader fails closed on NaN labels and rejects invalid encoding strings."""
+    from app.application.services.dataloader import load_elliptic
+
+    # Prepare minimal directory structure for Elliptic fixture
+    feat_file = tmp_path / "elliptic_txs_features.csv"
+    cls_file = tmp_path / "elliptic_txs_classes.csv"
+    edge_file = tmp_path / "elliptic_txs_edgelist.csv"
+
+    edge_file.write_text("txId1,txId2\n101,102\n")
+    feat_file.write_text("101,1,0.5,0.6\n102,1,0.2,0.3\n103,1,0.1,0.4\n")
+
+    # Case A: NaN in class column -> Fail Closed
+    cls_file.write_text("txId,class\n101,1\n102,\n103,2\n")
+    with pytest.raises(ValueError, match="Elliptic dataset contains NaN or missing values in label column"):
+        load_elliptic(path=tmp_path, use_cache=False)
+
+    # Case B: Invalid encoding string (e.g. '3' or 'malformed') -> Fail Closed
+    cls_file.write_text("txId,class\n101,1\n102,invalid_code\n103,2\n")
+    with pytest.raises(ValueError, match="Elliptic dataset contains invalid label encodings"):
+        load_elliptic(path=tmp_path, use_cache=False)
+
+    # Case C: Valid classes {'1', '2'} with include_unknown=False -> 1=illicit, 0=licit
+    cls_file.write_text("txId,class\n101,1\n102,2\n103,unknown\n")
+    data_sup = load_elliptic(path=tmp_path, use_cache=False, include_unknown=False)
+    assert len(data_sup["y"]) == 2
+    assert set(data_sup["y"].tolist()) == {0, 1}
+
+    # Case D: Valid classes with include_unknown=True -> unknown mapped to -1
+    data_all = load_elliptic(path=tmp_path, use_cache=False, include_unknown=True)
+    assert len(data_all["y"]) == 3
+    assert -1 in data_all["y"].tolist()
+
 
 
 
