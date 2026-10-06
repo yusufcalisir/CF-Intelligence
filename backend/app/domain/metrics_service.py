@@ -124,7 +124,8 @@ def compute_roc_auc_with_status(
         if np.isnan(val):
             return default, False, MetricStatusCode.COMPUTATION_ERROR.value
         return round(val, 4), True, MetricStatusCode.DEFINED.value
-    except Exception:
+    except Exception as exc:
+        logger.error("Internal computation failure calculating ROC-AUC: %s", exc, exc_info=True)
         return default, False, MetricStatusCode.COMPUTATION_ERROR.value
 
 
@@ -167,7 +168,8 @@ def compute_pr_auc_with_status(
         if np.isnan(val):
             return default, False, MetricStatusCode.COMPUTATION_ERROR.value
         return round(val, 4), True, MetricStatusCode.DEFINED.value
-    except Exception:
+    except Exception as exc:
+        logger.error("Internal computation failure calculating PR-AUC: %s", exc, exc_info=True)
         return default, False, MetricStatusCode.COMPUTATION_ERROR.value
 
 
@@ -233,7 +235,8 @@ def safe_f1_score(
         zero_div: Any = 0
         val = float(f1_score(y_t, preds, zero_division=zero_div))
         return default if np.isnan(val) else val
-    except Exception:
+    except Exception as exc:
+        logger.error("Internal computation failure calculating F1 score: %s", exc, exc_info=True)
         return default
 
 

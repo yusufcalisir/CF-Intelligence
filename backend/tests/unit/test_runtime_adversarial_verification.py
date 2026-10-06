@@ -1467,6 +1467,25 @@ def test_kafka_correlation_multi_dimensional_identity_and_idempotency() -> None:
     with pytest.raises(ValueError, match="model_id mismatch"):
         KafkaBankConnector.correlate_worker_result(cmd_meta, wrong_model_worker)
 
+    # Case E: Model version mismatch -> Fail Closed
+    cmd_meta_ver = {**cmd_meta, "model_version": 2}
+    worker_wrong_ver = {**valid_worker, "model_version": 1}
+    with pytest.raises(ValueError, match="model_version mismatch"):
+        KafkaBankConnector.correlate_worker_result(cmd_meta_ver, worker_wrong_ver)
+
+    # Case F: Checkpoint ID mismatch -> Fail Closed
+    cmd_meta_ckpt = {**cmd_meta, "checkpoint_id": "ckpt-r3-init"}
+    worker_wrong_ckpt = {**valid_worker, "checkpoint_id": "ckpt-r2-stale"}
+    with pytest.raises(ValueError, match="checkpoint_id mismatch"):
+        KafkaBankConnector.correlate_worker_result(cmd_meta_ckpt, worker_wrong_ckpt)
+
+    # Case G: Process restart redelivery (new process-local set)
+    restart_processed_set: set[str] = set()
+    res_restarted = KafkaBankConnector.correlate_worker_result(cmd_meta, valid_worker, restart_processed_set)
+    assert res_restarted["status"] == "PROCESSED"
+    assert res_restarted["idempotent_duplicate"] is False
+    assert "cid-abc-123" in restart_processed_set
+
 
 # ---------------------------------------------------------------------------
 # 47. Elliptic Deterministic Label Contract & Invalid Encoding Rejection (Part IV)

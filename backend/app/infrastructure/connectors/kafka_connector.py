@@ -195,7 +195,21 @@ class KafkaBankConnector(BankConnectorInterface):
                 f"Correlation failed: model_id mismatch: expected '{model_id}', received '{w_model_id}'"
             )
 
-        # Deterministic idempotency: duplicate results do not double-apply metrics or state transitions
+        model_version = command_meta.get("model_version")
+        w_model_version = worker_result.get("model_version")
+        if model_version is not None and w_model_version is not None and model_version != w_model_version:
+            raise ValueError(
+                f"Correlation failed: model_version mismatch: expected '{model_version}', received '{w_model_version}'"
+            )
+
+        checkpoint_id = command_meta.get("checkpoint_id")
+        w_checkpoint_id = worker_result.get("checkpoint_id")
+        if checkpoint_id and w_checkpoint_id and checkpoint_id != w_checkpoint_id:
+            raise ValueError(
+                f"Correlation failed: checkpoint_id mismatch: expected '{checkpoint_id}', received '{w_checkpoint_id}'"
+            )
+
+        # Scoped as PROCESS_LOCAL_DUPLICATE_SUPPRESSION: in-memory duplicate suppression within process lifetime
         if processed_correlation_ids is not None and cid in processed_correlation_ids:
             return {
                 "status": "DUPLICATE_IGNORED",
@@ -206,6 +220,8 @@ class KafkaBankConnector(BankConnectorInterface):
                 "run_id": run_id,
                 "round_id": round_id,
                 "model_id": model_id,
+                "model_version": model_version,
+                "checkpoint_id": checkpoint_id,
                 "idempotent_duplicate": True,
                 "loss": None,
                 "metrics": None,
@@ -224,6 +240,8 @@ class KafkaBankConnector(BankConnectorInterface):
             "run_id": run_id,
             "round_id": round_id,
             "model_id": model_id,
+            "model_version": model_version,
+            "checkpoint_id": checkpoint_id,
             "idempotent_duplicate": False,
             "loss": worker_result.get("loss"),
             "metrics": worker_result.get("metrics"),
