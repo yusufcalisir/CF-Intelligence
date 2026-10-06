@@ -221,7 +221,7 @@ class FHEDriver:
     ) -> FHEKeyRing:
         """Generate TenSEAL CKKS key ring respecting explicit capability mode contract."""
         start_time = time.perf_counter()
-        mode_val = capability_mode.value if isinstance(capability_mode, FHECapabilityMode) else str(capability_mode).upper()
+        mode_val = capability_mode.value if isinstance(capability_mode, FHECapabilityMode) else capability_mode.upper()
 
         if mode_val == FHECapabilityMode.FHE_DISABLED.value:
             raise ValueError("FHE capability is marked FHE_DISABLED. Key generation rejected.")
