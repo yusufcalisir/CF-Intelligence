@@ -15,7 +15,7 @@
     },
     {
       "CLAIM_ID": "CLM-CC-02",
-      "CLAIM": "Federated aggregation rescues near-zero fraud banking silos (Bank C) from statistical collapse under extreme non-IID data distribution.",
+      "CLAIM": "On the shared held-out evaluation population (56,962 transactions, 99 fraud cases) under extreme non-IID partition skew, the collaborative federated global model achieved PR-AUC 0.7788 versus 0.6113 for the Bank C silo-only model (an absolute difference of +0.1675).",
       "SUPPORTED_BY": "RU-CC-01",
       "DATASET": "European Credit Card Fraud Detection",
       "SCIENTIFIC_ORIGIN": "EMPIRICAL",
@@ -23,6 +23,7 @@
       "RESULT_ARTIFACT": "verification/scientific_revalidation/results/RU-CC-01/metrics.json",
       "RUN_ID": "RUN-RU-CC-01",
       "PROTOCOL_VERSION": "1.0",
+      "COMPARISON_TYPE": "HELD_OUT_EVALUATION_OBSERVATION",
       "STATUS": "SUPPORTED"
     },
     {
@@ -39,14 +40,15 @@
     },
     {
       "CLAIM_ID": "CLM-EL-01",
-      "CLAIM": "Inductive GraphSAGE 2-layer neighborhood aggregation provides significant detection uplift over 0-hop tabular MLP on the Elliptic Bitcoin transaction network under strict temporal partitioning.",
+      "CLAIM": "Under preregistered leakage-free temporal evaluation on the Elliptic Bitcoin transaction network, 2-layer GraphSAGE underperformed the 0-hop tabular MLP baseline. GraphSAGE achieved PR-AUC 0.3761 ± 0.0482 (seed 42: 0.4265), whereas the 0-hop tabular MLP baseline achieved PR-AUC 0.5778 (delta = -0.1513 vs seed 42, -0.2017 vs mean); graph neighborhood aggregation thus yielded a negative result relative to the tabular baseline without message passing.",
       "SUPPORTED_BY": "RU-EL-01",
       "DATASET": "Elliptic Bitcoin Transaction Graph (Real)",
       "SCIENTIFIC_ORIGIN": "EMPIRICAL",
-      "METRIC": "uplift_vs_tabular_mlp.delta_pr_auc_vs_mlp",
-      "RESULT_ARTIFACT": "verification/scientific_revalidation/results/RU-EL-01/metrics.json",
+      "METRIC": "comparative_baselines.models[0].delta_pr_auc_vs_tabular",
+      "RESULT_ARTIFACT": "verification/scientific_revalidation/results/RU-EL-01/comparative_baselines.json",
       "RUN_ID": "RUN-RU-EL-01",
       "PROTOCOL_VERSION": "1.0",
+      "COMPARISON_TYPE": "ARCHITECTURE_ABLATION",
       "STATUS": "SUPPORTED"
     },
     {
@@ -63,15 +65,16 @@
     },
     {
       "CLAIM_ID": "CLM-AML-01",
-      "CLAIM": "Graph representation learning detects multi-hop money laundering patterns on agent-simulated transaction networks (AMLSim).",
-      "SUPPORTED_BY": "RU-AML-01",
+      "CLAIM": "Inductive GraphSAGE with multi-hop neighborhood aggregation detects transaction-level money laundering alerts and structural typologies (Cycle and Fan-In patterns) on agent-simulated transaction networks (AMLSim) under strict chronological temporal evaluation.",
+      "SUPPORTED_BY": "RU-AML-02",
       "DATASET": "IBM AMLSim Agent-Based Multi-Hop Transaction Graph",
       "SCIENTIFIC_ORIGIN": "SIMULATED",
       "METRIC": "pr_auc",
-      "RESULT_ARTIFACT": "verification/scientific_revalidation/results/RU-AML-01/metrics.json",
-      "RUN_ID": "RUN-RU-AML-01",
+      "RESULT_ARTIFACT": "verification/scientific_revalidation/results/RU-AML-02/metrics.json",
+      "RUN_ID": "RUN-RU-AML-02",
       "PROTOCOL_VERSION": "1.0",
-      "STATUS": "INSUFFICIENT_EVIDENCE"
+      "COMPARISON_TYPE": "ARCHITECTURE_ABLATION",
+      "STATUS": "PREREGISTERED_PENDING_EXECUTION"
     },
     {
       "CLAIM_ID": "CLM-MS-01",

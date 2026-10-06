@@ -1,0 +1,16 @@
+{
+  "unit_id": "RU-AML-02",
+  "acceptance_criteria": {
+    "physical_dataset_verified": "transactions.parquet loaded and verified by SHA-256 (b3dc9b72f985e7247198f81df8d4db7c559d93dfd7d00fb4ec18a6b0b368647c).",
+    "row_count_verified": "Full 1,323,234 transactions loaded without sample truncation or row cap.",
+    "scientific_origin_truthfulness": "Labelled strictly as SIMULATED.",
+    "data_006_remediated": "Labels verified binary {0, 1}; NaN/missing labels fail closed without boolean coercion.",
+    "temporal_split_isolation": "Chronological split on TIMESTAMP (70% train / 30% test; cutoff=140). Zero lookahead.",
+    "graph_leakage_prevented": "Graph adjacency and node features constructed strictly from training transactions.",
+    "full_intended_execution": "Complete 15-epoch training and evaluation on full dataset without smoke substitution.",
+    "model_checkpoint_preserved": "GraphSAGE model weights and configuration saved with SHA-256 hash.",
+    "raw_predictions_preserved": "Test predictions table saved with row indices, true labels, prediction scores, and thresholded predictions.",
+    "metrics_reproducible": "Metrics reproducible from stored prediction records within numerical tolerance 1e-4.",
+    "historical_artifacts_untouched": "Zero modification to historical benchmarks/results/raw/fraud_benchmark_amlsim.json."
+  }
+}

@@ -57,6 +57,18 @@
       "statistical_derivation": "Sample mean, std (ddof=1), and 95% Student-t CI derived programmatically from stored per-seed outputs.",
       "scientific_origin_truthfulness": "Labelled strictly as SYNTHETIC.",
       "output_isolated": "Results saved into verification/scientific_revalidation/results/RU-MS-01; raw historical JSON untouched."
+    },
+    "RU-AML-02": {
+      "physical_dataset_verified": true,
+      "sha256_match_required": "b3dc9b72f985e7247198f81df8d4db7c559d93dfd7d00fb4ec18a6b0b368647c",
+      "data_006_remediated": "Labels verified binary {0, 1}; NaN/missing labels fail closed without boolean coercion.",
+      "full_rerun_contract": "Full intended scientific rerun on 1,323,234 transactions with seed=42; zero smoke substitution.",
+      "zero_leakage_split": "Strict chronological temporal split (70% train / 30% test) on TIMESTAMP <= 140 vs > 140.",
+      "graph_leakage_guard": "Graph adjacency and node features constructed strictly from training transactions.",
+      "raw_predictions_preserved": "Per-transaction prediction scores and true labels saved for independent metric reproduction.",
+      "model_checkpoint_preserved": "GraphSAGE model weights and configuration saved with SHA-256 hash.",
+      "scientific_origin_truthfulness": "Labelled strictly as SIMULATED.",
+      "output_isolated": "Results saved into verification/scientific_revalidation/results/RU-AML-02; raw historical JSON untouched."
     }
   }
 }

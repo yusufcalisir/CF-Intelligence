@@ -1,0 +1,22 @@
+{
+  "unit_id": "RU-AML-02",
+  "experiment_name": "IBM AMLSim Multi-Hop Pattern Detection Canonical Revalidation",
+  "seed": 42,
+  "epochs": 15,
+  "learning_rate": 0.005,
+  "weight_decay": 0.0001,
+  "hidden_dim": 64,
+  "embedding_dim": 32,
+  "dropout": 0.2,
+  "all_rows": true,
+  "require_real": true,
+  "temporal_split_quantile": 0.70,
+  "threshold_quantile": 0.99,
+  "models": [
+    "graphsage_2layer_champion",
+    "graphsage_1layer_ablation",
+    "tabular_mlp_0hop",
+    "random_forest",
+    "logistic_regression"
+  ]
+}

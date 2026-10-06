@@ -1,0 +1,25 @@
+{
+  "dataset_id": "amlsim",
+  "dataset_name": "IBM AMLSim Agent-Based Multi-Hop Transaction Graph",
+  "scientific_origin": "SIMULATED",
+  "file_path": "backend/storage/datasets/amlsim/transactions.parquet",
+  "file_size_bytes": 11987007,
+  "row_count": 1323234,
+  "column_count": 8,
+  "sha256": "b3dc9b72f985e7247198f81df8d4db7c559d93dfd7d00fb4ec18a6b0b368647c",
+  "hash_algorithm": "SHA-256",
+  "target_column": "IS_FRAUD",
+  "positive_label_count": 1719,
+  "negative_label_count": 1321515,
+  "null_count": 0,
+  "nan_count": 0,
+  "timesteps_min": 0,
+  "timesteps_max": 199,
+  "accounts_count": 10000,
+  "license": "Apache 2.0",
+  "provenance_notes": [
+    "Generated via IBM AMLSim simulation engine (Suzumura et al.).",
+    "Origin strictly labeled SIMULATED (never empirical real-world transactions).",
+    "SHA-256 verified against physical parquet artifact."
+  ]
+}

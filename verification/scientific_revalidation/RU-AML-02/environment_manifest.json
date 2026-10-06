@@ -1,0 +1,32 @@
+{
+  "unit_id": "RU-AML-02",
+  "generated_at_utc": "2026-10-06T17:45:00Z",
+  "system": {
+    "os": "Windows",
+    "os_version": "10.0.26300",
+    "architecture": "AMD64",
+    "processor": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "cpu_physical_cores": 8,
+    "cpu_logical_cores": 16,
+    "total_ram_gb": 7.34
+  },
+  "runtime": {
+    "python_version": "3.12.10",
+    "python_executable": "C:\\Users\\Yusuf\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+  },
+  "accelerator": {
+    "cuda_available": false,
+    "device_count": 0,
+    "gpu_model": "NONE_CPU_EXECUTION"
+  },
+  "dependencies": {
+    "torch": "2.12.0+cpu",
+    "numpy": "2.4.6",
+    "pandas": "2.3.3",
+    "scipy": "1.17.1",
+    "scikit-learn": "1.8.0",
+    "networkx": "3.6.1",
+    "pydantic": "2.13.4",
+    "matplotlib": "3.10.9"
+  }
+}
