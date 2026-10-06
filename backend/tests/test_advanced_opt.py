@@ -10,10 +10,7 @@ import numpy as np
 import pytest
 
 from app.application.services.dataloader import (
-    load_amlsim,
     load_dataset,
-    load_elliptic,
-    load_paysim,
 )
 from app.application.services.fl_engine import FederatedLearningEngine
 from app.application.services.model_service import NUM_FEATURES, ModelService
@@ -61,7 +58,9 @@ def _make_client_weights(n: int = 3, dim: int = 100, noise: float = 0.1) -> list
 
 class TestEllipticLoader:
     def test_mock_returns_correct_shape(self, tmp_path):
-        from app.application.services.synthetic_dataset_generators import generate_synthetic_elliptic
+        from app.application.services.synthetic_dataset_generators import (
+            generate_synthetic_elliptic,
+        )
 
         rng = np.random.default_rng(0)
         result = generate_synthetic_elliptic(n_mock_nodes=500, rng=rng)
@@ -71,14 +70,18 @@ class TestEllipticLoader:
         assert isinstance(result["edges"], list)
 
     def test_mock_labels_are_binary(self, tmp_path):
-        from app.application.services.synthetic_dataset_generators import generate_synthetic_elliptic
+        from app.application.services.synthetic_dataset_generators import (
+            generate_synthetic_elliptic,
+        )
 
         result = generate_synthetic_elliptic(n_mock_nodes=1000, rng=np.random.default_rng(1))
         unique = set(result["y"].tolist())
         assert unique <= {0, 1}
 
     def test_mock_illicit_ratio_approximately_correct(self, tmp_path):
-        from app.application.services.synthetic_dataset_generators import generate_synthetic_elliptic
+        from app.application.services.synthetic_dataset_generators import (
+            generate_synthetic_elliptic,
+        )
 
         result = generate_synthetic_elliptic(n_mock_nodes=5000, rng=np.random.default_rng(2))
         illicit_frac = result["y"].mean()
@@ -86,7 +89,9 @@ class TestEllipticLoader:
         assert abs(illicit_frac - 0.021) < 0.015
 
     def test_mock_has_edges(self, tmp_path):
-        from app.application.services.synthetic_dataset_generators import generate_synthetic_elliptic
+        from app.application.services.synthetic_dataset_generators import (
+            generate_synthetic_elliptic,
+        )
 
         result = generate_synthetic_elliptic(n_mock_nodes=200, rng=np.random.default_rng(3))
         assert len(result["edges"]) > 0

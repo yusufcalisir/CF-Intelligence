@@ -24,26 +24,22 @@ Guarantees repository-wide compliance with AGENTS.md runtime truth rules:
 from __future__ import annotations
 
 import os
-import sys
-import tempfile
 import uuid
 from pathlib import Path
 from typing import Any, cast
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 import torch
+from benchmarks.runners.run_latency_benchmark import validate_sample_size_for_percentiles
 from fastapi.testclient import TestClient
 
 from app.application.services.feature_service import KNOWN_OUTCOME_FEATURE_PATTERNS
 from app.application.services.graph_embedding_model import extract_node_features
-from app.application.services.graph_embedding_service import GraphEmbeddingService
 from app.application.services.security_compliance import SecurityComplianceEngine
-from app.dependencies import get_session
 from app.domain.enums import EntityType, RiskLevel
 from app.main import app
-from benchmarks.runners.run_latency_benchmark import validate_sample_size_for_percentiles
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +65,11 @@ def test_random_value_cannot_substitute_for_missing_real_value() -> None:
 # ---------------------------------------------------------------------------
 def test_runtime_prediction_is_not_constant() -> None:
     """Distinct physical inputs must produce dynamically computed, non-identical forward scores."""
-    from app.presentation.routers.predict import _eval_model, _get_cached_serving_model, preprocess_transaction
+    from app.presentation.routers.predict import (
+        _eval_model,
+        _get_cached_serving_model,
+        preprocess_transaction,
+    )
 
     model = _get_cached_serving_model(None)
 
@@ -172,6 +172,7 @@ def test_test_partition_unavailable_to_threshold_selection() -> None:
 def test_missing_model_fails_closed() -> None:
     """When a model simulation checkpoint is missing, it must fail closed, never return a dummy model."""
     from fastapi import HTTPException
+
     from app.presentation.routers.predict import _get_cached_serving_model
 
     non_existent_id = str(uuid.uuid4())
@@ -478,6 +479,7 @@ def test_auto_rollback_triggers_on_non_finite_metric_anomaly() -> None:
 def test_streaming_graph_ingestion_does_not_leak_is_fraud() -> None:
     """Streaming graph ingestion must not mutate node risk_level or alert_count from is_fraud."""
     from datetime import UTC, datetime
+
     from app.application.services.streaming_graph_service import StreamingGraphService
 
     engine = StreamingGraphService(max_window_minutes=60)
@@ -581,7 +583,9 @@ def test_flower_backend_rejects_native_fallback_when_secagg_requested(monkeypatc
 def test_model_registry_promote_distinguishes_validity_from_quality() -> None:
     """Model promotion must reject bool/str AUC and distinguish valid 0.0 from threshold failure."""
     import asyncio
+
     from fastapi import HTTPException
+
     from app.presentation.routers.model_registry import (
         ModelPromoteRequest,
         promote_model_version,
@@ -616,7 +620,7 @@ def test_model_registry_promote_distinguishes_validity_from_quality() -> None:
     v1_meta = registry.save_version(
         simulation_id=sim_id,
         state_dict={},
-        metrics=cast(Any, {"auc_roc": True}),
+        metrics=cast("Any", {"auc_roc": True}),
     )
     v1 = v1_meta["version"]
     with pytest.raises(HTTPException) as exc_info_bool:
@@ -638,7 +642,7 @@ def test_model_registry_promote_distinguishes_validity_from_quality() -> None:
     v2_meta = registry.save_version(
         simulation_id=sim_id,
         state_dict={},
-        metrics=cast(Any, {"auc_roc": "0.95"}),
+        metrics=cast("Any", {"auc_roc": "0.95"}),
     )
     v2 = v2_meta["version"]
     with pytest.raises(HTTPException) as exc_info_str:
@@ -776,6 +780,7 @@ def test_canary_gate_rejects_bool_and_string_metrics() -> None:
 def test_dataloader_missing_label_fails_closed() -> None:
     """Loaders must fail closed with ValueError when target label column is missing, never fabricating zeros."""
     import pandas as pd
+
     from app.application.services.dataloader import (
         _process_amlnet_dataframe,
         _process_amlsim_dataframe,
@@ -805,7 +810,7 @@ def test_fhe_emulation_provenance_truth() -> None:
     """FHEDriver and SimulationRun must truthfully reflect whether FHE is real TenSEAL or software emulated."""
     from app.domain.entities import SimulationConfig, SimulationRun
     from app.domain.value_objects import ModelWeights
-    from app.infrastructure.security.fhe_driver import FHEDriver, TENSEAL_AVAILABLE
+    from app.infrastructure.security.fhe_driver import TENSEAL_AVAILABLE, FHEDriver
 
     keyring = FHEDriver.generate_keys("sim_test_fhe")
     assert hasattr(keyring, "is_emulated")
@@ -831,8 +836,8 @@ def test_fhe_emulation_provenance_truth() -> None:
 # ---------------------------------------------------------------------------
 def test_bank_hardware_enclave_truth() -> None:
     """Bank configurations and ConsortiumStatusResponse must declare hardware enclave backing accurately."""
-    from app.presentation.routers.banks import BANK_CONFIGS
     from app.infrastructure.security.tee_driver import is_sgx_hardware_available
+    from app.presentation.routers.banks import BANK_CONFIGS
 
     hw_avail = is_sgx_hardware_available()
     for bank in BANK_CONFIGS:
@@ -847,9 +852,11 @@ def test_bank_hardware_enclave_truth() -> None:
 def test_hmac_tokenize_salt_provenance_and_security(monkeypatch: pytest.MonkeyPatch) -> None:
     """Tokenize must reject default salt in production and record salt provenance."""
     import asyncio
+
     from fastapi import HTTPException
-    from app.presentation.routers.entities import tokenize_raw_identifier
+
     from app.application.schemas.entities import HMACTokenizeRequest
+    from app.presentation.routers.entities import tokenize_raw_identifier
 
     # Development mode: allows default salt with warning and provenance marker
     monkeypatch.setenv("ENVIRONMENT", "development")
@@ -870,8 +877,8 @@ def test_hmac_tokenize_salt_provenance_and_security(monkeypatch: pytest.MonkeyPa
 # ---------------------------------------------------------------------------
 def test_event_bus_kafka_no_fake_metadata_when_producer_absent(monkeypatch: pytest.MonkeyPatch) -> None:
     """EventBus must NOT fabricate partition and offset when Kafka producer is not connected."""
-    from app.infrastructure.event_bus import AlertCreated, EventBus
     from app.config import get_settings
+    from app.infrastructure.event_bus import AlertCreated, EventBus
 
     settings = get_settings()
     monkeypatch.setattr(settings, "use_kafka", True)
@@ -891,8 +898,8 @@ def test_event_bus_kafka_no_fake_metadata_when_producer_absent(monkeypatch: pyte
 # ---------------------------------------------------------------------------
 def test_kafka_connector_no_fabricated_metrics() -> None:
     """KafkaBankConnector must return COMMAND_PUBLISHED and None for unmeasured metrics."""
-    from app.infrastructure.connectors.kafka_connector import KafkaBankConnector
     from app.domain.value_objects import ModelWeights
+    from app.infrastructure.connectors.kafka_connector import KafkaBankConnector
 
     connector = KafkaBankConnector(bootstrap_servers="localhost:9092")
     weights = ModelWeights(layer_shapes=[(2, 2)], flat_weights=[0.1, 0.2, 0.3, 0.4])
@@ -913,14 +920,14 @@ def test_kafka_connector_no_fabricated_metrics() -> None:
 # ---------------------------------------------------------------------------
 def test_fhe_capability_semantics_and_emulation_separation(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify FHE capability modes: fail-closed on required when TenSEAL missing, and distinct EmulatedWeights."""
+    from app.domain.enums import FHEBackendProvenance, FHECapabilityMode
+    from app.domain.value_objects import ModelWeights
     from app.infrastructure.security.fhe_driver import (
-        FHEDriver,
         EmulatedWeights,
         EncryptedWeights,
+        FHEDriver,
         verify_cryptographic_fhe,
     )
-    from app.domain.enums import FHECapabilityMode, FHEBackendProvenance
-    from app.domain.value_objects import ModelWeights
 
     weights = ModelWeights(layer_shapes=[(2, 2)], flat_weights=[0.1, 0.2, 0.3, 0.4])
 
@@ -1000,12 +1007,12 @@ def test_fhe_capability_semantics_and_emulation_separation(monkeypatch: pytest.M
 # ---------------------------------------------------------------------------
 def test_tee_device_availability_vs_hardware_attestation(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify device presence (/dev/sgx_enclave) does NOT equal verified hardware attestation."""
+    from app.domain.enums import TEECapabilityMode
     from app.infrastructure.security.tee_driver import (
-        TEEDriver,
         EmulatedAttestationReport,
+        TEEDriver,
         verify_hardware_attestation,
     )
-    from app.domain.enums import TEECapabilityMode
 
     # Context creation
     ctx = TEEDriver.create_enclave("sim_tee_test")
@@ -1042,9 +1049,11 @@ def test_tee_device_availability_vs_hardware_attestation(monkeypatch: pytest.Mon
 def test_hmac_capability_secret_enforcement_and_stability(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify HMAC tokenization enforces secret requirement under capability mode and ensures stability."""
     import asyncio
+
     from fastapi import HTTPException
-    from app.presentation.routers.entities import tokenize_raw_identifier
+
     from app.application.schemas.entities import HMACTokenizeRequest
+    from app.presentation.routers.entities import tokenize_raw_identifier
 
     monkeypatch.delenv("CFI_HMAC_SALT", raising=False)
     monkeypatch.setenv("ENVIRONMENT", "development")
@@ -1085,10 +1094,10 @@ def test_hmac_capability_secret_enforcement_and_stability(monkeypatch: pytest.Mo
 # ---------------------------------------------------------------------------
 def test_kafka_broker_metadata_and_result_correlation(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify Kafka delivery metadata records real broker ack and correlation fails closed on mismatches."""
-    from app.infrastructure.event_bus import AlertCreated, EventBus
-    from app.infrastructure.connectors.kafka_connector import KafkaBankConnector
     from app.config import get_settings
     from app.domain.value_objects import ModelWeights
+    from app.infrastructure.connectors.kafka_connector import KafkaBankConnector
+    from app.infrastructure.event_bus import AlertCreated, EventBus
 
     settings = get_settings()
     monkeypatch.setattr(settings, "use_kafka", True)
@@ -1154,13 +1163,14 @@ def test_kafka_broker_metadata_and_result_correlation(monkeypatch: pytest.Monkey
 def test_loader_fail_closed_contract_matrix(tmp_path: Path) -> None:
     """Verify PaySim, Elliptic, IEEE-CIS, CreditCard, AMLSim, SynthAML, and AMLNet fail closed on empty and NaN labels."""
     import pandas as pd
+
     from app.application.services.dataloader import (
-        _process_paysim_dataframe,
-        _process_ieee_cis_dataframe,
-        _process_creditcard_dataframe,
-        _process_amlsim_dataframe,
         _aggregate_synthaml_alert_features,
         _process_amlnet_dataframe,
+        _process_amlsim_dataframe,
+        _process_creditcard_dataframe,
+        _process_ieee_cis_dataframe,
+        _process_paysim_dataframe,
     )
 
     # 1. PaySim: empty and NaN label
@@ -1219,7 +1229,7 @@ def test_loader_fail_closed_contract_matrix(tmp_path: Path) -> None:
 def test_kafka_capability_mode_fail_closed_and_in_memory_distinction() -> None:
     """Verify KAFKA_REQUIRED fails closed when producer is absent, and IN_MEMORY is explicitly distinct."""
     from app.domain.enums import KafkaCapabilityMode
-    from app.infrastructure.event_bus import EventBus, AlertCreated
+    from app.infrastructure.event_bus import AlertCreated, EventBus
 
     bus = EventBus()
     event = AlertCreated(alert_id="alt_999", bank_id="bank_a", risk_score=0.9)
@@ -1319,7 +1329,6 @@ def test_pr_auc_truth_no_fabricated_half_score() -> None:
 # ---------------------------------------------------------------------------
 def test_pr_auc_promotion_fails_closed_when_metric_unavailable() -> None:
     """Verify Challenger model is NEVER promoted when PR-AUC cannot be computed (single-class or empty)."""
-    from unittest.mock import MagicMock
     from app.application.services.model_registry import ModelEvaluationEngine
 
     registry_mock = MagicMock()
@@ -1366,6 +1375,7 @@ def test_pr_auc_promotion_fails_closed_when_metric_unavailable() -> None:
 def test_elliptic_unknown_node_loss_and_eval_masking_invariance() -> None:
     """Behavioral proof that changing predictions on y=-1 unknown nodes has zero effect on supervised loss and metrics."""
     import torch
+
     from app.application.services.graph_embedding_model import GraphSAGEModel
     from app.domain.metrics_service import compute_pr_auc, compute_roc_auc_with_status
 

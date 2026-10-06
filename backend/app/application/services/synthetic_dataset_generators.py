@@ -497,7 +497,6 @@ def generate_synthetic_creditcard(
     amount_vals = np.abs(rng.exponential(scale=88.0, size=n_mock_txns)).astype(np.float32)
     time_vals = rng.uniform(0.0, 172800.0, size=n_mock_txns).astype(np.float32)
 
-    import pandas as pd
     from app.application.services.dataloader import _process_creditcard_dataframe
 
     data_dict = {"Time": time_vals}
@@ -533,8 +532,8 @@ def generate_synthetic_synthaml(
 ) -> dict[str, Any]:
     """Generate in-process synthetic Spar Nord Bank SynthAML alert fixture."""
     rng = rng or np.random.default_rng(42)
-    import tempfile
     import sys
+    import tempfile
 
     repo_root = Path(__file__).resolve().parents[4]
     if str(repo_root) not in sys.path:
@@ -576,14 +575,15 @@ def generate_synthetic_amlnet(
 ) -> dict[str, Any]:
     """Generate in-process synthetic AUSTRAC AMLNet transaction fixture."""
     rng = rng or np.random.default_rng(42)
-    import tempfile
     import sys
+    import tempfile
 
     repo_root = Path(__file__).resolve().parents[4]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
     from scripts.generate_amlnet_dataset import generate_amlnet
+
     from app.application.services.dataloader import _process_amlnet_dataframe
 
     seed = int(rng.integers(0, 100000))

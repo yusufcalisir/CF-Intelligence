@@ -137,7 +137,9 @@ class TestSynthAMLLoader:
         with pytest.raises(FileNotFoundError, match="Real SynthAML dataset files not found"):
             load_synthaml(require_real=False, data_dir=empty_dir, n_mock_alerts=50, seed=123)
 
-        from app.application.services.synthetic_dataset_generators import generate_synthetic_synthaml
+        from app.application.services.synthetic_dataset_generators import (
+            generate_synthetic_synthaml,
+        )
 
         data = generate_synthetic_synthaml(n_mock_alerts=50)
         assert data["is_synthetic"] is True

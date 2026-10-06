@@ -379,13 +379,17 @@ class CoordinatorService:
                 auc_score = float(eval_auc)
             else:
                 logger.warning("Invalid eval_auc provided for round %d: %s. Metric rejected.", round_id, eval_auc)
-        elif validation_labels is not None and validation_preds is not None:
-            if len(validation_labels) > 0 and len(validation_labels) == len(validation_preds):
-                from app.domain.metrics_service import compute_pr_auc
+        elif (
+            validation_labels is not None
+            and validation_preds is not None
+            and len(validation_labels) > 0
+            and len(validation_labels) == len(validation_preds)
+        ):
+            from app.domain.metrics_service import compute_pr_auc
 
-                computed = compute_pr_auc(validation_labels, validation_preds)
-                if math.isfinite(computed) and 0.0 <= computed <= 1.0:
-                    auc_score = float(computed)
+            computed = compute_pr_auc(validation_labels, validation_preds)
+            if math.isfinite(computed) and 0.0 <= computed <= 1.0:
+                auc_score = float(computed)
 
         now_iso = datetime.now(UTC).isoformat()
         if auc_score is None:

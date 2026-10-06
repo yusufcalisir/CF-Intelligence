@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import numpy as np
+
 from app.application.services.retraining_trigger_engine import RetrainingTriggerEngine
 from app.tasks.simulation_tasks import execute_automated_retraining_task
 
@@ -66,9 +68,6 @@ def test_retraining_trigger_engine_evaluate_triggers() -> None:
     assert "INGESTION_THRESHOLD_REACHED" in res["reasons"]
     assert "STATISTICAL_DRIFT_DETECTED" in res["reasons"]
     assert "SCHEDULED_CADENCE_ELAPSED" not in res["reasons"]
-
-
-import numpy as np
 
 
 def test_execute_automated_retraining_task_execution() -> None:

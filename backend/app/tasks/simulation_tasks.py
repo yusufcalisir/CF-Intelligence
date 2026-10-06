@@ -190,7 +190,6 @@ def execute_automated_retraining_task(
     from app.application.services.model_service import ModelService
     from app.application.services.privacy_service import PrivacyService
     from app.config import get_settings
-    from app.infrastructure.feature_store.store import StreamingFeatureStore
 
     task_id = self.request.id or "in_process_task"
     logger.info(
@@ -203,7 +202,6 @@ def execute_automated_retraining_task(
     settings = get_settings()
     model_service = ModelService(settings)
     privacy_service = PrivacyService()
-    feature_store = StreamingFeatureStore()
 
     # Step 1: Validate presence of training data (AGENTS.md Rule 11: No training reported without optimizer steps)
     if X_train is None or y_train is None:

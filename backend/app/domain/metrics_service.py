@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass
+from enum import StrEnum
 from typing import Any
 
 import numpy as np
@@ -17,10 +18,7 @@ import numpy.typing as npt
 logger = logging.getLogger(__name__)
 
 
-from enum import Enum
-
-
-class MetricStatusCode(str, Enum):
+class MetricStatusCode(StrEnum):
     """Explicit lifecycle status for mathematical metric evaluations."""
 
     DEFINED = "defined"

@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 import torch
 import torch.nn as nn
-from sklearn.metrics import average_precision_score, roc_auc_score, roc_curve
+from sklearn.metrics import roc_curve
 from sklearn.model_selection import train_test_split
 
 from app.application.services.dataloader import load_elliptic
@@ -178,7 +178,10 @@ class EllipticBenchmarkService:
             # ------------------------------------------------------------------
             # 3. Quantitative Metric Evaluation (Strict Truth Semantics)
             # ------------------------------------------------------------------
-            from app.domain.metrics_service import compute_pr_auc_with_status, compute_roc_auc_with_status
+            from app.domain.metrics_service import (
+                compute_pr_auc_with_status,
+                compute_roc_auc_with_status,
+            )
 
             local_roc_auc_val, is_def_roc, _ = compute_roc_auc_with_status(y_test, local_test_scores)
             local_pr_auc_val, is_def_pr, _ = compute_pr_auc_with_status(y_test, local_test_scores)

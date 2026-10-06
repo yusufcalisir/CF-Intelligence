@@ -35,7 +35,10 @@ if str(REPO_ROOT) not in sys.path:
 if str(REPO_ROOT / "backend") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "backend"))
 
-from app.application.services.dataloader import load_creditcard_fraud, resolve_dataset_dir  # noqa: E402
+from app.application.services.dataloader import (  # noqa: E402
+    load_creditcard_fraud,
+    resolve_dataset_dir,
+)
 
 logger = logging.getLogger("experiments.credit_card.evaluate_thresholds")
 

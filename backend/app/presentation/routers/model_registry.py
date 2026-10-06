@@ -374,7 +374,7 @@ async def promote_model_version(
                     "(neither 'auc_roc' nor 'auc' is present in registry entry)."
                 ),
             )
-        if isinstance(auc_raw, bool) or isinstance(auc_raw, (str, bytes)):
+        if isinstance(auc_raw, (bool, str, bytes)):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"SR 11-7 Quality Gate Rejection: Model AUC ({auc_raw!r}) must be a numeric float, not {type(auc_raw).__name__}.",
@@ -408,7 +408,7 @@ async def promote_model_version(
                     status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail="SR 11-7 Quality Gate Rejection: Sign-off record is missing required 'fairness_score'.",
                 )
-            if isinstance(fairness_raw, bool) or isinstance(fairness_raw, (str, bytes)):
+            if isinstance(fairness_raw, (bool, str, bytes)):
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail=f"SR 11-7 Quality Gate Rejection: Disparate impact ratio ({fairness_raw!r}) must be a numeric float, not {type(fairness_raw).__name__}.",

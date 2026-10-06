@@ -90,7 +90,9 @@ class TestIEEECISLoader:
             load_ieee_cis(path=empty_dir, nrows=500, require_real=False)
 
         # Explicit synthetic generator produces controlled test fixture
-        from app.application.services.synthetic_dataset_generators import generate_synthetic_ieee_cis
+        from app.application.services.synthetic_dataset_generators import (
+            generate_synthetic_ieee_cis,
+        )
 
         mock_data = generate_synthetic_ieee_cis(n_mock_txns=500)
         assert mock_data["is_synthetic"] is True

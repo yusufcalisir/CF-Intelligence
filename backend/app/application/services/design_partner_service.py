@@ -28,7 +28,6 @@ from app.domain.distribution_fidelity_service import (
 from app.domain.metrics_service import (
     compute_financial_cost_utility,
     compute_multi_threshold_confusion_matrix,
-    compute_pr_auc,
     compute_recall_at_fpr,
 )
 
@@ -300,7 +299,10 @@ class DesignPartnerPilotService:
                     y_prob_fl = np.asarray(out_fl, dtype=np.float32).flatten()
 
             # Compute scientific metrics
-            from app.domain.metrics_service import compute_pr_auc_with_status, compute_roc_auc_with_status
+            from app.domain.metrics_service import (
+                compute_pr_auc_with_status,
+                compute_roc_auc_with_status,
+            )
 
             roc_fl_score, is_roc_fl, _ = compute_roc_auc_with_status(y, y_prob_fl)
             roc_local_score, is_roc_local, _ = compute_roc_auc_with_status(y, y_prob_local)

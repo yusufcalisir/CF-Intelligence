@@ -23,17 +23,16 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from app.domain.enums import DatasetProvenance
-from app.infrastructure.storage.storage_utils import get_storage_dir
 from app.application.services.synthetic_dataset_generators import (
     generate_synthetic_amlnet,
     generate_synthetic_amlsim,
-    generate_synthetic_creditcard,
     generate_synthetic_elliptic,
     generate_synthetic_ieee_cis,
     generate_synthetic_paysim,
     generate_synthetic_synthaml,
 )
+from app.domain.enums import DatasetProvenance
+from app.infrastructure.storage.storage_utils import get_storage_dir
 
 # Compatibility aliases for non-runtime test code
 _generate_mock_elliptic = generate_synthetic_elliptic

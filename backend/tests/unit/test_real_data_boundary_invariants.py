@@ -18,7 +18,7 @@ INVARIANT 10: Final test partition is strictly isolated and never used for thres
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -333,9 +333,8 @@ def test_invariant_9_real_benchmark_completion_requires_validated_real_artifact(
     with patch(
         "app.application.services.dataloader.resolve_dataset_dir",
         return_value=tmp_path / "empty_dir",
-    ):
-        with pytest.raises(FileNotFoundError):
-            load_dataset("paysim")
+    ), pytest.raises(FileNotFoundError):
+        load_dataset("paysim")
 
 
 # ===========================================================================
