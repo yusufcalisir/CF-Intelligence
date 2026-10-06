@@ -171,7 +171,7 @@ class EventBus:
                         if hasattr(future, "get"):
                             rm = future.get(timeout=2.0)
                             event.metadata["kafka_publish"] = {
-                                "status": "PUBLISHED",
+                                "status": "BROKER_ACKNOWLEDGED",
                                 "topic": getattr(rm, "topic", topic),
                                 "partition": getattr(rm, "partition", None),
                                 "offset": getattr(rm, "offset", None),
@@ -179,14 +179,14 @@ class EventBus:
                             }
                         else:
                             event.metadata["kafka_publish"] = {
-                                "status": "DISPATCHED",
+                                "status": "SEND_REQUESTED",
                                 "topic": topic,
                                 "broker": app_settings.kafka_bootstrap_servers,
                             }
                 except Exception as exc:
                     logger.warning("Failed to forward event to Kafka: %s", exc)
                     event.metadata["kafka_publish"] = {
-                        "status": "FAILED",
+                        "status": "DELIVERY_FAILED",
                         "error": str(exc),
                         "topic": topic,
                     }

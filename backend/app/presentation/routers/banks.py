@@ -27,7 +27,7 @@ router = APIRouter(prefix="/api/v1/banks", tags=["banks"])
 api_router = APIRouter(prefix="/v1/banks", tags=["banks"])
 
 _sgx_hw_available = is_sgx_hardware_available()
-_enclave_mode = "INTEL_SGX_HARDWARE" if _sgx_hw_available else "SOFTWARE_EMULATION_SANDBOX"
+_enclave_mode = "SGX_DEVICE_AVAILABLE" if _sgx_hw_available else "SOFTWARE_EMULATION_SANDBOX"
 
 # Default bank configurations (static reference data)
 BANK_CONFIGS: list[dict[str, Any]] = [

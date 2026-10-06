@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from app.domain.enums import TEECapabilityMode
 from app.domain.value_objects import ModelWeights
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,34 @@ class AttestationReport:
     verified: bool
     timestamp: str
     is_hardware_backed: bool = False
+    is_hardware_attested: bool = False
+    is_emulated: bool = True
+    attestation_status: str = TEECapabilityMode.TEE_SOFTWARE_EMULATION.value
+    provenance: str = "EMULATED_ATTESTATION_REPORT"
     driver_mode: str = "SOFTWARE_EMULATION_SANDBOX"
+
+
+@dataclass
+class EmulatedAttestationReport(AttestationReport):
+    """Explicitly namespaced software-emulated attestation report."""
+
+    is_hardware_attested: bool = False
+    is_emulated: bool = True
+    provenance: str = "EMULATED_ATTESTATION_REPORT"
+    driver_mode: str = "SOFTWARE_EMULATION_SANDBOX"
+
+
+def verify_hardware_attestation(report: AttestationReport, require_hardware: bool = True) -> bool:
+    """Verify that an attestation report is genuinely hardware-attested.
+
+    Fails closed if require_hardware is True and report is software-emulated.
+    """
+    if require_hardware and (not getattr(report, "is_hardware_attested", False) or getattr(report, "is_emulated", True)):
+        raise ValueError(
+            "Hardware attestation gate rejected: Report is software-emulated (EMULATED_ATTESTATION_REPORT) "
+            "and lacks verified Intel SGX DCAP/IAS quote."
+        )
+    return True
 
 
 class TEEDriver:
@@ -85,7 +113,7 @@ class TEEDriver:
         )
 
     @staticmethod
-    def generate_attestation_report(enclave_ctx: EnclaveContext) -> AttestationReport:
+    def generate_attestation_report(enclave_ctx: EnclaveContext) -> EmulatedAttestationReport:
         """Generate remote attestation verification report signed by the enclave key."""
         start_time = time.perf_counter()
         time.sleep(0.05)
@@ -104,7 +132,17 @@ class TEEDriver:
         )
 
         hw_avail = is_sgx_hardware_available()
-        return AttestationReport(
+        status_mode = (
+            TEECapabilityMode.TEE_DEVICE_AVAILABLE.value
+            if hw_avail
+            else TEECapabilityMode.TEE_SOFTWARE_EMULATION.value
+        )
+        drv_mode = (
+            "SGX_DEVICE_AVAILABLE_EMULATED_ATTESTATION"
+            if hw_avail
+            else "SOFTWARE_EMULATION_SANDBOX"
+        )
+        return EmulatedAttestationReport(
             enclave_id=enclave_ctx.enclave_id,
             mrenclave=enclave_ctx.mrenclave,
             mrsigner=enclave_ctx.mrsigner,
@@ -112,7 +150,11 @@ class TEEDriver:
             verified=True,
             timestamp=time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime()),
             is_hardware_backed=hw_avail,
-            driver_mode="INTEL_SGX_HARDWARE" if hw_avail else "SOFTWARE_EMULATION_SANDBOX",
+            is_hardware_attested=False,
+            is_emulated=True,
+            attestation_status=status_mode,
+            provenance="EMULATED_ATTESTATION_REPORT",
+            driver_mode=drv_mode,
         )
 
     @staticmethod

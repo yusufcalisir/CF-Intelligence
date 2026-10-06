@@ -908,3 +908,283 @@ def test_kafka_connector_no_fabricated_metrics() -> None:
     assert eval_res["loss"] is None
 
 
+# ---------------------------------------------------------------------------
+# 37. FHE Capability Semantics & Emulated Separation (Part I)
+# ---------------------------------------------------------------------------
+def test_fhe_capability_semantics_and_emulation_separation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify FHE capability modes: fail-closed on required when TenSEAL missing, and distinct EmulatedWeights."""
+    from app.infrastructure.security.fhe_driver import (
+        FHEDriver,
+        EmulatedWeights,
+        EncryptedWeights,
+        verify_cryptographic_fhe,
+    )
+    from app.domain.enums import FHECapabilityMode, FHEBackendProvenance
+    from app.domain.value_objects import ModelWeights
+
+    weights = ModelWeights(layer_shapes=[(2, 2)], flat_weights=[0.1, 0.2, 0.3, 0.4])
+
+    # Case A: FHE_REQUIRED + TenSEAL unavailable -> FAIL CLOSED
+    monkeypatch.setattr("app.infrastructure.security.fhe_driver.TENSEAL_AVAILABLE", False)
+    with pytest.raises(RuntimeError, match="Fail-closed: refusing software emulation"):
+        FHEDriver.generate_keys("sim_req", capability_mode=FHECapabilityMode.FHE_REQUIRED)
+
+    # Case B: FHE_EMULATION_EXPLICITLY_REQUESTED + TenSEAL unavailable -> SOFTWARE_EMULATED & EmulatedWeights
+    emul_kr = FHEDriver.generate_keys(
+        "sim_emul", capability_mode=FHECapabilityMode.FHE_EMULATION_EXPLICITLY_REQUESTED
+    )
+    assert emul_kr.is_emulated is True
+    assert emul_kr.is_cryptographic is False
+    assert emul_kr.driver_mode == "SOFTWARE_EMULATED"
+    assert emul_kr.backend_provenance == FHEBackendProvenance.SOFTWARE_EMULATED.value
+
+    emul_weights = FHEDriver.encrypt_weights(weights, emul_kr)
+    assert isinstance(emul_weights, EmulatedWeights)
+    assert emul_weights.is_emulated is True
+    assert emul_weights.is_cryptographic is False
+    assert hasattr(emul_weights, "simulated_plaintext_vector")
+    assert emul_weights.backend_provenance == FHEBackendProvenance.SOFTWARE_EMULATED.value
+
+    # Case D: Emulated result cannot pass cryptographic FHE gate
+    with pytest.raises(ValueError, match="Cryptographic FHE gate rejected"):
+        verify_cryptographic_fhe(emul_weights)
+
+    # Case E: Decryption succeeds for emulated weights back to ModelWeights
+    dec = FHEDriver.decrypt_weights(emul_weights, emul_kr, [(2, 2)])
+    assert isinstance(dec, ModelWeights)
+    assert len(dec.flat_weights) == 4
+
+    # Case C: Real FHE execution when TenSEAL is available
+    monkeypatch.undo()
+    from app.infrastructure.security.fhe_driver import TENSEAL_AVAILABLE
+    if TENSEAL_AVAILABLE:
+        real_kr = FHEDriver.generate_keys("sim_real", capability_mode=FHECapabilityMode.FHE_REQUIRED)
+        assert real_kr.is_emulated is False
+        assert real_kr.is_cryptographic is True
+        assert real_kr.backend_provenance == FHEBackendProvenance.REAL_CKKS.value
+
+        real_enc = FHEDriver.encrypt_weights(weights, real_kr)
+        assert real_enc.is_cryptographic is True
+        assert not isinstance(real_enc, EmulatedWeights)
+        assert verify_cryptographic_fhe(real_enc) is True
+
+
+# ---------------------------------------------------------------------------
+# 38. TEE Device Availability vs Hardware Attestation (Part II)
+# ---------------------------------------------------------------------------
+def test_tee_device_availability_vs_hardware_attestation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify device presence (/dev/sgx_enclave) does NOT equal verified hardware attestation."""
+    from app.infrastructure.security.tee_driver import (
+        TEEDriver,
+        EmulatedAttestationReport,
+        verify_hardware_attestation,
+    )
+    from app.domain.enums import TEECapabilityMode
+
+    # Context creation
+    ctx = TEEDriver.create_enclave("sim_tee_test")
+
+    # 1. Device missing -> SOFTWARE_EMULATION
+    monkeypatch.setattr("app.infrastructure.security.tee_driver.is_sgx_hardware_available", lambda: False)
+    rep_no_hw = TEEDriver.generate_attestation_report(ctx)
+    assert isinstance(rep_no_hw, EmulatedAttestationReport)
+    assert rep_no_hw.is_hardware_backed is False
+    assert rep_no_hw.is_hardware_attested is False
+    assert rep_no_hw.attestation_status == TEECapabilityMode.TEE_SOFTWARE_EMULATION.value
+    assert rep_no_hw.provenance == "EMULATED_ATTESTATION_REPORT"
+
+    # 2. Device present -> DEVICE_AVAILABLE, but still is_hardware_attested=False (local hashes are simulated!)
+    monkeypatch.setattr("app.infrastructure.security.tee_driver.is_sgx_hardware_available", lambda: True)
+    rep_hw = TEEDriver.generate_attestation_report(ctx)
+    assert isinstance(rep_hw, EmulatedAttestationReport)
+    assert rep_hw.is_hardware_backed is True
+    assert rep_hw.is_hardware_attested is False
+    assert rep_hw.attestation_status == TEECapabilityMode.TEE_DEVICE_AVAILABLE.value
+    assert rep_hw.driver_mode == "SGX_DEVICE_AVAILABLE_EMULATED_ATTESTATION"
+
+    # 3. Verification gate requiring real hardware quote fails closed
+    with pytest.raises(ValueError, match="Hardware attestation gate rejected"):
+        verify_hardware_attestation(rep_hw, require_hardware=True)
+
+    # 4. Verification with require_hardware=False passes software report
+    assert verify_hardware_attestation(rep_hw, require_hardware=False) is True
+
+
+# ---------------------------------------------------------------------------
+# 39. HMAC Secret Capability Enforcement & Stability (Part III)
+# ---------------------------------------------------------------------------
+def test_hmac_capability_secret_enforcement_and_stability(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify HMAC tokenization enforces secret requirement under capability mode and ensures stability."""
+    import asyncio
+    from fastapi import HTTPException
+    from app.presentation.routers.entities import tokenize_raw_identifier
+    from app.application.schemas.entities import HMACTokenizeRequest
+
+    monkeypatch.delenv("CFI_HMAC_SALT", raising=False)
+    monkeypatch.setenv("ENVIRONMENT", "development")
+
+    # 1. require_secret=True with default salt -> fails closed regardless of environment
+    with pytest.raises(HTTPException) as exc1:
+        asyncio.run(tokenize_raw_identifier(payload=HMACTokenizeRequest(identifier="user@bank.com", require_secret=True)))
+    assert exc1.value.status_code == 400
+    assert "Insecure default consortium HMAC secret key is forbidden" in exc1.value.detail
+
+    # 2. tokenization_mode="REAL_CONSORTIUM_STRICT" with default salt -> fails closed
+    with pytest.raises(HTTPException) as exc2:
+        asyncio.run(tokenize_raw_identifier(payload=HMACTokenizeRequest(identifier="user@bank.com", tokenization_mode="REAL_CONSORTIUM_STRICT")))
+    assert exc2.value.status_code == 400
+
+    # 3. Valid explicit secret -> succeeds with HMAC_SECRET_KEY metadata
+    res1 = asyncio.run(tokenize_raw_identifier(payload=HMACTokenizeRequest(identifier="user@bank.com", tenant_salt="my_secret_key_123")))
+    assert res1.key_material_type == "HMAC_SECRET_KEY"
+    assert res1.salt_provenance == "EXPLICIT_TENANT_SALT"
+    assert res1.tokenization_mode == "REAL_CONSORTIUM"
+
+    # 4. Stability: same ID + same key -> same token
+    res2 = asyncio.run(tokenize_raw_identifier(payload=HMACTokenizeRequest(identifier="user@bank.com", tenant_salt="my_secret_key_123")))
+    assert res1.hmac_token == res2.hmac_token
+
+    # 5. Distinctness: same ID + different key -> different token
+    res3 = asyncio.run(tokenize_raw_identifier(payload=HMACTokenizeRequest(identifier="user@bank.com", tenant_salt="different_key_456")))
+    assert res1.hmac_token != res3.hmac_token
+
+    # 6. Empty identifier -> fails closed
+    with pytest.raises(HTTPException) as exc3:
+        asyncio.run(tokenize_raw_identifier(payload=HMACTokenizeRequest(identifier="   ", tenant_salt="key")))
+    assert exc3.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# 40. Kafka Broker Metadata & Correlation State Machine (Part IV)
+# ---------------------------------------------------------------------------
+def test_kafka_broker_metadata_and_result_correlation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify Kafka delivery metadata records real broker ack and correlation fails closed on mismatches."""
+    from app.infrastructure.event_bus import AlertCreated, EventBus
+    from app.infrastructure.connectors.kafka_connector import KafkaBankConnector
+    from app.config import get_settings
+    from app.domain.value_objects import ModelWeights
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "use_kafka", True)
+
+    # 1. EventBus with broker ack future
+    class MockRecordMetadata:
+        topic = "domain_events.alert.created"
+        partition = 2
+        offset = 1042
+
+    class MockFuture:
+        def get(self, timeout: float = 2.0):
+            return MockRecordMetadata()
+
+    class MockProducer:
+        def send(self, topic, key=None, value=None):
+            return MockFuture()
+
+    bus = EventBus()
+    bus.set_kafka_producer(MockProducer())
+    event = AlertCreated(alert_id="alt-42", bank_id="bank_b", severity="CRITICAL", risk_score=0.95)
+    bus.publish(event)
+
+    assert event.metadata["kafka_publish"]["status"] == "BROKER_ACKNOWLEDGED"
+    assert event.metadata["kafka_publish"]["partition"] == 2
+    assert event.metadata["kafka_publish"]["offset"] == 1042
+
+    # 2. Connector train command delivery state
+    connector = KafkaBankConnector()
+    weights = ModelWeights(layer_shapes=[(2,)], flat_weights=[0.5, 0.5])
+    cmd = connector.train("bank_b", weights, correlation_id="cid_999", run_id="run_42")
+    assert cmd["delivery_status"] == "SEND_REQUESTED"
+    assert cmd["command_type"] == "TRAIN"
+
+    # 3. Worker result correlation success
+    worker_ack = {
+        "correlation_id": "cid_999",
+        "bank_id": "bank_b",
+        "command_type": "TRAIN",
+        "run_id": "run_42",
+        "loss": 0.12,
+        "metrics": {"pr_auc": 0.88},
+        "num_samples": 500,
+    }
+    correlated = connector.correlate_worker_result(cmd, worker_ack)
+    assert correlated["status"] == "PROCESSED"
+    assert correlated["loss"] == 0.12
+
+    # 4. Correlation failure on mismatched command_type (eval result returned for train command)
+    worker_wrong_type = dict(worker_ack, command_type="EVALUATE")
+    with pytest.raises(ValueError, match="command_type mismatch"):
+        connector.correlate_worker_result(cmd, worker_wrong_type)
+
+    # 5. Correlation failure on stale/mismatched correlation_id
+    worker_stale_cid = dict(worker_ack, correlation_id="cid_stale")
+    with pytest.raises(ValueError, match="command correlation_id"):
+        connector.correlate_worker_result(cmd, worker_stale_cid)
+
+
+# ---------------------------------------------------------------------------
+# 41. Dataset Loader Fail-Closed Contract Matrix (Part V)
+# ---------------------------------------------------------------------------
+def test_loader_fail_closed_contract_matrix(tmp_path: Path) -> None:
+    """Verify PaySim, Elliptic, IEEE-CIS, CreditCard, AMLSim, SynthAML, and AMLNet fail closed on empty and NaN labels."""
+    import pandas as pd
+    from app.application.services.dataloader import (
+        _process_paysim_dataframe,
+        _process_ieee_cis_dataframe,
+        _process_creditcard_dataframe,
+        _process_amlsim_dataframe,
+        _aggregate_synthaml_alert_features,
+        _process_amlnet_dataframe,
+    )
+
+    # 1. PaySim: empty and NaN label
+    with pytest.raises(ValueError, match="dataframe is empty"):
+        _process_paysim_dataframe(pd.DataFrame(), source="real_csv")
+
+    df_paysim_nan = pd.DataFrame({"isFraud": [np.nan, 0.0], "amount": [10.0, 20.0]})
+    with pytest.raises(ValueError, match="contains NaN values"):
+        _process_paysim_dataframe(df_paysim_nan, source="real_csv")
+
+    # 2. IEEE-CIS: empty and NaN label
+    with pytest.raises(ValueError, match="dataframe is empty"):
+        _process_ieee_cis_dataframe(pd.DataFrame(), source="real_csv")
+
+    df_ieee_nan = pd.DataFrame({"isFraud": [1.0, np.nan], "TransactionAmt": [100.0, 200.0]})
+    with pytest.raises(ValueError, match="contains NaN in label column"):
+        _process_ieee_cis_dataframe(df_ieee_nan, source="real_csv")
+
+    # 3. CreditCard: empty and NaN label
+    with pytest.raises(ValueError, match="dataframe is empty"):
+        _process_creditcard_dataframe(pd.DataFrame())
+
+    df_cc_nan = pd.DataFrame({"Class": [0.0, np.nan], "Time": [1.0, 2.0], "V1": [0.5, 0.2]})
+    with pytest.raises(ValueError, match="contains NaN in label column"):
+        _process_creditcard_dataframe(df_cc_nan)
+
+    # 4. AMLSim: empty and NaN label
+    with pytest.raises(ValueError, match="dataframe is empty"):
+        _process_amlsim_dataframe(pd.DataFrame(), root=tmp_path)
+
+    df_amlsim_nan = pd.DataFrame({"IS_FRAUD": [0.0, np.nan], "TX_AMOUNT": [100.0, 200.0]})
+    with pytest.raises(ValueError, match="contains NaN in label column"):
+        _process_amlsim_dataframe(df_amlsim_nan, root=tmp_path)
+
+    # 5. SynthAML: empty and NaN label
+    with pytest.raises(ValueError, match="dataframe is empty"):
+        _aggregate_synthaml_alert_features(pd.DataFrame(), pd.DataFrame())
+
+    alerts_nan = pd.DataFrame({"ALERT_ID": ["A1"], "OUTCOME": [np.nan]})
+    tx_df = pd.DataFrame({"ALERT_ID": ["A1"], "ENTRY": ["credit"], "SIZE": [10.0]})
+    with pytest.raises(ValueError, match="contains NaN in label column"):
+        _aggregate_synthaml_alert_features(alerts_nan, tx_df)
+
+    # 6. AMLNet: empty and NaN label
+    with pytest.raises(ValueError, match="dataframe is empty"):
+        _process_amlnet_dataframe(pd.DataFrame())
+
+    df_amlnet_nan = pd.DataFrame({"isMoneyLaundering": [0.0, np.nan], "amount": [50.0, 100.0]})
+    with pytest.raises(ValueError, match="contains missing or NaN labels"):
+        _process_amlnet_dataframe(df_amlnet_nan)
+
+
+

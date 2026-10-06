@@ -505,3 +505,49 @@ class DatasetProvenance(StrEnum):
     SYNTHETIC_EVIDENCE = "CONTROLLED_PROJECT_SYNTHETIC"
 
 
+# ── Cryptographic & Execution Capability State Machines ──────────────────────
+
+class FHECapabilityMode(StrEnum):
+    """Discrete capability requirement states for Fully Homomorphic Encryption."""
+
+    FHE_REQUIRED = "FHE_REQUIRED"
+    FHE_OPTIONAL = "FHE_OPTIONAL"
+    FHE_EMULATION_EXPLICITLY_REQUESTED = "FHE_EMULATION_EXPLICITLY_REQUESTED"
+    FHE_DISABLED = "FHE_DISABLED"
+
+
+class FHEBackendProvenance(StrEnum):
+    """Authoritative provenance classification for FHE execution backend."""
+
+    REAL_CKKS = "REAL_CKKS"
+    SOFTWARE_EMULATED = "SOFTWARE_EMULATED"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class TEECapabilityMode(StrEnum):
+    """Execution and attestation state machine for Trusted Execution Environments."""
+
+    TEE_UNAVAILABLE = "TEE_UNAVAILABLE"
+    TEE_DEVICE_AVAILABLE = "TEE_DEVICE_AVAILABLE"
+    TEE_SOFTWARE_EMULATION = "TEE_SOFTWARE_EMULATION"
+    TEE_ENCLAVE_CREATED = "TEE_ENCLAVE_CREATED"
+    TEE_ATTESTATION_GENERATED = "TEE_ATTESTATION_GENERATED"
+    TEE_ATTESTATION_VERIFIED = "TEE_ATTESTATION_VERIFIED"
+    TEE_HARDWARE_ATTESTED = "TEE_HARDWARE_ATTESTED"
+
+
+class KafkaDeliveryStatus(StrEnum):
+    """Discrete lifecycle states of Kafka message delivery."""
+
+    EVENT_CREATED = "EVENT_CREATED"
+    SERIALIZED = "SERIALIZED"
+    SEND_REQUESTED = "SEND_REQUESTED"
+    BROKER_ACKNOWLEDGED = "BROKER_ACKNOWLEDGED"
+    BROKER_REJECTED = "BROKER_REJECTED"
+    DELIVERY_FAILED = "DELIVERY_FAILED"
+    CONSUMED = "CONSUMED"
+    PROCESSED = "PROCESSED"
+    PERSISTED = "PERSISTED"
+    UNAVAILABLE = "UNAVAILABLE"
+
+

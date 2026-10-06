@@ -102,7 +102,10 @@ class HMACTokenizeRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     identifier: str = Field(..., min_length=1, max_length=256, description="Raw customer identifier (IBAN, PAN, phone)")
-    tenant_salt: str = Field(default="default_consortium_salt", min_length=1, max_length=128, description="Institution salt")
+    tenant_salt: str = Field(default="default_consortium_salt", min_length=1, max_length=128, description="Institution HMAC secret key / salt")
+    require_secret: bool = Field(default=False, description="When true, strictly requires non-default secret key regardless of environment")
+    tokenization_mode: str = Field(default="REAL_CONSORTIUM", description="Tokenization capability mode: REAL_CONSORTIUM or DEMO")
+    key_material_type: str = Field(default="HMAC_SECRET_KEY", description="Cryptographic classification of secret material")
 
     @field_validator("identifier", "tenant_salt")
     @classmethod
@@ -119,6 +122,8 @@ class HMACTokenizeResponse(BaseModel):
     policy: str = "Zero Raw PII Policy Enforced"
     algorithm: str = "HMAC-SHA256"
     salt_provenance: str = "EXPLICIT_OR_ENV"
+    key_material_type: str = "HMAC_SECRET_KEY"
+    tokenization_mode: str = "REAL_CONSORTIUM"
 
 
 class PSIRequest(BaseModel):

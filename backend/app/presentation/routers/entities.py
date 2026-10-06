@@ -306,35 +306,40 @@ async def tokenize_raw_identifier(
     import hmac
     import os
 
-    raw_id = (payload.identifier if payload else None) or identifier
-    raw_salt = (payload.tenant_salt if payload else None) or tenant_salt
+    raw_id = payload.identifier if (payload is not None and payload.identifier is not None) else (identifier if isinstance(identifier, str) else None)
+    raw_salt = payload.tenant_salt if (payload is not None and payload.tenant_salt is not None) else (tenant_salt if isinstance(tenant_salt, str) else "default_consortium_salt")
+    req_mode = (payload.tokenization_mode if payload else "REAL_CONSORTIUM") or "REAL_CONSORTIUM"
+    require_secret = bool(payload.require_secret if payload else False)
+
+    if not raw_id or not str(raw_id).strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="identifier must be provided as a non-empty string in request body or query parameter",
+        )
 
     env_salt = os.environ.get("CFI_HMAC_SALT")
     if (raw_salt == "default_consortium_salt" or not raw_salt) and env_salt:
         salt = env_salt.strip()
         salt_provenance = "ENVIRONMENT_CFI_HMAC_SALT"
+        effective_mode = "REAL_CONSORTIUM"
     elif raw_salt and raw_salt != "default_consortium_salt":
         salt = raw_salt.strip()
         salt_provenance = "EXPLICIT_TENANT_SALT"
+        effective_mode = "REAL_CONSORTIUM"
     else:
         is_prod = (
             os.environ.get("ENVIRONMENT", "development").lower() == "production"
             or os.environ.get("CFI_STRICT_SECURITY") == "1"
         )
-        if is_prod:
+        if is_prod or require_secret or req_mode == "REAL_CONSORTIUM_STRICT":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Insecure default consortium salt is forbidden in production. Explicit tenant_salt or CFI_HMAC_SALT environment variable required.",
+                detail="Insecure default consortium HMAC secret key is forbidden when real tokenization is required. Explicit tenant_salt or CFI_HMAC_SALT environment variable required.",
             )
         salt = "default_consortium_salt"
         salt_provenance = "INSECURE_DEFAULT_DEV_SALT"
-        logger.warning("HMAC tokenization executed with insecure default_consortium_salt in development environment.")
-
-    if not raw_id or not raw_id.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="identifier must be provided as a non-empty string in request body or query parameter",
-        )
+        effective_mode = "DEMO"
+        logger.warning("HMAC tokenization executed with insecure default_consortium_salt in development/demo mode.")
 
     token = hmac.new(
         salt.encode("utf-8"), raw_id.strip().encode("utf-8"), hashlib.sha256
@@ -344,7 +349,10 @@ async def tokenize_raw_identifier(
         policy="Zero Raw PII Policy Enforced",
         algorithm="HMAC-SHA256",
         salt_provenance=salt_provenance,
+        key_material_type="HMAC_SECRET_KEY",
+        tokenization_mode=effective_mode,
     )
+
 
 
 # ── Private Set Intersection (DH-PSI) Endpoints under /entities ─────────────

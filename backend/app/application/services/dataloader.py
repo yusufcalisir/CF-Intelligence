@@ -294,11 +294,16 @@ def load_elliptic(
     if max_timesteps is not None and "timestep" in df.columns:
         df = df[df["timestep"] <= max_timesteps].copy()
 
+    if len(df) == 0:
+        raise ValueError("Elliptic dataset is empty after reading.")
+
     class_col = "class" if "class" in df.columns else ("label" if "label" in df.columns else None)
     if class_col is not None:
         c_str = df[class_col].astype(str)
         if not include_unknown:
             df = df[c_str.isin(["1", "2"])].copy()
+            if len(df) == 0:
+                raise ValueError("Elliptic dataset has 0 labeled samples (class 1 or 2) after filtering unknown.")
             c_str = df[class_col].astype(str)
             y: np.ndarray = np.asarray((c_str == "1").to_numpy(dtype=int))
         else:
@@ -520,16 +525,22 @@ def _process_amlsim_dataframe(
     temporal_split: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Process a raw AMLSim DataFrame into standardized features, labels, and graph structures."""
+    if len(df) == 0:
+        raise ValueError("AMLSim dataset dataframe is empty.")
+
     # 1. Label detection
     label_col = next((c for c in ["IS_FRAUD", "isFraud", "is_fraud", "Is Laundering", "is_laundering", "label"] if c in df.columns), None)
-    if label_col is not None:
-        y: np.ndarray = np.asarray(df[label_col].astype(bool).astype(int).to_numpy(), dtype=int)
-    else:
+    if label_col is None:
         raise ValueError(
             f"AMLSim dataset missing required fraud/laundering label column. "
             f"Available columns: {list(df.columns)}. Missing labels must not be fabricated."
         )
+    if df[label_col].isna().any():
+        raise ValueError(f"AMLSim dataset contains NaN in label column '{label_col}'. Missing labels cannot be fabricated.")
+    try:
+        y: np.ndarray = np.asarray(df[label_col].astype(int).to_numpy(), dtype=int)
+    except Exception as exc:
+        raise ValueError(f"AMLSim dataset contains invalid non-integer values in label column '{label_col}': {exc}") from exc
 
     # 2. Check for alerts.csv
     alerts_csv = root / "alerts.csv"
@@ -753,13 +764,18 @@ PAYSIM_REAL_FRAUD_RATIO = 0.00129  # 8,213 frauds out of 6.36M txns (~0.129%)
 
 def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
     """Process a raw PaySim dataframe into numerical feature matrix."""
+    if len(df) == 0:
+        raise ValueError("Malformed PaySim dataset: dataframe is empty")
     df = df.copy()
-    if "isFraud" in df.columns:
-        y = df["isFraud"].values.astype(int)
-    elif "is_fraud" in df.columns:
-        y = df["is_fraud"].values.astype(int)
-    else:
+    lbl_col = "isFraud" if "isFraud" in df.columns else ("is_fraud" if "is_fraud" in df.columns else None)
+    if lbl_col is None:
         raise ValueError("Malformed PaySim dataset: missing required label column 'isFraud' or 'is_fraud'")
+    if df[lbl_col].isna().any():
+        raise ValueError(f"Malformed PaySim dataset: label column '{lbl_col}' contains NaN values. Labels cannot be fabricated.")
+    try:
+        y = df[lbl_col].astype(int).values
+    except Exception as exc:
+        raise ValueError(f"Malformed PaySim dataset: invalid label values in '{lbl_col}': {exc}") from exc
 
     # Check if this is already an engineered/partitioned feature dataframe without raw PaySim columns
     has_raw_signals = any(c in df.columns for c in ("amount", "step", "oldbalanceOrg", "type"))
@@ -941,20 +957,23 @@ IEEE_CIS_REAL_FRAUD_RATIO = 0.035  # ~3.5% in real IEEE-CIS
 
 def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
     """Process a raw or merged IEEE-CIS dataframe into numerical feature matrix."""
+    if len(df) == 0:
+        raise ValueError("IEEE-CIS dataset dataframe is empty.")
     df = df.copy()
 
     # 1. Label extraction
-    if "isFraud" in df.columns:
-        y = df["isFraud"].values.astype(int)
-    elif "is_fraud" in df.columns:
-        y = df["is_fraud"].values.astype(int)
-    elif "label" in df.columns:
-        y = df["label"].values.astype(int)
-    else:
+    lbl_col = next((c for c in ["isFraud", "is_fraud", "label"] if c in df.columns), None)
+    if lbl_col is None:
         raise ValueError(
             f"IEEE-CIS dataset missing required fraud label column ('isFraud', 'is_fraud', or 'label'). "
             f"Available columns: {list(df.columns)}. Missing labels must not be fabricated."
         )
+    if df[lbl_col].isna().any():
+        raise ValueError(f"IEEE-CIS dataset contains NaN in label column '{lbl_col}'. Missing labels cannot be fabricated.")
+    try:
+        y = df[lbl_col].astype(int).values
+    except Exception as exc:
+        raise ValueError(f"IEEE-CIS dataset contains invalid non-integer values in label column '{lbl_col}': {exc}") from exc
 
     # 2. Identity indicators
     if "id_01" in df.columns:
@@ -1252,14 +1271,22 @@ def _process_creditcard_dataframe(
         feature_cols = [c for c in df.columns if c not in ("Time", "Class", "is_fraud", "isFraud") and pd.api.types.is_numeric_dtype(df[c])]
 
     X = np.asarray(df[feature_cols].fillna(0).values, dtype=np.float32)
+    if len(df) == 0:
+        raise ValueError("CreditCard dataset dataframe is empty.")
+
     label_col = next((c for c in ["Class", "class", "is_fraud", "isFraud", "label"] if c in df.columns), None)
     if label_col is None:
         raise ValueError(
             f"CreditCard dataset missing required label column ('Class'). "
             f"Available columns: {list(df.columns)}. Missing labels must not be fabricated."
         )
-    raw_y = df[label_col].values
-    y = np.asarray(raw_y, dtype=int)
+    if df[label_col].isna().any():
+        raise ValueError(f"CreditCard dataset contains NaN in label column '{label_col}'. Missing labels cannot be fabricated.")
+    try:
+        raw_y = df[label_col].values
+        y = np.asarray(raw_y, dtype=int)
+    except Exception as exc:
+        raise ValueError(f"CreditCard dataset contains invalid non-integer values in label column '{label_col}': {exc}") from exc
 
     if split_data:
         n_samples = len(y)
@@ -1535,14 +1562,21 @@ def _aggregate_synthaml_alert_features(
     Conforms to the benchmark feature pipeline described in:
     "A synthetic data set to benchmark anti-money laundering methods" (DOI: 10.1038/s41597-023-02569-2).
     """
+    if len(alerts_df) == 0:
+        raise ValueError("SynthAML alerts dataframe is empty.")
+
     label_col = next((c for c in ["OUTCOME", "outcome", "is_fraud", "IS_FRAUD", "label"] if c in alerts_df.columns), None)
-    if label_col is not None:
-        y: np.ndarray = np.asarray(alerts_df[label_col].astype(bool).astype(int).to_numpy(), dtype=int)
-    else:
+    if label_col is None:
         raise ValueError(
             f"SynthAML alerts table missing required label column ('OUTCOME' or 'is_fraud'). "
             f"Available columns: {list(alerts_df.columns)}. Missing labels must not be fabricated."
         )
+    if alerts_df[label_col].isna().any():
+        raise ValueError(f"SynthAML alerts table contains NaN in label column '{label_col}'. Missing labels cannot be fabricated.")
+    try:
+        y: np.ndarray = np.asarray(alerts_df[label_col].astype(int).to_numpy(), dtype=int)
+    except Exception as exc:
+        raise ValueError(f"SynthAML alerts table contains invalid non-integer values in label column '{label_col}': {exc}") from exc
 
     alert_id_col = next((c for c in ["ALERT_ID", "alert_id", "id"] if c in alerts_df.columns), "ALERT_ID")
     tx_alert_col = next((c for c in ["ALERT_ID", "alert_id", "id"] if c in tx_df.columns), "ALERT_ID")
@@ -1826,15 +1860,22 @@ def _process_amlnet_dataframe(
     source: str = "real_parquet",
 ) -> dict[str, Any]:
     """Process an AMLNet DataFrame into standardized numerical features, labels, and metadata."""
+    if len(df) == 0:
+        raise ValueError("AMLNet dataset dataframe is empty.")
+
     # 1. Labels
     label_col = next((c for c in ["isMoneyLaundering", "is_money_laundering", "isLaundering", "isFraud", "is_fraud"] if c in df.columns), None)
-    if label_col:
-        y = np.asarray(df[label_col].fillna(0).astype(int).values, dtype=int)
-    else:
+    if label_col is None:
         raise ValueError(
             f"AMLNet dataset missing required laundering label column. "
             f"Available columns: {list(df.columns)}. Missing labels must not be fabricated."
         )
+    if df[label_col].isna().any():
+        raise ValueError(f"AMLNet dataset contains missing or NaN labels in '{label_col}'. Missing labels must not be fabricated.")
+    try:
+        y = np.asarray(df[label_col].astype(int).values, dtype=int)
+    except Exception as exc:
+        raise ValueError(f"AMLNet dataset contains invalid non-integer values in label column '{label_col}': {exc}") from exc
 
     typology_col = next((c for c in ["laundering_typology", "typology", "laundering_phase"] if c in df.columns), None)
     if typology_col:

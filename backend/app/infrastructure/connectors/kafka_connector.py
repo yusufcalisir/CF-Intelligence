@@ -7,6 +7,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from app.application.interfaces.bank_connector import BankConnectorInterface
+from app.domain.enums import KafkaDeliveryStatus
 
 if TYPE_CHECKING:
     from app.domain.value_objects import ModelWeights
@@ -51,6 +52,7 @@ class KafkaBankConnector(BankConnectorInterface):
         return {
             "bank_id": bank_id,
             "status": "INITIALIZED",
+            "delivery_status": KafkaDeliveryStatus.SEND_REQUESTED.value,
             "num_transactions": num_transactions,
             "topic": topic,
             "raw_payload": json.dumps(payload),
@@ -68,6 +70,8 @@ class KafkaBankConnector(BankConnectorInterface):
         dp_delta: float = 1e-5,
         dp_max_grad_norm: float = 1.0,
         correlation_id: str = "cid",
+        run_id: str = "run_1",
+        round_id: int = 1,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Publish training payload to bank topic."""
@@ -75,6 +79,9 @@ class KafkaBankConnector(BankConnectorInterface):
         payload = {
             "bank_id": bank_id,
             "correlation_id": correlation_id,
+            "run_id": run_id,
+            "round_id": round_id,
+            "command_type": "TRAIN",
             "epochs": epochs,
             "learning_rate": learning_rate,
             "batch_size": batch_size,
@@ -89,7 +96,11 @@ class KafkaBankConnector(BankConnectorInterface):
         return {
             "bank_id": bank_id,
             "status": "COMMAND_PUBLISHED",
+            "delivery_status": KafkaDeliveryStatus.SEND_REQUESTED.value,
+            "command_type": "TRAIN",
             "correlation_id": correlation_id,
+            "run_id": run_id,
+            "round_id": round_id,
             "topic": topic,
             "raw_payload": json.dumps(payload),
             "loss": None,
@@ -102,21 +113,80 @@ class KafkaBankConnector(BankConnectorInterface):
         bank_id: str,
         weights: ModelWeights,
         correlation_id: str = "cid",
+        run_id: str = "run_1",
+        round_id: int = 1,
     ) -> dict[str, Any]:
         """Publish evaluation payload to bank topic."""
         topic = f"{self.topic_prefix}.{bank_id}.evaluate"
         payload = {
             "bank_id": bank_id,
             "correlation_id": correlation_id,
+            "run_id": run_id,
+            "round_id": round_id,
+            "command_type": "EVALUATE",
         }
         logger.info("Kafka published evaluation command to %s for bank %s", topic, bank_id)
         return {
             "bank_id": bank_id,
             "status": "COMMAND_PUBLISHED",
+            "delivery_status": KafkaDeliveryStatus.SEND_REQUESTED.value,
+            "command_type": "EVALUATE",
             "correlation_id": correlation_id,
+            "run_id": run_id,
+            "round_id": round_id,
             "topic": topic,
             "raw_payload": json.dumps(payload),
             "loss": None,
             "metrics": None,
             "num_samples": None,
         }
+
+    @staticmethod
+    def correlate_worker_result(
+        command_meta: dict[str, Any],
+        worker_result: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Correlate asynchronous worker response with original published command.
+
+        Fails closed if correlation identifiers (correlation_id, bank_id, command_type, run_id)
+        do not match, preventing stale or cross-command metric leakage.
+        """
+        cid = command_meta.get("correlation_id")
+        w_cid = worker_result.get("correlation_id")
+        if not cid or cid != w_cid:
+            raise ValueError(
+                f"Correlation failed: command correlation_id '{cid}' != worker correlation_id '{w_cid}'"
+            )
+
+        bid = command_meta.get("bank_id")
+        w_bid = worker_result.get("bank_id")
+        if bid and w_bid and bid != w_bid:
+            raise ValueError(
+                f"Correlation failed: bank_id mismatch: '{bid}' != '{w_bid}'"
+            )
+
+        cmd_type = command_meta.get("command_type")
+        w_cmd_type = worker_result.get("command_type")
+        if cmd_type and w_cmd_type and cmd_type != w_cmd_type:
+            raise ValueError(
+                f"Correlation failed: command_type mismatch: expected '{cmd_type}', received '{w_cmd_type}'"
+            )
+
+        run_id = command_meta.get("run_id")
+        w_run_id = worker_result.get("run_id")
+        if run_id and w_run_id and run_id != w_run_id:
+            raise ValueError(
+                f"Correlation failed: run_id mismatch: expected '{run_id}', received '{w_run_id}'"
+            )
+
+        return {
+            "status": "PROCESSED",
+            "delivery_status": KafkaDeliveryStatus.PROCESSED.value,
+            "correlation_id": cid,
+            "bank_id": bid,
+            "command_type": cmd_type,
+            "loss": worker_result.get("loss"),
+            "metrics": worker_result.get("metrics"),
+            "num_samples": worker_result.get("num_samples"),
+        }
+
