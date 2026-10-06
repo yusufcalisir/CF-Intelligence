@@ -22,6 +22,7 @@ Following the formal closure of the semantic and correctness remediation phase (
 - **Created At (UTC)**: `2026-10-06T15:19:30Z`
 - **Source Closure Commit**: `a0bb088febdc3fa3da16a620b281946ac8694e31`
 - **Pre-Preregistration HEAD**: `7cc1f003177a95004ce60d86305065e73b722c7a`
+- **Protocol Content Commit**: `d5b3a5883fe822304ab72181348bc42fd74560d4`
 - **Repository Worktree**: Clean
 
 ---
