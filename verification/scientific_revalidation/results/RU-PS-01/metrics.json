@@ -1,0 +1,56 @@
+{
+  "unit_id": "RU-PS-01",
+  "status": "PASS_VALID_REVALIDATION",
+  "scientific_origin": "SIMULATED",
+  "dataset_name": "PaySim Financial Transactions (Real CSV Systematic Sample)",
+  "dataset_sha256": "16910f90577b0d981bf8ff289714510bb89bc71bff7d3f220f024e287e4eea6b",
+  "sample_strategy": "systematic every 10th row",
+  "n_rows_sampled": 636262,
+  "test_fraud_count": 163,
+  "seeds": [
+    42,
+    123,
+    456
+  ],
+  "primary_metrics": {
+    "centralized_pr_auc_mean": 0.954524,
+    "centralized_pr_auc_std": 0.007288,
+    "fedavg_pr_auc_mean": 0.95454,
+    "fedavg_pr_auc_std": 0.011854,
+    "delta_pr_auc_mean": 1.6e-05,
+    "delta_pr_auc_std": 0.019056
+  },
+  "per_seed_results": [
+    {
+      "seed": 42,
+      "centralized_pr_auc": 0.9482352627344438,
+      "centralized_roc_auc": 0.9994042627100558,
+      "fedavg_pr_auc": 0.9671598883207566,
+      "fedavg_roc_auc": 0.9993726438846029,
+      "delta_pr_auc": 0.018925
+    },
+    {
+      "seed": 123,
+      "centralized_pr_auc": 0.9647396156713027,
+      "centralized_roc_auc": 0.9993870292433586,
+      "fedavg_pr_auc": 0.9386728448189527,
+      "fedavg_roc_auc": 0.9991194519159005,
+      "delta_pr_auc": -0.026067
+    },
+    {
+      "seed": 456,
+      "centralized_pr_auc": 0.9505975710473284,
+      "centralized_roc_auc": 0.9993150059035485,
+      "fedavg_pr_auc": 0.9577872890277412,
+      "fedavg_roc_auc": 0.9993061719416282,
+      "delta_pr_auc": 0.00719
+    }
+  ],
+  "guards_validated": {
+    "FL-001": "PASSED (FedAvg consensus strictly sample-weighted across participating clients)",
+    "scientific_origin_truthfulness": "PASSED (Explicitly preserved as SIMULATED, not empirical)",
+    "no_synthetic_fallback": "PASSED (Physical PaySim CSV loaded directly)"
+  },
+  "supersedes_historical_artifact": "benchmarks/results/raw/fraud_benchmark_paysim.json",
+  "historical_result_not_rewritten": true
+}

@@ -1,0 +1,154 @@
+{
+  "unit_id": "RU-IE-01",
+  "status": "PASS_VALID_REVALIDATION",
+  "scientific_origin": "EMPIRICAL",
+  "dataset_name": "IEEE-CIS Fraud Detection (Real 590k Transactions)",
+  "dataset_sha256": "3a5c83ab6b3cc13dcabe5ffa9f522307fd5f7f7b6e6f6a60c32284ca6283d642",
+  "evaluation_population": {
+    "total_transactions": 590540,
+    "train_transactions": 472432,
+    "test_transactions": 118108,
+    "test_fraud_count": 4064,
+    "test_prevalence": 0.034409
+  },
+  "seeds": [
+    42,
+    123,
+    456
+  ],
+  "primary_metrics": {
+    "centralized_pr_auc_mean": 0.439861,
+    "centralized_pr_auc_std": 0.007174,
+    "fedavg_pr_auc_mean": 0.389172,
+    "fedavg_pr_auc_std": 0.020131,
+    "delta_pr_auc_mean": -0.050689,
+    "delta_pr_auc_std": 0.012957,
+    "centralized_roc_auc_mean": 0.849038,
+    "fedavg_roc_auc_mean": 0.835596,
+    "fedavg_recall_at_01_fpr_mean": 0.196194
+  },
+  "per_seed_results": [
+    {
+      "seed": 42,
+      "centralized_pr_auc": 0.43768717521926176,
+      "centralized_roc_auc": 0.846918572378267,
+      "fedavg_pr_auc": 0.38290496756750425,
+      "fedavg_roc_auc": 0.8272194998832472,
+      "delta_pr_auc": -0.054782,
+      "budget": {
+        "centralized_steps": 9230,
+        "federated_total_local_steps": 9240,
+        "step_difference": 10,
+        "relative_difference_pct": 0.11,
+        "centralized_duration_seconds": 163.52,
+        "federated_duration_seconds": 120.79
+      }
+    },
+    {
+      "seed": 123,
+      "centralized_pr_auc": 0.44787061471233286,
+      "centralized_roc_auc": 0.8536428255467499,
+      "fedavg_pr_auc": 0.4116907438872339,
+      "fedavg_roc_auc": 0.8438144587342584,
+      "delta_pr_auc": -0.03618,
+      "budget": {
+        "centralized_steps": 9230,
+        "federated_total_local_steps": 9240,
+        "step_difference": 10,
+        "relative_difference_pct": 0.11,
+        "centralized_duration_seconds": 96.01,
+        "federated_duration_seconds": 138.53
+      }
+    },
+    {
+      "seed": 456,
+      "centralized_pr_auc": 0.4340250940602383,
+      "centralized_roc_auc": 0.8465529268369136,
+      "fedavg_pr_auc": 0.3729197317781572,
+      "fedavg_roc_auc": 0.8357532785557004,
+      "delta_pr_auc": -0.061105,
+      "budget": {
+        "centralized_steps": 9230,
+        "federated_total_local_steps": 9250,
+        "step_difference": 20,
+        "relative_difference_pct": 0.22,
+        "centralized_duration_seconds": 110.46,
+        "federated_duration_seconds": 89.75
+      }
+    }
+  ],
+  "operational_metrics": [
+    {
+      "target_fpr": 0.0001,
+      "fedavg_recall_mean": 0.06898,
+      "fedavg_recall_std": 0.01437,
+      "centralized_recall_mean": 0.080052,
+      "centralized_recall_std": 0.007022,
+      "fedavg_precision_mean": 0.961112,
+      "fedavg_mean_alerts": 291.3,
+      "mean_threshold": 0.816807,
+      "positive_denominator": 4064,
+      "negative_denominator": 114044,
+      "calibration_source": "test_set_diagnostic_operating_point"
+    },
+    {
+      "target_fpr": 0.0005,
+      "fedavg_recall_mean": 0.146243,
+      "fedavg_recall_std": 0.009062,
+      "centralized_recall_mean": 0.156332,
+      "centralized_recall_std": 0.009966,
+      "fedavg_precision_mean": 0.912294,
+      "fedavg_mean_alerts": 651.3,
+      "mean_threshold": 0.584778,
+      "positive_denominator": 4064,
+      "negative_denominator": 114044,
+      "calibration_source": "test_set_diagnostic_operating_point"
+    },
+    {
+      "target_fpr": 0.001,
+      "fedavg_recall_mean": 0.196194,
+      "fedavg_recall_std": 0.00988,
+      "centralized_recall_mean": 0.199967,
+      "centralized_recall_std": 0.009306,
+      "fedavg_precision_mean": 0.875727,
+      "fedavg_mean_alerts": 910.3,
+      "mean_threshold": 0.327919,
+      "positive_denominator": 4064,
+      "negative_denominator": 114044,
+      "calibration_source": "test_set_diagnostic_operating_point"
+    },
+    {
+      "target_fpr": 0.005,
+      "fedavg_recall_mean": 0.271982,
+      "fedavg_recall_std": 0.014298,
+      "centralized_recall_mean": 0.309793,
+      "centralized_recall_std": 0.006032,
+      "fedavg_precision_mean": 0.660423,
+      "fedavg_mean_alerts": 1673.0,
+      "mean_threshold": 0.115419,
+      "positive_denominator": 4064,
+      "negative_denominator": 114044,
+      "calibration_source": "test_set_diagnostic_operating_point"
+    },
+    {
+      "target_fpr": 0.01,
+      "fedavg_recall_mean": 0.311106,
+      "fedavg_recall_std": 0.028681,
+      "centralized_recall_mean": 0.361959,
+      "centralized_recall_std": 0.002662,
+      "fedavg_precision_mean": 0.526655,
+      "fedavg_mean_alerts": 2397.3,
+      "mean_threshold": 0.064925,
+      "positive_denominator": 4064,
+      "negative_denominator": 114044,
+      "calibration_source": "test_set_diagnostic_operating_point"
+    }
+  ],
+  "guards_validated": {
+    "FL-001": "PASSED (Sample-weighted FedAvg consensus verified across all seeds)",
+    "no_synthetic_smoke_substitute": "PASSED (Executed over full 590,540 Kaggle dataset, not 10k smoke test)",
+    "temporal_split": "PASSED (Strict chronological split on TransactionDT, 80% train / 20% test)"
+  },
+  "supersedes_historical_artifact": "benchmarks/results/raw/fraud_benchmark_ieee_cis.json",
+  "historical_result_not_rewritten": true
+}

@@ -967,7 +967,6 @@ def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]
     """Process a raw or merged IEEE-CIS dataframe into numerical feature matrix."""
     if len(df) == 0:
         raise ValueError("IEEE-CIS dataset dataframe is empty.")
-    df = df.copy()
 
     # 1. Label extraction
     lbl_col = next((c for c in ["isFraud", "is_fraud", "label"] if c in df.columns), None)
@@ -1047,7 +1046,9 @@ def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]
     drop_cols.update([f"id_{i}" for i in range(12, 39)])
 
     num_cols = [c for c in df.columns if c not in drop_cols and pd.api.types.is_numeric_dtype(df[c])]
-    X = df[num_cols].fillna(0).values.astype(np.float32)
+    X = np.empty((len(df), len(num_cols)), dtype=np.float32)
+    for idx, c in enumerate(num_cols):
+        X[:, idx] = df[c].fillna(0).to_numpy(dtype=np.float32)
 
     return {
         "X": X,
@@ -1118,6 +1119,8 @@ def load_ieee_cis(
         if txn_csv.exists():
             logger.info("[IEEE-CIS] Loading real transaction CSV from %s (nrows=%s)", txn_csv, target_nrows)
             txn_df = pd.read_csv(txn_csv, nrows=target_nrows)
+            for col in txn_df.select_dtypes(include=["float64"]).columns:
+                txn_df[col] = txn_df[col].astype(np.float32)
 
             # Check if identity join is requested and available
             id_csv_candidates = [root / "train_identity.csv"] + list(root.glob("*identity*.csv"))
@@ -1126,13 +1129,22 @@ def load_ieee_cis(
             if join_identity and id_csv is not None and "TransactionID" in txn_df.columns:
                 logger.info("[IEEE-CIS] Joining identity data from %s", id_csv)
                 id_df = pd.read_csv(id_csv)
+                for col in id_df.select_dtypes(include=["float64"]).columns:
+                    id_df[col] = id_df[col].astype(np.float32)
                 target_ids = set(txn_df["TransactionID"].unique())
                 id_df_sub = id_df[id_df["TransactionID"].isin(target_ids)]
+                del id_df
                 merged_df = pd.merge(txn_df, id_df_sub, on="TransactionID", how="left")
+                del txn_df, id_df_sub
+                import gc
+                gc.collect()
             else:
                 merged_df = txn_df
 
             res = _process_ieee_cis_dataframe(merged_df, source="real_csv")
+            del merged_df
+            import gc
+            gc.collect()
             if temporal_split:
                 clean_kwargs = {
                     k: v

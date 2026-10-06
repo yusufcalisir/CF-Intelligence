@@ -1,0 +1,23 @@
+{
+  "run_id": "RUN-RU-MS-01-1791305155",
+  "unit_id": "RU-MS-01",
+  "protocol_version": "1.0",
+  "git_commit": "5fd3bb6565cdebee0bed90ea0a114abc759e967f",
+  "start_time_utc": "2026-10-06T16:45:13.579020+00:00",
+  "end_time_utc": "2026-10-06T16:45:55.396357+00:00",
+  "duration_seconds": 41.821,
+  "status": "PASS_VALID_REVALIDATION",
+  "exit_code": 0,
+  "output_artifacts": [
+    "metrics.json",
+    "multi_seed_statistical_summary.json",
+    "stderr.log",
+    "stdout.log"
+  ],
+  "artifact_hashes": {
+    "metrics.json": "cdff29ea14697f62201745bcd62dff518ed1cde6e5e5a38e5ea6ae160e6fafdb",
+    "multi_seed_statistical_summary.json": "63262a5ad3cba238fdb912379e7108a4f5c75b7a39d2fc348f2772240d163743",
+    "stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout.log": "8132901c6563f989ee86e69fab3f0fd5c1b424b52f3f9cb0515e6f16edc1cd21"
+  }
+}

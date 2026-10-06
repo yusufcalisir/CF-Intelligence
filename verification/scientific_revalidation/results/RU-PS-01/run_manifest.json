@@ -1,0 +1,23 @@
+{
+  "run_id": "RUN-RU-PS-01-1791303960",
+  "unit_id": "RU-PS-01",
+  "protocol_version": "1.0",
+  "git_commit": "5fd3bb6565cdebee0bed90ea0a114abc759e967f",
+  "start_time_utc": "2026-10-06T15:47:14.293636+00:00",
+  "end_time_utc": "2026-10-06T16:25:59.933031+00:00",
+  "duration_seconds": 2325.639,
+  "status": "PASS_VALID_REVALIDATION",
+  "exit_code": 0,
+  "output_artifacts": [
+    "canonical_results.json",
+    "metrics.json",
+    "stderr.log",
+    "stdout.log"
+  ],
+  "artifact_hashes": {
+    "canonical_results.json": "de552abd8578b4efa76d1385159fd498efb3e78e16cadca83247823ec6642ac0",
+    "metrics.json": "1cf4c9522e623345b2420bbed40b4a22eb587b70cbbbfbaccd0d0e93bccb537a",
+    "stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout.log": "d4a8f3feb038e0e8e86153196b92ac239f52b8d70d211405ba12d2d612f5fcc0"
+  }
+}

@@ -1,0 +1,487 @@
+{
+  "timestamp_utc": "2026-10-06T15:33:45.129332+00:00",
+  "benchmark": "GraphSAGE Elliptic Bitcoin Inductive Node Classification",
+  "model": "GraphSAGE (2-layer Mean Aggregator)",
+  "dataset": "Elliptic Bitcoin Transaction Graph (Real)",
+  "dataset_mode": "real",
+  "git_commit": "5fd3bb6565cdebee0bed90ea0a114abc759e967f",
+  "dataset_metadata": {
+    "name": "Elliptic Bitcoin Transaction Graph (Weber et al., 2019)",
+    "source_uri": "backend/storage/datasets/elliptic",
+    "total_nodes": 203769,
+    "total_edges": 234355,
+    "total_features": 165,
+    "total_labeled_nodes": 46564,
+    "total_illicit_nodes": 4545,
+    "total_licit_nodes": 42019,
+    "total_unknown_nodes": 157205,
+    "sha256_hashes": {
+      "elliptic_cache.parquet": "f5843a7e37f551a11388b04da2d46ae655434e3ea65fa79a3613eb89c4ac6a8e",
+      "elliptic_txs_classes.csv": "93e2e7b2405c735ba752bf6ba06b947561deddd1f5a8fc91e46f6a4c0e439493",
+      "elliptic_txs_edgelist.csv": "a35053ba68a98e4382cae2ba65b9d9e36b23b6439e02dff084971b1b72a5156e",
+      "elliptic_txs_features.csv": "fd7f83573443c9e302e371d3f110e3b6224160f5d1ed8a287757936127800ff0"
+    }
+  },
+  "temporal_split": {
+    "split_policy": "Strict Out-of-Time Past-to-Future Temporal Partitioning",
+    "train_timesteps": "1-30",
+    "val_timesteps": "31-34",
+    "test_timesteps": "35-49",
+    "train_labeled_nodes": 26905,
+    "train_illicit_nodes": 2954,
+    "train_licit_nodes": 23951,
+    "val_labeled_nodes": 2989,
+    "val_illicit_nodes": 508,
+    "val_licit_nodes": 2481,
+    "test_labeled_nodes": 16670,
+    "test_illicit_nodes": 1083,
+    "test_licit_nodes": 15587,
+    "zero_future_leakage_enforced": true
+  },
+  "validation_methodology": {
+    "checkpoint_selection_criterion": "validation_pr_auc_maximization",
+    "operating_threshold_selection_criterion": "validation_f1_maximization",
+    "tie_breaking": "lowest_threshold",
+    "test_set_isolation": "final_test_labels_never_used_for_checkpoint_or_threshold_selection"
+  },
+  "seeds": [
+    42,
+    123,
+    456
+  ],
+  "metrics": {
+    "pr_auc": 0.3761,
+    "roc_auc": 0.8325,
+    "precision": 0.2757,
+    "recall": 0.5583,
+    "f1_score": 0.3555,
+    "recall_at_01_fpr": 0.0462,
+    "recall_at_05_fpr": 0.1434,
+    "recall_at_10_fpr": 0.2081,
+    "threshold": 0.65
+  },
+  "metrics_std": {
+    "definition": "sample standard deviation across 3 training seeds, ddof=1",
+    "pr_auc": 0.0482,
+    "roc_auc": 0.0078,
+    "precision": 0.0956,
+    "recall": 0.0871,
+    "f1_score": 0.0567,
+    "recall_at_01_fpr": 0.0375
+  },
+  "metrics_min": {
+    "pr_auc": 0.3304,
+    "roc_auc": 0.8245,
+    "precision": 0.2068,
+    "recall": 0.458,
+    "f1_score": 0.3078,
+    "recall_at_01_fpr": 0.0175
+  },
+  "metrics_max": {
+    "pr_auc": 0.4265,
+    "roc_auc": 0.8401,
+    "precision": 0.3848,
+    "recall": 0.615,
+    "f1_score": 0.4182,
+    "recall_at_01_fpr": 0.0886
+  },
+  "per_seed_results": [
+    {
+      "seed": 42,
+      "best_epoch": 15,
+      "val_pr_auc": 0.7139,
+      "operating_threshold": 0.67,
+      "test_pr_auc": 0.426475,
+      "test_roc_auc": 0.840058,
+      "precision": 0.235419,
+      "recall": 0.614958,
+      "f1_score": 0.340491,
+      "recall_at_01_fpr": 0.088643,
+      "confusion_matrix": {
+        "tn": 13424,
+        "fp": 2163,
+        "fn": 417,
+        "tp": 666
+      },
+      "non_canonical_05": {
+        "threshold": 0.5,
+        "precision": 0.185968,
+        "recall": 0.76362,
+        "f1_score": 0.299096,
+        "confusion_matrix": {
+          "tn": 11967,
+          "fp": 3620,
+          "fn": 256,
+          "tp": 827
+        }
+      }
+    },
+    {
+      "seed": 123,
+      "best_epoch": 11,
+      "val_pr_auc": 0.7345,
+      "operating_threshold": 0.6,
+      "test_pr_auc": 0.330439,
+      "test_roc_auc": 0.824526,
+      "precision": 0.206787,
+      "recall": 0.602031,
+      "f1_score": 0.307838,
+      "recall_at_01_fpr": 0.017544,
+      "confusion_matrix": {
+        "tn": 13086,
+        "fp": 2501,
+        "fn": 431,
+        "tp": 652
+      },
+      "non_canonical_05": {
+        "threshold": 0.5,
+        "precision": 0.174304,
+        "recall": 0.751616,
+        "f1_score": 0.282983,
+        "confusion_matrix": {
+          "tn": 11731,
+          "fp": 3856,
+          "fn": 269,
+          "tp": 814
+        }
+      }
+    },
+    {
+      "seed": 456,
+      "best_epoch": 15,
+      "val_pr_auc": 0.6651,
+      "operating_threshold": 0.68,
+      "test_pr_auc": 0.371511,
+      "test_roc_auc": 0.832918,
+      "precision": 0.384794,
+      "recall": 0.457987,
+      "f1_score": 0.418212,
+      "recall_at_01_fpr": 0.032318,
+      "confusion_matrix": {
+        "tn": 14794,
+        "fp": 793,
+        "fn": 587,
+        "tp": 496
+      },
+      "non_canonical_05": {
+        "threshold": 0.5,
+        "precision": 0.197242,
+        "recall": 0.739612,
+        "f1_score": 0.311431,
+        "confusion_matrix": {
+          "tn": 12327,
+          "fp": 3260,
+          "fn": 282,
+          "tp": 801
+        }
+      }
+    }
+  ],
+  "non_canonical_threshold_05": {
+    "description": "Secondary diagnostic only; arbitrary 0.5 threshold evaluated without validation calibration",
+    "precision": 0.1858,
+    "recall": 0.7516,
+    "f1_score": 0.2978
+  },
+  "graphsage_2layer_champion": {
+    "pr_auc": 0.426475,
+    "roc_auc": 0.840058,
+    "f1_score": 0.340491,
+    "precision": 0.235419,
+    "recall": 0.614958,
+    "operating_threshold": 0.67,
+    "brier_score": 0.164865,
+    "recall_at_01_fpr": 0.088643,
+    "recall_at_05_fpr": 0.203139,
+    "recall_at_10_fpr": 0.262235,
+    "confusion_matrix": {
+      "tn": 13424,
+      "fp": 2163,
+      "fn": 417,
+      "tp": 666
+    },
+    "non_canonical_05": {
+      "threshold": 0.5,
+      "precision": 0.185968,
+      "recall": 0.76362,
+      "f1_score": 0.299096,
+      "confusion_matrix": {
+        "tn": 11967,
+        "fp": 3620,
+        "fn": 256,
+        "tp": 827
+      }
+    },
+    "inference_latency_ms": 1027.77,
+    "inference_latency_per_1k_ms": 5.044,
+    "best_epoch": 15,
+    "val_pr_auc": 0.713901
+  },
+  "graphsage_1layer_ablation": {
+    "pr_auc": 0.455558,
+    "roc_auc": 0.83678,
+    "f1_score": 0.399202,
+    "precision": 0.312012,
+    "recall": 0.554017,
+    "operating_threshold": 0.69,
+    "brier_score": 0.239361,
+    "recall_at_01_fpr": 0.129271,
+    "recall_at_05_fpr": 0.22253,
+    "recall_at_10_fpr": 0.291782,
+    "confusion_matrix": {
+      "tn": 14264,
+      "fp": 1323,
+      "fn": 483,
+      "tp": 600
+    },
+    "non_canonical_05": {
+      "threshold": 0.5,
+      "precision": 0.13148,
+      "recall": 0.868883,
+      "f1_score": 0.228398,
+      "confusion_matrix": {
+        "tn": 9371,
+        "fp": 6216,
+        "fn": 142,
+        "tp": 941
+      }
+    },
+    "inference_latency_ms": 810.17,
+    "inference_latency_per_1k_ms": 3.976,
+    "best_epoch": 15,
+    "val_pr_auc": 0.735125
+  },
+  "tabular_mlp_baseline": {
+    "pr_auc": 0.577814,
+    "roc_auc": 0.872158,
+    "f1_score": 0.516186,
+    "precision": 0.496587,
+    "recall": 0.537396,
+    "operating_threshold": 0.91,
+    "brier_score": 0.172035,
+    "recall_at_01_fpr": 0.252078,
+    "recall_at_05_fpr": 0.389658,
+    "recall_at_10_fpr": 0.443213,
+    "confusion_matrix": {
+      "tn": 14997,
+      "fp": 590,
+      "fn": 501,
+      "tp": 582
+    },
+    "non_canonical_05": {
+      "threshold": 0.5,
+      "precision": 0.183422,
+      "recall": 0.796861,
+      "f1_score": 0.298203,
+      "confusion_matrix": {
+        "tn": 11745,
+        "fp": 3842,
+        "fn": 220,
+        "tp": 863
+      }
+    },
+    "inference_latency_ms": 192.97,
+    "inference_latency_per_1k_ms": 0.947,
+    "best_epoch": 9,
+    "val_pr_auc": 0.768833
+  },
+  "uplift": {
+    "delta_pr_auc_vs_tabular": -0.151339,
+    "delta_roc_auc_vs_tabular": -0.0321,
+    "delta_recall_01_fpr_vs_tabular": -0.163435,
+    "delta_recall_05_fpr_vs_tabular": -0.186519,
+    "delta_recall_10_fpr_vs_tabular": -0.180978,
+    "delta_f1_vs_tabular": -0.175695,
+    "hop_ablation": {
+      "0_hop_tabular_mlp": {
+        "pr_auc": 0.577814,
+        "roc_auc": 0.872158,
+        "f1_score": 0.516186,
+        "precision": 0.496587,
+        "recall": 0.537396,
+        "operating_threshold": 0.91,
+        "brier_score": 0.172035,
+        "recall_at_01_fpr": 0.252078,
+        "recall_at_05_fpr": 0.389658,
+        "recall_at_10_fpr": 0.443213,
+        "confusion_matrix": {
+          "tn": 14997,
+          "fp": 590,
+          "fn": 501,
+          "tp": 582
+        },
+        "non_canonical_05": {
+          "threshold": 0.5,
+          "precision": 0.183422,
+          "recall": 0.796861,
+          "f1_score": 0.298203,
+          "confusion_matrix": {
+            "tn": 11745,
+            "fp": 3842,
+            "fn": 220,
+            "tp": 863
+          }
+        },
+        "inference_latency_ms": 192.97,
+        "inference_latency_per_1k_ms": 0.947,
+        "best_epoch": 9,
+        "val_pr_auc": 0.768833
+      },
+      "1_hop_graphsage": {
+        "pr_auc": 0.455558,
+        "roc_auc": 0.83678,
+        "f1_score": 0.399202,
+        "precision": 0.312012,
+        "recall": 0.554017,
+        "operating_threshold": 0.69,
+        "brier_score": 0.239361,
+        "recall_at_01_fpr": 0.129271,
+        "recall_at_05_fpr": 0.22253,
+        "recall_at_10_fpr": 0.291782,
+        "confusion_matrix": {
+          "tn": 14264,
+          "fp": 1323,
+          "fn": 483,
+          "tp": 600
+        },
+        "non_canonical_05": {
+          "threshold": 0.5,
+          "precision": 0.13148,
+          "recall": 0.868883,
+          "f1_score": 0.228398,
+          "confusion_matrix": {
+            "tn": 9371,
+            "fp": 6216,
+            "fn": 142,
+            "tp": 941
+          }
+        },
+        "inference_latency_ms": 810.17,
+        "inference_latency_per_1k_ms": 3.976,
+        "best_epoch": 15,
+        "val_pr_auc": 0.735125
+      },
+      "2_hop_graphsage": {
+        "pr_auc": 0.426475,
+        "roc_auc": 0.840058,
+        "f1_score": 0.340491,
+        "precision": 0.235419,
+        "recall": 0.614958,
+        "operating_threshold": 0.67,
+        "brier_score": 0.164865,
+        "recall_at_01_fpr": 0.088643,
+        "recall_at_05_fpr": 0.203139,
+        "recall_at_10_fpr": 0.262235,
+        "confusion_matrix": {
+          "tn": 13424,
+          "fp": 2163,
+          "fn": 417,
+          "tp": 666
+        },
+        "non_canonical_05": {
+          "threshold": 0.5,
+          "precision": 0.185968,
+          "recall": 0.76362,
+          "f1_score": 0.299096,
+          "confusion_matrix": {
+            "tn": 11967,
+            "fp": 3620,
+            "fn": 256,
+            "tp": 827
+          }
+        },
+        "inference_latency_ms": 1027.77,
+        "inference_latency_per_1k_ms": 5.044,
+        "best_epoch": 15,
+        "val_pr_auc": 0.713901
+      }
+    },
+    "aggregator_ablation": {
+      "mean_aggregator": {
+        "pr_auc": 0.426475,
+        "roc_auc": 0.840058,
+        "f1_score": 0.340491,
+        "precision": 0.235419,
+        "recall": 0.614958,
+        "operating_threshold": 0.67,
+        "brier_score": 0.164865,
+        "recall_at_01_fpr": 0.088643,
+        "recall_at_05_fpr": 0.203139,
+        "recall_at_10_fpr": 0.262235,
+        "confusion_matrix": {
+          "tn": 13424,
+          "fp": 2163,
+          "fn": 417,
+          "tp": 666
+        },
+        "non_canonical_05": {
+          "threshold": 0.5,
+          "precision": 0.185968,
+          "recall": 0.76362,
+          "f1_score": 0.299096,
+          "confusion_matrix": {
+            "tn": 11967,
+            "fp": 3620,
+            "fn": 256,
+            "tp": 827
+          }
+        },
+        "inference_latency_ms": 1027.77,
+        "inference_latency_per_1k_ms": 5.044,
+        "best_epoch": 15,
+        "val_pr_auc": 0.713901
+      },
+      "gcn_aggregator": {
+        "pr_auc": 0.492174,
+        "roc_auc": 0.850385,
+        "f1_score": 0.384457,
+        "precision": 0.282195,
+        "recall": 0.602955,
+        "operating_threshold": 0.67,
+        "brier_score": 0.15235,
+        "recall_at_01_fpr": 0.10434,
+        "recall_at_05_fpr": 0.286242,
+        "recall_at_10_fpr": 0.34349,
+        "confusion_matrix": {
+          "tn": 13926,
+          "fp": 1661,
+          "fn": 430,
+          "tp": 653
+        },
+        "non_canonical_05": {
+          "threshold": 0.5,
+          "precision": 0.200413,
+          "recall": 0.716528,
+          "f1_score": 0.313219,
+          "confusion_matrix": {
+            "tn": 12491,
+            "fp": 3096,
+            "fn": 307,
+            "tp": 776
+          }
+        },
+        "inference_latency_ms": 918.4,
+        "inference_latency_per_1k_ms": 4.507,
+        "best_epoch": 15,
+        "val_pr_auc": 0.751268
+      }
+    }
+  },
+  "legacy_synthetic_benchmark": {
+    "status": "RETIRED_SYNTHETIC_SMOKE_BENCHMARK",
+    "pr_auc": 0.9001,
+    "roc_auc": 0.986,
+    "precision": 0.9636,
+    "recall": 0.3333,
+    "f1_score": 0.4953,
+    "note": "Measured on synthetic 1500-node smoke fallback testbed in run_graph_benchmark.py; superseded by canonical real-data multi-seed benchmark."
+  },
+  "legacy_real_data_single_run": {
+    "status": "HISTORICAL_CENTRALIZED_SINGLE_RUN_BASELINE",
+    "pr_auc": 0.4372,
+    "roc_auc": 0.8388,
+    "precision": 0.2711,
+    "recall": 0.6371,
+    "note": "Initial single-seed run without pre-test validation split; superseded by canonical 3-seed temporal validation benchmark."
+  }
+}

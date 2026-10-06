@@ -1,0 +1,27 @@
+{
+  "unit_id": "RU-AML-01",
+  "status": "BLOCKED_MISSING_HISTORICAL_STATE",
+  "preflight_status": "PASS",
+  "revalidation_type": "EVALUATION_ONLY_RECOMPUTATION",
+  "evaluation_state_status": "EVALUATION_STATE_UNAVAILABLE",
+  "reason": "Valid required historical prediction state (sample-level test prediction vector y_pred or saved model weights) is unavailable in repository storage. Only aggregate confusion matrix and 50-point ROC/PR curves are stored in experiments/amlsim/results.json. Section 40 strictly prohibits unplanned retraining without raising a protocol deviation.",
+  "future_revalidation_classification": "FULL_RERUN_REQUIRED",
+  "dataset": {
+    "name": "AMLSim (IBM Agent-Based Multi-Hop Transaction Graph)",
+    "scientific_origin": "SIMULATED",
+    "sha256": "b3dc9b72f985e7247198f81df8d4db7c559d93dfd7d00fb4ec18a6b0b368647c",
+    "path": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\backend\\storage\\datasets\\amlsim\\transactions.parquet",
+    "rows": 1323234
+  },
+  "defect_mitigation": {
+    "DATA-006": {
+      "status": "VERIFIED_CLEAN",
+      "evidence": "transactions.parquet verified: zero NaN values, strict boolean encoding, no astype(bool) coercion."
+    }
+  },
+  "historical_reference": {
+    "historical_raw_artifact": "benchmarks/results/raw/fraud_benchmark_amlsim.json",
+    "historical_status": "HISTORICAL (quarantined 500-sample smoke run)",
+    "historical_result_not_rewritten": true
+  }
+}

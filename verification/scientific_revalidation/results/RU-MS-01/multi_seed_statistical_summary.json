@@ -1,0 +1,509 @@
+{
+  "timestamp_utc": "2026-10-06T16:45:55.396357+00:00",
+  "protocol_version": "Phase-33-MultiSeed-v1.0",
+  "hardware": {
+    "os_platform": "Windows",
+    "os_release": "11",
+    "os_version": "10.0.26300",
+    "cpu_model": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "cpu_architecture": "AMD64",
+    "cpu_physical_cores": 8,
+    "cpu_logical_cores": 16,
+    "total_ram_gb": 7.34,
+    "available_ram_gb": 1.13,
+    "python_version": "3.12.10",
+    "torch_version": "2.12.0+cpu",
+    "cuda_available": false,
+    "device_name": "CPU"
+  },
+  "seeds": [
+    42,
+    123,
+    456,
+    789,
+    1024
+  ],
+  "suites": {
+    "federated_learning": [
+      {
+        "suite_name": "Federated_Optimizer_Comparison",
+        "model_or_strategy": "FEDAVG",
+        "seeds": [
+          42,
+          123,
+          456,
+          789,
+          1024
+        ],
+        "num_seeds": 5,
+        "metrics": {
+          "final_pr_auc": {
+            "mean": 0.0754,
+            "std": 0.0201,
+            "sem": 0.009002,
+            "median": 0.0659,
+            "min": 0.0564,
+            "max": 0.1062,
+            "ci_95_lower": 0.0504,
+            "ci_95_upper": 0.1003,
+            "formatted_mu_sigma": "0.0754 +/- 0.0201",
+            "formatted_ci_95": "[0.0504, 0.1003]",
+            "raw_values": [
+              0.084527,
+              0.065937,
+              0.06369,
+              0.056391,
+              0.106211
+            ]
+          },
+          "final_roc_auc": {
+            "mean": 0.3564,
+            "std": 0.1449,
+            "sem": 0.064803,
+            "median": 0.2588,
+            "min": 0.2408,
+            "max": 0.5394,
+            "ci_95_lower": 0.1765,
+            "ci_95_upper": 0.5363,
+            "formatted_mu_sigma": "0.3564 +/- 0.1449",
+            "formatted_ci_95": "[0.1765, 0.5363]",
+            "raw_values": [
+              0.488106,
+              0.255039,
+              0.258827,
+              0.240761,
+              0.539364
+            ]
+          },
+          "rounds_to_converge": {
+            "mean": 5.0,
+            "std": 0.0,
+            "sem": 0.0,
+            "median": 5.0,
+            "min": 5.0,
+            "max": 5.0,
+            "ci_95_lower": 5.0,
+            "ci_95_upper": 5.0,
+            "formatted_mu_sigma": "5.0000 +/- 0.0000",
+            "formatted_ci_95": "[5.0000, 5.0000]",
+            "raw_values": [
+              5.0,
+              5.0,
+              5.0,
+              5.0,
+              5.0
+            ]
+          }
+        },
+        "metadata": {
+          "n_clients": 5,
+          "rounds": 5,
+          "dirichlet_alpha": 0.5
+        }
+      },
+      {
+        "suite_name": "Federated_Optimizer_Comparison",
+        "model_or_strategy": "FEDPROX",
+        "seeds": [
+          42,
+          123,
+          456,
+          789,
+          1024
+        ],
+        "num_seeds": 5,
+        "metrics": {
+          "final_pr_auc": {
+            "mean": 0.064,
+            "std": 0.006,
+            "sem": 0.002696,
+            "median": 0.0619,
+            "min": 0.0579,
+            "max": 0.0734,
+            "ci_95_lower": 0.0566,
+            "ci_95_upper": 0.0715,
+            "formatted_mu_sigma": "0.0640 +/- 0.0060",
+            "formatted_ci_95": "[0.0566, 0.0715]",
+            "raw_values": [
+              0.061913,
+              0.073417,
+              0.066178,
+              0.057891,
+              0.060793
+            ]
+          },
+          "final_roc_auc": {
+            "mean": 0.289,
+            "std": 0.0304,
+            "sem": 0.013589,
+            "median": 0.2915,
+            "min": 0.2579,
+            "max": 0.3333,
+            "ci_95_lower": 0.2513,
+            "ci_95_upper": 0.3267,
+            "formatted_mu_sigma": "0.2890 +/- 0.0304",
+            "formatted_ci_95": "[0.2513, 0.3267]",
+            "raw_values": [
+              0.29892,
+              0.333305,
+              0.291537,
+              0.263292,
+              0.257942
+            ]
+          },
+          "rounds_to_converge": {
+            "mean": 5.0,
+            "std": 0.0,
+            "sem": 0.0,
+            "median": 5.0,
+            "min": 5.0,
+            "max": 5.0,
+            "ci_95_lower": 5.0,
+            "ci_95_upper": 5.0,
+            "formatted_mu_sigma": "5.0000 +/- 0.0000",
+            "formatted_ci_95": "[5.0000, 5.0000]",
+            "raw_values": [
+              5.0,
+              5.0,
+              5.0,
+              5.0,
+              5.0
+            ]
+          }
+        },
+        "metadata": {
+          "n_clients": 5,
+          "rounds": 5,
+          "dirichlet_alpha": 0.5
+        }
+      },
+      {
+        "suite_name": "Federated_Optimizer_Comparison",
+        "model_or_strategy": "SCAFFOLD",
+        "seeds": [
+          42,
+          123,
+          456,
+          789,
+          1024
+        ],
+        "num_seeds": 5,
+        "metrics": {
+          "final_pr_auc": {
+            "mean": 0.063,
+            "std": 0.0079,
+            "sem": 0.003539,
+            "median": 0.0639,
+            "min": 0.0547,
+            "max": 0.0718,
+            "ci_95_lower": 0.0532,
+            "ci_95_upper": 0.0728,
+            "formatted_mu_sigma": "0.0630 +/- 0.0079",
+            "formatted_ci_95": "[0.0532, 0.0728]",
+            "raw_values": [
+              0.054681,
+              0.069441,
+              0.063945,
+              0.071772,
+              0.055125
+            ]
+          },
+          "final_roc_auc": {
+            "mean": 0.2649,
+            "std": 0.0859,
+            "sem": 0.038409,
+            "median": 0.2649,
+            "min": 0.169,
+            "max": 0.393,
+            "ci_95_lower": 0.1583,
+            "ci_95_upper": 0.3716,
+            "formatted_mu_sigma": "0.2649 +/- 0.0859",
+            "formatted_ci_95": "[0.1583, 0.3716]",
+            "raw_values": [
+              0.207763,
+              0.289938,
+              0.264875,
+              0.393015,
+              0.168983
+            ]
+          },
+          "rounds_to_converge": {
+            "mean": 5.0,
+            "std": 0.0,
+            "sem": 0.0,
+            "median": 5.0,
+            "min": 5.0,
+            "max": 5.0,
+            "ci_95_lower": 5.0,
+            "ci_95_upper": 5.0,
+            "formatted_mu_sigma": "5.0000 +/- 0.0000",
+            "formatted_ci_95": "[5.0000, 5.0000]",
+            "raw_values": [
+              5.0,
+              5.0,
+              5.0,
+              5.0,
+              5.0
+            ]
+          }
+        },
+        "metadata": {
+          "n_clients": 5,
+          "rounds": 5,
+          "dirichlet_alpha": 0.5
+        }
+      }
+    ],
+    "fraud_detection": [
+      {
+        "suite_name": "Fraud_Detection_PAYSIM",
+        "model_or_strategy": "Centralized Baseline",
+        "seeds": [
+          42,
+          123,
+          456,
+          789,
+          1024
+        ],
+        "num_seeds": 5,
+        "metrics": {
+          "pr_auc": {
+            "mean": 0.4064,
+            "std": 0.1112,
+            "sem": 0.04971,
+            "median": 0.4042,
+            "min": 0.233,
+            "max": 0.531,
+            "ci_95_lower": 0.2683,
+            "ci_95_upper": 0.5444,
+            "formatted_mu_sigma": "0.4064 +/- 0.1112",
+            "formatted_ci_95": "[0.2683, 0.5444]",
+            "raw_values": [
+              0.530952,
+              0.404179,
+              0.39607,
+              0.467586,
+              0.233041
+            ]
+          },
+          "roc_auc": {
+            "mean": 0.9564,
+            "std": 0.0455,
+            "sem": 0.020339,
+            "median": 0.9692,
+            "min": 0.8777,
+            "max": 0.9913,
+            "ci_95_lower": 0.9,
+            "ci_95_upper": 1.0,
+            "formatted_mu_sigma": "0.9564 +/- 0.0455",
+            "formatted_ci_95": "[0.9000, 1.0000]",
+            "raw_values": [
+              0.991278,
+              0.969223,
+              0.961561,
+              0.982447,
+              0.877739
+            ]
+          },
+          "recall_at_0.1_fpr": {
+            "mean": 0.0,
+            "std": 0.0,
+            "sem": 0.0,
+            "median": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "ci_95_lower": 0.0,
+            "ci_95_upper": 0.0,
+            "formatted_mu_sigma": "0.0000 +/- 0.0000",
+            "formatted_ci_95": "[0.0000, 0.0000]",
+            "raw_values": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "metadata": {
+          "dataset": "paysim",
+          "rounds": 5
+        }
+      },
+      {
+        "suite_name": "Fraud_Detection_PAYSIM",
+        "model_or_strategy": "Federated FedAvg",
+        "seeds": [
+          42,
+          123,
+          456,
+          789,
+          1024
+        ],
+        "num_seeds": 5,
+        "metrics": {
+          "pr_auc": {
+            "mean": 0.2361,
+            "std": 0.0873,
+            "sem": 0.039062,
+            "median": 0.2273,
+            "min": 0.1203,
+            "max": 0.3662,
+            "ci_95_lower": 0.1277,
+            "ci_95_upper": 0.3446,
+            "formatted_mu_sigma": "0.2361 +/- 0.0873",
+            "formatted_ci_95": "[0.1277, 0.3446]",
+            "raw_values": [
+              0.240024,
+              0.226892,
+              0.227252,
+              0.366225,
+              0.120318
+            ]
+          },
+          "roc_auc": {
+            "mean": 0.9098,
+            "std": 0.0691,
+            "sem": 0.030887,
+            "median": 0.9151,
+            "min": 0.796,
+            "max": 0.9677,
+            "ci_95_lower": 0.824,
+            "ci_95_upper": 0.9956,
+            "formatted_mu_sigma": "0.9098 +/- 0.0691",
+            "formatted_ci_95": "[0.8240, 0.9956]",
+            "raw_values": [
+              0.967719,
+              0.908095,
+              0.915078,
+              0.962136,
+              0.79598
+            ]
+          },
+          "recall_at_0.1_fpr": {
+            "mean": 0.0,
+            "std": 0.0,
+            "sem": 0.0,
+            "median": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "ci_95_lower": 0.0,
+            "ci_95_upper": 0.0,
+            "formatted_mu_sigma": "0.0000 +/- 0.0000",
+            "formatted_ci_95": "[0.0000, 0.0000]",
+            "raw_values": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "metadata": {
+          "dataset": "paysim",
+          "rounds": 5
+        }
+      }
+    ],
+    "neural_architectures": [
+      {
+        "suite_name": "Harness_Neural_Model_Evaluation",
+        "model_or_strategy": "DeepFraudMLP (FedAvg)",
+        "seeds": [
+          42,
+          123,
+          456,
+          789,
+          1024
+        ],
+        "num_seeds": 5,
+        "metrics": {
+          "pr_auc": {
+            "mean": 0.076,
+            "std": 0.0631,
+            "sem": 0.028218,
+            "median": 0.0449,
+            "min": 0.0286,
+            "max": 0.1833,
+            "ci_95_lower": 0.0,
+            "ci_95_upper": 0.1543,
+            "formatted_mu_sigma": "0.0760 +/- 0.0631",
+            "formatted_ci_95": "[0.0000, 0.1543]",
+            "raw_values": [
+              0.183344,
+              0.044936,
+              0.081235,
+              0.041886,
+              0.028602
+            ]
+          },
+          "roc_auc": {
+            "mean": 0.5042,
+            "std": 0.2498,
+            "sem": 0.11173,
+            "median": 0.4576,
+            "min": 0.1357,
+            "max": 0.7726,
+            "ci_95_lower": 0.194,
+            "ci_95_upper": 0.8144,
+            "formatted_mu_sigma": "0.5042 +/- 0.2498",
+            "formatted_ci_95": "[0.1940, 0.8144]",
+            "raw_values": [
+              0.772606,
+              0.457218,
+              0.697742,
+              0.457632,
+              0.135695
+            ]
+          },
+          "f1_score": {
+            "mean": 0.0,
+            "std": 0.0,
+            "sem": 0.0,
+            "median": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "ci_95_lower": 0.0,
+            "ci_95_upper": 0.0,
+            "formatted_mu_sigma": "0.0000 +/- 0.0000",
+            "formatted_ci_95": "[0.0000, 0.0000]",
+            "raw_values": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "brier_score": {
+            "mean": 0.1486,
+            "std": 0.0186,
+            "sem": 0.008312,
+            "median": 0.1401,
+            "min": 0.1316,
+            "max": 0.1715,
+            "ci_95_lower": 0.1255,
+            "ci_95_upper": 0.1717,
+            "formatted_mu_sigma": "0.1486 +/- 0.0186",
+            "formatted_ci_95": "[0.1255, 0.1717]",
+            "raw_values": [
+              0.134236,
+              0.16557,
+              0.131567,
+              0.140105,
+              0.17152
+            ]
+          }
+        },
+        "metadata": {
+          "num_rounds": 3,
+          "learning_rate": 0.01
+        }
+      }
+    ]
+  },
+  "cryptographic_execution_mode": "PLAINTEXT_EMULATION_OF_FHE_WORKFLOW",
+  "scientific_origin": "SYNTHETIC",
+  "crypto_caveat": "Plaintext software simulation of homomorphic workflow; not genuine CKKS hardware execution."
+}

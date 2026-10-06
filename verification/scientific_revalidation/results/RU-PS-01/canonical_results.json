@@ -1,0 +1,225 @@
+{
+  "schema_version": "2.0.0",
+  "benchmark_id": "paysim_canonical_real_data",
+  "generated_at_utc": "2026-10-06T16:25:59.924534+00:00",
+  "dataset": {
+    "name": "PaySim Mobile Money Fraud",
+    "dataset_type": "real",
+    "source": "real_csv_systematic_10th",
+    "csv_path": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\backend\\storage\\datasets\\paysim\\PS_20174392719_1491204439457_log.csv",
+    "sha256": "16910f90577b0d981bf8ff289714510bb89bc71bff7d3f220f024e287e4eea6b",
+    "sampling_strategy": "systematic every 10th row",
+    "sample_every_nth": 10,
+    "n_rows_sampled": 636262,
+    "n_rows_full_approx": 6362620,
+    "n_fraud": 817,
+    "n_legit": 635445,
+    "fraud_rate": 0.0012840622259383714,
+    "step_range": [
+      1,
+      742
+    ],
+    "feature_cols": [
+      "step",
+      "type_TRANSFER",
+      "type_CASH_OUT",
+      "type_PAYMENT",
+      "type_DEBIT",
+      "type_CASH_IN",
+      "amount",
+      "oldbalanceOrg",
+      "newbalanceOrig",
+      "oldbalanceDest",
+      "newbalanceDest",
+      "errorBalanceOrig",
+      "errorBalanceDest"
+    ]
+  },
+  "split": {
+    "strategy": "stratified_random_80_20",
+    "data_seed": 42,
+    "train_n": 509010,
+    "train_fraud": 654,
+    "train_legit": 508356,
+    "train_fraud_rate": 0.0012848470560499793,
+    "test_n": 127252,
+    "test_fraud": 163,
+    "test_legit": 127089,
+    "test_fraud_rate": 0.0012809228931568856,
+    "split_justification": "PaySim is a Monte-Carlo simulation with fraud uniform across steps 1-742 (no concept drift). Temporal split introduces 4x fraud-rate imbalance between train and test sets, making PR-AUC incomparable. Stratified random split preserves natural ~0.13% prevalence in both sets."
+  },
+  "partition": {
+    "algorithm": "dirichlet",
+    "alpha": 0.5,
+    "n_clients": 3,
+    "data_seed": 42,
+    "client_diagnostics": {
+      "bank_a": {
+        "n_samples": 180498,
+        "n_fraud": 116,
+        "n_legit": 180382,
+        "fraud_rate": 0.0006426664007357422,
+        "volume_share": 0.3546059998821241
+      },
+      "bank_b": {
+        "n_samples": 202,
+        "n_fraud": 32,
+        "n_legit": 170,
+        "fraud_rate": 0.15841584158415842,
+        "volume_share": 0.000396848784896171
+      },
+      "bank_c": {
+        "n_samples": 328310,
+        "n_fraud": 506,
+        "n_legit": 327804,
+        "fraud_rate": 0.001541226280040206,
+        "volume_share": 0.6449971513329797
+      }
+    }
+  },
+  "budget": {
+    "description": "Centralized: num_rounds \u00d7 local_epochs epochs over pooled data. FedAvg: num_rounds rounds \u00d7 local_epochs per client.",
+    "num_rounds": 10,
+    "local_epochs": 3,
+    "centralized_epochs": 30
+  },
+  "per_seed_results": [
+    {
+      "seed": 42,
+      "centralized": {
+        "pr_auc": 0.9482352627344438,
+        "roc_auc": 0.9994042627100558,
+        "recall_at_01pct_fpr": 0.9877300613496932,
+        "budget": {
+          "epochs": 30,
+          "samples": 509010,
+          "batch_size": 256,
+          "optimizer_steps": 59670
+        },
+        "duration_seconds": 413.876
+      },
+      "fedavg": {
+        "pr_auc": 0.9671598883207566,
+        "roc_auc": 0.9993726438846029,
+        "recall_at_01pct_fpr": 0.9815950920245399,
+        "budget": {
+          "rounds": 10,
+          "local_epochs": 3,
+          "total_local_optimizer_steps": 59700,
+          "client_samples": {
+            "bank_a": 180498,
+            "bank_b": 202,
+            "bank_c": 328310
+          }
+        },
+        "duration_seconds": 315.967
+      },
+      "delta_pr_auc": 0.018925
+    },
+    {
+      "seed": 123,
+      "centralized": {
+        "pr_auc": 0.9647396156713027,
+        "roc_auc": 0.9993870292433586,
+        "recall_at_01pct_fpr": 0.9877300613496932,
+        "budget": {
+          "epochs": 30,
+          "samples": 509010,
+          "batch_size": 256,
+          "optimizer_steps": 59670
+        },
+        "duration_seconds": 392.386
+      },
+      "fedavg": {
+        "pr_auc": 0.9386728448189527,
+        "roc_auc": 0.9991194519159005,
+        "recall_at_01pct_fpr": 0.9754601226993865,
+        "budget": {
+          "rounds": 10,
+          "local_epochs": 3,
+          "total_local_optimizer_steps": 59700,
+          "client_samples": {
+            "bank_a": 180498,
+            "bank_b": 202,
+            "bank_c": 328310
+          }
+        },
+        "duration_seconds": 477.787
+      },
+      "delta_pr_auc": -0.026067
+    },
+    {
+      "seed": 456,
+      "centralized": {
+        "pr_auc": 0.9505975710473284,
+        "roc_auc": 0.9993150059035485,
+        "recall_at_01pct_fpr": 0.9815950920245399,
+        "budget": {
+          "epochs": 30,
+          "samples": 509010,
+          "batch_size": 256,
+          "optimizer_steps": 59670
+        },
+        "duration_seconds": 365.801
+      },
+      "fedavg": {
+        "pr_auc": 0.9577872890277412,
+        "roc_auc": 0.9993061719416282,
+        "recall_at_01pct_fpr": 0.9815950920245399,
+        "budget": {
+          "rounds": 10,
+          "local_epochs": 3,
+          "total_local_optimizer_steps": 59700,
+          "client_samples": {
+            "bank_a": 180498,
+            "bank_b": 202,
+            "bank_c": 328310
+          }
+        },
+        "duration_seconds": 312.578
+      },
+      "delta_pr_auc": 0.00719
+    }
+  ],
+  "aggregate": {
+    "centralized_pr_auc": {
+      "mean": 0.954524,
+      "std": 0.007288,
+      "min": 0.948235,
+      "max": 0.96474
+    },
+    "fedavg_pr_auc": {
+      "mean": 0.95454,
+      "std": 0.011854,
+      "min": 0.938673,
+      "max": 0.96716
+    },
+    "delta_pr_auc": {
+      "mean": 1.6e-05,
+      "std": 0.019056,
+      "min": -0.026067,
+      "max": 0.018925
+    }
+  },
+  "legacy_results": {
+    "note": "These are PRESERVED historical results. Do NOT use as canonical.",
+    "synthetic_fallback": {
+      "centralized_pr_auc": 0.4654,
+      "fedavg_pr_auc": 0.1463,
+      "source": "benchmarks/runners/run_fraud_benchmark.py",
+      "dataset_type": "synthetic_10_feature_fallback",
+      "rounds": 3,
+      "clients": 5,
+      "status": "ARCHIVED \u2014 produced when benchmarks/datasets/paysim/processed/ was missing"
+    },
+    "limited_30k_real": {
+      "fedavg_pr_auc": 0.11838,
+      "source": "experiments/paysim/train_federated.py",
+      "dataset_type": "real_csv_first_30k_rows",
+      "nrows": 30000,
+      "test_fraud_count": 3,
+      "status": "ARCHIVED \u2014 test set had only 3 fraud examples; PR-AUC statistically unreliable",
+      "sha256_bug": "results.json recorded sha256('') (empty string hash) instead of real file hash"
+    }
+  }
+}

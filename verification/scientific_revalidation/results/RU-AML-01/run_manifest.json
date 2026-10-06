@@ -1,0 +1,21 @@
+{
+  "run_id": "RUN-RU-AML-01-1791300437",
+  "unit_id": "RU-AML-01",
+  "protocol_version": "1.0",
+  "git_commit": "5fd3bb6565cdebee0bed90ea0a114abc759e967f",
+  "start_time_utc": "2026-10-06T15:27:15.444595+00:00",
+  "end_time_utc": "2026-10-06T15:27:17.049970+00:00",
+  "duration_seconds": 1.605,
+  "status": "BLOCKED_MISSING_HISTORICAL_STATE",
+  "exit_code": 0,
+  "output_artifacts": [
+    "metrics.json",
+    "stderr.log",
+    "stdout.log"
+  ],
+  "artifact_hashes": {
+    "metrics.json": "047f22b95c8784959a6a158317f22b1180bfc668496c6534ef1ceca2a3497b4c",
+    "stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout.log": "9e4f551414e1355996de7d30009342cddbeab1680594e6e447f8e4f3241cba1d"
+  }
+}

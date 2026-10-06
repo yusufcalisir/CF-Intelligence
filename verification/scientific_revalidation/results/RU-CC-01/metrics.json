@@ -1,0 +1,53 @@
+{
+  "unit_id": "RU-CC-01",
+  "status": "PASS_VALID_REVALIDATION",
+  "scientific_origin": "EMPIRICAL",
+  "dataset_name": "European Credit Card Fraud Detection (Real)",
+  "dataset_sha256": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
+  "evaluation_population": {
+    "total_transactions": 284807,
+    "train_transactions": 227845,
+    "test_transactions": 56962,
+    "test_positive_count": 99,
+    "test_negative_count": 56863,
+    "test_prevalence": 0.0017248568105510324
+  },
+  "centralized_baseline": {
+    "epochs": 10,
+    "pr_auc": 0.78004,
+    "roc_auc": 0.97304,
+    "recall_at_01_fpr": 0.84848,
+    "recall_at_05_fpr": 0.87879,
+    "recall_at_1_fpr": 0.87879
+  },
+  "federated_fedavg": {
+    "rounds": 5,
+    "local_epochs": 2,
+    "effective_passes": 10,
+    "clients": 3,
+    "pr_auc": 0.77875,
+    "roc_auc": 0.9839,
+    "recall_at_01_fpr": 0.84848,
+    "recall_at_05_fpr": 0.86869,
+    "recall_at_1_fpr": 0.88889,
+    "pr_auc_parity_ratio": 0.9983
+  },
+  "centralized_vs_federated_gap": {
+    "absolute_pr_auc_difference": 0.00129,
+    "relative_pr_auc_gap_pct": 0.17,
+    "absolute_roc_auc_difference": -0.01086
+  },
+  "bank_c_pathological_silo": {
+    "pr_auc": 0.61129,
+    "roc_auc": 0.94426,
+    "recall_at_01_fpr": 0.78788,
+    "federated_rescue_gain_pr_auc": 0.16746
+  },
+  "guards_validated": {
+    "DATA-002": "PASSED (80/20 train/test split strictly enforced)",
+    "FL-001": "PASSED (aggregate_weights validated with positive sample weights and non-empty checks)",
+    "no_synthetic_fallback": "PASSED (require_real=True enforced, physical CSV loaded)"
+  },
+  "supersedes_historical_artifact": "benchmarks/results/raw/fraud_benchmark_credit_card.json",
+  "historical_result_not_rewritten": true
+}

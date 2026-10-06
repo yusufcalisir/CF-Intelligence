@@ -1,0 +1,14 @@
+{
+  "audit_dossier.md": "37c9edba505116729a2c25a58357188e132ae1b012d60d700ac86925fa99a8b3",
+  "comparative_baselines.json": "71f0663b9a8a5745cbc9d9e492ad7c102f99433cb39324c84fc2c47bd2ed9843",
+  "fraud_benchmark_credit_card.json": "937bfabfbe6596dd88f452d3b07f53d023bb36eeee6145ac880b3098d6755e0f",
+  "metrics.json": "463870c87b4c12d45c3623817b28bd36ceed45cdd5fda6c3f0764bee754bc473",
+  "plots/imbalance_robustness.png": "337210fa7cd845cac0406cea1b8f8fed2540af462ed8f5cf00d876e84d6be80d",
+  "plots/optimizer_convergence.png": "488237751a76ad8a895f749d956f4db9de23c4afc7fa291bd7e857adf69e7d2b",
+  "plots/pr_curves.png": "2b548fc5524fb584cf84bb549c6247a26f0dd8a0764512d848be5480ac776151",
+  "plots/roc_curves.png": "c5d20299de56d4c3fb2c362b8221d056c39c7ca85e3751471ca1933ae20a6f52",
+  "results.json": "db3bfc6d2c4a3a0d952c860a499c1ceeb018464b87e536e87364760a87fedc5a",
+  "run_manifest.json": "abea8e054d0e20b247f30ef1c01bef5b2c09a9d3af6209e92c29f65c16276e0a",
+  "stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout.log": "998851e0b247fd9df4dec0cd295e1448ff70eec97135f9915194f37c224cccd3"
+}

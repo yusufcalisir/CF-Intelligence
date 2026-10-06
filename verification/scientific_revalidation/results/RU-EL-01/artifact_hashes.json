@@ -1,0 +1,14 @@
+{
+  "audit_dossier.md": "d272518b9fdfaf0383e87c3d4f6baa81c9b285987f70d1fb235ddfcc65bb7361",
+  "comparative_baselines.json": "488363cb0f4e5db062c951c8286bee0a926c56e9254149cb88201a582995bcc6",
+  "graphsage_elliptic_benchmark.json": "e082635c16e9d740119eaff703b0536de886699288aad7c59116f3b0e98bc39c",
+  "metrics.json": "2c698dd246599f617f5b0d40fc812a6c22986529605b6f539c51f92827f7c19e",
+  "plots/benchmark_graphsage_elliptic.png": "c4c5f01e6ccdd603896db55b00bf8a8003d21f5c700900a052356f2823569642",
+  "plots/neighborhood_ablation.png": "e76422a2169eb1e2e8aa83aba58c170f40eca1ff41be5093b727d55f696afead",
+  "plots/pr_curves.png": "06b2fc7f123781085a4fbafffdc7484d4fcafbea092c757e1e946475c3c2e08a",
+  "plots/roc_curves.png": "9a6514b7019f38bd16634fca97a5e5be662b9e57a9fd309a62f62b2c7f9f0c33",
+  "plots/temporal_generalization.png": "8f79378a6384a1e9ef822aebe3567e7f279a83d64f35eefdbfcfdc840bbf2cb3",
+  "results.json": "61675fbb3d117234067890204ad7cb61679438919b834138250f4e840fb47543",
+  "stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout.log": "30ba3538ff6f45287f1ebb31815bead2928025d454b4492f17d54807bd2c2d0a"
+}

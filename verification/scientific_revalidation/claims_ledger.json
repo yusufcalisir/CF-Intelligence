@@ -1,0 +1,89 @@
+{
+  "protocol_version": "1.0",
+  "claims": [
+    {
+      "CLAIM_ID": "CLM-CC-01",
+      "CLAIM": "Federated Learning (FedAvg) achieves competitive PR-AUC against centralized upper bound under extreme banking class imbalance on European Credit Card transactions.",
+      "SUPPORTED_BY": "RU-CC-01",
+      "DATASET": "European Credit Card Fraud Detection",
+      "SCIENTIFIC_ORIGIN": "EMPIRICAL",
+      "METRIC": "pr_auc",
+      "RESULT_ARTIFACT": "verification/scientific_revalidation/results/RU-CC-01/metrics.json",
+      "RUN_ID": "RUN-RU-CC-01",
+      "PROTOCOL_VERSION": "1.0",
+      "STATUS": "SUPPORTED"
+    },
+    {
+      "CLAIM_ID": "CLM-CC-02",
+      "CLAIM": "Federated aggregation rescues near-zero fraud banking silos (Bank C) from statistical collapse under extreme non-IID data distribution.",
+      "SUPPORTED_BY": "RU-CC-01",
+      "DATASET": "European Credit Card Fraud Detection",
+      "SCIENTIFIC_ORIGIN": "EMPIRICAL",
+      "METRIC": "bank_c_pathological_silo.federated_rescue_gain_pr_auc",
+      "RESULT_ARTIFACT": "verification/scientific_revalidation/results/RU-CC-01/metrics.json",
+      "RUN_ID": "RUN-RU-CC-01",
+      "PROTOCOL_VERSION": "1.0",
+      "STATUS": "SUPPORTED"
+    },
+    {
+      "CLAIM_ID": "CLM-PS-01",
+      "CLAIM": "Federated FedAvg matches centralized detection capability within bounded delta on simulated mobile money financial transactions (PaySim).",
+      "SUPPORTED_BY": "RU-PS-01",
+      "DATASET": "PaySim Financial Transactions",
+      "SCIENTIFIC_ORIGIN": "SIMULATED",
+      "METRIC": "fedavg_pr_auc_mean",
+      "RESULT_ARTIFACT": "verification/scientific_revalidation/results/RU-PS-01/metrics.json",
+      "RUN_ID": "RUN-RU-PS-01",
+      "PROTOCOL_VERSION": "1.0",
+      "STATUS": "SUPPORTED"
+    },
+    {
+      "CLAIM_ID": "CLM-EL-01",
+      "CLAIM": "Inductive GraphSAGE 2-layer neighborhood aggregation provides significant detection uplift over 0-hop tabular MLP on the Elliptic Bitcoin transaction network under strict temporal partitioning.",
+      "SUPPORTED_BY": "RU-EL-01",
+      "DATASET": "Elliptic Bitcoin Transaction Graph (Real)",
+      "SCIENTIFIC_ORIGIN": "EMPIRICAL",
+      "METRIC": "uplift_vs_tabular_mlp.delta_pr_auc_vs_mlp",
+      "RESULT_ARTIFACT": "verification/scientific_revalidation/results/RU-EL-01/metrics.json",
+      "RUN_ID": "RUN-RU-EL-01",
+      "PROTOCOL_VERSION": "1.0",
+      "STATUS": "SUPPORTED"
+    },
+    {
+      "CLAIM_ID": "CLM-IE-01",
+      "CLAIM": "Collaborative Federated Learning achieves robust fraud detection across simulated multi-bank partitions on real-world IEEE-CIS card transactions under strict out-of-time evaluation.",
+      "SUPPORTED_BY": "RU-IE-01",
+      "DATASET": "IEEE-CIS Fraud Detection Benchmark (Real)",
+      "SCIENTIFIC_ORIGIN": "EMPIRICAL",
+      "METRIC": "fedavg_pr_auc_mean",
+      "RESULT_ARTIFACT": "verification/scientific_revalidation/results/RU-IE-01/metrics.json",
+      "RUN_ID": "RUN-RU-IE-01",
+      "PROTOCOL_VERSION": "1.0",
+      "STATUS": "SUPPORTED"
+    },
+    {
+      "CLAIM_ID": "CLM-AML-01",
+      "CLAIM": "Graph representation learning detects multi-hop money laundering patterns on agent-simulated transaction networks (AMLSim).",
+      "SUPPORTED_BY": "RU-AML-01",
+      "DATASET": "IBM AMLSim Agent-Based Multi-Hop Transaction Graph",
+      "SCIENTIFIC_ORIGIN": "SIMULATED",
+      "METRIC": "pr_auc",
+      "RESULT_ARTIFACT": "verification/scientific_revalidation/results/RU-AML-01/metrics.json",
+      "RUN_ID": "RUN-RU-AML-01",
+      "PROTOCOL_VERSION": "1.0",
+      "STATUS": "INSUFFICIENT_EVIDENCE"
+    },
+    {
+      "CLAIM_ID": "CLM-MS-01",
+      "CLAIM": "Federated model convergence maintains bounded statistical variance and robust 95% confidence intervals across multi-seed training runs.",
+      "SUPPORTED_BY": "RU-MS-01",
+      "DATASET": "In Silico Gaussian Synthetic Benchmark",
+      "SCIENTIFIC_ORIGIN": "SYNTHETIC",
+      "METRIC": "fedavg_pr_auc_ci95",
+      "RESULT_ARTIFACT": "verification/scientific_revalidation/results/RU-MS-01/metrics.json",
+      "RUN_ID": "RUN-RU-MS-01",
+      "PROTOCOL_VERSION": "1.0",
+      "STATUS": "SUPPORTED"
+    }
+  ]
+}

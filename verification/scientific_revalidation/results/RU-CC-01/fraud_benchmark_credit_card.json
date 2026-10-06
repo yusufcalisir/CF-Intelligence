@@ -1,0 +1,38 @@
+{
+  "timestamp_utc": "2026-10-06T15:43:50.473093+00:00",
+  "dataset": "credit_card",
+  "dataset_sha256": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
+  "environment": {
+    "os": "Windows-11-10.0.26300",
+    "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "python_version": "3.12.10",
+    "torch_version": "2.12.0+cpu"
+  },
+  "centralized_baseline": {
+    "epochs": 10,
+    "budget_equalized": true,
+    "pr_auc": 0.78004,
+    "roc_auc": 0.97304,
+    "recall_at_0_1_pct_fpr": 0.84848,
+    "recall_at_0_5_pct_fpr": 0.87879,
+    "recall_at_1_0_pct_fpr": 0.87879,
+    "legacy_2ep_pr_auc": 0.70595
+  },
+  "federated_fedavg": {
+    "rounds": 5,
+    "local_epochs": 2,
+    "effective_passes": 10,
+    "clients": 3,
+    "pr_auc": 0.77875,
+    "roc_auc": 0.9839,
+    "recall_at_0_1_pct_fpr": 0.84848,
+    "recall_at_0_5_pct_fpr": 0.86869,
+    "recall_at_1_0_pct_fpr": 0.88889,
+    "pr_auc_parity_ratio": 0.9983462386544281
+  },
+  "bank_c_near_zero_silo": {
+    "pr_auc": 0.61129,
+    "roc_auc": 0.94426,
+    "recall_at_0_1_pct_fpr": 0.78788
+  }
+}

@@ -1,0 +1,171 @@
+{
+  "dataset": "credit_card",
+  "skew_mode": "extreme_skew",
+  "diagnostics": {
+    "skew_mode": "extreme_skew",
+    "alpha": null,
+    "total_train_samples": 227845,
+    "total_test_samples": 56962,
+    "global_train_fraud_samples": 393,
+    "global_test_fraud_samples": 99,
+    "global_fraud_prevalence": 0.0017248568105510324,
+    "client_stats": {
+      "bank_a": {
+        "total_samples": 125371,
+        "fraud_samples": 273,
+        "legit_samples": 125098,
+        "fraud_ratio": 0.00217753706997631,
+        "volume_share": 0.5502468783602887
+      },
+      "bank_b": {
+        "total_samples": 68353,
+        "fraud_samples": 118,
+        "legit_samples": 68235,
+        "fraud_ratio": 0.0017263324214006701,
+        "volume_share": 0.29999780552568633
+      },
+      "bank_c": {
+        "total_samples": 34121,
+        "fraud_samples": 2,
+        "legit_samples": 34119,
+        "fraud_ratio": 5.8614929222472966e-05,
+        "volume_share": 0.14975531611402487
+      }
+    },
+    "mean_tvd": 0.0007067992505344916
+  },
+  "provenance": {
+    "dataset_name": "European Credit Card Fraud Detection",
+    "source_uri": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\backend\\storage\\datasets\\creditcard\\creditcard.csv",
+    "sha256_hash": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
+    "seed": 42,
+    "git_commit": "5fd3bb6565cdebee0bed90ea0a114abc759e967f",
+    "timestamp_utc": "2026-10-06T15:37:33.298493+00:00"
+  },
+  "training_budget": {
+    "budget_equalized": true,
+    "centralized_equalized": {
+      "epochs": 10,
+      "optimizer_steps": 35610,
+      "samples_processed": 2278450,
+      "dataset_passes": 10
+    },
+    "centralized_legacy_2ep": {
+      "epochs": 2,
+      "optimizer_steps": 7122,
+      "samples_processed": 455690,
+      "dataset_passes": 2
+    },
+    "federated": {
+      "rounds": 5,
+      "local_epochs": 2,
+      "effective_passes": 10,
+      "total_client_optimizer_steps": 35620,
+      "total_samples_processed": 2278450
+    }
+  },
+  "centralized_pooled": {
+    "pr_auc": 0.78004,
+    "roc_auc": 0.97304,
+    "brier_score": 0.00084,
+    "precision": 0.69421,
+    "recall": 0.84848,
+    "f1_score": 0.76364,
+    "recall_at_001_fpr": 0.40404,
+    "recall_at_005_fpr": 0.81818,
+    "recall_at_01_fpr": 0.84848,
+    "recall_at_05_fpr": 0.87879,
+    "recall_at_1_fpr": 0.87879
+  },
+  "centralized_pooled_legacy_2ep": {
+    "pr_auc": 0.70595,
+    "roc_auc": 0.98497,
+    "brier_score": 0.00082,
+    "precision": 0.76471,
+    "recall": 0.78788,
+    "f1_score": 0.77612,
+    "recall_at_001_fpr": 0.22222,
+    "recall_at_005_fpr": 0.80808,
+    "recall_at_01_fpr": 0.83838,
+    "recall_at_05_fpr": 0.85859,
+    "recall_at_1_fpr": 0.87879
+  },
+  "isolated_silos": {
+    "bank_a": {
+      "pr_auc": 0.72909,
+      "roc_auc": 0.98498,
+      "brier_score": 0.00073,
+      "precision": 0.78788,
+      "recall": 0.78788,
+      "f1_score": 0.78788,
+      "recall_at_001_fpr": 0.30303,
+      "recall_at_005_fpr": 0.79798,
+      "recall_at_01_fpr": 0.84848,
+      "recall_at_05_fpr": 0.85859,
+      "recall_at_1_fpr": 0.85859
+    },
+    "bank_b": {
+      "pr_auc": 0.62752,
+      "roc_auc": 0.97362,
+      "brier_score": 0.00094,
+      "precision": 0.70085,
+      "recall": 0.82828,
+      "f1_score": 0.75926,
+      "recall_at_001_fpr": 0.06061,
+      "recall_at_005_fpr": 0.80808,
+      "recall_at_01_fpr": 0.82828,
+      "recall_at_05_fpr": 0.85859,
+      "recall_at_1_fpr": 0.85859
+    },
+    "bank_c": {
+      "pr_auc": 0.61129,
+      "roc_auc": 0.94426,
+      "brier_score": 0.00171,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "recall_at_001_fpr": 0.13131,
+      "recall_at_005_fpr": 0.78788,
+      "recall_at_01_fpr": 0.78788,
+      "recall_at_05_fpr": 0.78788,
+      "recall_at_1_fpr": 0.78788
+    }
+  },
+  "consortium_silo_mean": {
+    "pr_auc": 0.65597,
+    "roc_auc": 0.96762,
+    "recall_at_01_fpr": 0.82155
+  },
+  "federated_fedavg": {
+    "pr_auc": 0.77875,
+    "roc_auc": 0.9839,
+    "brier_score": 0.00072,
+    "precision": 0.76415,
+    "recall": 0.81818,
+    "f1_score": 0.79024,
+    "recall_at_001_fpr": 0.43434,
+    "recall_at_005_fpr": 0.81818,
+    "recall_at_01_fpr": 0.84848,
+    "recall_at_05_fpr": 0.86869,
+    "recall_at_1_fpr": 0.88889
+  },
+  "federated_fedprox": {
+    "pr_auc": 0.6652,
+    "roc_auc": 0.97366,
+    "brier_score": 0.00072,
+    "precision": 0.79592,
+    "recall": 0.78788,
+    "f1_score": 0.79188,
+    "recall_at_001_fpr": 0.13131,
+    "recall_at_005_fpr": 0.79798,
+    "recall_at_01_fpr": 0.81818,
+    "recall_at_05_fpr": 0.85859,
+    "recall_at_1_fpr": 0.85859
+  },
+  "collaborative_gain": {
+    "mean_silo_delta_prauc": 0.12278,
+    "bank_c_delta_prauc": 0.16746,
+    "centralization_gap": 0.00129,
+    "legacy_centralization_gap": -0.0728
+  }
+}

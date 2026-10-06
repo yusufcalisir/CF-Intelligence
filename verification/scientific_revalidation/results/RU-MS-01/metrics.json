@@ -1,0 +1,31 @@
+{
+  "unit_id": "RU-MS-01",
+  "status": "PASS_VALID_REVALIDATION",
+  "scientific_origin": "SYNTHETIC",
+  "cryptographic_execution_mode": "PLAINTEXT_EMULATION_OF_FHE_WORKFLOW",
+  "crypto_caveat": "Plaintext software simulation; not authentic CKKS ciphertext.",
+  "seeds": [
+    42,
+    123,
+    456,
+    789,
+    1024
+  ],
+  "suites_evaluated": [
+    "federated_learning",
+    "fraud_detection",
+    "neural_architectures"
+  ],
+  "summary_statistics": {
+    "fedavg_pr_auc": "0.0754 +/- 0.0201",
+    "fedavg_pr_auc_ci95": "[0.0504, 0.1003]",
+    "fedprox_pr_auc": "0.0640 +/- 0.0060",
+    "scaffold_pr_auc": "0.0630 +/- 0.0079"
+  },
+  "guards_validated": {
+    "FL-001": "PASSED (Zero-weight dropout bug eliminated across all optimizer rounds)",
+    "CRYPTO-001": "PASSED (Truthfully labeled PLAINTEXT_EMULATION_OF_FHE_WORKFLOW)"
+  },
+  "supersedes_historical_artifact": "benchmarks/results/raw/multi_seed_statistical_summary.json",
+  "historical_result_not_rewritten": true
+}
