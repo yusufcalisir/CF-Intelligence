@@ -379,6 +379,11 @@ class CoordinatorService:
             "round_id": round_id,
             "bank_id": clean_bank,
             "submitted_count": submitted_count,
+            "duplicate_policy": (
+                "EXACT_REPLAY_PRESERVED"
+                if is_exact_replay
+                else ("REPLACE_BEFORE_AGGREGATION" if is_duplicate else "NEW_SUBMISSION")
+            ),
         }
 
     def aggregate_and_deploy(

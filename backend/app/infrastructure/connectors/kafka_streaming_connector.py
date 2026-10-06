@@ -105,16 +105,39 @@ class InMemoryKafkaBroker:
             self._listeners[topic].remove(q)
 
     async def fetch_messages(
-        self, topic: str, group_id: str, max_messages: int = 10, partition: int = 0
+        self,
+        topic: str,
+        group_id: str,
+        max_messages: int = 10,
+        partition: int = 0,
+        auto_commit: bool = True,
     ) -> list[bytes]:
-        """Fetch committed messages from partition tracking group offset."""
+        """Fetch messages from partition tracking group offset.
+
+        If auto_commit is True, advances the group offset immediately to next_offset.
+        If auto_commit is False, reads messages without advancing the group offset,
+        allowing the caller to explicitly commit via commit_offset after domain handling.
+        """
         self._ensure_topic(topic)
         partitions = self._topics[topic]
         p = partitions[partition % len(partitions)]
         current_offset = self._group_offsets[group_id][f"{topic}:{p.partition}"]
         messages, next_offset = await p.read_from(current_offset, max_messages)
-        self._group_offsets[group_id][f"{topic}:{p.partition}"] = next_offset
+        if auto_commit:
+            self._group_offsets[group_id][f"{topic}:{p.partition}"] = next_offset
         return messages
+
+    def commit_offset(
+        self, topic: str, group_id: str, offset: int, partition: int = 0
+    ) -> None:
+        """Explicitly commit consumer group offset for topic partition."""
+        self._group_offsets[group_id][f"{topic}:{partition}"] = offset
+
+    def get_committed_offset(
+        self, topic: str, group_id: str, partition: int = 0
+    ) -> int:
+        """Get current committed consumer group offset."""
+        return self._group_offsets[group_id].get(f"{topic}:{partition}", 0)
 
     def reset_group_offset(self, topic: str, group_id: str, offset: int = 0, partition: int = 0) -> None:
         self._group_offsets[group_id][f"{topic}:{partition}"] = offset
@@ -366,15 +389,20 @@ class KafkaStreamingConnector(BaseBankConnector):
         topic: str,
         max_messages: int = 10,
         group_id: str | None = None,
+        auto_commit: bool = True,
     ) -> list[CloudEvent]:
         """Consume and parse up to max_messages from topic.
 
         Invalid payloads are automatically quarantined to the DLQ.
+        Offsets are committed only after successful parsing or DLQ quarantine.
         """
         active_group = group_id or self.group_id
-        current_offset = self._broker._group_offsets[active_group].get(f"{topic}:0", 0)
-        raw_messages = await self._broker.fetch_messages(topic, active_group, max_messages=max_messages)
+        current_offset = self._broker.get_committed_offset(topic, active_group, partition=0)
+        raw_messages = await self._broker.fetch_messages(
+            topic, active_group, max_messages=max_messages, auto_commit=False
+        )
         parsed_events: list[CloudEvent] = []
+        processed_count = 0
 
         for idx, raw_bytes in enumerate(raw_messages):
             self._total_consumed += 1
@@ -382,6 +410,7 @@ class KafkaStreamingConnector(BaseBankConnector):
                 raw_str = raw_bytes.decode("utf-8")
                 ce = CloudEvent.from_raw_json(raw_str)
                 parsed_events.append(ce)
+                processed_count += 1
             except Exception as exc:
                 # Quarantine to DLQ
                 try:
@@ -390,10 +419,12 @@ class KafkaStreamingConnector(BaseBankConnector):
                         original_topic=topic,
                         error=exc,
                     )
+                    processed_count += 1
                 except Exception as dlq_err:
-                    self._broker.reset_group_offset(topic, active_group, offset=current_offset + idx)
+                    if auto_commit and processed_count > 0:
+                        self._broker.commit_offset(topic, active_group, current_offset + processed_count)
                     logger.error(
-                        "DLQ publishing failed for message index %d; reset group offset to %d: %s",
+                        "DLQ publishing failed for message index %d at offset %d: %s",
                         idx,
                         current_offset + idx,
                         dlq_err,
@@ -402,7 +433,14 @@ class KafkaStreamingConnector(BaseBankConnector):
                         f"DLQ publishing failed for corrupted message at offset {current_offset + idx}"
                     ) from dlq_err
 
+        if auto_commit and processed_count > 0:
+            self._broker.commit_offset(topic, active_group, current_offset + processed_count)
+
         return parsed_events
+
+    def commit_offset(self, topic: str, offset: int, group_id: str | None = None) -> None:
+        """Explicitly commit consumer group offset for topic partition 0."""
+        self._broker.commit_offset(topic, group_id or self.group_id, offset=offset)
 
     async def process_incoming_raw(
         self,

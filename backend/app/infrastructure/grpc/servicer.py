@@ -300,9 +300,14 @@ class FederatedLearningServicer:
         self, request: ModelDownloadRequest
     ) -> AsyncIterable[ModelChunk]:
         """RPC 4: Server-streaming chunked global model download."""
-        model_version = (
-            request.target_version if request.target_version in self.global_models else "latest"
-        )
+        if request.target_version and request.target_version != "latest":
+            if request.target_version not in self.global_models:
+                raise ValueError(
+                    f"Requested model version '{request.target_version}' not found in global models."
+                )
+            model_version = request.target_version
+        else:
+            model_version = "latest"
         model_bytes = self.global_models[model_version]
 
         chunk_size = 512
