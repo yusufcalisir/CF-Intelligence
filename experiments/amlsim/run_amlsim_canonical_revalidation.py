@@ -111,8 +111,8 @@ def run_ru_aml_02_preflight(dataset_path: Path) -> dict[str, Any]:
     if not unique_vals.issubset({False, True, 0, 1}):
         raise ValueError(f"DATA-006 Guard: Unexpected values in label column: {unique_vals}")
 
-    pos_count = int((df_sample["IS_FRAUD"] == True).sum())  # noqa: E712
-    neg_count = int((df_sample["IS_FRAUD"] == False).sum())  # noqa: E712
+    pos_count = (df_sample["IS_FRAUD"] == True).sum()  # noqa: E712
+    neg_count = (df_sample["IS_FRAUD"] == False).sum()  # noqa: E712
     if pos_count != 1719 or neg_count != 1321515:
         raise ValueError(f"Class count mismatch! pos={pos_count}, neg={neg_count}")
 
