@@ -294,8 +294,8 @@ class RiskUtilityService:
 
     def evaluate_sweep(
         self,
-        y_true: np.ndarray,
-        scores: np.ndarray,
+        y_true: np.ndarray | Any,
+        scores: np.ndarray | Any,
         thresholds: tuple[float, ...] | list[float] | None = None,
         cost_config: CostMatrixConfig | None = None,
     ) -> ThresholdSweepReport:

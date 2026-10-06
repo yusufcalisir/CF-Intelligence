@@ -204,7 +204,7 @@ class ErrorStratifier:
         cost_fp: float = DEFAULT_COST_FP,
     ) -> StratumMetrics:
         """Compute precision, recall, FPR, FNR, and cost loss for a single stratum."""
-        total = int(len(y_true))
+        total = len(y_true)
         if total == 0:
             return StratumMetrics(
                 dimension=dimension,
@@ -529,7 +529,7 @@ class ErrorStratifier:
         cls,
         sample_size: int = 10000,
         seed: int = 42,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Generates realistic synthetic joint distributions and collaborative model predictions."""
         rng = np.random.default_rng(seed)
 
@@ -552,7 +552,7 @@ class ErrorStratifier:
         amounts = np.zeros(sample_size)
         amounts[y_true == 0] = clean_amounts
         amounts[y_true == 1] = fraud_amounts
-        amounts = np.round(np.clip(amounts, 1.0, 50000.0), 2)
+        amounts = np.asarray(np.round(np.clip(amounts, 1.0, 50000.0), 2), dtype=np.float64)
 
         # 3. Hours of day (0-23)
         # Clean: business hours peak (09:00 - 18:00)
@@ -628,7 +628,7 @@ class ErrorStratifier:
     ) -> ErrorStratificationAnalysis:
         """Runs complete error stratification across all dimensions and synthesizes dossier."""
         # 1. Overall metrics
-        total = int(len(y_true))
+        total = len(y_true)
         tp = int(np.sum((y_true == 1) & (y_pred == 1)))
         fp = int(np.sum((y_true == 0) & (y_pred == 1)))
         tn = int(np.sum((y_true == 0) & (y_pred == 0)))

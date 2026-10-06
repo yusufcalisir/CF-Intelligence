@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -240,9 +240,9 @@ class MIAuditor:
 
     def run_full_audit(
         self,
-        member_losses: np.ndarray,
-        nonmember_losses: np.ndarray,
-        gradients: list[np.ndarray],
+        member_losses: np.ndarray | Any,
+        nonmember_losses: np.ndarray | Any,
+        gradients: list[Any] | Sequence[Any],
     ) -> MIAAuditReport:
         member_losses = np.asarray(member_losses, dtype=np.float64)
         nonmember_losses = np.asarray(nonmember_losses, dtype=np.float64)

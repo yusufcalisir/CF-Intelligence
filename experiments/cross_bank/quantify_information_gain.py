@@ -146,7 +146,7 @@ class ConsortiumValueQuantifier:
         scenario_breakdown: dict[str, Any],
     ) -> dict[str, Any]:
         """Compute exact transaction amounts averted by federated consensus vs isolated silos."""
-        scenario_financials: dict[str, dict[str, float]] = {}
+        scenario_financials: dict[str, dict[str, Any]] = {}
         total_illicit_volume = 0.0
         total_isolated_detected_volume = 0.0
         total_federated_detected_volume = 0.0
@@ -210,9 +210,9 @@ class CommunicationCostModel:
         cls,
         rounds: int = 5,
         n_clients: int = 3,
-    ) -> dict[str, dict[str, float]]:
+    ) -> dict[str, dict[str, Any]]:
         """Calculate exact transmitted megabytes across transmission configurations."""
-        modes: dict[str, dict[str, float]] = {}
+        modes: dict[str, dict[str, Any]] = {}
 
         # 1. Plain Uncompressed FP32 (4 bytes per param, bidirectional upload + download)
         bytes_fp32_round = cls.TOTAL_PARAMS * 4 * n_clients * 2

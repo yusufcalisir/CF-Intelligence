@@ -142,7 +142,7 @@ class ExperimentRunner:
         # 7. Compile Markdown dossier
         report_path = run_dir / "REPORT.md"
         ReportCompiler.compile_markdown_report(result, report_path)
-        result.artifact_paths["report_md"] = str(report_path.as_posix())
+        result.artifact_paths["report_md"] = report_path.as_posix()
 
         # Re-save final results.json with complete plot and report links
         self.exporter.export_results_json(result, run_dir)

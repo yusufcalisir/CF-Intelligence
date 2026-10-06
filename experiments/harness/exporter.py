@@ -41,17 +41,17 @@ class ExperimentExporter:
 
         # 1. Export results.json
         json_path = self.export_results_json(result, run_dir)
-        artifact_paths["results_json"] = str(json_path.as_posix())
+        artifact_paths["results_json"] = json_path.as_posix()
 
         # 2. Export metrics.csv
         csv_path = self.export_metrics_csv(result, run_dir)
         if csv_path:
-            artifact_paths["metrics_csv"] = str(csv_path.as_posix())
+            artifact_paths["metrics_csv"] = csv_path.as_posix()
 
         # 3. Export traces.parquet
         parquet_path = self.export_traces_parquet(result, run_dir)
         if parquet_path:
-            artifact_paths["traces_parquet"] = str(parquet_path.as_posix())
+            artifact_paths["traces_parquet"] = parquet_path.as_posix()
 
         # Update in-memory result artifact paths
         result.artifact_paths.update(artifact_paths)

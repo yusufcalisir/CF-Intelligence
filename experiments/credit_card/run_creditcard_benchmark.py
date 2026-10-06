@@ -205,7 +205,7 @@ class CreditCardPartitioner:
             )
         else:
             self.raw_data = load_creditcard_fraud(
-                path=path,
+                path=Path(path) if path is not None else None,
                 nrows=nrows,
                 all_rows=all_rows,
                 include_time=True,

@@ -65,7 +65,7 @@ class PaySimPartitioner:
             raise ValueError(f"test_ratio must be between 0 and 1, got {test_ratio}")
 
         self.alpha = float(alpha)
-        self.num_clients = int(num_clients)
+        self.num_clients = num_clients
         if client_names is not None:
             if len(client_names) != self.num_clients:
                 raise ValueError(
@@ -79,9 +79,9 @@ class PaySimPartitioner:
             else:
                 self.client_names = [f"bank_{i}" for i in range(self.num_clients)]
 
-        self.seed = int(seed)
+        self.seed = seed
         self.rng = np.random.default_rng(self.seed)
-        self.min_samples_per_client = int(min_samples_per_client)
+        self.min_samples_per_client = min_samples_per_client
         self.test_ratio = float(test_ratio)
 
         # State storage
@@ -483,14 +483,14 @@ class PaySimPartitioner:
 
         # 2. Indices NPZ
         indices_path = out / "partition_indices.npz"
-        np.savez_compressed(
-            indices_path,
+        save_dict: dict[str, Any] = {
             **self.client_indices,
-            test_indices=np.arange(
+            "test_indices": np.arange(
                 len(self.X_train) if self.X_train is not None else 0,
                 len(self.X_all) if self.X_all is not None else 0,
             ),
-        )
+        }
+        np.savez_compressed(indices_path, **save_dict)
 
         # 3. Client Parquet files
         if export_parquet and self.X_train is not None and self.X_test is not None and self.y_test is not None:

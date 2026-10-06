@@ -568,11 +568,11 @@ def run_canonical_benchmark(
     split_info = {
         "strategy": "stratified_random_80_20",
         "data_seed": DATA_SPLIT_SEED,
-        "train_n": int(len(X_train)),
+        "train_n": len(X_train),
         "train_fraud": int(y_train.sum()),
         "train_legit": int((y_train == 0).sum()),
         "train_fraud_rate": float(y_train.mean()),
-        "test_n": int(len(X_test)),
+        "test_n": len(X_test),
         "test_fraud": int(y_test.sum()),
         "test_legit": int((y_test == 0).sum()),
         "test_fraud_rate": float(y_test.mean()),
