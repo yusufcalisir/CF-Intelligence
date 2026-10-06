@@ -1507,6 +1507,51 @@ def test_kafka_correlation_multi_dimensional_identity_and_idempotency() -> None:
     assert "cid-abc-123" in restart_processed_set
 
 
+def test_coordinator_gradient_submission_replay_and_stale_rejection() -> None:
+    """Verify CoordinatorService gradient collection idempotency, replay semantics, and stale rejection."""
+    from app.application.services.coordinator_service import CoordinatorService
+
+    coord = CoordinatorService(auto_seed=False)
+    coord.register_client("bank_alpha")
+    coord.register_client("bank_beta")
+
+    # Start round with min_clients=2
+    rnd = coord.start_round(min_clients=2)
+    round_id = rnd["round_id"]
+
+    # 1. First gradient arrival
+    res1 = coord.on_gradient_received(round_id, "bank_alpha", b"grad_alpha_v1")
+    assert res1["status"] == "GRADIENT_STORED"
+    assert res1["submitted_count"] == 1
+    assert coord.gradient_submissions[round_id]["bank_alpha"] == b"grad_alpha_v1"
+
+    # 2. Exact duplicate replay from same bank (e.g. Kafka redelivery)
+    res_replay = coord.on_gradient_received(round_id, "bank_alpha", b"grad_alpha_v1")
+    assert res_replay["status"] == "GRADIENT_STORED"
+    assert res_replay["submitted_count"] == 1
+    assert coord.gradient_submissions[round_id]["bank_alpha"] == b"grad_alpha_v1"
+
+    # 3. Updated gradient submission before quorum
+    res_upd = coord.on_gradient_received(round_id, "bank_alpha", b"grad_alpha_v2")
+    assert res_upd["status"] == "GRADIENT_STORED"
+    assert res_upd["submitted_count"] == 1
+    assert coord.gradient_submissions[round_id]["bank_alpha"] == b"grad_alpha_v2"
+
+    # 4. Quorum reached by second bank -> transitions to AGGREGATING and completes round
+    res_quorum = coord.on_gradient_received(round_id, "bank_beta", b"grad_beta_v1")
+    assert res_quorum["status"] == "COMPLETED"
+    assert coord.rounds[round_id]["status"] in ("COMPLETED", "AGGREGATING", "UNVERIFIED_NO_EVALUATION")
+
+    # 5. Stale / late submission after round aggregation
+    res_late = coord.on_gradient_received(round_id, "bank_alpha", b"grad_alpha_late")
+    assert res_late["status"] == "STALE_SUBMISSION_REJECTED"
+    assert coord.gradient_submissions[round_id]["bank_alpha"] == b"grad_alpha_v2"  # not mutated
+
+    # 6. Non-existent round ID fails closed
+    with pytest.raises(ValueError, match="does not exist"):
+        coord.on_gradient_received(99999, "bank_alpha", b"grad_bytes")
+
+
 # ---------------------------------------------------------------------------
 # 47. Elliptic Deterministic Label Contract & Invalid Encoding Rejection (Part IV)
 # ---------------------------------------------------------------------------

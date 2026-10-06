@@ -307,21 +307,53 @@ class CoordinatorService:
             raise ValueError(f"Round ID {round_id} does not exist.")
 
         with self._lock:
+            round_status = self.rounds[round_id].get("status")
+            if round_status in ("AGGREGATING", "COMPLETED", "REJECTED_LOW_AUC", "UNVERIFIED_NO_EVALUATION"):
+                logger.warning(
+                    "Stale gradient received from bank '%s' for round %d with status '%s'. Rejected.",
+                    clean_bank,
+                    round_id,
+                    round_status,
+                )
+                return {
+                    "status": "STALE_SUBMISSION_REJECTED",
+                    "round_id": round_id,
+                    "bank_id": clean_bank,
+                    "round_status": round_status,
+                    "reason": f"Round {round_id} has already moved to status {round_status}; late submissions rejected.",
+                }
+
             if round_id not in self.gradient_submissions:
                 self.gradient_submissions[round_id] = {}
+
+            is_duplicate = clean_bank in self.gradient_submissions[round_id]
+            is_exact_replay = is_duplicate and self.gradient_submissions[round_id][clean_bank] == gradient_bytes
 
             self.gradient_submissions[round_id][clean_bank] = gradient_bytes
             submitted_count = len(self.gradient_submissions[round_id])
             min_clients = self.rounds[round_id]["min_clients"]
             self.quorum_manager.record_node_submission(clean_bank)
 
-            logger.info(
-                "Received gradient from '%s' for round %d (%d/%d submissions)",
-                clean_bank,
-                round_id,
-                submitted_count,
-                min_clients,
-            )
+            if is_exact_replay:
+                logger.info(
+                    "Exact duplicate gradient replayed from bank '%s' for round %d. Dict entry preserved.",
+                    clean_bank,
+                    round_id,
+                )
+            elif is_duplicate:
+                logger.info(
+                    "Updated gradient received from bank '%s' for round %d before quorum. Submission overwritten.",
+                    clean_bank,
+                    round_id,
+                )
+            else:
+                logger.info(
+                    "Received gradient from '%s' for round %d (%d/%d submissions)",
+                    clean_bank,
+                    round_id,
+                    submitted_count,
+                    min_clients,
+                )
 
             # Quorum Check
             if (
