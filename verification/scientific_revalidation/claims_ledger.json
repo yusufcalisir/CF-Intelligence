@@ -65,7 +65,7 @@
     },
     {
       "CLAIM_ID": "CLM-AML-01",
-      "CLAIM": "Inductive GraphSAGE with multi-hop neighborhood aggregation detects transaction-level money laundering alerts and structural typologies (Cycle and Fan-In patterns) on agent-simulated transaction networks (AMLSim) under strict chronological temporal evaluation.",
+      "CLAIM": "Under strict chronological temporal evaluation on the simulated AMLSim transaction network, Inductive GraphSAGE binary SAR classification detects transaction-level money laundering alerts with PR-AUC 0.6527 (vs 0.6093 tabular MLP baseline), achieving 67.4% subgroup recall on transactions labeled as Cycle typology and 70.5% subgroup recall on transactions labeled as Fan-In typology at an operational top-1% alert threshold.",
       "SUPPORTED_BY": "RU-AML-02",
       "DATASET": "IBM AMLSim Agent-Based Multi-Hop Transaction Graph",
       "SCIENTIFIC_ORIGIN": "SIMULATED",
