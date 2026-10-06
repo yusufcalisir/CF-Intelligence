@@ -388,7 +388,7 @@ class CoordinatorService:
             from app.domain.metrics_service import compute_pr_auc
 
             computed = compute_pr_auc(validation_labels, validation_preds)
-            if math.isfinite(computed) and 0.0 <= computed <= 1.0:
+            if computed is not None and math.isfinite(computed) and 0.0 <= computed <= 1.0:
                 auc_score = float(computed)
 
         now_iso = datetime.now(UTC).isoformat()

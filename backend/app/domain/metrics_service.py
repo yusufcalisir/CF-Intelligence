@@ -230,7 +230,8 @@ def safe_f1_score(
         from sklearn.metrics import f1_score
 
         preds = (y_p >= threshold).astype(int)
-        val = float(f1_score(y_t, preds, zero_division=0))
+        zero_div: Any = 0
+        val = float(f1_score(y_t, preds, zero_division=zero_div))
         return default if np.isnan(val) else val
     except Exception:
         return default

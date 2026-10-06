@@ -137,8 +137,8 @@ class FlagshipConsortiumExperiment:
 
     def _train_local_model(
         self,
-        X_train: np.ndarray,
-        y_train: np.ndarray,
+        X_train: np.ndarray | Any,
+        y_train: np.ndarray | Any,
         global_state: dict[str, torch.Tensor] | None = None,
         mu: float = 0.0,
     ) -> FlagshipMLPClassifier:
@@ -241,8 +241,8 @@ class FlagshipConsortiumExperiment:
             if node.bank_id == "bank_c":
                 # Enforce cold-start zero positive condition for Scenario 7 transfer
                 sub = sub[sub["is_laundering"] == 0].reset_index(drop=True)
-            X_b = scaler.transform(sub[FEATURE_COLUMNS].to_numpy(dtype=float)) if len(sub) > 0 else np.empty((0, len(FEATURE_COLUMNS)))
-            y_b = sub["is_laundering"].to_numpy(dtype=int) if len(sub) > 0 else np.empty(0, dtype=int)
+            X_b = scaler.transform(np.asarray(sub[FEATURE_COLUMNS], dtype=float)) if len(sub) > 0 else np.empty((0, len(FEATURE_COLUMNS)))
+            y_b = np.asarray(sub["is_laundering"], dtype=int) if len(sub) > 0 else np.empty(0, dtype=int)
             bank_partitions[node.bank_id] = {"X": X_b, "y": y_b, "count": len(sub)}
 
         # 4. Paradigm A: Isolated Banking Silos
