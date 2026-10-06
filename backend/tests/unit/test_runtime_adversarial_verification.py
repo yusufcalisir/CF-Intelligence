@@ -28,6 +28,7 @@ import sys
 import tempfile
 import uuid
 from pathlib import Path
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
@@ -227,7 +228,7 @@ def test_unresolved_provenance_blocks_evidence() -> None:
 
     # Setting both resolves provenance
     sim.dataset_provenance = DatasetProvenance.EMPIRICAL_EXTERNAL_DATA.value
-    assert sim.is_provenance_resolved is True
+    assert sim.is_provenance_resolved
 
 
 # ---------------------------------------------------------------------------
@@ -615,7 +616,7 @@ def test_model_registry_promote_distinguishes_validity_from_quality() -> None:
     v1_meta = registry.save_version(
         simulation_id=sim_id,
         state_dict={},
-        metrics={"auc_roc": True},
+        metrics=cast(Any, {"auc_roc": True}),
     )
     v1 = v1_meta["version"]
     with pytest.raises(HTTPException) as exc_info_bool:
@@ -637,7 +638,7 @@ def test_model_registry_promote_distinguishes_validity_from_quality() -> None:
     v2_meta = registry.save_version(
         simulation_id=sim_id,
         state_dict={},
-        metrics={"auc_roc": "0.95"},
+        metrics=cast(Any, {"auc_roc": "0.95"}),
     )
     v2 = v2_meta["version"]
     with pytest.raises(HTTPException) as exc_info_str:

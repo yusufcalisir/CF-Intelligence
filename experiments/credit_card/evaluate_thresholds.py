@@ -84,8 +84,8 @@ class CreditCardImbalanceMLP(nn.Module):
 
 
 def select_fixed_fpr_thresholds(
-    y_val: np.ndarray,
-    val_scores: np.ndarray,
+    y_val: np.ndarray | Any,
+    val_scores: np.ndarray | Any,
     target_fprs: list[float] | None = None,
 ) -> dict[float, float]:
     """Select decision thresholds on validation split satisfying empirical FPR <= alpha.

@@ -48,6 +48,8 @@ class FraudDetectionModel(nn.Module):
     and possibly temporal features via LSTM.
     """
 
+    dp_provenance: dict[str, Any] | None = None
+
     def __init__(self, input_dim: int = NUM_FEATURES, dp_compatible: bool = False) -> None:
         super().__init__()
         norm1 = nn.GroupNorm(8, 64) if dp_compatible else nn.BatchNorm1d(64)
@@ -496,19 +498,23 @@ class ModelService:
         model_final = cast(
             "FraudDetectionModel", getattr(model_private, "_module", model_private)
         )
-        model_final.dp_provenance = {
-            "mechanism": "opacus_rdp",
-            "epsilon": float(actual_epsilon),
-            "delta": float(target_delta),
-            "accountant": "rdp",
-            "noise_multiplier": float(getattr(optimizer_private, "noise_multiplier", 0.0)),
-            "clip_norm": float(max_grad_norm),
-            "sample_rate": float(getattr(loader_private, "sample_rate", (batch_size or 64) / max(len(dataset), 1))),
-            "steps": int(getattr(optimizer_private, "steps_done", (epochs or 1) * max(n_batches, 1))),
-            "dp_mode": "opacus",
-            "secure_rng": False,
-            "version": "1.0",
-        }
+        object.__setattr__(
+            model_final,
+            "dp_provenance",
+            {
+                "mechanism": "opacus_rdp",
+                "epsilon": float(actual_epsilon),
+                "delta": float(target_delta),
+                "accountant": "rdp",
+                "noise_multiplier": float(getattr(optimizer_private, "noise_multiplier", 0.0)),
+                "clip_norm": float(max_grad_norm),
+                "sample_rate": float(getattr(loader_private, "sample_rate", (batch_size or 64) / max(len(dataset), 1))),
+                "steps": int(getattr(optimizer_private, "steps_done", (epochs or 1) * max(n_batches, 1))),
+                "dp_mode": "opacus",
+                "secure_rng": False,
+                "version": "1.0",
+            },
+        )
 
         import gc
 
