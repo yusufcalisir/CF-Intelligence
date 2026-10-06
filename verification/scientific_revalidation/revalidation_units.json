@@ -1,0 +1,280 @@
+{
+  "protocol_version": "1.0",
+  "total_revalidation_units": 6,
+  "units": [
+    {
+      "UNIT_ID": "RU-CC-01",
+      "TARGET_SCRIPT": "experiments/credit_card/run_creditcard_benchmark.py",
+      "SCIENTIFIC_ORIGIN": "EMPIRICAL",
+      "HISTORICAL_ARTIFACT": "benchmarks/results/raw/fraud_benchmark_credit_card.json",
+      "HISTORICAL_STATUS": "SUPERSEDED_PLACEHOLDER",
+      "APPLICABLE_CANONICAL_DEFECTS": ["FL-001", "DATA-002"],
+      "AFFECTED_PIPELINE_STAGE": "Data Splitting & Federated Aggregation Consensus",
+      "REVALIDATION_TYPE": "FULL_RERUN_REQUIRED",
+      "TRAINING_REQUIRED": true,
+      "EVALUATION_REQUIRED": true,
+      "REPORT_REGENERATION_REQUIRED": true,
+      "DATASET_REQUIRED": "creditcard",
+      "EXPECTED_DATASET_IDENTITY": {
+        "file": "backend/storage/datasets/creditcard/creditcard.csv",
+        "sha256": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
+        "rows": 284807
+      },
+      "MODEL_FAMILY": "CreditCardImbalanceMLP (Deep PyTorch MLP with LayerNorm)",
+      "FEDERATED_OR_CENTRALIZED": "BOTH_CENTRALIZED_AND_FEDERATED",
+      "EXPECTED_CLIENT_COUNT_OR_CLIENT_RULE": "3 clients (Bank A 70% fraud/55% legit, Bank B 29% fraud/30% legit, Bank C 1% / 2 fraud/15% legit under extreme_skew)",
+      "SEEDS": [42],
+      "PRIMARY_METRICS": [
+        "pr_auc",
+        "roc_auc"
+      ],
+      "SECONDARY_METRICS": [
+        "recall_at_01_fpr",
+        "recall_at_05_fpr",
+        "recall_at_1_fpr",
+        "precision",
+        "recall",
+        "f1_score",
+        "brier_score"
+      ],
+      "ACCEPTANCE_CRITERIA": [
+        "Physical CreditCard CSV loaded and verified by SHA-256 (76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89)",
+        "Corrected DATA-002 split contract enforced: 80% train / 20% untouched holdout test partition (seed=42)",
+        "FL-001 defect avoided: aggregate_weights enforces positive sample denominator and validates non-empty updates",
+        "No synthetic fallback reachable (require_real=True enforced)",
+        "Both Centralized and Federated FedAvg trained under equalized computational budget (10 epochs)",
+        "Zero modification or overwriting of historical raw placeholder artifact benchmarks/results/raw/fraud_benchmark_credit_card.json",
+        "All metrics finite and mathematically valid; confusion matrix non-negative"
+      ],
+      "OUTPUT_DIRECTORY": "verification/scientific_revalidation/results/RU-CC-01",
+      "FAILURE_POLICY": "FAIL_CLOSED_BLOCKED"
+    },
+    {
+      "UNIT_ID": "RU-PS-01",
+      "TARGET_SCRIPT": "experiments/paysim/run_paysim_canonical_benchmark.py",
+      "SCIENTIFIC_ORIGIN": "SIMULATED",
+      "HISTORICAL_ARTIFACT": "benchmarks/results/raw/fraud_benchmark_paysim.json",
+      "HISTORICAL_STATUS": "SUPERSEDED",
+      "APPLICABLE_CANONICAL_DEFECTS": ["FL-001"],
+      "AFFECTED_PIPELINE_STAGE": "Federated Aggregation & Simulation Lineage Labeling",
+      "REVALIDATION_TYPE": "FULL_RERUN_REQUIRED",
+      "TRAINING_REQUIRED": true,
+      "EVALUATION_REQUIRED": true,
+      "REPORT_REGENERATION_REQUIRED": true,
+      "DATASET_REQUIRED": "paysim",
+      "EXPECTED_DATASET_IDENTITY": {
+        "file": "backend/storage/datasets/paysim/PS_20174392719_1491204439457_log.csv",
+        "sha256": "16910f90577b0d981bf8ff289714510bb89bc71bff7d3f220f024e287e4eea6b",
+        "rows": 6362620
+      },
+      "MODEL_FAMILY": "PaySimMLP (PyTorch MLP with LayerNorm for heterogeneous clients)",
+      "FEDERATED_OR_CENTRALIZED": "BOTH_CENTRALIZED_AND_FEDERATED",
+      "EXPECTED_CLIENT_COUNT_OR_CLIENT_RULE": "3 clients (Bank A, Bank B, Bank C partitioned via Dirichlet alpha=0.5)",
+      "SEEDS": [42, 123, 456],
+      "PRIMARY_METRICS": [
+        "pr_auc",
+        "roc_auc"
+      ],
+      "SECONDARY_METRICS": [
+        "recall_at_01_fpr",
+        "delta_pr_auc"
+      ],
+      "ACCEPTANCE_CRITERIA": [
+        "Physical PaySim CSV loaded and verified by SHA-256 (16910f90577b0d981bf8ff289714510bb89bc71bff7d3f220f024e287e4eea6b)",
+        "Scientific origin explicitly preserved as SIMULATED (never misrepresented as empirical real-world banking transactions)",
+        "FL-001 defect avoided: FedAvg enforces sample-weighted consensus with positive denominator check",
+        "Systematic every-10th-row sample preserved (~636k transactions, ~817 fraud)",
+        "Stratified 80/20 train/test split (seed=42) preserves natural fraud prevalence (~0.13%)",
+        "Evaluated across all 3 preregistered seeds [42, 123, 456] under equalized budget (10 rounds * 3 epochs = 30 passes)",
+        "Zero modification of historical artifact benchmarks/results/raw/fraud_benchmark_paysim.json"
+      ],
+      "OUTPUT_DIRECTORY": "verification/scientific_revalidation/results/RU-PS-01",
+      "FAILURE_POLICY": "FAIL_CLOSED_BLOCKED"
+    },
+    {
+      "UNIT_ID": "RU-EL-01",
+      "TARGET_SCRIPT": "experiments/elliptic/train_graphsage.py",
+      "SCIENTIFIC_ORIGIN": "EMPIRICAL",
+      "HISTORICAL_ARTIFACT": "benchmarks/results/raw/graphsage_elliptic_benchmark.json",
+      "HISTORICAL_STATUS": "CANONICAL",
+      "APPLICABLE_CANONICAL_DEFECTS": ["GRAPH-LEAK-01", "DATA-007"],
+      "AFFECTED_PIPELINE_STAGE": "Graph Feature Extraction & Strict Class Vocabulary Validation",
+      "REVALIDATION_TYPE": "FULL_RERUN_REQUIRED",
+      "TRAINING_REQUIRED": true,
+      "EVALUATION_REQUIRED": true,
+      "REPORT_REGENERATION_REQUIRED": true,
+      "DATASET_REQUIRED": "elliptic",
+      "EXPECTED_DATASET_IDENTITY": {
+        "parquet": "backend/storage/datasets/elliptic/elliptic_cache.parquet",
+        "classes": "backend/storage/datasets/elliptic/elliptic_txs_classes.csv",
+        "edgelist": "backend/storage/datasets/elliptic/elliptic_txs_edgelist.csv",
+        "features": "backend/storage/datasets/elliptic/elliptic_txs_features.csv",
+        "sha256_classes": "93e2e7b2405c735ba752bf6ba06b947561deddd1f5a8fc91e46f6a4c0e439493",
+        "sha256_features": "fd7f83573443c9e302e371d3f110e3b6224160f5d1ed8a287757936127800ff0",
+        "nodes": 203769,
+        "edges": 234355
+      },
+      "MODEL_FAMILY": "GraphSAGE (2-layer Inductive Mean Neighborhood Aggregator) vs TabularMLPBaseline",
+      "FEDERATED_OR_CENTRALIZED": "CENTRALIZED_INDUCTIVE_GRAPH",
+      "EXPECTED_CLIENT_COUNT_OR_CLIENT_RULE": "N/A (Temporal graph partition)",
+      "SEEDS": [42, 123, 456],
+      "PRIMARY_METRICS": [
+        "pr_auc",
+        "roc_auc"
+      ],
+      "SECONDARY_METRICS": [
+        "precision",
+        "recall",
+        "f1_score",
+        "recall_at_01_fpr",
+        "recall_at_05_fpr",
+        "recall_at_10_fpr",
+        "neighborhood_uplift_delta_pr_auc"
+      ],
+      "ACCEPTANCE_CRITERIA": [
+        "Physical Elliptic files loaded and verified by SHA-256",
+        "DATA-007 guard enforced: Class labels strictly validated against vocabulary {'1', '2', 'unknown'}; unverified tokens rejected",
+        "GRAPH-LEAK-01 guard enforced: Zero target-derived features enter model input. Entity risk_level strictly absent from node features",
+        "Strict out-of-time past-to-future temporal split: train timesteps 1-30, val 31-34, test 35-49 with zero future leakage",
+        "Unknown labels (-1 / 'unknown') excluded from supervised loss and evaluation metrics",
+        "Full 203k graph topology evaluated across all 3 preregistered seeds [42, 123, 456]",
+        "Historical raw artifact benchmarks/results/raw/graphsage_elliptic_benchmark.json remains untouched"
+      ],
+      "OUTPUT_DIRECTORY": "verification/scientific_revalidation/results/RU-EL-01",
+      "FAILURE_POLICY": "FAIL_CLOSED_BLOCKED"
+    },
+    {
+      "UNIT_ID": "RU-IE-01",
+      "TARGET_SCRIPT": "experiments/ieee_cis/run_ieee_benchmark.py",
+      "SCIENTIFIC_ORIGIN": "EMPIRICAL",
+      "HISTORICAL_ARTIFACT": "benchmarks/results/raw/fraud_benchmark_ieee_cis.json",
+      "HISTORICAL_STATUS": "HISTORICAL",
+      "APPLICABLE_CANONICAL_DEFECTS": ["FL-001"],
+      "AFFECTED_PIPELINE_STAGE": "Federated Aggregation & Real Dataset Training",
+      "REVALIDATION_TYPE": "FULL_RERUN_REQUIRED",
+      "TRAINING_REQUIRED": true,
+      "EVALUATION_REQUIRED": true,
+      "REPORT_REGENERATION_REQUIRED": true,
+      "DATASET_REQUIRED": "ieee_cis",
+      "EXPECTED_DATASET_IDENTITY": {
+        "train_transaction": "backend/storage/datasets/ieee_cis/train_transaction.csv",
+        "train_identity": "backend/storage/datasets/ieee_cis/train_identity.csv",
+        "sha256_transaction": "3a5c83ab6b3cc13dcabe5ffa9f522307fd5f7f7b6e6f6a60c32284ca6283d642",
+        "sha256_identity": "b63c725d8377be90a995268d97f347c17d456b95db45807adcf9f59cd603c37c",
+        "train_rows": 590540
+      },
+      "MODEL_FAMILY": "IEEECISNeuralClassifier (Deep Tabular MLP with LayerNorm)",
+      "FEDERATED_OR_CENTRALIZED": "BOTH_CENTRALIZED_AND_FEDERATED",
+      "EXPECTED_CLIENT_COUNT_OR_CLIENT_RULE": "3 clients (Bank A, Bank B, Bank C partitioned via Dirichlet alpha=0.5)",
+      "SEEDS": [42],
+      "PRIMARY_METRICS": [
+        "pr_auc",
+        "roc_auc"
+      ],
+      "SECONDARY_METRICS": [
+        "recall_at_01_fpr",
+        "recall_at_05_fpr",
+        "recall_at_10_fpr",
+        "precision",
+        "recall",
+        "f1_score"
+      ],
+      "ACCEPTANCE_CRITERIA": [
+        "Physical IEEE-CIS CSV files loaded and verified by SHA-256",
+        "FL-001 defect avoided: FedAvg enforces valid non-zero client sample consensus",
+        "Strict temporal split along TransactionDT (80% train / 20% out-of-time test)",
+        "No synthetic 10k-row smoke test substitute masquerading as canonical benchmark",
+        "Historical raw artifact benchmarks/results/raw/fraud_benchmark_ieee_cis.json remains untouched",
+        "Zero NaN/Inf corruption in evaluation outputs"
+      ],
+      "OUTPUT_DIRECTORY": "verification/scientific_revalidation/results/RU-IE-01",
+      "FAILURE_POLICY": "FAIL_CLOSED_BLOCKED"
+    },
+    {
+      "UNIT_ID": "RU-AML-01",
+      "TARGET_SCRIPT": "experiments/amlsim/evaluate_patterns.py",
+      "SCIENTIFIC_ORIGIN": "SIMULATED",
+      "HISTORICAL_ARTIFACT": "benchmarks/results/raw/fraud_benchmark_amlsim.json",
+      "HISTORICAL_STATUS": "HISTORICAL",
+      "APPLICABLE_CANONICAL_DEFECTS": ["DATA-006"],
+      "AFFECTED_PIPELINE_STAGE": "Evaluation Metric Computation & Label Truthfulness",
+      "REVALIDATION_TYPE": "EVALUATION_ONLY_RECOMPUTATION",
+      "TRAINING_REQUIRED": false,
+      "EVALUATION_REQUIRED": true,
+      "REPORT_REGENERATION_REQUIRED": true,
+      "DATASET_REQUIRED": "amlsim",
+      "EXPECTED_DATASET_IDENTITY": {
+        "parquet": "backend/storage/datasets/amlsim/transactions.parquet",
+        "sha256": "b3dc9b72f985e7247198f81df8d4db7c559d93dfd7d00fb4ec18a6b0b368647c",
+        "rows": 1323234
+      },
+      "MODEL_FAMILY": "GraphSAGE 2-Layer Relational Detector vs Tabular MLP",
+      "FEDERATED_OR_CENTRALIZED": "CENTRALIZED_GRAPH_EVALUATION",
+      "EXPECTED_CLIENT_COUNT_OR_CLIENT_RULE": "N/A (Multi-hop pattern benchmark)",
+      "SEEDS": [42],
+      "PRIMARY_METRICS": [
+        "pr_auc",
+        "roc_auc"
+      ],
+      "SECONDARY_METRICS": [
+        "cycle_recall",
+        "fan_in_recall",
+        "recall_at_01_fpr",
+        "f1_score",
+        "brier_score"
+      ],
+      "ACCEPTANCE_CRITERIA": [
+        "Recomputes evaluation strictly without unplanned retraining, using verified ground-truth labels and model scores",
+        "DATA-006 guard enforced: NaN labels are not coerced into positive fraud via astype(bool); loader fails closed on missing/NaN labels",
+        "Labels strictly validated to belong to binary set {0, 1}",
+        "Scientific origin explicitly marked SIMULATED",
+        "Historical raw artifact benchmarks/results/raw/fraud_benchmark_amlsim.json remains untouched",
+        "Outputs verified against Pydantic ExperimentResult schema"
+      ],
+      "OUTPUT_DIRECTORY": "verification/scientific_revalidation/results/RU-AML-01",
+      "FAILURE_POLICY": "FAIL_CLOSED_BLOCKED"
+    },
+    {
+      "UNIT_ID": "RU-MS-01",
+      "TARGET_SCRIPT": "experiments/harness/multi_seed_runner.py",
+      "SCIENTIFIC_ORIGIN": "SYNTHETIC",
+      "HISTORICAL_ARTIFACT": "benchmarks/results/raw/multi_seed_statistical_summary.json",
+      "HISTORICAL_STATUS": "HISTORICAL",
+      "APPLICABLE_CANONICAL_DEFECTS": ["FL-001", "CRYPTO-001"],
+      "AFFECTED_PIPELINE_STAGE": "Multi-Seed Statistical Aggregation & Cryptographic Execution Reporting",
+      "REVALIDATION_TYPE": "FULL_RERUN_REQUIRED",
+      "TRAINING_REQUIRED": true,
+      "EVALUATION_REQUIRED": true,
+      "REPORT_REGENERATION_REQUIRED": true,
+      "DATASET_REQUIRED": "in_silico_synthetic",
+      "EXPECTED_DATASET_IDENTITY": {
+        "generator": "In Silico Gaussian Synthetic Generator",
+        "sample_count": 5000,
+        "features": 10
+      },
+      "MODEL_FAMILY": "DeepFraudMLP (Federated FedAvg, FedProx, SCAFFOLD)",
+      "FEDERATED_OR_CENTRALIZED": "BOTH_CENTRALIZED_AND_FEDERATED",
+      "EXPECTED_CLIENT_COUNT_OR_CLIENT_RULE": "5 clients partitioned via Dirichlet alpha=0.5",
+      "SEEDS": [42, 123, 456, 789, 1024],
+      "PRIMARY_METRICS": [
+        "pr_auc",
+        "roc_auc"
+      ],
+      "SECONDARY_METRICS": [
+        "rounds_to_converge",
+        "f1_score",
+        "brier_score"
+      ],
+      "ACCEPTANCE_CRITERIA": [
+        "All 5 preregistered seeds executed: [42, 123, 456, 789, 1024]",
+        "FL-001 defect avoided: All federated optimizer rounds enforce valid positive sample weights",
+        "CRYPTO-001 guard enforced: Cryptographic execution mode is truthfully labeled as 'PLAINTEXT_EMULATION_OF_FHE_WORKFLOW' (never claimed as hardware TEE or authentic encrypted ciphertext unless genuine CKKS executed)",
+        "Scientific origin explicitly marked SYNTHETIC",
+        "Aggregate mean, standard deviation (ddof=1), and 95% Student-t confidence intervals programmatically derived from stored per-seed results",
+        "Historical raw artifact benchmarks/results/raw/multi_seed_statistical_summary.json remains untouched"
+      ],
+      "OUTPUT_DIRECTORY": "verification/scientific_revalidation/results/RU-MS-01",
+      "FAILURE_POLICY": "FAIL_CLOSED_BLOCKED"
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "PROTOCOL_NAME": "CF_INTELLIGENCE_SCIENTIFIC_REVALIDATION_V1",
+  "PROTOCOL_VERSION": "1.0",
+  "CREATED_AT_UTC": "2026-10-06T15:19:30Z",
+  "SOURCE_CLOSURE_COMMIT": "a0bb088febdc3fa3da16a620b281946ac8694e31",
+  "PRE_PREREGISTRATION_HEAD": "7cc1f003177a95004ce60d86305065e73b722c7a",
+  "REPOSITORY_DIRTY": false,
+  "STATUS": "PREREGISTERED_AWAITING_PREREGISTRATION_COMMIT",
+  "FIREWALLS": {
+    "final_unseen_external_dataset_firewall": {
+      "status": "ENFORCED",
+      "rules": [
+        "No searching for final external evaluation datasets.",
+        "No downloading or inspecting candidate external datasets.",
+        "No optimizing models or thresholds against external evaluation candidates.",
+        "Existing datasets (CreditCard, PaySim, Elliptic, IEEE-CIS, AMLSim) cannot later be represented as the unseen external dataset."
+      ]
+    },
+    "anti_fabrication_firewall": {
+      "status": "ENFORCED",
+      "rules": [
+        "Zero mock, placeholder, precomputed, or synthetic fallback metrics.",
+        "Fail closed on missing physical data or schema divergence.",
+        "Zero post-hoc parameter tuning or HARK-ing."
+      ]
+    }
+  },
+  "BENCHMARK_CODE_HASHES": {
+    "experiments/credit_card/run_creditcard_benchmark.py": "cb52bb2239082762fd641b4e9efe13e6fdc2047e0bb1c4388eb2c4f460d15269",
+    "experiments/paysim/run_paysim_canonical_benchmark.py": "86ff52eb6ce1aefacbc0a3a3fd83220f63222973ada888fbc3626d233921306a",
+    "experiments/elliptic/train_graphsage.py": "3f96205f5ce0f7bd9be82504a042135bbed57400976bdb8365360e82feee3bed",
+    "experiments/ieee_cis/run_ieee_benchmark.py": "a788e6f28bf3ad1b820391dcf71304ca8798070eb657c00ba79d21666f50688e",
+    "experiments/ieee_cis/run_ieee_cis_canonical_benchmark.py": "d086e527964befbdedf69d700b2fde879e3c17c599364c2a392c88fdb664d0ba",
+    "experiments/amlsim/evaluate_patterns.py": "381ce9e3aa935a990ee2a10710b5f30a1aff1c122fd40a5d04c8afb911311a37",
+    "experiments/harness/multi_seed_runner.py": "8ea4e6e42535932b03e1c5c8421fdefa175d9331da51e345aad6ec49d541ca75",
+    "backend/app/application/services/dataloader.py": "de750a54204cb52586f8d173544d73306ccbf4f182470dd1496f7f070e04b04b"
+  },
+  "EXECUTION_PLAN": {
+    "recommended_sequence": [
+      "RU-AML-01",
+      "RU-EL-01",
+      "RU-CC-01",
+      "RU-PS-01",
+      "RU-IE-01",
+      "RU-MS-01"
+    ],
+    "rationale": "RU-AML-01 is evaluation-only verification; RU-EL-01 verifies graph pipeline with strong existing provenance; RU-CC-01 validates corrected split and FL aggregation; RU-PS-01 evaluates simulated mobile money federation; RU-IE-01 executes empirical tabular federation; RU-MS-01 assesses multi-seed statistical convergence."
+  },
+  "HISTORICAL_ARTIFACTS_LEDGER": [
+    {
+      "historical_artifact_path": "benchmarks/results/raw/fraud_benchmark_credit_card.json",
+      "historical_git_commit": "032d78a7ed3ef05f226f51ed3d99d711df81dbd2",
+      "historical_status": "SUPERSEDED_PLACEHOLDER",
+      "known_defects": ["FL-001", "DATA-002"],
+      "provenance_class": "PLACEHOLDER_ONLY",
+      "superseded_by": "RU-CC-01"
+    },
+    {
+      "historical_artifact_path": "benchmarks/results/raw/fraud_benchmark_paysim.json",
+      "historical_git_commit": "032d78a7ed3ef05f226f51ed3d99d711df81dbd2",
+      "historical_status": "SUPERSEDED",
+      "known_defects": ["FL-001"],
+      "provenance_class": "SYNTHETIC_FALLBACK",
+      "superseded_by": "RU-PS-01"
+    },
+    {
+      "historical_artifact_path": "benchmarks/results/raw/graphsage_elliptic_benchmark.json",
+      "historical_git_commit": "032d78a7ed3ef05f226f51ed3d99d711df81dbd2",
+      "historical_status": "CANONICAL",
+      "known_defects": ["GRAPH-LEAK-01", "DATA-007"],
+      "provenance_class": "REAL_DATA_CANONICAL",
+      "superseded_by": "RU-EL-01"
+    },
+    {
+      "historical_artifact_path": "benchmarks/results/raw/fraud_benchmark_ieee_cis.json",
+      "historical_git_commit": "032d78a7ed3ef05f226f51ed3d99d711df81dbd2",
+      "historical_status": "HISTORICAL",
+      "known_defects": ["FL-001"],
+      "provenance_class": "SMOKE_TEST_ONLY",
+      "superseded_by": "RU-IE-01"
+    },
+    {
+      "historical_artifact_path": "benchmarks/results/raw/fraud_benchmark_amlsim.json",
+      "historical_git_commit": "032d78a7ed3ef05f226f51ed3d99d711df81dbd2",
+      "historical_status": "HISTORICAL",
+      "known_defects": ["DATA-006"],
+      "provenance_class": "SMOKE_TEST_ONLY",
+      "superseded_by": "RU-AML-01"
+    },
+    {
+      "historical_artifact_path": "benchmarks/results/raw/multi_seed_statistical_summary.json",
+      "historical_git_commit": "754e119bd649bd75d56f3af2f3aa25d444025604",
+      "historical_status": "HISTORICAL",
+      "known_defects": ["FL-001", "CRYPTO-001"],
+      "provenance_class": "MULTI_SEED_STATISTICAL",
+      "superseded_by": "RU-MS-01"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "criteria_name": "CF_INTELLIGENCE_SCIENTIFIC_ACCEPTANCE_CRITERIA_V1",
+  "philosophy": "Acceptance criteria verify scientific validity, procedural correctness, and provenance integrity, NOT whether arbitrary metric thresholds were exceeded. Poor empirical performance is a valid scientific finding; fabricated or unvalidated execution is an invalid failure.",
+  "repository_level_invariants": {
+    "no_fabrication": "Zero mock, synthetic substitute, dummy, precomputed, or hardcoded metrics.",
+    "no_silent_fallback": "If physical dataset is missing or schema mismatches, runner fails closed immediately with FileNotFoundError or ValueError.",
+    "external_dataset_firewall": "No unseen external evaluation dataset is selected, searched, inspected, or evaluated during this phase.",
+    "no_hyperparameter_optimization": "No tuning, grid search, random search, or post-hoc adjustments to learning rates, architectures, or weights.",
+    "historical_artifact_immutability": "Historical artifacts in benchmarks/results/raw/ are strictly read-only and preserved for scientific auditability."
+  },
+  "unit_acceptance_gates": {
+    "RU-CC-01": {
+      "physical_dataset_verified": true,
+      "sha256_match_required": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
+      "data_002_remediated": "Strict 80% train / 20% untouched holdout test split (seed=42). Extreme skew partition verified.",
+      "fl_001_remediated": "Federated aggregation weight denominator sum(n_k) > 0 enforced; empty updates rejected.",
+      "compute_budget_equalized": "Centralized 10 epochs equal to Federated 5 rounds * 2 local epochs = 10 passes.",
+      "output_isolated": "Results saved into verification/scientific_revalidation/results/RU-CC-01; raw historical JSON untouched."
+    },
+    "RU-PS-01": {
+      "physical_dataset_verified": true,
+      "sha256_match_required": "16910f90577b0d981bf8ff289714510bb89bc71bff7d3f220f024e287e4eea6b",
+      "scientific_origin_truthfulness": "Labelled strictly as SIMULATED (never empirical transactions).",
+      "sampling_preserved": "Systematic every-10th-row sample preserved (~636k rows).",
+      "fl_001_remediated": "FedAvg consensus enforces valid positive sample weights.",
+      "multi_seed_evaluated": "Seeds [42, 123, 456] executed under equalized budget.",
+      "output_isolated": "Results saved into verification/scientific_revalidation/results/RU-PS-01; raw historical JSON untouched."
+    },
+    "RU-EL-01": {
+      "physical_dataset_verified": true,
+      "data_007_remediated": "Label strings strictly validated against {'1', '2', 'unknown'}; unknown tokens reject immediately.",
+      "graph_leak_01_remediated": "Zero label-derived proxy features in input tensor. Node feature 7 confirmed clean/masked.",
+      "temporal_isolation": "Timesteps 1-30 train, 31-34 val, 35-49 test with zero future lookahead.",
+      "full_topology_trained": "Full 203k node graph with 234k edges trained across seeds [42, 123, 456].",
+      "output_isolated": "Results saved into verification/scientific_revalidation/results/RU-EL-01; raw historical JSON untouched."
+    },
+    "RU-IE-01": {
+      "physical_dataset_verified": true,
+      "sha256_match_required": "3a5c83ab6b3cc13dcabe5ffa9f522307fd5f7f7b6e6f6a60c32284ca6283d642",
+      "no_synthetic_smoke_substitute": "Synthetic 10k smoke runs rejected as evidence; physical 590k Kaggle dataset required.",
+      "fl_001_remediated": "Sample-weighted consensus with positive denominator check.",
+      "temporal_isolation": "Strict chronological split on TransactionDT (80% train / 20% test).",
+      "output_isolated": "Results saved into verification/scientific_revalidation/results/RU-IE-01; raw historical JSON untouched."
+    },
+    "RU-AML-01": {
+      "physical_dataset_verified": true,
+      "sha256_match_required": "b3dc9b72f985e7247198f81df8d4db7c559d93dfd7d00fb4ec18a6b0b368647c",
+      "data_006_remediated": "Labels verified binary {0, 1}; NaN/missing labels fail closed without boolean coercion.",
+      "evaluation_only_contract": "Recomputed strictly without unplanned retraining.",
+      "scientific_origin_truthfulness": "Labelled strictly as SIMULATED.",
+      "output_isolated": "Results saved into verification/scientific_revalidation/results/RU-AML-01; raw historical JSON untouched."
+    },
+    "RU-MS-01": {
+      "all_seeds_executed": [42, 123, 456, 789, 1024],
+      "fl_001_remediated": "Consensus weights verified for all federated strategies (FedAvg, FedProx, SCAFFOLD).",
+      "crypto_001_remediated": "Cryptographic execution mode explicitly labeled 'PLAINTEXT_EMULATION_OF_FHE_WORKFLOW' (truthful attribution).",
+      "statistical_derivation": "Sample mean, std (ddof=1), and 95% Student-t CI derived programmatically from stored per-seed outputs.",
+      "scientific_origin_truthfulness": "Labelled strictly as SYNTHETIC.",
+      "output_isolated": "Results saved into verification/scientific_revalidation/results/RU-MS-01; raw historical JSON untouched."
+    }
+  }
+}
