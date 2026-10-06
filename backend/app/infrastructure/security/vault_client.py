@@ -414,9 +414,9 @@ class VaultClient:
                 return resp.read().decode("utf-8")
         except Exception as exc:
             self._record_failure(exc)
-            return (
-                "-----BEGIN CERTIFICATE-----\nMIIB_MOCK_CFI_ROOT_CA_PEM\n-----END CERTIFICATE-----"
-            )
+            raise VaultUnavailableError(
+                f"Vault PKI Root CA certificate unavailable: {exc}"
+            ) from exc
 
     def revoke_pki_certificate(self, serial_number: str) -> bool:
         """Revoke a certificate by serial number in Vault PKI engine (/v1/pki/revoke)."""
@@ -438,11 +438,12 @@ class VaultClient:
                 return resp.status in (200, 204)
         except Exception as exc:
             self._record_failure(exc)
-            logger.warning(
-                "Vault PKI revoke offline for serial '%s', using local fallback revocation.",
+            logger.error(
+                "Vault PKI revoke failed for serial '%s': %s",
                 serial_number,
+                exc,
             )
-            return True
+            return False
 
     def is_healthy(self) -> bool:
         """Check if Vault client circuit breaker is healthy and available."""

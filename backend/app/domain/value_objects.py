@@ -31,6 +31,7 @@ class EvaluationMetrics:
     """Metrics from evaluating a fraud detection model.
 
     All values are computed on a held-out test set per bank.
+    Fairness and defense metrics default to None when uncalculated.
     """
 
     accuracy: float
@@ -52,17 +53,17 @@ class EvaluationMetrics:
     feature_importance: dict[str, float] = field(default_factory=dict)
 
     # Federated Fairness Audit metrics (EU AI Act compliance)
-    disparate_impact: float = 1.0
-    equal_opportunity_diff: float = 0.0
-    protected_selection_rate: float = 1.0
-    reference_selection_rate: float = 1.0
+    disparate_impact: float | None = None
+    equal_opportunity_diff: float | None = None
+    protected_selection_rate: float | None = None
+    reference_selection_rate: float | None = None
 
     # Active Defense & Adversarial Training metrics
-    adversarial_robustness_score: float = 1.0
-    clean_accuracy: float = 0.0
-    robust_accuracy: float = 0.0
-    fgsm_evasion_rate: float = 0.0
-    pgd_evasion_rate: float = 0.0
+    adversarial_robustness_score: float | None = None
+    clean_accuracy: float | None = None
+    robust_accuracy: float | None = None
+    fgsm_evasion_rate: float | None = None
+    pgd_evasion_rate: float | None = None
 
     # Operating point and threshold provenance
     threshold: float = 0.5

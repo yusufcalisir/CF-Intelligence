@@ -220,17 +220,8 @@ class FeatureStoreService:
                 elif feature in stats_profile:
                     record[feature] = stats_profile[feature]
                 else:
-                    # Fallback defaults if not found
-                    defaults = {
-                        "customer_history_score": 0.95,
-                        "account_age_days": 365,
-                        "chargeback_count": 0,
-                        "merchant_risk_score": 0.05,
-                        "merchant_category": "grocery",
-                        "rolling_velocity_1h": 1.0,
-                        "avg_amount_24h": 100.0,
-                    }
-                    record[feature] = defaults.get(feature, 0.0)
+                    # Missing feature state: represent as None rather than fabricating plausible metrics
+                    record[feature] = None
 
             results.append(record)
 
@@ -247,32 +238,18 @@ class FeatureStoreService:
         """Simulate point-in-time join (AS-OF join) from the Offline Store.
 
         Prevents data leakage by matching features exactly as they existed
-        at the transaction timestamp.
+        at the transaction timestamp. Missing historical features are represented
+        truthfully as np.nan without inventing plausible customer profiles.
         """
+        import numpy as np
+
         # Create a copy to avoid side-effects
         joined_df = entity_df.copy()
 
         # In a real Feast/Hopsworks deploy, this queries Snowflake/BigQuery.
         # Here we simulate the join using pandas over the offline database records.
-        # Standard default fallbacks to match the data generator
         for f in features:
             if f not in joined_df.columns:
-                if f == "rolling_velocity_1h":
-                    # Velocity maps to the generated velocity
-                    joined_df[f] = joined_df.get("velocity", 1.0)
-                elif f == "avg_amount_24h":
-                    joined_df[f] = joined_df.get("transaction_amount", 100.0)
-                elif f == "customer_history_score":
-                    joined_df[f] = joined_df.get("customer_history_score", 0.95)
-                elif f == "account_age_days":
-                    joined_df[f] = joined_df.get("account_age_days", 365)
-                elif f == "chargeback_count":
-                    joined_df[f] = joined_df.get("chargeback_count", 0)
-                elif f == "merchant_risk_score":
-                    joined_df[f] = joined_df.get("merchant_risk_score", 0.05)
-                elif f == "merchant_category":
-                    joined_df[f] = joined_df.get("merchant_category", "grocery")
-                else:
-                    joined_df[f] = 0.0
+                joined_df[f] = np.nan
 
         return joined_df[features]

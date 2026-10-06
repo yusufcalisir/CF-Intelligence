@@ -159,7 +159,15 @@ class FLHyperparameterOptimizer:
 
             # Evaluate round performance on real holdout validation dataset
             eval_metrics = model_service.evaluate(global_model, X_val, y_val)
-            round_auc = float(eval_metrics.get("auc_roc", 0.5))
+            raw_round_auc = eval_metrics.get("auc_roc")
+            if raw_round_auc is None:
+                logger.warning(
+                    "Trial %d produced undefined validation AUC at round %d; pruning trial explicitly",
+                    trial.number,
+                    round_idx,
+                )
+                raise optuna.TrialPruned(f"Undefined validation AUC at round {round_idx}")
+            round_auc = float(raw_round_auc)
             final_score = round_auc
 
             # Report step metric to Optuna for early MedianPruner decisions

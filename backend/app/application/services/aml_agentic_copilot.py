@@ -168,16 +168,7 @@ class AMLAgenticCopilot:
             ]
 
         # 5. Graph metadata
-        effective_graph: dict[str, Any] = {}
-        if graph_metadata:
-            effective_graph = dict(graph_metadata)
-        else:
-            effective_graph = {
-                "louvain_community_id": f"cluster_{case_id[-4:] if len(case_id) >= 4 else '001'}",
-                "pagerank_score": round(min(0.50 + (total_risk_score / 2000.0), 0.99), 3),
-                "layering_hops": 3 if total_risk_score >= 600.0 else 1,
-                "connected_banks": ["Participating Bank Alpha", "Participating Bank Beta"],
-            }
+        effective_graph: dict[str, Any] = dict(graph_metadata) if graph_metadata else {}
 
         # 6. Cryptographic Evidence Package Hash
         canonical_evidence_bytes = json.dumps(
@@ -254,10 +245,12 @@ class AMLAgenticCopilot:
             if artifacts
             else "Evidence artifacts and transaction telemetry were collected from secure enclave audit logs. "
         )
+        hops_val = graph_meta.get("layering_hops")
+        hops_text = f"{hops_val} distinct institutional hops" if hops_val is not None else "multiple institutional hops"
         p2 = (
             f"### Paragraph 2: Financial Mechanism & Transaction Hops\n"
             f"Financial payloads were ingested via ISO 20022 MX `pacs.008` (Credit Transfer) and SWIFT MT103 messaging protocols. "
-            f"The primary transaction flow exhibited rapid cross-bank layering across {graph_meta.get('layering_hops', 3)} distinct institutional hops "
+            f"The primary transaction flow exhibited rapid cross-bank layering across {hops_text} "
             f"between {connected_banks_str}. "
             f"{evidence_summary_str}"
             f"Transaction patterns indicate suspicious structuring behavior with individual payments closely approximating regulatory reporting thresholds."
@@ -276,12 +269,33 @@ class AMLAgenticCopilot:
         )
 
         # ── Paragraph 4: Graph Topology & Community Clusters ───────────────
-        p4 = (
-            f"### Paragraph 4: Graph Topology & Community Clusters\n"
-            f"Graph Neural Network (GraphSAGE) analysis mapped the entity into Louvain Community Cluster `{graph_meta.get('louvain_community_id', 'cluster_1')}` "
-            f"with a PageRank centrality score of **{graph_meta.get('pagerank_score', 0.85):.3f}**. "
-            f"The entity exhibits topological clustering indicative of a coordinated money mule network distributing funds across fragmented beneficiary accounts."
-        )
+        has_pagerank = "pagerank_score" in graph_meta and graph_meta["pagerank_score"] is not None
+        has_community = "louvain_community_id" in graph_meta and graph_meta["louvain_community_id"] is not None
+
+        if has_pagerank and has_community:
+            p4 = (
+                f"### Paragraph 4: Graph Topology & Community Clusters\n"
+                f"Graph Neural Network (GraphSAGE) analysis mapped the entity into Louvain Community Cluster `{graph_meta['louvain_community_id']}` "
+                f"with a PageRank centrality score of **{float(graph_meta['pagerank_score']):.3f}**. "
+                f"The entity exhibits topological clustering indicative of a coordinated money mule network distributing funds across fragmented beneficiary accounts."
+            )
+        elif has_pagerank:
+            p4 = (
+                f"### Paragraph 4: Graph Topology & Community Clusters\n"
+                f"Graph Neural Network (GraphSAGE) analysis recorded a PageRank centrality score of **{float(graph_meta['pagerank_score']):.3f}**. "
+                f"Community cluster detection was not computed or is unavailable for this entity."
+            )
+        elif has_community:
+            p4 = (
+                f"### Paragraph 4: Graph Topology & Community Clusters\n"
+                f"Graph Neural Network (GraphSAGE) analysis mapped the entity into Louvain Community Cluster `{graph_meta['louvain_community_id']}`. "
+                f"PageRank centrality metric was not computed or is unavailable for this entity."
+            )
+        else:
+            p4 = (
+                "### Paragraph 4: Graph Topology & Community Clusters\n"
+                "Graph topology metrics (PageRank centrality and Louvain community clustering) were not computed or are unavailable for this entity."
+            )
 
         # ── Paragraph 5: Investigative Conclusion & Disposition ────────────
         if risk_score >= 850.0:

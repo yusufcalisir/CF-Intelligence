@@ -51,6 +51,7 @@ class TestDirichletPartitioner:
         assert len(p.X_test) == 250
 
         # Enforce that max train step <= min test step
+        assert p.steps_train is not None and p.steps_test is not None
         max_train_step = float(np.max(p.steps_train))
         min_test_step = float(np.min(p.steps_test))
         assert max_train_step <= min_test_step
@@ -77,6 +78,7 @@ class TestDirichletPartitioner:
             allocated_indices.update(idx_k)
 
         # Assert total partitioned samples exactly matches training pool
+        assert p.X_train is not None
         assert total_partitioned == len(p.X_train)
         assert len(allocated_indices) == len(p.X_train)
 
@@ -154,6 +156,14 @@ class TestDirichletPartitioner:
             bank_train_partitions=bank_train_partitions,
             X_global_test=X_test,
             y_global_test=y_test,
+            federated_results={
+                "pr_auc": 0.88,
+                "roc_auc": 0.94,
+                "recall_at_01_fpr": 0.50,
+                "f1_score": 0.75,
+                "brier_score": 0.05,
+                "latency_ms_per_sample": 0.26,
+            },
             dataset_name="PaySim_Federated_SubPlan_5_1",
             train_neural=False,  # Tabular speed
         )

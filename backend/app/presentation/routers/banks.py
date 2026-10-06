@@ -322,8 +322,8 @@ def _compute_concept_drift(
     }
 
     # 2) Conditional distributions (Y given X)
-    is_fraud_exp = y_exp.to_numpy().astype(bool)
-    is_fraud_act = y_act.to_numpy().astype(bool)
+    is_fraud_exp = (y_exp.to_numpy() == 1)
+    is_fraud_act = (y_act.to_numpy() == 1)
 
     # Hour of day fraud occurrences normalized
     hours_exp = df_exp["hour_of_day"].to_numpy()
@@ -392,7 +392,7 @@ async def get_bank_distributions() -> dict[str, Any]:
         amount_arrays[bank_id] = amounts
         hours = df["hour_of_day"].to_numpy()
         merchants = df["merchant_category"].to_numpy()
-        is_fraud = labels.to_numpy().astype(bool)
+        is_fraud = (labels.to_numpy() == 1)
 
         # 1) Transaction amount histogram (log-scale bins)
         log_bins = np.logspace(

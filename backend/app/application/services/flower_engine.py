@@ -214,26 +214,23 @@ class CallbackFedAvg(fl.server.strategy.FedAvg):
                 except Exception:
                     if 0 <= idx < len(self.bank_ids):
                         bid = self.bank_ids[idx]
-            if bid and bid in self.bank_ids:
-                per_bank_loss[bid] = float(metrics.get("loss", 0.0))
+            if bid and bid in self.bank_ids and "loss" in metrics and metrics["loss"] is not None:
+                per_bank_loss[bid] = float(metrics["loss"])
 
-        reporting_losses = [v for v in per_bank_loss.values() if v > 0]
-        default_loss = (sum(reporting_losses) / len(reporting_losses)) if reporting_losses else 0.0
-        for bid in self.bank_ids:
-            if bid not in per_bank_loss:
-                per_bank_loss[bid] = default_loss
-
-        avg_loss = sum(per_bank_loss.values()) / len(per_bank_loss) if per_bank_loss else 0.0
+        reporting_losses = list(per_bank_loss.values())
+        avg_loss = sum(reporting_losses) / len(reporting_losses) if reporting_losses else 0.0
+        reporting_bank_ids = list(per_bank_loss.keys())
+        dropped_bank_ids = [b for b in self.bank_ids if b not in per_bank_loss]
 
         round_info = {
             "round_number": server_round,
             "global_loss": avg_loss,
             "per_bank_loss": per_bank_loss,
-            "participating_bank_ids": self.bank_ids,
-            "dropped_bank_ids": [],
+            "participating_bank_ids": reporting_bank_ids,
+            "dropped_bank_ids": dropped_bank_ids,
             "aggregation_time_ms": round_duration,
             "round_duration_ms": round_duration,
-            "per_bank_samples": {bid: len(self.bank_data[bid]["X_train"]) for bid in self.bank_ids},
+            "per_bank_samples": {bid: len(self.bank_data[bid]["X_train"]) for bid in self.bank_ids if bid in self.bank_data},
         }
         self.round_results.append(round_info)
 

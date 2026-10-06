@@ -208,10 +208,19 @@ class TestComparativeBenchmarkEngine:
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             engine = ComparativeBenchmarkEngine(random_state=42, output_dir=tmp_dir)
+            fed_metrics = {
+                "pr_auc": 0.85,
+                "roc_auc": 0.96,
+                "recall_at_01_fpr": 0.55,
+                "f1_score": 0.72,
+                "brier_score": 0.04,
+                "latency_ms_per_sample": 0.25,
+            }
             report = engine.run_full_comparative_suite(
                 bank_train_partitions=bank_partitions,
                 X_global_test=X_test,
                 y_global_test=y_test,
+                federated_results=fed_metrics,
                 dataset_name="TestSyntheticFraud",
                 train_neural=True,
             )
@@ -226,6 +235,16 @@ class TestComparativeBenchmarkEngine:
             exported_file = Path(tmp_dir) / "comparative_baselines.json"
             assert exported_file.exists()
             assert exported_file.stat().st_size > 500
+
+            # Prohibit synthesis: federated_results=None must fail closed
+            with pytest.raises(ValueError, match="Explicit federated_results dictionary is required"):
+                engine.run_full_comparative_suite(
+                    bank_train_partitions=bank_partitions,
+                    X_global_test=X_test,
+                    y_global_test=y_test,
+                    federated_results=None,
+                    dataset_name="TestSyntheticFraud",
+                )
 
 
 class TestComparativeBaselinesEndpoint:
@@ -255,6 +274,14 @@ class TestComparativeBaselinesEndpoint:
             bank_train_partitions=bank_partitions,
             X_global_test=X_test,
             y_global_test=y_test,
+            federated_results={
+                "pr_auc": 0.85,
+                "roc_auc": 0.96,
+                "recall_at_01_fpr": 0.55,
+                "f1_score": 0.72,
+                "brier_score": 0.04,
+                "latency_ms_per_sample": 0.25,
+            },
             dataset_name="EndpointEvidenceSynthetic",
             train_neural=False,
         )

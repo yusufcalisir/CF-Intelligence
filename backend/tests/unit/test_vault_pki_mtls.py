@@ -37,16 +37,40 @@ class TestVaultPKIMTLSIntegration(unittest.TestCase):
         self.assertEqual(cert_data["common_name"], "bank-a.cfi.internal")
         self.assertIn("Vault Circuit Breaker Fallback", cert_data["source"])
 
-    def test_vault_client_ca_retrieval(self) -> None:
-        """Assert CA certificate PEM retrieval works in fallback mode."""
-        ca_pem = self.vault_client_mock.get_ca_certificate()
-        self.assertIn("BEGIN CERTIFICATE", ca_pem)
-        self.assertIn("END CERTIFICATE", ca_pem)
+    def test_vault_client_ca_retrieval_offline_raises_error(self) -> None:
+        """Assert CA certificate PEM retrieval raises VaultUnavailableError when Vault is offline."""
+        from app.infrastructure.security.vault_client import VaultUnavailableError
 
-    def test_vault_client_revoke_pki(self) -> None:
-        """Assert revocation of serial number completes successfully."""
+        with self.assertRaises(VaultUnavailableError):
+            self.vault_client_mock.get_ca_certificate()
+
+    def test_vault_client_ca_retrieval_success(self) -> None:
+        """Assert authoritative CA certificate PEM retrieval succeeds when Vault responds."""
+        from unittest.mock import MagicMock, patch
+
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b"-----BEGIN CERTIFICATE-----\nVALID_CA_CERT\n-----END CERTIFICATE-----"
+        mock_resp.__enter__.return_value = mock_resp
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            ca_pem = self.vault_client_mock.get_ca_certificate()
+            self.assertIn("BEGIN CERTIFICATE", ca_pem)
+            self.assertIn("VALID_CA_CERT", ca_pem)
+
+    def test_vault_client_revoke_pki_offline_fails_closed(self) -> None:
+        """Assert revocation of serial number fails closed (returns False) when Vault is offline."""
         res = self.vault_client_mock.revoke_pki_certificate("1234567890abcdef")
-        self.assertTrue(res)
+        self.assertFalse(res)
+
+    def test_vault_client_revoke_pki_success(self) -> None:
+        """Assert authoritative revocation returns True when Vault responds with 200/204."""
+        from unittest.mock import MagicMock, patch
+
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.__enter__.return_value = mock_resp
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            res = self.vault_client_mock.revoke_pki_certificate("1234567890abcdef")
+            self.assertTrue(res)
 
     def test_mtls_manager_issue_vault_certificate(self) -> None:
         """Assert MTLSManager issues Vault certificate and returns parsed metadata."""

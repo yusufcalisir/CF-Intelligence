@@ -7,6 +7,7 @@ and computes aggregate comparisons between local and federated models.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from app.domain.value_objects import EvaluationMetrics
 
@@ -44,35 +45,46 @@ class MetricsService:
             except (ValueError, TypeError):
                 pr_auc = None
 
-        return EvaluationMetrics(
-            accuracy=float(eval_dict.get("accuracy", 0.0)),
-            precision=float(eval_dict.get("precision", eval_dict.get("prec", 0.0))),
-            recall=float(eval_dict.get("recall", eval_dict.get("rec", 0.0))),
-            f1_score=float(eval_dict.get("f1_score", eval_dict.get("f1", 0.0))),
-            auc_roc=auc_roc,
-            loss=float(eval_dict.get("loss", 0.0)),
-            confusion_matrix=eval_dict.get("confusion_matrix", [[0, 0], [0, 0]]),
-            roc_fpr=eval_dict.get("roc_fpr", []),
-            roc_tpr=eval_dict.get("roc_tpr", []),
-            roc_thresholds=eval_dict.get("roc_thresholds", []),
-            feature_importance=feature_importance or {},
-            disparate_impact=eval_dict.get("disparate_impact", 1.0),
-            equal_opportunity_diff=eval_dict.get("equal_opportunity_diff", 0.0),
-            protected_selection_rate=eval_dict.get("protected_selection_rate", 1.0),
-            reference_selection_rate=eval_dict.get("reference_selection_rate", 1.0),
-            adversarial_robustness_score=eval_dict.get("adversarial_robustness_score", 1.0),
-            clean_accuracy=eval_dict.get("clean_accuracy", 0.0),
-            robust_accuracy=eval_dict.get("robust_accuracy", 0.0),
-            fgsm_evasion_rate=eval_dict.get("fgsm_evasion_rate", 0.0),
-            pgd_evasion_rate=eval_dict.get("pgd_evasion_rate", 0.0),
-            threshold=float(eval_dict.get("threshold", 0.5)),
-            pr_auc=pr_auc,
-            predicted_positives=int(eval_dict.get("predicted_positives", 0)),
-            threshold_provenance=str(eval_dict.get("threshold_provenance", "default_fixed_0.5")),
-            dp_provenance=eval_dict.get("dp_provenance"),
-            auc_roc_defined=eval_dict.get("auc_roc_defined", auc_roc is not None),
-            auc_roc_status=str(eval_dict.get("auc_roc_status", "defined" if auc_roc is not None else "undefined")),
-        )
+        def _parse_opt_float(raw_val: Any) -> float | None:
+            if raw_val is None or isinstance(raw_val, (bool, str, bytes)):
+                return None
+            try:
+                v = float(raw_val)
+                return v if math.isfinite(v) else None
+            except (ValueError, TypeError):
+                return None
+
+        # Build EvaluationMetrics domain value object with validated metrics.
+        metrics_kwargs: dict[str, Any] = {
+            "accuracy": float(eval_dict.get("accuracy", 0.0)),
+            "precision": float(eval_dict.get("precision", eval_dict.get("prec", 0.0))),
+            "recall": float(eval_dict.get("recall", eval_dict.get("rec", 0.0))),
+            "f1_score": float(eval_dict.get("f1_score", eval_dict.get("f1", 0.0))),
+            "auc_roc": auc_roc,
+            "loss": float(eval_dict.get("loss", 0.0)),
+            "confusion_matrix": eval_dict.get("confusion_matrix", [[0, 0], [0, 0]]),
+            "roc_fpr": eval_dict.get("roc_fpr", []),
+            "roc_tpr": eval_dict.get("roc_tpr", []),
+            "roc_thresholds": eval_dict.get("roc_thresholds", []),
+            "feature_importance": feature_importance or {},
+            "disparate_impact": _parse_opt_float(eval_dict.get("disparate_impact")),
+            "equal_opportunity_diff": _parse_opt_float(eval_dict.get("equal_opportunity_diff")),
+            "protected_selection_rate": _parse_opt_float(eval_dict.get("protected_selection_rate")),
+            "reference_selection_rate": _parse_opt_float(eval_dict.get("reference_selection_rate")),
+            "adversarial_robustness_score": _parse_opt_float(eval_dict.get("adversarial_robustness_score")),
+            "clean_accuracy": _parse_opt_float(eval_dict.get("clean_accuracy")),
+            "robust_accuracy": _parse_opt_float(eval_dict.get("robust_accuracy")),
+            "fgsm_evasion_rate": _parse_opt_float(eval_dict.get("fgsm_evasion_rate")),
+            "pgd_evasion_rate": _parse_opt_float(eval_dict.get("pgd_evasion_rate")),
+            "threshold": float(eval_dict.get("threshold", 0.5)),
+            "pr_auc": pr_auc,
+            "predicted_positives": int(eval_dict.get("predicted_positives", 0)),
+            "threshold_provenance": str(eval_dict.get("threshold_provenance", "default_fixed_0.5")),
+            "dp_provenance": eval_dict.get("dp_provenance"),
+            "auc_roc_defined": eval_dict.get("auc_roc_defined", auc_roc is not None),
+            "auc_roc_status": str(eval_dict.get("auc_roc_status", "defined" if auc_roc is not None else "undefined")),
+        }
+        return EvaluationMetrics(**metrics_kwargs)
 
     @staticmethod
     def compute_aggregate_improvement(

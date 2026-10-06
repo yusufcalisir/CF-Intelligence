@@ -22,8 +22,22 @@ def test_vault_pki_engine_cert_issuance() -> None:
     assert "private_key" in cert_data
     assert cert_data["common_name"] == "bank-alpha.cfi.internal"
 
-    ca_pem = vault.get_ca_certificate()
-    assert "BEGIN CERTIFICATE" in ca_pem
+    import pytest
+    from app.infrastructure.security.vault_client import VaultUnavailableError
+
+    # Offline Vault must fail closed and raise VaultUnavailableError
+    with pytest.raises(VaultUnavailableError):
+        vault.get_ca_certificate()
+
+    # Authoritative mock response verification
+    from unittest.mock import MagicMock, patch
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = b"-----BEGIN CERTIFICATE-----\nTEST_ROOT_CA\n-----END CERTIFICATE-----"
+    mock_resp.__enter__.return_value = mock_resp
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        ca_pem = vault.get_ca_certificate()
+        assert "BEGIN CERTIFICATE" in ca_pem
 
 
 def test_mtls_manager_san_and_crl_revocation() -> None:

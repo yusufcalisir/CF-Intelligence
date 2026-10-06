@@ -1021,6 +1021,12 @@ class DDoSProtectionMiddleware:
             remaining = max(0, self._MAX_REQUESTS_PER_WINDOW - len(history))
             return False, None, remaining
 
+    @classmethod
+    def reset_state(cls) -> None:
+        """Explicit state reset method for isolated testing harnesses."""
+        with cls._lock:
+            cls._requests.clear()
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
@@ -1034,19 +1040,6 @@ class DDoSProtectionMiddleware:
             or (forwarded.split(",")[0].strip() if forwarded else None)
             or (request.client.host if request.client else "unknown")
         )
-
-        # Bypass throttling in test environments only for standard testclient/loopback
-        # to prevent cross-test 429 accumulation while allowing real burst testing on explicit IPs.
-        import os
-
-        if os.environ.get("TESTING") == "1" and client_ip in (
-            "testclient",
-            "127.0.0.1",
-            "unknown",
-            "localhost",
-        ):
-            await self.app(scope, receive, send)
-            return
 
         is_throttled, throttled_resp, remaining = self._evaluate_rate_limit(
             client_ip, request.url.path
@@ -1083,16 +1076,6 @@ class DDoSProtectionMiddleware:
             or (forwarded.split(",")[0].strip() if forwarded else None)
             or (request.client.host if request.client else "unknown")
         )
-
-        import os
-
-        if os.environ.get("TESTING") == "1" and client_ip in (
-            "testclient",
-            "127.0.0.1",
-            "unknown",
-            "localhost",
-        ):
-            return await call_next(request)
 
         is_throttled, throttled_resp, remaining = self._evaluate_rate_limit(
             client_ip, request.url.path

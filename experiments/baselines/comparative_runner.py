@@ -100,30 +100,29 @@ class ComparativeBenchmarkEngine:
             y_global_test=y_global_test,
         )
 
-        # Use or synthesize federated results
+        # Genuine federated results must be explicitly provided.
+        # Synthesizing federated consensus metrics from pooled GBDT multipliers is strictly prohibited.
         if federated_results is None:
-            # High-fidelity realistic consensus performance based on empirical runs
-            pooled_gbdt = pooled_results.get("pooled_gradient_boosting", {})
-            p_pr = pooled_gbdt.get("pr_auc", 0.75)
-            p_roc = pooled_gbdt.get("roc_auc", 0.95)
-            p_rec = pooled_gbdt.get("recall_at_01_fpr", 0.50)
-            federated_results = {
-                "pr_auc": round(float(p_pr * 0.965), 4),
-                "roc_auc": round(float(p_roc * 0.992), 4),
-                "recall_at_01_fpr": round(float(p_rec * 0.94), 4),
-                "f1_score": round(float(pooled_gbdt.get("f1_score", 0.70) * 0.97), 4),
-                "brier_score": round(float(pooled_gbdt.get("brier_score", 0.05) * 1.05), 4),
-                "latency_ms_per_sample": 0.26,
-            }
+            raise ValueError(
+                "Explicit federated_results dictionary is required for comparative evaluation. "
+                "Synthesizing federated consensus metrics from pooled baselines violates Runtime Truth contracts."
+            )
+
+        fed_pr = federated_results.get("pr_auc")
+        fed_roc = federated_results.get("roc_auc")
+        if fed_pr is None or fed_roc is None:
+            raise ValueError(
+                "federated_results must contain authoritative 'pr_auc' and 'roc_auc' values."
+            )
 
         silo_summary = self.silo_runner.compute_silo_summary(
-            federated_pr_auc=federated_results.get("pr_auc"),
-            federated_roc_auc=federated_results.get("roc_auc"),
+            federated_pr_auc=float(fed_pr),
+            federated_roc_auc=float(fed_roc),
         )
 
         gap_analysis = self.pooled_runner.compute_centralization_gap(
-            federated_pr_auc=federated_results.get("pr_auc", 0.0),
-            federated_roc_auc=federated_results.get("roc_auc", 0.5),
+            federated_pr_auc=float(fed_pr),
+            federated_roc_auc=float(fed_roc),
         )
 
         # 4. Synthesize comparative multi-paradigm table
@@ -168,27 +167,32 @@ class ComparativeBenchmarkEngine:
         pooled_lr = pooled_results.get("pooled_logistic_regression", {})
         pooled_mlp = pooled_results.get("pooled_neural_mlp", {})
 
-        silo_mean_pr = silo_summary.get("mean_pr_auc", 0.0)
-        silo_mean_roc = silo_summary.get("mean_roc_auc", 0.5)
-        silo_mean_rec = silo_summary.get("mean_recall_at_01_fpr", 0.0)
+        silo_mean_pr = silo_summary.get("mean_pr_auc")
+        silo_mean_roc = silo_summary.get("mean_roc_auc")
+        silo_mean_rec = silo_summary.get("mean_recall_at_01_fpr")
 
-        fed_pr = federated_results.get("pr_auc", 0.0)
-        fed_roc = federated_results.get("roc_auc", 0.5)
-        fed_rec = federated_results.get("recall_at_01_fpr", 0.0)
+        fed_pr = float(federated_results["pr_auc"])
+        fed_roc = float(federated_results["roc_auc"])
+        fed_rec = federated_results.get("recall_at_01_fpr")
 
-        collab_gain_pr = round(fed_pr - silo_mean_pr, 4)
+        collab_gain_pr = round(fed_pr - silo_mean_pr, 4) if silo_mean_pr is not None else None
+
+        gbdt_pr = pooled_gbdt.get("pr_auc")
+        mlp_pr = pooled_mlp.get("pr_auc")
+        rf_pr = pooled_rf.get("pr_auc")
+        lr_pr = pooled_lr.get("pr_auc")
 
         return [
             {
                 "paradigm": "Centralized Upper Bound (Pooled GBDT)",
                 "category": "THEORETICAL_UPPER_BOUND",
-                "pr_auc": pooled_gbdt.get("pr_auc", 0.0),
-                "roc_auc": pooled_gbdt.get("roc_auc", 0.5),
-                "recall_at_01_fpr": pooled_gbdt.get("recall_at_01_fpr", 0.0),
-                "f1_score": pooled_gbdt.get("f1_score", 0.0),
-                "brier_score": pooled_gbdt.get("brier_score", 0.0),
-                "latency_ms": pooled_gbdt.get("latency_ms_per_sample", 0.0),
-                "delta_pr_auc_vs_fed": round(pooled_gbdt.get("pr_auc", 0.0) - fed_pr, 4),
+                "pr_auc": gbdt_pr,
+                "roc_auc": pooled_gbdt.get("roc_auc"),
+                "recall_at_01_fpr": pooled_gbdt.get("recall_at_01_fpr"),
+                "f1_score": pooled_gbdt.get("f1_score"),
+                "brier_score": pooled_gbdt.get("brier_score"),
+                "latency_ms": pooled_gbdt.get("latency_ms_per_sample"),
+                "delta_pr_auc_vs_fed": round(gbdt_pr - fed_pr, 4) if gbdt_pr is not None else None,
                 "privacy_guarantee": "ILLEGAL_DATA_POOLING",
                 "legal_compliance": "VIOLATES_GDPR_BANKING_SECRECY",
                 "description": "All bank data combined into single repository (theoretical mathematical ceiling)",
@@ -196,13 +200,13 @@ class ComparativeBenchmarkEngine:
             {
                 "paradigm": "Centralized Deep MLP (Pooled Neural)",
                 "category": "THEORETICAL_UPPER_BOUND",
-                "pr_auc": pooled_mlp.get("pr_auc", 0.0),
-                "roc_auc": pooled_mlp.get("roc_auc", 0.5),
-                "recall_at_01_fpr": pooled_mlp.get("recall_at_01_fpr", 0.0),
-                "f1_score": pooled_mlp.get("f1_score", 0.0),
-                "brier_score": pooled_mlp.get("brier_score", 0.0),
-                "latency_ms": pooled_mlp.get("latency_ms_per_sample", 0.26),
-                "delta_pr_auc_vs_fed": round(pooled_mlp.get("pr_auc", 0.0) - fed_pr, 4),
+                "pr_auc": mlp_pr,
+                "roc_auc": pooled_mlp.get("roc_auc"),
+                "recall_at_01_fpr": pooled_mlp.get("recall_at_01_fpr"),
+                "f1_score": pooled_mlp.get("f1_score"),
+                "brier_score": pooled_mlp.get("brier_score"),
+                "latency_ms": pooled_mlp.get("latency_ms_per_sample"),
+                "delta_pr_auc_vs_fed": round(mlp_pr - fed_pr, 4) if mlp_pr is not None else None,
                 "privacy_guarantee": "ILLEGAL_DATA_POOLING",
                 "legal_compliance": "VIOLATES_GDPR_BANKING_SECRECY",
                 "description": "PyTorch multi-layer perceptron on pooled raw transactions",
@@ -213,9 +217,9 @@ class ComparativeBenchmarkEngine:
                 "pr_auc": fed_pr,
                 "roc_auc": fed_roc,
                 "recall_at_01_fpr": fed_rec,
-                "f1_score": federated_results.get("f1_score", 0.0),
-                "brier_score": federated_results.get("brier_score", 0.0),
-                "latency_ms": federated_results.get("latency_ms_per_sample", 0.26),
+                "f1_score": federated_results.get("f1_score"),
+                "brier_score": federated_results.get("brier_score"),
+                "latency_ms": federated_results.get("latency_ms_per_sample"),
                 "delta_pr_auc_vs_fed": 0.0,
                 "privacy_guarantee": "ZERO_RAW_PII_CURVE25519_OPACUS_DP",
                 "legal_compliance": "FULLY_COMPLIANT_GDPR_KVKK",
@@ -227,10 +231,10 @@ class ComparativeBenchmarkEngine:
                 "pr_auc": silo_mean_pr,
                 "roc_auc": silo_mean_roc,
                 "recall_at_01_fpr": silo_mean_rec,
-                "f1_score": round(float(np.mean([m.get("f1_score", 0.0) for m in silo_summary.get("individual_banks", {}).values()])) if silo_summary.get("individual_banks") else 0.0, 4),
-                "brier_score": round(float(np.mean([m.get("brier_score", 0.0) for m in silo_summary.get("individual_banks", {}).values()])) if silo_summary.get("individual_banks") else 0.0, 4),
+                "f1_score": round(float(np.mean([m["f1_score"] for m in silo_summary["individual_banks"].values() if "f1_score" in m])), 4) if silo_summary.get("individual_banks") else None,
+                "brier_score": round(float(np.mean([m["brier_score"] for m in silo_summary["individual_banks"].values() if "brier_score" in m])), 4) if silo_summary.get("individual_banks") else None,
                 "latency_ms": 0.05,
-                "delta_pr_auc_vs_fed": -collab_gain_pr,
+                "delta_pr_auc_vs_fed": -collab_gain_pr if collab_gain_pr is not None else None,
                 "privacy_guarantee": "LOCAL_DATA_ONLY",
                 "legal_compliance": "LEGALLY_PASSIVE_FRAUD_BLIND",
                 "description": f"Average performance of {silo_summary.get('silo_count', 3)} banks training exclusively on local data",
@@ -238,13 +242,13 @@ class ComparativeBenchmarkEngine:
             {
                 "paradigm": "Classical Random Forest (Pooled Baseline)",
                 "category": "CLASSICAL_BASELINE",
-                "pr_auc": pooled_rf.get("pr_auc", 0.0),
-                "roc_auc": pooled_rf.get("roc_auc", 0.5),
-                "recall_at_01_fpr": pooled_rf.get("recall_at_01_fpr", 0.0),
-                "f1_score": pooled_rf.get("f1_score", 0.0),
-                "brier_score": pooled_rf.get("brier_score", 0.0),
-                "latency_ms": pooled_rf.get("latency_ms_per_sample", 0.08),
-                "delta_pr_auc_vs_fed": round(pooled_rf.get("pr_auc", 0.0) - fed_pr, 4),
+                "pr_auc": rf_pr,
+                "roc_auc": pooled_rf.get("roc_auc"),
+                "recall_at_01_fpr": pooled_rf.get("recall_at_01_fpr"),
+                "f1_score": pooled_rf.get("f1_score"),
+                "brier_score": pooled_rf.get("brier_score"),
+                "latency_ms": pooled_rf.get("latency_ms_per_sample"),
+                "delta_pr_auc_vs_fed": round(rf_pr - fed_pr, 4) if rf_pr is not None else None,
                 "privacy_guarantee": "ILLEGAL_DATA_POOLING",
                 "legal_compliance": "VIOLATES_GDPR_BANKING_SECRECY",
                 "description": "100-tree bagging ensemble with balanced subsample weighting",
@@ -252,13 +256,13 @@ class ComparativeBenchmarkEngine:
             {
                 "paradigm": "Classical Logistic Regression (Pooled Baseline)",
                 "category": "CLASSICAL_BASELINE",
-                "pr_auc": pooled_lr.get("pr_auc", 0.0),
-                "roc_auc": pooled_lr.get("roc_auc", 0.5),
-                "recall_at_01_fpr": pooled_lr.get("recall_at_01_fpr", 0.0),
-                "f1_score": pooled_lr.get("f1_score", 0.0),
-                "brier_score": pooled_lr.get("brier_score", 0.0),
-                "latency_ms": pooled_lr.get("latency_ms_per_sample", 0.01),
-                "delta_pr_auc_vs_fed": round(pooled_lr.get("pr_auc", 0.0) - fed_pr, 4),
+                "pr_auc": lr_pr,
+                "roc_auc": pooled_lr.get("roc_auc"),
+                "recall_at_01_fpr": pooled_lr.get("recall_at_01_fpr"),
+                "f1_score": pooled_lr.get("f1_score"),
+                "brier_score": pooled_lr.get("brier_score"),
+                "latency_ms": pooled_lr.get("latency_ms_per_sample"),
+                "delta_pr_auc_vs_fed": round(lr_pr - fed_pr, 4) if lr_pr is not None else None,
                 "privacy_guarantee": "ILLEGAL_DATA_POOLING",
                 "legal_compliance": "VIOLATES_GDPR_BANKING_SECRECY",
                 "description": "L2-regularized linear decision boundary with balanced class weighting",

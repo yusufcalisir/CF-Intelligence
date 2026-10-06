@@ -457,7 +457,7 @@ class EllipticBenchmarkResponse(BaseModel):
     macro_f1: float = 0.0
     illicit_precision: float = 0.0
     illicit_recall: float = 0.0
-    auc_roc: float = 0.0
+    auc_roc: float | None = None
     epochs_trained: int = 0
 
     @model_validator(mode="before")
@@ -466,8 +466,8 @@ class EllipticBenchmarkResponse(BaseModel):
         if isinstance(data, dict):
             metrics = data.get("metrics", {})
             fed = metrics.get("federated_graph_pipeline", {}) if isinstance(metrics, dict) else {}
-            if "auc_roc" not in data or data.get("auc_roc") == 0.0:
-                data["auc_roc"] = fed.get("roc_auc", 0.0)
+            if "auc_roc" not in data or data.get("auc_roc") is None:
+                data["auc_roc"] = fed.get("roc_auc")
             if "samples_evaluated" not in data or data.get("samples_evaluated") == 0:
                 data["samples_evaluated"] = data.get("evaluated_test_nodes", 0)
         return data
