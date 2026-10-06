@@ -88,12 +88,13 @@ async def test_non_quorum_gradient_crash_window_and_work_loss() -> None:
     events = await connector.consume_batch(topic, max_messages=1, auto_commit=False)
     assert len(events) == 1
     event_data = events[0].data
+    assert isinstance(event_data, dict)
 
     # Application domain handler executes
     resp = coordinator.on_gradient_received(
-        round_id=event_data["round_id"],
-        bank_id=event_data["bank_id"],
-        gradient_bytes=event_data["gradient_bytes"].encode("latin1"),
+        round_id=int(event_data["round_id"]),
+        bank_id=str(event_data["bank_id"]),
+        gradient_bytes=str(event_data["gradient_bytes"]).encode("latin1"),
     )
 
     # A2: Gradient accepted, quorum NOT reached
