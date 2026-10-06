@@ -18,17 +18,17 @@ def test_safe_roc_auc_score_edge_cases():
     y_pred = [0.1, 0.2, 0.8, 0.9]
     assert safe_roc_auc_score(y_true, y_pred) == 1.0
 
-    # 2. Single-class all 0s
-    assert safe_roc_auc_score([0, 0, 0, 0], [0.1, 0.2, 0.3, 0.4]) == 0.5
+    # 2. Single-class all 0s returns None (undefined, never fabricated 0.5)
+    assert safe_roc_auc_score([0, 0, 0, 0], [0.1, 0.2, 0.3, 0.4]) is None
 
-    # 3. Single-class all 1s
-    assert safe_roc_auc_score([1, 1, 1, 1], [0.1, 0.2, 0.3, 0.4], default=0.7) == 0.7
+    # 3. Single-class all 1s returns None
+    assert safe_roc_auc_score([1, 1, 1, 1], [0.1, 0.2, 0.3, 0.4]) is None
 
-    # 4. Empty arrays
-    assert safe_roc_auc_score([], []) == 0.5
+    # 4. Empty arrays returns None
+    assert safe_roc_auc_score([], []) is None
 
-    # 5. Numpy arrays
-    assert safe_roc_auc_score(np.array([0, 0, 0]), np.array([0.1, 0.2, 0.3])) == 0.5
+    # 5. Numpy arrays returns None
+    assert safe_roc_auc_score(np.array([0, 0, 0]), np.array([0.1, 0.2, 0.3])) is None
 
 
 def test_safe_pr_auc_score_edge_cases():
@@ -37,13 +37,13 @@ def test_safe_pr_auc_score_edge_cases():
     y_true = [0, 0, 1, 1]
     y_pred = [0.1, 0.2, 0.8, 0.9]
     pr_auc = safe_pr_auc_score(y_true, y_pred)
-    assert 0.0 <= pr_auc <= 1.0
+    assert pr_auc is not None and 0.0 <= pr_auc <= 1.0
 
-    # 2. Single-class all 0s
-    assert safe_pr_auc_score([0, 0, 0], [0.1, 0.2, 0.3]) == 0.5
+    # 2. Single-class all 0s returns None (undefined, never fabricated 0.0 or 0.5)
+    assert safe_pr_auc_score([0, 0, 0], [0.1, 0.2, 0.3]) is None
 
-    # 3. Empty arrays
-    assert safe_pr_auc_score([], []) == 0.5
+    # 3. Empty arrays returns None
+    assert safe_pr_auc_score([], []) is None
 
 
 def test_safe_precision_recall_curve_edge_cases():
@@ -69,20 +69,20 @@ def test_safe_f1_score_edge_cases():
     # 1. Normal case
     assert safe_f1_score([0, 1, 0, 1], [0.1, 0.8, 0.2, 0.9]) == 1.0
 
-    # 2. All zeros with zero predictions (no true or false positives)
-    assert safe_f1_score([0, 0, 0], [0.1, 0.2, 0.3]) == 0.0
+    # 2. All zeros with zero predictions (single-class undefined)
+    assert safe_f1_score([0, 0, 0], [0.1, 0.2, 0.3]) is None
 
     # 3. Empty arrays
-    assert safe_f1_score([], []) == 0.0
+    assert safe_f1_score([], []) is None
 
 
 def test_compute_scientific_benchmark_single_class():
-    """Test compute_scientific_benchmark does not raise error on homogeneous labels."""
+    """Test compute_scientific_benchmark truthfully returns None for undefined metrics on homogeneous labels."""
     metrics = compute_scientific_benchmark(
         model_config_name="Single Class Test",
         y_true=[0, 0, 0, 0, 0],
         y_pred=[0.1, 0.2, 0.3, 0.4, 0.5],
     )
-    assert metrics.roc_auc == 0.5
-    assert metrics.pr_auc == 0.5
+    assert metrics.roc_auc is None
+    assert metrics.pr_auc is None
     assert metrics.model_config_name == "Single Class Test"

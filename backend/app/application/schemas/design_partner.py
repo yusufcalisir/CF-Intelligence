@@ -88,17 +88,17 @@ class CostReportResponse(BaseModel):
 class BenchmarkModelPerformanceResponse(BaseModel):
     """Model performance metrics on benchmark evaluation."""
 
-    roc_auc: float
-    pr_auc: float
-    recall_at_01_fpr: float
+    roc_auc: float | None = None
+    pr_auc: float | None = None
+    recall_at_01_fpr: float | None = None
     cost_report: CostReportResponse
 
 
 class FederatedAdvantageResponse(BaseModel):
     """Quantified economic and statistical advantage of federated model."""
 
-    pr_auc_gain: float
-    recall_at_01_fpr_gain: float
+    pr_auc_gain: float | None = None
+    recall_at_01_fpr_gain: float | None = None
     daily_fraud_loss_saved_dollars: float
     daily_investigation_saved_dollars: float
     net_daily_economic_benefit_dollars: float

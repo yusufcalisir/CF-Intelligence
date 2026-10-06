@@ -300,17 +300,17 @@ class DesignPartnerPilotService:
                     y_prob_fl = np.asarray(out_fl, dtype=np.float32).flatten()
 
             # Compute scientific metrics
-            from sklearn.metrics import roc_auc_score
+            from app.domain.metrics_service import compute_pr_auc_with_status, compute_roc_auc_with_status
 
-            if len(np.unique(y)) >= 2:
-                roc_fl = round(float(roc_auc_score(y, y_prob_fl)), 4)
-                roc_local = round(float(roc_auc_score(y, y_prob_local)), 4)
-            else:
-                roc_fl = 0.5
-                roc_local = 0.5
+            roc_fl_score, is_roc_fl, _ = compute_roc_auc_with_status(y, y_prob_fl)
+            roc_local_score, is_roc_local, _ = compute_roc_auc_with_status(y, y_prob_local)
+            roc_fl = round(roc_fl_score, 4) if is_roc_fl and roc_fl_score is not None else None
+            roc_local = round(roc_local_score, 4) if is_roc_local and roc_local_score is not None else None
 
-            pr_fl = compute_pr_auc(y, y_prob_fl)
-            pr_local = compute_pr_auc(y, y_prob_local)
+            pr_fl_score, is_pr_fl, _ = compute_pr_auc_with_status(y, y_prob_fl)
+            pr_local_score, is_pr_local, _ = compute_pr_auc_with_status(y, y_prob_local)
+            pr_fl = round(pr_fl_score, 4) if is_pr_fl and pr_fl_score is not None else None
+            pr_local = round(pr_local_score, 4) if is_pr_local and pr_local_score is not None else None
             rec01_fl = compute_recall_at_fpr(y, y_prob_fl, target_fpr=0.001)
             rec01_local = compute_recall_at_fpr(y, y_prob_local, target_fpr=0.001)
 
@@ -339,11 +339,11 @@ class DesignPartnerPilotService:
                     "target_auc_design_goal": 0.950,
                     "synthetic_auc": 0.835,
                     "real_world_auc": roc_fl,
-                    "auc_degradation_delta": round(roc_fl - 0.835, 4),
+                    "auc_degradation_delta": round(roc_fl - 0.835, 4) if roc_fl is not None else None,
                     "synthetic_pr_auc": 0.820,
                     "real_world_pr_auc": pr_fl,
-                    "pr_auc_degradation_delta": round(pr_fl - 0.820, 4),
-                    "recall_at_01_fpr_drop": round(rec01_fl - 0.780, 4),
+                    "pr_auc_degradation_delta": round(pr_fl - 0.820, 4) if pr_fl is not None else None,
+                    "recall_at_01_fpr_drop": round(rec01_fl - 0.780, 4) if rec01_fl is not None else None,
                 },
             )
 
@@ -401,8 +401,8 @@ class DesignPartnerPilotService:
                     "cost_report": asdict(cost_local),
                 },
                 "federated_advantage": {
-                    "pr_auc_gain": round(cached["pr_fl"] - cached["pr_local"], 4),
-                    "recall_at_01_fpr_gain": round(cached["rec01_fl"] - cached["rec01_local"], 4),
+                    "pr_auc_gain": round(cached["pr_fl"] - cached["pr_local"], 4) if (cached["pr_fl"] is not None and cached["pr_local"] is not None) else None,
+                    "recall_at_01_fpr_gain": round(cached["rec01_fl"] - cached["rec01_local"], 4) if (cached["rec01_fl"] is not None and cached["rec01_local"] is not None) else None,
                     "daily_fraud_loss_saved_dollars": round(
                         cost_local.estimated_daily_fraud_loss_dollars
                         - cost_fl.estimated_daily_fraud_loss_dollars,

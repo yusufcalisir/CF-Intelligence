@@ -347,18 +347,20 @@ class GraphSAGEModel(nn.Module):
         mask: torch.Tensor | None = None,
         pos_weight: float | None = None,
     ) -> torch.Tensor:
-        """Compute binary cross-entropy loss optionally restricted to masked nodes.
+        """Compute binary cross-entropy loss strictly on labeled nodes.
 
         Supports semi-supervised graph learning where message passing runs on all nodes
-        (including unlabeled background nodes), but loss is computed strictly on
-        labeled nodes specified by the mask.
+        (including unlabeled background nodes with target == -1), but loss is computed strictly on
+        labeled nodes (targets in {0, 1}). Unlabeled nodes (targets == -1) are guaranteed to be
+        excluded from loss computation and class re-weighting.
         """
-        if mask is not None:
-            preds = predictions[mask]
-            targs = targets[mask].float()
-        else:
-            preds = predictions
-            targs = targets.float()
+        # Ensure unknown/unlabeled nodes (target == -1) are never included in supervised loss
+        labeled_filter = (targets == 0) | (targets == 1)
+        effective_mask = (mask & labeled_filter) if mask is not None else labeled_filter
+
+        preds = predictions[effective_mask]
+        targs = targets[effective_mask].float()
+
         if preds.numel() == 0:
             return torch.tensor(0.0, device=predictions.device, requires_grad=True)
         if pos_weight is not None:

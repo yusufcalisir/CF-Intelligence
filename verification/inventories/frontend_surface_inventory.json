@@ -1,0 +1,1730 @@
+{
+  "total_discovered": 184,
+  "in_scope": 97,
+  "excluded": 87,
+  "items": [
+    {
+      "path": "frontend/src/App.tsx",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/api/__tests__/api-contract.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/api/__tests__/client.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/api/__tests__/queries.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/api/__tests__/state-management.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/api/client.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/api/queries.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/api/types.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "pr_auc",
+        "roc_auc",
+        "recall_at",
+        "precision",
+        "f1_score",
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/components/BenchmarkLaunchModal.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/CounterfactualWorkbench.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/DatasetTrainingConfigPanel.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/DriftAnalytics.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/FLRoundRunner.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/Navbar.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/PlatformLaunchModal.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/Predictor.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/TechnicalReportModal.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/__tests__/BenchmarkLaunchModal.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/__tests__/CounterfactualWorkbench.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/__tests__/DatasetTrainingConfigPanel.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/__tests__/DriftAnalytics.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/__tests__/FLRoundRunner.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/__tests__/KeyboardAccessibility.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/__tests__/ModalAccessibility.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/__tests__/Navbar.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/__tests__/PlatformLaunchModal.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/__tests__/Predictor.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/cases/CounterfactualExplorer.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/cases/FourEyesApprovalModal.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/cases/__tests__/CounterfactualExplorer.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/cases/__tests__/FourEyesApprovalModal.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/chaos/ChaosAttackInjectorPanel.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/components/chaos/__tests__/ChaosAttackInjectorPanel.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/charts/ConfusionMatrix.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "precision",
+        "f1_score"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/components/charts/FeatureImportance.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/charts/LossChart.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/charts/MetricsComparisonBarChart.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "precision",
+        "f1_score",
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/components/charts/MetricsRadar.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/charts/ROCCurve.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/charts/__tests__/ConfusionMatrix.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/charts/__tests__/FeatureImportance.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/charts/__tests__/LossChart.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/charts/__tests__/MetricsComparisonBarChart.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/charts/__tests__/MetricsRadar.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/charts/__tests__/ROCCurve.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/common/ErrorBoundary.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/AdversarialDefensePanel.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/BankCard.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/CalibrationReliabilityPlot.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/ComparativeModelWidget.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "pr_auc",
+        "roc_auc",
+        "recall_at",
+        "precision",
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/components/dashboard/ComplianceReportPanel.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/ConnectorDiagnosticsPanel.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/DataDriftPanel.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/FeatureImportanceTimeline.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/FederatedTrainingAnimation.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/FlagshipConsortiumWidget.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/IncentiveRegistryPanel.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/MetricsComparison.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "precision",
+        "f1_score",
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/components/dashboard/ModelRegistryPanel.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "pr_auc",
+        "f1_score",
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/components/dashboard/PrivacyMonitor.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/SecureHardwarePanel.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/SimulationControls.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/StreamingGNNPanel.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/ThresholdTuningSlider.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "precision"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/components/dashboard/TrainingTimeline.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/Web3SettlementPanel.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/AdversarialDefensePanel.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/BankCard.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/CalibrationReliabilityPlot.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/ComplianceReportPanel.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/ConnectorDiagnosticsPanel.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/ModelRegistryPanel.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/PrivacyMonitor.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/SecureHardwarePanel.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/SimulationControls.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/StreamingGNNPanel.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/ThresholdTuningSlider.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/Web3SettlementPanel.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/dashboard/__tests__/businessLogicBranches.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/ingestion/ConsortiumAssignmentPanel.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/ingestion/DataContractAuditCard.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/ingestion/DatasetDropzone.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/ingestion/DatasetIngestionStudioModal.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/ingestion/SchemaMappingTable.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/ingestion/__tests__/DatasetIngestionStudioModal.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/layout/Header.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/layout/Layout.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/layout/Sidebar.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/layout/__tests__/Header.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/layout/__tests__/Sidebar.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/components/network/CrossBankTopologyGraph.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/notifications/LiveFraudToastContainer.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/telemetry/DriftMetricsCard.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/components/telemetry/PrivacyBudgetWidget.tsx",
+      "classification": "COMPONENT",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "pr_auc",
+        "roc_auc",
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/components/telemetry/__tests__/DriftMetricsCard.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/e2e/__tests__/ConsortiumTrainingAndModelPromotion.e2e.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/e2e/__tests__/CriticalAMLAlertTriageAndSARLedger.e2e.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/e2e/__tests__/InstitutionalBankOnboardingAndPolicyActivation.e2e.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/e2e/__tests__/PrivacyDefenseAndByzantineQuarantine.e2e.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/hooks/__tests__/useModalA11yBranches.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/hooks/__tests__/useRealTimeFraudStream.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/hooks/useModalA11y.ts",
+      "classification": "HOOK",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/hooks/useRealTimeFraudStream.ts",
+      "classification": "HOOK",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/index.css",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/integration/__tests__/AMLInvestigationWorkflow.integration.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/integration/__tests__/BankOnboardingAndCoordinator.integration.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/integration/__tests__/BenchmarkAndModelTraining.integration.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/integration/__tests__/ComprehensiveErrorStates.integration.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/integration/__tests__/ErrorHandlingAndResilience.integration.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/integration/__tests__/FullConsortiumWorkflow.integration.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/integration/__tests__/PoliciesAndScenarios.integration.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/integration/__tests__/SecurityAndPrivacyDefense.integration.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/main.tsx",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/AlertsPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/pages/ApiDocsPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/pages/BankOnboardingPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/BenchmarkHubPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "pr_auc",
+        "roc_auc",
+        "recall_at",
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/pages/CaseDetailPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/CasesPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/ConsortiumPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/CoordinatorPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/CounterfactualPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/Dashboard.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/GraphPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/InvestigationDashboard.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/LandingPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "precision",
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/pages/LiveOperationsView.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "precision",
+        "f1_score",
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/pages/ObservabilityPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/PoliciesPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/PrivacyDefensePage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "roc_auc",
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/pages/PsiPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/ScenariosPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/SecurityPage.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/SimulationView.tsx",
+      "classification": "PAGE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/AlertsPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/ApiDocsPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/BankOnboardingPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/BenchmarkHubPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/CaseDetailPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/CasesPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/CoordinatorPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/Dashboard.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/DesktopComponentFit.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/GraphPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/InvestigationAndCaseHardening.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/InvestigationDashboard.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/LandingPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/LiveOperationsView.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/MobileComponentFit.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/ObservabilityPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/PerformanceScrollRender.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/PoliciesPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/PrivacyDefensePage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/PsiPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/ResponsiveLayout.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/RoutingAndDeepLinking.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/ScenariosPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/SecurityPage.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/pages/__tests__/test_case_concurrency_and_stale_rollback.test.tsx",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/services/__tests__/api.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/services/__tests__/apiBranches.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/services/api.ts",
+      "classification": "SERVICE",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/stores/useLiveAlertStore.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/testing/__tests__/testDataFactories.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/testing/factories/alertFactory.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/testing/factories/bankFactory.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/testing/factories/caseFactory.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/testing/factories/driftFactory.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/testing/factories/index.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/testing/factories/securityFactory.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/testing/factories/simulationFactory.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/testing/fixtures/canonicalFixtures.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/types.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/types/benchmark.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "pr_auc",
+        "roc_auc",
+        "precision",
+        "f1_score",
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/utils/__tests__/datasetProfiles.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/utils/__tests__/edgeMiddleware.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/utils/__tests__/formatters.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/utils/__tests__/mutationHardening.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/utils/__tests__/piiSanitizer.test.ts",
+      "classification": "TEST_SUITE",
+      "in_scope": false,
+      "inspected": true,
+      "reason": "Excluded test specification under __tests__",
+      "truth_sensitive_fields_found": [],
+      "findings": "Isolated test specification; verified excluded from production bundle"
+    },
+    {
+      "path": "frontend/src/utils/constants.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "precision",
+        "f1_score",
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/utils/datasetProfiles.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [
+        "auc"
+      ],
+      "findings": "Verified truthful null/undefined handling (renders '\u2014' or 'N/A' rather than 0.000)"
+    },
+    {
+      "path": "frontend/src/utils/formatters.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/utils/piiSanitizer.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    },
+    {
+      "path": "frontend/src/vite-env.d.ts",
+      "classification": "UTILITY",
+      "in_scope": true,
+      "inspected": true,
+      "reason": "Production UI asset rendering user-facing state",
+      "truth_sensitive_fields_found": [],
+      "findings": "Standard presentation logic; no metric coercion detected"
+    }
+  ]
+}

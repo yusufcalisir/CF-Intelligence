@@ -1,0 +1,679 @@
+{
+  "total_routers": 45,
+  "total_schemas": 39,
+  "total_items": 84,
+  "items": [
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/admin_console.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/alerts.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/asset_recovery.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/auth.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/bank_client.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/banks.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/bridge_messaging.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/cases.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/compliance.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/coordinator.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/copilot.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/core_banking_gateway.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/dashboard.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/datasets.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/design_partner.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/diagnostics.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/entities.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/european_scenarios.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/feedback.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/financial_messages.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/gateway.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/graph.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/health.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/maintenance_cron.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/model_registry.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/monitoring.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/onboarding.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/open_aml_adapter.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/optimization.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/payment_recall.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/predict.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/privacy_defense.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/psd2.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/realtime_inference.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/regulatory.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/regulatory_dossier.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/rules.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/scenarios.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/screening.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/security.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/settlement.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/simulation.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/training.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/ubo_graph.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "ROUTER",
+      "path": "backend/app/presentation/routers/webhook_gateway.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified HTTP error mapping and null metric serialization without default substitution"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/admin_console.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/alerts.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/auth.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/banks.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/bridge_messaging.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/cases.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/compliance.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/coordinator.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/copilot.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/dashboard.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/datasets.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/design_partner.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/entities.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/event_schemas.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/feedback.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/gateway.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/graph.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/investigation.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/maintenance_cron.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/model_registry.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/observability.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/onboarding.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/open_aml_schemas.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/optimization.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/privacy_defense.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/psd2.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/recall_schemas.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/regulatory_schemas.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/rules.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/scenario_schemas.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/scenarios.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/screening_schemas.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/security.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/settlement.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/simulation.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/transaction.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/ubo_schemas.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/webhook.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": false,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    },
+    {
+      "type": "SCHEMA",
+      "path": "backend/app/application/schemas/websockets.py",
+      "in_scope": true,
+      "inspected": true,
+      "truth_sensitive": true,
+      "findings": "Verified Pydantic schema preserves float | None = None; no falsy coercion to 0.0"
+    }
+  ]
+}

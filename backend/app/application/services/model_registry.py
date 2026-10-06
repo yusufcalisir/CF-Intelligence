@@ -477,8 +477,8 @@ class ModelEvaluationEngine:
 
             from app.domain.metrics_service import safe_pr_auc_score, safe_roc_auc_score
 
-            champ_auc = safe_roc_auc_score(y_true, y_pred_champ, default=0.5)
-            champ_pr_auc = safe_pr_auc_score(y_true, y_pred_champ, default=0.5)
+            champ_auc = safe_roc_auc_score(y_true, y_pred_champ)
+            champ_pr_auc = safe_pr_auc_score(y_true, y_pred_champ)
 
             champ_fp = 0
             champ_tn = 0
@@ -490,15 +490,15 @@ class ModelEvaluationEngine:
                         champ_tn += 1
             champ_fpr = champ_fp / (champ_fp + champ_tn) if (champ_fp + champ_tn) > 0 else 0.0
 
-            chall_auc = 0.5
-            chall_pr_auc = 0.5
+            chall_auc: float | None = None
+            chall_pr_auc: float | None = None
             chall_fpr = 0.0
             if y_pred_chall:
                 y_true_chall = [
                     r["actual_label"] for r in records if r["challenger_version"] is not None
                 ]
-                chall_auc = safe_roc_auc_score(y_true_chall, y_pred_chall, default=0.5)
-                chall_pr_auc = safe_pr_auc_score(y_true_chall, y_pred_chall, default=0.5)
+                chall_auc = safe_roc_auc_score(y_true_chall, y_pred_chall)
+                chall_pr_auc = safe_pr_auc_score(y_true_chall, y_pred_chall)
 
                 chall_fp = 0
                 chall_tn = 0
@@ -514,7 +514,7 @@ class ModelEvaluationEngine:
             rollback_triggered = False
             rollback_message = ""
             has_both_classes = len(set(y_true)) >= 2
-            if (has_both_classes and champ_auc < 0.65) or avg_champ_latency > 200.0 or champ_fpr > 0.05:
+            if (has_both_classes and champ_auc is not None and champ_auc < 0.65) or avg_champ_latency > 200.0 or champ_fpr > 0.05:
                 rollback_triggered = True
                 manifest = self.registry._load_manifest(simulation_id)
                 previous_versions = [v for v in manifest if v["version"] < active_ver_num]
@@ -531,11 +531,14 @@ class ModelEvaluationEngine:
                     )
                     logger.warning(rollback_message)
 
-            # Promotion Gating:
+            # Promotion Gating (Fail-closed on undefined/missing PR-AUC):
             promotion_triggered = False
             promotion_message = ""
             if not rollback_triggered and y_pred_chall and len(y_pred_chall) >= 5:
-                if traffic_share == 0.0 and chall_pr_auc > champ_pr_auc:
+                if champ_pr_auc is None or chall_pr_auc is None:
+                    promotion_message = "Challenger promotion evaluation deferred: PR-AUC undefined (single class or empty evaluation window)."
+                    logger.info(promotion_message)
+                elif traffic_share == 0.0 and chall_pr_auc > champ_pr_auc:
                     traffic_share = 0.1
                     self._store.set(share_key, 0.1)
                     promotion_message = f"Challenger (PR-AUC: {chall_pr_auc:.4f}) outperformed Champion (PR-AUC: {champ_pr_auc:.4f}). Routed 10% traffic to Challenger."

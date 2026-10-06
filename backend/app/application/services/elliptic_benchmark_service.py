@@ -85,33 +85,44 @@ class EllipticBenchmarkService:
             source: str = data["source"]
 
             n_nodes = len(y)
-            n_illicit = int(np.sum(y))
+            labeled_indices = np.where((y == 0) | (y == 1))[0]
+            n_illicit = int(np.sum(y == 1))
+            n_licit = int(np.sum(y == 0))
 
-            # Ensure minimum positive representation for evaluation
+            # Ensure minimum positive representation for evaluation among labeled nodes
             if n_illicit < 2:
-                y[0] = 1
-                y[1] = 1
-                n_illicit = int(np.sum(y))
+                if len(labeled_indices) >= 2:
+                    y[labeled_indices[0]] = 1
+                    y[labeled_indices[1]] = 1
+                else:
+                    y[0] = 1
+                    y[1] = 1
+                labeled_indices = np.where((y == 0) | (y == 1))[0]
+                n_illicit = int(np.sum(y == 1))
+                n_licit = int(np.sum(y == 0))
 
-            illicit_rate = n_illicit / max(1, n_nodes)
+            illicit_rate = n_illicit / max(1, n_illicit + n_licit)
 
-            # Build adjacency lists for undirected message passing
+            # Build adjacency lists for undirected message passing (includes full graph context)
             adjacency_lists: list[list[int]] = [[] for _ in range(n_nodes)]
             for u, v in edges:
                 if 0 <= u < n_nodes and 0 <= v < n_nodes:
                     adjacency_lists[u].append(v)
                     adjacency_lists[v].append(u)
 
-            # Stratified 80/20 train/test split
-            indices = np.arange(n_nodes)
+            # Stratified 80/20 train/test split strictly on labeled (y in {0, 1}) nodes
+            y_labeled = y[labeled_indices]
             try:
-                train_idx, test_idx = train_test_split(
-                    indices, test_size=0.2, stratify=y, random_state=random_seed
+                train_sub_idx, test_sub_idx = train_test_split(
+                    np.arange(len(labeled_indices)), test_size=0.2, stratify=y_labeled, random_state=random_seed
                 )
             except ValueError:
-                train_idx, test_idx = train_test_split(
-                    indices, test_size=0.2, random_state=random_seed
+                train_sub_idx, test_sub_idx = train_test_split(
+                    np.arange(len(labeled_indices)), test_size=0.2, random_state=random_seed
                 )
+
+            train_idx = labeled_indices[train_sub_idx]
+            test_idx = labeled_indices[test_sub_idx]
 
             y_train = y[train_idx]
             y_test = y[test_idx]
@@ -165,20 +176,26 @@ class EllipticBenchmarkService:
                 fed_test_scores = fed_preds_all[test_idx].cpu().numpy()
 
             # ------------------------------------------------------------------
-            # 3. Quantitative Metric Evaluation
+            # 3. Quantitative Metric Evaluation (Strict Truth Semantics)
             # ------------------------------------------------------------------
-            if np.sum(y_test) > 0 and len(np.unique(y_test)) > 1:
-                local_roc_auc = float(roc_auc_score(y_test, local_test_scores))
-                local_pr_auc = float(average_precision_score(y_test, local_test_scores))
+            from app.domain.metrics_service import compute_pr_auc_with_status, compute_roc_auc_with_status
 
-                fed_roc_auc = float(roc_auc_score(y_test, fed_test_scores))
-                fed_pr_auc = float(average_precision_score(y_test, fed_test_scores))
+            local_roc_auc_val, is_def_roc, _ = compute_roc_auc_with_status(y_test, local_test_scores)
+            local_pr_auc_val, is_def_pr, _ = compute_pr_auc_with_status(y_test, local_test_scores)
+            local_roc_auc = round(local_roc_auc_val, 4) if is_def_roc and local_roc_auc_val is not None else None
+            local_pr_auc = round(local_pr_auc_val, 4) if is_def_pr and local_pr_auc_val is not None else None
 
-                local_recall_01 = self._compute_recall_at_target_fpr(y_test, local_test_scores, target_fpr=0.001)
-                fed_recall_01 = self._compute_recall_at_target_fpr(y_test, fed_test_scores, target_fpr=0.001)
-            else:
-                local_roc_auc, local_pr_auc, local_recall_01 = 0.5, float(illicit_rate), 0.0
-                fed_roc_auc, fed_pr_auc, fed_recall_01 = 0.5, float(illicit_rate), 0.0
+            fed_roc_auc_val, is_def_fed_roc, _ = compute_roc_auc_with_status(y_test, fed_test_scores)
+            fed_pr_auc_val, is_def_fed_pr, _ = compute_pr_auc_with_status(y_test, fed_test_scores)
+            fed_roc_auc = round(fed_roc_auc_val, 4) if is_def_fed_roc and fed_roc_auc_val is not None else None
+            fed_pr_auc = round(fed_pr_auc_val, 4) if is_def_fed_pr and fed_pr_auc_val is not None else None
+
+            local_recall_01 = self._compute_recall_at_target_fpr(y_test, local_test_scores, target_fpr=0.001) if is_def_roc else None
+            fed_recall_01 = self._compute_recall_at_target_fpr(y_test, fed_test_scores, target_fpr=0.001) if is_def_fed_roc else None
+
+            pr_auc_gain = round(fed_pr_auc - local_pr_auc, 4) if (fed_pr_auc is not None and local_pr_auc is not None) else None
+            roc_auc_gain = round(fed_roc_auc - local_roc_auc, 4) if (fed_roc_auc is not None and local_roc_auc is not None) else None
+            recall_gain = round(fed_recall_01 - local_recall_01, 4) if (fed_recall_01 is not None and local_recall_01 is not None) else None
 
             results: dict[str, Any] = {
                 "dataset": "Elliptic Bitcoin Dataset",
@@ -190,19 +207,19 @@ class EllipticBenchmarkService:
                 "evaluated_test_nodes": len(test_idx),
                 "metrics": {
                     "federated_graph_pipeline": {
-                        "roc_auc": round(fed_roc_auc, 4),
-                        "pr_auc": round(fed_pr_auc, 4),
-                        "recall_at_01_fpr": round(fed_recall_01, 4),
+                        "roc_auc": fed_roc_auc,
+                        "pr_auc": fed_pr_auc,
+                        "recall_at_01_fpr": fed_recall_01,
                     },
                     "isolated_single_bank_baseline": {
-                        "roc_auc": round(local_roc_auc, 4),
-                        "pr_auc": round(local_pr_auc, 4),
-                        "recall_at_01_fpr": round(local_recall_01, 4),
+                        "roc_auc": local_roc_auc,
+                        "pr_auc": local_pr_auc,
+                        "recall_at_01_fpr": local_recall_01,
                     },
                     "federated_advantage": {
-                        "pr_auc_gain": round(fed_pr_auc - local_pr_auc, 4),
-                        "roc_auc_gain": round(fed_roc_auc - local_roc_auc, 4),
-                        "recall_gain": round(fed_recall_01 - local_recall_01, 4),
+                        "pr_auc_gain": pr_auc_gain,
+                        "roc_auc_gain": roc_auc_gain,
+                        "recall_gain": recall_gain,
                     },
                 },
             }

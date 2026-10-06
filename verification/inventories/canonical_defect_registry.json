@@ -1,0 +1,871 @@
+{
+  "total_canonical_defects": 33,
+  "total_legacy_collisions": 5,
+  "defects": [
+    {
+      "stable_id": "FL-001",
+      "canonical_title": "Fabricated Zero FL Client Weights",
+      "legacy_ids": [
+        "DEF-01",
+        "DEF-FL-01"
+      ],
+      "legacy_descriptions": [
+        "Missing FL client weights replaced with all-zero array"
+      ],
+      "subsystem": "Federated Learning",
+      "root_cause": "Missing client state replaced with all-zero weights array during FedAvg aggregation step",
+      "exact_bad_behavior": "Clients failing round uploaded zeros, pulling global weights towards origin",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/services/federated_coordinator.py"
+      ],
+      "first_known_report": "Phase 1 Audit Report",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Biased FL convergence metrics; reduced accuracy in early rounds",
+      "security_privacy_impact": "None",
+      "operational_impact": "Model parameters corrupted if client timed out",
+      "source_evidence": "verification/federated_learning/test_coordinator_aggregation.py"
+    },
+    {
+      "stable_id": "FL-002",
+      "canonical_title": "Silent Plaintext Fallback in SecAgg",
+      "legacy_ids": [
+        "DEF-02",
+        "DEF-FL-02"
+      ],
+      "legacy_descriptions": [
+        "SecAgg cryptographic failure silently dropped to plaintext transmission"
+      ],
+      "subsystem": "Federated Learning / SecAgg",
+      "root_cause": "SecAgg failure silently continued in unmasked plaintext without user opt-in or warning",
+      "exact_bad_behavior": "If client dropout threshold violated SecAgg protocol, weights sent in plaintext",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/security/secure_aggregation.py"
+      ],
+      "first_known_report": "Phase 1 Audit Report",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "Critical privacy violation: plaintext gradients exposed to server",
+      "operational_impact": "Compromised consortium confidentiality guarantees",
+      "source_evidence": "verification/secure_aggregation/test_secagg_contract.py"
+    },
+    {
+      "stable_id": "FL-003",
+      "canonical_title": "Mock Retraining Bypass",
+      "legacy_ids": [
+        "DEF-03",
+        "DEF-FL-03"
+      ],
+      "legacy_descriptions": [
+        "Background retrain task completed without gradient optimization"
+      ],
+      "subsystem": "Model Lifecycle",
+      "root_cause": "Background retrain task invoked mock sleep rather than executing true PyTorch optimizer loop",
+      "exact_bad_behavior": "Model retraining reported success and updated version without changing parameters",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/services/retraining_service.py"
+      ],
+      "first_known_report": "Phase 1 Audit Report",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "No adaptation to concept drift",
+      "security_privacy_impact": "None",
+      "operational_impact": "Silent staleness in deployed production fraud models",
+      "source_evidence": "backend/tests/unit/test_model_lifecycle_hardening.py"
+    },
+    {
+      "stable_id": "FL-004",
+      "canonical_title": "Test-Shaped Flower Backend Bypass",
+      "legacy_ids": [
+        "DEF-04",
+        "DEF-FL-04"
+      ],
+      "legacy_descriptions": [
+        "Flower simulation bypassed when testing flag detected"
+      ],
+      "subsystem": "Federated Backend",
+      "root_cause": "if os.getenv('TESTING'): return dummy_flower_run bypassed authentic Flower simulation",
+      "exact_bad_behavior": "Flower integration tests passed without actually running Flower client/server stack",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/federated/flower_server.py"
+      ],
+      "first_known_report": "Phase 1 Audit Report",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Invalid scientific claims regarding Flower engine parity",
+      "security_privacy_impact": "None",
+      "operational_impact": "False test confidence",
+      "source_evidence": "backend/tests/unit/test_federated_orchestration.py"
+    },
+    {
+      "stable_id": "CRYPTO-001",
+      "canonical_title": "FHE Plaintext Simulation Masquerading as CKKS",
+      "legacy_ids": [
+        "DEF-05",
+        "DEF-FHE-01"
+      ],
+      "legacy_descriptions": [
+        "Software Gaussian noise emulation labeled as TenSEAL CKKS encryption"
+      ],
+      "subsystem": "Cryptography (FHE)",
+      "root_cause": "Missing TenSEAL library fell back to plaintext vector addition + noise while labeling output as authentic CKKS ciphertext",
+      "exact_bad_behavior": "FHEDriver returned simulated float arrays as ciphertext",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/security/fhe_driver.py"
+      ],
+      "first_known_report": "Phase 2 Audit Report",
+      "first_known_bad_commit_or_range": "pre-8ada5090",
+      "fix_commit": "8ada5090",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Historical FHE performance and memory benchmarks reflected plaintext emulation rather than authentic CKKS polynomial multiplication",
+      "security_privacy_impact": "Plaintext weights exposed if deployed in production",
+      "operational_impact": "Invalid homomorphic encryption assurance",
+      "source_evidence": "backend/tests/unit/test_fhe_driver.py"
+    },
+    {
+      "stable_id": "CRYPTO-002",
+      "canonical_title": "Static Hardware Enclave Claims",
+      "legacy_ids": [
+        "DEF-06",
+        "DEF-TEE-01"
+      ],
+      "legacy_descriptions": [
+        "Local SHA-256 digest claimed to be authentic Intel SGX DCAP attestation quote"
+      ],
+      "subsystem": "Hardware Security (TEE)",
+      "root_cause": "OS device node presence /dev/sgx_enclave treated as proof of hardware enclave execution and IAS/DCAP quote validation",
+      "exact_bad_behavior": "TEEDriver claimed HARDWARE_ATTESTED on generic hosts",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/security/tee_driver.py"
+      ],
+      "first_known_report": "Phase 2 Audit Report",
+      "first_known_bad_commit_or_range": "pre-8ada5090",
+      "fix_commit": "8ada5090",
+      "current_status": "REPAIRED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "Misleading hardware root-of-trust guarantees",
+      "operational_impact": "System claimed physical enclave boundary where only software sandbox existed",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "CRYPTO-003",
+      "canonical_title": "Insecure Default HMAC Key Material",
+      "legacy_ids": [
+        "DEF-07",
+        "DEF-SEC-01"
+      ],
+      "legacy_descriptions": [
+        "Consortium tokenization accepted well-known default salt string in production"
+      ],
+      "subsystem": "Cryptography (HMAC)",
+      "root_cause": "Tokenization service used hardcoded 'default_consortium_salt' if env var missing",
+      "exact_bad_behavior": "Sensitive bank customer identifiers tokenized using predictable public key",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/security/tokenization.py"
+      ],
+      "first_known_report": "Phase 2 Audit Report",
+      "first_known_bad_commit_or_range": "pre-8ada5090",
+      "fix_commit": "8ada5090",
+      "current_status": "REPAIRED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "High: rainbow table attacks possible against pseudonymous bank IDs",
+      "operational_impact": "Non-compliance with GDPR pseudonymization standards",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "CRYPTO-004",
+      "canonical_title": "Shared Type Contract for Emulated and Real FHE",
+      "legacy_ids": [
+        "DEF-21"
+      ],
+      "legacy_descriptions": [
+        "Single EncryptedWeights class held either bytes or float list"
+      ],
+      "subsystem": "Cryptography (FHE)",
+      "root_cause": "EncryptedWeights class contained simulated_plaintext_vector field, allowing emulated weights to impersonate ciphertexts",
+      "exact_bad_behavior": "Type checkers and gates could not distinguish real from emulated weights at type level",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/security/fhe_driver.py"
+      ],
+      "first_known_report": "Phase 3 Closure Report",
+      "first_known_bad_commit_or_range": "8ada5090..16a1f240",
+      "fix_commit": "16a1f240",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Ambiguous benchmark reporting",
+      "security_privacy_impact": "Medium: risk of downstream confusion",
+      "operational_impact": "Potential bypass of cryptographic gates",
+      "source_evidence": "backend/tests/unit/test_fhe_driver.py"
+    },
+    {
+      "stable_id": "CRYPTO-005",
+      "canonical_title": "FHE Subtype Confusion via Class Inheritance",
+      "legacy_ids": [
+        "DEF-27"
+      ],
+      "legacy_descriptions": [
+        "EmulatedWeights subclassed EncryptedWeights, satisfying isinstance checks"
+      ],
+      "subsystem": "Cryptography (FHE)",
+      "root_cause": "class EmulatedWeights(EncryptedWeights) meant isinstance(x, EncryptedWeights) was True for emulation",
+      "exact_bad_behavior": "Emulated weights passed verify_cryptographic_fhe isinstance checks",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/security/fhe_driver.py"
+      ],
+      "first_known_report": "Phase 4 Review",
+      "first_known_bad_commit_or_range": "16a1f240..f9b0816d",
+      "fix_commit": "f9b0816d",
+      "current_status": "REPAIRED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "Critical: broke type safety boundary of cryptographic gates",
+      "operational_impact": "Emulated weights could enter real decryption paths",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "DIST-001",
+      "canonical_title": "Fabricated Kafka Partition and Offset Metadata",
+      "legacy_ids": [
+        "DEF-08",
+        "DEF-KAFKA-01"
+      ],
+      "legacy_descriptions": [
+        "Synthetic hash(bank_id) % 3 used when Kafka broker unacknowledged"
+      ],
+      "subsystem": "Distributed Systems",
+      "root_cause": "Event bus manufactured synthetic partition = hash(bank_id)%3 and offset = counter instead of authentic broker RecordMetadata",
+      "exact_bad_behavior": "Unacknowledged messages reported partition/offset as if committed to broker",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/event_bus.py"
+      ],
+      "first_known_report": "Phase 2 Audit Report",
+      "first_known_bad_commit_or_range": "pre-8ada5090",
+      "fix_commit": "8ada5090",
+      "current_status": "REPAIRED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "None",
+      "operational_impact": "Fabricated distributed audit trail; impossible forensic replay",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "DIST-002",
+      "canonical_title": "Hardcoded Async Kafka Training Metrics",
+      "legacy_ids": [
+        "DEF-09",
+        "DEF-KAFKA-02"
+      ],
+      "legacy_descriptions": [
+        "Asynchronous command dispatch returned hardcoded loss=0.25, accuracy=0.98"
+      ],
+      "subsystem": "Distributed Systems",
+      "root_cause": "KafkaBankConnector.train returned static dictionary {'loss': 0.25, 'accuracy': 0.98} upon command publication",
+      "exact_bad_behavior": "Publishing training command immediately returned successful fictitious metrics before worker executed",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/connectors/kafka_connector.py"
+      ],
+      "first_known_report": "Phase 2 Audit Report",
+      "first_known_bad_commit_or_range": "pre-8ada5090",
+      "fix_commit": "8ada5090",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Fabricated training loss and accuracy evidence",
+      "security_privacy_impact": "None",
+      "operational_impact": "UI showed completed training metrics before worker started",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "DIST-003",
+      "canonical_title": "Uncorrelated Kafka Worker Result Acceptance",
+      "legacy_ids": [
+        "DEF-22"
+      ],
+      "legacy_descriptions": [
+        "Worker response accepted without matching correlation_id or command_type"
+      ],
+      "subsystem": "Distributed Systems",
+      "root_cause": "Response listener accepted any worker payload arriving on response topic without verifying correlation identity",
+      "exact_bad_behavior": "Stale results or results from different runs/models accepted as current result",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/connectors/kafka_connector.py"
+      ],
+      "first_known_report": "Phase 3 Closure Report",
+      "first_known_bad_commit_or_range": "8ada5090..16a1f240",
+      "fix_commit": "16a1f240",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Risk of cross-run metric contamination",
+      "security_privacy_impact": "None",
+      "operational_impact": "Workers from run A could satisfy commands in run B",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "DIST-004",
+      "canonical_title": "EventBus Silent Fallback on Kafka Required",
+      "legacy_ids": [
+        "DEF-28"
+      ],
+      "legacy_descriptions": [
+        "EventBus logged warning and continued in-memory when Kafka was required"
+      ],
+      "subsystem": "Distributed Systems",
+      "root_cause": "EventBus.publish caught exception and logged warning without failing closed when mode was KAFKA_REQUIRED",
+      "exact_bad_behavior": "Required distributed coordination silently degraded to local memory",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/event_bus.py"
+      ],
+      "first_known_report": "Phase 4 Review",
+      "first_known_bad_commit_or_range": "16a1f240..f9b0816d",
+      "fix_commit": "f9b0816d",
+      "current_status": "REPAIRED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "None",
+      "operational_impact": "System operated in single-process memory when distributed delivery was required",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "DATA-001",
+      "canonical_title": "Missing Dataset Labels Replaced with All-Zero Labels",
+      "legacy_ids": [
+        "DEF-10",
+        "DEF-DATA-01"
+      ],
+      "legacy_descriptions": [
+        "Missing or null label column filled with 0 (non-fraud) across loaders"
+      ],
+      "subsystem": "Data Loaders",
+      "root_cause": "Loaders used df['label'].fillna(0) when label column missing or corrupt",
+      "exact_bad_behavior": "Missing fraud targets silently treated as confirmed legitimate transactions",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/services/dataloader.py"
+      ],
+      "first_known_report": "Phase 2 Audit Report",
+      "first_known_bad_commit_or_range": "pre-8ada5090",
+      "fix_commit": "8ada5090",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Artificially lowered fraud prevalence and distorted PR-AUC",
+      "security_privacy_impact": "None",
+      "operational_impact": "Unlabeled anomalies silently trained as normal transactions",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "DATA-002",
+      "canonical_title": "CreditCard Split Ratio Ambiguity",
+      "legacy_ids": [
+        "DEF-11",
+        "DEF-DATA-02"
+      ],
+      "legacy_descriptions": [
+        "Split discrepancy between paper claims (70/15/15) and scripts (80/20 and 60/20/20)"
+      ],
+      "subsystem": "Data Lineage",
+      "root_cause": "Historical research scripts diverged: run_creditcard_benchmark.py used 80/20, evaluate_thresholds.py used 60/20/20",
+      "exact_bad_behavior": "Neither script executed 70/15/15 split claimed in early project notes",
+      "affected_files_at_time_of_defect": [
+        "experiments/credit_card/run_creditcard_benchmark.py",
+        "experiments/credit_card/evaluate_thresholds.py"
+      ],
+      "first_known_report": "Phase 2 Audit Report",
+      "first_known_bad_commit_or_range": "historical",
+      "fix_commit": "16a1f240",
+      "current_status": "CLASSIFIED",
+      "scientific_impact": "Historical comparative metrics must be evaluated against 80/20 and 60/20/20 baselines",
+      "security_privacy_impact": "None",
+      "operational_impact": "None",
+      "source_evidence": "experiments/credit_card/run_creditcard_benchmark.py"
+    },
+    {
+      "stable_id": "GRAPH-EDGE-01",
+      "canonical_title": "Graph Target Leakage in Edge Construction",
+      "legacy_ids": [
+        "DEF-12",
+        "DEF-GRAPH-01",
+        "DATA-003"
+      ],
+      "legacy_descriptions": [
+        "Future transaction edges connected to historical nodes without temporal barrier"
+      ],
+      "subsystem": "Graph Pipeline",
+      "root_cause": "Missing as_of timestamp filter allowed future transactions to form edges with historical nodes",
+      "exact_bad_behavior": "Information from future transactions propagated back into test node embeddings",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/services/graph_service.py"
+      ],
+      "first_known_report": "Audit 1 Report",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Severely inflated GNN fraud detection ROC-AUC and PR-AUC",
+      "security_privacy_impact": "None",
+      "operational_impact": "GNN failed to generalize to real-time unseen streaming transactions",
+      "source_evidence": "verification/graph_intelligence/test_temporal_graph_boundaries.py"
+    },
+    {
+      "stable_id": "GRAPH-LEAK-01",
+      "canonical_title": "Node Feature Index 7 Target Leakage",
+      "legacy_ids": [
+        "DEF-12B",
+        "GRAPH-FEAT-01"
+      ],
+      "legacy_descriptions": [
+        "Entity risk_level derived from ground truth label stored at feature index 7"
+      ],
+      "subsystem": "Graph Pipeline",
+      "root_cause": "Feature extractor mapped entity risk_level (computed directly from ground-truth is_fraud) into node feature vector at index 7",
+      "exact_bad_behavior": "GNN layer 1 learned to inspect feature 7 as a near-perfect label proxy",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/services/graph_service.py"
+      ],
+      "first_known_report": "Audit 1 Feature Inspection",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Manufactured artificial 0.99 AUC in tabular-GNN models",
+      "security_privacy_impact": "None",
+      "operational_impact": "Complete failure in live serving where future risk_level is unknown",
+      "source_evidence": "backend/app/application/services/graph_service.py"
+    },
+    {
+      "stable_id": "GRAPH-LEAK-02",
+      "canonical_title": "Streaming is_fraud-Derived Feature Mutation",
+      "legacy_ids": [
+        "GRAPH-STREAM-01"
+      ],
+      "legacy_descriptions": [
+        "Streaming ingest mutated node alert/risk features using test labels"
+      ],
+      "subsystem": "Graph Pipeline",
+      "root_cause": "Real-time streaming ingestion handler updated neighbor alert counters using actual is_fraud test labels",
+      "exact_bad_behavior": "Incoming stream mutated graph topology and features with future ground truth",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/services/streaming_service.py"
+      ],
+      "first_known_report": "Phase 2 Graph Review",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Corrupted streaming evaluation benchmark metrics",
+      "security_privacy_impact": "None",
+      "operational_impact": "Contaminated real-time fraud alert stream",
+      "source_evidence": "verification/graph_intelligence/test_streaming_isolation.py"
+    },
+    {
+      "stable_id": "GRAPH-LEAK-03",
+      "canonical_title": "Feature Masking Configuration Bypass",
+      "legacy_ids": [
+        "GRAPH-CONF-01"
+      ],
+      "legacy_descriptions": [
+        "mask_label_leakage=False parameter allowed callers to disable leakage protection"
+      ],
+      "subsystem": "Graph Pipeline",
+      "root_cause": "Config option mask_label_leakage permitted callers to bypass feature sanitization",
+      "exact_bad_behavior": "Callers passing mask_label_leakage=False received unmasked target-derived features",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/services/graph_service.py"
+      ],
+      "first_known_report": "Phase 2 Graph Review",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Vulnerability to accidental leakage during experiment configuration",
+      "security_privacy_impact": "None",
+      "operational_impact": "Unsafe configuration interface",
+      "source_evidence": "backend/app/application/services/graph_service.py"
+    },
+    {
+      "stable_id": "DATA-004",
+      "canonical_title": "Corrupted Weight File Zero Substitution",
+      "legacy_ids": [
+        "DEF-13",
+        "DEF-DATA-03"
+      ],
+      "legacy_descriptions": [
+        "Corrupted checkpoint file loaded as all-zero tensors"
+      ],
+      "subsystem": "Model Checkpoints",
+      "root_cause": "try/except around torch.load replaced corrupted checkpoint bytes with torch.zeros",
+      "exact_bad_behavior": "Broken model file served all-zero weights without raising deserialization error",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/services/model_registry.py"
+      ],
+      "first_known_report": "Audit 1 Report",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Degraded evaluation without explicit error indication",
+      "security_privacy_impact": "None",
+      "operational_impact": "Silent serving of dead models",
+      "source_evidence": "backend/tests/unit/test_model_registry.py"
+    },
+    {
+      "stable_id": "DATA-005",
+      "canonical_title": "AMLNet Missing Label Silent Imputation (fillna(0))",
+      "legacy_ids": [
+        "DEF-23"
+      ],
+      "legacy_descriptions": [
+        "load_amlnet called fillna(0) silently converting NaN to non-fraud"
+      ],
+      "subsystem": "Data Loaders",
+      "root_cause": "load_amlnet executed df['Is_Fraud'].fillna(0) without validating data completeness",
+      "exact_bad_behavior": "Corrupt or unannotated nodes silently treated as legitimate non-fraud",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/services/dataloader.py"
+      ],
+      "first_known_report": "Phase 3 Closure Report",
+      "first_known_bad_commit_or_range": "8ada5090..16a1f240",
+      "fix_commit": "16a1f240",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Distorted AMLNet topological fraud detection benchmarks",
+      "security_privacy_impact": "None",
+      "operational_impact": "Silent corruption of graph training labels",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "DATA-006",
+      "canonical_title": "AMLSim / SynthAML NaN Coercion via astype(bool)",
+      "legacy_ids": [
+        "DEF-24"
+      ],
+      "legacy_descriptions": [
+        "df[col].astype(bool) converted np.nan to True (fraud label)"
+      ],
+      "subsystem": "Data Loaders",
+      "root_cause": "In Python/NumPy, np.nan.astype(bool) evaluates to True; astype(bool).astype(int) converted NaN to 1",
+      "exact_bad_behavior": "Missing values manufactured synthetic fraud cases",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/services/dataloader.py"
+      ],
+      "first_known_report": "Phase 3 Closure Report",
+      "first_known_bad_commit_or_range": "8ada5090..16a1f240",
+      "fix_commit": "16a1f240",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Manufactured artificial fraud cases, biasing benchmark prevalence",
+      "security_privacy_impact": "None",
+      "operational_impact": "Corrupted training sets with false positives",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "DATA-007",
+      "canonical_title": "Elliptic Loader Non-Deterministic Label String Permissiveness",
+      "legacy_ids": [
+        "DEF-29"
+      ],
+      "legacy_descriptions": [
+        "Unlabeled strings outside {'1', '2', 'unknown'} were silently coerced"
+      ],
+      "subsystem": "Data Loaders",
+      "root_cause": "Loader did not validate label column against strict vocabulary {'1', '2', 'unknown'}",
+      "exact_bad_behavior": "Corrupt strings or NaNs were silently coerced or ignored",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/services/dataloader.py"
+      ],
+      "first_known_report": "Phase 4 Review",
+      "first_known_bad_commit_or_range": "16a1f240..f9b0816d",
+      "fix_commit": "f9b0816d",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Non-reproducible graph node label partitions",
+      "security_privacy_impact": "None",
+      "operational_impact": "Data loading instability on malformed inputs",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "ML-001",
+      "canonical_title": "Boolean and String Masking as Numerical Metrics",
+      "legacy_ids": [
+        "DEF-14",
+        "DEF-ML-01"
+      ],
+      "legacy_descriptions": [
+        "Boolean mask flag serialized where float PR-AUC was expected"
+      ],
+      "subsystem": "Evaluation Metrics",
+      "root_cause": "Metric payload dictionary coerced boolean mask flag into PR-AUC metric key",
+      "exact_bad_behavior": "Frontend and consumers received True/False instead of numeric float",
+      "affected_files_at_time_of_defect": [
+        "backend/app/domain/metrics_service.py"
+      ],
+      "first_known_report": "Phase 1 Audit Report",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "None",
+      "operational_impact": "Frontend dashboard runtime TypeError crashes",
+      "source_evidence": "backend/tests/unit/test_safe_metrics.py"
+    },
+    {
+      "stable_id": "ML-002",
+      "canonical_title": "Undefined Metric Cross-Layer Crashes",
+      "legacy_ids": [
+        "DEF-15",
+        "DEF-ML-02"
+      ],
+      "legacy_descriptions": [
+        "None metric caused HTTP 500 in strict JSON serializer"
+      ],
+      "subsystem": "Presentation / Serializer",
+      "root_cause": "FastAPI Pydantic schema required strict float; passing None threw ValidationError",
+      "exact_bad_behavior": "Evaluation endpoints failed with 500 Internal Server Error when evaluating single-class data",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/schemas/investigation.py"
+      ],
+      "first_known_report": "Phase 1 Audit Report",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "None",
+      "operational_impact": "Endpoints crashed during model warmup periods",
+      "source_evidence": "backend/tests/unit/test_safe_metrics.py"
+    },
+    {
+      "stable_id": "ML-003",
+      "canonical_title": "Weak Graph Normalization Invariants",
+      "legacy_ids": [
+        "DEF-16",
+        "DEF-ML-03"
+      ],
+      "legacy_descriptions": [
+        "Symmetric graph laplacian normalization allowed zero degree division"
+      ],
+      "subsystem": "Graph Pipeline",
+      "root_cause": "Adjacency matrix normalization lacked epsilon guard for isolated nodes (degree = 0)",
+      "exact_bad_behavior": "Isolated nodes generated NaN in normalized adjacency matrix",
+      "affected_files_at_time_of_defect": [
+        "backend/app/application/services/graph_service.py"
+      ],
+      "first_known_report": "Phase 1 Audit Report",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "NaN propagation through GNN layers",
+      "security_privacy_impact": "None",
+      "operational_impact": "GNN inference produced NaN predictions",
+      "source_evidence": "verification/graph_intelligence/test_graph_matrix_normalization.py"
+    },
+    {
+      "stable_id": "ML-004",
+      "canonical_title": "CreditCard Threshold Evaluation 60/20/20 Hardcoding",
+      "legacy_ids": [
+        "DEF-25"
+      ],
+      "legacy_descriptions": [
+        "evaluate_thresholds.py hardcoded train/val/test to 60/20/20"
+      ],
+      "subsystem": "Experiments",
+      "root_cause": "Lines 210, 239, 255 hardcoded train=0.60, val=0.20, test=0.20 rather than using configurable split",
+      "exact_bad_behavior": "Threshold tuning evaluated on different data partition than 80/20 benchmark",
+      "affected_files_at_time_of_defect": [
+        "experiments/credit_card/evaluate_thresholds.py"
+      ],
+      "first_known_report": "Phase 3 Closure Report",
+      "first_known_bad_commit_or_range": "historical",
+      "fix_commit": "16a1f240",
+      "current_status": "CLASSIFIED",
+      "scientific_impact": "Optimal thresholds derived from 60/20/20 split",
+      "security_privacy_impact": "None",
+      "operational_impact": "None",
+      "source_evidence": "experiments/credit_card/evaluate_thresholds.py"
+    },
+    {
+      "stable_id": "ML-005",
+      "canonical_title": "Fabricated 0.5 PR-AUC Score and Default Substitution",
+      "legacy_ids": [
+        "DEF-30"
+      ],
+      "legacy_descriptions": [
+        "compute_pr_auc returned 0.5 or 0.0 on single-class inputs"
+      ],
+      "subsystem": "Evaluation Metrics",
+      "root_cause": "compute_pr_auc and safe_pr_auc_score returned 0.5 (and later default=0.0) when PR-AUC was mathematically undefined",
+      "exact_bad_behavior": "Single-class windows fabricated 0.5 PR-AUC; subsequent fix fabricated 0.0 without distinguishing valid computed 0.0",
+      "affected_files_at_time_of_defect": [
+        "backend/app/domain/metrics_service.py"
+      ],
+      "first_known_report": "Phase 4 Review",
+      "first_known_bad_commit_or_range": "16a1f240..f9b0816d",
+      "fix_commit": "HEAD (Current Residual Remediation)",
+      "current_status": "REPAIRED",
+      "scientific_impact": "Fabricated high or low precision-recall performance in highly imbalanced fraud regimes",
+      "security_privacy_impact": "None",
+      "operational_impact": "Model promotion decisions contaminated by artificial metric defaults",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "SEC-001",
+      "canonical_title": "Unverified Client Certificate in FL Gateway",
+      "legacy_ids": [
+        "DEF-17",
+        "DEF-SEC-02"
+      ],
+      "legacy_descriptions": [
+        "mTLS client certificate verification bypassed when verify_ssl=False"
+      ],
+      "subsystem": "Security / Gateway",
+      "root_cause": "Gateway allowed dev configuration to disable mTLS without environment gating",
+      "exact_bad_behavior": "Rogue banks could connect to federation coordinator without presenting valid x509 cert",
+      "affected_files_at_time_of_defect": [
+        "backend/app/presentation/routers/banks.py"
+      ],
+      "first_known_report": "Phase 1 Audit Report",
+      "first_known_bad_commit_or_range": "pre-831fddb0",
+      "fix_commit": "831fddb0",
+      "current_status": "REPAIRED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "High: unauthorized client injection into federated rounds",
+      "operational_impact": "Potential consortium security breach",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "SEC-002",
+      "canonical_title": "Weak Consortium Salt Entropy",
+      "legacy_ids": [
+        "DEF-18",
+        "DEF-SEC-03"
+      ],
+      "legacy_descriptions": [
+        "Fixed 8-character salt allowed dictionary attacks on tokenized entities"
+      ],
+      "subsystem": "Security / Cryptography",
+      "root_cause": "Consortium salt was short fixed string allowing offline preimage search",
+      "exact_bad_behavior": "Pseudonymized account IDs vulnerable to re-identification",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/security/tokenization.py"
+      ],
+      "first_known_report": "Phase 2 Audit Report",
+      "first_known_bad_commit_or_range": "pre-8ada5090",
+      "fix_commit": "8ada5090",
+      "current_status": "REPAIRED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "Medium: lowered privacy margin under GDPR Recital 26",
+      "operational_impact": "Audit compliance failure",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "SEC-003",
+      "canonical_title": "FastAPI Empty String Query Parameter Fallback Bug",
+      "legacy_ids": [
+        "DEF-26"
+      ],
+      "legacy_descriptions": [
+        "'' or identifier resolved to FastAPI Query(...) param object"
+      ],
+      "subsystem": "API Presentation",
+      "root_cause": "Misuse of 'or' fallback between payload string and FastAPI Query(...) default object",
+      "exact_bad_behavior": "Empty string passed validation unnoticed, resolving to FastAPI metadata object",
+      "affected_files_at_time_of_defect": [
+        "backend/app/presentation/routers/banks.py"
+      ],
+      "first_known_report": "Phase 3 Closure Report",
+      "first_known_bad_commit_or_range": "8ada5090..16a1f240",
+      "fix_commit": "16a1f240",
+      "current_status": "REPAIRED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "High: bypassed bank identifier format validation",
+      "operational_impact": "Validation evasion",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    },
+    {
+      "stable_id": "SEC-004",
+      "canonical_title": "TEE Attestation Hardware Claim Overstatement",
+      "legacy_ids": [
+        "DEF-31"
+      ],
+      "legacy_descriptions": [
+        "Matrices claimed physical Intel SGX DCAP quote verification as VERIFIED"
+      ],
+      "subsystem": "Hardware Security",
+      "root_cause": "Documentation and matrices claimed hardware quote verification as VERIFIED despite absence of DCAP daemon",
+      "exact_bad_behavior": "System overclaimed physical enclave verification",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/security/tee_driver.py"
+      ],
+      "first_known_report": "Phase 4 Review",
+      "first_known_bad_commit_or_range": "16a1f240..f9b0816d",
+      "fix_commit": "f9b0816d",
+      "current_status": "RECONCILED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "Medium: overstatement of hardware root of trust",
+      "operational_impact": "Audit reconciliation required",
+      "source_evidence": "backend/app/infrastructure/security/tee_driver.py"
+    },
+    {
+      "stable_id": "OPS-003",
+      "canonical_title": "Broad Exception Swallowing in EventBus Warning Logger",
+      "legacy_ids": [
+        "DEF-32"
+      ],
+      "legacy_descriptions": [
+        "Catch-all Exception in EventBus._kafka_publish swallowed failure"
+      ],
+      "subsystem": "Infrastructure / Messaging",
+      "root_cause": "Broad except Exception caught delivery errors and silently set in-memory state without explicit delivery failure status",
+      "exact_bad_behavior": "Event delivery failures hidden from caller",
+      "affected_files_at_time_of_defect": [
+        "backend/app/infrastructure/event_bus.py"
+      ],
+      "first_known_report": "Phase 3 Closure Report",
+      "first_known_bad_commit_or_range": "8ada5090..16a1f240",
+      "fix_commit": "16a1f240",
+      "current_status": "REPAIRED",
+      "scientific_impact": "None",
+      "security_privacy_impact": "None",
+      "operational_impact": "Silent loss of audit events",
+      "source_evidence": "backend/tests/unit/test_runtime_adversarial_verification.py"
+    }
+  ],
+  "legacy_collisions": [
+    {
+      "legacy_id": "DEF-01",
+      "source_a": "Federated Learning Audit (Phase 1)",
+      "meaning_a": "Fabricated Zero FL Client Weights",
+      "source_b": "Security / Crypto Audit (Phase 2)",
+      "meaning_b": "FHE Plaintext Simulation Masquerading as CKKS",
+      "stable_id_a": "FL-001",
+      "stable_id_b": "CRYPTO-001",
+      "resolution": "Disambiguated via domain prefixes: FL-001 for Federated Learning weight zeroing, CRYPTO-001 for FHE software emulation"
+    },
+    {
+      "legacy_id": "DEF-02",
+      "source_a": "Federated Learning Audit (Phase 1)",
+      "meaning_a": "Silent Plaintext Fallback in SecAgg",
+      "source_b": "Security / TEE Audit (Phase 2)",
+      "meaning_b": "Static Hardware Enclave Claims",
+      "stable_id_a": "FL-002",
+      "stable_id_b": "CRYPTO-002",
+      "resolution": "Disambiguated via domain prefixes: FL-002 for SecAgg plaintext fallback, CRYPTO-002 for TEE attestation claims"
+    },
+    {
+      "legacy_id": "DEF-03",
+      "source_a": "Federated Learning Audit (Phase 1)",
+      "meaning_a": "Mock Retraining Bypass",
+      "source_b": "Security / Crypto Audit (Phase 2)",
+      "meaning_b": "Insecure Default HMAC Key Material",
+      "stable_id_a": "FL-003",
+      "stable_id_b": "CRYPTO-003",
+      "resolution": "Disambiguated via domain prefixes: FL-003 for model retraining bypass, CRYPTO-003 for HMAC secret defaults"
+    },
+    {
+      "legacy_id": "DEF-12",
+      "source_a": "Graph Pipeline Audit (Audit 1)",
+      "meaning_a": "Graph Target Leakage in Edge Construction",
+      "source_b": "Feature Engineering Audit (Audit 1)",
+      "meaning_b": "Node Feature Index 7 Target Leakage",
+      "stable_id_a": "GRAPH-EDGE-01",
+      "stable_id_b": "GRAPH-LEAK-01",
+      "resolution": "Disambiguated by root cause: GRAPH-EDGE-01 for edge construction temporal leakage, GRAPH-LEAK-01 for entity risk_level encoded at node feature index 7"
+    },
+    {
+      "legacy_id": "DEF-14",
+      "source_a": "Metrics Audit (Phase 1)",
+      "meaning_a": "Boolean and String Masking as Numerical Metrics",
+      "source_b": "Dataset Loader Audit (Phase 3)",
+      "meaning_b": "AMLNet Missing Label Silent Imputation (fillna(0))",
+      "stable_id_a": "ML-001",
+      "stable_id_b": "DATA-005",
+      "resolution": "Disambiguated via domain prefixes: ML-001 for metric type serialization coercion, DATA-005 for AMLNet fillna(0) imputation"
+    }
+  ]
+}

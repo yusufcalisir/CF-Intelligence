@@ -824,15 +824,15 @@ class EllipticBenchmarkRequest(BaseModel):
 
 
 class EllipticPipelineMetrics(BaseModel):
-    roc_auc: float
-    pr_auc: float
-    recall_at_01_fpr: float
+    roc_auc: float | None = None
+    pr_auc: float | None = None
+    recall_at_01_fpr: float | None = None
 
 
 class EllipticAdvantageMetrics(BaseModel):
-    pr_auc_gain: float
-    roc_auc_gain: float
-    recall_gain: float
+    pr_auc_gain: float | None = None
+    roc_auc_gain: float | None = None
+    recall_gain: float | None = None
 
 
 class EllipticBenchmarkMetrics(BaseModel):

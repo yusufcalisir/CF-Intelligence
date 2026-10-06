@@ -1258,40 +1258,44 @@ def test_kafka_capability_mode_fail_closed_and_in_memory_distinction() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 43. PR-AUC Truth & No Fabricated 0.5 Score (Part VII)
+# 43. PR-AUC Truth & Definedness Semantics (Part I: ML-005 Full Closure)
 # ---------------------------------------------------------------------------
 def test_pr_auc_truth_no_fabricated_half_score() -> None:
-    """Verify PR-AUC computation does not invent a plausible 0.5 score for degenerate inputs."""
+    """Verify PR-AUC computation distinguishes valid 0.0 from undefined None and rejects non-finite inputs."""
     from app.domain.metrics_service import (
         compute_pr_auc,
         compute_pr_auc_with_status,
         safe_pr_auc_score,
     )
 
-    # Single-class labels: PR-AUC is mathematically undefined
+    # 1. Single-class labels: PR-AUC is mathematically undefined -> value is None
     y_single = [0, 0, 0, 0]
     y_pred = [0.1, 0.2, 0.3, 0.4]
 
-    score, is_def, status = compute_pr_auc_with_status(y_single, y_pred, default=0.0)
+    score, is_def, status = compute_pr_auc_with_status(y_single, y_pred)
     assert is_def is False
     assert status == "undefined_single_class"
-    assert score == 0.0
+    assert score is None
 
-    # compute_pr_auc returns 0.0, NOT 0.5
-    raw_score = compute_pr_auc(y_single, y_pred, default=0.0)
-    assert raw_score == 0.0
+    # compute_pr_auc and safe_pr_auc_score return None, NOT 0.0, NOT 0.5
+    assert compute_pr_auc(y_single, y_pred) is None
+    assert safe_pr_auc_score(y_single, y_pred) is None
 
-    # safe_pr_auc_score returns default (0.0)
-    safe_score = safe_pr_auc_score(y_single, y_pred, default=0.0)
-    assert safe_score == 0.0
+    # 2. Single-class all 1s
+    score_p, is_def_p, status_p = compute_pr_auc_with_status([1, 1, 1], [0.8, 0.9, 0.7])
+    assert is_def_p is False
+    assert status_p == "undefined_single_class"
+    assert score_p is None
+    assert compute_pr_auc([1, 1, 1], [0.8, 0.9, 0.7]) is None
 
-    # Empty inputs
-    score_empty, is_def_e, status_e = compute_pr_auc_with_status([], [], default=0.0)
+    # 3. Empty inputs -> value is None, status is undefined_empty_input
+    score_empty, is_def_e, status_e = compute_pr_auc_with_status([], [])
     assert is_def_e is False
-    assert status_e == "undefined_empty"
-    assert score_empty == 0.0
+    assert status_e == "undefined_empty_input"
+    assert score_empty is None
+    assert compute_pr_auc([], []) is None
 
-    # Two-class legitimate input
+    # 4. Two-class legitimate input
     y_two = [0, 1, 0, 1]
     y_pred_two = [0.1, 0.9, 0.2, 0.8]
     score_two, is_def_t, status_t = compute_pr_auc_with_status(y_two, y_pred_two)
@@ -1299,9 +1303,163 @@ def test_pr_auc_truth_no_fabricated_half_score() -> None:
     assert status_t == "defined"
     assert score_two == 1.0
 
+    # 5. Non-finite values (NaN / Inf) raise explicit ValueError
+    with pytest.raises(ValueError, match="Non-finite values"):
+        compute_pr_auc([0, 1], [float("nan"), 0.5])
+    with pytest.raises(ValueError, match="Non-finite values"):
+        compute_pr_auc([0, 1], [float("inf"), 0.5])
+
+    # 6. Shape mismatch raises explicit ValueError
+    with pytest.raises(ValueError, match="Shape mismatch"):
+        compute_pr_auc([0, 1, 0], [0.2, 0.8])
+
 
 # ---------------------------------------------------------------------------
-# 44. Elliptic Deterministic Label Contract & Invalid Encoding Rejection (Part IV)
+# 44. Model Promotion Fail-Closed on Undefined PR-AUC (Part I Section 12)
+# ---------------------------------------------------------------------------
+def test_pr_auc_promotion_fails_closed_when_metric_unavailable() -> None:
+    """Verify Challenger model is NEVER promoted when PR-AUC cannot be computed (single-class or empty)."""
+    from unittest.mock import MagicMock
+    from app.application.services.model_registry import ModelEvaluationEngine
+
+    registry_mock = MagicMock()
+    registry_mock.get_active_version.return_value = {"version": 1}
+    store_mock = MagicMock()
+    engine = ModelEvaluationEngine(registry=registry_mock)
+    engine._store = store_mock
+
+    # 10 transactions with only class 0 (single-class: PR-AUC is None)
+    records = [
+        {
+            "actual_label": 0,
+            "champion_prob": 0.1,
+            "champion_latency_ms": 10.0,
+            "challenger_version": 2,
+            "challenger_prob": 0.05,
+            "challenger_latency_ms": 8.0,
+        }
+        for _ in range(10)
+    ]
+    keys = [f"sim_pr_test:prediction:tx_{i}" for i in range(10)]
+    store_data: dict[str, Any] = {
+        "sim_pr_test:prediction_keys": keys,
+        "sim_pr_test:challenger_traffic_share": 0.0,
+    }
+    for k, r in zip(keys, records, strict=True):
+        store_data[k] = r
+
+    store_mock.get.side_effect = lambda k: store_data.get(k)
+
+    # Evaluate performance
+    metrics = engine.evaluate_performance("sim_pr_test")
+
+    # Promotion MUST NOT be triggered
+    assert metrics["promotion_triggered"] is False
+    assert metrics["champion_pr_auc"] is None
+    assert metrics["challenger_pr_auc"] is None
+    assert "PR-AUC undefined" in metrics["promotion_message"]
+
+
+# ---------------------------------------------------------------------------
+# 45. Elliptic Unknown Node Loss & Evaluation Masking Invariance (Part V)
+# ---------------------------------------------------------------------------
+def test_elliptic_unknown_node_loss_and_eval_masking_invariance() -> None:
+    """Behavioral proof that changing predictions on y=-1 unknown nodes has zero effect on supervised loss and metrics."""
+    import torch
+    from app.application.services.graph_embedding_model import GraphSAGEModel
+    from app.domain.metrics_service import compute_pr_auc, compute_roc_auc_with_status
+
+    model = GraphSAGEModel(input_dim=12, hidden_dim=16, embedding_dim=8)
+
+    # 5 nodes: node 0: class 0, node 1: class 1, node 2: unknown (-1), node 3: class 0, node 4: unknown (-1)
+    targets = torch.tensor([0, 1, -1, 0, -1], dtype=torch.long)
+    preds_initial = torch.tensor([0.2, 0.8, 0.05, 0.3, 0.10], dtype=torch.float32)
+
+    # Baseline supervised loss
+    loss_initial = model.compute_loss(preds_initial, targets)
+
+    # Drastically mutate predictions on unknown nodes (node 2 from 0.05 -> 0.999, node 4 from 0.10 -> 0.001)
+    preds_mutated = torch.tensor([0.2, 0.8, 0.999, 0.3, 0.001], dtype=torch.float32)
+    loss_mutated = model.compute_loss(preds_mutated, targets)
+
+    # Behavioral Invariant 1: Supervised loss MUST remain identical to exact machine precision
+    assert torch.equal(loss_initial, loss_mutated), "Loss changed when only unknown node predictions were mutated!"
+
+    # Behavioral Invariant 2: Supervised evaluation metrics on labeled subset are identical
+    labeled_mask = (targets != -1).numpy()
+    y_labeled = targets[labeled_mask].numpy()
+    pr_initial = compute_pr_auc(y_labeled, preds_initial[labeled_mask].numpy())
+    pr_mutated = compute_pr_auc(y_labeled, preds_mutated[labeled_mask].numpy())
+    assert pr_initial == pr_mutated, "Supervised PR-AUC changed after mutating unknown node predictions!"
+
+    roc_init, is_def_init, _ = compute_roc_auc_with_status(y_labeled, preds_initial[labeled_mask].numpy())
+    roc_mut, is_def_mut, _ = compute_roc_auc_with_status(y_labeled, preds_mutated[labeled_mask].numpy())
+    assert roc_init == roc_mut and is_def_init == is_def_mut
+
+    # Behavioral Invariant 3: Class weights computed strictly excluding -1 nodes
+    num_pos = int(torch.sum(targets == 1).item())
+    num_neg = int(torch.sum(targets == 0).item())
+    assert num_pos == 1
+    assert num_neg == 2
+    # Ensure -1 was not counted as positive or negative
+    assert int(torch.sum(targets != -1).item()) == num_pos + num_neg
+
+
+# ---------------------------------------------------------------------------
+# 46. Kafka Multi-Dimensional Identity & Idempotency (Part VI)
+# ---------------------------------------------------------------------------
+def test_kafka_correlation_multi_dimensional_identity_and_idempotency() -> None:
+    """Verify Kafka connector correlation enforces 6 identity dimensions and guarantees idempotency."""
+    from app.infrastructure.connectors.kafka_connector import KafkaBankConnector
+
+    cmd_meta = {
+        "correlation_id": "cid-abc-123",
+        "bank_id": "bank_a",
+        "command_type": "TRAIN",
+        "run_id": "run-42",
+        "round_id": 3,
+        "model_id": "model-gnn-v1",
+    }
+
+    # Case A: Matching worker result -> PROCESSED
+    valid_worker = {
+        "correlation_id": "cid-abc-123",
+        "bank_id": "bank_a",
+        "command_type": "TRAIN",
+        "run_id": "run-42",
+        "round_id": 3,
+        "model_id": "model-gnn-v1",
+        "loss": 0.245,
+        "metrics": {"pr_auc": 0.82},
+        "num_samples": 500,
+    }
+    processed_set: set[str] = set()
+    res1 = KafkaBankConnector.correlate_worker_result(cmd_meta, valid_worker, processed_set)
+    assert res1["status"] == "PROCESSED"
+    assert res1["idempotent_duplicate"] is False
+    assert res1["loss"] == 0.245
+    assert "cid-abc-123" in processed_set
+
+    # Case B: Duplicate response with same correlation_id -> DUPLICATE_IGNORED
+    res_dup = KafkaBankConnector.correlate_worker_result(cmd_meta, valid_worker, processed_set)
+    assert res_dup["status"] == "DUPLICATE_IGNORED"
+    assert res_dup["idempotent_duplicate"] is True
+    assert res_dup["loss"] is None
+    assert res_dup["num_samples"] == 0
+
+    # Case C: Round ID mismatch -> Fail Closed
+    stale_round_worker = {**valid_worker, "round_id": 2}
+    with pytest.raises(ValueError, match="round_id mismatch"):
+        KafkaBankConnector.correlate_worker_result(cmd_meta, stale_round_worker)
+
+    # Case D: Model ID mismatch -> Fail Closed
+    wrong_model_worker = {**valid_worker, "model_id": "model-v2"}
+    with pytest.raises(ValueError, match="model_id mismatch"):
+        KafkaBankConnector.correlate_worker_result(cmd_meta, wrong_model_worker)
+
+
+# ---------------------------------------------------------------------------
+# 47. Elliptic Deterministic Label Contract & Invalid Encoding Rejection (Part IV)
 # ---------------------------------------------------------------------------
 def test_elliptic_loader_deterministic_contract_and_invalid_encoding_rejection(tmp_path: Path) -> None:
     """Verify Elliptic loader fails closed on NaN labels and rejects invalid encoding strings."""

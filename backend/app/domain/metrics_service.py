@@ -17,15 +17,28 @@ import numpy.typing as npt
 logger = logging.getLogger(__name__)
 
 
+from enum import Enum
+
+
+class MetricStatusCode(str, Enum):
+    """Explicit lifecycle status for mathematical metric evaluations."""
+
+    DEFINED = "defined"
+    UNDEFINED_SINGLE_CLASS = "undefined_single_class"
+    UNDEFINED_EMPTY_INPUT = "undefined_empty_input"
+    UNAVAILABLE = "unavailable"
+    COMPUTATION_ERROR = "computation_error"
+
+
 @dataclass
 class ScientificValidationMetrics:
     """Scientific evaluation metrics for imbalanced cross-bank fraud detection."""
 
     model_config_name: str
-    pr_auc: float
-    roc_auc: float
-    recall_at_01_fpr: float
-    precision_at_k: float
+    pr_auc: float | None
+    roc_auc: float | None
+    recall_at_01_fpr: float | None
+    precision_at_k: float | None
     detection_latency_ms: float
     communication_payload_mb: float
     dp_epsilon: float
@@ -56,6 +69,28 @@ def _subsample_for_curve(y_t: np.ndarray, y_p: np.ndarray, max_samples: int = 50
     return y_t[sampled_idx], y_p[sampled_idx]
 
 
+def validate_metric_inputs(
+    y_true: list[int] | np.ndarray,
+    y_pred: list[float] | np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Validate metric inputs for 1-D matching shape and absence of non-finite values."""
+    y_t = np.asarray(y_true)
+    y_p = np.asarray(y_pred)
+    if y_t.ndim > 1:
+        y_t = y_t.squeeze()
+    if y_p.ndim > 1:
+        y_p = y_p.squeeze()
+    if y_t.ndim > 1 or y_p.ndim > 1:
+        raise ValueError(
+            f"Metric inputs must be 1-dimensional, got y_true shape {y_t.shape} and y_pred shape {y_p.shape}"
+        )
+    if y_t.shape != y_p.shape:
+        raise ValueError(f"Shape mismatch: y_true shape {y_t.shape} != y_pred shape {y_p.shape}")
+    if y_t.size > 0 and (not np.all(np.isfinite(y_t)) or not np.all(np.isfinite(y_p))):
+        raise ValueError("Non-finite values (NaN or Inf) detected in metric inputs")
+    return y_t, y_p
+
+
 def is_roc_auc_defined(y_true: list[int] | np.ndarray) -> bool:
     """Return True if ROC-AUC is mathematically defined (at least two classes present)."""
     y_t = np.asarray(y_true)
@@ -71,73 +106,60 @@ def is_pr_auc_defined(y_true: list[int] | np.ndarray) -> bool:
 def compute_roc_auc_with_status(
     y_true: list[int] | np.ndarray,
     y_pred: list[float] | np.ndarray,
-    default: float = 0.5,
-) -> tuple[float, bool, str]:
+    default: float | None = None,
+) -> tuple[float | None, bool, str]:
     """Compute ROC-AUC with explicit mathematical definedness status.
 
     Returns:
-        tuple[float, bool, str]: (score, is_defined, status_code)
-        where status_code is 'defined', 'undefined_single_class', 'undefined_empty', or 'computation_error'.
+        tuple[float | None, bool, str]: (score, is_defined, status_code)
+        where status_code is 'defined', 'undefined_single_class', 'undefined_empty_input', or 'computation_error'.
     """
-    y_t = np.asarray(y_true)
-    y_p = np.asarray(y_pred)
+    y_t, y_p = validate_metric_inputs(y_true, y_pred)
     if y_t.size == 0 or y_p.size == 0:
-        return default, False, "undefined_empty"
+        return default, False, MetricStatusCode.UNDEFINED_EMPTY_INPUT.value
     if len(np.unique(y_t)) < 2:
-        return default, False, "undefined_single_class"
+        return default, False, MetricStatusCode.UNDEFINED_SINGLE_CLASS.value
     try:
         from sklearn.metrics import roc_auc_score
 
         val = float(roc_auc_score(y_t, y_p))
         if np.isnan(val):
-            return default, False, "computation_error"
-        return val, True, "defined"
+            return default, False, MetricStatusCode.COMPUTATION_ERROR.value
+        return round(val, 4), True, MetricStatusCode.DEFINED.value
     except Exception:
-        return default, False, "computation_error"
+        return default, False, MetricStatusCode.COMPUTATION_ERROR.value
 
 
 def safe_roc_auc_score(
     y_true: list[int] | np.ndarray,
     y_pred: list[float] | np.ndarray,
-    default: float = 0.5,
-) -> float:
+    default: float | None = None,
+) -> float | None:
     """Safely compute ROC-AUC score.
 
-    When y_true contains only one class, ROC-AUC is mathematically undefined because
-    a binary ranking cannot be formed. In that degenerate case, this function returns
-    the documented fallback sentinel `default` (0.5). Callers requiring strict definedness
-    truth must verify `is_roc_auc_defined(y_true)` or call `compute_roc_auc_with_status`.
+    When y_true contains only one class or is empty, ROC-AUC is mathematically undefined.
+    In that degenerate case, this function returns `default` (None by default).
     """
-    y_t = np.asarray(y_true)
-    y_p = np.asarray(y_pred)
-    if y_t.size == 0 or y_p.size == 0 or len(np.unique(y_t)) < 2:
-        return default
-    try:
-        from sklearn.metrics import roc_auc_score
-
-        val = float(roc_auc_score(y_t, y_p))
-        return default if np.isnan(val) else val
-    except Exception:
-        return default
+    score, is_def, _ = compute_roc_auc_with_status(y_true, y_pred, default=default)
+    return score if is_def else default
 
 
 def compute_pr_auc_with_status(
     y_true: list[int] | np.ndarray,
     y_pred: list[float] | np.ndarray,
-    default: float = 0.0,
-) -> tuple[float, bool, str]:
+    default: float | None = None,
+) -> tuple[float | None, bool, str]:
     """Compute PR-AUC with explicit mathematical definedness status.
 
     Returns:
-        tuple[float, bool, str]: (score, is_defined, status_code)
-        where status_code is 'defined', 'undefined_single_class', 'undefined_empty', or 'computation_error'.
+        tuple[float | None, bool, str]: (score, is_defined, status_code)
+        where status_code is 'defined', 'undefined_single_class', 'undefined_empty_input', or 'computation_error'.
     """
-    y_t = np.asarray(y_true)
-    y_p = np.asarray(y_pred)
+    y_t, y_p = validate_metric_inputs(y_true, y_pred)
     if y_t.size == 0 or y_p.size == 0:
-        return default, False, "undefined_empty"
+        return default, False, MetricStatusCode.UNDEFINED_EMPTY_INPUT.value
     if len(np.unique(y_t)) < 2:
-        return default, False, "undefined_single_class"
+        return default, False, MetricStatusCode.UNDEFINED_SINGLE_CLASS.value
     try:
         from sklearn.metrics import auc, precision_recall_curve
 
@@ -145,33 +167,36 @@ def compute_pr_auc_with_status(
         precision, recall, _ = precision_recall_curve(y_t_sub, y_p_sub)
         val = float(auc(recall, precision))
         if np.isnan(val):
-            return default, False, "computation_error"
-        return round(val, 4), True, "defined"
+            return default, False, MetricStatusCode.COMPUTATION_ERROR.value
+        return round(val, 4), True, MetricStatusCode.DEFINED.value
     except Exception:
-        return default, False, "computation_error"
+        return default, False, MetricStatusCode.COMPUTATION_ERROR.value
 
 
 def safe_pr_auc_score(
     y_true: list[int] | np.ndarray,
     y_pred: list[float] | np.ndarray,
-    default: float = 0.0,
-) -> float:
-    """Safely compute PR-AUC score, guarding against single-class, empty, or NaN inputs."""
+    default: float | None = None,
+) -> float | None:
+    """Safely compute PR-AUC score, guarding against single-class, empty, or NaN inputs.
+
+    Returns `default` (None by default) when undefined.
+    """
     return compute_pr_auc(y_true, y_pred, default=default)
 
 
 def compute_pr_auc(
     y_true: list[int] | np.ndarray,
     y_pred: list[float] | np.ndarray,
-    default: float = 0.0,
-) -> float:
+    default: float | None = None,
+) -> float | None:
     """Computes Precision-Recall Area Under Curve (PR-AUC) using sklearn.
 
-    Returns `default` (0.0) when single-class, empty, or ill-defined, preventing
-    fabrication of arbitrary positive scores (e.g. 0.5).
+    Returns `default` (None) when single-class, empty, or ill-defined, preventing
+    fabrication of arbitrary positive scores (e.g. 0.5) or conflation with valid 0.0.
     """
-    score, _, _ = compute_pr_auc_with_status(y_true, y_pred, default=default)
-    return score
+    score, is_def, _ = compute_pr_auc_with_status(y_true, y_pred, default=default)
+    return score if is_def else default
 
 
 def safe_precision_recall_curve(
@@ -196,12 +221,12 @@ def safe_f1_score(
     y_true: list[int] | np.ndarray,
     y_pred: list[float] | np.ndarray,
     threshold: float = 0.5,
-    default: float = 0.0,
-) -> float:
+    default: float | None = None,
+) -> float | None:
     """Safely compute binary F1-score with zero-division handling."""
     y_t = np.asarray(y_true)
     y_p = np.asarray(y_pred)
-    if y_t.size == 0 or y_p.size == 0:
+    if y_t.size == 0 or y_p.size == 0 or len(np.unique(y_t)) < 2:
         return default
     try:
         from sklearn.metrics import f1_score
@@ -217,17 +242,17 @@ def compute_recall_at_fpr(
     y_true: list[int] | np.ndarray,
     y_pred: list[float] | np.ndarray,
     target_fpr: float = 0.001,
-) -> float:
+) -> float | None:
     """Computes Recall at a fixed False Positive Rate (e.g. 0.1% FPR = 1 in 1,000 legitimate transactions)."""
-    from sklearn.metrics import roc_curve
-
     y_t = np.asarray(y_true)
     y_p = np.asarray(y_pred)
 
-    if len(np.unique(y_t)) < 2:
-        return 0.0
+    if y_t.size == 0 or len(np.unique(y_t)) < 2:
+        return None
 
     y_t, y_p = _subsample_for_curve(y_t, y_p)
+    from sklearn.metrics import roc_curve
+
     fpr, tpr, _ = roc_curve(y_t, y_p)
     fpr_f = np.asarray(fpr, dtype=np.float64)
     tpr_f = np.asarray(tpr, dtype=np.float64)
@@ -240,19 +265,19 @@ def compute_precision_at_k(
     y_true: list[int] | np.ndarray,
     y_pred: list[float] | np.ndarray,
     k: int = 100,
-) -> float:
+) -> float | None:
     """Computes Precision among top K highest risk-scored transactions."""
     y_t = np.asarray(y_true)
     y_p = np.asarray(y_pred)
 
     if len(y_t) == 0:
-        return 0.0
+        return None
 
     top_k_indices = np.argsort(y_p)[::-1][: min(k, len(y_p))]
     top_k_labels = y_t[top_k_indices]
 
     if len(top_k_labels) == 0:
-        return 0.0
+        return None
 
     precision_k = float(np.sum(top_k_labels == 1) / len(top_k_labels))
     return round(precision_k, 4)
@@ -417,8 +442,10 @@ def compute_scientific_benchmark(
     y_t = np.asarray(y_true)
     y_p = np.asarray(y_pred)
 
-    roc_auc = round(safe_roc_auc_score(y_t, y_p, default=0.5), 4)
-    pr_auc = compute_pr_auc(y_t, y_p)
+    roc_score = safe_roc_auc_score(y_t, y_p)
+    roc_auc = round(roc_score, 4) if roc_score is not None else None
+    pr_score = compute_pr_auc(y_t, y_p)
+    pr_auc = round(pr_score, 4) if pr_score is not None else None
     rec_01_fpr = compute_recall_at_fpr(y_t, y_p, target_fpr=0.001)
     prec_k = compute_precision_at_k(y_t, y_p, k=top_k)
 

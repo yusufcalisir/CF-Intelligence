@@ -145,11 +145,13 @@ class KafkaBankConnector(BankConnectorInterface):
     def correlate_worker_result(
         command_meta: dict[str, Any],
         worker_result: dict[str, Any],
+        processed_correlation_ids: set[str] | None = None,
     ) -> dict[str, Any]:
         """Correlate asynchronous worker response with original published command.
 
-        Fails closed if correlation identifiers (correlation_id, bank_id, command_type, run_id)
-        do not match, preventing stale or cross-command metric leakage.
+        Fails closed if correlation identifiers (correlation_id, bank_id, command_type,
+        run_id, round_id, model_id) do not match, preventing stale or cross-command metric leakage.
+        Provides deterministic idempotency via processed_correlation_ids tracking.
         """
         cid = command_meta.get("correlation_id")
         w_cid = worker_result.get("correlation_id")
@@ -179,12 +181,50 @@ class KafkaBankConnector(BankConnectorInterface):
                 f"Correlation failed: run_id mismatch: expected '{run_id}', received '{w_run_id}'"
             )
 
+        round_id = command_meta.get("round_id")
+        w_round_id = worker_result.get("round_id")
+        if round_id is not None and w_round_id is not None and round_id != w_round_id:
+            raise ValueError(
+                f"Correlation failed: round_id mismatch: expected '{round_id}', received '{w_round_id}'"
+            )
+
+        model_id = command_meta.get("model_id")
+        w_model_id = worker_result.get("model_id")
+        if model_id and w_model_id and model_id != w_model_id:
+            raise ValueError(
+                f"Correlation failed: model_id mismatch: expected '{model_id}', received '{w_model_id}'"
+            )
+
+        # Deterministic idempotency: duplicate results do not double-apply metrics or state transitions
+        if processed_correlation_ids is not None and cid in processed_correlation_ids:
+            return {
+                "status": "DUPLICATE_IGNORED",
+                "delivery_status": KafkaDeliveryStatus.PROCESSED.value,
+                "correlation_id": cid,
+                "bank_id": bid,
+                "command_type": cmd_type,
+                "run_id": run_id,
+                "round_id": round_id,
+                "model_id": model_id,
+                "idempotent_duplicate": True,
+                "loss": None,
+                "metrics": None,
+                "num_samples": 0,
+            }
+
+        if processed_correlation_ids is not None:
+            processed_correlation_ids.add(cid)
+
         return {
             "status": "PROCESSED",
             "delivery_status": KafkaDeliveryStatus.PROCESSED.value,
             "correlation_id": cid,
             "bank_id": bid,
             "command_type": cmd_type,
+            "run_id": run_id,
+            "round_id": round_id,
+            "model_id": model_id,
+            "idempotent_duplicate": False,
             "loss": worker_result.get("loss"),
             "metrics": worker_result.get("metrics"),
             "num_samples": worker_result.get("num_samples"),
