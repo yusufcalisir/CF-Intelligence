@@ -18,7 +18,10 @@
       "affected_files": [
         "backend/app/application/services/federated_coordinator.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "CoordinatorService.aggregate_gradients",
+        "FederatedCoordinator.aggregate_weights"
+      ],
       "first_known_report": "Phase 1 Audit Report",
       "first_known_bad_commit_or_range": "pre-831fddb0",
       "fix_commit": "831fddb0",
@@ -48,7 +51,10 @@
       "affected_files": [
         "backend/app/infrastructure/security/secure_aggregation.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "SecureAggregation.mask_vector",
+        "SecureAggregation.aggregate_shares"
+      ],
       "first_known_report": "Phase 1 Audit Report",
       "first_known_bad_commit_or_range": "pre-831fddb0",
       "fix_commit": "831fddb0",
@@ -78,7 +84,10 @@
       "affected_files": [
         "backend/app/application/services/retraining_service.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "RetrainingService.trigger_retraining",
+        "RetrainingService._execute_training_job"
+      ],
       "first_known_report": "Phase 1 Audit Report",
       "first_known_bad_commit_or_range": "pre-831fddb0",
       "fix_commit": "831fddb0",
@@ -108,7 +117,10 @@
       "affected_files": [
         "backend/app/infrastructure/federated/flower_server.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "FlowerServer.start",
+        "FlowerServer._evaluate_round"
+      ],
       "first_known_report": "Phase 1 Audit Report",
       "first_known_bad_commit_or_range": "pre-831fddb0",
       "fix_commit": "831fddb0",
@@ -138,7 +150,10 @@
       "affected_files": [
         "backend/app/infrastructure/security/fhe_driver.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "FHEDriver.encrypt_weights",
+        "FHEDriver.decrypt_weights"
+      ],
       "first_known_report": "Phase 2 Audit Report",
       "first_known_bad_commit_or_range": "pre-8ada5090",
       "fix_commit": "8ada5090",
@@ -168,7 +183,10 @@
       "affected_files": [
         "backend/app/infrastructure/security/tee_driver.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "TEEDriver.generate_attestation_report",
+        "TEEDriver.verify_quote"
+      ],
       "first_known_report": "Phase 2 Audit Report",
       "first_known_bad_commit_or_range": "pre-8ada5090",
       "fix_commit": "8ada5090",
@@ -198,7 +216,10 @@
       "affected_files": [
         "backend/app/infrastructure/security/tokenization.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "TokenizationService.generate_hmac",
+        "TokenizationService.__init__"
+      ],
       "first_known_report": "Phase 2 Audit Report",
       "first_known_bad_commit_or_range": "pre-8ada5090",
       "fix_commit": "8ada5090",
@@ -227,7 +248,10 @@
       "affected_files": [
         "backend/app/infrastructure/security/fhe_driver.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "FHEDriver.verify_cryptographic_fhe",
+        "FHEDriver.encrypt_vector"
+      ],
       "first_known_report": "Phase 3 Closure Report",
       "first_known_bad_commit_or_range": "8ada5090..16a1f240",
       "fix_commit": "16a1f240",
@@ -256,7 +280,10 @@
       "affected_files": [
         "backend/app/infrastructure/security/fhe_driver.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "FHEDriver.serialize_keys",
+        "FHEDriver.export_context"
+      ],
       "first_known_report": "Phase 4 Review",
       "first_known_bad_commit_or_range": "16a1f240..f9b0816d",
       "fix_commit": "f9b0816d",
@@ -286,7 +313,10 @@
       "affected_files": [
         "backend/app/infrastructure/event_bus.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "EventBus.publish",
+        "EventBus._get_kafka_metadata"
+      ],
       "first_known_report": "Phase 2 Audit Report",
       "first_known_bad_commit_or_range": "pre-8ada5090",
       "fix_commit": "8ada5090",
@@ -316,7 +346,10 @@
       "affected_files": [
         "backend/app/infrastructure/connectors/kafka_connector.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "KafkaBankConnector.send_training_command",
+        "KafkaBankConnector.poll_results"
+      ],
       "first_known_report": "Phase 2 Audit Report",
       "first_known_bad_commit_or_range": "pre-8ada5090",
       "fix_commit": "8ada5090",
@@ -345,7 +378,9 @@
       "affected_files": [
         "backend/app/infrastructure/connectors/kafka_connector.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "KafkaBankConnector.correlate_worker_result"
+      ],
       "first_known_report": "Phase 3 Closure Report",
       "first_known_bad_commit_or_range": "8ada5090..16a1f240",
       "fix_commit": "16a1f240",
@@ -374,7 +409,10 @@
       "affected_files": [
         "backend/app/infrastructure/event_bus.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "EventBus.publish",
+        "EventBus.subscribe"
+      ],
       "first_known_report": "Phase 4 Review",
       "first_known_bad_commit_or_range": "16a1f240..f9b0816d",
       "fix_commit": "f9b0816d",
@@ -404,7 +442,10 @@
       "affected_files": [
         "backend/app/application/services/dataloader.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "DataLoader.load_dataset",
+        "DataLoader._fill_missing_labels"
+      ],
       "first_known_report": "Phase 2 Audit Report",
       "first_known_bad_commit_or_range": "pre-8ada5090",
       "fix_commit": "8ada5090",
@@ -435,7 +476,10 @@
         "experiments/credit_card/run_creditcard_benchmark.py",
         "experiments/credit_card/evaluate_thresholds.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "run_creditcard_benchmark.main",
+        "evaluate_thresholds.main"
+      ],
       "first_known_report": "Phase 2 Audit Report",
       "first_known_bad_commit_or_range": "historical",
       "fix_commit": "16a1f240",
@@ -503,7 +547,10 @@
       "affected_files": [
         "backend/app/application/services/graph_service.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "GraphService.extract_node_features",
+        "GraphFeatureExtractor.build_node_features"
+      ],
       "first_known_report": "Audit 1 Feature Inspection",
       "first_known_bad_commit_or_range": "pre-831fddb0",
       "fix_commit": "831fddb0",
@@ -532,7 +579,10 @@
       "affected_files": [
         "backend/app/application/services/streaming_service.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "StreamingService.process_transaction",
+        "StreamingService.update_node_risk"
+      ],
       "first_known_report": "Phase 2 Graph Review",
       "first_known_bad_commit_or_range": "pre-831fddb0",
       "fix_commit": "831fddb0",
@@ -561,7 +611,10 @@
       "affected_files": [
         "backend/app/application/services/graph_service.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "GraphService.apply_feature_mask",
+        "GraphService.load_graph"
+      ],
       "first_known_report": "Phase 2 Graph Review",
       "first_known_bad_commit_or_range": "pre-831fddb0",
       "fix_commit": "831fddb0",
@@ -591,7 +644,10 @@
       "affected_files": [
         "backend/app/application/services/model_registry.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "ModelRegistry.load_weights",
+        "ModelRegistry._read_checkpoint_file"
+      ],
       "first_known_report": "Audit 1 Report",
       "first_known_bad_commit_or_range": "pre-831fddb0",
       "fix_commit": "831fddb0",
@@ -620,7 +676,10 @@
       "affected_files": [
         "backend/app/application/services/dataloader.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "load_amlnet",
+        "DataLoader.load_amlnet"
+      ],
       "first_known_report": "Phase 3 Closure Report",
       "first_known_bad_commit_or_range": "8ada5090..16a1f240",
       "fix_commit": "16a1f240",
@@ -649,7 +708,10 @@
       "affected_files": [
         "backend/app/application/services/dataloader.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "load_amlsim",
+        "load_synthaml"
+      ],
       "first_known_report": "Phase 3 Closure Report",
       "first_known_bad_commit_or_range": "8ada5090..16a1f240",
       "fix_commit": "16a1f240",
@@ -678,7 +740,9 @@
       "affected_files": [
         "backend/app/application/services/dataloader.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "load_elliptic"
+      ],
       "first_known_report": "Phase 4 Review",
       "first_known_bad_commit_or_range": "16a1f240..f9b0816d",
       "fix_commit": "f9b0816d",
@@ -708,7 +772,10 @@
       "affected_files": [
         "backend/app/domain/metrics_service.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "compute_scientific_benchmark",
+        "metrics_service.safe_f1_score"
+      ],
       "first_known_report": "Phase 1 Audit Report",
       "first_known_bad_commit_or_range": "pre-831fddb0",
       "fix_commit": "831fddb0",
@@ -738,7 +805,10 @@
       "affected_files": [
         "backend/app/application/schemas/investigation.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "InvestigationResult.from_dict",
+        "InvestigationResult.validate"
+      ],
       "first_known_report": "Phase 1 Audit Report",
       "first_known_bad_commit_or_range": "pre-831fddb0",
       "fix_commit": "831fddb0",
@@ -768,7 +838,10 @@
       "affected_files": [
         "backend/app/application/services/graph_service.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "GraphService.normalize_adjacency",
+        "GraphEngine.compute_laplacian"
+      ],
       "first_known_report": "Phase 1 Audit Report",
       "first_known_bad_commit_or_range": "pre-831fddb0",
       "fix_commit": "831fddb0",
@@ -797,7 +870,10 @@
       "affected_files": [
         "experiments/credit_card/evaluate_thresholds.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "evaluate_thresholds.main",
+        "evaluate_thresholds.evaluate_model"
+      ],
       "first_known_report": "Phase 3 Closure Report",
       "first_known_bad_commit_or_range": "historical",
       "fix_commit": "16a1f240",
@@ -826,7 +902,11 @@
       "affected_files": [
         "backend/app/domain/metrics_service.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "compute_pr_auc",
+        "compute_pr_auc_with_status",
+        "safe_pr_auc_score"
+      ],
       "first_known_report": "Phase 4 Review",
       "first_known_bad_commit_or_range": "16a1f240..f9b0816d",
       "fix_commit": "HEAD (Current Residual Remediation)",
@@ -856,7 +936,10 @@
       "affected_files": [
         "backend/app/presentation/routers/banks.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "banks_router.register_bank",
+        "banks_router.verify_bank_mtls"
+      ],
       "first_known_report": "Phase 1 Audit Report",
       "first_known_bad_commit_or_range": "pre-831fddb0",
       "fix_commit": "831fddb0",
@@ -886,7 +969,10 @@
       "affected_files": [
         "backend/app/infrastructure/security/tokenization.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "TokenizationService.hash_identifier",
+        "TokenizationService._salt_rounds"
+      ],
       "first_known_report": "Phase 2 Audit Report",
       "first_known_bad_commit_or_range": "pre-8ada5090",
       "fix_commit": "8ada5090",
@@ -915,7 +1001,9 @@
       "affected_files": [
         "backend/app/presentation/routers/banks.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "banks_router.get_bank_nodes"
+      ],
       "first_known_report": "Phase 3 Closure Report",
       "first_known_bad_commit_or_range": "8ada5090..16a1f240",
       "fix_commit": "16a1f240",
@@ -944,7 +1032,9 @@
       "affected_files": [
         "backend/app/infrastructure/security/tee_driver.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "TEEDriver.generate_attestation_report"
+      ],
       "first_known_report": "Phase 4 Review",
       "first_known_bad_commit_or_range": "16a1f240..f9b0816d",
       "fix_commit": "f9b0816d",
@@ -973,7 +1063,10 @@
       "affected_files": [
         "backend/app/infrastructure/event_bus.py"
       ],
-      "affected_functions": [],
+      "affected_functions": [
+        "EventBus._log_warning",
+        "EventBus.publish"
+      ],
       "first_known_report": "Phase 3 Closure Report",
       "first_known_bad_commit_or_range": "8ada5090..16a1f240",
       "fix_commit": "16a1f240",
@@ -1034,7 +1127,8 @@
         "backend/app/application/services/model_registry.py"
       ],
       "affected_functions": [
-        "ShadowDeploymentEvaluationEngine.evaluate_and_route"
+        "ModelEvaluationEngine.evaluate_performance",
+        "ModelRegistry.evaluate_and_route"
       ],
       "first_known_report": "Phase 1 Runtime Truth Audit Report",
       "first_known_bad_commit_or_range": "pre-d4a81a99",
@@ -1065,7 +1159,7 @@
         "backend/app/application/services/model_governance_service.py"
       ],
       "affected_functions": [
-        "CanaryQualityGate.evaluate_candidate_for_canary_deployment"
+        "ModelGovernanceService.evaluate_canary_gate"
       ],
       "first_known_report": "Phase 1 Runtime Truth Audit Report",
       "first_known_bad_commit_or_range": "pre-d4a81a99",
@@ -1097,7 +1191,8 @@
         "backend/app/application/services/metrics_service.py"
       ],
       "affected_functions": [
-        "ModelService.evaluate"
+        "compute_roc_auc_with_status",
+        "safe_roc_auc_score"
       ],
       "first_known_report": "Phase 1 Audit Report",
       "first_known_bad_commit_or_range": "pre-831fddb0",
@@ -1128,7 +1223,7 @@
         "backend/app/tasks/simulation_tasks.py"
       ],
       "affected_functions": [
-        "execute_automated_retraining_task"
+        "simulation_tasks.execute_automated_retraining_task"
       ],
       "first_known_report": "Phase 1 Runtime Truth Audit Report",
       "first_known_bad_commit_or_range": "pre-831fddb0",
@@ -1159,7 +1254,7 @@
         "backend/app/application/services/auto_rollback.py"
       ],
       "affected_functions": [
-        "AutoRollbackService.evaluate_health_and_rollback"
+        "AutoRollbackService.evaluate_health_metrics"
       ],
       "first_known_report": "Phase 1 Runtime Truth Audit Report",
       "first_known_bad_commit_or_range": "pre-d4a81a99",
@@ -1190,7 +1285,7 @@
         "backend/app/application/services/automated_retraining.py"
       ],
       "affected_functions": [
-        "DriftTriggeredRetrainingService.evaluate_drift_and_trigger"
+        "AutomatedRetrainingService.evaluate_drift_and_trigger"
       ],
       "first_known_report": "Phase 1 Runtime Truth Audit Report",
       "first_known_bad_commit_or_range": "pre-d4a81a99",
@@ -1222,8 +1317,8 @@
         "backend/app/application/services/coordinator_service.py"
       ],
       "affected_functions": [
-        "lifespan",
-        "seed_mock_data",
+        "main.lifespan",
+        "main.seed_mock_data",
         "CoordinatorService.__init__"
       ],
       "first_known_report": "Phase 1 Runtime Truth Audit Report",
@@ -1255,7 +1350,8 @@
         "backend/app/application/services/flower_engine.py"
       ],
       "affected_functions": [
-        "FlowerFLEngine.run_simulation"
+        "FlowerEngine.execute_federated_round",
+        "FlowerEngine._fallback_to_native"
       ],
       "first_known_report": "Phase 1 Runtime Truth Audit Report",
       "first_known_bad_commit_or_range": "pre-d4a81a99",

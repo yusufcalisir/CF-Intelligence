@@ -1473,11 +1473,31 @@ def test_kafka_correlation_multi_dimensional_identity_and_idempotency() -> None:
     with pytest.raises(ValueError, match="model_version mismatch"):
         KafkaBankConnector.correlate_worker_result(cmd_meta_ver, worker_wrong_ver)
 
+    # Case E2: Expected model_version omitted by worker -> Fail Closed
+    worker_missing_ver = {**valid_worker}  # no model_version
+    with pytest.raises(ValueError, match="model_version mismatch"):
+        KafkaBankConnector.correlate_worker_result(cmd_meta_ver, worker_missing_ver)
+
+    # Case E3: Unexpected worker model_version when none expected -> Fail Closed
+    worker_unexpected_ver = {**valid_worker, "model_version": 1}
+    with pytest.raises(ValueError, match="unexpected worker model_version"):
+        KafkaBankConnector.correlate_worker_result(cmd_meta, worker_unexpected_ver)
+
     # Case F: Checkpoint ID mismatch -> Fail Closed
     cmd_meta_ckpt = {**cmd_meta, "checkpoint_id": "ckpt-r3-init"}
     worker_wrong_ckpt = {**valid_worker, "checkpoint_id": "ckpt-r2-stale"}
     with pytest.raises(ValueError, match="checkpoint_id mismatch"):
         KafkaBankConnector.correlate_worker_result(cmd_meta_ckpt, worker_wrong_ckpt)
+
+    # Case F2: Expected checkpoint_id omitted by worker -> Fail Closed
+    worker_missing_ckpt = {**valid_worker}  # no checkpoint_id
+    with pytest.raises(ValueError, match="checkpoint_id mismatch"):
+        KafkaBankConnector.correlate_worker_result(cmd_meta_ckpt, worker_missing_ckpt)
+
+    # Case F3: Unexpected worker checkpoint_id when none expected -> Fail Closed
+    worker_unexpected_ckpt = {**valid_worker, "checkpoint_id": "ckpt-r1"}
+    with pytest.raises(ValueError, match="unexpected worker checkpoint_id"):
+        KafkaBankConnector.correlate_worker_result(cmd_meta, worker_unexpected_ckpt)
 
     # Case G: Process restart redelivery (new process-local set)
     restart_processed_set: set[str] = set()

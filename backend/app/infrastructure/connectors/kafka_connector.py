@@ -197,16 +197,26 @@ class KafkaBankConnector(BankConnectorInterface):
 
         model_version = command_meta.get("model_version")
         w_model_version = worker_result.get("model_version")
-        if model_version is not None and w_model_version is not None and model_version != w_model_version:
+        if model_version is not None:
+            if w_model_version is None or model_version != w_model_version:
+                raise ValueError(
+                    f"Correlation failed: model_version mismatch: expected '{model_version}', received '{w_model_version}'"
+                )
+        elif w_model_version is not None:
             raise ValueError(
-                f"Correlation failed: model_version mismatch: expected '{model_version}', received '{w_model_version}'"
+                f"Correlation failed: unexpected worker model_version: received '{w_model_version}', none expected"
             )
 
         checkpoint_id = command_meta.get("checkpoint_id")
         w_checkpoint_id = worker_result.get("checkpoint_id")
-        if checkpoint_id and w_checkpoint_id and checkpoint_id != w_checkpoint_id:
+        if checkpoint_id:
+            if not w_checkpoint_id or checkpoint_id != w_checkpoint_id:
+                raise ValueError(
+                    f"Correlation failed: checkpoint_id mismatch: expected '{checkpoint_id}', received '{w_checkpoint_id}'"
+                )
+        elif w_checkpoint_id:
             raise ValueError(
-                f"Correlation failed: checkpoint_id mismatch: expected '{checkpoint_id}', received '{w_checkpoint_id}'"
+                f"Correlation failed: unexpected worker checkpoint_id: received '{w_checkpoint_id}', none expected"
             )
 
         # Scoped as PROCESS_LOCAL_DUPLICATE_SUPPRESSION: in-memory duplicate suppression within process lifetime
