@@ -163,27 +163,45 @@ class ThoughtMachineConnector(BaseBankConnector):
         postings = posting_data.get("postings") or []
         if postings:
             # A double-entry transfer has debtor and creditor postings
-            debtor_acc = "ACC_UNKNOWN"
-            creditor_acc = "ACC_UNKNOWN"
+            debtor_acc: str | None = None
+            creditor_acc: str | None = None
             amount = 0.0
             currency = "EUR"
 
             for post in postings:
-                acc = post.get("account_id", "ACC_UNKNOWN")
+                acc = post.get("account_id")
+                if not acc or str(acc).strip() in ("", "ACC_UNKNOWN", "UNKNOWN"):
+                    logger.warning("Posting in instruction %s missing account_id", instruction_id)
+                    return None
+                clean_acc = str(acc).strip()
+                if "amount" not in post or post.get("amount") is None:
+                    logger.warning("Posting in instruction %s missing required amount", instruction_id)
+                    return None
                 try:
-                    val = float(post.get("amount", 0.0))
-                    raw_amt = val if math.isfinite(val) else 0.0
+                    val = float(post["amount"])
                 except (ValueError, TypeError):
-                    raw_amt = 0.0
+                    logger.warning("Posting in instruction %s has invalid amount: %s", instruction_id, post.get("amount"))
+                    return None
+                if not math.isfinite(val) or val <= 0.0:
+                    logger.warning("Posting in instruction %s has non-positive or non-finite amount: %s", instruction_id, val)
+                    return None
+                raw_amt = val
                 currency = post.get("denomination", "EUR")
                 is_credit = bool(post.get("credit", False))
 
                 if is_credit:
-                    creditor_acc = acc
+                    creditor_acc = clean_acc
                     amount = max(amount, raw_amt)
                 else:
-                    debtor_acc = acc
+                    debtor_acc = clean_acc
                     amount = max(amount, raw_amt)
+
+            if not debtor_acc or not creditor_acc:
+                logger.warning("Posting instruction %s missing debtor or creditor account", instruction_id)
+                return None
+            if amount <= 0.0:
+                logger.warning("Posting instruction %s has non-positive evaluated amount: %s", instruction_id, amount)
+                return None
 
             raw_ts = (
                 posting_data.get("value_timestamp")
@@ -193,16 +211,19 @@ class ThoughtMachineConnector(BaseBankConnector):
             )
             event_time = self._parse_vault_timestamp(raw_ts)
 
+            origin_country = debtor_acc[:2].upper() if len(debtor_acc) >= 2 and debtor_acc[:2].isalpha() else None
+            destination_country = creditor_acc[:2].upper() if len(creditor_acc) >= 2 and creditor_acc[:2].isalpha() else None
+
             return NormalizedTransaction(
                 transaction_id=str(instruction_id),
-                account_id=str(debtor_acc),
-                counterparty_account_id=str(creditor_acc),
-                amount=max(0.01, amount),
+                account_id=debtor_acc,
+                counterparty_account_id=creditor_acc,
+                amount=amount,
                 currency=currency,
                 timestamp=event_time,
                 merchant_category_code=str(posting_data.get("mcc", "6011")),
-                origin_country="GB",
-                destination_country="GB",
+                origin_country=origin_country,
+                destination_country=destination_country,
                 device_fingerprint=str(posting_data.get("device_id", "")),
                 ip_subnet="172.16.0.0/16",
                 channel_type="ONLINE",
@@ -210,13 +231,31 @@ class ThoughtMachineConnector(BaseBankConnector):
             )
         else:
             # Single-leg or direct instruction representation
-            account_id = posting_data.get("account_id") or inst.get("account_id") or "ACC_UNKNOWN"
-            target_account = posting_data.get("target_account_id") or f"tm_cpty_{account_id[-6:]}"
+            raw_acc = posting_data.get("account_id") or inst.get("account_id")
+            if not raw_acc or str(raw_acc).strip() in ("", "ACC_UNKNOWN", "UNKNOWN"):
+                logger.warning("Instruction %s missing account_id", instruction_id)
+                return None
+            account_id = str(raw_acc).strip()
+
+            raw_target = posting_data.get("target_account_id") or inst.get("target_account_id")
+            if not raw_target or str(raw_target).strip() in ("", "ACC_UNKNOWN", "UNKNOWN"):
+                logger.warning("Instruction %s missing target_account_id", instruction_id)
+                return None
+            target_account = str(raw_target).strip()
+
+            raw_amt_val = posting_data.get("amount") if "amount" in posting_data else inst.get("amount")
+            if raw_amt_val is None:
+                logger.warning("Instruction %s missing required amount", instruction_id)
+                return None
             try:
-                val = float(posting_data.get("amount") or inst.get("amount") or 100.0)
-                amount = val if math.isfinite(val) else 100.0
+                val = float(raw_amt_val)
             except (ValueError, TypeError):
-                amount = 100.0
+                logger.warning("Instruction %s has invalid amount: %s", instruction_id, raw_amt_val)
+                return None
+            if not math.isfinite(val) or val <= 0.0:
+                logger.warning("Instruction %s has non-positive or non-finite amount: %s", instruction_id, val)
+                return None
+            amount = val
             currency = posting_data.get("denomination") or inst.get("currency") or "EUR"
 
             raw_ts = (
@@ -227,16 +266,19 @@ class ThoughtMachineConnector(BaseBankConnector):
             )
             event_time = self._parse_vault_timestamp(raw_ts)
 
+            origin_country = account_id[:2].upper() if len(account_id) >= 2 and account_id[:2].isalpha() else None
+            destination_country = target_account[:2].upper() if len(target_account) >= 2 and target_account[:2].isalpha() else None
+
             return NormalizedTransaction(
                 transaction_id=str(instruction_id),
-                account_id=str(account_id),
-                counterparty_account_id=str(target_account),
-                amount=max(0.01, amount),
+                account_id=account_id,
+                counterparty_account_id=target_account,
+                amount=amount,
                 currency=currency,
                 timestamp=event_time,
                 merchant_category_code="6011",
-                origin_country="GB",
-                destination_country="GB",
+                origin_country=origin_country,
+                destination_country=destination_country,
                 device_fingerprint="",
                 ip_subnet="172.16.0.0/16",
                 channel_type="ONLINE",
@@ -250,11 +292,12 @@ class ThoughtMachineConnector(BaseBankConnector):
         reason: str,
         idempotency_token: str | None = None,
         reference_id: str | None = None,
+        simulation: bool = False,
     ) -> dict[str, Any]:
         """Dispatches an outbound provisional account restriction/hold to Vault Core.
 
         Calls Thought Machine Vault Core API to apply an account restriction.
-        If live endpoint is offline or credentials not set, executes resilient simulated confirmation.
+        If live endpoint fails or credentials missing, records authentic failure without fake success.
         """
         token = idempotency_token or f"idemp_tm_{uuid.uuid4().hex}"
         if token in self._idempotency_cache:
@@ -266,7 +309,6 @@ class ThoughtMachineConnector(BaseBankConnector):
         hold_id = f"tm_rst_{uuid.uuid4().hex[:12]}"
         applied_at = datetime.now(UTC).isoformat()
         hold_record: dict[str, Any] = {
-            "status": "RESTRICTION_COMMITTED",
             "provider": "THOUGHT_MACHINE",
             "hold_id": hold_id,
             "account_id": account_id,
@@ -278,8 +320,14 @@ class ThoughtMachineConnector(BaseBankConnector):
             "audit_hash": hashlib.sha256(f"{hold_id}:{account_id}:{amount}:{applied_at}".encode()).hexdigest(),
         }
 
-        # Attempt live API dispatch if API key is provided and base_url is configured
-        if self.api_key and "vault-core.internal" not in self.base_url:
+        if simulation:
+            hold_record["status"] = "SIMULATION_RESULT"
+            hold_record["external_status"] = "SIMULATED_LOOPBACK"
+        elif not self.api_key:
+            logger.error("Thought Machine restriction failed: missing API credentials for live operation")
+            hold_record["status"] = "RESTRICTION_FAILED"
+            hold_record["external_status"] = "AUTHENTICATION_FAILED"
+        else:
             try:
                 async with httpx.AsyncClient(timeout=3.0) as client:
                     resp = await client.post(
@@ -296,16 +344,21 @@ class ThoughtMachineConnector(BaseBankConnector):
                         },
                     )
                     if resp.status_code in (200, 201):
+                        hold_record["status"] = "RESTRICTION_COMMITTED"
                         hold_record["external_status"] = "SYNCED_HTTP_201"
+                    else:
+                        logger.error("Thought Machine HTTP dispatch returned error status: %d", resp.status_code)
+                        hold_record["status"] = "RESTRICTION_FAILED"
+                        hold_record["external_status"] = f"DISPATCH_FAILED_HTTP_{resp.status_code}"
             except Exception as exc:
-                logger.warning("Live Thought Machine HTTP dispatch failed, falling back to simulated hold: %s", exc)
-                hold_record["external_status"] = "SIMULATED_LOOPBACK"
-        else:
-            hold_record["external_status"] = "SIMULATED_LOOPBACK"
+                logger.error("Live Thought Machine HTTP dispatch failed: %s", exc)
+                hold_record["status"] = "RESTRICTION_FAILED"
+                hold_record["external_status"] = "DISPATCH_FAILED_UNREACHABLE"
 
         self._idempotency_cache.add(token)
         self._audit_restrictions.append(hold_record)
-        self._holds_dispatched += 1
+        if hold_record["status"] in ("RESTRICTION_COMMITTED", "SIMULATION_RESULT"):
+            self._holds_dispatched += 1
         return hold_record
 
     def consume_stream(self) -> Generator[NormalizedTransaction, None, None]:
@@ -327,6 +380,16 @@ class ThoughtMachineConnector(BaseBankConnector):
 
     def health_check(self) -> dict[str, Any]:
         """Returns Thought Machine connector telemetry, mode, and connectivity health."""
+        cb_state = self.circuit_breaker.state
+        if cb_state == "OPEN":
+            status_val = "UNAVAILABLE"
+        elif cb_state == "HALF_OPEN":
+            status_val = "DEGRADED"
+        elif not self.api_key:
+            status_val = "AUTHENTICATION_UNAVAILABLE"
+        else:
+            status_val = "HEALTHY"
+
         return {
             "connector": "ThoughtMachineConnector",
             "provider": "THOUGHT_MACHINE",
@@ -335,8 +398,8 @@ class ThoughtMachineConnector(BaseBankConnector):
             "events_ingested": self._events_ingested,
             "holds_dispatched": self._holds_dispatched,
             "buffer_depth": len(self._buffer),
-            "circuit_breaker": self.circuit_breaker.state,
-            "status": "HEALTHY",
+            "circuit_breaker": cb_state,
+            "status": status_val,
         }
 
     # Stubs satisfying BankConnectorInterface

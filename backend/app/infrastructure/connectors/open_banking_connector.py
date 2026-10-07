@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import os
 import time
 import uuid
@@ -23,6 +24,10 @@ logger = logging.getLogger(__name__)
 MAX_RATE_LIMIT_RETRIES = 3
 
 
+class AuthenticationError(RuntimeError):
+    """Raised when OAuth2 token acquisition fails or token is missing."""
+
+
 class OpenBankingConnector(BaseBankConnector):
     """Connector for querying Berlin Group NextGenPSD2 / UK Open Banking endpoints and mapping payloads into NormalizedTransaction streams."""
 
@@ -35,6 +40,7 @@ class OpenBankingConnector(BaseBankConnector):
         client_secret: str = "tpp_demo_secret_key",
         token_url: str = "https://sandbox.berlingroup.org/oauth/token",
         tpp_signature_key: str = "",
+        access_token: str | None = None,
     ) -> None:
         app_env = os.getenv("APP_ENV", "development").lower()
         if not base_url:
@@ -53,8 +59,12 @@ class OpenBankingConnector(BaseBankConnector):
         self.client_secret = client_secret
         self.token_url = token_url
         self.tpp_signature_key = tpp_signature_key
-        self._cached_token: str | None = None
-        self._token_expires_at: float = 0.0
+        if access_token:
+            self._cached_token = access_token
+            self._token_expires_at = float("inf")
+        else:
+            self._cached_token = None
+            self._token_expires_at = 0.0
         self._buffered_transactions: list[NormalizedTransaction] = []
 
     def _get_oauth2_token(self, force_refresh: bool = False) -> str:
@@ -64,9 +74,7 @@ class OpenBankingConnector(BaseBankConnector):
             return self._cached_token
 
         if not self.token_url:
-            self._cached_token = "psd2_bearer_token_12345"
-            self._token_expires_at = now + 3600.0
-            return self._cached_token
+            raise AuthenticationError("OAuth2 token_url is not configured and no access_token provided.")
 
         try:
             resp = httpx.post(
@@ -77,20 +85,21 @@ class OpenBankingConnector(BaseBankConnector):
             )
             if resp.status_code == 200:
                 data = resp.json()
-                self._cached_token = data.get("access_token", "psd2_bearer_token_12345")
+                token = data.get("access_token")
+                if not token:
+                    raise AuthenticationError("OAuth2 token endpoint returned HTTP 200 but 'access_token' is missing.")
+                self._cached_token = str(token)
                 expires_in = float(data.get("expires_in", 3600))
                 self._token_expires_at = now + expires_in
                 return self._cached_token
+            raise AuthenticationError(
+                f"OAuth2 token request failed with HTTP {resp.status_code}: {resp.text}"
+            )
+        except AuthenticationError:
+            raise
         except Exception as err:
-            logger.warning("OAuth2 token endpoint unreachable (%s) -> using configured token", err)
-            if os.getenv("APP_ENV") == "production":
-                raise RuntimeError(
-                    "Production Open Banking OAuth2 authentication failed. Fallback tokens disabled in production."
-                ) from err
-
-        self._cached_token = f"psd2_token_{uuid.uuid4().hex[:12]}"
-        self._token_expires_at = now + 3600.0
-        return self._cached_token
+            logger.warning("OAuth2 token endpoint unreachable (%s)", err)
+            raise AuthenticationError(f"OAuth2 token endpoint unreachable: {err}") from err
 
     def _refresh_token_if_expiring(self) -> None:
         """Proactively refresh OAuth2 token if less than 5 minutes (300s) remain before expiry."""
@@ -169,19 +178,43 @@ class OpenBankingConnector(BaseBankConnector):
         for idx, item in enumerate(raw_items):
             tx_id = str(item.get("transactionId") or item.get("entryReference") or f"psd2_tx_{idx}")
 
-            debtor_acc = item.get("debtorAccount", {})
-            debtor_iban = str(
-                debtor_acc.get("iban") or debtor_acc.get("bban") or "DE89370400440532013000"
-            )
+            debtor_acc = item.get("debtorAccount")
+            if not isinstance(debtor_acc, dict):
+                debtor_acc = {}
+            debtor_iban = debtor_acc.get("iban") or debtor_acc.get("bban")
+            if not debtor_iban or not str(debtor_iban).strip():
+                raise ValueError(f"OpenBanking PSD2 transaction {tx_id} missing required debtor account identity")
+            debtor_iban = str(debtor_iban).strip()
 
-            creditor_acc = item.get("creditorAccount", {})
-            creditor_iban = str(
-                creditor_acc.get("iban") or creditor_acc.get("bban") or "DE89370400440532013999"
-            )
+            creditor_acc = item.get("creditorAccount")
+            if not isinstance(creditor_acc, dict):
+                creditor_acc = {}
+            creditor_iban = creditor_acc.get("iban") or creditor_acc.get("bban")
+            if not creditor_iban or not str(creditor_iban).strip():
+                raise ValueError(f"OpenBanking PSD2 transaction {tx_id} missing required creditor account identity")
+            creditor_iban = str(creditor_iban).strip()
 
-            amt_obj = item.get("transactionAmount", {})
-            amount = float(amt_obj.get("amount", 0.0) or item.get("amount", 100.0))
-            currency = str(amt_obj.get("currency") or item.get("currency") or "EUR")
+            amt_obj = item.get("transactionAmount")
+            if not isinstance(amt_obj, dict):
+                amt_obj = {}
+            raw_amt = amt_obj.get("amount") if "amount" in amt_obj else item.get("amount")
+            if raw_amt is None:
+                raise ValueError(f"OpenBanking PSD2 transaction {tx_id} missing required transaction amount")
+            try:
+                amt_float = float(raw_amt)
+            except (ValueError, TypeError) as err:
+                raise ValueError(f"OpenBanking PSD2 transaction {tx_id} has invalid non-numeric amount: {raw_amt}") from err
+            if not math.isfinite(amt_float):
+                raise ValueError(f"OpenBanking PSD2 transaction {tx_id} amount must be finite, got: {amt_float}")
+            if amt_float <= 0.0:
+                raise ValueError(f"OpenBanking PSD2 transaction {tx_id} amount must be strictly positive, got: {amt_float}")
+            amount = amt_float
+
+            currency = amt_obj.get("currency") or item.get("currency")
+            if not currency or not str(currency).strip():
+                currency = "EUR"
+            else:
+                currency = str(currency).strip().upper()
 
             date_str = (
                 item.get("bookingDate") or item.get("bookingDateTime") or item.get("valueDate")
@@ -194,18 +227,25 @@ class OpenBankingConnector(BaseBankConnector):
             else:
                 ts = datetime.now(UTC)
 
-            mcc = str(item.get("merchantCategoryCode") or "5999")
+            raw_mcc = item.get("merchantCategoryCode")
+            if raw_mcc is not None and str(raw_mcc).strip():
+                mcc = str(raw_mcc).strip()
+            else:
+                mcc = "0000"
+
+            origin_country = debtor_iban[:2].upper() if len(debtor_iban) >= 2 and debtor_iban[:2].isalpha() else None
+            destination_country = creditor_iban[:2].upper() if len(creditor_iban) >= 2 and creditor_iban[:2].isalpha() else None
 
             tx = NormalizedTransaction(
                 transaction_id=tx_id,
                 account_id=debtor_iban,
                 counterparty_account_id=creditor_iban,
-                amount=abs(amount),
+                amount=amount,
                 currency=currency,
                 timestamp=ts,
                 merchant_category_code=mcc,
-                origin_country="DE",
-                destination_country="DE",
+                origin_country=origin_country,
+                destination_country=destination_country,
                 device_fingerprint=str(item.get("deviceFingerprint", "")),
                 ip_subnet="192.168.1.0/24",
                 channel_type="OPEN_BANKING_PSD2",
@@ -217,11 +257,13 @@ class OpenBankingConnector(BaseBankConnector):
 
     def fetch_account_transactions(
         self,
-        account_id: str = "DE89370400440532013000",
+        account_id: str,
         date_from: str | None = None,
         date_to: str | None = None,
     ) -> list[NormalizedTransaction]:
         """Queries the sandbox /v1/accounts/{account_id}/transactions REST endpoint with 429 retry handling."""
+        if not account_id or not account_id.strip():
+            raise ValueError("account_id is required to fetch Open Banking transactions")
         self._refresh_token_if_expiring()
 
         url = f"{self.base_url}/accounts/{account_id}/transactions"
@@ -232,7 +274,6 @@ class OpenBankingConnector(BaseBankConnector):
             params["dateTo"] = date_to
 
         headers = self._get_headers()
-
         try:
             resp = self._handle_rate_limit_and_execute(
                 lambda: httpx.get(url, headers=headers, params=params, timeout=5.0)
@@ -240,36 +281,10 @@ class OpenBankingConnector(BaseBankConnector):
             if resp.status_code == 200:
                 payload = resp.json()
                 return self.parse_psd2_payload(payload)
+            raise RuntimeError(f"PSD2 API returned non-200 status code: {resp.status_code}")
         except Exception as err:
-            logger.warning("PSD2 API request failed (%s) -> using fallback sample payload", err)
-
-        # Fallback sample response matching Berlin Group schema
-        sample_payload = {
-            "accounts": {"iban": account_id},
-            "transactions": {
-                "booked": [
-                    {
-                        "transactionId": f"psd2_booked_{uuid.uuid4().hex[:8]}",
-                        "debtorAccount": {"iban": account_id},
-                        "creditorAccount": {"iban": "DE89370400440532013999"},
-                        "transactionAmount": {"amount": "250.00", "currency": "EUR"},
-                        "bookingDate": datetime.now(UTC).isoformat(),
-                        "merchantCategoryCode": "5411",
-                    }
-                ],
-                "pending": [
-                    {
-                        "transactionId": f"psd2_pending_{uuid.uuid4().hex[:8]}",
-                        "debtorAccount": {"iban": account_id},
-                        "creditorAccount": {"iban": "DE89370400440532013777"},
-                        "transactionAmount": {"amount": "89.50", "currency": "EUR"},
-                        "bookingDate": datetime.now(UTC).isoformat(),
-                        "merchantCategoryCode": "5999",
-                    }
-                ],
-            },
-        }
-        return self.parse_psd2_payload(sample_payload)
+            logger.error("PSD2 API request failed for account %s: %s", account_id, err)
+            raise RuntimeError(f"PSD2 API request failed for account {account_id}: {err}") from err
 
     def parse_batch(self, payload: Any) -> list[NormalizedTransaction]:
         """Parses batch payloads from JSON dict, JSON string, bytes, or httpx.Response objects."""

@@ -140,20 +140,32 @@ class TestMambuConnector:
             )
 
     @pytest.mark.asyncio
-    async def test_mambu_provisional_hold_dispatch(self, mambu_connector: MambuConnector) -> None:
+    async def test_mambu_provisional_hold_dispatch_simulation(self, mambu_connector: MambuConnector) -> None:
         record = await mambu_connector.apply_provisional_hold(
             account_id="ACC_TARGET_1234",
             amount=8500.0,
             reason="High velocity smurfing suspicion",
             reference_id="TICKET_FININT_4401",
+            simulation=True,
         )
-        assert record["status"] == "HOLD_APPLIED"
+        assert record["status"] == "SIMULATION_RESULT"
         assert record["provider"] == "MAMBU"
         assert record["account_id"] == "ACC_TARGET_1234"
         assert record["amount"] == 8500.0
         assert record["reference_id"] == "TICKET_FININT_4401"
         assert len(record["audit_hash"]) == 64
         assert record["external_status"] == "SIMULATED_LOOPBACK"
+
+    @pytest.mark.asyncio
+    async def test_mambu_provisional_hold_live_missing_creds(self, mambu_connector: MambuConnector) -> None:
+        record = await mambu_connector.apply_provisional_hold(
+            account_id="ACC_TARGET_1234",
+            amount=8500.0,
+            reason="Live hold attempt without credentials",
+            simulation=False,
+        )
+        assert record["status"] == "HOLD_FAILED"
+        assert record["external_status"] == "AUTHENTICATION_FAILED"
 
     @pytest.mark.asyncio
     async def test_mambu_hold_idempotency_deduplication(self, mambu_connector: MambuConnector) -> None:
@@ -163,6 +175,7 @@ class TestMambuConnector:
             amount=500.0,
             reason="Test deduplication",
             idempotency_token=token,
+            simulation=True,
         )
         assert r1.get("deduplicated") is not True
 
@@ -171,6 +184,7 @@ class TestMambuConnector:
             amount=500.0,
             reason="Test deduplication",
             idempotency_token=token,
+            simulation=True,
         )
         assert r2.get("deduplicated") is True
         assert r2["hold_id"] == r1["hold_id"]
@@ -189,10 +203,19 @@ class TestMambuConnector:
         assert len(stream_items) == 2
 
     def test_mambu_connector_health(self, mambu_connector: MambuConnector) -> None:
+        mambu_connector.api_key = "test_key"
         health = mambu_connector.health_check()
         assert health["connector"] == "MambuConnector"
         assert health["status"] == "HEALTHY"
         assert health["circuit_breaker"] == "CLOSED"
+
+        mambu_connector.api_key = ""
+        health_unauth = mambu_connector.health_check()
+        assert health_unauth["status"] == "AUTHENTICATION_UNAVAILABLE"
+
+        mambu_connector.circuit_breaker.state = "OPEN"
+        health_unavail = mambu_connector.health_check()
+        assert health_unavail["status"] == "UNAVAILABLE"
 
 
 # ── 2. Thought Machine Connector Ingestion & Security Tests ───────────────────
@@ -271,12 +294,28 @@ class TestThoughtMachineConnector:
             amount=12000.0,
             reason="Unusual mule account burst activity",
             reference_id="ALERT_ML_0019",
+            simulation=True,
         )
-        assert record["status"] == "RESTRICTION_COMMITTED"
+        assert record["status"] == "SIMULATION_RESULT"
+        assert record["external_status"] == "SIMULATED_LOOPBACK"
         assert record["provider"] == "THOUGHT_MACHINE"
         assert record["account_id"] == "ACC_VAULT_DEBTOR_88"
         assert record["amount"] == 12000.0
         assert len(record["audit_hash"]) == 64
+
+    @pytest.mark.asyncio
+    async def test_thought_machine_provisional_restriction_live_missing_creds(
+        self,
+        thought_machine_connector: ThoughtMachineConnector,
+    ) -> None:
+        record = await thought_machine_connector.apply_provisional_hold(
+            account_id="ACC_VAULT_DEBTOR_88",
+            amount=12000.0,
+            reason="Live test without credentials",
+            simulation=False,
+        )
+        assert record["status"] == "RESTRICTION_FAILED"
+        assert record["external_status"] == "AUTHENTICATION_FAILED"
 
     @pytest.mark.asyncio
     async def test_thought_machine_restriction_idempotency(
@@ -289,6 +328,7 @@ class TestThoughtMachineConnector:
             amount=300.0,
             reason="Deduplication test",
             idempotency_token=token,
+            simulation=True,
         )
         assert r1.get("deduplicated") is not True
 
@@ -297,6 +337,7 @@ class TestThoughtMachineConnector:
             amount=300.0,
             reason="Deduplication test",
             idempotency_token=token,
+            simulation=True,
         )
         assert r2.get("deduplicated") is True
         assert r2["hold_id"] == r1["hold_id"]
@@ -305,9 +346,18 @@ class TestThoughtMachineConnector:
         self,
         thought_machine_connector: ThoughtMachineConnector,
     ) -> None:
+        thought_machine_connector.api_key = "test_key"
         health = thought_machine_connector.health_check()
         assert health["connector"] == "ThoughtMachineConnector"
         assert health["status"] == "HEALTHY"
+
+        thought_machine_connector.api_key = ""
+        health_unauth = thought_machine_connector.health_check()
+        assert health_unauth["status"] == "AUTHENTICATION_UNAVAILABLE"
+
+        thought_machine_connector.circuit_breaker.state = "OPEN"
+        health_unavail = thought_machine_connector.health_check()
+        assert health_unavail["status"] == "UNAVAILABLE"
 
 
 # ── 3. Core Banking Gateway REST Router & Dual Prefix Tests ───────────────────
@@ -386,38 +436,68 @@ class TestCoreBankingGatewayRouter:
         assert res.status_code == 200
         assert res.json()["status"] == "ACCEPTED"
 
-    def test_provisional_hold_endpoint_mambu_success(self) -> None:
+    def test_provisional_hold_endpoint_mambu_simulation(self) -> None:
         hold_req = {
             "account_id": "ACC_RESTRICT_MAMBU",
             "amount": 7500.0,
             "reason": "Layering pattern detected across 3 consortium banks",
             "provider": "mambu",
             "reference_ticket_id": "CASE_9901",
+            "simulation": True,
         }
         res = client.post("/connectors/core-banking/holds/provisional", json=hold_req)
         assert res.status_code == 201
         data = res.json()
-        assert data["status"] == "HOLD_APPLIED"
+        assert data["status"] == "SIMULATION_RESULT"
+        assert data["external_status"] == "SIMULATED_LOOPBACK"
         assert data["provider"] == "MAMBU"
         assert data["account_id"] == "ACC_RESTRICT_MAMBU"
         assert data["amount"] == 7500.0
         assert len(data["audit_hash"]) == 64
 
-    def test_provisional_hold_endpoint_thought_machine_success(self) -> None:
+    def test_provisional_hold_endpoint_mambu_live_failure_fails_closed(self) -> None:
+        hold_req = {
+            "account_id": "ACC_RESTRICT_MAMBU",
+            "amount": 7500.0,
+            "reason": "Layering pattern detected across 3 consortium banks",
+            "provider": "mambu",
+            "reference_ticket_id": "CASE_9901",
+            "simulation": False,
+        }
+        res = client.post("/connectors/core-banking/holds/provisional", json=hold_req)
+        assert res.status_code == 503
+        assert "Core banking provisional hold failed" in res.json()["detail"]
+
+    def test_provisional_hold_endpoint_thought_machine_simulation(self) -> None:
         hold_req = {
             "account_id": "ACC_RESTRICT_TM",
             "amount": 14200.0,
             "reason": "Rapid mule outbound dispersion",
             "provider": "thought_machine",
             "reference_ticket_id": "CASE_9902",
+            "simulation": True,
         }
         res = client.post("/api/v1/connectors/core-banking/holds/provisional", json=hold_req)
         assert res.status_code == 201
         data = res.json()
-        assert data["status"] == "RESTRICTION_COMMITTED"
+        assert data["status"] == "SIMULATION_RESULT"
+        assert data["external_status"] == "SIMULATED_LOOPBACK"
         assert data["provider"] == "THOUGHT_MACHINE"
         assert data["account_id"] == "ACC_RESTRICT_TM"
         assert data["amount"] == 14200.0
+
+    def test_provisional_hold_endpoint_thought_machine_live_failure_fails_closed(self) -> None:
+        hold_req = {
+            "account_id": "ACC_RESTRICT_TM",
+            "amount": 14200.0,
+            "reason": "Rapid mule outbound dispersion",
+            "provider": "thought_machine",
+            "reference_ticket_id": "CASE_9902",
+            "simulation": False,
+        }
+        res = client.post("/api/v1/connectors/core-banking/holds/provisional", json=hold_req)
+        assert res.status_code == 503
+        assert "Core banking provisional hold failed" in res.json()["detail"]
 
     def test_provisional_hold_unsupported_provider_400(self) -> None:
         hold_req = {
@@ -441,6 +521,19 @@ class TestCoreBankingGatewayRouter:
         assert res.status_code == 422
 
     def test_core_banking_health_endpoints(self) -> None:
+        from app.presentation.routers.core_banking_gateway import (
+            get_mambu_connector,
+            get_thought_machine_connector,
+        )
+        mambu = get_mambu_connector()
+        tm = get_thought_machine_connector()
+
+        # Both configured with keys -> HEALTHY
+        mambu.api_key = "test_mambu_key"
+        tm.api_key = "test_tm_key"
+        mambu.circuit_breaker.state = "CLOSED"
+        tm.circuit_breaker.state = "CLOSED"
+
         res1 = client.get("/connectors/core-banking/health")
         assert res1.status_code == 200
         data1 = res1.json()
@@ -451,6 +544,24 @@ class TestCoreBankingGatewayRouter:
         res2 = client.get("/api/v1/connectors/core-banking/health")
         assert res2.status_code == 200
         assert res2.json()["status"] == "HEALTHY"
+
+        # One circuit breaker open -> DEGRADED
+        mambu.circuit_breaker.state = "OPEN"
+        res_open = client.get("/connectors/core-banking/health")
+        assert res_open.status_code == 200
+        assert res_open.json()["status"] == "DEGRADED"
+
+        # Both open -> UNAVAILABLE
+        tm.circuit_breaker.state = "OPEN"
+        res_all_open = client.get("/connectors/core-banking/health")
+        assert res_all_open.status_code == 200
+        assert res_all_open.json()["status"] == "UNAVAILABLE"
+
+        # Reset state
+        mambu.circuit_breaker.state = "CLOSED"
+        tm.circuit_breaker.state = "CLOSED"
+        mambu.api_key = ""
+        tm.api_key = ""
 
 
 # ── 4. Factory Integration Tests ──────────────────────────────────────────────

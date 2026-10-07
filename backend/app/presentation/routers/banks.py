@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd  # noqa: TC002
@@ -19,6 +19,7 @@ from app.application.schemas.banks import (
     ScoringVolumePointResponse,
 )
 from app.application.services.data_generator import DataGenerator
+from app.domain.data_validator import validate_binary_labels
 from app.infrastructure.security.tee_driver import is_sgx_hardware_available
 
 logger = logging.getLogger(__name__)
@@ -242,7 +243,7 @@ def _compute_feature_drift(df_exp: pd.DataFrame, df_act: pd.DataFrame) -> dict[s
             hist_exp, _ = np.histogram(exp_vals, bins=bins)
             hist_act, _ = np.histogram(act_vals, bins=bins)
             js = _compute_js_divergence(hist_exp, hist_act)
-            ks_val = round(float(ks_stat), 4)
+            ks_val = round(float(cast("Any", ks_stat)), 4)
         else:
             psi = _compute_categorical_psi(exp_vals, act_vals)
             js = _compute_categorical_js(exp_vals, act_vals)
@@ -322,8 +323,10 @@ def _compute_concept_drift(
     }
 
     # 2) Conditional distributions (Y given X)
-    is_fraud_exp = (y_exp.to_numpy() == 1)
-    is_fraud_act = (y_act.to_numpy() == 1)
+    clean_y_exp = validate_binary_labels(y_exp)
+    clean_y_act = validate_binary_labels(y_act)
+    is_fraud_exp = (clean_y_exp == 1)
+    is_fraud_act = (clean_y_act == 1)
 
     # Hour of day fraud occurrences normalized
     hours_exp = df_exp["hour_of_day"].to_numpy()
@@ -392,7 +395,8 @@ async def get_bank_distributions() -> dict[str, Any]:
         amount_arrays[bank_id] = amounts
         hours = df["hour_of_day"].to_numpy()
         merchants = df["merchant_category"].to_numpy()
-        is_fraud = (labels.to_numpy() == 1)
+        clean_labels = validate_binary_labels(labels)
+        is_fraud = (clean_labels == 1)
 
         # 1) Transaction amount histogram (log-scale bins)
         log_bins = np.logspace(
@@ -459,7 +463,7 @@ async def get_bank_distributions() -> dict[str, Any]:
 
         # Original amount KS statistic
         ks_stat, _ = stats.ks_2samp(amount_arrays[b1], amount_arrays[b2])
-        ks_stats[key] = round(float(ks_stat), 4)
+        ks_stats[key] = round(float(cast("Any", ks_stat)), 4)
 
         # Continuous & categorical feature drift
         feature_drifts[key] = _compute_feature_drift(datasets[b1][0], datasets[b2][0])

@@ -171,17 +171,39 @@ class MTLSManager:
         serial_number: str,
         reason: str = "Unspecified",
         vault_client: Any | None = None,
-    ) -> None:
-        """Add certificate serial number to local CRL and notify Vault PKI engine if active."""
-        self.crl_revoked_serials.add(serial_number)
+    ) -> bool:
+        """Add certificate serial number to local CRL and notify Vault PKI engine if active.
+
+        Returns True if certificate was successfully revoked.
+        If Vault PKI engine is enabled and revocation fails (returns False or raises exception),
+        returns False and does not record successful revocation.
+        """
         vc = vault_client or self.vault_client
         if vc and getattr(vc, "enabled", False):
-            vc.revoke_pki_certificate(serial_number)
+            try:
+                vault_success = vc.revoke_pki_certificate(serial_number)
+            except Exception as exc:
+                logger.error(
+                    "Vault PKI certificate revocation failed with exception for serial %s: %s",
+                    serial_number,
+                    exc,
+                )
+                return False
+            if not vault_success:
+                logger.error(
+                    "Authoritative Vault PKI revocation failed for serial %s (reason: %s).",
+                    serial_number,
+                    reason,
+                )
+                return False
+
+        self.crl_revoked_serials.add(serial_number)
         logger.warning(
             "Certificate serial %s added to mTLS CRL revocation list (reason: %s).",
             serial_number,
             reason,
         )
+        return True
 
     def is_certificate_valid(self, serial_number: str) -> bool:
         """Check whether certificate serial number is valid (i.e. not in CRL revocation set)."""

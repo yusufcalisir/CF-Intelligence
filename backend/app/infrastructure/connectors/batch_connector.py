@@ -33,6 +33,18 @@ class BatchEODFileConnector(BaseBankConnector):
         transactions: list[NormalizedTransaction] = []
 
         for row in reader:
+            raw_amount = row.get("amount")
+            if raw_amount is None or raw_amount == "":
+                raise ValueError("Transaction amount is mandatory for batch row")
+            amount = float(raw_amount)
+            if amount <= 0:
+                raise ValueError("Transaction amount must be strictly positive")
+
+            raw_orig = row.get("origin_country")
+            origin_country = str(raw_orig).strip() if raw_orig else None
+            raw_dest = row.get("destination_country")
+            destination_country = str(raw_dest).strip() if raw_dest else None
+
             tx = NormalizedTransaction(
                 transaction_id=str(
                     row.get("transaction_id") or row.get("tx_id") or f"batch_{len(transactions)}"
@@ -41,7 +53,7 @@ class BatchEODFileConnector(BaseBankConnector):
                 counterparty_account_id=str(
                     row.get("counterparty_account_id") or row.get("receiver") or "UNKNOWN_RECEIVER"
                 ),
-                amount=float(row.get("amount", 0.0)),
+                amount=amount,
                 currency=str(row.get("currency", "USD")),
                 timestamp=datetime.fromisoformat(row["timestamp"])
                 if "timestamp" in row and row["timestamp"]
@@ -49,8 +61,8 @@ class BatchEODFileConnector(BaseBankConnector):
                 merchant_category_code=str(
                     row.get("merchant_category_code") or row.get("mcc") or "0000"
                 ),
-                origin_country=str(row.get("origin_country") or "US"),
-                destination_country=str(row.get("destination_country") or "US"),
+                origin_country=origin_country,
+                destination_country=destination_country,
                 device_fingerprint=str(row.get("device_fingerprint", "")),
                 ip_subnet=str(row.get("ip_subnet", "")),
                 channel_type=str(row.get("channel_type", "BATCH_FILE")),
@@ -64,18 +76,30 @@ class BatchEODFileConnector(BaseBankConnector):
         """Parses a list of row dictionaries extracted from a Parquet file."""
         transactions: list[NormalizedTransaction] = []
         for row in rows:
+            raw_amount = row.get("amount")
+            if raw_amount is None or raw_amount == "":
+                raise ValueError("Transaction amount is mandatory for batch row")
+            amount = float(raw_amount)
+            if amount <= 0:
+                raise ValueError("Transaction amount must be strictly positive")
+
+            raw_orig = row.get("origin_country")
+            origin_country = str(raw_orig).strip() if raw_orig else None
+            raw_dest = row.get("destination_country")
+            destination_country = str(raw_dest).strip() if raw_dest else None
+
             tx = NormalizedTransaction(
                 transaction_id=str(row.get("transaction_id", f"pq_{len(transactions)}")),
                 account_id=str(row.get("account_id", "UNKNOWN")),
                 counterparty_account_id=str(row.get("counterparty_account_id", "UNKNOWN")),
-                amount=float(row.get("amount", 0.0)),
+                amount=amount,
                 currency=str(row.get("currency", "USD")),
                 timestamp=datetime.fromisoformat(str(row["timestamp"]))
                 if "timestamp" in row
                 else datetime.now(UTC),
                 merchant_category_code=str(row.get("merchant_category_code", "0000")),
-                origin_country=str(row.get("origin_country", "US")),
-                destination_country=str(row.get("destination_country", "US")),
+                origin_country=origin_country,
+                destination_country=destination_country,
                 device_fingerprint=str(row.get("device_fingerprint", "")),
                 ip_subnet=str(row.get("ip_subnet", "")),
                 channel_type=str(row.get("channel_type", "PARQUET_BATCH")),

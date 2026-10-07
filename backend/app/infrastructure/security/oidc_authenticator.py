@@ -24,9 +24,9 @@ class UserClaims:
     username: str
     bank_id: str
     roles: list[str] = field(default_factory=list)
-    clearance_level: int = 1
+    clearance_level: int = 0
     shift_hours: str = "00:00-24:00"
-    approval_tier: float = 100000.0
+    approval_tier: float = 0.0
     allowed_ip_subnets: list[str] = field(default_factory=lambda: ["0.0.0.0/0"])
     issuer: str = "https://auth.cfi-platform.internal/realms/cfi"
     exp: float = 0.0
@@ -126,10 +126,10 @@ class OIDCAuthenticator:
                 sub=claims_dict.get("sub", "anonymous"),
                 username=claims_dict.get("preferred_username", claims_dict.get("username", "user")),
                 bank_id=claims_dict.get("bank_id", "bank_a"),
-                roles=claims_dict.get("roles", ["analyst"]),
-                clearance_level=int(claims_dict.get("clearance_level", 1)),
+                roles=list(claims_dict.get("roles") or []),
+                clearance_level=int(claims_dict.get("clearance_level", 0)),
                 shift_hours=str(claims_dict.get("shift_hours", "00:00-24:00")),
-                approval_tier=float(claims_dict.get("approval_tier", 100000.0)),
+                approval_tier=float(claims_dict.get("approval_tier", 0.0)),
                 allowed_ip_subnets=claims_dict.get("allowed_ip_subnets", ["0.0.0.0/0"]),
                 issuer=claims_dict.get("iss", self.issuer),
                 exp=exp,

@@ -224,11 +224,12 @@ class MambuConnector(BaseBankConnector):
         reason: str,
         idempotency_token: str | None = None,
         reference_id: str | None = None,
+        simulation: bool = False,
     ) -> dict[str, Any]:
         """Dispatches an outbound provisional account hold/block to Mambu Core Banking.
 
         Sends POST request to Mambu v2 deposits block endpoint with idempotency checks.
-        If live network endpoint is unreachable, executes resilient simulated confirmation.
+        If live network endpoint fails or credentials missing, records authentic failure without fake success.
         """
         token = idempotency_token or f"idemp_mambu_{uuid.uuid4().hex}"
         if token in self._idempotency_cache:
@@ -240,7 +241,6 @@ class MambuConnector(BaseBankConnector):
         hold_id = f"mambu_blk_{uuid.uuid4().hex[:12]}"
         applied_at = datetime.now(UTC).isoformat()
         hold_record: dict[str, Any] = {
-            "status": "HOLD_APPLIED",
             "provider": "MAMBU",
             "hold_id": hold_id,
             "account_id": account_id,
@@ -252,8 +252,14 @@ class MambuConnector(BaseBankConnector):
             "audit_hash": hashlib.sha256(f"{hold_id}:{account_id}:{amount}:{applied_at}".encode()).hexdigest(),
         }
 
-        # Attempt live API dispatch if API key is provided and base_url is live
-        if self.api_key and "api.mambu.com" not in self.base_url:
+        if simulation:
+            hold_record["status"] = "SIMULATION_RESULT"
+            hold_record["external_status"] = "SIMULATED_LOOPBACK"
+        elif not self.api_key:
+            logger.error("Mambu hold failed: missing API credentials for live operation")
+            hold_record["status"] = "HOLD_FAILED"
+            hold_record["external_status"] = "AUTHENTICATION_FAILED"
+        else:
             try:
                 async with httpx.AsyncClient(timeout=3.0) as client:
                     resp = await client.post(
@@ -270,16 +276,21 @@ class MambuConnector(BaseBankConnector):
                         },
                     )
                     if resp.status_code in (200, 201):
+                        hold_record["status"] = "HOLD_APPLIED"
                         hold_record["external_status"] = "SYNCED_HTTP_201"
+                    else:
+                        logger.error("Mambu HTTP dispatch returned error status: %d", resp.status_code)
+                        hold_record["status"] = "HOLD_FAILED"
+                        hold_record["external_status"] = f"DISPATCH_FAILED_HTTP_{resp.status_code}"
             except Exception as exc:
-                logger.warning("Live Mambu HTTP dispatch failed, falling back to simulated hold: %s", exc)
-                hold_record["external_status"] = "SIMULATED_LOOPBACK"
-        else:
-            hold_record["external_status"] = "SIMULATED_LOOPBACK"
+                logger.error("Live Mambu HTTP dispatch failed: %s", exc)
+                hold_record["status"] = "HOLD_FAILED"
+                hold_record["external_status"] = "DISPATCH_FAILED_UNREACHABLE"
 
         self._idempotency_cache.add(token)
         self._audit_holds.append(hold_record)
-        self._holds_dispatched += 1
+        if hold_record["status"] in ("HOLD_APPLIED", "SIMULATION_RESULT"):
+            self._holds_dispatched += 1
         return hold_record
 
     def consume_stream(self) -> Generator[NormalizedTransaction, None, None]:
@@ -301,6 +312,16 @@ class MambuConnector(BaseBankConnector):
 
     def health_check(self) -> dict[str, Any]:
         """Returns Mambu connector telemetry, mode, and connectivity health."""
+        cb_state = self.circuit_breaker.state
+        if cb_state == "OPEN":
+            status_val = "UNAVAILABLE"
+        elif cb_state == "HALF_OPEN":
+            status_val = "DEGRADED"
+        elif not self.api_key:
+            status_val = "AUTHENTICATION_UNAVAILABLE"
+        else:
+            status_val = "HEALTHY"
+
         return {
             "connector": "MambuConnector",
             "provider": "MAMBU",
@@ -309,8 +330,8 @@ class MambuConnector(BaseBankConnector):
             "events_ingested": self._events_ingested,
             "holds_dispatched": self._holds_dispatched,
             "buffer_depth": len(self._buffer),
-            "circuit_breaker": self.circuit_breaker.state,
-            "status": "HEALTHY",
+            "circuit_breaker": cb_state,
+            "status": status_val,
         }
 
     # Stubs satisfying BankConnectorInterface

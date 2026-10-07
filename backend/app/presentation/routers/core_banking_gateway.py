@@ -98,12 +98,13 @@ class ProvisionalHoldRequest(BaseModel):
     )
     idempotency_key: str | None = Field(default=None, description="Client idempotency token")
     reference_ticket_id: str | None = Field(default=None, description="FININT case or alert ticket ID")
+    simulation: bool = Field(default=False, description="Explicit simulation flag")
 
 
 class ProvisionalHoldResponse(BaseModel):
     """Receipt returned after executing a provisional account hold."""
 
-    status: str = Field(..., description="Hold status: HOLD_APPLIED or RESTRICTION_COMMITTED")
+    status: str = Field(..., description="Hold status: HOLD_APPLIED, RESTRICTION_COMMITTED, or SIMULATION_RESULT")
     provider: str = Field(..., description="Executing core banking provider")
     hold_id: str = Field(..., description="Unique hold/restriction identifier")
     account_id: str = Field(..., description="Target account identifier")
@@ -112,14 +113,14 @@ class ProvisionalHoldResponse(BaseModel):
     reference_id: str = Field(default="", description="Case or ticket reference ID")
     applied_at: str = Field(..., description="UTC ISO-8601 timestamp")
     audit_hash: str = Field(..., description="Cryptographic SHA-256 audit digest")
-    external_status: str = Field(default="SIMULATED_LOOPBACK", description="API dispatch outcome")
+    external_status: str = Field(..., description="API dispatch outcome")
     deduplicated: bool = Field(default=False, description="True if idempotency cache hit")
 
 
 class CoreBankingHealthResponse(BaseModel):
     """Health, configuration, and telemetry status of core banking connectors."""
 
-    status: str = Field(default="HEALTHY")
+    status: str = Field(...)
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     mambu: dict[str, Any]
     thought_machine: dict[str, Any]
@@ -228,6 +229,7 @@ async def _handle_provisional_hold(cmd: ProvisionalHoldRequest) -> ProvisionalHo
             reason=cmd.reason,
             idempotency_token=cmd.idempotency_key,
             reference_id=cmd.reference_ticket_id,
+            simulation=cmd.simulation,
         )
     elif provider_key in ("thought_machine", "thoughtmachine"):
         tm_connector = get_thought_machine_connector()
@@ -237,6 +239,7 @@ async def _handle_provisional_hold(cmd: ProvisionalHoldRequest) -> ProvisionalHo
             reason=cmd.reason,
             idempotency_token=cmd.idempotency_key,
             reference_id=cmd.reference_ticket_id,
+            simulation=cmd.simulation,
         )
     else:
         raise HTTPException(
@@ -244,8 +247,17 @@ async def _handle_provisional_hold(cmd: ProvisionalHoldRequest) -> ProvisionalHo
             detail=f"Unsupported core banking provider: '{cmd.provider}'. Valid options: 'mambu', 'thought_machine'.",
         )
 
+    hold_status = record.get("status", "HOLD_FAILED")
+    external_status = record.get("external_status", "UNKNOWN")
+
+    if not cmd.simulation and hold_status not in ("HOLD_APPLIED", "RESTRICTION_COMMITTED"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Core banking provisional hold failed ({hold_status}, {external_status})",
+        )
+
     return ProvisionalHoldResponse(
-        status=record.get("status", "HOLD_APPLIED"),
+        status=hold_status,
         provider=record.get("provider", cmd.provider.upper()),
         hold_id=record.get("hold_id", ""),
         account_id=record.get("account_id", cmd.account_id),
@@ -254,7 +266,7 @@ async def _handle_provisional_hold(cmd: ProvisionalHoldRequest) -> ProvisionalHo
         reference_id=record.get("reference_id", cmd.reference_ticket_id or ""),
         applied_at=record.get("applied_at", datetime.now(UTC).isoformat()),
         audit_hash=record.get("audit_hash", ""),
-        external_status=record.get("external_status", "SIMULATED_LOOPBACK"),
+        external_status=external_status,
         deduplicated=bool(record.get("deduplicated", False)),
     )
 
@@ -263,10 +275,26 @@ def _handle_health() -> CoreBankingHealthResponse:
     """Return health check telemetry across core banking connectors."""
     mambu = get_mambu_connector()
     tm = get_thought_machine_connector()
+    mambu_health = mambu.health_check()
+    tm_health = tm.health_check()
+
+    statuses = [mambu_health.get("status", "UNKNOWN"), tm_health.get("status", "UNKNOWN")]
+    if any(s in ("UNAVAILABLE", "OPEN") for s in statuses):
+        if all(s in ("UNAVAILABLE", "OPEN") for s in statuses):
+            agg_status = "UNAVAILABLE"
+        else:
+            agg_status = "DEGRADED"
+    elif any(s in ("DEGRADED", "HALF_OPEN", "AUTHENTICATION_UNAVAILABLE") for s in statuses):
+        agg_status = "DEGRADED"
+    elif all(s == "HEALTHY" for s in statuses):
+        agg_status = "HEALTHY"
+    else:
+        agg_status = "DEGRADED"
+
     return CoreBankingHealthResponse(
-        status="HEALTHY",
-        mambu=mambu.health_check(),
-        thought_machine=tm.health_check(),
+        status=agg_status,
+        mambu=mambu_health,
+        thought_machine=tm_health,
     )
 
 

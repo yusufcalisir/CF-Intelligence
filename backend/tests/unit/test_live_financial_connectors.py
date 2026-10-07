@@ -11,6 +11,7 @@ def test_open_banking_eidas_header_injection_and_token_refresh() -> None:
     connector = OpenBankingConnector(
         base_url="https://sandbox.berlingroup.org/psd2/v1",
         tpp_signature_key="dummy_rsa_key",
+        access_token="psd2_test_token_live",
     )
 
     headers = connector._get_headers(body_bytes=b'{"sample":"payload"}')

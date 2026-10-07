@@ -52,18 +52,35 @@ class ParquetConnector(BaseBankConnector):
             else:
                 ts = datetime.now(UTC)
 
+            raw_orig = row.get("origin_country")
+            origin_country: str | None = None
+            if raw_orig is not None and not bool(pd.isna(raw_orig)):
+                s_orig = str(raw_orig).strip()
+                if s_orig and s_orig.lower() != "nan":
+                    origin_country = s_orig
+
+            raw_dest = row.get("destination_country")
+            destination_country: str | None = None
+            if raw_dest is not None and not bool(pd.isna(raw_dest)):
+                s_dest = str(raw_dest).strip()
+                if s_dest and s_dest.lower() != "nan":
+                    destination_country = s_dest
+
+            raw_amt = row.get("amount")
+            amt = float(raw_amt) if (raw_amt is not None and not bool(pd.isna(raw_amt))) else 100.0
+
             tx = NormalizedTransaction(
                 transaction_id=str(row.get("transaction_id") or f"parquet_tx_{idx}"),
                 account_id=str(row.get("account_id") or "UNKNOWN_DEBTOR"),
                 counterparty_account_id=str(
                     row.get("counterparty_account_id") or "UNKNOWN_CREDITOR"
                 ),
-                amount=float(row.get("amount", 100.0)),
+                amount=amt,
                 currency=str(row.get("currency", "USD")),
                 timestamp=ts,
                 merchant_category_code=str(row.get("merchant_category_code", "5999")),
-                origin_country=str(row.get("origin_country", "US")),
-                destination_country=str(row.get("destination_country", "US")),
+                origin_country=origin_country,
+                destination_country=destination_country,
                 device_fingerprint=str(row.get("device_fingerprint", "")),
                 ip_subnet=str(row.get("ip_subnet", "")),
                 channel_type=str(row.get("channel_type", "BENCHMARK_PARQUET")),

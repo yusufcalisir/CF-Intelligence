@@ -71,9 +71,9 @@ class NormalizedTransaction(BaseModel):
     merchant_category_code: str = Field(
         default="0000", description="ISO 18245 Merchant Category Code"
     )
-    origin_country: str = Field(default="US", description="ISO 3166-1 alpha-2 origin country code")
-    destination_country: str = Field(
-        default="US", description="ISO 3166-1 alpha-2 destination country code"
+    origin_country: str | None = Field(default=None, description="ISO 3166-1 alpha-2 origin country code")
+    destination_country: str | None = Field(
+        default=None, description="ISO 3166-1 alpha-2 destination country code"
     )
     device_fingerprint: str = Field(
         default="", description="Cryptographic device or browser fingerprint"

@@ -132,7 +132,9 @@ class TestOIDCBearerAuthentication:
 class TestRBACRouteGating:
     def test_analyst_can_access_dashboard(self):
         """Analyst role can access all dashboard routes."""
-        claims = UserClaims(sub="u1", username="analyst_1", bank_id="global", roles=["analyst"])
+        claims = UserClaims(
+            sub="u1", username="analyst_1", bank_id="global", roles=["analyst"], clearance_level=1
+        )
         assert (
             check_authorization("analyst_1", "analyst", "/api/v1/dashboard", {}, "GET", claims)
             is True
@@ -175,7 +177,7 @@ class TestABACMultiTenantIsolation:
     def test_bank_user_allowed_for_own_bank_resource(self):
         """User from bank_a accessing bank_a data passes ABAC evaluation."""
         claims = UserClaims(
-            sub="u_bank_a", username="bank_node_a", bank_id="bank_a", roles=["bank"]
+            sub="u_bank_a", username="bank_node_a", bank_id="bank_a", roles=["bank"], clearance_level=1
         )
         assert (
             check_authorization(

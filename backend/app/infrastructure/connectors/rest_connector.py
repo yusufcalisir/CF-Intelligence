@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -15,6 +16,10 @@ if TYPE_CHECKING:
     from app.domain.value_objects import ModelWeights
 
 logger = logging.getLogger(__name__)
+
+
+class AuthenticationError(RuntimeError):
+    """Raised when REST bank connector authentication fails."""
 
 
 class RESTBankConnector(BaseBankConnector):
@@ -77,6 +82,8 @@ class RESTBankConnector(BaseBankConnector):
     def _get_oauth2_token(self) -> str:
         if self._token:
             return self._token
+        if not self.oauth_token_url:
+            raise AuthenticationError("OAuth2 token_url is not configured.")
         logger.info("Requesting OAuth2 client credentials token from %s", self.oauth_token_url)
         try:
             # Send standard client credentials request
@@ -89,21 +96,33 @@ class RESTBankConnector(BaseBankConnector):
                 resp = client.post(self.oauth_token_url, data=payload, timeout=10.0)
                 if resp.status_code == 200:
                     data = resp.json()
-                    self._token = data.get("access_token")
-                    if self._token:
+                    tok = data.get("access_token")
+                    if tok and str(tok).strip():
+                        self._token = str(tok).strip()
                         return self._token
-                logger.warning(
-                    "OAuth2 server returned status %d. Falling back to placeholder token.",
+                    raise AuthenticationError(
+                        f"OAuth2 server returned 200 but response is missing access_token: {data}"
+                    )
+                logger.error(
+                    "OAuth2 server %s returned status %d: %s",
+                    self.oauth_token_url,
                     resp.status_code,
+                    resp.text,
                 )
+                raise AuthenticationError(
+                    f"OAuth2 server returned status {resp.status_code} during token acquisition"
+                )
+        except AuthenticationError:
+            raise
         except Exception as exc:
-            logger.warning(
-                "Failed to fetch OAuth2 token from %s: %s. Falling back to placeholder token.",
+            logger.error(
+                "Failed to fetch OAuth2 token from %s: %s",
                 self.oauth_token_url,
                 exc,
             )
-        self._token = "mock_oauth2_access_token_placeholder"
-        return self._token
+            raise AuthenticationError(
+                f"OAuth2 token acquisition failed from {self.oauth_token_url}: {exc}"
+            ) from exc
 
     def _get_client(self) -> httpx.Client:
         import os
@@ -228,11 +247,29 @@ class RESTBankConnector(BaseBankConnector):
         results: list[NormalizedTransaction] = []
         if isinstance(payload, list):
             for item in payload:
+                acc_id = item.get("account_id")
+                if not acc_id or str(acc_id).strip() in ("", "UNKNOWN", "UNKNOWN_DEBTOR"):
+                    raise ValueError(f"Transaction item {item.get('transaction_id')} missing mandatory account_id")
+
+                cpty_id = item.get("counterparty_account_id")
+                if not cpty_id or str(cpty_id).strip() in ("", "UNKNOWN", "UNKNOWN_CREDITOR"):
+                    raise ValueError(f"Transaction item {item.get('transaction_id')} missing mandatory counterparty_account_id")
+
+                amt_val = item.get("amount")
+                if amt_val is None:
+                    raise ValueError(f"Transaction item {item.get('transaction_id')} missing mandatory amount")
+                try:
+                    amt = float(amt_val)
+                except (ValueError, TypeError) as exc:
+                    raise ValueError(f"Transaction item {item.get('transaction_id')} invalid amount: {amt_val}") from exc
+                if amt <= 0 or not math.isfinite(amt):
+                    raise ValueError(f"Transaction item {item.get('transaction_id')} amount must be positive and finite: {amt}")
+
                 tx = NormalizedTransaction(
-                    transaction_id=str(item.get("transaction_id", f"wh_{len(results)}")),
-                    account_id=str(item.get("account_id", "UNKNOWN")),
-                    counterparty_account_id=str(item.get("counterparty_account_id", "UNKNOWN")),
-                    amount=float(item.get("amount", 0.0)),
+                    transaction_id=str(item.get("transaction_id") or f"wh_{len(results)}"),
+                    account_id=str(acc_id).strip(),
+                    counterparty_account_id=str(cpty_id).strip(),
+                    amount=amt,
                     currency=str(item.get("currency", "USD")),
                     merchant_category_code=str(item.get("merchant_category_code", "0000")),
                     channel_type="REST_WEBHOOK",

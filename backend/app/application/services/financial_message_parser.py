@@ -191,8 +191,8 @@ class FinancialMessageParser:
 
         if "entries_count" in parsed_dict:
             features["entries_count"] = parsed_dict.get("entries_count", 0)
-            features["total_credit_amount"] = parsed_dict.get("total_credit_amount", 0.0)
-            features["total_debit_amount"] = parsed_dict.get("total_debit_amount", 0.0)
+            features["total_credit_amount"] = parsed_dict.get("total_credit_amount")
+            features["total_debit_amount"] = parsed_dict.get("total_debit_amount")
 
         if "risk_score" in parsed_dict:
             features["risk_score"] = parsed_dict.get("risk_score")
@@ -831,7 +831,7 @@ class FinancialMessageParser:
         risk_factors: list[str] = []
 
         amount = float(pacs003_data.get("amount", 0.0))
-        seq_type = str(pacs003_data.get("sequence_type", "RCUR")).upper()
+        seq_type = str(pacs003_data.get("sequence_type") or "UNKNOWN").upper()
         mandate_id = str(pacs003_data.get("mandate_id") or "").strip()
         dt_of_sgntr = str(pacs003_data.get("mandate_signature_date") or "").strip()
         settlement_date = str(pacs003_data.get("date") or "").strip()

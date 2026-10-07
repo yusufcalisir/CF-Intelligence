@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+import httpx
+import pytest
+
 from app.infrastructure.connectors.open_banking_connector import OpenBankingConnector
 
 
@@ -54,6 +59,7 @@ def test_oauth2_token_fetch_and_mtls_header_injection() -> None:
         auth_type="oauth2",
         client_id="tpp_alpha_id",
         tpp_signature_key="rsa_demo_key",
+        access_token="psd2_test_token_123",
     )
 
     headers = connector._get_headers(body_bytes=b'{"test": 123}')
@@ -85,11 +91,15 @@ def test_parse_batch_handles_empty_booked_list() -> None:
     assert len(streamed) == 0
 
 
-def test_fetch_account_transactions_fallback() -> None:
-    """Verifies fallback transaction generation when remote PSD2 sandbox is unreachable."""
-    connector = OpenBankingConnector(base_url="https://invalid-psd2-sandbox.local/v1")
-    txs = connector.fetch_account_transactions(account_id="DE89370400440532013111")
+def test_fetch_account_transactions_fails_closed_when_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies that unreachable remote PSD2 endpoint raises RuntimeError rather than fabricating transactions."""
+    connector = OpenBankingConnector(
+        base_url="https://invalid-psd2-sandbox.local/v1",
+        access_token="valid_test_token_123",
+    )
+    def _mock_get(*args: Any, **kwargs: Any) -> Any:
+        raise httpx.ConnectError("Network host unreachable")
+    monkeypatch.setattr(httpx, "get", _mock_get)
 
-    assert len(txs) >= 2
-    assert txs[0].account_id == "DE89370400440532013111"
-    assert txs[0].channel_type == "OPEN_BANKING_PSD2"
+    with pytest.raises(RuntimeError, match="PSD2 API request failed"):
+        connector.fetch_account_transactions(account_id="DE89370400440532013111")
