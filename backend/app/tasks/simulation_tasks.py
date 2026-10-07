@@ -203,7 +203,7 @@ def execute_automated_retraining_task(
     model_service = ModelService(settings)
     privacy_service = PrivacyService()
 
-    # Step 1: Validate presence of training data (AGENTS.md Rule 11: No training reported without optimizer steps)
+    # Step 1: Validate presence of training data (fail-closed if no training data is present)
     if X_train is None or y_train is None:
         logger.warning(
             "Automated retraining candidate for %s lacks training data. Task REJECTED (fail-closed).",

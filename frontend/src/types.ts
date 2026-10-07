@@ -1,4 +1,4 @@
-export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'UNASSESSED';
 
 export interface PredictPayload {
   transaction_amount: number;

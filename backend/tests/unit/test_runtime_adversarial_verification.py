@@ -528,7 +528,7 @@ def test_model_service_undefined_auc_returns_none() -> None:
 # 24. Flower backend fails closed when required or native fallback disabled
 # ---------------------------------------------------------------------------
 def test_flower_backend_fails_closed_when_required(monkeypatch: pytest.MonkeyPatch) -> None:
-    """When require_flower_backend=True, unavailable Ray must raise RuntimeError (AGENTS.md Rule 5)."""
+    """When require_flower_backend=True, unavailable Ray must raise RuntimeError."""
     from app.application.services.flower_engine import FlowerFLEngine
     from app.application.services.model_service import ModelService
     from app.config import get_settings
@@ -555,7 +555,7 @@ def test_flower_backend_fails_closed_when_required(monkeypatch: pytest.MonkeyPat
 # 25. Flower backend rejects native fallback when SecAgg is requested
 # ---------------------------------------------------------------------------
 def test_flower_backend_rejects_native_fallback_when_secagg_requested(monkeypatch: pytest.MonkeyPatch) -> None:
-    """When enable_secure_aggregation=True, native plaintext fallback must be rejected (AGENTS.md Rule 11)."""
+    """When enable_secure_aggregation=True, native plaintext fallback must be rejected."""
     from app.application.services.flower_engine import FlowerFLEngine
     from app.application.services.model_service import ModelService
     from app.config import get_settings

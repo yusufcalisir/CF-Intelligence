@@ -11,7 +11,7 @@ import contextlib
 import logging
 import os
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, Any
 
 import flwr as fl
@@ -35,7 +35,7 @@ def _weights_to_ndarrays(
     arrays: list[np.ndarray] = []
     if hasattr(model, "parameters") and callable(model.parameters):
         params = model.parameters()
-        if hasattr(params, "__iter__"):
+        if isinstance(params, Iterable):
             for param in params:
                 if hasattr(param, "data") and hasattr(param.data, "cpu"):
                     arrays.append(param.data.cpu().numpy().copy())
@@ -55,7 +55,7 @@ def _ndarrays_to_model(
     if hasattr(model, "parameters") and callable(model.parameters):
         device = getattr(model_service, "device", "cpu")
         params = model.parameters()
-        if hasattr(params, "__iter__"):
+        if isinstance(params, Iterable):
             for param, arr in zip(params, ndarrays, strict=False):
                 if hasattr(param, "data") and isinstance(arr, np.ndarray):
                     param.data = torch.FloatTensor(arr).to(device)
@@ -449,7 +449,7 @@ class FlowerFLEngine:
                 raise RuntimeError(
                     "Required execution backend 'FLOWER_RAY' failed: Native simulation requested via "
                     "FLWR_SIMULATION_NATIVE does not implement cryptographically masked Secure Aggregation (SecAgg). "
-                    "Execution rejected to prevent unencrypted parameter aggregation (AGENTS.md Rule 11)."
+                    "Execution rejected to prevent unencrypted parameter aggregation."
                 )
             return self._run_native_production_fl(
                 config=sim_config,
@@ -524,7 +524,7 @@ class FlowerFLEngine:
                 raise RuntimeError(
                     f"Required execution backend 'FLOWER_RAY' failed: {exc}. Native production fallback "
                     "does not implement cryptographically masked Secure Aggregation (SecAgg). "
-                    "Execution rejected to prevent unencrypted parameter aggregation (AGENTS.md Rule 11)."
+                    "Execution rejected to prevent unencrypted parameter aggregation."
                 ) from exc
 
             logger.warning(

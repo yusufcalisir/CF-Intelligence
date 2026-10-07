@@ -197,7 +197,7 @@ class FederatedLearningEngine:
             if global_weights is not None:
                 logger.warning("Falling back to verified prior round global weights.")
                 return global_weights
-            # Fail closed: never fabricate zero-weights when no prior valid state exists (AGENTS.md Rule 6)
+            # Fail closed: never fabricate zero-weights when no prior valid state exists.
             raise ValueError(
                 "All client updates contained non-finite weights (NaN/Inf) and no prior global "
                 "weights exist. Aggregation failed closed to prevent fabricated parameter initialization."
