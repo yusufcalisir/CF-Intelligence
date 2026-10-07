@@ -2,7 +2,7 @@
 
 > **Experiment Name:** IBM AMLSim Multi-Hop Pattern Detection Benchmark  
 > **Model / Strategy:** `GraphSAGE` (InductiveNeighborhoodAggregation)  
-> **Status:** `COMPLETED` | **Duration:** 20.20s  
+> **Status:** `CANONICAL` | **Duration:** 20.20s  
 > **Git Provenance:** Commit `b531eab85e` (Branch: `main`)
 
 ---
@@ -14,8 +14,8 @@
 | **Precision-Recall AUC (PR-AUC)** | **0.6527** | Primary Imbalanced Metric | `CONFIRMED` |
 | **ROC-AUC** | **0.9509** | Area Under Receiver Operating Characteristic | `CONFIRMED` |
 | **F1-Score (Optimal Threshold)** | **0.1689** | Harmonic Mean of Precision & Recall | `CONFIRMED` |
-| **Precision (PPV)** | **N/A** | Operational False Positive Ceiling | `CONFIRMED` |
-| **Recall (Sensitivity)** | **N/A** | True Positive Fraud Detection Floor | `CONFIRMED` |
+| **Precision (PPV)** | **N/A** | Operational False Positive Ceiling | `UNMEASURED` |
+| **Recall (Sensitivity)** | **N/A** | True Positive Fraud Detection Floor | `UNMEASURED` |
 | **Brier Calibration Score** | **0.0047** | Probability Calibration Fidelity | `CONFIRMED` |
 | **Recall @ 0.1% FPR** | **64.1200%** | Low-FPR Operational Boundary | `CONFIRMED` |
 | **Recall @ 1.0% FPR** | **69.2200%** | Strict Bank Operational Tier | `CONFIRMED` |
@@ -44,7 +44,7 @@
 | **Feature Dimensionality** | 6 tabular/graph columns |
 | **Class Balance** | 1,719 positive fraud records (0.1299% prevalence) |
 | **Partition Ratios** | Train: 70% / Val: 0% / Test: 30% |
-| **Data Integrity Hash** | `sha256:ae03a98c74a5c46e1213d8da0bb1b69ea76b9b9f19d04127fa7a281a3f5035a9` |
+| **Data Integrity Hash** | `sha256:b3dc9b72f985e7247198f81df8d4db7c559d93dfd7d00fb4ec18a6b0b368647c` |
 
 ---
 

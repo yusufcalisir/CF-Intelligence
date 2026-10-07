@@ -49,7 +49,7 @@ class ReportCompiler:
         cfg = data.get("config", {})
         hw = data.get("hardware", {})
         ds = data.get("dataset", {})
-        metrics = data.get("final_metrics", {})
+        metrics = data.get("final_metrics") or data.get("metrics") or {}
         cm = data.get("confusion_matrix")
         history = data.get("history", [])
 
@@ -80,6 +80,9 @@ class ReportCompiler:
         git_hash = str(data.get("git_commit", "N/A"))[:10]
         git_branch = str(data.get("git_branch", "main"))
 
+        def _metric_status(val: Any) -> str:
+            return "`CONFIRMED`" if val is not None else "`UNMEASURED`"
+
         lines: list[str] = [
             f"# Experiment Execution Dossier: `{exp_id}`",
             "",
@@ -94,21 +97,27 @@ class ReportCompiler:
             "",
             "| Evaluation Dimension | Measured Value | Target SLA / Baseline | Status |",
             "| :--- | :---: | :---: | :---: |",
-            f"| **Precision-Recall AUC (PR-AUC)** | **{pr_str}** | Primary Imbalanced Metric | `CONFIRMED` |",
-            f"| **ROC-AUC** | **{roc_str}** | Area Under Receiver Operating Characteristic | `CONFIRMED` |",
-            f"| **F1-Score (Optimal Threshold)** | **{f1_str}** | Harmonic Mean of Precision & Recall | `CONFIRMED` |",
-            f"| **Precision (PPV)** | **{prec_str}** | Operational False Positive Ceiling | `CONFIRMED` |",
-            f"| **Recall (Sensitivity)** | **{rec_str}** | True Positive Fraud Detection Floor | `CONFIRMED` |",
-            f"| **Brier Calibration Score** | **{brier_str}** | Probability Calibration Fidelity | `CONFIRMED` |",
+            f"| **Precision-Recall AUC (PR-AUC)** | **{pr_str}** | Primary Imbalanced Metric | {_metric_status(pr_auc_val)} |",
+            f"| **ROC-AUC** | **{roc_str}** | Area Under Receiver Operating Characteristic | {_metric_status(roc_auc_val)} |",
+            f"| **F1-Score (Optimal Threshold)** | **{f1_str}** | Harmonic Mean of Precision & Recall | {_metric_status(f1_val)} |",
+            f"| **Precision (PPV)** | **{prec_str}** | Operational False Positive Ceiling | {_metric_status(prec_val)} |",
+            f"| **Recall (Sensitivity)** | **{rec_str}** | True Positive Fraud Detection Floor | {_metric_status(rec_val)} |",
+            f"| **Brier Calibration Score** | **{brier_str}** | Probability Calibration Fidelity | {_metric_status(brier_val)} |",
         ]
 
         # Add optional recall at low FPR metrics if available
         if "recall_at_001_fpr" in metrics or "recall_at_01_fpr" in metrics:
-            rec_01 = metrics.get("recall_at_01_fpr", metrics.get("recall_at_001_fpr", 0.0))
-            lines.append(f"| **Recall @ 0.1% FPR** | **{rec_01:.4%}** | Low-FPR Operational Boundary | `CONFIRMED` |")
+            rec_01 = metrics.get("recall_at_01_fpr")
+            if rec_01 is None:
+                rec_01 = metrics.get("recall_at_001_fpr")
+            rec_01_str = f"{rec_01:.4%}" if rec_01 is not None else "N/A"
+            lines.append(f"| **Recall @ 0.1% FPR** | **{rec_01_str}** | Low-FPR Operational Boundary | {_metric_status(rec_01)} |")
         if "recall_at_1_fpr" in metrics or "recall_at_10_fpr" in metrics:
-            rec_1 = metrics.get("recall_at_1_fpr", metrics.get("recall_at_10_fpr", 0.0))
-            lines.append(f"| **Recall @ 1.0% FPR** | **{rec_1:.4%}** | Strict Bank Operational Tier | `CONFIRMED` |")
+            rec_1 = metrics.get("recall_at_1_fpr")
+            if rec_1 is None:
+                rec_1 = metrics.get("recall_at_10_fpr")
+            rec_1_str = f"{rec_1:.4%}" if rec_1 is not None else "N/A"
+            lines.append(f"| **Recall @ 1.0% FPR** | **{rec_1_str}** | Strict Bank Operational Tier | {_metric_status(rec_1)} |")
 
         lines.extend([
             "",
@@ -273,20 +282,26 @@ class ReportCompiler:
         """Compile an authoritative Markdown dossier for the Cross-Bank Consortium experiment."""
         bench_id = data.get("benchmark_id", "CFI-CrossBank-01")
         timestamp = data.get("timestamp", "N/A")
-        total_tx = data.get("total_transactions", 19567)
+        total_tx = data.get("total_transactions")
         scenarios = data.get("scenarios", {})
 
-        iso_rate = data.get("overall_isolated_detection_rate", 0.0)
-        fed_rate = data.get("overall_federated_detection_rate", 0.0)
-        pool_rate = data.get("overall_pooled_detection_rate", 0.0)
-        delta_rate = data.get("overall_delta_detection_rate", 0.0)
+        iso_rate = data.get("overall_isolated_detection_rate")
+        fed_rate = data.get("overall_federated_detection_rate")
+        pool_rate = data.get("overall_pooled_detection_rate")
+        delta_rate = data.get("overall_delta_detection_rate")
+
+        total_tx_str = f"{total_tx:,} transactions" if total_tx is not None else "N/A"
+        iso_str = f"{iso_rate:.2%}" if iso_rate is not None else "N/A"
+        fed_str = f"{fed_rate:.2%}" if fed_rate is not None else "N/A"
+        pool_str = f"{pool_rate:.2%}" if pool_rate is not None else "N/A"
+        delta_str = f"+{delta_rate:.2%} Uplift" if delta_rate is not None else "N/A"
 
         lines: list[str] = [
             "# Empirical Consortium Value & Information Gain Quantification Dossier",
             f"## Cross-Bank Synthetic Consortium Benchmark (`{bench_id}`)",
             "",
             f"> **Dataset Identifier:** `{bench_id}`  ",
-            f"> **Total Evaluated Transactions:** {total_tx:,} transactions  ",
+            f"> **Total Evaluated Transactions:** {total_tx_str}  ",
             f"> **Scenarios Evaluated:** {len(scenarios)} core typologies  ",
             f"> **Timestamp:** `{timestamp}`",
             "",
@@ -296,9 +311,9 @@ class ReportCompiler:
             "",
             "| Evaluation Paradigm | Overall Detection Rate | Status | Regulatory Compliance |",
             "| :--- | :---: | :---: | :--- |",
-            f"| **Isolated Institutional Silos** | **{iso_rate:.2%}** | Operational Baseline | Legally Passive (Severe Mule Blindness) |",
-            f"| **Federated Collaboration (FedAvg)** | **{fed_rate:.2%}** | **+{delta_rate:.2%} Uplift** | **100% Compliant** (Zero Raw PII, SecAgg) |",
-            f"| **Centralized Pooled Upper Bound** | **{pool_rate:.2%}** | Theoretical Ceiling | Illegal Data Pooling (GDPR Violation) |",
+            f"| **Isolated Institutional Silos** | **{iso_str}** | Operational Baseline | Legally Passive (Severe Mule Blindness) |",
+            f"| **Federated Collaboration (FedAvg)** | **{fed_str}** | **{delta_str}** | **100% Compliant** (Zero Raw PII, SecAgg) |",
+            f"| **Centralized Pooled Upper Bound** | **{pool_str}** | Theoretical Ceiling | Illegal Data Pooling (GDPR Violation) |",
             "",
             "---",
             "",
@@ -310,11 +325,15 @@ class ReportCompiler:
 
         for sc_id, sc_data in scenarios.items():
             name = sc_data.get("scenario_name", sc_id)
-            iso = sc_data.get("isolated_detection_rate", 0.0)
-            fed = sc_data.get("federated_detection_rate", 0.0)
-            pool = sc_data.get("pooled_detection_rate", 0.0)
-            delta = sc_data.get("delta_detection_rate", 0.0)
-            lines.append(f"| **{sc_id}** | {name} | {iso:.1%} | **{fed:.1%}** | {pool:.1%} | **+{delta:.1%}** |")
+            iso = sc_data.get("isolated_detection_rate")
+            fed = sc_data.get("federated_detection_rate")
+            pool = sc_data.get("pooled_detection_rate")
+            delta = sc_data.get("delta_detection_rate")
+            iso_fmt = f"{iso:.1%}" if iso is not None else "N/A"
+            fed_fmt = f"{fed:.1%}" if fed is not None else "N/A"
+            pool_fmt = f"{pool:.1%}" if pool is not None else "N/A"
+            delta_fmt = f"+{delta:.1%}" if delta is not None else "N/A"
+            lines.append(f"| **{sc_id}** | {name} | {iso_fmt} | **{fed_fmt}** | {pool_fmt} | **{delta_fmt}** |")
 
         lines.extend([
             "",
@@ -400,8 +419,8 @@ class ReportCompiler:
                     "local_epochs": data.get("metadata", {}).get("local_epochs", 3),
                     "seed": data.get("metadata", {}).get("seed", 42),
                     "feature_count": data.get("metadata", {}).get("feature_count", 14),
-                    "total_transactions": data.get("total_transactions", 19567),
-                    "total_accounts": data.get("total_accounts", 10000),
+                    "total_transactions": data.get("total_transactions"),
+                    "total_accounts": data.get("total_accounts"),
                 }
             else:
                 config_data = data.get("config", {})

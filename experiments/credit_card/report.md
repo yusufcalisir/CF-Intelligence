@@ -1,9 +1,9 @@
 # Experiment Execution Dossier: `exp_creditcard_extreme_imbalance_benchmark`
 
 > **Experiment Name:** Credit Card Federated Benchmark (Mode=extreme_skew)  
-> **Model / Strategy:** `CreditCardImbalanceMLP` (fedavg)  
-> **Status:** `COMPLETED` | **Duration:** 277.94s  
-> **Git Provenance:** Commit `f2acbdd6c5` (Branch: `main`)
+> **Model / Strategy:** `CreditCardImbalanceMLP` (fedprox)  
+> **Status:** `COMPLETED` | **Duration:** 47.15s  
+> **Git Provenance:** Commit `50672988fc` (Branch: `main`)
 
 ---
 
@@ -11,14 +11,14 @@
 
 | Evaluation Dimension | Measured Value | Target SLA / Baseline | Status |
 | :--- | :---: | :---: | :---: |
-| **Precision-Recall AUC (PR-AUC)** | **0.7750** | Primary Imbalanced Metric | `CONFIRMED` |
-| **ROC-AUC** | **0.9837** | Area Under Receiver Operating Characteristic | `CONFIRMED` |
-| **F1-Score (Optimal Threshold)** | **0.7882** | Harmonic Mean of Precision & Recall | `CONFIRMED` |
-| **Precision (PPV)** | **0.7619** | Operational False Positive Ceiling | `CONFIRMED` |
-| **Recall (Sensitivity)** | **0.8163** | True Positive Fraud Detection Floor | `CONFIRMED` |
-| **Brier Calibration Score** | **0.0007** | Probability Calibration Fidelity | `CONFIRMED` |
-| **Recall @ 0.1% FPR** | **84.6940%** | Low-FPR Operational Boundary | `CONFIRMED` |
-| **Recall @ 1.0% FPR** | **88.7760%** | Strict Bank Operational Tier | `CONFIRMED` |
+| **Precision-Recall AUC (PR-AUC)** | **0.0033** | Primary Imbalanced Metric | `CONFIRMED` |
+| **ROC-AUC** | **0.5561** | Area Under Receiver Operating Characteristic | `CONFIRMED` |
+| **F1-Score (Optimal Threshold)** | **0.0000** | Harmonic Mean of Precision & Recall | `CONFIRMED` |
+| **Precision (PPV)** | **0.0000** | Operational False Positive Ceiling | `CONFIRMED` |
+| **Recall (Sensitivity)** | **0.0000** | True Positive Fraud Detection Floor | `CONFIRMED` |
+| **Brier Calibration Score** | **0.0020** | Probability Calibration Fidelity | `CONFIRMED` |
+| **Recall @ 0.1% FPR** | **0.0000%** | Low-FPR Operational Boundary | `CONFIRMED` |
+| **Recall @ 1.0% FPR** | **0.0000%** | Strict Bank Operational Tier | `CONFIRMED` |
 
 ---
 
@@ -26,10 +26,10 @@
 
 | Environment Attribute | Specification |
 | :--- | :--- |
-| **Operating System** | Windows 11 (Version: 10.0.26200) |
+| **Operating System** | Windows 11 (Version: 10.0.26300) |
 | **CPU Model** | AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD (AMD64) |
 | **CPU Core Topology** | 8 Physical Cores / 16 Threads |
-| **System RAM** | 7.34 GB (Available at Start: 0.82 GB) |
+| **System RAM** | 7.34 GB (Available at Start: 0.75 GB) |
 | **Python Runtime** | Python 3.12.10 |
 | **PyTorch Framework** | PyTorch 2.12.0+cpu (Device: `CPU`, CUDA: `False`) |
 
@@ -39,12 +39,12 @@
 
 | Dataset Attribute | Specification |
 | :--- | :--- |
-| **Dataset Canonical Name** | `European Credit Card Fraud Detection` |
-| **Total Record Count** | 284,806 records |
+| **Dataset Canonical Name** | `European Credit Card Fraud Detection (Synthetic Consortium Benchmark Fixture)` |
+| **Total Record Count** | 5,000 records |
 | **Feature Dimensionality** | 30 tabular/graph columns |
-| **Class Balance** | 491 positive fraud records (0.1725% prevalence) |
+| **Class Balance** | 8 positive fraud records (0.1500% prevalence) |
 | **Partition Ratios** | Train: 80% / Val: 15% / Test: 20% |
-| **Data Integrity Hash** | `sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| **Data Integrity Hash** | `sha256:UNAVAILABLE_MOCK_DATA` |
 
 ---
 
@@ -53,12 +53,12 @@
 | Hyperparameter | Value | Description |
 | :--- | :---: | :--- |
 | `model_type` | `CreditCardImbalanceMLP` | Neural Network or Classifier Architecture |
-| `strategy` | `fedavg` | Optimization / Aggregation Strategy |
+| `strategy` | `fedprox` | Optimization / Aggregation Strategy |
 | `seeds` | `[42]` | Evaluated Random Seed(s) |
-| `num_rounds` | `5` | Federated Communication Rounds / Epochs |
-| `local_epochs` | `2` | Client Local SGD Epochs per Round |
+| `num_rounds` | `10` | Federated Communication Rounds / Epochs |
+| `local_epochs` | `3` | Client Local SGD Epochs per Round |
 | `batch_size` | `64` | Mini-Batch Size |
-| `learning_rate` | `0.002` | Client Optimizer Learning Rate |
+| `learning_rate` | `0.001` | Client Optimizer Learning Rate |
 | `dp_enabled` | `False` | Differential Privacy Guarantee Active |
 
 ---
@@ -73,12 +73,17 @@
 
 | Step / Round | Train Loss | Val Loss | PR-AUC | ROC-AUC | F1-Score | Duration |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 0 | 0.5355 | 0.5355 | 0.0019 | 0.5933 | 0.0006 | 0.00s |
-| 1 | 0.0468 | 0.0043 | 0.6593 | 0.9832 | 0.7857 | 22.59s |
-| 2 | 0.0381 | 0.0048 | 0.7210 | 0.9851 | 0.7843 | 22.39s |
-| 3 | 0.0336 | 0.0047 | 0.7765 | 0.9847 | 0.7861 | 24.70s |
-| 4 | 0.0301 | 0.0047 | 0.7708 | 0.9830 | 0.7921 | 21.70s |
-| 5 | 0.0285 | 0.0046 | 0.7750 | 0.9837 | 0.7882 | 23.86s |
+| 0 | 0.5481 | 0.5481 | 0.0057 | 0.7452 | 0.0000 | 0.00s |
+| 1 | 0.2725 | 0.0517 | 0.0042 | 0.6416 | 0.0000 | 1.65s |
+| 2 | 0.1865 | 0.0275 | 0.0030 | 0.5015 | 0.0000 | 1.68s |
+| 3 | 0.1931 | 0.0207 | 0.0028 | 0.4745 | 0.0000 | 1.69s |
+| 4 | 0.1991 | 0.0176 | 0.0027 | 0.4515 | 0.0000 | 1.69s |
+| 5 | 0.2030 | 0.0158 | 0.0026 | 0.4485 | 0.0000 | 1.66s |
+| 6 | 0.2051 | 0.0149 | 0.0029 | 0.4895 | 0.0000 | 1.70s |
+| 7 | 0.2046 | 0.0145 | 0.0031 | 0.5285 | 0.0000 | 1.72s |
+| 8 | 0.2026 | 0.0146 | 0.0032 | 0.5505 | 0.0000 | 1.64s |
+| 9 | 0.1985 | 0.0152 | 0.0033 | 0.5535 | 0.0000 | 1.68s |
+| 10 | 0.1915 | 0.0160 | 0.0033 | 0.5561 | 0.0000 | 1.67s |
 
 ---
 
@@ -99,4 +104,37 @@
 - **Federal Reserve SR 11-7 Compliance**: Experimental evaluation is calibrated against fixed random seeds and out-of-time chronological validation splits.
 
 ---
-*Dossier generated automatically by CF-Intelligence Experiment Harness v1.0.0 on 2026-09-26T18:36:38.403547+00:00.*
+*Dossier generated automatically by CF-Intelligence Experiment Harness v1.0.0 on 2026-10-07T17:03:26.510721+00:00.*
+
+
+---
+
+## 9. Preregistered Scientific Protocol Revalidation (`PROT-CC-REVAL-01`)
+
+> **Protocol Identifier:** `PROT-CC-REVAL-01`  
+> **Protocol SHA-256:** `93af866637655f464865ed752bd77130ba98bdc06c878661dec33974dcdeed40`  
+> **Scientific Target:** `experiments/credit_card/report.md`  
+> **Dataset Specification:** Synthetic consortium credit card benchmark fixture (`is_synthetic=True`, seed 42)  
+> **Execution Status:** `EXPERIMENT_EXECUTION_SUCCESS` (`COMPLETED` in 47.15s)  
+> **Reproducibility Status:** `BIT_FOR_BIT_IDENTICAL` (Deterministic under seed 42)  
+> **External Test Data Exposure:** `0` (Strictly zero exposure of protected external data)
+
+### Acceptance Criteria Mechanical Evaluation Table
+
+| Metric | Measured Value | Preregistered Criterion | Evaluation Status |
+| :--- | :---: | :---: | :---: |
+| **Precision-Recall AUC (PR-AUC)** | **0.0033** | $\ge 0.85$ | ❌ **FAIL** |
+| **ROC-AUC** | **0.5561** | $\ge 0.90$ | ❌ **FAIL** |
+| **Brier Calibration Score** | **0.0020** | $\le 0.05$ | ✅ **PASS** |
+| **Overall Acceptance Contract** | — | All Criteria Met | ❌ **FAIL** |
+
+### Scientific Verdict & Negative Result Preservation
+- **Execution Success**: The experiment executed cleanly to full convergence across 10 communication rounds without infrastructure failure.
+- **Negative Acceptance Outcome**: The trained federated model on the synthetic consortium benchmark fixture achieved PR-AUC 0.0033 and ROC-AUC 0.5561, failing the preregistered acceptance thresholds ($\ge 0.85$ and $\ge 0.90$).
+- **Calibration & Extreme Imbalance Nuance**: The low Brier calibration score (**0.0020**) is mathematically dominated by the overwhelming prevalence of the negative majority class (99.85% non-fraud). It indicates that the model predicts near-zero probabilities for all transactions, reflecting the baseline prevalence rather than high-fidelity positive-class fraud discernment. It must **not** be interpreted in isolation as evidence of strong fraud detection performance.
+- **Tiny Positive-Class Statistical Limitation**: The holdout evaluation split (20% of 5,000 = 1,000 records) contains only **2 positive fraud cases** (998 non-fraud records). With $N_{\text{fraud}}=2$, threshold metrics (Precision, Recall, F1) and area under curves (PR-AUC, ROC-AUC) exhibit extreme sample-variance sensitivity and limited statistical power.
+- **Synthetic Fixture Provenance**: This experiment is executed against an in-process synthetic test fixture (`is_synthetic=True`, seed 42) created for federated algorithm verification, NOT real-world production credit card transactions or the external Kaggle European Credit Card dataset. It must not be cited or represented as real-world empirical validation.
+- **External Disclosure & Readiness Scope**: "External use ready" certifies that the experiment is methodologically complete, bit-for-bit reproducible, and safe for transparent negative-result scientific publication. It does **not** imply that the model meets operational SLA or is production-ready.
+- **No Post-Hoc Tuning**: In compliance with repository Runtime Truth rules and scientific preregistration integrity, hyperparameters, seeds, and thresholds were **not modified** post-hoc.
+- **Historical Supersession**: This revalidated report supersedes the historical unrevalidated dossier (commit `f2acbdd6c5`, preserved at [`report.historical_unrevalidated.md`](report.historical_unrevalidated.md)).
+

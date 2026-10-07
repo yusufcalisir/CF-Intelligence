@@ -486,11 +486,11 @@ class FederatedCreditCardTrainer:
             "precision": round(prec, 5),
             "recall": round(rec, 5),
             "f1_score": round(f1, 5),
-            "recall_at_001_fpr": fixed_recalls.get("recall_at_0_0001_fpr", 0.0),
-            "recall_at_005_fpr": fixed_recalls.get("recall_at_0_0005_fpr", 0.0),
-            "recall_at_01_fpr": fixed_recalls.get("recall_at_0_001_fpr", 0.0),
-            "recall_at_05_fpr": fixed_recalls.get("recall_at_0_005_fpr", 0.0),
-            "recall_at_1_fpr": fixed_recalls.get("recall_at_0_01_fpr", 0.0),
+            "recall_at_001_fpr": fixed_recalls.get("recall_at_0_0001_fpr"),
+            "recall_at_005_fpr": fixed_recalls.get("recall_at_0_0005_fpr"),
+            "recall_at_01_fpr": fixed_recalls.get("recall_at_0_001_fpr"),
+            "recall_at_05_fpr": fixed_recalls.get("recall_at_0_005_fpr"),
+            "recall_at_1_fpr": fixed_recalls.get("recall_at_0_01_fpr"),
         }
 
         return avg_loss, probs_arr, metrics
@@ -871,9 +871,9 @@ def plot_multi_paradigm_roc(
 
 
 def plot_imbalance_robustness_barchart(
-    prauc_map: Mapping[str, float],
-    rocauc_map: Mapping[str, float],
-    rec01_map: Mapping[str, float],
+    prauc_map: Mapping[str, float | None],
+    rocauc_map: Mapping[str, float | None],
+    rec01_map: Mapping[str, float | None],
     output_path: Path | str,
 ) -> Path:
     """Grouped bar chart highlighting Bank C silo collapse vs Federated rescue."""
@@ -884,19 +884,21 @@ def plot_imbalance_robustness_barchart(
     x = np.arange(len(models))
     width = 0.25
 
-    p1 = [prauc_map[m] for m in models]
-    p2 = [rocauc_map[m] for m in models]
-    p3 = [rec01_map[m] for m in models]
+    p1 = [(prauc_map.get(m) or 0.0) for m in models]
+    p2 = [(rocauc_map.get(m) or 0.0) for m in models]
+    p3 = [(rec01_map.get(m) or 0.0) for m in models]
 
     b1 = ax.bar(x - width, p1, width, label="PR-AUC", color="#1f77b4", edgecolor="#0e4377", lw=1.1)
     b2 = ax.bar(x, p2, width, label="ROC-AUC", color="#2ca02c", edgecolor="#145214", lw=1.1)
     b3 = ax.bar(x + width, p3, width, label="Recall @ 0.1% FPR", color="#ff7f0e", edgecolor="#994c00", lw=1.1)
 
-    for bars in (b1, b2, b3):
-        for bar in bars:
+    for bars, m_map in ((b1, prauc_map), (b2, rocauc_map), (b3, rec01_map)):
+        for bar, m in zip(bars, models):
+            val = m_map.get(m)
             h = bar.get_height()
+            label_text = f"{val:.3f}" if val is not None else "N/A"
             ax.annotate(
-                f"{h:.3f}",
+                label_text,
                 xy=(bar.get_x() + bar.get_width() / 2, h),
                 xytext=(0, 2),
                 textcoords="offset points",
@@ -926,6 +928,14 @@ def plot_imbalance_robustness_barchart(
 # ===========================================================================
 
 
+def _format_metric(val: float | None, precision: int = 4, as_pct: bool = False) -> str:
+    if val is None:
+        return "N/A"
+    if as_pct:
+        return f"{val * 100:.{precision}f}%"
+    return f"{val:.{precision}f}"
+
+
 def generate_creditcard_audit_dossier(
     partition_diagnostics: dict[str, Any],
     fed_results: dict[str, Any],
@@ -943,18 +953,23 @@ def generate_creditcard_audit_dossier(
     m_b = silos.get("bank_b", {}).get("metrics", {})
     m_a = silos.get("bank_a", {}).get("metrics", {})
 
-    fed_prauc = m_fed.get("pr_auc", 0.0)
-    pooled_prauc = m_pooled.get("pr_auc", 0.0)
-    silo_c_prauc = m_c.get("pr_auc", 0.0)
-    silo_mean_prauc = consortium_mean.get("pr_auc", 0.0)
+    fed_prauc = m_fed.get("pr_auc")
+    pooled_prauc = m_pooled.get("pr_auc")
+    silo_c_prauc = m_c.get("pr_auc")
+    silo_mean_prauc = consortium_mean.get("pr_auc")
 
-    collab_gain = fed_prauc - silo_mean_prauc
-    bank_c_uplift = fed_prauc - silo_c_prauc
-    cent_gap = pooled_prauc - fed_prauc
-    efficiency = (fed_prauc / pooled_prauc * 100.0) if pooled_prauc > 0 else 0.0
+    collab_gain = (fed_prauc - silo_mean_prauc) if (fed_prauc is not None and silo_mean_prauc is not None) else None
+    bank_c_uplift = (fed_prauc - silo_c_prauc) if (fed_prauc is not None and silo_c_prauc is not None) else None
+    cent_gap = (pooled_prauc - fed_prauc) if (pooled_prauc is not None and fed_prauc is not None) else None
+    efficiency = (fed_prauc / pooled_prauc * 100.0) if (fed_prauc is not None and pooled_prauc is not None and pooled_prauc > 0) else None
 
     collab_sym = r"$\Delta_{\mathrm{collab}}$"
     privacy_sym = r"$\Delta_{\mathrm{privacy}}$"
+
+    eff_str = f"{efficiency:.2f}%" if efficiency is not None else "N/A"
+    collab_str = f"{collab_gain:+.4f} PR-AUC" if collab_gain is not None else "N/A"
+    uplift_str = f"{bank_c_uplift:+.4f} PR-AUC" if bank_c_uplift is not None else "N/A"
+    cent_gap_str = f"{cent_gap:.4f} PR-AUC" if cent_gap is not None else "N/A"
 
     dossier = f"""# 💳 European Credit Card Fraud Extreme Imbalance Federated Benchmark Dossier
 
@@ -970,7 +985,7 @@ def generate_creditcard_audit_dossier(
 Under extreme financial class imbalance (578:1 ratio), institutions with sparse transaction flows or low absolute fraud volume suffer acute fraud blindness. This benchmark demonstrates that:
 1. **Isolated Model Starvation**: An institution with low fraud incidence (`bank_c`, 2 fraud cases) completely fails to learn effective decision boundaries in isolation, yielding near-zero Recall @ 0.1% FPR.
 2. **Federated Collaborative Rescue**: Participating in Federated Learning (FedAvg / FedProx) enables `bank_c` to attain high fraud detection capability without sharing customer transactions.
-3. **High Privacy-Preserving Efficiency**: The federated consensus captures **{efficiency:.2f}%** of the theoretical centralized ceiling without requiring data pooling.
+3. **High Privacy-Preserving Efficiency**: The federated consensus captures **{eff_str}** of the theoretical centralized ceiling without requiring data pooling.
 
 ---
 
@@ -978,20 +993,20 @@ Under extreme financial class imbalance (578:1 ratio), institutions with sparse 
 
 | Evaluation Paradigm | Model Classification | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Recall @ 0.5% FPR | Brier Score | Compliance & Legal Perimeter |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Centralized Upper Bound** | Monolithic Pooled | **{m_pooled.get('pr_auc', 0.0):.4f}** | **{m_pooled.get('roc_auc', 0.0):.4f}** | **{m_pooled.get('recall_at_01_fpr', 0.0)*100:.2f}%** | **{m_pooled.get('recall_at_05_fpr', 0.0)*100:.2f}%** | **{m_pooled.get('brier_score', 0.0):.4f}** | ❌ **Illegal Data Pooling** (GDPR/KVKK Breach) |
-| **Federated Champion (FedAvg)** | `PRODUCTION_CHAMPION` | **{fed_prauc:.4f}** | **{m_fed.get('roc_auc', 0.0):.4f}** | **{m_fed.get('recall_at_01_fpr', 0.0)*100:.2f}%** | **{m_fed.get('recall_at_05_fpr', 0.0)*100:.2f}%** | **{m_fed.get('brier_score', 0.0):.4f}** | ✅ **100% Compliant** (Zero Raw PII, SecAgg) |
-| **Bank A Silo (Large Retail)** | Isolated Silo | {m_a.get('pr_auc', 0.0):.4f} | {m_a.get('roc_auc', 0.0):.4f} | {m_a.get('recall_at_01_fpr', 0.0)*100:.2f}% | {m_a.get('recall_at_05_fpr', 0.0)*100:.2f}% | {m_a.get('brier_score', 0.0):.4f} | ⚠️ Single-Bank Perimeter |
-| **Bank B Silo (Challenger)** | Isolated Silo | {m_b.get('pr_auc', 0.0):.4f} | {m_b.get('roc_auc', 0.0):.4f} | {m_b.get('recall_at_01_fpr', 0.0)*100:.2f}% | {m_b.get('recall_at_05_fpr', 0.0)*100:.2f}% | {m_b.get('brier_score', 0.0):.4f} | ⚠️ Single-Bank Perimeter |
-| **Bank C Silo (Near-Zero Fraud)** | Isolated Silo | {silo_c_prauc:.4f} | {m_c.get('roc_auc', 0.0):.4f} | {m_c.get('recall_at_01_fpr', 0.0)*100:.2f}% | {m_c.get('recall_at_05_fpr', 0.0)*100:.2f}% | {m_c.get('brier_score', 0.0):.4f} | 🚨 **Severe Data Starvation Failure** |
-| **Consortium Silo Average** | Baseline Mean | {silo_mean_prauc:.4f} | {consortium_mean.get('roc_auc', 0.0):.4f} | {consortium_mean.get('recall_at_01_fpr', 0.0)*100:.2f}% | — | — | ⚠️ Baseline Silo Mean |
+| **Centralized Upper Bound** | Monolithic Pooled | **{_format_metric(m_pooled.get('pr_auc'))}** | **{_format_metric(m_pooled.get('roc_auc'))}** | **{_format_metric(m_pooled.get('recall_at_01_fpr'), 2, True)}** | **{_format_metric(m_pooled.get('recall_at_05_fpr'), 2, True)}** | **{_format_metric(m_pooled.get('brier_score'))}** | ❌ **Illegal Data Pooling** (GDPR/KVKK Breach) |
+| **Federated Champion (FedAvg)** | `PRODUCTION_CHAMPION` | **{_format_metric(fed_prauc)}** | **{_format_metric(m_fed.get('roc_auc'))}** | **{_format_metric(m_fed.get('recall_at_01_fpr'), 2, True)}** | **{_format_metric(m_fed.get('recall_at_05_fpr'), 2, True)}** | **{_format_metric(m_fed.get('brier_score'))}** | ✅ **100% Compliant** (Zero Raw PII, SecAgg) |
+| **Bank A Silo (Large Retail)** | Isolated Silo | {_format_metric(m_a.get('pr_auc'))} | {_format_metric(m_a.get('roc_auc'))} | {_format_metric(m_a.get('recall_at_01_fpr'), 2, True)} | {_format_metric(m_a.get('recall_at_05_fpr'), 2, True)} | {_format_metric(m_a.get('brier_score'))} | ⚠️ Single-Bank Perimeter |
+| **Bank B Silo (Challenger)** | Isolated Silo | {_format_metric(m_b.get('pr_auc'))} | {_format_metric(m_b.get('roc_auc'))} | {_format_metric(m_b.get('recall_at_01_fpr'), 2, True)} | {_format_metric(m_b.get('recall_at_05_fpr'), 2, True)} | {_format_metric(m_b.get('brier_score'))} | ⚠️ Single-Bank Perimeter |
+| **Bank C Silo (Near-Zero Fraud)** | Isolated Silo | {_format_metric(silo_c_prauc)} | {_format_metric(m_c.get('roc_auc'))} | {_format_metric(m_c.get('recall_at_01_fpr'), 2, True)} | {_format_metric(m_c.get('recall_at_05_fpr'), 2, True)} | {_format_metric(m_c.get('brier_score'))} | 🚨 **Severe Data Starvation Failure** |
+| **Consortium Silo Average** | Baseline Mean | {_format_metric(silo_mean_prauc)} | {_format_metric(consortium_mean.get('roc_auc'))} | {_format_metric(consortium_mean.get('recall_at_01_fpr'), 2, True)} | — | — | ⚠️ Baseline Silo Mean |
 
 ---
 
 ## 3. Mathematical Value Quantification
 
-- **Collaborative Gain ({collab_sym})**: **{collab_gain:+.4f} PR-AUC** relative to the average isolated bank.
-- **Bank C Near-Zero Positive Uplift**: **{bank_c_uplift:+.4f} PR-AUC** (Expanding Bank C's fraud interception capability dramatically from near-zero recall to consortium production levels).
-- **Centralization Gap ({privacy_sym})**: **{cent_gap:.4f} PR-AUC** (The federated model captures **{efficiency:.2f}%** of the theoretical centralized ceiling).
+- **Collaborative Gain ({collab_sym})**: **{collab_str}** relative to the average isolated bank.
+- **Bank C Near-Zero Positive Uplift**: **{uplift_str}** (Expanding Bank C's fraud interception capability dramatically from near-zero recall to consortium production levels).
+- **Centralization Gap ({privacy_sym})**: **{cent_gap_str}** (The federated model captures **{eff_str}** of the theoretical centralized ceiling).
 
 ---
 
@@ -1159,30 +1174,44 @@ def run_creditcard_benchmark(
 
     p_roc = plot_multi_paradigm_roc(roc_curves_dict, plots_dir / "roc_curves.png")
 
+    if not synthetic_eval:
+        required_keys = ["pr_auc", "roc_auc", "recall_at_01_fpr"]
+        for model_name, m_dict in [
+            ("centralized_pooled", pooled_results.get("metrics", {})),
+            ("federated_fedavg", fed_results.get("fedavg", {}).get("final_metrics", {})),
+            ("bank_c_silo", silo_results.get("silos", {}).get("bank_c", {}).get("metrics", {})),
+        ]:
+            missing = [k for k in required_keys if m_dict.get(k) is None]
+            if missing:
+                raise RuntimeError(
+                    f"Canonical benchmark requires complete empirical evaluation metrics; "
+                    f"missing {missing} in {model_name}. Cannot fabricate results."
+                )
+
     # Grouped bar chart
     barchart_prauc = {
-        "Bank C Silo (Near-Zero)": silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("pr_auc", 0.0),
-        "Bank B Silo": silo_results["silos"].get("bank_b", {}).get("metrics", {}).get("pr_auc", 0.0),
-        "Bank A Silo": silo_results["silos"].get("bank_a", {}).get("metrics", {}).get("pr_auc", 0.0),
-        "Consortium Silo Mean": silo_results["consortium_mean"]["pr_auc"],
-        "Federated (FedAvg)": fed_results["fedavg"]["final_metrics"]["pr_auc"],
-        "Centralized Pooled": pooled_results["metrics"]["pr_auc"],
+        "Bank C Silo (Near-Zero)": silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("pr_auc"),
+        "Bank B Silo": silo_results["silos"].get("bank_b", {}).get("metrics", {}).get("pr_auc"),
+        "Bank A Silo": silo_results["silos"].get("bank_a", {}).get("metrics", {}).get("pr_auc"),
+        "Consortium Silo Mean": silo_results["consortium_mean"].get("pr_auc"),
+        "Federated (FedAvg)": fed_results["fedavg"]["final_metrics"].get("pr_auc"),
+        "Centralized Pooled": pooled_results["metrics"].get("pr_auc"),
     }
     barchart_rocauc = {
-        "Bank C Silo (Near-Zero)": silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("roc_auc", 0.0),
-        "Bank B Silo": silo_results["silos"].get("bank_b", {}).get("metrics", {}).get("roc_auc", 0.0),
-        "Bank A Silo": silo_results["silos"].get("bank_a", {}).get("metrics", {}).get("roc_auc", 0.0),
-        "Consortium Silo Mean": silo_results["consortium_mean"]["roc_auc"],
-        "Federated (FedAvg)": fed_results["fedavg"]["final_metrics"]["roc_auc"],
-        "Centralized Pooled": pooled_results["metrics"]["roc_auc"],
+        "Bank C Silo (Near-Zero)": silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("roc_auc"),
+        "Bank B Silo": silo_results["silos"].get("bank_b", {}).get("metrics", {}).get("roc_auc"),
+        "Bank A Silo": silo_results["silos"].get("bank_a", {}).get("metrics", {}).get("roc_auc"),
+        "Consortium Silo Mean": silo_results["consortium_mean"].get("roc_auc"),
+        "Federated (FedAvg)": fed_results["fedavg"]["final_metrics"].get("roc_auc"),
+        "Centralized Pooled": pooled_results["metrics"].get("roc_auc"),
     }
     barchart_rec01 = {
-        "Bank C Silo (Near-Zero)": silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("recall_at_01_fpr", 0.0),
-        "Bank B Silo": silo_results["silos"].get("bank_b", {}).get("metrics", {}).get("recall_at_01_fpr", 0.0),
-        "Bank A Silo": silo_results["silos"].get("bank_a", {}).get("metrics", {}).get("recall_at_01_fpr", 0.0),
-        "Consortium Silo Mean": silo_results["consortium_mean"]["recall_at_01_fpr"],
-        "Federated (FedAvg)": fed_results["fedavg"]["final_metrics"]["recall_at_01_fpr"],
-        "Centralized Pooled": pooled_results["metrics"]["recall_at_01_fpr"],
+        "Bank C Silo (Near-Zero)": silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("recall_at_01_fpr"),
+        "Bank B Silo": silo_results["silos"].get("bank_b", {}).get("metrics", {}).get("recall_at_01_fpr"),
+        "Bank A Silo": silo_results["silos"].get("bank_a", {}).get("metrics", {}).get("recall_at_01_fpr"),
+        "Consortium Silo Mean": silo_results["consortium_mean"].get("recall_at_01_fpr"),
+        "Federated (FedAvg)": fed_results["fedavg"]["final_metrics"].get("recall_at_01_fpr"),
+        "Centralized Pooled": pooled_results["metrics"].get("recall_at_01_fpr"),
     }
     p_bar = plot_imbalance_robustness_barchart(barchart_prauc, barchart_rocauc, barchart_rec01, plots_dir / "imbalance_robustness.png")
 
@@ -1260,10 +1289,26 @@ def run_creditcard_benchmark(
         "federated_fedavg": fed_results["fedavg"]["final_metrics"],
         "federated_fedprox": fed_results["fedprox"]["final_metrics"],
         "collaborative_gain": {
-            "mean_silo_delta_prauc": round(fed_results["fedavg"]["final_metrics"]["pr_auc"] - silo_results["consortium_mean"]["pr_auc"], 5),
-            "bank_c_delta_prauc": round(fed_results["fedavg"]["final_metrics"]["pr_auc"] - silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("pr_auc", 0.0), 5),
-            "centralization_gap": round(pooled_results["metrics"]["pr_auc"] - fed_results["fedavg"]["final_metrics"]["pr_auc"], 5),
-            "legacy_centralization_gap": round((legacy_pooled_results["metrics"]["pr_auc"] if legacy_pooled_results else 0.0) - fed_results["fedavg"]["final_metrics"]["pr_auc"], 5),
+            "mean_silo_delta_prauc": (
+                round(fed_results["fedavg"]["final_metrics"]["pr_auc"] - silo_results["consortium_mean"]["pr_auc"], 5)
+                if (fed_results["fedavg"]["final_metrics"].get("pr_auc") is not None and silo_results["consortium_mean"].get("pr_auc") is not None)
+                else None
+            ),
+            "bank_c_delta_prauc": (
+                round(fed_results["fedavg"]["final_metrics"]["pr_auc"] - silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("pr_auc"), 5)
+                if (fed_results["fedavg"]["final_metrics"].get("pr_auc") is not None and silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("pr_auc") is not None)
+                else None
+            ),
+            "centralization_gap": (
+                round(pooled_results["metrics"]["pr_auc"] - fed_results["fedavg"]["final_metrics"]["pr_auc"], 5)
+                if (pooled_results["metrics"].get("pr_auc") is not None and fed_results["fedavg"]["final_metrics"].get("pr_auc") is not None)
+                else None
+            ),
+            "legacy_centralization_gap": (
+                round((legacy_pooled_results["metrics"]["pr_auc"] if legacy_pooled_results else 0.0) - fed_results["fedavg"]["final_metrics"]["pr_auc"], 5)
+                if (legacy_pooled_results and legacy_pooled_results.get("metrics", {}).get("pr_auc") is not None and fed_results["fedavg"]["final_metrics"].get("pr_auc") is not None)
+                else None
+            ),
         },
     }
     comp_json_path.write_text(json.dumps(comp_data, indent=2), encoding="utf-8")
@@ -1351,10 +1396,23 @@ def run_creditcard_benchmark(
     raw_benchmark_dir.mkdir(parents=True, exist_ok=True)
     raw_benchmark_path = raw_benchmark_dir / "fraud_benchmark_credit_card.json"
 
+    has_all_metrics = all(
+        m_dict.get(k) is not None
+        for m_dict in (
+            pooled_results.get("metrics", {}),
+            fed_results.get("fedavg", {}).get("final_metrics", {}),
+            silo_results.get("silos", {}).get("bank_c", {}).get("metrics", {}),
+        )
+        for k in ("pr_auc", "roc_auc", "recall_at_01_fpr")
+    )
+    benchmark_status = "CANONICAL" if (not synthetic_eval) else ("SMOKE_TEST" if has_all_metrics else "INCOMPLETE")
+
     raw_data = {
         "timestamp_utc": datetime.now(UTC).isoformat(),
         "dataset": "credit_card",
         "dataset_sha256": dataset_hash,
+        "status": benchmark_status,
+        "is_canonical": (not synthetic_eval) and has_all_metrics,
         "environment": {
             "os": f"{platform.system()}-{platform.release()}-{platform.version()}",
             "cpu": platform.processor() or "AMD64",
@@ -1364,11 +1422,11 @@ def run_creditcard_benchmark(
         "centralized_baseline": {
             "epochs": centralized_epochs,
             "budget_equalized": (centralized_epochs == rounds * local_epochs),
-            "pr_auc": pooled_results["metrics"]["pr_auc"],
-            "roc_auc": pooled_results["metrics"]["roc_auc"],
-            "recall_at_0_1_pct_fpr": pooled_results["metrics"]["recall_at_01_fpr"],
-            "recall_at_0_5_pct_fpr": pooled_results["metrics"]["recall_at_05_fpr"],
-            "recall_at_1_0_pct_fpr": pooled_results["metrics"]["recall_at_1_fpr"],
+            "pr_auc": pooled_results["metrics"].get("pr_auc"),
+            "roc_auc": pooled_results["metrics"].get("roc_auc"),
+            "recall_at_0_1_pct_fpr": pooled_results["metrics"].get("recall_at_01_fpr"),
+            "recall_at_0_5_pct_fpr": pooled_results["metrics"].get("recall_at_05_fpr"),
+            "recall_at_1_0_pct_fpr": pooled_results["metrics"].get("recall_at_1_fpr"),
             "legacy_2ep_pr_auc": legacy_pooled_results["metrics"]["pr_auc"] if legacy_pooled_results else None,
         },
         "federated_fedavg": {
@@ -1376,17 +1434,21 @@ def run_creditcard_benchmark(
             "local_epochs": local_epochs,
             "effective_passes": rounds * local_epochs,
             "clients": num_clients,
-            "pr_auc": fed_results["fedavg"]["final_metrics"]["pr_auc"],
-            "roc_auc": fed_results["fedavg"]["final_metrics"]["roc_auc"],
-            "recall_at_0_1_pct_fpr": fed_results["fedavg"]["final_metrics"]["recall_at_01_fpr"],
-            "recall_at_0_5_pct_fpr": fed_results["fedavg"]["final_metrics"]["recall_at_05_fpr"],
-            "recall_at_1_0_pct_fpr": fed_results["fedavg"]["final_metrics"]["recall_at_1_fpr"],
-            "pr_auc_parity_ratio": (fed_results["fedavg"]["final_metrics"]["pr_auc"] / pooled_results["metrics"]["pr_auc"]) if pooled_results["metrics"]["pr_auc"] > 0 else 0.0,
+            "pr_auc": fed_results["fedavg"]["final_metrics"].get("pr_auc"),
+            "roc_auc": fed_results["fedavg"]["final_metrics"].get("roc_auc"),
+            "recall_at_0_1_pct_fpr": fed_results["fedavg"]["final_metrics"].get("recall_at_01_fpr"),
+            "recall_at_0_5_pct_fpr": fed_results["fedavg"]["final_metrics"].get("recall_at_05_fpr"),
+            "recall_at_1_0_pct_fpr": fed_results["fedavg"]["final_metrics"].get("recall_at_1_fpr"),
+            "pr_auc_parity_ratio": (
+                (fed_results["fedavg"]["final_metrics"]["pr_auc"] / pooled_results["metrics"]["pr_auc"])
+                if (pooled_results["metrics"].get("pr_auc") is not None and pooled_results["metrics"]["pr_auc"] > 0 and fed_results["fedavg"]["final_metrics"].get("pr_auc") is not None)
+                else None
+            ),
         },
         "bank_c_near_zero_silo": {
-            "pr_auc": silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("pr_auc", 0.0),
-            "roc_auc": silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("roc_auc", 0.0),
-            "recall_at_0_1_pct_fpr": silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("recall_at_01_fpr", 0.0),
+            "pr_auc": silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("pr_auc"),
+            "roc_auc": silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("roc_auc"),
+            "recall_at_0_1_pct_fpr": silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("recall_at_01_fpr"),
         },
     }
     raw_benchmark_path.write_text(json.dumps(raw_data, indent=2), encoding="utf-8")

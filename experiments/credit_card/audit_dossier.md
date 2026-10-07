@@ -1,9 +1,11 @@
 # 💳 European Credit Card Fraud Extreme Imbalance Federated Benchmark Dossier
 
-**Execution Date**: 2026-09-30 17:53:57 UTC
+**Execution Date**: 2026-09-30 17:53:57 UTC (Historical Snapshot)
 **Dataset**: European Credit Card Fraud Detection (284,807 transactions, 0.172% fraud prevalence)
 **Partitioning Mode**: Extreme Imbalance Skew (`bank_c` near-zero positive collapse scenario)
 **Privacy Perimeter**: Zero Raw PII, Strictly Local Gradient Updates, Federated Consensus
+
+> **Historical Benchmark Context**: This document is a historical benchmark snapshot from 2026-09-30. The canonical revalidated benchmark dossier under preregistered protocol `PROT-CC-REVAL-01` is documented in [`report.md`](report.md).
 
 ---
 

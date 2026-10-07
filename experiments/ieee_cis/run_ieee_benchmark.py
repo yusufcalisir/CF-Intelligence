@@ -975,16 +975,34 @@ def run_ieee_benchmark(
     m_fedavg = optimizer_results["fedavg"]["final_metrics"]
     m_fedprox = optimizer_results["fedprox"]["final_metrics"]
 
-    pooled_pr_auc = comp_pooled.get("pr_auc", 0.781)
-    fedavg_pr_auc = m_fedavg.get("pr_auc", 0.755)
-    fedprox_pr_auc = m_fedprox.get("pr_auc", 0.750)
+    if not is_synthetic:
+        required_keys = ["pr_auc", "roc_auc", "recall_at_01_fpr", "recall_at_05_fpr", "recall_at_1_fpr"]
+        for model_name, m_dict in [("pooled_gradient_boosting", comp_pooled), ("fedavg", m_fedavg), ("fedprox", m_fedprox)]:
+            missing = [k for k in required_keys if m_dict.get(k) is None]
+            if missing:
+                raise RuntimeError(
+                    f"Canonical benchmark requires complete empirical evaluation metrics; "
+                    f"missing {missing} in {model_name}. Cannot fabricate results."
+                )
+
+    has_all_metrics = all(
+        m_dict.get(k) is not None
+        for m_dict in (comp_pooled, m_fedavg, m_fedprox)
+        for k in ("pr_auc", "roc_auc", "recall_at_01_fpr", "recall_at_05_fpr", "recall_at_1_fpr")
+    )
+
+    pooled_pr_auc = comp_pooled.get("pr_auc")
+    fedavg_pr_auc = m_fedavg.get("pr_auc")
+    fedprox_pr_auc = m_fedprox.get("pr_auc")
+
+    benchmark_status = "CANONICAL" if (not is_synthetic) else ("SMOKE_TEST" if has_all_metrics else "INCOMPLETE")
 
     raw_benchmark_data = {
         "timestamp_utc": datetime.now(UTC).isoformat(),
         "dataset": "ieee_cis",
         "dataset_type": "PROJECT_SYNTHETIC" if is_synthetic else "REAL_DATA",
-        "status": "SMOKE_TEST" if is_synthetic else "CANONICAL",
-        "is_canonical": not is_synthetic,
+        "status": benchmark_status,
+        "is_canonical": (not is_synthetic) and has_all_metrics,
         "environment": {
             "os": f"{platform.system()}-{platform.release()}-{platform.version()}",
             "cpu": platform.processor() or "AMD64",
@@ -993,30 +1011,30 @@ def run_ieee_benchmark(
         },
         "centralized_baseline": {
             "pr_auc": pooled_pr_auc,
-            "roc_auc": comp_pooled.get("roc_auc", 0.970),
-            "recall_at_0_1_pct_fpr": comp_pooled.get("recall_at_01_fpr", 0.369),
-            "recall_at_0_5_pct_fpr": comp_pooled.get("recall_at_05_fpr", 0.585),
-            "recall_at_1_0_pct_fpr": comp_pooled.get("recall_at_1_fpr", 0.769),
+            "roc_auc": comp_pooled.get("roc_auc"),
+            "recall_at_0_1_pct_fpr": comp_pooled.get("recall_at_01_fpr"),
+            "recall_at_0_5_pct_fpr": comp_pooled.get("recall_at_05_fpr"),
+            "recall_at_1_0_pct_fpr": comp_pooled.get("recall_at_1_fpr"),
         },
         "federated_fedavg": {
             "rounds": rounds,
             "clients": num_clients,
             "pr_auc": fedavg_pr_auc,
-            "roc_auc": m_fedavg.get("roc_auc", 0.967),
-            "recall_at_0_1_pct_fpr": m_fedavg.get("recall_at_01_fpr", 0.430),
-            "recall_at_0_5_pct_fpr": m_fedavg.get("recall_at_05_fpr", 0.600),
-            "recall_at_1_0_pct_fpr": m_fedavg.get("recall_at_1_fpr", 0.692),
-            "pr_auc_parity_ratio": (fedavg_pr_auc / pooled_pr_auc) if pooled_pr_auc > 0 else 0.0,
+            "roc_auc": m_fedavg.get("roc_auc"),
+            "recall_at_0_1_pct_fpr": m_fedavg.get("recall_at_01_fpr"),
+            "recall_at_0_5_pct_fpr": m_fedavg.get("recall_at_05_fpr"),
+            "recall_at_1_0_pct_fpr": m_fedavg.get("recall_at_1_fpr"),
+            "pr_auc_parity_ratio": (fedavg_pr_auc / pooled_pr_auc) if (fedavg_pr_auc is not None and pooled_pr_auc is not None and pooled_pr_auc > 0) else None,
         },
         "federated_fedprox": {
             "rounds": rounds,
             "clients": num_clients,
             "pr_auc": fedprox_pr_auc,
-            "roc_auc": m_fedprox.get("roc_auc", 0.965),
-            "recall_at_0_1_pct_fpr": m_fedprox.get("recall_at_01_fpr", 0.420),
-            "recall_at_0_5_pct_fpr": m_fedprox.get("recall_at_05_fpr", 0.590),
-            "recall_at_1_0_pct_fpr": m_fedprox.get("recall_at_1_fpr", 0.685),
-            "pr_auc_parity_ratio": (fedprox_pr_auc / pooled_pr_auc) if pooled_pr_auc > 0 else 0.0,
+            "roc_auc": m_fedprox.get("roc_auc"),
+            "recall_at_0_1_pct_fpr": m_fedprox.get("recall_at_01_fpr"),
+            "recall_at_0_5_pct_fpr": m_fedprox.get("recall_at_05_fpr"),
+            "recall_at_1_0_pct_fpr": m_fedprox.get("recall_at_1_fpr"),
+            "pr_auc_parity_ratio": (fedprox_pr_auc / pooled_pr_auc) if (fedprox_pr_auc is not None and pooled_pr_auc is not None and pooled_pr_auc > 0) else None,
         },
     }
     if is_synthetic:
