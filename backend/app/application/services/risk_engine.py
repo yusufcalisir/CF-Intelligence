@@ -216,17 +216,51 @@ class RiskScoringEngine:
 
     # ── Signal evaluators ─────────────────────
 
-    def _eval_ml_prediction(self, prediction: float) -> RiskSignal:
+    def _eval_ml_prediction(self, prediction: float | None) -> RiskSignal:
+        if prediction is None:
+            return RiskSignal(
+                signal_name="ml_prediction",
+                weight=0.0,
+                raw_value=0.0,
+                normalized_score=0.0,
+                explanation="ml_prediction: unassessed (prediction missing)",
+            )
+        try:
+            pred_val = float(prediction)
+            if math.isnan(pred_val) or math.isinf(pred_val):
+                return RiskSignal(
+                    signal_name="ml_prediction",
+                    weight=0.0,
+                    raw_value=0.0,
+                    normalized_score=0.0,
+                    explanation="ml_prediction: unassessed (prediction non-finite)",
+                )
+        except (ValueError, TypeError):
+            return RiskSignal(
+                signal_name="ml_prediction",
+                weight=0.0,
+                raw_value=0.0,
+                normalized_score=0.0,
+                explanation="ml_prediction: unassessed (prediction invalid)",
+            )
         return RiskSignal(
             signal_name="ml_prediction",
             weight=self.weights.ml_prediction,
-            raw_value=prediction,
-            normalized_score=max(0.0, min(1.0, prediction)),
-            explanation=f"ML model confidence: {prediction:.1%}",
+            raw_value=pred_val,
+            normalized_score=max(0.0, min(1.0, pred_val)),
+            explanation=f"ML model confidence: {pred_val:.1%}",
         )
 
     def _eval_velocity(self, txn: dict) -> RiskSignal:
-        velocity = txn.get("velocity", 0.0)
+        if "velocity" not in txn or txn["velocity"] is None:
+            return RiskSignal(
+                signal_name="velocity_rules",
+                weight=0.0,
+                raw_value=0.0,
+                normalized_score=0.0,
+                explanation="velocity_rules: unassessed (input missing)",
+            )
+        velocity = float(txn["velocity"])
         # Normalize: 0-3 is normal, >10 is extreme
         normalized = min(1.0, max(0.0, (velocity - 2) / 8))
         return RiskSignal(
@@ -239,9 +273,19 @@ class RiskScoringEngine:
         )
 
     def _eval_merchant_reputation(self, txn: dict) -> RiskSignal:
-        category = txn.get("merchant_category", "")
-        merchant_score = txn.get("merchant_risk_score", 0.10)
-        category_risk = MERCHANT_RISK.get(category, 0.1)
+        has_cat = "merchant_category" in txn and txn["merchant_category"] is not None
+        has_score = "merchant_risk_score" in txn and txn["merchant_risk_score"] is not None
+        if not has_cat and not has_score:
+            return RiskSignal(
+                signal_name="merchant_reputation",
+                weight=0.0,
+                raw_value=0.0,
+                normalized_score=0.0,
+                explanation="merchant_reputation: unassessed (input missing)",
+            )
+        category = str(txn.get("merchant_category") or "")
+        merchant_score = float(txn.get("merchant_risk_score") or 0.10) if has_score else 0.10
+        category_risk = MERCHANT_RISK.get(category, 0.1) if has_cat else 0.1
         # Blend merchant's own risk score with category risk, clamped to [0.0, 1.0]
         normalized = max(0.0, min(1.0, 0.6 * merchant_score + 0.4 * category_risk))
         return RiskSignal(
@@ -254,7 +298,15 @@ class RiskScoringEngine:
         )
 
     def _eval_country_risk(self, txn: dict) -> RiskSignal:
-        country = str(txn.get("country_code", "US")).upper()
+        if "country_code" not in txn or txn["country_code"] is None:
+            return RiskSignal(
+                signal_name="country_risk",
+                weight=0.0,
+                raw_value=0.0,
+                normalized_score=0.0,
+                explanation="country_risk: unassessed (input missing)",
+            )
+        country = str(txn["country_code"]).upper()
         risk = COUNTRY_RISK.get(country, 0.15)
         return RiskSignal(
             signal_name="country_risk",
@@ -265,7 +317,15 @@ class RiskScoringEngine:
         )
 
     def _eval_device_anomaly(self, txn: dict) -> RiskSignal:
-        device = txn.get("device_type", "web_browser")
+        if "device_type" not in txn or txn["device_type"] is None:
+            return RiskSignal(
+                signal_name="device_anomaly",
+                weight=0.0,
+                raw_value=0.0,
+                normalized_score=0.0,
+                explanation="device_anomaly: unassessed (input missing)",
+            )
+        device = str(txn["device_type"])
         # Simple heuristic: ATM and phone banking are higher risk channels
         device_scores = {
             "mobile_app": 0.10,
@@ -336,9 +396,28 @@ class RiskScoringEngine:
             )
 
         # Compare transaction amount to baseline
-        amount = txn.get("transaction_amount", 0)
-        mean_amt = baseline.get("mean_amount", 100)
-        std_amt = baseline.get("std_amount", 50)
+        if "transaction_amount" not in txn or txn["transaction_amount"] is None:
+            return RiskSignal(
+                signal_name="behavior_anomaly",
+                weight=0.0,
+                raw_value=0.0,
+                normalized_score=0.0,
+                explanation="behavior_anomaly: unassessed (transaction amount missing)",
+            )
+        amount = float(txn["transaction_amount"])
+
+        mean_amt_val = baseline.get("mean_amount")
+        std_amt_val = baseline.get("std_amount")
+        if mean_amt_val is None or std_amt_val is None:
+            return RiskSignal(
+                signal_name="behavior_anomaly",
+                weight=0.0,
+                raw_value=0.0,
+                normalized_score=0.0,
+                explanation="behavior_anomaly: unassessed (baseline statistics incomplete)",
+            )
+        mean_amt = float(mean_amt_val)
+        std_amt = float(std_amt_val)
 
         if std_amt > 0:
             z_score = abs(amount - mean_amt) / std_amt
@@ -358,15 +437,39 @@ class RiskScoringEngine:
         )
 
     def _eval_gnn_topological_risk(self, txn: dict) -> RiskSignal:
-        raw_gnn = txn.get(
-            "gnn_topological_risk", txn.get("gnn_score", txn.get("gnn_risk_score", 0.0))
-        )
+        raw_gnn = txn.get("gnn_topological_risk")
+        if raw_gnn is None:
+            raw_gnn = txn.get("gnn_score")
+        if raw_gnn is None:
+            raw_gnn = txn.get("gnn_risk_score")
+
+        if raw_gnn is None:
+            return RiskSignal(
+                signal_name="gnn_topological_risk",
+                weight=0.0,
+                raw_value=0.0,
+                normalized_score=0.0,
+                explanation="gnn_topological_risk: unassessed (input missing)",
+            )
         try:
             val = float(raw_gnn)
             if math.isnan(val) or math.isinf(val):
-                val = 0.0
+                return RiskSignal(
+                    signal_name="gnn_topological_risk",
+                    weight=0.0,
+                    raw_value=0.0,
+                    normalized_score=0.0,
+                    explanation="gnn_topological_risk: unassessed (invalid non-finite input)",
+                )
         except (ValueError, TypeError):
-            val = 0.0
+            return RiskSignal(
+                signal_name="gnn_topological_risk",
+                weight=0.0,
+                raw_value=0.0,
+                normalized_score=0.0,
+                explanation="gnn_topological_risk: unassessed (invalid non-numeric input)",
+            )
+
         normalized = max(0.0, min(1.0, val))
         weight = (
             self.weights.gnn_topological_risk

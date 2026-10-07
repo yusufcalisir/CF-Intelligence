@@ -157,12 +157,22 @@ export const Predictor: React.FC = () => {
               <div className="flex items-center justify-between bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
                 <div>
                   <span className="text-slate-400">Risk Score</span>
-                  <p className={`font-mono text-2xl font-bold ${result.is_fraud_suspected ? 'text-rose-500' : 'text-emerald-400'}`}>
-                    {result.risk_score.toFixed(1)} / 1000
+                  <p className={`font-mono text-2xl font-bold ${
+                    result.risk_level === 'UNASSESSED'
+                      ? 'text-amber-400'
+                      : result.is_fraud_suspected
+                      ? 'text-rose-500'
+                      : 'text-emerald-400'
+                  }`}>
+                    {result.risk_level === 'UNASSESSED' ? 'UNASSESSED' : `${result.risk_score.toFixed(1)} / 1000`}
                   </p>
                 </div>
                 <span className={`px-3 py-1 rounded-full font-bold uppercase text-[11px] ${
-                  result.is_fraud_suspected ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  result.policy_action === 'HOLD_FOR_REVIEW'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : result.is_fraud_suspected
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                 }`}>
                   {result.policy_action}
                 </span>

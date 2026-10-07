@@ -102,24 +102,25 @@ class TestInputMissingSignalsAndRobustness:
     """Verifies calculation behavior when signals are partially missing or malformed."""
 
     def test_empty_signals_dictionary(self) -> None:
-        """Empty input dictionary defaults all 9 signals to 0.0."""
+        """Empty input dictionary leaves all signals unassessed with UNASSESSED tier."""
         res = calculate_weighted_score({})
         assert res.score == 0.0
-        assert res.tier == RiskTier.MINIMAL
-        assert res.decision == PolicyAction.ALLOW
+        assert res.tier == RiskTier.UNASSESSED
+        assert res.decision == PolicyAction.HOLD_FOR_REVIEW
         assert len(res.signals) == 9
 
     def test_partial_signals_dictionary(self) -> None:
-        """Supplying only a subset of signals defaults unspecified signals to 0.0."""
+        """Supplying only a subset of signals renormalizes over assessed signals without zero dilution."""
         # Only ML=0.80 and velocity=0.50 supplied
         # ml: 0.25 * 0.80 = 0.20
         # velocity: 0.15 * 0.50 = 0.075
-        # Total = 0.275 -> Score = 275.0 -> Tier LOW
+        # Effective denominator: 0.25 + 0.15 = 0.40
+        # Normalized: 0.275 / 0.40 = 0.6875 -> Score = 687.5 -> Tier HIGH
         signals = {"ml_prediction": 0.80, "velocity_rules": 0.50}
         res = calculate_weighted_score(signals)
 
-        assert abs(res.score - 275.0) < 1e-4
-        assert res.tier == RiskTier.LOW
+        assert abs(res.score - 687.5) < 1e-4
+        assert res.tier == RiskTier.HIGH
 
     def test_unknown_extra_keys_ignored(self) -> None:
         """Unrecognized keys in signal dictionary do not alter standard weights."""
@@ -129,17 +130,17 @@ class TestInputMissingSignalsAndRobustness:
             "another_extra_key": 100.0,
         }
         res = calculate_weighted_score(signals)
-        # ml_prediction = 0.5 * 0.25 = 0.125 -> Score = 125.0
-        assert abs(res.score - 125.0) < 1e-4
+        # ml_prediction = 0.5 * 0.25 / 0.25 = 0.5 -> Score = 500.0
+        assert abs(res.score - 500.0) < 1e-4
 
     def test_nan_values_in_signals_dict(self) -> None:
         """NaN values in signal dictionary are safely clamped to 0.0 without error."""
         signals = {
             "ml_prediction": float("nan"),
-            "velocity_rules": 0.50,  # 0.15 * 0.50 = 0.075
+            "velocity_rules": 0.50,  # 0.15 * 0.50 = 0.075 / 0.40 = 0.1875 -> 187.5
         }
         res = calculate_weighted_score(signals)
-        assert abs(res.score - 75.0) < 1e-4
+        assert abs(res.score - 187.5) < 1e-4
         assert not math.isnan(res.score)
 
 
@@ -165,7 +166,8 @@ class TestWeightConfigurationInvariants:
         res = calculate_weighted_score(signals, weights=zero_weights)
         assert res.score == 0.0
         assert res.normalized_score == 0.0
-        assert res.tier == RiskTier.MINIMAL
+        assert res.tier == RiskTier.UNASSESSED
+        assert res.decision == PolicyAction.HOLD_FOR_REVIEW
 
     def test_signal_and_composite_serialization(self) -> None:
         """Verifies dictionary conversion for API and JSON serialization."""

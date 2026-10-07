@@ -304,13 +304,18 @@ class AlertTriageEngine:
             reasons.append(f"Low baseline risk score ({risk_score:.1f}/1000)")
 
         # 2. Amount impact escalation
-        amount = float(txn.get("transaction_amount", 0.0) or 0.0)
-        if amount >= 10000.0:
-            if priority == TriagePriority.P2_HIGH:
-                priority = TriagePriority.P1_CRITICAL
-            elif priority == TriagePriority.P3_MEDIUM:
-                priority = TriagePriority.P2_HIGH
-            reasons.append(f"High-value transaction amount (${amount:,.2f} >= $10,000 threshold)")
+        raw_amount = txn.get("transaction_amount")
+        if raw_amount is not None:
+            try:
+                amount = float(raw_amount)
+                if amount >= 10000.0:
+                    if priority == TriagePriority.P2_HIGH:
+                        priority = TriagePriority.P1_CRITICAL
+                    elif priority == TriagePriority.P3_MEDIUM:
+                        priority = TriagePriority.P2_HIGH
+                    reasons.append(f"High-value transaction amount (${amount:,.2f} >= $10,000 threshold)")
+            except (ValueError, TypeError):
+                pass
 
         # 3. Geopolitical sanctions and high-risk jurisdiction
         country = str(txn.get("country_code", "")).upper()
@@ -441,9 +446,18 @@ class AlertIntelligenceService:
                 )
 
                 # Deduplication sliding window processing
+                primary_id = (
+                    entity_ids[0]
+                    if entity_ids
+                    else (
+                        str(txn["customer_id"])
+                        if txn.get("customer_id")
+                        else (str(txn["transaction_id"]) if txn.get("transaction_id") else f"alert:{alert.id}")
+                    )
+                )
                 is_dup, alert = self._dedup_engine.process_alert(
                     alert=alert,
-                    primary_entity_id=entity_ids[0] if entity_ids else str(txn.get("customer_id", "")),
+                    primary_entity_id=primary_id,
                 )
 
                 # Re-evaluate triage on duplicate burst
@@ -471,6 +485,65 @@ class AlertIntelligenceService:
             len(self._dedup_engine._records),
         )
         return alerts
+
+    def generate_unassessed_hold_alert(
+        self,
+        bank_id: str,
+        transaction: dict,
+    ) -> Alert:
+        """Generate an informational investigation hold alert for an unassessed transaction.
+
+        An unassessed transaction lacks sufficient risk signals to compute an empirical
+        fraud score. In accordance with Runtime Truth invariants, no synthetic fraud score
+        is fabricated (risk_score remains 0.0), no false accusation of fraud is made
+        (severity is INFO, reason code is UNASSESSED_RISK_HOLD), and the transaction is
+        routed to the standard review queue (QUEUE_STANDARD) with status NEW for analyst review.
+        """
+        with self._lock:
+            txn_id = transaction.get("transaction_id", str(uuid.uuid4()))
+            entity_ids = self._extract_entity_ids(transaction, bank_id)
+            primary_id = (
+                entity_ids[0]
+                if entity_ids
+                else (
+                    str(transaction["customer_id"])
+                    if transaction.get("customer_id")
+                    else (str(transaction["transaction_id"]) if transaction.get("transaction_id") else f"alert:unassessed:{txn_id}")
+                )
+            )
+
+            alert = Alert(
+                bank_id=bank_id,
+                transaction_id=txn_id,
+                risk_score=0.0,
+                severity=AlertSeverity.INFO,
+                status=AlertStatus.NEW,
+                reason_codes=["UNASSESSED_RISK_HOLD"],
+                confidence=0.0,
+                involved_entity_ids=entity_ids,
+                model_confidence=0.0,
+                top_features=[],
+                risk_factors=["Risk assessment unavailable — transaction held for review"],
+                triage_priority=TriagePriority.P3_MEDIUM,
+                triage_action=TriageAction.QUEUE_STANDARD,
+                sla_minutes=1440,
+                triage_reasons=["Risk signals unassessed: automated settlement suspended pending manual review"],
+            )
+
+            # Deduplication sliding window processing
+            is_dup, alert = self._dedup_engine.process_alert(
+                alert=alert,
+                primary_entity_id=primary_id,
+            )
+
+            self._alert_store.set(alert.id, _alert_to_dict(alert))
+            logger.info(
+                "Generated unassessed hold alert %s for transaction %s (bank=%s)",
+                alert.id,
+                txn_id,
+                bank_id,
+            )
+            return alert
 
     def update_alert_status(
         self,
@@ -711,10 +784,19 @@ class AlertIntelligenceService:
             codes.append("NEW-ACCT")
         if txn.get("chargeback_count", 0) >= 2:
             codes.append("CB-HIST")
-        if txn.get("transaction_amount", 0) > 5000:
-            codes.append("HIGH-AMT")
-        if txn.get("hour_of_day", 12) < 5 or txn.get("hour_of_day", 12) > 22:
-            codes.append("ODD-HOUR")
+        if txn.get("transaction_amount") is not None:
+            try:
+                if float(txn["transaction_amount"]) > 5000:
+                    codes.append("HIGH-AMT")
+            except (ValueError, TypeError):
+                pass
+        if txn.get("hour_of_day") is not None:
+            try:
+                hour = int(txn["hour_of_day"])
+                if hour < 5 or hour > 22:
+                    codes.append("ODD-HOUR")
+            except (ValueError, TypeError):
+                pass
         return codes or ["ML-FLAG"]
 
     @staticmethod
@@ -768,7 +850,9 @@ class AlertIntelligenceService:
                 "merchant_category": 0.02,
             }
             for feat, base_weight in feature_weights.items():
-                val = txn.get(feat, 0)
+                if feat not in txn or txn[feat] is None:
+                    continue
+                val = txn[feat]
                 if isinstance(val, str):
                     val_num = hash(val) % 100 / 100  # Normalize categorical for weight
                 else:

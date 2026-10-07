@@ -78,11 +78,11 @@ class SettlementReceiptResponse(BaseModel):
     total_pool_usd: float = Field(..., description="Total deposited pool amount in USD")
     total_distributed_usd: float = Field(..., description="Sum of distributed payouts in USD")
     total_distributed_wei: str = Field(..., description="Total distributed amount in Wei")
-    gas_used: int = Field(..., description="Gas units consumed by execution")
-    effective_gas_price_gwei: float = Field(..., description="Effective gas price in Gwei")
+    gas_used: int | None = Field(default=None, description="Gas units consumed by execution")
+    effective_gas_price_gwei: float | None = Field(default=None, description="Effective gas price in Gwei")
     audit_proof_hash: str = Field(..., description="Linked immutable audit chain proof hash")
     mode: str = Field(default="SIMULATOR_FALLBACK", description="Execution mode: LIVE_EVM_RPC or SIMULATOR_FALLBACK")
-    audit_chain_verified: bool = Field(default=True, description="True if proof hash verified against ImmutableAuditChain")
+    audit_chain_verified: bool = Field(default=False, description="True if proof hash verified against ImmutableAuditChain")
     payouts: list[OnChainPayoutItem] = Field(..., description="Per-participant payout breakdown")
 
 
@@ -139,7 +139,7 @@ class PayoutClaimResponse(BaseModel):
     payout_wei: str = Field(..., description="Claimed amount in Wei")
     currency: str = Field(..., description="Disbursed currency denomination")
     transaction_hash: str = Field(..., description="EVM payout transaction hash")
-    block_number: int = Field(..., description="Block height of payout transaction")
+    block_number: int | None = Field(default=None, description="Block height of payout transaction")
     claimed_at: str = Field(..., description="ISO 8601 claim timestamp")
     status: str = Field(default="CLAIMED", description="Claim status: CLAIMED")
 

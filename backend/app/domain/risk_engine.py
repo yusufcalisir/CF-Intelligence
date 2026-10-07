@@ -27,6 +27,7 @@ References:
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -40,6 +41,7 @@ class RiskTier(StrEnum):
     MEDIUM = "MEDIUM"      # [400, 600)
     HIGH = "HIGH"          # [600, 800)
     CRITICAL = "CRITICAL"  # [800, 1000]
+    UNASSESSED = "UNASSESSED"  # When all signals unassessed (total_effective_weight == 0)
 
 
 class PolicyAction(StrEnum):
@@ -213,6 +215,8 @@ def classify_risk_tier(score: float) -> RiskTier:
 
 def map_tier_to_action(tier: RiskTier, score: float = 0.0) -> PolicyAction:
     """Deterministically maps a classified RiskTier to standard gateway policy disposition."""
+    if tier == RiskTier.UNASSESSED:
+        return PolicyAction.HOLD_FOR_REVIEW
     if tier in (RiskTier.MINIMAL, RiskTier.LOW):
         return PolicyAction.ALLOW
     if tier == RiskTier.MEDIUM:
@@ -226,7 +230,7 @@ def map_tier_to_action(tier: RiskTier, score: float = 0.0) -> PolicyAction:
 
 
 def calculate_weighted_score(
-    signals: dict[str, float] | list[RiskSignalValue],
+    signals: Mapping[str, float | None] | list[RiskSignalValue],
     weights: SignalWeights | dict[str, float] | None = None,
 ) -> CompositeRiskScoreResult:
     """Computes exact floating-point weighted risk score and audit provenance.
@@ -245,7 +249,7 @@ def calculate_weighted_score(
     else:
         weight_cfg = weights
 
-    signal_map: dict[str, float] = {}
+    signal_map: dict[str, float | None] = {}
     if isinstance(signals, list):
         for s in signals:
             signal_map[s.signal_name] = s.raw_value
@@ -264,7 +268,22 @@ def calculate_weighted_score(
             active_keys.append(k)
 
     for sig_name in active_keys:
-        raw_val = signal_map.get(sig_name, 0.0)
+        sig_val = signal_map.get(sig_name)
+        if sig_val is None:
+            # Unassessed signal contributes zero weight to denominator
+            evaluated_signals.append(
+                RiskSignalValue(
+                    signal_name=sig_name,
+                    raw_value=0.0,
+                    normalized_score=0.0,
+                    weight=0.0,
+                    weighted_score=0.0,
+                    explanation=f"{sig_name}: unassessed (input missing)",
+                )
+            )
+            continue
+
+        raw_val = float(sig_val)
         norm_val = clamp_signal(raw_val)
         w = weight_cfg.get(sig_name, 0.0)
         weighted_val = w * norm_val
@@ -285,12 +304,14 @@ def calculate_weighted_score(
 
     if total_effective_weight > 0.0:
         normalized_composite = min(1.0, max(0.0, accumulated_weighted_sum / total_effective_weight))
+        composite_score = round(normalized_composite * 1000.0, 1)
+        tier = classify_risk_tier(composite_score)
+        decision = map_tier_to_action(tier, composite_score)
     else:
         normalized_composite = 0.0
-
-    composite_score = round(normalized_composite * 1000.0, 1)
-    tier = classify_risk_tier(composite_score)
-    decision = map_tier_to_action(tier, composite_score)
+        composite_score = 0.0
+        tier = RiskTier.UNASSESSED
+        decision = map_tier_to_action(tier, composite_score)
 
     # Sort signals by weighted contribution descending
     sorted_signals = sorted(evaluated_signals, key=lambda s: s.weighted_score, reverse=True)

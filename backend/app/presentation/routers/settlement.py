@@ -73,11 +73,11 @@ def _format_receipt(receipt: dict[str, Any]) -> SettlementReceiptResponse:
         total_pool_usd=receipt["total_pool_usd"],
         total_distributed_usd=receipt["total_distributed_usd"],
         total_distributed_wei=str(receipt["total_distributed_wei"]),
-        gas_used=receipt.get("gas_used", 142850),
-        effective_gas_price_gwei=float(receipt.get("effective_gas_price_gwei", 15.5)),
+        gas_used=int(receipt["gas_used"]) if receipt.get("gas_used") is not None else None,
+        effective_gas_price_gwei=float(receipt["effective_gas_price_gwei"]) if receipt.get("effective_gas_price_gwei") is not None else None,
         audit_proof_hash=receipt["audit_proof_hash"],
         mode=receipt.get("mode", "SIMULATOR_FALLBACK"),
-        audit_chain_verified=receipt.get("audit_chain_verified", True),
+        audit_chain_verified=bool(receipt.get("audit_chain_verified", False)),
         payouts=payouts,
     )
 
@@ -197,7 +197,7 @@ async def claim_participant_payout(req: PayoutClaimRequest) -> PayoutClaimRespon
         payout_wei=str(payout_record["payout_wei"]),
         currency=matching_epoch.get("currency", "wCBDC"),
         transaction_hash=tx_hash,
-        block_number=matching_epoch.get("block_number", 5000001) + 1,
+        block_number=(int(matching_epoch["block_number"]) + 1) if matching_epoch.get("block_number") is not None else None,
         claimed_at=datetime.now(UTC).isoformat(),
         status="CLAIMED",
     )

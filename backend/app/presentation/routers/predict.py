@@ -281,24 +281,18 @@ async def predict_transaction(
             )
             if online_feats:
                 feats = online_feats[0]
-                txn_dict["velocity"] = feats.get(
-                    "rolling_velocity_1h", txn_dict.get("velocity", 1.0)
-                )
-                txn_dict["customer_history_score"] = feats.get(
-                    "customer_history_score", txn_dict.get("customer_history_score", 0.95)
-                )
-                txn_dict["account_age_days"] = feats.get(
-                    "account_age_days", txn_dict.get("account_age_days", 365)
-                )
-                txn_dict["chargeback_count"] = feats.get(
-                    "chargeback_count", txn_dict.get("chargeback_count", 0)
-                )
-                txn_dict["merchant_risk_score"] = feats.get(
-                    "merchant_risk_score", txn_dict.get("merchant_risk_score", 0.05)
-                )
-                txn_dict["merchant_category"] = feats.get(
-                    "merchant_category", txn_dict.get("merchant_category", "grocery")
-                )
+                if feats.get("rolling_velocity_1h") is not None:
+                    txn_dict["velocity"] = feats["rolling_velocity_1h"]
+                if feats.get("customer_history_score") is not None:
+                    txn_dict["customer_history_score"] = feats["customer_history_score"]
+                if feats.get("account_age_days") is not None:
+                    txn_dict["account_age_days"] = feats["account_age_days"]
+                if feats.get("chargeback_count") is not None:
+                    txn_dict["chargeback_count"] = feats["chargeback_count"]
+                if feats.get("merchant_risk_score") is not None:
+                    txn_dict["merchant_risk_score"] = feats["merchant_risk_score"]
+                if feats.get("merchant_category") is not None:
+                    txn_dict["merchant_category"] = feats["merchant_category"]
             # Schedule asynchronous feature ingestion — runs after response is sent
             background_tasks.add_task(
                 _feature_store.ingest_transaction,
@@ -400,6 +394,12 @@ async def predict_transaction(
                 routed_to=routed_to,
             )
 
+    except ValueError as e:
+        logger.error("Inference validation failed: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Transaction feature validation error: {e}",
+        )
     except Exception as e:
         logger.error("Inference execution failed: %s", e)
         raise HTTPException(
@@ -423,15 +423,18 @@ async def predict_transaction(
 
     score = risk_score_obj.score
     is_fraud_suspected = score >= 600.0
-    risk_level = (
-        "CRITICAL"
-        if score >= 850.0
-        else "HIGH"
-        if score >= 700.0
-        else "MEDIUM"
-        if score >= 500.0
-        else "LOW"
-    )
+    if risk_score_obj.signals and all(s.weight == 0.0 for s in risk_score_obj.signals):
+        risk_level = "UNASSESSED"
+    else:
+        risk_level = (
+            "CRITICAL"
+            if score >= 850.0
+            else "HIGH"
+            if score >= 700.0
+            else "MEDIUM"
+            if score >= 500.0
+            else "LOW"
+        )
 
     # 5. Generate and publish alert in the shared intelligence layer if fraud suspected
     alert_details = None
@@ -480,6 +483,35 @@ async def predict_transaction(
                 )
         except Exception as e:
             logger.warning("Alert/Explainability pipeline degraded: %s", e)
+    elif risk_level == "UNASSESSED":
+        try:
+            features_dict = {
+                "transaction_id": txn_id,
+                "customer_id": payload.customer_id or payload.account_id or customer_ref,
+                "merchant_category": payload.merchant_category,
+                "country_code": payload.country_code,
+                "device_type": payload.device_type,
+                "transaction_amount": payload.transaction_amount,
+                "merchant_risk_score": payload.merchant_risk_score,
+                "customer_history_score": payload.customer_history_score,
+                "chargeback_count": payload.chargeback_count,
+                "account_age_days": payload.account_age_days,
+            }
+            unassessed_alert = _alert_service.generate_unassessed_hold_alert(
+                bank_id=bank_id,
+                transaction=features_dict,
+            )
+            alert_details = AlertDetails(
+                alert_id=unassessed_alert.id,
+                severity=unassessed_alert.severity.value,
+                status=unassessed_alert.status.value,
+                reason_codes=unassessed_alert.reason_codes,
+                explanation="Risk assessment unavailable — transaction held for review",
+                top_features=[],
+                risk_factors=unassessed_alert.risk_factors,
+            )
+        except Exception as e:
+            logger.warning("Unassessed alert generation degraded: %s", e)
 
     breakdown = [
         SignalBreakdown(
@@ -493,7 +525,7 @@ async def predict_transaction(
     ]
 
     # ── Dynamic Policy Rule Evaluation ────────
-    policy_action = "ALLOW"
+    policy_action = "HOLD_FOR_REVIEW" if risk_level == "UNASSESSED" else "ALLOW"
     triggered_rules = []
     try:
         from app.application.services.policy_engine import PolicyEngineService
@@ -505,7 +537,7 @@ async def predict_transaction(
         eval_context = {
             "composite_risk_score": score,
             "country_code": payload.country_code,
-            "velocity": txn_dict.get("velocity", 1.0),
+            "velocity": txn_dict.get("velocity"),
             "transaction_amount": payload.transaction_amount,
             "merchant_category": payload.merchant_category,
             "device_type": payload.device_type,
@@ -601,22 +633,18 @@ async def predict_batch(
             )
             for idx, feats in enumerate(online_feats):
                 td = txn_dicts[idx]
-                td["velocity"] = feats.get("rolling_velocity_1h", td.get("velocity", 1.0))
-                td["customer_history_score"] = feats.get(
-                    "customer_history_score", td.get("customer_history_score", 0.95)
-                )
-                td["account_age_days"] = feats.get(
-                    "account_age_days", td.get("account_age_days", 365)
-                )
-                td["chargeback_count"] = feats.get(
-                    "chargeback_count", td.get("chargeback_count", 0)
-                )
-                td["merchant_risk_score"] = feats.get(
-                    "merchant_risk_score", td.get("merchant_risk_score", 0.05)
-                )
-                td["merchant_category"] = feats.get(
-                    "merchant_category", td.get("merchant_category", "grocery")
-                )
+                if feats.get("rolling_velocity_1h") is not None:
+                    td["velocity"] = feats["rolling_velocity_1h"]
+                if feats.get("customer_history_score") is not None:
+                    td["customer_history_score"] = feats["customer_history_score"]
+                if feats.get("account_age_days") is not None:
+                    td["account_age_days"] = feats["account_age_days"]
+                if feats.get("chargeback_count") is not None:
+                    td["chargeback_count"] = feats["chargeback_count"]
+                if feats.get("merchant_risk_score") is not None:
+                    td["merchant_risk_score"] = feats["merchant_risk_score"]
+                if feats.get("merchant_category") is not None:
+                    td["merchant_category"] = feats["merchant_category"]
 
         tensors = []
         for td in txn_dicts:
@@ -669,16 +697,22 @@ async def predict_batch(
         if is_fraud:
             fraud_count += 1
 
-        level = (
-            "CRITICAL"
-            if score >= 850.0
-            else "HIGH"
-            if score >= 700.0
-            else "MEDIUM"
-            if score >= 500.0
-            else "LOW"
-        )
-        decision = "BLOCK" if score >= 850.0 else "REVIEW" if score >= 600.0 else "ALLOW"
+        if risk_obj.signals and all(s.weight == 0.0 for s in risk_obj.signals):
+            level = "UNASSESSED"
+            decision = "REVIEW"
+            policy_action = "HOLD_FOR_REVIEW"
+        else:
+            level = (
+                "CRITICAL"
+                if score >= 850.0
+                else "HIGH"
+                if score >= 700.0
+                else "MEDIUM"
+                if score >= 500.0
+                else "LOW"
+            )
+            decision = "BLOCK" if score >= 850.0 else "REVIEW" if score >= 600.0 else "ALLOW"
+            policy_action = "BLOCK_TRANSACTION" if decision == "BLOCK" else "ALLOW"
 
         items.append(
             BatchPredictionItem(
@@ -688,7 +722,7 @@ async def predict_batch(
                 decision=decision,
                 risk_level=level,
                 is_fraud_suspected=is_fraud,
-                policy_action="BLOCK_TRANSACTION" if decision == "BLOCK" else "ALLOW",
+                policy_action=policy_action,
                 latency_ms=batch_item_latency,
             )
         )
@@ -771,7 +805,7 @@ async def explain_transaction(
                     description="Reduce single transfer amount below $5,000 threshold to reduce risk score.",
                 )
             )
-        if payload.transaction.velocity > 5.0:
+        if payload.transaction.velocity is not None and payload.transaction.velocity > 5.0:
             counterfactual_paths.append(
                 CounterfactualPathItem(
                     feature="velocity",
@@ -939,10 +973,13 @@ async def score_transaction(
             )
             if online_feats:
                 feats = online_feats[0]
-                customer_history_score = feats.get("customer_history_score", customer_history_score)
-                chargeback_count = feats.get("chargeback_count", chargeback_count)
-                account_age_days = feats.get("account_age_days", account_age_days)
-                if "rolling_velocity_1h" in feats:
+                if feats.get("customer_history_score") is not None:
+                    customer_history_score = feats["customer_history_score"]
+                if feats.get("chargeback_count") is not None:
+                    chargeback_count = feats["chargeback_count"]
+                if feats.get("account_age_days") is not None:
+                    account_age_days = feats["account_age_days"]
+                if feats.get("rolling_velocity_1h") is not None:
                     velocity = max(velocity, float(feats["rolling_velocity_1h"]))
         except Exception as exc:
             logger.debug("Feature Store online query failed in score_transaction: %s", exc)

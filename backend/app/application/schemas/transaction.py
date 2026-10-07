@@ -57,7 +57,7 @@ class TransactionPredictRequest(BaseModel):
     device_type: str = Field(
         "web_browser", max_length=256, description="Type of device (e.g. web_browser, mobile_app)"
     )
-    velocity: float = Field(1.0, ge=0.0, description="Transaction velocity (txns/hr)")
+    velocity: float | None = Field(default=None, ge=0.0, description="Transaction velocity (txns/hr)")
     hour_of_day: int = Field(12, ge=0, le=23, description="Hour of the transaction")
     merchant_risk_score: float = Field(
         0.05, ge=0.0, le=1.0, description="Historical fraud rate of the merchant"
@@ -115,7 +115,7 @@ class TransactionPredictResponse(BaseModel):
     is_fraud_suspected: bool = Field(
         ..., description="Whether transaction exceeds fraud suspicion threshold"
     )
-    risk_level: str = Field(..., description="Risk category: LOW, MEDIUM, HIGH, CRITICAL")
+    risk_level: str = Field(..., description="Risk category: LOW, MEDIUM, HIGH, CRITICAL, UNASSESSED")
     breakdown: list[SignalBreakdown] = Field(
         default_factory=list, description="Risk signal breakdown"
     )

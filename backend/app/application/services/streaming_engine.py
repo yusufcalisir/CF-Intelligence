@@ -229,7 +229,7 @@ class StreamingEngine:
                     event.bank_id,
                     {
                         "total_spent": payload.get("amount", 0),
-                        "risk_score": payload.get("risk_score", 0),
+                        "risk_score": payload.get("risk_score"),
                         "bank_name": payload.get("bank_name", event.bank_id),
                     },
                 )
@@ -268,8 +268,15 @@ class StreamingEngine:
 
         elif event.event_type == "alert":
             # Generate and store a new alert
-            severity_str = payload.get("severity", "medium").upper()
-            severity = getattr(AlertSeverity, severity_str, AlertSeverity.MEDIUM)
+            raw_severity = payload.get("severity")
+            if not raw_severity:
+                logger.warning("Streaming alert event missing required severity; dropping event.")
+                return None
+            severity_str = str(raw_severity).upper()
+            if not hasattr(AlertSeverity, severity_str):
+                logger.warning("Streaming alert event has invalid severity '%s'; dropping event.", raw_severity)
+                return None
+            severity = getattr(AlertSeverity, severity_str)
 
             # Find a customer entity from the same bank to associate with
             cust_id = None
@@ -289,7 +296,7 @@ class StreamingEngine:
                     entity_svc.update_risk_level(cust_entity.id, RiskLevel.MEDIUM)
 
             # Calculate dynamic top features based on reason codes and confidence
-            reason_codes = payload.get("reason_codes", ["SUSP-PATTERN"])
+            reason_codes = payload.get("reason_codes", [])
             confidence = payload.get("confidence", 0.5)
 
             # Reconstruct a dummy transaction to run through SHAP
@@ -401,16 +408,22 @@ class StreamingEngine:
 
         elif event.event_type == "intelligence":
             # Share intelligence across banks
-            privacy_hash = payload.get("shared_device_hash", str(uuid.uuid4())[:8])
+            privacy_hash = payload.get("shared_device_hash")
+            combined_confidence = payload.get("combined_confidence")
+            if not privacy_hash or combined_confidence is None:
+                logger.warning(
+                    "Streaming intelligence event missing required shared_device_hash or combined_confidence; dropping event."
+                )
+                return None
 
             intel = SharedIntelligence(
                 source_bank_id=event.bank_id,
                 intelligence_type=IntelligenceType.FRAUD_ALERT,
-                privacy_hash=privacy_hash,
-                risk_indicator=payload.get("combined_confidence", 0.8),
+                privacy_hash=str(privacy_hash),
+                risk_indicator=float(combined_confidence),
                 description=payload.get("description", "Cross-institution match"),
                 entity_type=EntityType.CUSTOMER,
-                related_alert_count=payload.get("cards_identified", 2),
+                related_alert_count=int(payload.get("cards_identified") or 0),
             )
             from app.application.services.alert_service import _intel_to_dict
 
@@ -427,7 +440,7 @@ class StreamingEngine:
                         customers[i].id,
                         customers[i + 1].id,
                         RelationshipType.SHARES_DEVICE,
-                        confidence=payload.get("combined_confidence", 0.9),
+                        confidence=float(combined_confidence),
                     )
                     graph_engine.add_relationship(rel)
 
