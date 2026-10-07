@@ -66,7 +66,7 @@ The console implements a custom glassmorphism aesthetic adhering strictly to hig
 * **Numeric Standard**: Strict localized number formatting with thousands separators (e.g., `$1,450,000.00`, `38,421 tx/s`).
 
 ### 3.3. Zero Cumulative Layout Shift (CLS Invariant)
-In compliance with workspace guidelines (`AGENTS.md` Rule 5):
+In compliance with layout stability and visual rendering requirements:
 * **Fixed Minimum Heights**: Interactive buttons, tabs, and pill selectors maintain bounded heights (`min-h-[44px]`).
 * **Static Border Placeholders**: Active tab states alter border colors without changing border widths, eliminating vertical jumps.
 * **Responsive Overflow Prevention**: Horizontal scrolling is strictly isolated to designated tab wrappers (`overflow-x-auto no-scrollbar`), preventing global viewport horizontal scrolling.

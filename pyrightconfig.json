@@ -5,7 +5,17 @@
   "venv": ".venv",
   "extraPaths": [
     ".",
+    "runtime_truth_guard",
+    ".runtime_truth_guard",
+    "verification",
     "backend",
     "sdk/python"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "backend/.venv",
+    "frontend",
+    ".git"
   ]
 }

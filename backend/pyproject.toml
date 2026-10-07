@@ -22,6 +22,9 @@ known-first-party = ["app"]
 [tool.pyright]
 extraPaths = [
     "..",
+    "../runtime_truth_guard",
+    "../.runtime_truth_guard",
+    "../verification",
     "../sdk/python",
     "."
 ]

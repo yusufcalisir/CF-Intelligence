@@ -3,10 +3,15 @@
   "venv": ".venv",
   "extraPaths": [
     "..",
+    "../runtime_truth_guard",
+    "../.runtime_truth_guard",
+    "../verification",
     "../sdk/python",
     "."
   ],
   "exclude": [
+    "**/__pycache__",
+    ".venv",
     "tests/unit/test_byzantine_canonical_protocol.py"
   ]
 }
