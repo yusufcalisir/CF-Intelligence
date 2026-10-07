@@ -44,7 +44,7 @@ class AnalystFeedbackIngestRequest(BaseModel):
         description="Investigation alert ID to auto-hash",
     )
     determination: Literal["CONFIRMED_FRAUD", "FALSE_POSITIVE"] = Field(
-        default="CONFIRMED_FRAUD",
+        ...,
         description="Verdict: CONFIRMED_FRAUD or FALSE_POSITIVE",
     )
     priority: int | None = Field(

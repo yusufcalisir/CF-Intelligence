@@ -511,8 +511,8 @@ class SmurfingPatternItem(BaseModel):
     central_entity_id: str = Field(default="", description="Central mule or aggregator entity ID")
     counterparty_ids: list[str] = Field(default_factory=list, description="List of originators or recipient counterparty entity IDs")
     fan_degree: int = Field(..., ge=1, description="Number of converging or dispersing counterparties")
-    severity: str = Field(default="medium", description="Smurfing severity level")
-    risk_score: float = Field(..., ge=0.0, le=1000.0, description="Assessed risk score for the smurfing cluster")
+    severity: str = Field(default="unassessed", description="Smurfing severity level")
+    risk_score: float | None = Field(default=None, ge=0.0, le=1000.0, description="Assessed risk score for the smurfing cluster")
     detected_at: str = Field(..., description="ISO 8601 timestamp of detection")
 
     @model_validator(mode="before")
@@ -525,16 +525,20 @@ class SmurfingPatternItem(BaseModel):
                 data["counterparty_ids"] = data["spoke_entity_ids"]
             if "detected_at" in data and not isinstance(data["detected_at"], str):
                 data["detected_at"] = data["detected_at"].isoformat()
-            if "severity" not in data:
-                score = float(data.get("risk_score", 0.0))
-                if score >= 0.8:
-                    data["severity"] = "critical"
-                elif score >= 0.6:
-                    data["severity"] = "high"
-                elif score >= 0.3:
-                    data["severity"] = "medium"
+            if "severity" not in data or not data["severity"]:
+                raw_score = data.get("risk_score")
+                if raw_score is not None:
+                    score = float(raw_score)
+                    if score >= 0.8:
+                        data["severity"] = "critical"
+                    elif score >= 0.6:
+                        data["severity"] = "high"
+                    elif score >= 0.3:
+                        data["severity"] = "medium"
+                    else:
+                        data["severity"] = "low"
                 else:
-                    data["severity"] = "low"
+                    data["severity"] = "unassessed"
         return data
 
 

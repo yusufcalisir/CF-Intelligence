@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import re
 import threading
 import xml.etree.ElementTree as ET
@@ -342,18 +343,27 @@ class SARGenerator:
         if notes:
             notes_elem = ET.SubElement(narrative, "Notes")
             for n in notes:
+                author = n.get("author")
+                if not author or author.strip() == "":
+                    raise ValueError("FinCEN SAR Note missing mandatory author")
                 ne = ET.SubElement(notes_elem, "Note")
-                ET.SubElement(ne, "Author").text = n.get("author", "AML_INVESTIGATOR")
+                ET.SubElement(ne, "Author").text = author.strip()
                 ET.SubElement(ne, "Content").text = n.get("content", "")
                 ET.SubElement(ne, "Timestamp").text = n.get("timestamp", datetime.now(UTC).isoformat())
 
         if timeline:
             timeline_elem = ET.SubElement(narrative, "Timeline")
             for e in timeline:
+                ev_type = e.get("event_type")
+                if not ev_type or ev_type.strip() == "":
+                    raise ValueError("FinCEN SAR Timeline event missing mandatory event_type")
+                actor = e.get("actor")
+                if not actor or actor.strip() == "":
+                    raise ValueError("FinCEN SAR Timeline event missing mandatory actor")
                 ee = ET.SubElement(timeline_elem, "Event")
-                ET.SubElement(ee, "Type").text = e.get("event_type", "AUDIT")
+                ET.SubElement(ee, "Type").text = ev_type.strip()
                 ET.SubElement(ee, "Description").text = e.get("description", "")
-                ET.SubElement(ee, "Actor").text = e.get("actor", "system")
+                ET.SubElement(ee, "Actor").text = actor.strip()
                 ET.SubElement(ee, "Timestamp").text = e.get("timestamp", datetime.now(UTC).isoformat())
 
         raw_xml = ET.tostring(root, encoding="utf-8").decode("utf-8")
@@ -438,7 +448,14 @@ class SARGenerator:
                 ET.SubElement(tx_elem, "value_date").text = tx["value_date"]
 
             ET.SubElement(tx_elem, "transmode_code").text = tx.get("transmode_code", "EFT")
-            amount = float(tx.get("amount_local", 0.0))
+            if "amount_local" not in tx or tx["amount_local"] is None:
+                raise ValueError(f"goAML transaction {tx.get('transaction_number')} missing mandatory amount_local")
+            try:
+                amount = float(tx["amount_local"])
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"goAML transaction {tx.get('transaction_number')} invalid amount_local: {tx['amount_local']}") from exc
+            if amount <= 0.0 or not math.isfinite(amount):
+                raise ValueError(f"goAML transaction {tx.get('transaction_number')} amount_local must be positive and finite: {amount}")
             ET.SubElement(tx_elem, "amount_local").text = f"{amount:.2f}"
             ET.SubElement(tx_elem, "currency_code").text = tx.get("currency_code", currency_code)
 
@@ -452,7 +469,10 @@ class SARGenerator:
                     ET.SubElement(fa, "institution_name").text = from_acc["institution_name"]
                 if "institution_code" in from_acc:
                     ET.SubElement(fa, "institution_code").text = from_acc["institution_code"]
-                ET.SubElement(fa, "account").text = from_acc.get("account", "ACC_FROM_UNKNOWN")
+                from_acct_val = from_acc.get("account")
+                if not from_acct_val or str(from_acct_val).strip() in ("", "ACC_FROM_UNKNOWN", "UNKNOWN"):
+                    raise ValueError(f"goAML transaction {tx.get('transaction_number')} t_from missing mandatory account")
+                ET.SubElement(fa, "account").text = str(from_acct_val).strip()
                 if "currency_code" in from_acc:
                     ET.SubElement(fa, "currency_code").text = from_acc["currency_code"]
 
@@ -466,7 +486,10 @@ class SARGenerator:
                     ET.SubElement(ta, "institution_name").text = to_acc["institution_name"]
                 if "institution_code" in to_acc:
                     ET.SubElement(ta, "institution_code").text = to_acc["institution_code"]
-                ET.SubElement(ta, "account").text = to_acc.get("account", "ACC_TO_UNKNOWN")
+                to_acct_val = to_acc.get("account")
+                if not to_acct_val or str(to_acct_val).strip() in ("", "ACC_TO_UNKNOWN", "UNKNOWN"):
+                    raise ValueError(f"goAML transaction {tx.get('transaction_number')} t_to missing mandatory account")
+                ET.SubElement(ta, "account").text = str(to_acct_val).strip()
                 if "currency_code" in to_acc:
                     ET.SubElement(ta, "currency_code").text = to_acc["currency_code"]
 
@@ -629,10 +652,22 @@ class SARGenerator:
         ET.SubElement(acct_id, "IBAN").text = account_iban
 
         for idx, entry in enumerate(entries or []):
+            ntry_ref = entry.get("ntry_ref")
+            if not ntry_ref or str(ntry_ref).strip() == "":
+                raise ValueError(f"CAMT.053 entry at index {idx} missing mandatory ntry_ref")
             ntry = ET.SubElement(stmt, "Ntry")
-            ET.SubElement(ntry, "NtryRef").text = entry.get("ntry_ref", f"NTRY-{idx + 1}")
+            ET.SubElement(ntry, "NtryRef").text = str(ntry_ref).strip()
+
+            if "amount" not in entry or entry["amount"] is None:
+                raise ValueError(f"CAMT.053 entry at index {idx} missing mandatory amount")
+            try:
+                amt_val = float(entry["amount"])
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"CAMT.053 entry at index {idx} invalid amount: {entry['amount']}") from exc
+            if amt_val <= 0 or not math.isfinite(amt_val):
+                raise ValueError(f"CAMT.053 entry at index {idx} amount must be positive and finite: {amt_val}")
+
             amt_el = ET.SubElement(ntry, "Amt", {"Ccy": entry.get("currency", currency)})
-            amt_val = float(entry.get("amount", 0.0))
             amt_el.text = f"{amt_val:.2f}"
             ET.SubElement(ntry, "CdtDbtInd").text = entry.get("credit_debit", "CRDT")
             ET.SubElement(ntry, "Sts").text = entry.get("status", "BOOK")
@@ -641,17 +676,31 @@ class SARGenerator:
             tx_dtls = ET.SubElement(ntry_dtls, "TxDtls")
             rltd = ET.SubElement(tx_dtls, "RltdPties")
 
+            dbtr_name = entry.get("debtor_name")
+            if not dbtr_name or str(dbtr_name).strip() == "":
+                raise ValueError(f"CAMT.053 entry at index {idx} missing mandatory debtor_name")
+            dbtr_iban = entry.get("debtor_iban")
+            if not dbtr_iban or str(dbtr_iban).strip() == "":
+                raise ValueError(f"CAMT.053 entry at index {idx} missing mandatory debtor_iban")
+
             dbtr = ET.SubElement(rltd, "Dbtr")
-            ET.SubElement(dbtr, "Nm").text = entry.get("debtor_name", "Originator Corp")
+            ET.SubElement(dbtr, "Nm").text = str(dbtr_name).strip()
             dbtr_acct = ET.SubElement(rltd, "DbtrAcct")
             dbtr_id = ET.SubElement(dbtr_acct, "Id")
-            ET.SubElement(dbtr_id, "IBAN").text = entry.get("debtor_iban", account_iban)
+            ET.SubElement(dbtr_id, "IBAN").text = str(dbtr_iban).strip()
+
+            cdtr_name = entry.get("creditor_name")
+            if not cdtr_name or str(cdtr_name).strip() == "":
+                raise ValueError(f"CAMT.053 entry at index {idx} missing mandatory creditor_name")
+            cdtr_iban = entry.get("creditor_iban")
+            if not cdtr_iban or str(cdtr_iban).strip() == "":
+                raise ValueError(f"CAMT.053 entry at index {idx} missing mandatory creditor_iban")
 
             cdtr = ET.SubElement(rltd, "Cdtr")
-            ET.SubElement(cdtr, "Nm").text = entry.get("creditor_name", "Beneficiary Logistics")
+            ET.SubElement(cdtr, "Nm").text = str(cdtr_name).strip()
             cdtr_acct = ET.SubElement(rltd, "CdtrAcct")
             cdtr_id = ET.SubElement(cdtr_acct, "Id")
-            ET.SubElement(cdtr_id, "IBAN").text = entry.get("creditor_iban", account_iban)
+            ET.SubElement(cdtr_id, "IBAN").text = str(cdtr_iban).strip()
 
         raw_xml = ET.tostring(root, encoding="utf-8").decode("utf-8")
         parsed = defusedxml.minidom.parseString(raw_xml)

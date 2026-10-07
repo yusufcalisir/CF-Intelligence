@@ -6,7 +6,10 @@ These are passed between services and serialized to API responses.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
+
+import numpy as np
 
 
 @dataclass(frozen=True)
@@ -34,15 +37,15 @@ class EvaluationMetrics:
     Fairness and defense metrics default to None when uncalculated.
     """
 
-    accuracy: float
-    precision: float
-    recall: float
-    f1_score: float
+    accuracy: float | None = None
+    precision: float | None = None
+    recall: float | None = None
+    f1_score: float | None = None
     auc_roc: float | None = None
-    loss: float = 0.0
+    loss: float | None = None
 
     # Confusion matrix: [[TN, FP], [FN, TP]]
-    confusion_matrix: list[list[int]] = field(default_factory=lambda: [[0, 0], [0, 0]])
+    confusion_matrix: list[list[int]] | None = None
 
     # ROC curve data points for plotting
     roc_fpr: list[float] = field(default_factory=list)
@@ -88,6 +91,106 @@ class RoundMetrics:
     aggregation_time_ms: float
     round_duration_ms: float
     privacy_budget_spent: float = 0.0
+
+
+@dataclass(frozen=True)
+class RoundEvaluationEvidence:
+    """Cryptographically and structurally bound holdout evaluation evidence for an FL round.
+
+    Binds empirical holdout labels, predictions, metric outcomes, and model hashes to the
+    specific round, candidate model version, and designated holdout dataset to prevent
+    arbitrary vector/scalar injection and cross-round/cross-model evidence substitution.
+    """
+
+    round_id: int
+    validation_labels: list[int] = field(default_factory=list)
+    validation_preds: list[float] = field(default_factory=list)
+    dataset_id: str = "canonical_holdout"
+    model_version: str | None = None
+    model_hash: str | None = None
+    metric_name: str = "pr_auc"
+    metric_score: float | None = None
+    metric_status: str = "defined"
+    sample_count: int = 0
+    provenance: str = "AUTHORITATIVE_HOLDOUT_EVALUATION"
+    producer: str = "CandidateModelEvaluator"
+    evaluated_at: str = ""
+
+    def __post_init__(self) -> None:
+        if self.validation_labels or self.validation_preds:
+            if not self.validation_labels or not self.validation_preds:
+                raise ValueError("Validation labels and predictions must be non-empty.")
+            if len(self.validation_labels) != len(self.validation_preds):
+                raise ValueError(
+                    f"Validation labels length ({len(self.validation_labels)}) must match "
+                    f"predictions length ({len(self.validation_preds)})."
+                )
+            for label in self.validation_labels:
+                if label not in (0, 1):
+                    raise ValueError(f"Validation label {label} must be binary 0 or 1.")
+            for pred in self.validation_preds:
+                if not math.isfinite(pred) or not (0.0 <= pred <= 1.0):
+                    raise ValueError(f"Validation prediction {pred} must be a finite float in [0.0, 1.0].")
+            if not self.sample_count:
+                object.__setattr__(self, "sample_count", len(self.validation_labels))
+        elif self.sample_count <= 0:
+            raise ValueError("Validation labels and predictions must be non-empty.")
+
+
+@dataclass(frozen=True)
+class DesignatedHoldoutDataset:
+    """Designated holdout dataset explicitly configured for coordinator candidate model evaluation.
+
+    Encapsulates immutable feature matrix, ground-truth binary labels, dataset identifier,
+    and dataset provenance. Guarantees non-empty, finite arrays and binary labels.
+    """
+
+    dataset_id: str
+    features: np.ndarray
+    labels: np.ndarray
+    provenance: str = "EMPIRICAL_EXTERNAL_DATA"
+    version: str = "1.0.0"
+    feature_names: list[str] | None = None
+    sha256: str = ""
+    created_at: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.dataset_id or not self.dataset_id.strip():
+            raise ValueError("Holdout dataset_id must be a non-empty string.")
+
+        if not self.version or not self.version.strip():
+            raise ValueError("Holdout dataset version must be a non-empty string.")
+
+        feats = np.asarray(self.features)
+        lbls = np.asarray(self.labels)
+
+        if feats.size == 0 or lbls.size == 0:
+            raise ValueError("Holdout dataset features and labels must be non-empty.")
+
+        if feats.ndim != 2:
+            raise ValueError(f"Holdout features must be a 2D array, got shape {feats.shape}.")
+
+        if lbls.ndim != 1:
+            raise ValueError(f"Holdout labels must be a 1D array, got shape {lbls.shape}.")
+
+        if len(feats) != len(lbls):
+            raise ValueError(
+                f"Holdout features length ({len(feats)}) must match labels length ({len(lbls)})."
+            )
+
+        if not np.isfinite(feats).all():
+            raise ValueError("Holdout features must contain only finite numbers (no NaN or Inf).")
+
+        unique_labels = set(np.unique(lbls).tolist())
+        if not unique_labels.issubset({0, 1}):
+            raise ValueError(f"Holdout labels must be binary {0, 1}, got unique values {unique_labels}.")
+
+    @property
+    def versioned_id(self) -> str:
+        """Returns version-qualified dataset identity (e.g., 'fraud_holdout:v1.0.0')."""
+        if ":" in self.dataset_id:
+            return self.dataset_id
+        return f"{self.dataset_id}:{self.version}"
 
 
 @dataclass(frozen=True)
