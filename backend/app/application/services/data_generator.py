@@ -113,17 +113,11 @@ def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
     """
     vals = []
     for name in FEATURE_NAMES:
-        val = txn.get(name)
-        if val is None:
-            # Defaults matching data generator logic
-            if name == "country_code":
-                val = "US"
-            elif name == "merchant_category":
-                val = "grocery"
-            elif name == "device_type":
-                val = "web_browser"
-            else:
-                val = 0.0
+        if name not in txn or txn[name] is None:
+            raise ValueError(
+                f"Feature '{name}' is missing or None; unobserved features must fail closed without trained imputation."
+            )
+        val = txn[name]
 
         # Validate non-finite numeric input (MODEL-INV-13 fail-closed)
         if isinstance(val, (int, float)) and not math.isfinite(val):

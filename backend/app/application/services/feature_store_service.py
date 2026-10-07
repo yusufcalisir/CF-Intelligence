@@ -190,25 +190,31 @@ class FeatureStoreService:
         results: list[dict[str, Any]] = []
 
         for row in entity_rows:
-            raw_cust = row.get("customer_id", "default_customer")
-            raw_merch = row.get("merchant_id", "default_merchant")
+            raw_cust = row.get("customer_id")
+            raw_merch = row.get("merchant_id")
             row_tenant = tenant_id or row.get("tenant_id") or row.get("bank_id")
 
-            cust_id = (
-                f"{row_tenant}:{raw_cust}"
-                if row_tenant and not raw_cust.startswith(f"{row_tenant}:")
-                else raw_cust
-            )
-            merch_id = (
-                f"{row_tenant}:{raw_merch}"
-                if row_tenant and not raw_merch.startswith(f"{row_tenant}:")
-                else raw_merch
-            )
+            cust_profile = {}
+            stats_profile = {}
+            if raw_cust:
+                raw_cust_str = str(raw_cust)
+                cust_id = (
+                    f"{row_tenant}:{raw_cust_str}"
+                    if row_tenant and not raw_cust_str.startswith(f"{row_tenant}:")
+                    else raw_cust_str
+                )
+                cust_profile = self.online_customer.get(cust_id) or {}
+                stats_profile = self.online_stats.get(cust_id) or {}
 
-            # Fetch views from online store
-            cust_profile = self.online_customer.get(cust_id) or {}
-            merch_profile = self.online_merchant.get(merch_id) or {}
-            stats_profile = self.online_stats.get(cust_id) or {}
+            merch_profile = {}
+            if raw_merch:
+                raw_merch_str = str(raw_merch)
+                merch_id = (
+                    f"{row_tenant}:{raw_merch_str}"
+                    if row_tenant and not raw_merch_str.startswith(f"{row_tenant}:")
+                    else raw_merch_str
+                )
+                merch_profile = self.online_merchant.get(merch_id) or {}
 
             # Blend views into single record
             record = {}

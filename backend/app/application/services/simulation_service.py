@@ -81,6 +81,116 @@ class InvalidPipelineConfigurationError(Exception):
     pass
 
 
+def validate_bank_data_contract(bank_data: dict[str, dict[str, Any]]) -> None:
+    """Validate bank data dictionary against the authoritative federated contract.
+
+    Enforces:
+    1. bank_data is a non-empty dictionary.
+    2. Every bank partition contains all required canonical keys:
+       {'X_train', 'X_val', 'X_test', 'y_train', 'y_val', 'y_test'}.
+    3. Feature matrices (X_train, X_val, X_test) are 2D arrays with matching column dimension.
+    4. Label arrays (y_train, y_val, y_test) are 1D arrays aligned in length with features.
+    5. Partitions are non-empty (>0 samples).
+    6. Feature dimensions are identical across all partitions and banks.
+    7. Partitions enforce strict memory non-aliasing (distinct array instances preventing cross-split memory leakage).
+       Note: Sample-identity disjointness is guaranteed upstream by the partition constructor.
+
+    Raises
+    ------
+    ValueError
+        If any bank violates required keys, shapes, lengths, or memory non-aliasing constraints.
+    """
+    if not bank_data or not isinstance(bank_data, dict):
+        raise ValueError("Bank data contract violation: bank_data must be a non-empty dictionary.")
+
+    canonical_keys = {"X_train", "X_val", "X_test", "y_train", "y_val", "y_test"}
+    splits = ["train", "val", "test"]
+    ref_feature_dim: int | None = None
+    ref_bank_id: str | None = None
+
+    for bank_id, d in bank_data.items():
+        if not isinstance(d, dict):
+            raise ValueError(
+                f"Bank '{bank_id}' data partition must be a dictionary, got {type(d).__name__}."
+            )
+
+        missing_keys = canonical_keys - set(d.keys())
+        if missing_keys:
+            if "X_val" in missing_keys or "y_val" in missing_keys:
+                raise ValueError(
+                    f"Validation partition missing for bank '{bank_id}'. Missing required keys: {sorted(missing_keys)}"
+                )
+            raise ValueError(
+                f"Bank '{bank_id}' data partition violates canonical dataset contract. Missing required keys: {sorted(missing_keys)}"
+            )
+
+        # Check memory non-aliasing (anti-leakage invariant: partitions must not reference the same array buffer)
+        if d["X_val"] is d["X_train"] or d["X_val"] is d["X_test"] or d["X_train"] is d["X_test"]:
+            raise ValueError(
+                f"Bank '{bank_id}' violates data separation: validation, training, and test feature arrays alias the same memory object."
+            )
+        if d["y_val"] is d["y_train"] or d["y_val"] is d["y_test"] or d["y_train"] is d["y_test"]:
+            raise ValueError(
+                f"Bank '{bank_id}' violates data separation: validation, training, and test label arrays alias the same memory object."
+            )
+
+        for split in splits:
+            x_key = f"X_{split}"
+            y_key = f"y_{split}"
+            X = d[x_key]
+            y = d[y_key]
+
+            # Validate array shape and non-empty
+            if not hasattr(X, "shape") or not hasattr(X, "ndim"):
+                X = np.asarray(X)
+            if not hasattr(y, "shape") or not hasattr(y, "ndim"):
+                y = np.asarray(y)
+
+            if X.ndim != 2:
+                raise ValueError(
+                    f"Bank '{bank_id}' {split} feature matrix must be 2-dimensional, got shape {X.shape}."
+                )
+            if y.ndim != 1:
+                if y.ndim == 2 and y.shape[1] == 1:
+                    y = y.ravel()
+                else:
+                    raise ValueError(
+                        f"Bank '{bank_id}' {split} label array must be 1-dimensional, got shape {y.shape}."
+                    )
+
+            if len(X) == 0:
+                raise ValueError(
+                    f"Bank '{bank_id}' {split} feature partition cannot be empty (0 samples)."
+                )
+            if len(y) == 0:
+                raise ValueError(
+                    f"Bank '{bank_id}' {split} label partition cannot be empty (0 samples)."
+                )
+
+            if len(X) != len(y):
+                raise ValueError(
+                    f"Bank '{bank_id}' {split} partition length mismatch: {x_key} has {len(X)} samples, {y_key} has {len(y)} samples."
+                )
+
+        # Feature dimension consistency within bank
+        tr_dim = d["X_train"].shape[1]
+        va_dim = d["X_val"].shape[1]
+        te_dim = d["X_test"].shape[1]
+        if not (tr_dim == va_dim == te_dim):
+            raise ValueError(
+                f"Bank '{bank_id}' feature dimension mismatch across partitions: train={tr_dim}, val={va_dim}, test={te_dim}."
+            )
+
+        # Feature dimension consistency across banks
+        if ref_feature_dim is None:
+            ref_feature_dim = tr_dim
+            ref_bank_id = bank_id
+        elif tr_dim != ref_feature_dim:
+            raise ValueError(
+                f"Bank '{bank_id}' feature dimension ({tr_dim}) does not match reference bank '{ref_bank_id}' dimension ({ref_feature_dim})."
+            )
+
+
 class SimulationService:
     """Orchestrates the complete federated learning simulation."""
 
@@ -116,7 +226,7 @@ class SimulationService:
 
         self.model_registry = ModelRegistry()
 
-    def run_simulation(
+    def run_simulation(  # pyright: ignore[reportGeneralTypeIssues] - Tool limitation: Pyright complexity threshold exceeded on full orchestration flow; refactoring omitted to preserve runtime stability.
         self,
         config: SimulationConfig,
         progress_callback: ProgressCallback = None,
@@ -148,6 +258,8 @@ class SimulationService:
         final_round_participating: list[Any] | None = None
         final_round_samples: list[int] | None = None
         banks: list[Any] = []
+        global_auc: float | None = None
+        global_f1: float | None = None
 
         # Validate aggregation method
         try:
@@ -236,41 +348,69 @@ class SimulationService:
                     partition_dataset_non_iid,
                 )
 
-                dataset_mode_req = getattr(config, "dataset_mode", None)
+                dataset_mode_req = getattr(config, "dataset_mode", "real")
                 if dataset_mode_req == "synthetic":
-                    raise ValueError(
-                        f"Conflict: requested registered benchmark dataset '{dataset_choice}' with "
-                        f"dataset_mode='synthetic'. Registered benchmark datasets cannot be loaded in synthetic mode."
+                    from app.application.services import synthetic_dataset_generators as sdg
+
+                    synthetic_generators = {
+                        "paysim": sdg.generate_synthetic_paysim,
+                        "ieee_cis": sdg.generate_synthetic_ieee_cis,
+                        "elliptic": sdg.generate_synthetic_elliptic,
+                        "creditcard": sdg.generate_synthetic_creditcard,
+                        "credit_card": sdg.generate_synthetic_creditcard,
+                    }
+                    gen_fn = synthetic_generators.get(dataset_choice)
+                    if gen_fn is None:
+                        raise ValueError(
+                            f"Synthetic benchmark fixture generator for '{dataset_choice}' is not available."
+                        )
+                    self._notify(
+                        progress_callback,
+                        simulation.id,
+                        "status",
+                        {
+                            "status": simulation.status,
+                            "message": f"Loading synthetic benchmark fixture: {dataset_choice.upper()} (mode: synthetic)",
+                        },
+                    )
+                    dataset_data = gen_fn()
+                    simulation.dataset_mode = DatasetMode.SYNTHETIC.value
+                    simulation.dataset_provenance = DatasetProvenance.TEST_FIXTURE.value
+                else:
+                    self._notify(
+                        progress_callback,
+                        simulation.id,
+                        "status",
+                        {
+                            "status": simulation.status,
+                            "message": f"Loading benchmark dataset: {dataset_choice.upper()} (mode: real)",
+                        },
+                    )
+                    # Baseline multi-bank transaction pool ceiling for 3-bank federated simulation
+                    n_samples_req = max(
+                        6000,
+                        config.bank_a_transactions
+                        + config.bank_b_transactions
+                        + config.bank_c_transactions,
                     )
 
-                self._notify(
-                    progress_callback,
-                    simulation.id,
-                    "status",
-                    {
-                        "status": simulation.status,
-                        "message": f"Loading benchmark dataset: {dataset_choice.upper()} (mode: real)",
-                    },
-                )
-                n_samples_req = max(
-                    6000,
-                    config.bank_a_transactions
-                    + config.bank_b_transactions
-                    + config.bank_c_transactions,
-                )
-                real_data = load_dataset(
-                    dataset_choice,
-                    nrows=n_samples_req,
-                )
-                X_full = np.nan_to_num(real_data["X"], nan=0.0, posinf=0.0, neginf=0.0).astype(
+                    dataset_data = load_dataset(
+                        dataset_choice,
+                        nrows=n_samples_req,
+                    )
+                    simulation.dataset_mode = DatasetMode.REAL.value
+                    loader_provenance = dataset_data.get("provenance")
+                    if not loader_provenance:
+                        raise ValueError(
+                            f"Dataset '{dataset_choice}' loader contract violation: missing authoritative provenance metadata."
+                        )
+                    simulation.dataset_provenance = loader_provenance
+
+                X_full = np.nan_to_num(dataset_data["X"], nan=0.0, posinf=0.0, neginf=0.0).astype(
                     np.float32
                 )
-                y_full = np.asarray(real_data["y"], dtype=int)
-                feature_names = real_data.get("feature_names")
-                simulation.dataset_mode = DatasetMode.REAL.value
-                simulation.dataset_provenance = real_data.get(
-                    "provenance", DatasetProvenance.REAL_DATA_EVIDENCE.value
-                )
+                y_full = np.asarray(dataset_data["y"], dtype=int)
+                feature_names = dataset_data.get("feature_names")
 
                 # Non-IID Dirichlet partition across 3 banks
                 partitions = partition_dataset_non_iid(
@@ -306,54 +446,58 @@ class SimulationService:
                         try:
                             unique_cls, counts = np.unique(y_bank, return_counts=True)
                             can_stratify = len(unique_cls) > 1 and int(np.min(counts)) >= 4
-                            X_train, X_rem, y_train, y_rem, sens_train, sens_rem = (
-                                train_test_split(
-                                    X_bank,
-                                    y_bank,
-                                    sensitive_array,
-                                    test_size=test_rem_ratio,
-                                    random_state=42,
-                                    stratify=cast("Any", y_bank) if can_stratify else None,
-                                )
+                            X_train, X_rem, y_train, y_rem, sens_train, sens_rem = train_test_split(
+                                X_bank,
+                                y_bank,
+                                sensitive_array,
+                                test_size=test_rem_ratio,
+                                random_state=42,
+                                stratify=cast("Any", y_bank) if can_stratify else None,
                             )
                             unique_rem, counts_rem = np.unique(y_rem, return_counts=True)
                             can_stratify_rem = len(unique_rem) > 1 and int(np.min(counts_rem)) >= 2
-                            X_val, X_test, y_val, y_test, sens_val, sens_test = (
-                                train_test_split(
-                                    X_rem,
-                                    y_rem,
-                                    sens_rem,
-                                    test_size=0.50,
-                                    random_state=42,
-                                    stratify=cast("Any", y_rem) if can_stratify_rem else None,
-                                )
+                            X_val, X_test, y_val, y_test, sens_val, sens_test = train_test_split(
+                                X_rem,
+                                y_rem,
+                                sens_rem,
+                                test_size=0.50,
+                                random_state=42,
+                                stratify=cast("Any", y_rem) if can_stratify_rem else None,
                             )
                         except Exception:
-                            X_train, X_rem, y_train, y_rem, sens_train, sens_rem = (
-                                train_test_split(
-                                    X_bank,
-                                    y_bank,
-                                    sensitive_array,
-                                    test_size=test_rem_ratio,
-                                    random_state=42,
-                                )
+                            X_train, X_rem, y_train, y_rem, sens_train, sens_rem = train_test_split(
+                                X_bank,
+                                y_bank,
+                                sensitive_array,
+                                test_size=test_rem_ratio,
+                                random_state=42,
                             )
-                            X_val, X_test, y_val, y_test, sens_val, sens_test = (
-                                train_test_split(
-                                    X_rem,
-                                    y_rem,
-                                    sens_rem,
-                                    test_size=0.50,
-                                    random_state=42,
-                                )
+                            X_val, X_test, y_val, y_test, sens_val, sens_test = train_test_split(
+                                X_rem,
+                                y_rem,
+                                sens_rem,
+                                test_size=0.50,
+                                random_state=42,
                             )
                     elif n_tx >= 3:
                         n_te = max(1, n_tx // 3)
                         n_va = max(1, n_tx // 3)
                         n_tr = max(1, n_tx - n_te - n_va)
-                        X_train, y_train, sens_train = X_bank[:n_tr], y_bank[:n_tr], sensitive_array[:n_tr]
-                        X_val, y_val, sens_val = X_bank[n_tr:n_tr+n_va], y_bank[n_tr:n_tr+n_va], sensitive_array[n_tr:n_tr+n_va]
-                        X_test, y_test, sens_test = X_bank[n_tr+n_va:], y_bank[n_tr+n_va:], sensitive_array[n_tr+n_va:]
+                        X_train, y_train, sens_train = (
+                            X_bank[:n_tr],
+                            y_bank[:n_tr],
+                            sensitive_array[:n_tr],
+                        )
+                        X_val, y_val, sens_val = (
+                            X_bank[n_tr : n_tr + n_va],
+                            y_bank[n_tr : n_tr + n_va],
+                            sensitive_array[n_tr : n_tr + n_va],
+                        )
+                        X_test, y_test, sens_test = (
+                            X_bank[n_tr + n_va :],
+                            y_bank[n_tr + n_va :],
+                            sensitive_array[n_tr + n_va :],
+                        )
                     else:
                         raise ValueError(
                             f"Simulation dataset contract violation for bank '{bank_id}': "
@@ -506,13 +650,7 @@ class SimulationService:
             )
 
             # Enforce canonical dataset contract across all banks
-            canonical_keys = {"X_train", "X_val", "X_test", "y_train", "y_val", "y_test"}
-            for b_id, d in bank_data.items():
-                missing_keys = canonical_keys - set(d.keys())
-                if missing_keys:
-                    raise ValueError(
-                        f"Bank {b_id} data partition violates canonical dataset contract. Missing keys: {missing_keys}"
-                    )
+            validate_bank_data_contract(bank_data)
 
             # ARCHITECTURAL PRIVACY BOUNDARY NOTE:
             # Concatenating X_val and X_test across banks into X_val_global / X_test_global is an
@@ -583,11 +721,16 @@ class SimulationService:
                 )
                 bank.local_metrics = self.metrics_service.from_eval_dict(eval_dict, feat_imp)
 
+                local_auc_str = (
+                    f"{bank.local_metrics.auc_roc:.4f}"
+                    if bank.local_metrics.auc_roc is not None
+                    else "None"
+                )
                 logger.info(
-                    "Local model for %s | F1: %.4f, AUC: %.4f",
+                    "Local model for %s | F1: %.4f, AUC: %s",
                     bank.name,
                     bank.local_metrics.f1_score,
-                    bank.local_metrics.auc_roc,
+                    local_auc_str,
                 )
 
                 self._notify(
@@ -971,13 +1114,11 @@ class SimulationService:
                             )
                             loc_model = self.model_service.set_parameters(loc_model, global_weights)
                             if use_opacus_dp:
-                                effective_dp_epochs = (
-                                    getattr(config, "dp_local_epochs", None)
-                                    or (1 if config.local_epochs in (2, 3) else config.local_epochs)
+                                effective_dp_epochs = getattr(config, "dp_local_epochs", None) or (
+                                    1 if config.local_epochs in (2, 3) else config.local_epochs
                                 )
-                                effective_dp_lr = (
-                                    getattr(config, "dp_learning_rate", None)
-                                    or (0.005 if config.learning_rate == 0.001 else config.learning_rate)
+                                effective_dp_lr = getattr(config, "dp_learning_rate", None) or (
+                                    0.005 if config.learning_rate == 0.001 else config.learning_rate
                                 )
                                 loc_model, loss_hist, actual_eps = (
                                     self.model_service.train_local_with_opacus(
@@ -1270,10 +1411,12 @@ class SimulationService:
                         round_val_probs = global_eval_m(val_t).cpu().numpy()
                         del val_t
 
-                    round_th, round_val_f1, round_prov = self.model_service.select_operating_threshold(
-                        y_val_global,
-                        round_val_probs,
-                        policy=getattr(config, "threshold_policy", "max_f1"),
+                    round_th, round_val_f1, round_prov = (
+                        self.model_service.select_operating_threshold(
+                            y_val_global,
+                            round_val_probs,
+                            policy=getattr(config, "threshold_policy", "max_f1"),
+                        )
                     )
                     global_eval = self.model_service.evaluate(
                         global_eval_m,
@@ -1347,12 +1490,13 @@ class SimulationService:
                         final_round_samples = list(raw_client_samples)
                         final_round_participating = list(raw_participating)
 
+                    auc_display = f"{global_auc:.4f}" if global_auc is not None else "None"
                     logger.info(
-                        "[Federated FL] Round %d/%d — loss: %.4f, auc: %.4f, participants: %d, dropped: %d, duration: %.0fms",
+                        "[Federated FL] Round %d/%d — loss: %.4f, auc: %s, participants: %d, dropped: %d, duration: %.0fms",
                         round_num,
                         config.num_rounds,
                         round_loss,
-                        global_auc,
+                        auc_display,
                         len(participating),
                         len(dropped_this_round),
                         round_duration,
@@ -1370,9 +1514,12 @@ class SimulationService:
                             "round": round_num,
                             "total": config.num_rounds,
                             "loss": round_loss,
-                            "auc": round(global_auc, 4),
-                            "f1": round(global_f1, 4),
-                            "per_bank_auc": {k: round(v, 4) for k, v in eval_aucs.items()},
+                            "auc": round(global_auc, 4) if global_auc is not None else None,
+                            "f1": round(global_f1, 4) if global_f1 is not None else None,
+                            "per_bank_auc": {
+                                k: (round(v, 4) if v is not None else None)
+                                for k, v in eval_aucs.items()
+                            },
                             "per_bank_loss": {k: round(v, 4) for k, v in per_bank_loss.items()},
                             "participants": [b.id for b in participating],
                             "dropped": dropped_this_round,
@@ -1718,13 +1865,20 @@ class SimulationService:
                         bank.federated_metrics.feature_importance,
                     )
 
+                    fed_auc_str = (
+                        f"{bank.federated_metrics.auc_roc:.4f}"
+                        if bank.federated_metrics.auc_roc is not None
+                        else "None"
+                    )
+                    local_auc_val = bank.local_metrics.auc_roc if bank.local_metrics else None
+                    local_auc_str = f"{local_auc_val:.4f}" if local_auc_val is not None else "None"
                     logger.info(
-                        "Federated model at %s | F1: %.4f (local: %.4f), AUC: %.4f (local: %.4f)",
+                        "Federated model at %s | F1: %.4f (local: %.4f), AUC: %s (local: %s)",
                         bank.name,
                         bank.federated_metrics.f1_score,
                         bank.local_metrics.f1_score if bank.local_metrics else 0,
-                        bank.federated_metrics.auc_roc,
-                        bank.local_metrics.auc_roc if bank.local_metrics else 0,
+                        fed_auc_str,
+                        local_auc_str,
                     )
 
             contribution_scores = {}
@@ -1998,11 +2152,11 @@ class SimulationService:
                     else 0.0,
                 }
 
-                # Compile final metrics
-                final_metrics = {
-                    "auc_roc": 0.85,
+                # Compile final metrics from authoritative model evaluation
+                final_metrics: dict[str, Any] = {
+                    "auc_roc": global_auc if global_auc is not None else None,
                     "loss": rounds[-1].global_loss if rounds else 0.0,
-                    "f1_score": 0.82,
+                    "f1_score": global_f1 if global_f1 is not None else None,
                 }
 
                 self.model_registry.save_version(
@@ -2221,31 +2375,35 @@ class SimulationService:
                 avg_f1_score = sum(b.federated_metrics.f1_score for b in valid_banks) / len(
                     valid_banks
                 )
-                avg_auc_roc = sum(b.federated_metrics.auc_roc for b in valid_banks) / len(
-                    valid_banks
-                )
+                auc_values = [
+                    b.federated_metrics.auc_roc
+                    for b in valid_banks
+                    if b.federated_metrics.auc_roc is not None
+                ]
+                avg_auc_roc = (sum(auc_values) / len(auc_values)) if auc_values else None
 
-                mlflow.log_metrics(
-                    {
-                        "final_avg_accuracy": avg_accuracy,
-                        "final_avg_precision": avg_precision,
-                        "final_avg_recall": avg_recall,
-                        "final_avg_f1_score": avg_f1_score,
-                        "final_avg_auc_roc": avg_auc_roc,
-                    }
-                )
+                metrics_to_log: dict[str, Any] = {
+                    "final_avg_accuracy": avg_accuracy,
+                    "final_avg_precision": avg_precision,
+                    "final_avg_recall": avg_recall,
+                    "final_avg_f1_score": avg_f1_score,
+                }
+                if avg_auc_roc is not None:
+                    metrics_to_log["final_avg_auc_roc"] = avg_auc_roc
+
+                mlflow.log_metrics(metrics_to_log)
 
                 # Log metrics per bank
                 for b in valid_banks:
-                    mlflow.log_metrics(
-                        {
-                            f"{b.id}_accuracy": b.federated_metrics.accuracy,
-                            f"{b.id}_precision": b.federated_metrics.precision,
-                            f"{b.id}_recall": b.federated_metrics.recall,
-                            f"{b.id}_f1_score": b.federated_metrics.f1_score,
-                            f"{b.id}_auc_roc": b.federated_metrics.auc_roc,
-                        }
-                    )
+                    b_metrics: dict[str, Any] = {
+                        f"{b.id}_accuracy": b.federated_metrics.accuracy,
+                        f"{b.id}_precision": b.federated_metrics.precision,
+                        f"{b.id}_recall": b.federated_metrics.recall,
+                        f"{b.id}_f1_score": b.federated_metrics.f1_score,
+                    }
+                    if b.federated_metrics.auc_roc is not None:
+                        b_metrics[f"{b.id}_auc_roc"] = b.federated_metrics.auc_roc
+                    mlflow.log_metrics(b_metrics)
 
             mlflow.end_run()
         except Exception as e:

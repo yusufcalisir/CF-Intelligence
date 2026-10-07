@@ -298,21 +298,25 @@ async def get_pareto_frontier(
     if study_name:
         study = get_stored_study(study_name)
         if study:
-            params = study.get("best_params", {})
-            auc_val = float(study.get("best_value", 0.93))
-            noise_mult = float(params.get("dp_noise_multiplier", 0.5))
-            eps_val = round(max(0.5, 4.0 / (noise_mult + 0.1)), 2)
-            raw_points.append(
-                ParetoPoint(
-                    trial_id=99,
-                    learning_rate=float(params.get("learning_rate", 0.01)),
-                    batch_size=int(params.get("batch_size", 32)),
-                    fedprox_mu=float(params.get("fedprox_mu", 0.01)),
-                    dp_epsilon=eps_val,
-                    auc_roc=auc_val,
-                    latency_ms=round(float(study.get("duration_ms", 350.0)) / max(study.get("completed_trials", 1), 1), 1),
+            duration_val = study.get("duration_ms")
+            if duration_val is not None:
+                params = study.get("best_params", {})
+                auc_val = float(study.get("best_value", 0.93))
+                noise_mult = float(params.get("dp_noise_multiplier", 0.5))
+                eps_val = round(max(0.5, 4.0 / (noise_mult + 0.1)), 2)
+                raw_points.append(
+                    ParetoPoint(
+                        trial_id=99,
+                        learning_rate=float(params.get("learning_rate", 0.01)),
+                        batch_size=int(params.get("batch_size", 32)),
+                        fedprox_mu=float(params.get("fedprox_mu", 0.01)),
+                        dp_epsilon=eps_val,
+                        auc_roc=auc_val,
+                        latency_ms=round(float(duration_val) / max(study.get("completed_trials", 1), 1), 1),
+                    )
                 )
-            )
+            else:
+                logger.warning("Optimization study lacks measured duration_ms; omitting from latency Pareto frontier.")
 
     evaluated_points = _compute_pareto_dominance(raw_points)
     pareto_optimal_points = [p for p in evaluated_points if p.is_pareto_optimal]

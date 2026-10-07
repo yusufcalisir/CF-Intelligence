@@ -103,7 +103,7 @@ class ModelRegistry:
         self,
         simulation_id: str,
         state_dict: dict[str, Any],
-        metrics: dict[str, float],
+        metrics: dict[str, Any],
         is_promoted: bool = True,
         git_commit_hash: str | None = None,
         dataset_hash: str | None = None,

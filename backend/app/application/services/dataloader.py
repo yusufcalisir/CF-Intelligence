@@ -1905,17 +1905,33 @@ def _process_amlnet_dataframe(
 
     # 2. Amounts & Balances
     n = len(df)
+    if "oldbalanceOrg" not in df.columns or "newbalanceOrig" not in df.columns:
+        raise ValueError("AMLNet dataset requires 'oldbalanceOrg' and 'newbalanceOrig' columns")
+
     amount = np.asarray(pd.to_numeric(df.get("amount", pd.Series([0.0] * n)), errors="coerce").fillna(0.0).values, dtype=np.float32)
     log_amount = np.log1p(np.maximum(0.0, amount)).astype(np.float32)
-    old_bal = np.asarray(pd.to_numeric(df.get("oldbalanceOrg", pd.Series([0.0] * n)), errors="coerce").fillna(0.0).values, dtype=np.float32)
-    new_bal = np.asarray(pd.to_numeric(df.get("newbalanceOrig", pd.Series([0.0] * n)), errors="coerce").fillna(0.0).values, dtype=np.float32)
+    old_bal = np.asarray(pd.to_numeric(df["oldbalanceOrg"], errors="coerce").fillna(0.0).values, dtype=np.float32)
+    new_bal = np.asarray(pd.to_numeric(df["newbalanceOrig"], errors="coerce").fillna(0.0).values, dtype=np.float32)
 
     bal_delta = (new_bal + amount - old_bal).astype(np.float32)
     bal_ratio = (amount / (old_bal + 1.0)).astype(np.float32)
 
     # 3. Temporal
-    hour = np.asarray(pd.to_numeric(df.get("hour", pd.Series([12] * n)), errors="coerce").fillna(12).values, dtype=np.float32)
-    dow = np.asarray(pd.to_numeric(df.get("day_of_week", pd.Series([0] * n)), errors="coerce").fillna(0).values, dtype=np.float32)
+    if "hour" in df.columns:
+        hour = np.asarray(pd.to_numeric(df["hour"], errors="coerce").fillna(0.0).values, dtype=np.float32)
+    elif "step" in df.columns:
+        step_series = pd.to_numeric(df["step"], errors="coerce").fillna(0)
+        hour = np.asarray((step_series % 24).values, dtype=np.float32)
+    else:
+        raise ValueError("AMLNet dataset requires 'hour' or 'step' column for temporal features")
+
+    if "day_of_week" in df.columns:
+        dow = np.asarray(pd.to_numeric(df["day_of_week"], errors="coerce").fillna(0.0).values, dtype=np.float32)
+    elif "step" in df.columns:
+        step_series = pd.to_numeric(df["step"], errors="coerce").fillna(0)
+        dow = np.asarray(((step_series // 24) % 7).values, dtype=np.float32)
+    else:
+        raise ValueError("AMLNet dataset requires 'day_of_week' or 'step' column for temporal features")
 
     # 4. Payment channel one-hot encoding
     type_col = df.get("type", pd.Series(["TRANSFER"] * len(df))).astype(str).str.upper()
@@ -1931,7 +1947,10 @@ def _process_amlnet_dataframe(
     near_thresh = ((amount >= 8500.0) & (amount < 10000.0)).astype(np.float32)
 
     # High-risk category
-    cat_col = df.get("category", pd.Series(["Retail"] * len(df))).astype(str)
+    if "category" in df.columns:
+        cat_col = df["category"].astype(str)
+    else:
+        cat_col = pd.Series(["Unknown"] * len(df))
     high_risk_cats = {"Cryptocurrency", "Shell Company", "Luxury Goods", "Gambling", "Investment"}
     high_risk = cat_col.isin(high_risk_cats).astype(np.float32).values
 
@@ -1960,8 +1979,9 @@ def _process_amlnet_dataframe(
         np.asarray(is_weekend, dtype=np.float32),
     ]).astype(np.float32)
 
-    step_default = pd.Series(range(len(df)))
-    steps = np.asarray(pd.to_numeric(df.get("step", step_default), errors="coerce").fillna(0).values, dtype=np.float64)
+    if "step" not in df.columns:
+        raise ValueError("AMLNet dataset requires 'step' column for temporal sequence alignment")
+    steps = np.asarray(pd.to_numeric(df["step"], errors="coerce").fillna(0).values, dtype=np.float64)
 
     return {
         "X": X,

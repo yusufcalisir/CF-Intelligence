@@ -56,13 +56,13 @@ class MetricsService:
 
         # Build EvaluationMetrics domain value object with validated metrics.
         metrics_kwargs: dict[str, Any] = {
-            "accuracy": float(eval_dict.get("accuracy", 0.0)),
-            "precision": float(eval_dict.get("precision", eval_dict.get("prec", 0.0))),
-            "recall": float(eval_dict.get("recall", eval_dict.get("rec", 0.0))),
-            "f1_score": float(eval_dict.get("f1_score", eval_dict.get("f1", 0.0))),
+            "accuracy": _parse_opt_float(eval_dict.get("accuracy")),
+            "precision": _parse_opt_float(eval_dict.get("precision", eval_dict.get("prec"))),
+            "recall": _parse_opt_float(eval_dict.get("recall", eval_dict.get("rec"))),
+            "f1_score": _parse_opt_float(eval_dict.get("f1_score", eval_dict.get("f1"))),
             "auc_roc": auc_roc,
-            "loss": float(eval_dict.get("loss", 0.0)),
-            "confusion_matrix": eval_dict.get("confusion_matrix", [[0, 0], [0, 0]]),
+            "loss": _parse_opt_float(eval_dict.get("loss")),
+            "confusion_matrix": eval_dict.get("confusion_matrix"),
             "roc_fpr": eval_dict.get("roc_fpr", []),
             "roc_tpr": eval_dict.get("roc_tpr", []),
             "roc_thresholds": eval_dict.get("roc_thresholds", []),
@@ -99,25 +99,29 @@ class MetricsService:
         if not local_metrics or not federated_metrics:
             return {}
 
-        n = len(local_metrics)
-        improvements: dict[str, float] = {
-            "accuracy": 0.0,
-            "precision": 0.0,
-            "recall": 0.0,
-            "f1_score": 0.0,
+        deltas: dict[str, list[float]] = {
+            "accuracy": [],
+            "precision": [],
+            "recall": [],
+            "f1_score": [],
+            "auc_roc": [],
         }
 
-        auc_deltas: list[float] = []
         for local, federated in zip(local_metrics, federated_metrics, strict=False):
-            improvements["accuracy"] += federated.accuracy - local.accuracy
-            improvements["precision"] += federated.precision - local.precision
-            improvements["recall"] += federated.recall - local.recall
-            improvements["f1_score"] += federated.f1_score - local.f1_score
+            if federated.accuracy is not None and local.accuracy is not None:
+                deltas["accuracy"].append(federated.accuracy - local.accuracy)
+            if federated.precision is not None and local.precision is not None:
+                deltas["precision"].append(federated.precision - local.precision)
+            if federated.recall is not None and local.recall is not None:
+                deltas["recall"].append(federated.recall - local.recall)
+            if federated.f1_score is not None and local.f1_score is not None:
+                deltas["f1_score"].append(federated.f1_score - local.f1_score)
             if federated.auc_roc is not None and local.auc_roc is not None:
-                auc_deltas.append(federated.auc_roc - local.auc_roc)
+                deltas["auc_roc"].append(federated.auc_roc - local.auc_roc)
 
-        res: dict[str, float | None] = {k: round(v / n, 4) for k, v in improvements.items()}
-        res["auc_roc"] = round(sum(auc_deltas) / len(auc_deltas), 4) if auc_deltas else None
+        res: dict[str, float | None] = {}
+        for k, v in deltas.items():
+            res[k] = round(sum(v) / len(v), 4) if v else None
         return res
 
     @staticmethod

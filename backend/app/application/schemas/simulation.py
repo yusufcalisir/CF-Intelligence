@@ -348,14 +348,14 @@ class TrainingRoundResponse(BaseModel):
 
     round_number: int
     total_rounds: int
-    global_loss: float
-    auc: float = 0.0
+    global_loss: float | None = None
+    auc: float | None = None
     per_bank_auc: dict[str, float] = Field(default_factory=dict)
     per_bank_loss: dict[str, float] = Field(default_factory=dict)
     participating_banks: list[str] = Field(default_factory=list)
     dropped_banks: list[str] = Field(default_factory=list)
     duration_ms: float = 0.0
-    privacy_budget: float = 0.0
+    privacy_budget: float | None = None
     feature_importance: dict[str, float] = Field(default_factory=dict)
     canary_info: dict[str, Any] = Field(default_factory=dict)
 

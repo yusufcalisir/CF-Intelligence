@@ -72,11 +72,15 @@ class LabelFeedbackItem:
         else:
             rec_at_dt = datetime.now(UTC)
 
-        raw_label = data.get("label", "CONFIRMED_FRAUD")
+        raw_label = data.get("label")
+        if raw_label is None:
+            raise ValueError("Field 'label' is mandatory and cannot be missing or null.")
         try:
             lbl = FeedbackLabel(raw_label)
-        except ValueError:
-            lbl = FeedbackLabel.CONFIRMED_FRAUD
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid feedback label '{raw_label}'. Expected one of: {[e.value for e in FeedbackLabel]}"
+            ) from exc
 
         return cls(
             transaction_id_hash=data.get("transaction_id_hash", ""),
@@ -126,7 +130,7 @@ class LocalLabelFeedbackPipeline:
         self,
         tenant_id: str = "default_bank",
         transaction_id_hash: str | None = None,
-        determination: str | FeedbackLabel = FeedbackLabel.CONFIRMED_FRAUD,
+        determination: str | FeedbackLabel | None = None,
         alert_id: str | None = None,
         priority: int | None = None,
         weight: float | None = None,
@@ -157,7 +161,14 @@ class LocalLabelFeedbackPipeline:
             raw_attributes=raw_attributes,
         )
 
-        label = determination if isinstance(determination, FeedbackLabel) else FeedbackLabel(determination)
+        if determination is None:
+            raise ValueError("Determination label is mandatory and cannot be missing or None.")
+        try:
+            label = determination if isinstance(determination, FeedbackLabel) else FeedbackLabel(determination)
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid determination '{determination}'. Expected one of: {[e.value for e in FeedbackLabel]}"
+            ) from exc
 
         # Calibrate default priority and weight based on business impact
         if priority is None:

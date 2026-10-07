@@ -1,6 +1,6 @@
-"""Automated Regression Suite for Runtime Truth Invariants (Phase 2).
+"""Automated Regression Suite for Runtime Truth Invariants.
 
-Verifies the 8 core runtime truth invariants across backend execution paths:
+Verifies core runtime truth invariants across backend execution paths:
 Invariant 1: Simulation creation records genuine live execution provenance.
 Invariant 2: Telemetry streaming exposes explicit provenance and rejects fake live labeling.
 Invariant 3: Design partner evaluation uses genuine model inference without Beta fabrication.

@@ -20,7 +20,10 @@ from app.application.services.fl_engine import FederatedLearningEngine
 from app.application.services.metrics_service import MetricsService
 from app.application.services.model_service import ModelService
 from app.application.services.privacy_service import PrivacyService
-from app.application.services.simulation_service import SimulationService
+from app.application.services.simulation_service import (
+    SimulationService,
+    validate_bank_data_contract,
+)
 from app.config import get_settings
 from app.domain.enums import SimulationStatus
 from app.domain.value_objects import SimulationConfig
@@ -148,7 +151,10 @@ def test_end_to_end_federated_simulation_real_benchmarks(
 
     for bank in result.banks:
         assert bank.federated_metrics is not None
-        assert 0.0 <= bank.federated_metrics.auc_roc <= 1.0
+        assert 0.0 <= bank.federated_metrics.accuracy <= 1.0
+        assert 0.0 <= bank.federated_metrics.f1_score <= 1.0
+        if bank.federated_metrics.auc_roc is not None:
+            assert 0.0 <= bank.federated_metrics.auc_roc <= 1.0
 
 
 def test_end_to_end_federated_simulation_synthetic_contract(
@@ -218,3 +224,141 @@ def test_provenance_survives_pipeline(simulation_service: SimulationService):
     result = simulation_service.run_simulation(config)
     assert result.dataset_mode == "real"
     assert result.dataset_provenance == "EMPIRICAL_EXTERNAL_DATA"
+
+
+@pytest.mark.parametrize("dataset_name", ["paysim", "ieee_cis", "elliptic", "creditcard"])
+def test_end_to_end_federated_simulation_benchmark_fixtures(
+    simulation_service: SimulationService, dataset_name: str
+):
+    """Suite A: Full 2-round federated simulation using explicit synthetic benchmark test fixtures (CI smoke suite)."""
+    config = SimulationConfig(
+        num_rounds=2,
+        local_epochs=1,
+        batch_size=32,
+        dataset=dataset_name,
+        dataset_mode="synthetic",
+        bank_a_transactions=100,
+        bank_b_transactions=100,
+        bank_c_transactions=100,
+    )
+
+    result = simulation_service.run_simulation(config)
+    assert result.status == SimulationStatus.COMPLETED
+    assert result.dataset_mode == "synthetic"
+    assert result.dataset_provenance == "TEST_FIXTURE"
+    assert len(result.rounds) == 2
+    assert len(result.banks) == 3
+
+    last_round = result.rounds[-1]
+    assert last_round.global_loss is not None
+    assert last_round.global_loss > 0.0
+
+    for bank in result.banks:
+        assert bank.federated_metrics is not None
+        assert 0.0 <= bank.federated_metrics.accuracy <= 1.0
+        assert 0.0 <= bank.federated_metrics.f1_score <= 1.0
+        if bank.federated_metrics.auc_roc is not None:
+            assert 0.0 <= bank.federated_metrics.auc_roc <= 1.0
+
+
+def test_bank_data_validation_contract_success():
+    """Suite C: Canonical bank data structure passes validation contract."""
+    bank_data = {
+        "bank_a": {
+            "X_train": np.ones((10, 5), dtype=np.float32),
+            "X_val": np.ones((4, 5), dtype=np.float32),
+            "X_test": np.ones((4, 5), dtype=np.float32),
+            "y_train": np.zeros(10, dtype=int),
+            "y_val": np.zeros(4, dtype=int),
+            "y_test": np.zeros(4, dtype=int),
+        },
+        "bank_b": {
+            "X_train": np.ones((12, 5), dtype=np.float32),
+            "X_val": np.ones((5, 5), dtype=np.float32),
+            "X_test": np.ones((5, 5), dtype=np.float32),
+            "y_train": np.zeros(12, dtype=int),
+            "y_val": np.zeros(5, dtype=int),
+            "y_test": np.zeros(5, dtype=int),
+        },
+    }
+    # Must succeed without error
+    validate_bank_data_contract(bank_data)
+
+
+def test_bank_data_validation_contract_missing_x_val_fails_early():
+    """Suite D / Adversarial 1: Missing X_val raises descriptive ValueError, never raw KeyError."""
+    bank_data = {
+        "bank_a": {
+            "X_train": np.ones((10, 5), dtype=np.float32),
+            "X_test": np.ones((4, 5), dtype=np.float32),
+            "y_train": np.zeros(10, dtype=int),
+            "y_val": np.zeros(4, dtype=int),
+            "y_test": np.zeros(4, dtype=int),
+        }
+    }
+    with pytest.raises(ValueError, match="Validation partition missing for bank 'bank_a'"):
+        validate_bank_data_contract(bank_data)
+
+
+def test_bank_data_validation_contract_missing_y_val_fails_early():
+    """Suite D / Adversarial 2: Missing y_val raises descriptive ValueError, never raw KeyError."""
+    bank_data = {
+        "bank_a": {
+            "X_train": np.ones((10, 5), dtype=np.float32),
+            "X_val": np.ones((4, 5), dtype=np.float32),
+            "X_test": np.ones((4, 5), dtype=np.float32),
+            "y_train": np.zeros(10, dtype=int),
+            "y_test": np.zeros(4, dtype=int),
+        }
+    }
+    with pytest.raises(ValueError, match="Validation partition missing for bank 'bank_a'"):
+        validate_bank_data_contract(bank_data)
+
+
+def test_bank_data_validation_contract_length_mismatch_rejected():
+    """Suite D / Adversarial 3: Mismatched features and labels lengths are rejected."""
+    bank_data = {
+        "bank_a": {
+            "X_train": np.ones((10, 5), dtype=np.float32),
+            "X_val": np.ones((4, 5), dtype=np.float32),
+            "X_test": np.ones((4, 5), dtype=np.float32),
+            "y_train": np.zeros(10, dtype=int),
+            "y_val": np.zeros(3, dtype=int),  # 3 vs 4!
+            "y_test": np.zeros(4, dtype=int),
+        }
+    }
+    with pytest.raises(ValueError, match="val partition length mismatch"):
+        validate_bank_data_contract(bank_data)
+
+
+def test_bank_data_validation_contract_incompatible_feature_dim_rejected():
+    """Suite D / Adversarial 4: Incompatible feature dimensions between partitions or banks are rejected."""
+    bank_data = {
+        "bank_a": {
+            "X_train": np.ones((10, 5), dtype=np.float32),
+            "X_val": np.ones((4, 6), dtype=np.float32),  # 6 vs 5!
+            "X_test": np.ones((4, 5), dtype=np.float32),
+            "y_train": np.zeros(10, dtype=int),
+            "y_val": np.zeros(4, dtype=int),
+            "y_test": np.zeros(4, dtype=int),
+        }
+    }
+    with pytest.raises(ValueError, match="feature dimension mismatch across partitions"):
+        validate_bank_data_contract(bank_data)
+
+
+def test_bank_data_validation_contract_aliasing_rejected():
+    """Suite D / Adversarial 5: Aliased partitions (data leakage) are rejected."""
+    shared_arr = np.ones((10, 5), dtype=np.float32)
+    bank_data = {
+        "bank_a": {
+            "X_train": shared_arr,
+            "X_val": shared_arr,  # Aliasing train array!
+            "X_test": np.ones((4, 5), dtype=np.float32),
+            "y_train": np.zeros(10, dtype=int),
+            "y_val": np.zeros(10, dtype=int),
+            "y_test": np.zeros(4, dtype=int),
+        }
+    }
+    with pytest.raises(ValueError, match="violates data separation"):
+        validate_bank_data_contract(bank_data)
