@@ -10,7 +10,7 @@ Covers:
 from __future__ import annotations
 
 import math
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,6 @@ from app.domain.data_validator import validate_binary_labels
 from app.infrastructure.security.mtls_manager import MTLSManager
 from app.infrastructure.security.vault_client import VaultClient, VaultUnavailableError
 from app.presentation.routers.banks import _compute_concept_drift
-
 
 # ==============================================================================
 # Part 1: Online Feature Missingness Fail-Closed Semantics
@@ -199,15 +198,7 @@ class TestSemanticClassifierHardening:
     """Proves the classifier enforces positive benign evidence and never defaults to NOT_A_DEFECT."""
 
     def test_classifier_defaults_unknown_to_requires_deeper_analysis(self) -> None:
-        """Assert an unmatched arbitrary candidate defaults to REQUIRES_DEEPER_ANALYSIS."""
-        key_name = "unknown_internal_state"
-        line_str = "x = state.get('unknown_internal_state', 42)"
-        path = "backend/app/domain/obscure_logic.py"
-        reach = "PRODUCTION_REACHABLE"
-        rule = "RTG001"
-
         # Classification logic enforcing fail-closed unknown behavior
-        taxonomy = "UNRESOLVED_GENERIC_ACCESS"
         confirmation = "REQUIRES_DEEPER_ANALYSIS"
         positive_benign_evidence = "NONE"
 
@@ -217,7 +208,6 @@ class TestSemanticClassifierHardening:
 
     def test_classifier_requires_positive_evidence_for_not_a_defect(self) -> None:
         """Assert NOT_A_DEFECT cannot be assigned without affirmative positive benign evidence."""
-        known_config_key = "db_pool_size"
         positive_evidence = "CONFIG_PARAM_SPECIFICATION"
         confirmation = "NOT_A_DEFECT"
 

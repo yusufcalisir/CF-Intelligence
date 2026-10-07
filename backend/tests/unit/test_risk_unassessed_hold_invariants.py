@@ -11,8 +11,6 @@ Validates the authoritative governance contract:
 
 from __future__ import annotations
 
-import math
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -29,15 +27,12 @@ from app.domain.enums import (
     CasePriority,
     CaseStatus,
     TriageAction,
-    TriagePriority,
 )
 from app.domain.risk_engine import (
     DEFAULT_WEIGHTS,
     PolicyAction,
     RiskTier,
-    SignalWeights,
     calculate_weighted_score,
-    classify_risk_tier,
     map_tier_to_action,
 )
 from app.main import app

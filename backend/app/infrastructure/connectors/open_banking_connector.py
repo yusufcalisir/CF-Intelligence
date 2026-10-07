@@ -228,10 +228,7 @@ class OpenBankingConnector(BaseBankConnector):
                 ts = datetime.now(UTC)
 
             raw_mcc = item.get("merchantCategoryCode")
-            if raw_mcc is not None and str(raw_mcc).strip():
-                mcc = str(raw_mcc).strip()
-            else:
-                mcc = "0000"
+            mcc = str(raw_mcc).strip() if raw_mcc is not None and str(raw_mcc).strip() else "0000"
 
             origin_country = debtor_iban[:2].upper() if len(debtor_iban) >= 2 and debtor_iban[:2].isalpha() else None
             destination_country = creditor_iban[:2].upper() if len(creditor_iban) >= 2 and creditor_iban[:2].isalpha() else None

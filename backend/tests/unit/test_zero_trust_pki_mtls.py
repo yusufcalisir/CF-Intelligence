@@ -23,6 +23,7 @@ def test_vault_pki_engine_cert_issuance() -> None:
     assert cert_data["common_name"] == "bank-alpha.cfi.internal"
 
     import pytest
+
     from app.infrastructure.security.vault_client import VaultUnavailableError
 
     # Offline Vault must fail closed and raise VaultUnavailableError

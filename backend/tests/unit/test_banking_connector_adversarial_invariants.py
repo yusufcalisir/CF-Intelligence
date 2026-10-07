@@ -11,25 +11,24 @@ Validates core invariants across 36 adversarial controls:
 
 from __future__ import annotations
 
-import json
-from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
 
 import httpx
 import pytest
+from experiments.harness.compile_reports import ReportCompiler
 from fastapi.testclient import TestClient
 
 from app.infrastructure.connectors.mambu_connector import MambuConnector
 from app.infrastructure.connectors.open_banking_connector import OpenBankingConnector
 from app.infrastructure.connectors.rest_connector import (
     AuthenticationError as RESTAuthError,
+)
+from app.infrastructure.connectors.rest_connector import (
     RESTBankConnector,
 )
 from app.infrastructure.connectors.thought_machine_connector import ThoughtMachineConnector
 from app.main import app
-from experiments.harness.compile_reports import ReportCompiler
-
 
 client = TestClient(app)
 
@@ -402,12 +401,11 @@ class TestRESTOAuth2Integrity:
             auth_type="oauth2",
             oauth_token_url="https://invalid-auth-url.local/token",
         )
-        with pytest.raises(RESTAuthError):
-            with pytest.MonkeyPatch.context() as mp:
-                def _mock_post(*a: Any, **kw: Any) -> Any:
-                    raise httpx.ConnectError("Connection refused")
-                mp.setattr(httpx.Client, "post", _mock_post)
-                connector._get_headers()
+        with pytest.raises(RESTAuthError), pytest.MonkeyPatch.context() as mp:
+            def _mock_post(*a: Any, **kw: Any) -> Any:
+                raise httpx.ConnectError("Connection refused")
+            mp.setattr(httpx.Client, "post", _mock_post)
+            connector._get_headers()
 
     def test_failed_token_acquisition_prevents_downstream_request(self) -> None:
         """AC-22: Failure to acquire token prevents executing command requests."""
@@ -416,12 +414,11 @@ class TestRESTOAuth2Integrity:
             auth_type="oauth2",
             oauth_token_url="https://invalid-auth-url.local/token",
         )
-        with pytest.raises(RESTAuthError):
-            with pytest.MonkeyPatch.context() as mp:
-                def _mock_post(*a: Any, **kw: Any) -> Any:
-                    raise httpx.ConnectError("Network error")
-                mp.setattr(httpx.Client, "post", _mock_post)
-                connector.initialize(bank_id="BANK_A", num_transactions=10)
+        with pytest.raises(RESTAuthError), pytest.MonkeyPatch.context() as mp:
+            def _mock_post(*a: Any, **kw: Any) -> Any:
+                raise httpx.ConnectError("Network error")
+            mp.setattr(httpx.Client, "post", _mock_post)
+            connector.initialize(bank_id="BANK_A", num_transactions=10)
 
     def test_successful_oauth_path_remains_intact(self) -> None:
         """AC-23: Valid OAuth2 response caches and returns valid token."""

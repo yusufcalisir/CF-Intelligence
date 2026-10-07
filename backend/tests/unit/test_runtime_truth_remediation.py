@@ -23,15 +23,14 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pandas as pd
 import pytest
+from experiments.baselines.comparative_runner import ComparativeBenchmarkEngine
 
 from app.application.schemas.graph import EllipticBenchmarkResponse
 from app.application.services.aml_agentic_copilot import AMLAgenticCopilot
 from app.application.services.feature_store_service import FeatureStoreService
 from app.application.services.metrics_service import MetricsService
-from app.domain.value_objects import EvaluationMetrics
 from app.infrastructure.security.vault_client import VaultClient, VaultUnavailableError
 from app.main import DDoSProtectionMiddleware
-from experiments.baselines.comparative_runner import ComparativeBenchmarkEngine
 
 
 # ── 1. RC-RATE-LIMIT-BYPASS ───────────────────────────────────────────────────
@@ -260,6 +259,7 @@ def test_elliptic_benchmark_schema_preserves_none_auc() -> None:
 def test_flower_engine_tracks_dropped_clients_without_average_loss_injection() -> None:
     """Verify CallbackFedAvg aggregate_fit records dropped clients truthfully without injecting default loss."""
     import flwr as fl
+
     from app.application.services.flower_engine import CallbackFedAvg
 
     round_results: list[dict[str, Any]] = []
