@@ -2601,7 +2601,7 @@ export interface TransactionPredictResponse {
   fraud_probability: number;
   risk_score: number;
   is_fraud_suspected: boolean;
-  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'UNASSESSED';
   breakdown: SignalBreakdownItem[];
   alert_details?: AlertDetailsItem | null;
   policy_action: string;
@@ -2614,7 +2614,7 @@ export interface BatchPredictionItem {
   fraud_probability: number;
   risk_score: number;
   decision: 'ALLOW' | 'REVIEW' | 'BLOCK';
-  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'UNASSESSED';
   is_fraud_suspected: boolean;
   policy_action: string;
   latency_ms: number;

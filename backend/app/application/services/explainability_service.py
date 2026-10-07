@@ -15,6 +15,7 @@ and investigator trust.
 from __future__ import annotations
 
 import logging
+import math
 import threading
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -243,14 +244,22 @@ class ExplainabilityService:
         if not txns:
             return []
 
+        # Strict fail-closed validation on non-finite numeric or malformed values (MODEL-INV-13 / XAI-INV-15)
+        for t in txns:
+            for k_feat, v_feat in t.items():
+                if isinstance(v_feat, (int, float)) and not math.isfinite(v_feat):
+                    raise ValueError(f"Feature '{k_feat}' contains non-finite value: {v_feat}")
+                if k_feat == "transaction_amount" and isinstance(v_feat, str):
+                    try:
+                        f_val = float(v_feat)
+                        if not math.isfinite(f_val):
+                            raise ValueError(f"Feature '{k_feat}' contains non-finite value: {v_feat}")
+                    except ValueError as str_err:
+                        raise ValueError(f"Invalid numeric value for feature '{k_feat}': {v_feat}") from str_err
+
         import os
 
         import torch
-
-        input_matrix = np.array(
-            [self._parse_transaction_features(t) for t in txns],
-            dtype=np.float32,
-        )
 
         if model is None:
             from app.infrastructure.storage.storage_utils import get_storage_dir
@@ -296,6 +305,10 @@ class ExplainabilityService:
 
         if model:
             try:
+                input_matrix = np.array(
+                    [self._parse_transaction_features(t) for t in txns],
+                    dtype=np.float32,
+                )
                 import shap
 
                 def predict_fn(x_np: np.ndarray) -> np.ndarray:
@@ -398,6 +411,8 @@ class ExplainabilityService:
                 return batch_results
 
             except Exception as e:
+                if isinstance(e, ValueError) and ("non-finite" in str(e) or "Invalid numeric value" in str(e)):
+                    raise
                 logger.warning(
                     "SHAP execution failed: %s. Falling back to analytical heuristic.", e
                 )
@@ -427,19 +442,32 @@ class ExplainabilityService:
 
             raw_contribs = {}
             for name, w in feature_weights.items():
-                val = txn_dict.get(name, 0.5)
-                val_norm = parsed_norm.get(name, 0.5)
-                raw_contribs[name] = (w, val, w * (val_norm - 0.5), val_norm)
+                if name in txn_dict and txn_dict[name] is not None:
+                    val = txn_dict[name]
+                    val_norm = parsed_norm.get(name)
+                    if val_norm is not None:
+                        delta = w * (val_norm - 0.5)
+                        val_norm_rounded = round(val_norm, 4)
+                    else:
+                        delta = 0.0
+                        val_norm_rounded = None
+                    raw_val = float(val) if isinstance(val, (int, float)) else str(val)
+                else:
+                    val = None
+                    val_norm_rounded = None
+                    delta = 0.0
+                    raw_val = None
+                raw_contribs[name] = (w, raw_val, delta, val_norm_rounded)
 
             sum_delta = sum(c[2] for c in raw_contribs.values())
             model_output = round(base_value + sum_delta, 4)
 
-            for name, (w, val, delta, val_norm) in raw_contribs.items():
+            for name, (w, raw_val, delta, val_norm_rounded) in raw_contribs.items():
                 features.append({
                     "feature": name,
                     "contribution": round(delta, 4),
-                    "value": round(val_norm, 4),
-                    "raw_value": float(val) if isinstance(val, (int, float)) else str(val),
+                    "value": val_norm_rounded,
+                    "raw_value": raw_val,
                     "explanation_method": "fallback_heuristic",
                     "base_value": base_value,
                     "model_output": model_output,
@@ -819,6 +847,9 @@ class ExplainabilityService:
 
         if subgraph.edges:
             for i, edge in enumerate(subgraph.edges[:6]):
+                target = edge.get("target")
+                if not target:
+                    continue
                 rel_type = edge.get("data", {}).get("relationshipType", "shares_device")
                 # Higher weight for device / alert linkages
                 if rel_type in ("shares_device", "linked_alert"):
@@ -829,7 +860,7 @@ class ExplainabilityService:
                 contributions.append(
                     EdgeContribution(
                         source=edge.get("source", node_id),
-                        target=edge.get("target", "entity_neighbor"),
+                        target=str(target),
                         relationship_type=rel_type,
                         weight=round(w, 3),
                         contribution_percentage=round(w * 100 / max(1, len(subgraph.edges)), 1),

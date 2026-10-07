@@ -132,8 +132,8 @@ class SmurfingPatternItem(BaseModel):
     central_entity_id: str = Field(default="", description="Central mule or aggregator entity ID")
     counterparty_ids: list[str] = Field(default_factory=list, description="List of counterparty entity IDs")
     fan_degree: int = Field(default=1, ge=1, description="Number of converging or dispersing counterparties")
-    severity: str = Field(default="medium", description="Smurfing severity level")
-    risk_score: float = Field(default=0.0, ge=0.0, le=1000.0, description="Assessed risk score")
+    severity: str = Field(default="unassessed", description="Smurfing severity level")
+    risk_score: float | None = Field(default=None, ge=0.0, le=1000.0, description="Assessed risk score")
     detected_at: str = Field(default="", description="ISO 8601 timestamp of detection")
 
     @classmethod
@@ -143,17 +143,21 @@ class SmurfingPatternItem(BaseModel):
         det_at = data.get("detected_at")
         if det_at is not None and not isinstance(det_at, str):
             det_at = det_at.isoformat()
-        score = float(data.get("risk_score", 0.0))
+        raw_score = data.get("risk_score")
+        score = float(raw_score) if raw_score is not None else None
         severity = data.get("severity")
         if not severity:
-            if score >= 0.8:
-                severity = "critical"
-            elif score >= 0.6:
-                severity = "high"
-            elif score >= 0.3:
-                severity = "medium"
+            if score is not None:
+                if score >= 0.8:
+                    severity = "critical"
+                elif score >= 0.6:
+                    severity = "high"
+                elif score >= 0.3:
+                    severity = "medium"
+                else:
+                    severity = "low"
             else:
-                severity = "low"
+                severity = "unassessed"
 
         return cls(
             pattern_id=str(data.get("pattern_id", "")),
