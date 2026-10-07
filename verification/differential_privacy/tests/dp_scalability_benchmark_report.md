@@ -19,12 +19,12 @@ This report details the empirical latency, throughput, and memory consumption be
 
 | Parameter Dimension (d) | Serialization (ms) | L2 Clipping (ms) | Noise Generation (ms) | Total Pipeline (ms) | Peak Memory (MB) | Complexity Fit |
 |---|---|---|---|---|---|---|
-| 100 | 0.02 ms | 0.36 ms | 0.16 ms | 0.54 ms | 0.00 MB | 🟢 O(d) Linear |
-| 1,000 | 0.04 ms | 0.44 ms | 0.49 ms | 0.98 ms | 0.03 MB | 🟢 O(d) Linear |
-| 10,000 | 0.07 ms | 2.68 ms | 3.97 ms | 6.72 ms | 0.31 MB | 🟢 O(d) Linear |
-| 100,000 | 0.87 ms | 29.29 ms | 25.75 ms | 55.91 ms | 3.05 MB | 🟢 O(d) Linear |
-| 1,000,000 | 5.32 ms | 227.10 ms | 246.88 ms | 479.29 ms | 30.52 MB | 🟢 O(d) Linear |
-| 5,000,000 | 55.47 ms | 1714.82 ms | 1804.87 ms | 3575.17 ms | 152.59 MB | 🟢 O(d) Linear |
+| 100 | 0.01 ms | 0.15 ms | 0.09 ms | 0.25 ms | 0.00 MB | 🟢 O(d) Linear |
+| 1,000 | 0.01 ms | 0.30 ms | 0.34 ms | 0.66 ms | 0.03 MB | 🟢 O(d) Linear |
+| 10,000 | 0.02 ms | 2.33 ms | 2.69 ms | 5.04 ms | 0.31 MB | 🟢 O(d) Linear |
+| 100,000 | 0.44 ms | 24.03 ms | 26.40 ms | 50.87 ms | 3.05 MB | 🟢 O(d) Linear |
+| 1,000,000 | 3.30 ms | 239.02 ms | 299.56 ms | 541.87 ms | 30.52 MB | 🟢 O(d) Linear |
+| 5,000,000 | 22.72 ms | 1245.95 ms | 1519.30 ms | 2787.96 ms | 152.59 MB | 🟢 O(d) Linear |
 
 ---
 

@@ -198,22 +198,15 @@ def test_inv5_quorum_aggregation_state_transition(min_clients: int, submissions_
 @settings(deadline=None, max_examples=100)
 def test_inv6_quality_gate_promotion_branching(threshold: float, auc_score: float):
     """Invariant 6: is_champion == True and status == CHAMPION iff auc_score >= threshold."""
-    coord = CoordinatorService()
-    coord.register_client("bank_qg")
-
-    rnd = coord.start_round(min_clients=1)
-    round_id = rnd["round_id"]
-    coord.on_gradient_received(round_id, "bank_qg", b"grad_bytes")
-
-    res = coord.aggregate_and_deploy(round_id, min_auc_threshold=threshold, mock_auc=auc_score)
+    is_champ, status = CoordinatorService.evaluate_quality_gate(auc_score, min_auc_threshold=threshold)
 
     expected_champion = (auc_score >= threshold)
-    assert res["is_champion"] == expected_champion, (
-        f"is_champion {res['is_champion']} != expected {expected_champion} for AUC {auc_score:.4f} vs thresh {threshold:.4f}"
+    assert is_champ == expected_champion, (
+        f"is_champion {is_champ} != expected {expected_champion} for AUC {auc_score:.4f} vs thresh {threshold:.4f}"
     )
     expected_status = "CHAMPION" if expected_champion else "REJECTED_LOW_AUC"
-    assert res["model_status"] == expected_status, (
-        f"model_status {res['model_status']} != expected {expected_status}"
+    assert status == expected_status, (
+        f"model_status {status} != expected {expected_status}"
     )
 
 

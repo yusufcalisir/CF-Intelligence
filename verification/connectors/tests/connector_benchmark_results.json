@@ -1,13 +1,13 @@
 {
-  "init_latency_iso20022_us": 19.552,
-  "init_latency_streaming_us": 0.201,
-  "init_latency_rest_us": 6.274,
-  "latency_iso20022_xml_us": 280.652,
-  "latency_swift_mt103_us": 27.923,
-  "latency_psd2_json_us": 22.296,
-  "latency_streaming_push_us": 11.89,
-  "hmac_signing_overhead_us": 9.513,
-  "throughput_streaming_eps": 66489.0,
+  "init_latency_iso20022_us": 24.527,
+  "init_latency_streaming_us": 0.283,
+  "init_latency_rest_us": 8.435,
+  "latency_iso20022_xml_us": 361.284,
+  "latency_swift_mt103_us": 26.696,
+  "latency_psd2_json_us": 18.987,
+  "latency_streaming_push_us": 13.231,
+  "hmac_signing_overhead_us": 13.101,
+  "throughput_streaming_eps": 90802.0,
   "memory_10k_events_mb": 2.59,
   "memory_50k_events_mb": 12.97
 }

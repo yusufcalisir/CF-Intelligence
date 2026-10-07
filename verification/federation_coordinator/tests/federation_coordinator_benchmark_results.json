@@ -2,83 +2,83 @@
   "client_registration_scaling": {
     "N_10": {
       "client_count": 10,
-      "total_time_ms": 0.1,
-      "per_client_latency_us": 9.55,
-      "throughput_calls_per_sec": 104712.0,
+      "total_time_ms": 0.37,
+      "per_client_latency_us": 36.93,
+      "throughput_calls_per_sec": 27078.3,
       "memory_added_mb": 0.0
     },
     "N_50": {
       "client_count": 50,
-      "total_time_ms": 0.31,
-      "per_client_latency_us": 6.22,
-      "throughput_calls_per_sec": 160720.0,
-      "memory_added_mb": 0.02
+      "total_time_ms": 0.33,
+      "per_client_latency_us": 6.5,
+      "throughput_calls_per_sec": 153751.5,
+      "memory_added_mb": 0.01
     },
     "N_100": {
       "client_count": 100,
-      "total_time_ms": 0.45,
-      "per_client_latency_us": 4.54,
-      "throughput_calls_per_sec": 220118.9,
+      "total_time_ms": 0.61,
+      "per_client_latency_us": 6.06,
+      "throughput_calls_per_sec": 164962.1,
       "memory_added_mb": 0.01
     },
     "N_500": {
       "client_count": 500,
-      "total_time_ms": 4.03,
-      "per_client_latency_us": 8.06,
-      "throughput_calls_per_sec": 124091.0,
+      "total_time_ms": 3.08,
+      "per_client_latency_us": 6.16,
+      "throughput_calls_per_sec": 162390.4,
       "memory_added_mb": 0.13
     },
     "N_1000": {
       "client_count": 1000,
-      "total_time_ms": 8.58,
-      "per_client_latency_us": 8.58,
-      "throughput_calls_per_sec": 116486.3,
+      "total_time_ms": 6.05,
+      "per_client_latency_us": 6.05,
+      "throughput_calls_per_sec": 165264.7,
       "memory_added_mb": 0.16
     },
     "N_5000": {
       "client_count": 5000,
-      "total_time_ms": 31.03,
-      "per_client_latency_us": 6.21,
-      "throughput_calls_per_sec": 161150.5,
-      "memory_added_mb": 1.32
+      "total_time_ms": 30.63,
+      "per_client_latency_us": 6.13,
+      "throughput_calls_per_sec": 163240.8,
+      "memory_added_mb": 1.34
     }
   },
   "heartbeat_throughput": {
     "iterations": 10000,
-    "total_time_ms": 39.02,
-    "per_heartbeat_latency_us": 3.9,
-    "throughput_calls_per_sec": 256290.7
+    "total_time_ms": 51.78,
+    "per_heartbeat_latency_us": 5.18,
+    "throughput_calls_per_sec": 193107.6
   },
   "round_startup_scaling": {
     "active_clients_10": {
       "active_clients": 10,
-      "round_startup_time_ms": 0.062,
+      "round_startup_time_ms": 0.065,
       "notifications_dispatched": 10
     },
     "active_clients_50": {
       "active_clients": 50,
-      "round_startup_time_ms": 0.047,
+      "round_startup_time_ms": 0.058,
       "notifications_dispatched": 50
     },
     "active_clients_100": {
       "active_clients": 100,
-      "round_startup_time_ms": 0.068,
+      "round_startup_time_ms": 0.078,
       "notifications_dispatched": 100
     },
     "active_clients_500": {
       "active_clients": 500,
-      "round_startup_time_ms": 0.266,
+      "round_startup_time_ms": 0.297,
       "notifications_dispatched": 500
     },
     "active_clients_1000": {
       "active_clients": 1000,
-      "round_startup_time_ms": 1.147,
+      "round_startup_time_ms": 1.282,
       "notifications_dispatched": 1000
     }
   },
   "aggregation_scheduling_latency": {
     "quorum_size": 10,
-    "trigger_and_aggregation_time_ms": 0.062,
+    "trigger_and_aggregation_time_ms": 0.293,
     "resulting_status": "COMPLETED"
   },
   "model_chunking_throughput": {},

@@ -30,6 +30,7 @@ PROJECT_ROOT = str(Path(__file__).resolve().parents[3] / "backend")
 sys.path.insert(0, PROJECT_ROOT)
 
 from app.application.services.coordinator_service import CoordinatorService
+from app.domain.value_objects import RoundEvaluationEvidence
 from app.infrastructure.grpc.servicer import FederatedLearningServicer
 from app.infrastructure.grpc.types import ClientRegisterRequest, SubmitGradientRequest
 from app.infrastructure.disaster_recovery.region_failover import MultiRegionFailoverManager, CoordinatorRegionRole
@@ -259,8 +260,8 @@ def test_gcex10_coordinator_restart_simulation():
 # GCEX11: High Round ID Simulated AUC Decay Quality Gate Rejection
 # =====================================================================
 
-def test_gcex11_high_round_id_simulated_auc_decay():
-    """GCEX11: High round_id 25 causes simulated AUC 0.63 < 0.70 threshold rejection."""
+def test_gcex11_low_evaluated_auc_rejects_champion_promotion():
+    """GCEX11: Holdout validation evaluating below quality gate threshold (e.g. < 0.70) blocks champion promotion."""
     coord = CoordinatorService()
     coord.register_client("bank_decay")
     coord.current_round_id = 24  # Next round will be 25
@@ -270,10 +271,23 @@ def test_gcex11_high_round_id_simulated_auc_decay():
     assert round_id == 25
 
     coord.on_gradient_received(round_id, "bank_decay", b"grad")
-    # aggregate_and_deploy with low mock AUC 0.63 < 0.70 threshold rejection
-    res = coord.aggregate_and_deploy(round_id, min_auc_threshold=0.70, mock_auc=0.63)
 
-    assert res["auc_score"] == 0.63
+    val_labels_fail = [0, 0, 0, 0, 1, 1, 1, 1]
+    val_preds_fail = [0.90, 0.85, 0.80, 0.75, 0.10, 0.15, 0.20, 0.05]
+    ev = RoundEvaluationEvidence(
+        round_id=round_id,
+        validation_labels=val_labels_fail,
+        validation_preds=val_preds_fail,
+        provenance="TEST_FIXTURE",
+    )
+    res = coord.aggregate_and_deploy(
+        round_id,
+        min_auc_threshold=0.70,
+        allow_test_fixtures=True,
+        evidence=ev,
+    )
+
+    assert res["auc_score"] is not None and res["auc_score"] < 0.70
     assert res["is_champion"] is False
     assert res["model_status"] == "REJECTED_LOW_AUC"
 

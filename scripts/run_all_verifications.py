@@ -20,34 +20,44 @@ VERIFICATION_DIR = REPO_ROOT / "verification"
 
 
 def run_all_verifications() -> bool:
-    logger.info("==========================================================================")
-    logger.info("STARTING MASTER SCIENTIFIC VERIFICATION SUITE ACROSS ALL 21 SUBSYSTEMS")
-    logger.info("==========================================================================")
+    subsystems = sorted([
+        d for d in VERIFICATION_DIR.iterdir()
+        if d.is_dir() and ((d / "tests").is_dir() or any(d.glob("test_*.py")))
+    ])
+    total_dirs = len([d for d in VERIFICATION_DIR.iterdir() if d.is_dir()])
 
-    subsystems = sorted([d for d in VERIFICATION_DIR.iterdir() if d.is_dir()])
-    logger.info("Discovered %d subsystem verification directories.", len(subsystems))
+    logger.info("==========================================================================")
+    logger.info("STARTING MASTER SCIENTIFIC VERIFICATION SUITE ACROSS %d VERIFIED SUBSYSTEMS", len(subsystems))
+    logger.info("==========================================================================")
+    logger.info(
+        "Discovered %d verified subsystem directories (out of %d total entries in verification/).",
+        len(subsystems),
+        total_dirs,
+    )
 
     start_time = time.perf_counter()
     overall_success = True
 
     # Step 1: Run reference verification runners
     logger.info("\n--- Phase 1: Running Reference Verification Scripts ---")
-    ref_scripts = list(VERIFICATION_DIR.glob("**/tests/*_reference_verification.py"))
+    ref_scripts = sorted(list(VERIFICATION_DIR.glob("**/tests/*_reference_verification.py")))
+    logger.info("Discovered %d reference verification scripts.", len(ref_scripts))
     for script in ref_scripts:
         logger.info("Executing reference script: %s", script.name)
         res = subprocess.run([sys.executable, str(script)], cwd=REPO_ROOT, capture_output=True, text=True)
         if res.returncode != 0:
-            logger.error("FAILED reference script %s:\n%s", script.name, res.stderr)
+            logger.error("FAILED reference script %s:\nSTDOUT:\n%s\nSTDERR:\n%s", script.name, res.stdout, res.stderr)
             overall_success = False
 
     # Step 2: Run benchmark scripts
     logger.info("\n--- Phase 2: Running Scalability Benchmark Scripts ---")
-    bench_scripts = list(VERIFICATION_DIR.glob("**/tests/*_benchmark_scalability.py"))
+    bench_scripts = sorted(list(VERIFICATION_DIR.glob("**/tests/*_benchmark_scalability.py")))
+    logger.info("Discovered %d benchmark scalability scripts.", len(bench_scripts))
     for script in bench_scripts:
         logger.info("Executing benchmark script: %s", script.name)
         res = subprocess.run([sys.executable, str(script)], cwd=REPO_ROOT, capture_output=True, text=True)
         if res.returncode != 0:
-            logger.error("FAILED benchmark script %s:\n%s", script.name, res.stderr)
+            logger.error("FAILED benchmark script %s:\nSTDOUT:\n%s\nSTDERR:\n%s", script.name, res.stdout, res.stderr)
             overall_success = False
 
     # Step 3: Run full pytest suite across verification/
@@ -56,13 +66,15 @@ def run_all_verifications() -> bool:
     logger.info("Pytest Suite Output Summary:\n%s", pytest_res.stdout.splitlines()[-1] if pytest_res.stdout else "")
 
     if pytest_res.returncode != 0:
-        logger.error("Pytest suite reported failures:\n%s", pytest_res.stderr)
+        logger.error("Pytest suite reported failures:\n%s", pytest_res.stdout)
+        if pytest_res.stderr:
+            logger.error("Pytest stderr:\n%s", pytest_res.stderr)
         overall_success = False
 
     elapsed = time.perf_counter() - start_time
     logger.info("\n==========================================================================")
     if overall_success:
-        logger.info("✅ ALL 16 SUBSYSTEM VERIFICATION SUITES PASSED IN %.2f SECONDS!", elapsed)
+        logger.info("✅ ALL %d SUBSYSTEM VERIFICATION SUITES PASSED IN %.2f SECONDS!", len(subsystems), elapsed)
     else:
         logger.error("❌ VERIFICATION SUITE ENCOUNTERED FAILURES.")
     logger.info("==========================================================================")
@@ -74,7 +86,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Master Automated Verification Suite Runner across all 16 verified subsystems."
+        description="Master Automated Verification Suite Runner across verified subsystems."
     )
     parser.parse_args()
     success = run_all_verifications()

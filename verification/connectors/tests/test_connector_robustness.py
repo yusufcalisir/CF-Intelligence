@@ -37,7 +37,7 @@ from app.infrastructure.connectors.batch_connector import BatchEODFileConnector
 from app.infrastructure.connectors.factory import BankConnectorFactory
 from app.infrastructure.connectors.fixture_connector import FixtureConnector
 from app.infrastructure.connectors.iso20022_connector import ISO20022MessagingConnector
-from app.infrastructure.connectors.open_banking_connector import OpenBankingConnector
+from app.infrastructure.connectors.open_banking_connector import AuthenticationError, OpenBankingConnector
 from app.infrastructure.connectors.parquet_connector import ParquetConnector
 from app.infrastructure.connectors.rabbitmq_connector import RabbitMQBankConnector
 from app.infrastructure.connectors.redis_connector import RedisBankConnector
@@ -86,16 +86,16 @@ def test_conn_rob_2_malformed_xml_xxe_payloads() -> None:
 # CONN_ROB_3: Invalid Credentials & Failed Auth Handshakes
 # -----------------------------------------------------------------------------
 def test_conn_rob_3_invalid_credentials_auth() -> None:
-    """Pass invalid OAuth2 token URL and verify graceful fallback token generation."""
+    """Pass invalid OAuth2 token URL and verify fail-closed AuthenticationError."""
     ob_conn = OpenBankingConnector(
         token_url="http://invalid-auth-server-host.local/oauth/token",
         client_id="invalid_client",
         client_secret="invalid_secret",
     )
 
-    # Token fetch must not raise crash exception; returns fallback token
-    token = ob_conn._get_oauth2_token(force_refresh=True)
-    assert token.startswith("psd2_token_") or token == "psd2_bearer_token_12345"
+    with pytest.raises(AuthenticationError) as exc_info:
+        ob_conn._get_oauth2_token(force_refresh=True)
+    assert "OAuth2 token endpoint unreachable" in str(exc_info.value) or "failed" in str(exc_info.value).lower()
 
 
 # -----------------------------------------------------------------------------
@@ -142,25 +142,45 @@ def test_conn_rob_5_timeout_simulation() -> None:
 # CONN_ROB_6: Partial & Missing Field Responses
 # -----------------------------------------------------------------------------
 def test_conn_rob_6_partial_missing_field_responses() -> None:
-    """Pass incomplete JSON payload with missing optional fields to OpenBankingConnector."""
+    """Verify missing required identities fail closed and optional fields resolve defaults."""
     ob_conn = OpenBankingConnector(token_url="")
-    incomplete_json = {
+
+    # Missing required debtor account must fail closed without inventing fallback IBAN
+    missing_debtor_json = {
         "transactions": {
             "booked": [
                 {
-                    # Missing transactionId, debtorAccount, creditorAccount, currency
+                    "amount": 75.0,
+                    "creditorAccount": {"iban": "DE89370400440532013999"},
+                }
+            ],
+            "pending": [],
+        }
+    }
+    with pytest.raises(ValueError, match="missing required debtor account identity"):
+        ob_conn.parse_psd2_payload(missing_debtor_json)
+
+    # Valid identities with optional fields omitted (currency, MCC, transactionId)
+    valid_with_optional_omitted = {
+        "transactions": {
+            "booked": [
+                {
+                    "debtorAccount": {"iban": "DE89370400440532013000"},
+                    "creditorAccount": {"iban": "DE89370400440532013999"},
                     "amount": 75.0,
                 }
             ],
             "pending": [],
         }
     }
-
-    txs = ob_conn.parse_psd2_payload(incomplete_json)
+    txs = ob_conn.parse_psd2_payload(valid_with_optional_omitted)
     assert len(txs) == 1
     assert txs[0].transaction_id == "psd2_tx_0"
-    assert txs[0].account_id == "DE89370400440532013000"  # Default fallback IBAN
+    assert txs[0].account_id == "DE89370400440532013000"
+    assert txs[0].counterparty_account_id == "DE89370400440532013999"
+    assert txs[0].amount == 75.0
     assert txs[0].currency == "EUR"
+    assert txs[0].merchant_category_code == "0000"
 
 
 # -----------------------------------------------------------------------------
@@ -210,11 +230,12 @@ def test_conn_rob_9_invalid_config_vault_resolution(tmp_path: Path) -> None:
 # CONN_ROB_10: External Service Unavailability & Fallback Resilience
 # -----------------------------------------------------------------------------
 def test_conn_rob_10_external_service_unavailability() -> None:
-    """Invoke fetch_account_transactions on unreachable base_url and verify fallback response."""
-    ob_conn = OpenBankingConnector(base_url="http://unreachable-bank-host.invalid/psd2/v1", token_url="")
+    """Invoke fetch_account_transactions on unreachable base_url and verify fail-closed exception."""
+    ob_conn = OpenBankingConnector(
+        base_url="http://unreachable-bank-host.invalid/psd2/v1",
+        access_token="test_token_service_unavail",
+    )
 
-    # Should fall back to sample response without throwing unhandled exception
-    txs = ob_conn.fetch_account_transactions(account_id="DE89370400440532013000")
-    assert len(txs) == 2
-    assert txs[0].account_id == "DE89370400440532013000"
-    assert txs[0].channel_type == "OPEN_BANKING_PSD2"
+    with pytest.raises((RuntimeError, AuthenticationError)) as exc_info:
+        ob_conn.fetch_account_transactions(account_id="DE89370400440532013000")
+    assert "PSD2 API request failed" in str(exc_info.value) or "unreachable" in str(exc_info.value)

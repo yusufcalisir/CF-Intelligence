@@ -44,7 +44,7 @@ from app.infrastructure.connectors.factory import BankConnectorFactory
 from app.infrastructure.connectors.fixture_connector import FixtureConnector
 from app.infrastructure.connectors.iso20022_connector import ISO20022MessagingConnector, retry_connector
 from app.infrastructure.connectors.kafka_connector import KafkaBankConnector
-from app.infrastructure.connectors.open_banking_connector import OpenBankingConnector
+from app.infrastructure.connectors.open_banking_connector import AuthenticationError, OpenBankingConnector
 from app.infrastructure.connectors.parquet_connector import ParquetConnector
 from app.infrastructure.connectors.rabbitmq_connector import RabbitMQBankConnector
 from app.infrastructure.connectors.redis_connector import RedisBankConnector
@@ -171,7 +171,12 @@ def run_reference_verifications() -> dict[str, Any]:
     # Test 4: Open Banking PSD2 JSON Mapping & Header Verification
     # -------------------------------------------------------------------------
     print("\n--- Test 4: Open Banking PSD2 JSON Mapping & Header Verification ---")
-    ob_conn = OpenBankingConnector(api_key="test_api_key", tpp_signature_key="sig_secret", token_url="")
+    ob_conn = OpenBankingConnector(
+        api_key="test_api_key",
+        tpp_signature_key="sig_secret",
+        token_url="",
+        access_token="deterministic_test_access_token_ref_verify",
+    )
     psd2_payload = {
         "transactions": {
             "booked": [
@@ -191,11 +196,60 @@ def run_reference_verifications() -> dict[str, Any]:
     txs = ob_conn.parse_psd2_payload(psd2_payload)
     psd2_map_ok = (len(txs) == 1 and txs[0].transaction_id == "psd2_bk_01" and txs[0].amount == 320.0)
 
+    # 1. Valid explicitly supplied authentication material produces expected header structure
     headers = ob_conn._get_headers(b'{"test": 1}')
-    header_ok = ("X-Request-ID" in headers and "Digest" in headers and "Authorization" in headers)
+    header_ok = (
+        "X-Request-ID" in headers
+        and "Digest" in headers
+        and headers.get("Authorization") == "Bearer deterministic_test_access_token_ref_verify"
+        and "TPP-Signature" in headers
+    )
 
-    print(f"PSD2 JSON Mapping OK: {psd2_map_ok}, PSD2 Mandated Headers OK: {header_ok}")
-    results["test_4_open_banking_psd2"] = (psd2_map_ok and header_ok)
+    # 2. Missing authentication configuration fails closed
+    ob_conn_no_auth = OpenBankingConnector(token_url="", access_token=None)
+    missing_auth_fail_closed = False
+    try:
+        ob_conn_no_auth._get_headers(b'{"test": 1}')
+    except AuthenticationError:
+        missing_auth_fail_closed = True
+
+    # 3. OAuth endpoint failure fails closed
+    ob_conn_bad_url = OpenBankingConnector(
+        token_url="http://invalid-auth-server-host.local/oauth/token", access_token=None
+    )
+    endpoint_failure_fail_closed = False
+    try:
+        ob_conn_bad_url._get_oauth2_token(force_refresh=True)
+    except AuthenticationError:
+        endpoint_failure_fail_closed = True
+
+    # 4. Empty/invalid OAuth response cannot become an accepted token
+    from unittest.mock import MagicMock, patch
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"expires_in": 3600}  # access_token missing
+    empty_token_fail_closed = False
+    with patch("httpx.post", return_value=mock_resp):
+        try:
+            ob_conn_bad_url._get_oauth2_token(force_refresh=True)
+        except AuthenticationError:
+            empty_token_fail_closed = True
+
+    all_auth_invariants_ok = (
+        header_ok
+        and missing_auth_fail_closed
+        and endpoint_failure_fail_closed
+        and empty_token_fail_closed
+    )
+
+    print(
+        f"PSD2 JSON Mapping OK: {psd2_map_ok}, PSD2 Headers OK: {header_ok}, "
+        f"Missing Auth Fails Closed: {missing_auth_fail_closed}, "
+        f"Endpoint Failure Fails Closed: {endpoint_failure_fail_closed}, "
+        f"Empty Token Response Fails Closed: {empty_token_fail_closed}"
+    )
+    results["test_4_open_banking_psd2"] = (psd2_map_ok and all_auth_invariants_ok)
 
     # -------------------------------------------------------------------------
     # Test 5: REST & HMAC-SHA256 Payload Signature Verification

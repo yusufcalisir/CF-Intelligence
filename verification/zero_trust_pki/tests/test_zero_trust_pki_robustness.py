@@ -17,9 +17,29 @@ from app.infrastructure.security.oidc_authenticator import UserClaims
 
 def test_robustness_revoked_cert_crl_blocking():
     """Failure Injection 1: Revoked cert serial is rejected by CRL manager."""
-    mgr = MTLSManager()
-    mgr.revoke_certificate("REVOKED_SERIAL_999", reason="Key Compromise")
-    assert mgr.is_certificate_valid("REVOKED_SERIAL_999") is False
+    from unittest.mock import MagicMock
+
+    # 1. Local CRL revocation mode (Vault external synchronization disabled)
+    mgr_local = MTLSManager()
+    mgr_local.vault_client.enabled = False
+    assert mgr_local.revoke_certificate("REVOKED_SERIAL_LOCAL_999", reason="Key Compromise") is True
+    assert mgr_local.is_certificate_valid("REVOKED_SERIAL_LOCAL_999") is False
+
+    # 2. Authoritative Vault synchronization failure fails closed (does not record revocation)
+    mgr_vault_fail = MTLSManager()
+    mock_vault_fail = MagicMock()
+    mock_vault_fail.enabled = True
+    mock_vault_fail.revoke_pki_certificate.return_value = False
+    assert mgr_vault_fail.revoke_certificate("REVOKED_SERIAL_VAULT_FAIL", reason="Key Compromise", vault_client=mock_vault_fail) is False
+    assert mgr_vault_fail.is_certificate_valid("REVOKED_SERIAL_VAULT_FAIL") is True
+
+    # 3. Successful authoritative Vault revocation updates CRL and blocks serial
+    mgr_vault_ok = MTLSManager()
+    mock_vault_ok = MagicMock()
+    mock_vault_ok.enabled = True
+    mock_vault_ok.revoke_pki_certificate.return_value = True
+    assert mgr_vault_ok.revoke_certificate("REVOKED_SERIAL_999", reason="Key Compromise", vault_client=mock_vault_ok) is True
+    assert mgr_vault_ok.is_certificate_valid("REVOKED_SERIAL_999") is False
 
 
 def test_robustness_abac_cross_tenant_access_denied():

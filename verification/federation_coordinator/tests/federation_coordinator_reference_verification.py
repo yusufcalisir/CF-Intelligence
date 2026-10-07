@@ -21,6 +21,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from app.application.services.coordinator_service import CoordinatorService
 from app.domain.investigation_entities import Alert, AlertSeverity
+from app.domain.value_objects import RoundEvaluationEvidence
 
 def run_reference_verification():
     np.random.seed(42)
@@ -104,30 +105,69 @@ def run_reference_verification():
     else:
         deviations.append(f"DEV-05: Quorum submission failed to transition to COMPLETED: {resp3['status']}")
 
-    # -------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # 4. Quality Gate Model Promotion Verification
-    # -------------------------------------------------------------
-    # Test champion promotion with mock_auc = 0.85 (pass >= 0.70)
+    # -------------------------------------------------------------------------
+    # 4a. Negative control: Missing evaluation metrics fails closed
+    round_no_eval = coordinator.start_round(min_clients=1)
+    r_no_eval_id = round_no_eval["round_id"]
+    coordinator.on_gradient_received(r_no_eval_id, "bank_1", b"grad_bytes_no_eval")
+    res_no_eval = coordinator.aggregate_and_deploy(r_no_eval_id, min_auc_threshold=0.70)
+
+    if res_no_eval["is_champion"] is False and res_no_eval["model_status"] == "UNVERIFIED_NO_EVALUATION":
+        invariants_passed.append("Round with no evaluation evidence correctly marked UNVERIFIED_NO_EVALUATION (promotion blocked)")
+    else:
+        deviations.append(f"EVALUATION_EVIDENCE_PROMOTION_GATE: Missing evaluation evidence did not block promotion: {res_no_eval['model_status']}")
+
+    # 4b. Positive control: Legitimate holdout validation data evaluated via compute_pr_auc >= 0.70 threshold
+    val_labels_pass = [0, 0, 0, 0, 1, 1, 1, 1]
+    val_preds_pass = [0.05, 0.08, 0.12, 0.10, 0.88, 0.92, 0.95, 0.89]
+
     round_pass = coordinator.start_round(min_clients=1)
     r_pass_id = round_pass["round_id"]
     coordinator.on_gradient_received(r_pass_id, "bank_1", b"grad_bytes_pass")
-    res_pass = coordinator.aggregate_and_deploy(r_pass_id, min_auc_threshold=0.70, mock_auc=0.85)
+    ev_pass = RoundEvaluationEvidence(
+        round_id=r_pass_id,
+        validation_labels=val_labels_pass,
+        validation_preds=val_preds_pass,
+        provenance="TEST_FIXTURE",
+    )
+    res_pass = coordinator.aggregate_and_deploy(
+        r_pass_id,
+        min_auc_threshold=0.70,
+        allow_test_fixtures=True,
+        evidence=ev_pass,
+    )
 
-    if res_pass["is_champion"] is True and res_pass["model_status"] == "CHAMPION":
-        invariants_passed.append("Model with AUC=0.85 promoted to CHAMPION")
+    if res_pass["is_champion"] is True and res_pass["model_status"] == "CHAMPION" and res_pass.get("auc_score", 0) >= 0.70:
+        invariants_passed.append(f"Model with measured PR-AUC={res_pass['auc_score']:.4f} promoted to CHAMPION")
     else:
-        deviations.append(f"DEV-06: Model with AUC=0.85 failed promotion: {res_pass['model_status']}")
+        deviations.append(f"DEV-06b: Model with measured passing AUC failed promotion: {res_pass['model_status']}")
 
-    # Test reject promotion with mock_auc = 0.65 (fail < 0.70)
+    # 4c. Negative control: Legitimate holdout validation data with low score < 0.70 rejected
+    val_labels_fail = [0, 0, 0, 0, 1, 1, 1, 1]
+    val_preds_fail = [0.90, 0.85, 0.80, 0.75, 0.10, 0.15, 0.20, 0.05]
+
     round_fail = coordinator.start_round(min_clients=1)
     r_fail_id = round_fail["round_id"]
     coordinator.on_gradient_received(r_fail_id, "bank_1", b"grad_bytes_fail")
-    res_fail = coordinator.aggregate_and_deploy(r_fail_id, min_auc_threshold=0.70, mock_auc=0.65)
+    ev_fail = RoundEvaluationEvidence(
+        round_id=r_fail_id,
+        validation_labels=val_labels_fail,
+        validation_preds=val_preds_fail,
+        provenance="TEST_FIXTURE",
+    )
+    res_fail = coordinator.aggregate_and_deploy(
+        r_fail_id,
+        min_auc_threshold=0.70,
+        allow_test_fixtures=True,
+        evidence=ev_fail,
+    )
 
-    if res_fail["is_champion"] is False and res_fail["model_status"] == "REJECTED_LOW_AUC":
-        invariants_passed.append("Model with AUC=0.65 correctly marked REJECTED_LOW_AUC")
+    if res_fail["is_champion"] is False and res_fail["model_status"] == "REJECTED_LOW_AUC" and res_fail.get("auc_score", 1.0) < 0.70:
+        invariants_passed.append(f"Model with measured PR-AUC={res_fail['auc_score']:.4f} correctly marked REJECTED_LOW_AUC")
     else:
-        deviations.append(f"DEV-07: Model with AUC=0.65 improperly promoted: {res_fail['model_status']}")
+        deviations.append(f"DEV-07: Model with measured low AUC improperly promoted: {res_fail['model_status']}")
 
     # Output verification summary
     print("=====================================================")
