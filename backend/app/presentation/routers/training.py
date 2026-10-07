@@ -81,12 +81,18 @@ async def get_training_metrics(
     for event in events:
         if event.get("event_type") == "round_complete":
             d = event.get("data", {})
-            losses.append(float(d.get("loss", 0.0)))
-            aucs.append(float(d.get("auc", 0.0)))
+            loss_val = d.get("loss")
+            if loss_val is not None:
+                losses.append(float(loss_val))
+            auc_val = d.get("auc")
+            if auc_val is not None:
+                aucs.append(float(auc_val))
             for b, val in d.get("per_bank_auc", {}).items():
-                per_bank_auc.setdefault(b, []).append(float(val))
+                if val is not None:
+                    per_bank_auc.setdefault(b, []).append(float(val))
             for b, val in d.get("per_bank_loss", {}).items():
-                per_bank_loss.setdefault(b, []).append(float(val))
+                if val is not None:
+                    per_bank_loss.setdefault(b, []).append(float(val))
 
     return TrainingMetricsSummaryResponse(
         simulation_id=target_id,
@@ -149,18 +155,21 @@ async def get_training_rounds(
     for event in events:
         if event.get("event_type") == "round_complete":
             data = event.get("data", {})
+            loss_raw = data.get("loss")
+            auc_raw = data.get("auc")
+            pb_raw = data.get("privacy_budget")
             rounds.append(
                 TrainingRoundResponse(
                     round_number=data.get("round", 0),
                     total_rounds=data.get("total", sim.get("total_rounds", 10)),
-                    global_loss=float(data.get("loss", 0.0)),
-                    auc=float(data.get("auc", 0.0)),
+                    global_loss=float(loss_raw) if loss_raw is not None else None,
+                    auc=float(auc_raw) if auc_raw is not None else None,
                     per_bank_auc=data.get("per_bank_auc", {}),
                     per_bank_loss=data.get("per_bank_loss", {}),
                     participating_banks=data.get("participants", []),
                     dropped_banks=data.get("dropped", []),
                     duration_ms=float(data.get("duration_ms", 0.0)),
-                    privacy_budget=float(data.get("privacy_budget", 0.0)),
+                    privacy_budget=float(pb_raw) if pb_raw is not None else None,
                     feature_importance=data.get("feature_importance", {}),
                     canary_info=data.get("canary_info", {}),
                 )

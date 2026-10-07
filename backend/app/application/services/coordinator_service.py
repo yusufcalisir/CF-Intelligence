@@ -10,13 +10,18 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np  # noqa: TC002
 
 from app.domain.async_fl_engine import AsyncFLEngine, staleness_attenuation
 from app.domain.quorum_manager import DynamicQuorumManager, RoundQuorumStatus
+from app.domain.value_objects import RoundEvaluationEvidence
 from app.infrastructure.logging.siem_exporter import SIEMAuditEvent, SIEMLogExporter
+
+if TYPE_CHECKING:
+    from app.application.services.candidate_evaluator import CandidateModelEvaluator
+    from app.application.services.holdout_provider import HoldoutDatasetProvider
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +148,13 @@ class CoordinatorService:
         # Domain FL Engines
         self.async_fl_engine = AsyncFLEngine(current_round=1, alpha_staleness=0.5, learning_rate=0.8)
         self.quorum_manager = DynamicQuorumManager(quorum_threshold_pct=0.60, target_window_seconds=300)
+        self.round_validation_data: dict[int, RoundEvaluationEvidence] = {}
+
+        # Production Candidate Model Evaluator & Model Binding
+        self.evaluator: CandidateModelEvaluator | None = None
+        self.holdout_provider: HoldoutDatasetProvider | None = None
+        self.round_candidate_models: dict[int, Any] = {}
+        self.round_designated_datasets: dict[int, str] = {}
 
         if auto_seed:
             self.seed_consortium_nodes()
@@ -279,6 +291,14 @@ class CoordinatorService:
         self.gradient_submissions[round_id] = {}
         self.quorum_manager.register_nodes(active_banks)
 
+        # Bind designated holdout dataset for this round if provider is configured
+        if self.holdout_provider is not None:
+            designated_holdout = self.holdout_provider.resolve_designated_holdout()
+            if designated_holdout is not None:
+                self.round_designated_datasets[round_id] = designated_holdout.versioned_id
+                if self.evaluator is not None and self.evaluator.holdout_dataset is None:
+                    self.evaluator.set_holdout_dataset(designated_holdout)
+
         # Send StartRoundRequest gRPC notifications to all participating active banks
         for bank_id in active_banks:
             notif = {
@@ -386,15 +406,131 @@ class CoordinatorService:
             ),
         }
 
+    def set_evaluator(self, evaluator: CandidateModelEvaluator) -> None:
+        """Configures the authoritative candidate model evaluator for coordinator promotion quality gates."""
+        self.evaluator = evaluator
+
+    def set_holdout_provider(self, provider: HoldoutDatasetProvider) -> None:
+        """Configures the authoritative holdout dataset provider for production candidate evaluation."""
+        self.holdout_provider = provider
+
+    def set_round_designated_dataset(self, round_id: int, dataset_id: str) -> None:
+        """Explicitly binds a designated dataset identifier or version to a round."""
+        if round_id not in self.rounds:
+            raise ValueError(f"Round ID {round_id} does not exist.")
+        self.round_designated_datasets[round_id] = dataset_id
+
+    def set_round_candidate_model(
+        self,
+        round_id: int,
+        candidate_model: Any,
+        model_version: str | None = None,
+        designated_dataset_id: str | None = None,
+    ) -> None:
+        """Binds an aggregated candidate model and metadata to a specific round."""
+        if round_id not in self.rounds:
+            raise ValueError(f"Round ID {round_id} does not exist.")
+        round_status = self.rounds[round_id].get("status")
+        if round_status in ("COMPLETED", "REJECTED_LOW_AUC", "UNVERIFIED_NO_EVALUATION"):
+            raise ValueError(
+                f"Round {round_id} is in terminal status '{round_status}', cannot bind candidate model."
+            )
+        self.round_candidate_models[round_id] = candidate_model
+        if model_version is not None:
+            self.rounds[round_id]["model_version"] = model_version
+        if designated_dataset_id is not None:
+            self.round_designated_datasets[round_id] = designated_dataset_id
+
+    def set_test_evidence_fixture(
+        self,
+        round_id: int,
+        evidence: RoundEvaluationEvidence,
+    ) -> None:
+        """Explicit test helper for injecting deterministic test fixtures into verification test runs."""
+        self.set_round_validation_data(round_id, evidence=evidence)
+
+    def set_round_validation_data(
+        self,
+        round_id: int,
+        validation_labels: list[int] | None = None,
+        validation_preds: list[float] | None = None,
+        evidence: RoundEvaluationEvidence | None = None,
+        dataset_id: str = "canonical_holdout",
+        model_version: str | None = None,
+        provenance: str = "AUTHORITATIVE_HOLDOUT_EVALUATION",
+    ) -> None:
+        """Binds evaluation evidence to a specific round.
+
+        Enforces round existence, active round lifecycle state, round-id binding,
+        and model version matching to prevent arbitrary vector injection.
+        If raw vectors (validation_labels, validation_preds) are passed, they are
+        strictly categorized as TEST_FIXTURE and cannot promote a production model.
+        """
+        if round_id not in self.rounds:
+            raise ValueError(f"Round ID {round_id} does not exist.")
+        round_status = self.rounds[round_id].get("status")
+        if round_status not in ("COLLECTING_GRADIENTS", "AGGREGATING"):
+            raise ValueError(
+                f"Round {round_id} is in status '{round_status}', cannot bind validation data."
+            )
+
+        if evidence is not None:
+            if evidence.round_id != round_id:
+                raise ValueError(
+                    f"Evidence round_id {evidence.round_id} does not match target round {round_id}."
+                )
+            ev = evidence
+        else:
+            if validation_labels is None or validation_preds is None:
+                raise ValueError("Must provide either an evidence object or validation labels and predictions.")
+            ev = RoundEvaluationEvidence(
+                round_id=round_id,
+                validation_labels=list(validation_labels),
+                validation_preds=[float(p) for p in validation_preds],
+                dataset_id=dataset_id,
+                model_version=model_version or self.rounds[round_id].get("model_version"),
+                provenance="TEST_FIXTURE" if provenance == "AUTHORITATIVE_HOLDOUT_EVALUATION" else provenance,
+                producer="caller_raw_vector_fixture",
+                evaluated_at=datetime.now(UTC).isoformat(),
+            )
+
+        # Enforce model version binding if model_version is tracked on the round
+        round_model_ver = self.rounds[round_id].get("model_version")
+        if round_model_ver and ev.model_version and ev.model_version != round_model_ver:
+            raise ValueError(
+                f"Evidence model_version '{ev.model_version}' does not match round model_version '{round_model_ver}'."
+            )
+
+        self.round_validation_data[round_id] = ev
+
+    @staticmethod
+    def evaluate_quality_gate(
+        auc_score: float | None, min_auc_threshold: float = 0.70
+    ) -> tuple[bool, str]:
+        """Pure policy decision function evaluating whether measured holdout AUC meets the promotion threshold.
+
+        Returns (is_champion, model_status).
+        If auc_score is None or invalid: (False, "UNVERIFIED_NO_EVALUATION").
+        If auc_score >= min_auc_threshold: (True, "CHAMPION").
+        If auc_score < min_auc_threshold: (False, "REJECTED_LOW_AUC").
+        """
+        if auc_score is None:
+            return False, "UNVERIFIED_NO_EVALUATION"
+        if not math.isfinite(auc_score) or not (0.0 <= auc_score <= 1.0):
+            return False, "UNVERIFIED_NO_EVALUATION"
+        if auc_score >= min_auc_threshold:
+            return True, "CHAMPION"
+        return False, "REJECTED_LOW_AUC"
+
     def aggregate_and_deploy(
         self,
         round_id: int,
         min_auc_threshold: float = 0.70,
-        eval_auc: float | None = None,
-        validation_labels: list[int] | None = None,
-        validation_preds: list[float] | None = None,
+        allow_test_fixtures: bool = False,
+        evidence: RoundEvaluationEvidence | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
-        """Aggregates unmasked SecAgg gradients via FedAvg and evaluates AUC for champion promotion."""
+        """Aggregates unmasked SecAgg gradients via FedAvg and evaluates holdout PR-AUC for champion promotion."""
         if round_id not in self.rounds:
             raise ValueError(f"Round ID {round_id} not found.")
 
@@ -407,58 +543,160 @@ class CoordinatorService:
             round_id,
         )
 
-        # 2. Evaluate Holdout AUC
-        # Holdout AUC must derive strictly from empirical validation measurements.
-        # Fallback constants or volume-synthesized scores are strictly forbidden (AGENTS.md).
-        auc_score: float | None = None
-        if eval_auc is not None:
-            if math.isfinite(eval_auc) and 0.0 <= eval_auc <= 1.0:
-                auc_score = float(eval_auc)
-            else:
-                logger.warning("Invalid eval_auc provided for round %d: %s. Metric rejected.", round_id, eval_auc)
-        elif (
-            validation_labels is not None
-            and validation_preds is not None
-            and len(validation_labels) > 0
-            and len(validation_labels) == len(validation_preds)
-        ):
-            from app.domain.metrics_service import compute_pr_auc
+        # 2. Evaluate Holdout PR-AUC
+        # Resolve structured evaluation evidence
+        ev: RoundEvaluationEvidence | None = None
+        if evidence is not None:
+            if evidence.round_id != round_id:
+                raise ValueError(
+                    f"Evidence round_id {evidence.round_id} does not match target round {round_id}."
+                )
+            ev = evidence
+        elif self.evaluator is not None:
+            candidate_model = self.round_candidate_models.get(round_id)
+            if candidate_model is None and self.async_fl_engine.global_weights:
+                candidate_model = self.async_fl_engine.get_global_weights()
 
-            computed = compute_pr_auc(validation_labels, validation_preds)
-            if computed is not None and math.isfinite(computed) and 0.0 <= computed <= 1.0:
-                auc_score = float(computed)
+            round_model_ver = self.rounds[round_id].get("model_version")
+            expected_dataset_id = self.round_designated_datasets.get(round_id)
+
+            if self.evaluator.holdout_dataset is None and self.holdout_provider is not None:
+                holdout = self.holdout_provider.resolve_designated_holdout(
+                    expected_dataset_id=expected_dataset_id
+                )
+                if holdout is not None:
+                    self.evaluator.set_holdout_dataset(holdout)
+
+            if candidate_model is not None and self.evaluator.holdout_dataset is not None:
+                try:
+                    ev = self.evaluator.evaluate(
+                        round_id=round_id,
+                        candidate_model=candidate_model,
+                        model_version=round_model_ver,
+                        expected_dataset_id=expected_dataset_id,
+                    )
+                except Exception as exc:
+                    logger.warning("Internal candidate evaluation failed for round %d: %s", round_id, exc)
+                    ev = None
+        elif round_id in self.round_validation_data:
+            ev = self.round_validation_data[round_id]
+        elif "validation_labels" in kwargs and "validation_preds" in kwargs:
+            raw_labels = kwargs.get("validation_labels")
+            raw_preds = kwargs.get("validation_preds")
+            if raw_labels is not None and raw_preds is not None:
+                ev = RoundEvaluationEvidence(
+                    round_id=round_id,
+                    validation_labels=list(raw_labels),
+                    validation_preds=[float(p) for p in raw_preds],
+                    dataset_id="caller_provided_fixture",
+                    model_version=self.rounds[round_id].get("model_version"),
+                    provenance="TEST_FIXTURE",
+                    producer="legacy_kwarg_test_fixture",
+                    evaluated_at=datetime.now(UTC).isoformat(),
+                )
+
+        # Model Version Binding Verification
+        round_model_ver = self.rounds[round_id].get("model_version")
+        if ev is not None and round_model_ver and ev.model_version and ev.model_version != round_model_ver:
+            raise ValueError(
+                f"Evidence model_version '{ev.model_version}' does not match round model_version '{round_model_ver}'."
+            )
+
+        # Model Hash Binding Verification
+        candidate_model = self.round_candidate_models.get(round_id)
+        if ev is not None and ev.model_hash and candidate_model is not None:
+            from app.application.services.candidate_evaluator import CandidateModelEvaluator
+
+            cand_hash = CandidateModelEvaluator.compute_model_hash(candidate_model)
+            if cand_hash and cand_hash != ev.model_hash:
+                raise ValueError(
+                    f"Evidence model_hash '{ev.model_hash}' does not match candidate model hash '{cand_hash}'."
+                )
+
+        # Dataset Identity Binding Verification
+        expected_dataset_id = self.round_designated_datasets.get(round_id)
+        if ev is not None and expected_dataset_id and ev.dataset_id != expected_dataset_id:
+            raise ValueError(
+                f"Evidence dataset_id '{ev.dataset_id}' does not match designated dataset '{expected_dataset_id}'."
+            )
+
+        auc_score: float | None = None
+        is_champion: bool = False
+        model_status: str = "UNVERIFIED_NO_EVALUATION"
+
+        if ev is not None:
+            is_caller_injected = (
+                ev.producer != "CandidateModelEvaluator"
+                or ev.provenance == "TEST_FIXTURE"
+            )
+            if is_caller_injected and not allow_test_fixtures:
+                logger.warning(
+                    "Round %d evidence is caller-supplied or has TEST_FIXTURE provenance. Production promotion blocked.",
+                    round_id,
+                )
+                if ev.metric_score is not None:
+                    auc_score = ev.metric_score
+                elif ev.validation_labels and ev.validation_preds:
+                    from app.domain.metrics_service import compute_pr_auc
+
+                    computed = compute_pr_auc(ev.validation_labels, ev.validation_preds)
+                    if computed is not None and math.isfinite(computed) and 0.0 <= computed <= 1.0:
+                        auc_score = float(computed)
+                is_champion = False
+                model_status = "TEST_FIXTURE_PROMOTION_BLOCKED"
+            else:
+                if ev.metric_score is not None:
+                    auc_score = ev.metric_score
+                elif ev.validation_labels and ev.validation_preds:
+                    from app.domain.metrics_service import compute_pr_auc
+
+                    computed = compute_pr_auc(ev.validation_labels, ev.validation_preds)
+                    if computed is not None and math.isfinite(computed) and 0.0 <= computed <= 1.0:
+                        auc_score = float(computed)
+                is_champion, model_status = self.evaluate_quality_gate(auc_score, min_auc_threshold)
 
         now_iso = datetime.now(UTC).isoformat()
         if auc_score is None:
-            is_champion = False
-            model_status = "UNVERIFIED_NO_EVALUATION"
             logger.warning(
                 "Aggregated model round %d has NO valid evaluation metrics. Quality gate REJECTED (champion promotion blocked).",
                 round_id,
             )
+        elif is_champion:
+            logger.info(
+                "Aggregated model round %d passed Quality Gate (PR-AUC=%.4f >= %.4f). Promoted to CHAMPION.",
+                round_id,
+                auc_score,
+                min_auc_threshold,
+            )
+        elif model_status == "TEST_FIXTURE_PROMOTION_BLOCKED":
+            logger.warning(
+                "Aggregated model round %d evaluated with TEST_FIXTURE evidence. Production promotion blocked.",
+                round_id,
+            )
         else:
-            is_champion = auc_score >= min_auc_threshold
-            model_status = "CHAMPION" if is_champion else "REJECTED_LOW_AUC"
-            if is_champion:
-                logger.info(
-                    "Aggregated model round %d passed Quality Gate (AUC=%.4f >= %.4f). Promoted to CHAMPION.",
-                    round_id,
-                    auc_score,
-                    min_auc_threshold,
-                )
-            else:
-                logger.warning(
-                    "Aggregated model round %d FAILED Quality Gate (AUC=%.4f < %.4f). Promotion BLOCKED.",
-                    round_id,
-                    auc_score,
-                    min_auc_threshold,
-                )
+            logger.warning(
+                "Aggregated model round %d FAILED Quality Gate (PR-AUC=%.4f < %.4f). Promotion BLOCKED.",
+                round_id,
+                auc_score,
+                min_auc_threshold,
+            )
 
         # 3. Update Round Record
         self.rounds[round_id]["status"] = "COMPLETED"
         self.rounds[round_id]["completed_at"] = now_iso
         self.rounds[round_id]["auc_score"] = auc_score
         self.rounds[round_id]["is_champion"] = is_champion
+        self.rounds[round_id]["model_status"] = model_status
+        self.rounds[round_id]["evaluation_evidence"] = {
+            "dataset_id": ev.dataset_id if ev else None,
+            "model_version": ev.model_version if ev else None,
+            "model_hash": ev.model_hash if ev else None,
+            "provenance": ev.provenance if ev else "NONE",
+            "sample_count": ev.sample_count if ev else (len(ev.validation_labels) if ev else 0),
+            "metric_name": ev.metric_name if ev else "NONE",
+            "metric_status": ev.metric_status if ev else "NONE",
+            "producer": ev.producer if ev else "NONE",
+        }
 
         # 4. Dispatch RoundCompleteNotification gRPC messages
         participating = self.rounds[round_id]["participating_banks"]
@@ -476,12 +714,13 @@ class CoordinatorService:
         # 5. Log SIEM Audit Event
         siem = SIEMLogExporter()
         auc_str = f"{auc_score:.4f}" if auc_score is not None else "UNAVAILABLE"
+        prov_str = ev.provenance if ev else "NONE"
         event = SIEMAuditEvent(
             event_id=f"fl_round_comp_r{round_id}",
             event_type="FL_ROUND_COMPLETED",
             severity="INFO" if is_champion else "WARNING",
             source_bank="coordinator",
-            message=f"FL Round {round_id} complete. AUC={auc_str}, Champion={is_champion}",
+            message=f"FL Round {round_id} complete. AUC={auc_str}, Champion={is_champion}, Provenance={prov_str}",
         )
         siem.export_event(event)
 
@@ -492,6 +731,7 @@ class CoordinatorService:
             "is_champion": is_champion,
             "model_status": model_status,
             "completed_at": now_iso,
+            "evaluation_evidence": self.rounds[round_id]["evaluation_evidence"],
         }
 
     def negotiate_parameters(
@@ -618,6 +858,9 @@ class CoordinatorService:
             for r_id in to_prune:
                 self.rounds.pop(r_id, None)
                 self.gradient_submissions.pop(r_id, None)
+                self.round_validation_data.pop(r_id, None)
+                self.round_candidate_models.pop(r_id, None)
+                self.round_designated_datasets.pop(r_id, None)
             logger.info("Pruned %d historical rounds from coordinator memory", len(to_prune))
             return len(to_prune)
 
