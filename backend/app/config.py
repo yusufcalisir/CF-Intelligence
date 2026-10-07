@@ -93,6 +93,18 @@ class Settings(BaseSettings):
     fedopt_beta2: float = 0.999
     fedopt_tau: float = 1e-3
 
+    # ── Candidate Model Evaluation & Quality Gate ─────────
+    holdout_manifest_path: str = Field(
+        default="",
+        validation_alias=AliasChoices("holdout_manifest_path", "cfi_holdout_manifest_path"),
+        description="Path to designated holdout dataset manifest JSON file.",
+    )
+    holdout_dataset_path: str = Field(
+        default="",
+        validation_alias=AliasChoices("holdout_dataset_path", "cfi_holdout_dataset_path"),
+        description="Direct path to designated holdout data file (npz/parquet/csv).",
+    )
+
     # ── API Gateway Security ──────────────────
     gateway_require_auth: bool = False
     gateway_rate_limit: int = 120  # requests per minute
