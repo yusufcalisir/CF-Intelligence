@@ -47,11 +47,12 @@ Turnkey, zero-credential HCL modules supporting enterprise multi-cloud deploymen
 
 ## 3. Kubernetes Orchestration (Helm Charts)
 
-Production-ready Helm charts (`deployments/helm/cfi-platform`) deploying microservices under strict zero-trust governance:
+Production-ready Helm charts (`deployments/helm/cfi-platform` and `deployments/helm/cfi-platform-root`) deploying microservices under strict zero-trust governance:
 * **Zero-Trust NetworkPolicies**: Ingress strictly restricted to authorized gateways; inter-bank lateral communication blocked at the kernel netfilter level.
-* **Horizontal Pod Autoscaling (HPA)**: Dynamic scaling between 2 and 10 replicas based on CPU (70%) and inference request queues.
+* **Horizontal Pod Autoscaling (HPA)**: Dynamic scaling between 2 and 10 replicas based on CPU (70-75%) and inference request queues.
 * **Pod Disruption Budgets (PDB)**: Guarantees high-availability during node upgrades and drain events (`minAvailable: 1`).
 * **Container Hardening**: Read-only root filesystems (`readOnlyRootFilesystem: true`), non-root execution (`runAsNonRoot: true`, UID 1000), and all Linux capabilities dropped (`drop: ["ALL"]`).
+* **Platform Version**: Standardized at `v2.4.0` across microservice image tags and Helm chart specifications.
 
 ---
 
@@ -69,4 +70,10 @@ All deployment artifacts are verified by automated testing pipelines:
    ```bash
    python scripts/validate_k8s_manifests.py --all
    # Result: 39/39 Kubernetes resources rendered and validated cleanly via kubectl apply --dry-run=client
+   ```
+
+3. **Helm Chart & Observability Verification Suite**:
+   ```bash
+   python -m pytest backend/tests/unit/test_helm_chart.py backend/tests/unit/test_telemetry_metrics.py -v
+   # Result: 56/56 PASSED (Validates Chart.yaml, values.yaml security posture, templates, Prometheus alert rules, and Grafana JSON schemas)
    ```
