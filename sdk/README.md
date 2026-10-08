@@ -56,11 +56,14 @@ python sdk/examples/reference_bank_connector.py --bank-id bank-a --salt sec_bank
 
 ## 4. Automated Testing
 
-Verify the SDK implementation using pytest:
+Verify the SDK implementation across both standalone unit tests and backend platform integration suites:
 
 ```bash
+# 1. Standalone SDK test suite (11 Tests)
 pytest sdk/python/tests/ -v
-# Result: 11/11 PASSED in <1s
+
+# 2. Backend platform integration suite (6 Tests)
+pytest backend/tests/unit/test_bank_connector_sdk.py backend/tests/unit/test_connector_health.py -v
 ```
 
 ---
