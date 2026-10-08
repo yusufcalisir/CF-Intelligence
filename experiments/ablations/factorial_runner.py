@@ -32,6 +32,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
+import torch.nn as nn
 from pydantic import BaseModel, Field
 from sklearn.metrics import (
     average_precision_score,
@@ -39,14 +41,7 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
-
-try:
-    import torch
-    import torch.nn as nn
-    from torch.utils.data import DataLoader, TensorDataset
-except ImportError:
-    torch = None  # type: ignore
-    nn = None  # type: ignore
+from torch.utils.data import DataLoader, TensorDataset
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +189,7 @@ def calculate_brier_score(y_true: np.ndarray, y_prob: np.ndarray) -> float:
 # Neural Classification Architecture
 # ---------------------------------------------------------------------------
 
-class FactorialMLPClassifier(nn.Module if torch else object):  # type: ignore
+class FactorialMLPClassifier(nn.Module):
     """Standardized 2-layer MLP with LayerNorm for component factorial benchmarking."""
 
     def __init__(self, input_dim: int = 22, hidden_dim: int = 48) -> None:

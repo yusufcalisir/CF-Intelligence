@@ -221,7 +221,7 @@ def measure_host_fast_path_calibration(warmup_runs: int = 5, measurement_runs: i
         "max_latency_ms": round(max_lat, 3),
         "mean_latency_ms": round(mean_lat, 3),
         "stage_breakdown": last_breakdown,
-        "sla_fast_path_passed": bool(p99 < 15.0 or min_lat < 15.0),
+        "sla_fast_path_passed": (p99 < 15.0 or min_lat < 15.0),
     }
 
 

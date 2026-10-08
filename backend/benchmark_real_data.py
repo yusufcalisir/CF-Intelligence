@@ -44,6 +44,8 @@ from sklearn.model_selection import train_test_split
 # Ensure the backend package is importable when running from the backend/ dir
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).parent))
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -54,6 +56,7 @@ logger = logging.getLogger(__name__)
 from app.application.services.dataloader import load_dataset  # noqa: E402
 from app.application.services.fl_engine import FederatedLearningEngine  # noqa: E402
 from app.application.services.model_service import ModelService  # noqa: E402
+from app.application.services.privacy_service import PrivacyService  # noqa: E402
 from app.config import Settings  # noqa: E402
 from app.domain.enums import AggregationMethod  # noqa: E402
 from app.domain.value_objects import ModelWeights  # noqa: E402
@@ -335,7 +338,12 @@ def run_benchmark(
 ) -> None:
     settings = Settings()  # type: ignore[call-arg]
     model_svc = ModelService(settings=settings)
-    fl_engine = FederatedLearningEngine(settings=settings)
+    privacy_svc = PrivacyService()
+    fl_engine = FederatedLearningEngine(
+        settings=settings,
+        model_service=model_svc,
+        privacy_service=privacy_svc,
+    )
     rng = np.random.default_rng(42)
 
     rows: list[dict[str, Any]] = []

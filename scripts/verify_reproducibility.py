@@ -93,7 +93,7 @@ class ReproducibilityVerifier:
             exp_dir = self.root / "experiments" / dir_name
             in_datasets_doc = dir_name in datasets_md or name in datasets_md
             has_dir = exp_dir.exists() and exp_dir.is_dir()
-            passed = bool(has_dir and in_datasets_doc)
+            passed = has_dir and in_datasets_doc
             details = f"Dir exists: {has_dir} | License: {license_name} | Documented in DATASETS.md: {in_datasets_doc}"
             self._record(item_id, name, cat, passed, details, f"experiments/{dir_name}")
 

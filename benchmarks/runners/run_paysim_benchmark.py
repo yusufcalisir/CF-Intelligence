@@ -97,9 +97,9 @@ def safe_relpath(path: Path | str, root: Path = REPO_ROOT) -> str:
     """Format path relative to root if inside repository, else return posix path."""
     p = Path(path).resolve()
     try:
-        return str(p.relative_to(root.resolve()).as_posix())
+        return p.relative_to(root.resolve()).as_posix()
     except ValueError:
-        return str(p.as_posix())
+        return p.as_posix()
 
 
 def plot_optimizer_convergence(
@@ -163,8 +163,8 @@ def plot_multi_paradigm_roc(
         ax.plot(fpr, tpr, color=color, lw=lw, linestyle=ls, label=f"{name} (AUC = {auc_val:.4f})")
 
     ax.plot([0, 1], [0, 1], color="#999999", lw=1.2, linestyle="--", label="Random Chance (0.5000)")
-    ax.set_xlim([-0.02, 1.02])
-    ax.set_ylim([-0.02, 1.02])
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
     ax.set_xlabel("False Positive Rate (1 - Specificity)")
     ax.set_ylabel("True Positive Rate (Recall / Sensitivity)")
     ax.set_title("PaySim Multi-Paradigm ROC Comparison")
@@ -208,8 +208,8 @@ def plot_multi_paradigm_pr(
             label=f"Fraud Prevalence ({prevalence:.3%})",
         )
 
-    ax.set_xlim([-0.02, 1.02])
-    ax.set_ylim([-0.02, 1.02])
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
     ax.set_xlabel("Recall (Coverage)")
     ax.set_ylabel("Precision (Positive Predictive Value)")
     ax.set_title("PaySim Multi-Paradigm Precision-Recall Curves")
@@ -232,7 +232,7 @@ def plot_confusion_matrix_heatmap(
     total = max(1, int(matrix.sum()))
 
     fig, ax = plt.subplots(figsize=(5.5, 4.8), dpi=300)
-    im = ax.imshow(matrix, interpolation="nearest", cmap=plt.cm.Blues)
+    im = ax.imshow(matrix, interpolation="nearest", cmap="Blues")
     plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
     labels = ["Legitimate", "Fraud"]
@@ -285,7 +285,7 @@ def plot_paradigm_auc_comparison(
     ax.set_title("PaySim Multi-Paradigm Fraud Detection Performance Comparison")
     ax.set_xticks(x)
     ax.set_xticklabels(names, rotation=15, ha="right")
-    ax.set_ylim([0, 1.12])
+    ax.set_ylim(0, 1.12)
     ax.legend(loc="upper right", frameon=True)
     ax.grid(True, axis="y", linestyle="--", alpha=0.7)
 

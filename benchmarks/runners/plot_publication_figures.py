@@ -65,8 +65,8 @@ def plot_roc_curve(
     ax.plot([0, 1], [0, 1], color="#7f7f7f", lw=1.5, linestyle="--", label="Random Chance (AUC = 0.5000)")
 
     ax.fill_between(fpr, tpr, alpha=0.15, color="#1f77b4")
-    ax.set_xlim([-0.02, 1.02])
-    ax.set_ylim([-0.02, 1.02])
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
     ax.set_xlabel("False Positive Rate (1 - Specificity)")
     ax.set_ylabel("True Positive Rate (Recall / Sensitivity)")
     ax.set_title(title)
@@ -111,8 +111,8 @@ def plot_pr_curve(
         )
 
     ax.fill_between(recall, precision, alpha=0.15, color="#d62728")
-    ax.set_xlim([-0.02, 1.02])
-    ax.set_ylim([-0.02, 1.02])
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
     ax.set_xlabel("Recall (Coverage)")
     ax.set_ylabel("Precision (Positive Predictive Value)")
     ax.set_title(title)
@@ -144,8 +144,8 @@ def plot_calibration_curve(
     ax.plot(prob_pred, prob_true, marker="o", lw=2.0, color="#2ca02c", label=label)
     ax.plot([0, 1], [0, 1], color="#7f7f7f", lw=1.5, linestyle="--", label="Perfect Calibration")
 
-    ax.set_xlim([-0.02, 1.02])
-    ax.set_ylim([-0.02, 1.02])
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
     ax.set_xlabel("Mean Predicted Probability")
     ax.set_ylabel("Empirical Fraction of Positives")
     ax.set_title(title)
@@ -175,7 +175,7 @@ def plot_confusion_matrix(
     total = max(1, int(matrix.sum()))
 
     fig, ax = plt.subplots(figsize=(5, 4.5), dpi=300)
-    im = ax.imshow(matrix, interpolation="nearest", cmap=plt.cm.Blues)
+    im = ax.imshow(matrix, interpolation="nearest", cmap="Blues")
     plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
     ax.set(
@@ -227,7 +227,7 @@ def plot_all_experiment_figures(result_dict: dict[str, Any], output_dir: Path | 
             output_path=out_dir / "roc_curve.png",
             model_name=model_name,
         )
-        generated["roc_curve"] = str(roc_p.as_posix())
+        generated["roc_curve"] = roc_p.as_posix()
 
     if curves and "recall" in curves and "precision" in curves and curves["recall"] and pr_auc is not None:
         pr_p = plot_pr_curve(
@@ -238,7 +238,7 @@ def plot_all_experiment_figures(result_dict: dict[str, Any], output_dir: Path | 
             baseline_prevalence=fraud_rate,
             model_name=model_name,
         )
-        generated["pr_curve"] = str(pr_p.as_posix())
+        generated["pr_curve"] = pr_p.as_posix()
 
     if calib and "prob_true" in calib and calib["prob_true"]:
         cal_p = plot_calibration_curve(
@@ -247,7 +247,7 @@ def plot_all_experiment_figures(result_dict: dict[str, Any], output_dir: Path | 
             brier_score=calib.get("brier_score"),
             output_path=out_dir / "calibration_curve.png",
         )
-        generated["calibration_curve"] = str(cal_p.as_posix())
+        generated["calibration_curve"] = cal_p.as_posix()
 
     if cm and "tn" in cm:
         cm_p = plot_confusion_matrix(
@@ -258,7 +258,7 @@ def plot_all_experiment_figures(result_dict: dict[str, Any], output_dir: Path | 
             labels=cm.get("labels", ["Legitimate", "Fraud"]),
             output_path=out_dir / "confusion_matrix.png",
         )
-        generated["confusion_matrix"] = str(cm_p.as_posix())
+        generated["confusion_matrix"] = cm_p.as_posix()
 
     return generated
 

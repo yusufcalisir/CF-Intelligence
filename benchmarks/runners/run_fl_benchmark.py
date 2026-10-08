@@ -22,17 +22,13 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import torch
+import torch.nn as nn
 from sklearn.metrics import average_precision_score, roc_auc_score
-
-try:
-    import torch
-    import torch.nn as nn
-    from torch.utils.data import DataLoader, TensorDataset
-except ImportError:
-    torch = None  # type: ignore
+from torch.utils.data import DataLoader, TensorDataset
 
 
-class FraudClassifier(nn.Module if torch else object):
+class FraudClassifier(nn.Module):
     def __init__(self, input_dim: int = 10, hidden_dim: int = 32):
         super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)

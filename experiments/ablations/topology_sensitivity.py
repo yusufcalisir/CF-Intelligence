@@ -266,6 +266,7 @@ class SyntheticTransactionGraph:
             h0[i, 3] = self.X_tab[i, 1]
         embeddings.append(h0)
 
+        h1 = h0
         # 1-hop mean aggregation
         if max_hops >= 1:
             h1 = np.zeros_like(h0)
@@ -276,6 +277,7 @@ class SyntheticTransactionGraph:
                     h1[i] = h0[i]
             embeddings.append(h1)
 
+        h2 = h1
         # 2-hop mean aggregation
         if max_hops >= 2:
             h2 = np.zeros_like(h0)
@@ -290,6 +292,7 @@ class SyntheticTransactionGraph:
                     h2[i] = h1[i]
             embeddings.append(h2)
 
+        h3 = h2
         # 3-hop aggregation
         if max_hops >= 3:
             h3 = np.zeros_like(h0)

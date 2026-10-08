@@ -83,9 +83,9 @@ def run_benchmark():
     fed_f1s = []
 
     for b in sim_run.banks:
-        loc_auc = b.local_metrics.auc_roc if b.local_metrics else 0.0
-        fed_auc = b.federated_metrics.auc_roc if b.federated_metrics else 0.0
-        fed_f1 = b.federated_metrics.f1_score if b.federated_metrics else 0.0
+        loc_auc = b.local_metrics.auc_roc if (b.local_metrics and b.local_metrics.auc_roc is not None) else 0.0
+        fed_auc = b.federated_metrics.auc_roc if (b.federated_metrics and b.federated_metrics.auc_roc is not None) else 0.0
+        fed_f1 = b.federated_metrics.f1_score if (b.federated_metrics and b.federated_metrics.f1_score is not None) else 0.0
         delta = fed_auc - loc_auc
 
         local_aucs.append(loc_auc)
