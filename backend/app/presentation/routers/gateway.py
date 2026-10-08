@@ -414,7 +414,7 @@ async def gateway_status() -> GatewayStatusResponse:
     return GatewayStatusResponse(
         status="ok",
         service="gateway",
-        version="0.2.0",
+        version="2.4.0",
         environment=mode_env,
         uptime_seconds=round(uptime, 2),
         mode=service_name,

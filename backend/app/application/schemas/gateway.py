@@ -39,7 +39,7 @@ class GatewayStatusResponse(BaseModel):
 
     status: str = Field("ok", description="Overall gateway status ('ok', 'degraded')")
     service: str = Field("gateway", description="Service identifier")
-    version: str = Field("0.2.0", description="Gateway API engine version")
+    version: str = Field("2.4.0", description="Gateway API engine version")
     environment: str = Field("production", description="Active runtime environment")
     uptime_seconds: float = Field(..., ge=0.0, description="Uptime duration in seconds")
     mode: str = Field("monolith", description="Operating deployment topology ('gateway', 'monolith')")

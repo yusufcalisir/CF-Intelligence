@@ -619,7 +619,7 @@ elif service_name == "fraud-alert":
 app = FastAPI(
     title=app_title,
     description=app_description,
-    version="0.2.0",
+    version="2.4.0",
     lifespan=lifespan,
     docs_url=None,
     redoc_url=None,
@@ -1397,7 +1397,7 @@ async def root() -> dict:
     """API root — returns basic service info."""
     return {
         "service": app_title,
-        "version": "0.2.0",
+        "version": "2.4.0",
         "docs": "/docs",
         "redoc": "/redoc",
         "scalar": "/scalar",

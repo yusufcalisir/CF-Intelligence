@@ -1,6 +1,6 @@
 [project]
 name = "collaborative-fraud-intelligence"
-version = "0.1.0"
+version = "2.4.0"
 description = "Privacy-preserving cross-institution fraud detection using Federated Learning"
 requires-python = ">=3.12"
 
