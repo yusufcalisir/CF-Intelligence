@@ -6,17 +6,19 @@ This directory contains the reproducible benchmark runners, dataset preprocessin
 
 ## 1. Architectural Scope & Evaluation Pillars
 
-The benchmark suite provides reproducible quantitative evaluation across five core engineering pillars:
+The benchmark suite provides reproducible quantitative evaluation across ten core engineering pillars:
 
 | Evaluation Pillar | Script Runner | Target Datasets / Testbeds | Primary Metrics |
 |:---|:---|:---|:---|
-| **Fraud Detection Performance** | `benchmarks/runners/run_fraud_benchmark.py` | PaySim, IEEE-CIS | PR-AUC, ROC-AUC, Recall @ 0.1% / 0.5% / 1% FPR |
-| **Federated Optimization** | `benchmarks/runners/run_fl_benchmark.py` | Dirichlet $\mathrm{Dir}(\alpha)$ Skew | Convergence Rounds, Communication MB, PR-AUC |
+| **Fraud Detection Performance** | `benchmarks/runners/run_fraud_benchmark.py` | PaySim, IEEE-CIS, CreditCard | PR-AUC, ROC-AUC, Recall @ 0.1% / 0.5% / 1% FPR |
+| **Cross-Bank Consortium Topology v2** | `benchmarks/crossbank_v2/runner.py` | 7 AML Consortium Typologies | Scenario PR-AUC, Exposure Caught USD, Incident Recall |
+| **Byzantine Federated Robustness** | `benchmarks/runners/run_byzantine_federated_benchmark.py` | ALIE, Sign-Flip, Gaussian Noise | Clean vs Attack Retention %, Krum / Bulyan / Trimmed Mean |
+| **Federated Optimization & Dirichlet Skew** | `benchmarks/runners/run_fl_benchmark.py`, `run_dirichlet_sweep.py` | Dirichlet $\mathrm{Dir}(\alpha)$ Skew ($\alpha \in [0.1, 1.0]$) | Convergence Rounds, Communication MB, PR-AUC |
 | **Differential Privacy Tradeoff** | `benchmarks/runners/run_dp_tradeoff.py` | Opacus PRVAccountant (DP-SGD) | $\epsilon$ vs PR-AUC Frontier, Clipping Norm $C$ |
-| **Byzantine Adversarial Defense** | `benchmarks/runners/run_byzantine_benchmark.py` | Sign Inversion, Noise | Robust PR-AUC (Krum, Trimmed Mean, Bulyan) |
 | **Graph Intelligence (GraphSAGE)**| `benchmarks/runners/run_graph_benchmark.py` | Elliptic Bitcoin Graph | Node PR-AUC, ROC-AUC, Temporal Split (Timestep 34) |
 | **In-Process Scoring Pipeline** | `benchmarks/runners/run_latency_benchmark.py` | CPU Thread Concurrency $C \in [1, 500]$ | p50, p95, p99 Latency (ms), Throughput (req/s) |
 | **HTTP Service Gateway** | `benchmarks/runners/run_http_benchmark.py` | HTTP Concurrency $C \in [1, 500]$ | p50, p95, p99 Latency (ms), Throughput (req/s), Status Codes |
+| **HTTP Rate-Limiting & WAF Defense** | `benchmarks/runners/run_http_ratelimit_benchmark.py` | Burst Rate & Token Bucket | Rejection Accuracy, False Rejection Rate (FRR) |
 | **Architectural Factorial Ablation** | `benchmarks/runners/run_factorial_ablation.py` | Synthetic Consortium ($2^4 = 16$ Grid) | PR-AUC, Recall @ 0.01% FPR, ANOVA Main Effects, Pareto Frontier |
 
 ---
@@ -77,17 +79,29 @@ python benchmarks/runners/run_dp_tradeoff.py
 # 4. Run Byzantine Adversarial Defense Benchmark (Sign Inversion Attack)
 python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion --byzantine 2
 
-# 5. Run GraphSAGE Node Classification Benchmark
+# 5. Run Comprehensive Byzantine Federated Benchmark (ALIE / Sign-Flip / Gaussian)
+python benchmarks/runners/run_byzantine_federated_benchmark.py
+
+# 6. Run Cross-Bank Consortium Topology v2 Benchmark (All 7 AML Typologies)
+python -m benchmarks.crossbank_v2.runner --rounds 10 --n-clients 5
+
+# 7. Run GraphSAGE Node Classification Benchmark
 python benchmarks/runners/run_graph_benchmark.py
 
-# 6. Run In-Process Scoring Pipeline Microbenchmark
+# 8. Run In-Process Scoring Pipeline Microbenchmark
 python benchmarks/runners/run_latency_benchmark.py --workers 50
 
-# 7. Run End-to-End Local HTTP Service Benchmark
+# 9. Run End-to-End Local HTTP Service Benchmark
 python benchmarks/runners/run_http_benchmark.py --concurrency 50
 
-# 8. Run Architectural Component Factorial Ablation Benchmark (Graph x DP x SecAgg x CrossBank)
+# 10. Run Architectural Component Factorial Ablation Benchmark (Graph x DP x SecAgg x CrossBank)
 python benchmarks/runners/run_factorial_ablation.py --rounds 5 --local-epochs 2 --n-clients 5
+
+# 11. Generate / Verify Master Benchmark Matrix
+python benchmarks/generate_master_benchmark_matrix.py --verify
+
+# 12. Run Claims Registry & Provenance Invariant Suite
+python -m pytest backend/tests/unit/test_claims_registry.py -v
 ```
 
 ---
@@ -112,25 +126,32 @@ $$\mathrm{Recall@0.1\%FPR}, \quad \mathrm{Recall@0.5\%FPR}, \quad \mathrm{Recall
 
 ---
 
-## 5. Machine-Readable Results Schema
+## 5. Machine-Readable Results Schema & Canonical Artifacts
 
 All benchmark executions output deterministic JSON artifacts to `benchmarks/results/raw/`:
 
 ```
 benchmarks/results/
 ├── raw/
-│   ├── fraud_benchmark_paysim.json
-│   ├── fl_comparison_alpha_0.5.json
-│   ├── dp_privacy_utility_tradeoff.json
-│   ├── byzantine_benchmark_sign_inversion.json
-│   ├── graphsage_elliptic_benchmark.json
-│   ├── factorial_ablation_matrix.json
-│   ├── latency_microbenchmark.json
-│   ├── latency_microbenchmark_samples.json
-│   ├── latency_http_service_benchmark.json
-│   ├── latency_http_service_samples.json
-│   └── latency_concurrency_benchmark.json
-└── summary.md
+│   ├── crossbank_v2_canonical.json            # Level 1 Canonical 7-Scenario Cross-Bank Benchmark
+│   ├── byzantine_federated_canonical.json     # Level 1 Canonical Multi-Attack Byzantine Matrix
+│   ├── consortium_flagship_benchmark.json     # Flagship cross-bank consortium valuation
+│   ├── master_benchmark_matrix.json           # Unified multi-dataset, multi-seed matrix
+│   ├── multi_seed_statistical_summary.json    # Bootstrap 95% confidence intervals
+│   ├── demographic_fairness_audit.json        # Equal opportunity and disparate impact audit
+│   ├── fraud_benchmark_paysim.json            # PaySim performance baseline
+│   ├── fraud_benchmark_ieee_cis.json          # IEEE-CIS card transaction baseline
+│   ├── fraud_benchmark_credit_card.json       # European credit card baseline
+│   ├── fraud_benchmark_amlsim.json            # AMLSim synthetic agent simulation
+│   ├── fraud_benchmark_amlnet.json            # AMLNet graph structure baseline
+│   ├── fraud_benchmark_synthaml.json          # SynthAML high-concurrency baseline
+│   ├── graphsage_elliptic_benchmark.json      # Elliptic Bitcoin graph temporal classification
+│   ├── dp_privacy_utility_tradeoff.json       # Differential privacy epsilon utility frontier
+│   ├── factorial_ablation_matrix.json         # 2^4 component factorial ablation grid
+│   ├── latency_microbenchmark.json            # In-process sub-millisecond scoring latencies
+│   └── latency_http_service_benchmark.json    # FastAPI HTTP reverse proxy throughput & SLA
+├── canonical_evidence_registry.json           # Machine-readable registry of verified Level 1 evidence
+└── summary.md                                 # High-level aggregated benchmark executive summary
 ```
 
 ### Environmental Metadata Transparency
@@ -138,7 +159,19 @@ Every generated artifact records host machine specifications (CPU model, total R
 
 ---
 
-## 6. Scientific Limitations
+## 6. Canonical Evidence Governance (`canonical_registry.py`)
+
+In accordance with **Runtime Truth Rule 16** ("No historical/superseded evidence presented as current canonical evidence"):
+- **Level 1 Verification**: Only benchmarks executed against real physical source datasets or certified simulations with frozen schemas and verification hashes are registered with status `CANONICAL`.
+- **Automatic Fallback Rejection**: `resolve_canonical_artifact()` strictly refuses to promote `HISTORICAL`, `SUPERSEDED`, or `SMOKE_TEST` artifacts as canonical benchmarks.
+- **Verification Command**:
+  ```bash
+  python -c "from benchmarks.canonical_registry import CANONICAL_REGISTRY, resolve_canonical_artifact, ArtifactStatus; [resolve_canonical_artifact(k) for k, v in CANONICAL_REGISTRY.items() if v.status == ArtifactStatus.CANONICAL]; print('All Level 1 Canonical Artifacts Validated!')"
+  ```
+
+---
+
+## 7. Scientific Limitations
 
 1. **Synthetic and Public Proxy Datasets**: Real inter-bank clearing feeds (SWIFT MT/pacs, Fedwire) contain proprietary transaction topologies not fully mirrored in public datasets.
 2. **In-Process Simulation**: Multi-client benchmarks execute as concurrent threads or processes on a single physical host; inter-datacenter WAN packet latency ($30\text{--}80\mathrm{ms}$) is modeled analytically.
