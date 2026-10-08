@@ -19,9 +19,12 @@ backend_dir = Path(__file__).resolve().parent.parent.parent.parent / "backend"
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-from app.application.services.dataloader import load_dataset  # noqa: E402
 from app.application.services.feature_service import FeatureService  # noqa: E402
 from app.application.services.preprocessor import DataPreprocessor  # noqa: E402
+from app.application.services.synthetic_dataset_generators import (  # noqa: E402
+    generate_synthetic_creditcard,
+    generate_synthetic_paysim,
+)
 
 
 def test_scientific_temporal_monotonicity() -> None:
@@ -95,8 +98,12 @@ def test_absence_of_data_snooping_in_scaling() -> None:
 
 def test_benchmark_dataset_hygiene_and_leakage_absence() -> None:
     """Public dataset synthetic loaders must be free of infinite values, leakage, and corruption."""
-    for dataset_name in ["paysim", "creditcard"]:
-        data = load_dataset(dataset_name, n_mock_txns=1000)
+    loaders = {
+        "paysim": lambda: generate_synthetic_paysim(n_mock_txns=1000),
+        "creditcard": lambda: generate_synthetic_creditcard(n_mock_txns=1000),
+    }
+    for dataset_name, loader in loaders.items():
+        data = loader()
         X = data["X"]
         y = data["y"]
 
