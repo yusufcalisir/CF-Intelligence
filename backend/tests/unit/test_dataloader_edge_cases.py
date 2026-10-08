@@ -26,6 +26,7 @@ from app.application.services.dataloader import (
 def _get_or_create_real_path(dataset_name: str, tmp_path: Path) -> Path | None:
     """Return default storage path if real files exist, or create minimal real CSV in tmp_path for CI."""
     root = resolve_dataset_dir(dataset_name)
+    tmp_path.mkdir(parents=True, exist_ok=True)
 
     if dataset_name == "elliptic":
         feat = root / "elliptic_txs_features.csv"
