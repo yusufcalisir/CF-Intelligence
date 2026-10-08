@@ -6,7 +6,7 @@ This directory houses the unified operational CLI, benchmarking harnesses, secur
 
 ## 1. Scripts Taxonomy & Directory Index
 
-The 36 scripts are organized into five primary engineering domains:
+The 37 operational, benchmarking, and verification scripts are organized into five primary engineering domains:
 
 ```text
 scripts/
@@ -49,7 +49,9 @@ scripts/
 │   ├── init_vault_pki.py                # HashiCorp Vault mTLS intermediate CA & certificate provisioning
 │   └── setup_cloudflare_waf.py          # Cloudflare WAF perimeter rules, rate limits & TLS 1.3 setup
 │
-└── [5. Deployment & Cloud Verification]
+└── [5. Deployment, Scientific Provenance & Verification]
+    ├── verify_benchmark_evidence.py     # Master scientific evidence provenance & mathematical reconciliation CLI
+    ├── verify_b1_reconstruction.py      # Independent Class B1 HTTP latency percentile & sample math verifier
     ├── verify_reproducibility.py        # 38-Item platform reproducibility & empirical parity sweep
     ├── verify_docker_deployment.py      # Automated Docker Compose pre-flight & runtime verification
     ├── validate_k8s_manifests.py        # Rendered Helm manifest dry-run validator (kubectl apply --dry-run=client)
@@ -144,6 +146,15 @@ python scripts/generate_amlnet_dataset.py
 
 # Generate Nature Scientific Data calibrated SynthAML dataset
 python scripts/generate_synthaml_dataset.py
+```
+
+### 2.8 Scientific Evidence Provenance & Benchmark Verification
+```bash
+# Verify end-to-end scientific evidence chain, SHA-256 hashes & mathematical reconciliation
+python scripts/verify_benchmark_evidence.py
+
+# Verify Class B1 HTTP service latency sample percentile math
+python scripts/verify_b1_reconstruction.py
 ```
 
 ---

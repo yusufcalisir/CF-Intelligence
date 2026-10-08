@@ -14,7 +14,11 @@ from typing import Any
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-BENCHMARK_FILE = REPO_ROOT / "benchmarks" / "results" / "raw" / "latency_http_service_benchmark.json"
+BENCHMARK_FILE = (
+    REPO_ROOT / "benchmarks" / "results" / "raw" / "latency_http_service_benchmark_post_basehttp0_diagnosis.json"
+    if (REPO_ROOT / "benchmarks" / "results" / "raw" / "latency_http_service_benchmark_post_basehttp0_diagnosis.json").exists()
+    else REPO_ROOT / "benchmarks" / "results" / "raw" / "latency_http_service_benchmark.json"
+)
 SAMPLES_FILE = REPO_ROOT / "benchmarks" / "results" / "raw" / "latency_http_service_samples.json"
 
 
