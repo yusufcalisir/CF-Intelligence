@@ -59,12 +59,8 @@ class OpenBankingConnector(BaseBankConnector):
         self.client_secret = client_secret
         self.token_url = token_url
         self.tpp_signature_key = tpp_signature_key
-        if access_token:
-            self._cached_token = access_token
-            self._token_expires_at = float("inf")
-        else:
-            self._cached_token = None
-            self._token_expires_at = 0.0
+        self._cached_token: str | None = access_token if access_token else None
+        self._token_expires_at: float = float("inf") if access_token else 0.0
         self._buffered_transactions: list[NormalizedTransaction] = []
 
     def _get_oauth2_token(self, force_refresh: bool = False) -> str:

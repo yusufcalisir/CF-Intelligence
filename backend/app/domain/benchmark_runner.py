@@ -27,10 +27,10 @@ class BenchmarkResult:
 
     config_id: str
     name: str
-    roc_auc: float
-    pr_auc: float
-    f1_score: float
-    recall_at_1pct_fpr: float
+    roc_auc: float | None
+    pr_auc: float | None
+    f1_score: float | None
+    recall_at_1pct_fpr: float | None
     false_positive_rate: float
     epsilon_consumed: float
     total_bytes_transmitted: int
@@ -192,10 +192,10 @@ class BenchmarkRunner:
         res = BenchmarkResult(
             config_id=config_id,
             name=name,
-            roc_auc=round(final_auc, 4),
-            pr_auc=round(abs(pr_auc), 4),
-            f1_score=round(f1, 4),
-            recall_at_1pct_fpr=round(recall_1pct, 4),
+            roc_auc=round(final_auc, 4) if final_auc is not None else None,
+            pr_auc=round(abs(pr_auc), 4) if pr_auc is not None else None,
+            f1_score=round(f1, 4) if f1 is not None else None,
+            recall_at_1pct_fpr=round(recall_1pct, 4) if recall_1pct is not None else None,
             false_positive_rate=0.01,
             epsilon_consumed=prof["eps"],
             total_bytes_transmitted=int(prof["bytes"]),
@@ -206,12 +206,12 @@ class BenchmarkRunner:
 
         self.results[config_id] = res
         logger.info(
-            "Benchmark %s (%s) complete -> ROC-AUC: %.4f, PR-AUC: %.4f, F1: %.4f, eps: %.1f",
+            "Benchmark %s (%s) complete -> ROC-AUC: %s, PR-AUC: %s, F1: %s, eps: %.1f",
             config_id,
             name,
-            res.roc_auc,
-            res.pr_auc,
-            res.f1_score,
+            f"{res.roc_auc:.4f}" if res.roc_auc is not None else "N/A",
+            f"{res.pr_auc:.4f}" if res.pr_auc is not None else "N/A",
+            f"{res.f1_score:.4f}" if res.f1_score is not None else "N/A",
             res.epsilon_consumed,
         )
         return res

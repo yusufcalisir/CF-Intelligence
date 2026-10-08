@@ -112,7 +112,7 @@ if HAS_GREAT_EXPECTATIONS:
                 return orig_fget(self)
             return None
 
-        project_manager.__class__._project = property(_tl_get_project_prop)
+        setattr(project_manager.__class__, "_project", property(_tl_get_project_prop))  # noqa: B010
         project_manager._cf_thread_local_installed = True  # type: ignore[attr-defined] # pyright: ignore[reportAttributeAccessIssue]
 
 

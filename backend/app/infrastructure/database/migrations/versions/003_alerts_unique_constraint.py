@@ -59,15 +59,15 @@ def _alerts_table_at_revision_002() -> sa.Table:
     )
 
 
-def _batch_kwargs() -> dict[str, sa.Table]:
+def _copy_from_table() -> sa.Table | None:
     if context.is_offline_mode():
-        return {"copy_from": _alerts_table_at_revision_002()}
-    return {}
+        return _alerts_table_at_revision_002()
+    return None
 
 
 def upgrade() -> None:
     """Add uq_alerts_bank_transaction composite unique constraint."""
-    with op.batch_alter_table("alerts", **_batch_kwargs()) as batch_op:
+    with op.batch_alter_table("alerts", copy_from=_copy_from_table()) as batch_op:
         batch_op.create_unique_constraint(
             "uq_alerts_bank_transaction",
             ["bank_id", "transaction_id"],
@@ -76,5 +76,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Remove uq_alerts_bank_transaction composite unique constraint."""
-    with op.batch_alter_table("alerts", **_batch_kwargs()) as batch_op:
+    with op.batch_alter_table("alerts", copy_from=_copy_from_table()) as batch_op:
         batch_op.drop_constraint("uq_alerts_bank_transaction", type_="unique")

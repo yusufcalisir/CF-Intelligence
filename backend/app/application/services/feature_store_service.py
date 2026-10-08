@@ -194,8 +194,8 @@ class FeatureStoreService:
             raw_merch = row.get("merchant_id")
             row_tenant = tenant_id or row.get("tenant_id") or row.get("bank_id")
 
-            cust_profile = {}
-            stats_profile = {}
+            cust_profile: dict[str, float | int] = {}
+            stats_profile: dict[str, float] = {}
             if raw_cust:
                 raw_cust_str = str(raw_cust)
                 cust_id = (
@@ -206,7 +206,7 @@ class FeatureStoreService:
                 cust_profile = self.online_customer.get(cust_id) or {}
                 stats_profile = self.online_stats.get(cust_id) or {}
 
-            merch_profile = {}
+            merch_profile: dict[str, str | float] = {}
             if raw_merch:
                 raw_merch_str = str(raw_merch)
                 merch_id = (
@@ -217,7 +217,7 @@ class FeatureStoreService:
                 merch_profile = self.online_merchant.get(merch_id) or {}
 
             # Blend views into single record
-            record = {}
+            record: dict[str, Any] = {}
             for feature in features:
                 if feature in cust_profile:
                     record[feature] = cust_profile[feature]

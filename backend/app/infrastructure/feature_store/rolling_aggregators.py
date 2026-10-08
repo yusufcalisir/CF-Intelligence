@@ -109,8 +109,11 @@ class RollingFeatureAggregator:
         device_entropy = round(unique_count / total_count, 4) if total_count > 0 else 0.0
 
         # 4. country_risk_score (FATF destination country weight)
-        dest_country = tx.destination_country.upper()
-        country_risk_score = FATF_COUNTRY_RISK_MAP.get(dest_country, DEFAULT_COUNTRY_RISK)
+        if tx.destination_country is not None:
+            dest_country = tx.destination_country.strip().upper()
+            country_risk_score = FATF_COUNTRY_RISK_MAP.get(dest_country, DEFAULT_COUNTRY_RISK)
+        else:
+            country_risk_score = DEFAULT_COUNTRY_RISK
 
         # 5. Cyclical time encodings (hour_of_day_cos and hour_of_day_sin)
         hour = now.hour + (now.minute / 60.0)

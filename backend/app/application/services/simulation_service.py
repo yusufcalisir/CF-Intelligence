@@ -352,7 +352,7 @@ class SimulationService:
                 if dataset_mode_req == "synthetic":
                     from app.application.services import synthetic_dataset_generators as sdg
 
-                    synthetic_generators = {
+                    synthetic_generators: dict[str, Callable[..., dict[str, Any]]] = {
                         "paysim": sdg.generate_synthetic_paysim,
                         "ieee_cis": sdg.generate_synthetic_ieee_cis,
                         "elliptic": sdg.generate_synthetic_elliptic,

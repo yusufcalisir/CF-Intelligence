@@ -1684,46 +1684,6 @@ def _aggregate_synthaml_alert_features(
     return X, y, SYNTHAML_FEATURE_COLS
 
 
-def _generate_mock_synthaml(
-    n_mock_alerts: int = 500,
-    rng: np.random.Generator | None = None,
-) -> dict[str, Any]:
-    """Generate high-fidelity synthetic mock of the SynthAML benchmark."""
-    if rng is None:
-        rng = np.random.default_rng(42)
-
-    logger.warning("[SynthAML] Generating synthetic fallback mock (%d alerts)...", n_mock_alerts)
-    import sys
-    import tempfile
-
-    repo_root = Path(__file__).resolve().parents[4]
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
-
-    from scripts.generate_synthaml_dataset import generate_synthaml
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        alerts_df, tx_df = generate_synthaml(tmp_dir, n_alerts=n_mock_alerts, seed=42)
-
-    X, y, feature_names = _aggregate_synthaml_alert_features(alerts_df, tx_df)
-
-    return {
-        "X": X,
-        "y": y,
-        "feature_names": feature_names,
-        "alerts_df": alerts_df,
-        "transactions_df": tx_df,
-        "alert_ids": alerts_df["ALERT_ID"].values,
-        "account_ids": alerts_df["ACCOUNT_ID"].values,
-        "timestamps": alerts_df["TIMESTAMP"].values,
-        "dates": alerts_df["DATE"].values,
-        "source": "synthetic_fallback",
-        "fraud_ratio": float(np.mean(y == 1)),
-        "n_alerts": len(y),
-        "n_transactions": len(tx_df),
-    }
-
-
 def load_synthaml(
     data_dir: Path | str | None = None,
     all_rows: bool = False,

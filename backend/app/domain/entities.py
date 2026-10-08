@@ -46,16 +46,18 @@ class Bank:
         """Calculate metric improvements from local to federated model."""
         if not self.local_metrics or not self.federated_metrics:
             return None
-        auc_delta: float | None = None
-        if self.federated_metrics.auc_roc is not None and self.local_metrics.auc_roc is not None:
-            auc_delta = self.federated_metrics.auc_roc - self.local_metrics.auc_roc
+
+        def _calc_delta(fed: float | None, loc: float | None) -> float | None:
+            if fed is not None and loc is not None:
+                return fed - loc
+            return None
 
         return {
-            "accuracy": self.federated_metrics.accuracy - self.local_metrics.accuracy,
-            "precision": self.federated_metrics.precision - self.local_metrics.precision,
-            "recall": self.federated_metrics.recall - self.local_metrics.recall,
-            "f1_score": self.federated_metrics.f1_score - self.local_metrics.f1_score,
-            "auc_roc": auc_delta,
+            "accuracy": _calc_delta(self.federated_metrics.accuracy, self.local_metrics.accuracy),
+            "precision": _calc_delta(self.federated_metrics.precision, self.local_metrics.precision),
+            "recall": _calc_delta(self.federated_metrics.recall, self.local_metrics.recall),
+            "f1_score": _calc_delta(self.federated_metrics.f1_score, self.local_metrics.f1_score),
+            "auc_roc": _calc_delta(self.federated_metrics.auc_roc, self.local_metrics.auc_roc),
         }
 
 

@@ -71,7 +71,7 @@ class DriftTriggeredRetrainingService:
         concept_drift = math.isfinite(concept_drift_score) and concept_drift_score >= 0.15
 
         auc_avail = current_auc is not None and math.isfinite(current_auc)
-        if auc_avail:
+        if current_auc is not None and math.isfinite(current_auc):
             auc_mon_status = "METRIC_AVAILABLE"
             acc_status = (
                 "DEGRADATION_DETECTED"
