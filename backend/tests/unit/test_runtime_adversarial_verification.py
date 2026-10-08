@@ -276,6 +276,8 @@ def test_dp_enabled_actually_executes_dp() -> None:
 
     assert c3_fedavg.epsilon_consumed == 0.0
     assert c5_dp.epsilon_consumed > 0.0
+    assert c3_fedavg.roc_auc is not None and c5_dp.roc_auc is not None
+    assert c3_fedavg.pr_auc is not None and c5_dp.pr_auc is not None
     # DP noise degrades utility relative to unconstrained FedAvg
     assert c5_dp.roc_auc <= c3_fedavg.roc_auc or c5_dp.pr_auc <= c3_fedavg.pr_auc
 

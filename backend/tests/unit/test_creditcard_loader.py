@@ -26,6 +26,7 @@ from app.application.services.dataloader import (
 )
 
 
+@pytest.mark.real_data
 class TestCreditCardDataLoader:
     """Validates ingestion, schema, scaling, and zero-leakage splitting for Credit Card Fraud."""
 

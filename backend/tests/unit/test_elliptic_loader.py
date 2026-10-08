@@ -30,6 +30,7 @@ def elliptic_dir():
     return resolve_dataset_dir("elliptic")
 
 
+@pytest.mark.real_data
 class TestEllipticLoaderRealDataset:
     """Tests evaluating real Elliptic Bitcoin dataset files."""
 

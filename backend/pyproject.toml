@@ -45,6 +45,9 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-v --tb=short"
+markers = [
+    "real_data: Tests that require physical empirical benchmark datasets on disk",
+]
 filterwarnings = [
     "ignore::DeprecationWarning:torch.jit.*:",
     "ignore::FutureWarning:torch.jit.*:",

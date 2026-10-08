@@ -151,7 +151,9 @@ def test_end_to_end_federated_simulation_real_benchmarks(
 
     for bank in result.banks:
         assert bank.federated_metrics is not None
+        assert bank.federated_metrics.accuracy is not None
         assert 0.0 <= bank.federated_metrics.accuracy <= 1.0
+        assert bank.federated_metrics.f1_score is not None
         assert 0.0 <= bank.federated_metrics.f1_score <= 1.0
         if bank.federated_metrics.auc_roc is not None:
             assert 0.0 <= bank.federated_metrics.auc_roc <= 1.0
@@ -255,7 +257,9 @@ def test_end_to_end_federated_simulation_benchmark_fixtures(
 
     for bank in result.banks:
         assert bank.federated_metrics is not None
+        assert bank.federated_metrics.accuracy is not None
         assert 0.0 <= bank.federated_metrics.accuracy <= 1.0
+        assert bank.federated_metrics.f1_score is not None
         assert 0.0 <= bank.federated_metrics.f1_score <= 1.0
         if bank.federated_metrics.auc_roc is not None:
             assert 0.0 <= bank.federated_metrics.auc_roc <= 1.0

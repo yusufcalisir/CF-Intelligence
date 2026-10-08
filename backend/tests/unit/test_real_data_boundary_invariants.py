@@ -81,6 +81,7 @@ def create_test_simulation_service() -> SimulationService:
 # ===========================================================================
 
 
+@pytest.mark.real_data
 def test_invariant_1_real_loaders_never_return_generated_data():
     """Invariant 1: Real loaders return authentic data with is_synthetic=False and real source tags."""
     loaders_to_test = [
@@ -283,6 +284,7 @@ def test_invariant_7_test_fixture_provenance_cannot_become_benchmark_provenance(
 # ===========================================================================
 
 
+@pytest.mark.real_data
 def test_invariant_8_physical_artifact_vs_scientific_origin_distinguishability():
     """Invariant 8: Public simulated datasets (PaySim/AMLSim) have physical disk artifacts but simulated scientific origin."""
     paysim = load_paysim(nrows=50)

@@ -59,6 +59,7 @@ def test_load_creditcard_mock_structure():
     assert data["X"].shape[1] == 29
 
 
+@pytest.mark.real_data
 def test_load_amlsim_structure():
     data = load_amlsim(nrows=1000)
     assert "X" in data
@@ -75,6 +76,7 @@ def test_load_amlsim_structure():
     assert data["source"] in ("real", "real_csv", "real_parquet", "mock")
 
 
+@pytest.mark.real_data
 def test_load_amlsim_pyg_and_networkx():
     data = load_amlsim(nrows=500)
     pyg_data = data["to_pyg_data"]()
@@ -112,6 +114,7 @@ def test_load_amlsim_require_real_raises_on_missing(tmp_path):
         load_amlsim(path=tmp_path / "nonexistent", require_real=True)
 
 
+@pytest.mark.real_data
 def test_load_synthaml_structure():
     data = load_synthaml(nrows=200)
     assert "X" in data
@@ -124,6 +127,7 @@ def test_load_synthaml_structure():
     assert data["source"] in ("real_parquet", "real_csv", "synthetic_fallback")
 
 
+@pytest.mark.real_data
 def test_load_amlnet_structure():
     data = load_amlnet(nrows=200)
     assert "X" in data

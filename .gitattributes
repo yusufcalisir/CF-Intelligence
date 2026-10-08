@@ -15,6 +15,7 @@
 frontend/e2e-visual/snapshots/** -filter -diff -merge
 # Exclude test fixtures from Git LFS so they are committed as native binary assets
 backend/tests/fixtures/** -filter -diff -merge
+backend/tests/fixtures/*.py text diff merge
 # Exclude experiment metrics CSV files from Git LFS so they are committed as native text assets
 experiments/**/metrics.csv -filter -diff -merge
 

@@ -21,6 +21,46 @@ import pytest  # noqa: E402
 
 from tests.factories.data_factory import TestDataFactory  # noqa: E402
 
+# ── Real-Data Integration Test Flags & Gating ──────────────────────────────────
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Register custom CLI options for real-data integration gating."""
+    parser.addoption(
+        "--require-real-data",
+        action="store_true",
+        default=False,
+        help="Enforce execution of real-data integration tests; fails closed if physical datasets are missing.",
+    )
+    parser.addoption(
+        "--include-real-data",
+        action="store_true",
+        default=False,
+        help="Include real-data integration tests in execution (skips if physical datasets are missing).",
+    )
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Gate tests marked with @pytest.mark.real_data so standard CI runs dataset-independent tests."""
+    require_real = config.getoption("--require-real-data", default=False) or os.environ.get("CFI_REQUIRE_REAL_DATA") == "1"
+    include_real = config.getoption("--include-real-data", default=False) or os.environ.get("CFI_INCLUDE_REAL_DATA") == "1"
+
+    if not require_real and not include_real:
+        skip_real = pytest.mark.skip(
+            reason="Real-data integration test skipped by default. Run with --require-real-data or --include-real-data to execute."
+        )
+        for item in items:
+            if "real_data" in item.keywords:
+                item.add_marker(skip_real)
+
+
+@pytest.fixture
+def require_real_data(request: pytest.FixtureRequest) -> bool:
+    """Fixture returning True if real data execution is mandatory."""
+    return bool(
+        request.config.getoption("--require-real-data", default=False)
+        or os.environ.get("CFI_REQUIRE_REAL_DATA") == "1"
+    )
+
+
 # ── DDoS Throttle bypass ───────────────────────────────────────────────────────
 # Setting TESTING=1 before the app module is imported causes DDoSProtectionMiddleware
 # to skip all volumetric counting, preventing cross-test 429 bleed from the

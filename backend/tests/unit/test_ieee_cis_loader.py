@@ -16,6 +16,7 @@ from app.application.services.dataloader import (
 class TestIEEECISLoader:
     """Test suite verifying IEEE-CIS ingestion, identity join, and feature engineering."""
 
+    @pytest.mark.real_data
     def test_ieee_cis_real_dataset_loading_and_identity_join(self) -> None:
         """Verify real IEEE-CIS transaction ingestion and identity left join."""
         root = resolve_dataset_dir("ieee_cis")
@@ -53,6 +54,7 @@ class TestIEEECISLoader:
         assert data["transaction_dt"] is not None
         assert len(data["transaction_dt"]) == 500
 
+    @pytest.mark.real_data
     def test_ieee_cis_temporal_split_zero_leakage(self) -> None:
         """Verify temporal train/val/test splitting produces zero forward lookahead leakage."""
         split_data = load_ieee_cis(
@@ -103,6 +105,7 @@ class TestIEEECISLoader:
         assert "transaction_dt" in mock_data
         assert len(mock_data["transaction_dt"]) == 500
 
+    @pytest.mark.real_data
     def test_ieee_cis_dataset_registry_integration(self) -> None:
         """Verify load_dataset registry resolves 'ieee_cis' and 'ieee-cis'."""
         data1 = load_dataset("ieee_cis", nrows=200)
@@ -114,6 +117,7 @@ class TestIEEECISLoader:
         assert len(data2["y"]) == 200
 
 
+@pytest.mark.real_data
 class TestIEEECISPartitioner:
     """Test suite verifying IEEECISPartitioner temporal splitting and Dirichlet non-IID allocation."""
 

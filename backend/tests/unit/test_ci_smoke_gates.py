@@ -14,6 +14,7 @@ from __future__ import annotations
 import io
 from pathlib import Path
 
+import numpy as np
 import pytest
 import torch
 from experiments.harness.schema import (
@@ -35,52 +36,86 @@ from app.application.services.dataloader import (
     load_synthaml,
 )
 from app.application.services.model_service import FraudDetectionModel
+from tests.fixtures.dataloader_smoke_fixtures import (
+    create_amlnet_test_fixture,
+    create_amlsim_test_fixture,
+    create_creditcard_test_fixture,
+    create_elliptic_test_fixture,
+    create_ieee_cis_test_fixture,
+    create_paysim_test_fixture,
+    create_synthaml_test_fixture,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class TestDataloaderSmokeGates:
-    """Fast deterministic smoke tests for canonical dataloaders."""
+    """Fast deterministic smoke tests for canonical dataloaders.
 
-    def test_dataloader_smoke_paysim_and_ieeecis(self) -> None:
-        """Verify PaySim and IEEE-CIS load rapidly with correct shapes and binary labels."""
-        paysim_data = load_paysim(nrows=50)
+    Gate A Architecture:
+    Exercises production dataloader parsing, column cleaning, and label mapping logic
+    using minimal deterministic temporary test fixtures. Does not depend on external
+    multi-gigabyte Kaggle/empirical downloads, allowing standard CI to execute safely
+    and rapidly while verifying real loader implementation contracts.
+    """
+
+    def test_dataloader_smoke_paysim_and_ieeecis(self, tmp_path: Path) -> None:
+        """Verify PaySim and IEEE-CIS production loaders parse schema fixtures correctly."""
+        paysim_dir = create_paysim_test_fixture(tmp_path / "paysim", n_rows=10)
+        paysim_data = load_paysim(path=paysim_dir, nrows=10)
         assert isinstance(paysim_data, dict)
         assert "X" in paysim_data and "y" in paysim_data
-        assert len(paysim_data["X"]) > 0
-        assert len(paysim_data["y"]) == len(paysim_data["X"])
+        assert paysim_data["X"].shape == (10, 13)
+        assert len(paysim_data["y"]) == 10
+        assert set(np.unique(paysim_data["y"])).issubset({0, 1})
 
-        ieee_data = load_ieee_cis(nrows=50)
+        ieee_dir = create_ieee_cis_test_fixture(tmp_path / "ieee_cis", n_rows=10)
+        ieee_data = load_ieee_cis(path=ieee_dir, nrows=10, join_identity=False)
         assert isinstance(ieee_data, dict)
         assert "X" in ieee_data and "y" in ieee_data
-        assert len(ieee_data["X"]) > 0
-        assert len(ieee_data["y"]) == len(ieee_data["X"])
+        assert len(ieee_data["X"]) == 10
+        assert len(ieee_data["y"]) == 10
+        assert set(np.unique(ieee_data["y"])).issubset({0, 1})
 
-    def test_dataloader_smoke_creditcard_and_elliptic(self) -> None:
-        """Verify CreditCard and Elliptic graph datasets load with valid schema parity."""
-        cc_data = load_creditcard_fraud(nrows=50)
+    def test_dataloader_smoke_creditcard_and_elliptic(self, tmp_path: Path) -> None:
+        """Verify CreditCard and Elliptic graph production loaders parse schema fixtures."""
+        cc_dir = create_creditcard_test_fixture(tmp_path / "creditcard", n_rows=10)
+        cc_data = load_creditcard_fraud(path=cc_dir, nrows=10)
         assert isinstance(cc_data, dict)
         assert "X" in cc_data and "y" in cc_data
-        assert len(cc_data["X"]) > 0
+        assert cc_data["X"].shape == (10, 29)
+        assert len(cc_data["y"]) == 10
+        assert set(np.unique(cc_data["y"])).issubset({0, 1})
 
-        elliptic_data = load_elliptic(nrows=50)
+        elliptic_dir = create_elliptic_test_fixture(tmp_path / "elliptic", n_nodes=10)
+        elliptic_data = load_elliptic(path=elliptic_dir, nrows=10, include_unknown=True)
         assert isinstance(elliptic_data, dict)
         assert "X" in elliptic_data and "y" in elliptic_data
-        assert len(elliptic_data["X"]) > 0
+        assert elliptic_data["X"].shape == (10, 166)
+        assert len(elliptic_data["y"]) == 10
+        assert "edges" in elliptic_data and len(elliptic_data["edges"]) > 0
 
-    def test_dataloader_smoke_amlsim_synthaml_amlnet(self) -> None:
-        """Verify specialized AML topology datasets initialize in smoke mode."""
-        amlsim_data = load_amlsim(nrows=50)
+    def test_dataloader_smoke_amlsim_synthaml_amlnet(self, tmp_path: Path) -> None:
+        """Verify specialized AML topology production loaders parse schema fixtures."""
+        amlsim_dir = create_amlsim_test_fixture(tmp_path / "amlsim", n_rows=10)
+        amlsim_data = load_amlsim(path=amlsim_dir, nrows=10)
         assert isinstance(amlsim_data, dict)
-        assert "X" in amlsim_data or "df" in amlsim_data or "transactions" in amlsim_data
+        assert "X" in amlsim_data and "y" in amlsim_data
+        assert len(amlsim_data["X"]) == 10
 
-        synthaml_data = load_synthaml(nrows=50)
+        synthaml_dir = create_synthaml_test_fixture(tmp_path / "synthaml", n_alerts=5, n_txs=15)
+        synthaml_data = load_synthaml(path=synthaml_dir, nrows=5)
         assert isinstance(synthaml_data, dict)
-        assert "X" in synthaml_data or "df" in synthaml_data or "alerts" in synthaml_data
+        assert "X" in synthaml_data and "y" in synthaml_data
+        assert synthaml_data["X"].shape[1] == 14
+        assert len(synthaml_data["y"]) == 5
 
-        amlnet_data = load_amlnet(nrows=50)
+        amlnet_dir = create_amlnet_test_fixture(tmp_path / "amlnet", n_rows=10)
+        amlnet_data = load_amlnet(path=amlnet_dir, nrows=10)
         assert isinstance(amlnet_data, dict)
-        assert "X" in amlnet_data or "df" in amlnet_data or "transactions" in amlnet_data
+        assert "X" in amlnet_data and "y" in amlnet_data
+        assert amlnet_data["X"].shape == (10, 18)
+        assert len(amlnet_data["y"]) == 10
 
 
 class TestModelSerializationSmokeGates:
@@ -183,9 +218,9 @@ class TestSchemaValidationSmokeGates:
             step=1,
             train_loss=0.45,
             val_loss=0.42,
-            val_pr_auc=0.88,
-            val_roc_auc=0.92,
-            val_f1=0.75,
+            pr_auc=0.88,
+            roc_auc=0.92,
+            f1_score=0.75,
         )
         assert step.step == 1
 

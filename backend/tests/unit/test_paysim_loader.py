@@ -16,6 +16,7 @@ from app.application.services.dataloader import (
 class TestPaySimLoader:
     """Test suite verifying PaySim data ingestion and feature engineering."""
 
+    @pytest.mark.real_data
     def test_paysim_real_dataset_loading_if_present(self) -> None:
         """Verify real PaySim CSV ingestion when present in local storage."""
         root = resolve_dataset_dir("paysim")
@@ -33,6 +34,7 @@ class TestPaySimLoader:
         assert "steps" in data
         assert data["steps"] is not None
 
+    @pytest.mark.real_data
     def test_paysim_feature_engineering_equations(self) -> None:
         """Verify accounting error features and one-hot encoding consistency."""
         data = load_paysim(nrows=1000)
@@ -67,6 +69,7 @@ class TestPaySimLoader:
         type_sum = np.sum(X[:, type_indices], axis=1)
         np.testing.assert_allclose(type_sum, 1.0, rtol=1e-5, atol=1e-5)
 
+    @pytest.mark.real_data
     def test_paysim_temporal_split_zero_leakage(self) -> None:
         """Verify temporal train/val/test splitting produces zero forward leakage."""
         split_data = load_paysim(
@@ -120,6 +123,7 @@ class TestPaySimLoader:
         with pytest.raises(FileNotFoundError, match="Real PaySim dataset files not found"):
             load_paysim(path=empty_dir, require_real=True)
 
+    @pytest.mark.real_data
     def test_paysim_via_load_dataset_registry(self) -> None:
         """Verify load_dataset('paysim') correctly loads with temporal splitting."""
         res = load_dataset("paysim", nrows=200, temporal_split=True)
