@@ -19,40 +19,40 @@ The engine coordinates privacy-preserving machine learning and collaborative ant
 - **Zero-Fabrication Runtime Truth**: Guaranteed fail-closed and truthful degradation behavior under missing dependencies, hardware failures, or network partitions.
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                               BACKEND CLEAN ARCHITECTURE TOPOLOGY                                │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                              BACKEND CLEAN ARCHITECTURE TOPOLOGY                               │
+└────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-                       [ External Ingress: REST / WebSocket / gRPC ]
-                                            │
-                                            ▼
- ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
- │ 1. PRESENTATION LAYER (46 Routers, WebSocket Managers, CLI)                                  │
- │    • simulations, alerts, cases, banks, graph, coordinator, privacy_defense, gateway, health │
- │    • OpenAPI 3.1 Enriched Specification (/docs, /redoc, /scalar, /openapi.json)              │
- └──────────────────────────────────────────┬───────────────────────────────────────────────────┘
-                                            │
-                                            ▼
- ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
- │ 2. APPLICATION LAYER (79 Services & Pipeline Coordinators)                                   │
- │    • SimulationService, FLEngine, DirichletPartitioner, CaseService, AlertService            │
- │    • ExplainabilityService, FlinkStreaming, AMLCopilot, RegulatoryReporter, FeatureService  │
- └──────────────────────────────────────────┬───────────────────────────────────────────────────┘
-                                            │
-                                            ▼
- ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
- │ 3. DOMAIN LAYER (48 Modules: Entities, Value Objects, Mathematical Invariants)               │
- │    • ByzantineDefenses (Krum, Bulyan, Trimmed Mean), AI Act Compliance, SAR Generator        │
- │    • Fuzzy PSI, MinHash LSH, QuorumManager, RiskEngine, RealtimeExplainer                    │
- └──────────────────────────────────────────┬───────────────────────────────────────────────────┘
-                                            │
-                                            ▼
- ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
- │ 4. INFRASTRUCTURE LAYER (33 Security Modules, Persistence Repositories, Messaging)          │
- │    • Security: FHE, TEE Sandbox Driver, HSM Key Service, ZK-SNARK Verifier, RDP Accountant   │
- │    • Persistence: RedisStore (RLock fallbacks), PostgreSQL/asyncpg, SQLite, Database Repos   │
- │    • Messaging: Kafka Consumers, Celery Workers, EventBus, WebhookDispatcher                │
- └──────────────────────────────────────────────────────────────────────────────────────────────┘
+                          [ External Ingress: REST / WebSocket / gRPC ]
+                                                 │
+                                                 ▼
+┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 1. PRESENTATION LAYER (46 Routers, WebSocket Managers, CLI)                                    │
+│    • simulations, alerts, cases, banks, graph, coordinator, privacy_defense, gateway, health   │
+│    • OpenAPI 3.1 Enriched Specification (/docs, /redoc, /scalar, /openapi.json)                │
+└────────────────────────────────────────────────┬───────────────────────────────────────────────┘
+                                                 │
+                                                 ▼
+┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 2. APPLICATION LAYER (79 Services & Pipeline Coordinators)                                     │
+│    • SimulationService, FLEngine, DirichletPartitioner, CaseService, AlertService              │
+│    • ExplainabilityService, FlinkStreaming, AMLCopilot, RegulatoryReporter, FeatureService     │
+└────────────────────────────────────────────────┬───────────────────────────────────────────────┘
+                                                 │
+                                                 ▼
+┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 3. DOMAIN LAYER (48 Modules: Entities, Value Objects, Mathematical Invariants)                 │
+│    • ByzantineDefenses (Krum, Bulyan, Trimmed Mean), AI Act Compliance, SAR Generator          │
+│    • Fuzzy PSI, MinHash LSH, QuorumManager, RiskEngine, RealtimeExplainer                      │
+└────────────────────────────────────────────────┬───────────────────────────────────────────────┘
+                                                 │
+                                                 ▼
+┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 4. INFRASTRUCTURE LAYER (33 Security Modules, Persistence Repositories, Messaging)             │
+│    • Security: FHE, TEE Sandbox Driver, HSM Key Service, ZK-SNARK Verifier, RDP Accountant     │
+│    • Persistence: RedisStore (RLock fallbacks), PostgreSQL/asyncpg, SQLite, Database Repos     │
+│    • Messaging: Kafka Consumers, Celery Workers, EventBus, WebhookDispatcher                   │
+└────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
