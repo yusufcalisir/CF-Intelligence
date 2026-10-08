@@ -157,9 +157,11 @@ def run_fl_experiment(
 
             # Aggregate
             total_active_samples = sum(item[2] for item in local_weights)
-            new_global = {}
-            for k in global_model.state_dict():
-                w_sum = sum(item[1][k] * (item[2] / total_active_samples) for item in local_weights)
+            new_global: dict[str, torch.Tensor] = {}
+            for k, v in global_model.state_dict().items():
+                w_sum = torch.zeros_like(v)
+                for item in local_weights:
+                    w_sum = w_sum + item[1][k] * (item[2] / total_active_samples)
                 new_global[k] = w_sum
             global_model.load_state_dict(new_global)
 

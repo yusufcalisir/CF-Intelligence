@@ -356,16 +356,21 @@ class DirichletSweepRunner:
             # Federated Aggregation (Sample-Weighted FedAvg)
             total_active_samples = sum(item[2] for item in local_weights)
             new_global: dict[str, torch.Tensor] = {}
-            for k in global_model.state_dict():
-                w_sum = sum(item[1][k] * (item[2] / total_active_samples) for item in local_weights)
+            for k, v in global_model.state_dict().items():
+                w_sum = torch.zeros_like(v)
+                for item in local_weights:
+                    w_sum = w_sum + item[1][k] * (item[2] / total_active_samples)
                 new_global[k] = w_sum
             global_model.load_state_dict(new_global)
 
             # SCAFFOLD update server control variate: c <- c + (1/N) * sum(delta_c_i)
             if strategy == "scaffold":
+                n_participants = len(local_weights)
                 for k in server_c:
-                    delta_c_sum = sum(client_c[item[0]][k] for item in local_weights) / len(local_weights)
-                    server_c[k] = delta_c_sum
+                    delta_c_sum = torch.zeros_like(server_c[k])
+                    for item in local_weights:
+                        delta_c_sum = delta_c_sum + client_c[item[0]][k]
+                    server_c[k] = delta_c_sum / n_participants
 
             # Parameter drift computation
             param_drift = self._compute_param_drift(local_weights, new_global)
