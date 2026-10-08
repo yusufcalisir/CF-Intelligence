@@ -343,6 +343,15 @@ class SimulationStopResponse(BaseModel):
     stopped_at: str
 
 
+class SimulationDeleteResponse(BaseModel):
+    """Response returned upon deleting a simulation."""
+
+    simulation_id: str
+    status: str = "DELETED"
+    message: str
+
+
+
 class TrainingRoundResponse(BaseModel):
     """Round-by-round training telemetry metrics."""
 

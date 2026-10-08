@@ -373,6 +373,13 @@ export interface SimulationStopResponse {
   stopped_at: string;
 }
 
+export interface SimulationDeleteResponse {
+  simulation_id: string;
+  status: string;
+  message: string;
+}
+
+
 export interface TrainingProgressResponse {
   simulation_id?: string | null;
   event_type: string;

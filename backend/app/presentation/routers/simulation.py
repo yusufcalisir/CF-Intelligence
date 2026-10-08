@@ -30,6 +30,7 @@ from app.application.schemas.simulation import (
     POCReplayRequest,
     SimulationConfigRequest,
     SimulationCreateResponse,
+    SimulationDeleteResponse,
     SimulationDetailResponse,
     SimulationStatusResponse,
     SimulationStopRequest,
@@ -57,6 +58,7 @@ _simulation_results = RedisStore("sim_results")
 _simulation_events = RedisStore("sim_events")
 _stop_events: dict[str, threading.Event] = {}
 _stop_events_lock = threading.Lock()
+_tombstones: set[str] = set()
 
 
 def _seed_canonical_simulation() -> None:
@@ -66,6 +68,8 @@ def _seed_canonical_simulation() -> None:
     and dashboard entry routes have immediate access to baseline federated metrics,
     training rounds, and EU AI Act compliance telemetry without returning 404s.
     """
+    if "sim_fed_01" in _tombstones:
+        return
     if _simulation_results.get("sim_fed_01"):
         return
 
@@ -629,7 +633,7 @@ async def get_simulation_status(
 ) -> SimulationStatusResponse:
     """Get lightweight progress status and execution phase of a simulation."""
     sim = _simulation_results.get(simulation_id)
-    if not sim and simulation_id == "sim_fed_01":
+    if not sim and simulation_id == "sim_fed_01" and "sim_fed_01" not in _tombstones:
         _seed_canonical_simulation()
         sim = _simulation_results.get(simulation_id)
     if not sim:
@@ -709,6 +713,53 @@ async def stop_simulation(
     )
 
 
+@router.delete("/{simulation_id}", response_model=SimulationDeleteResponse)
+@api_router.delete("/{simulation_id}", response_model=SimulationDeleteResponse)
+@singular_router.delete("/{simulation_id}", response_model=SimulationDeleteResponse)
+@singular_api_router.delete("/{simulation_id}", response_model=SimulationDeleteResponse)
+async def delete_simulation(
+    simulation_id: str = Path(..., min_length=1, description="Simulation run identifier"),
+) -> SimulationDeleteResponse:
+    """Permanently delete a simulation run and its associated events and telemetry."""
+    sim = _simulation_results.get(simulation_id)
+    if not sim:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Simulation '{simulation_id}' not found",
+        )
+
+    # Signal stop event if currently running
+    with _stop_events_lock:
+        stop_event = _stop_events.pop(simulation_id, None)
+    if stop_event:
+        stop_event.set()
+
+    # Track tombstone to prevent re-seeding if canonical
+    _tombstones.add(simulation_id)
+
+    # Delete from results and events stores
+    _simulation_results.delete(simulation_id)
+    _simulation_events.delete(simulation_id)
+    _simulation_events.delete(f"{simulation_id}:list_data")
+
+    now_iso = datetime.now(UTC).isoformat()
+    delete_payload = {
+        "event_type": "simulation_deleted",
+        "data": {
+            "simulation_id": simulation_id,
+            "deleted_at": now_iso,
+        },
+    }
+    training_ws_manager.broadcast_to_room_sync(f"simulation:{simulation_id}", delete_payload)
+    training_ws_manager.broadcast_to_room_sync("simulation:live_prod_v2", delete_payload)
+
+    return SimulationDeleteResponse(
+        simulation_id=simulation_id,
+        status="DELETED",
+        message=f"Simulation '{simulation_id}' permanently deleted.",
+    )
+
+
 @router.get("/{simulation_id}/rounds", response_model=list[TrainingRoundResponse])
 @api_router.get("/{simulation_id}/rounds", response_model=list[TrainingRoundResponse])
 @singular_router.get("/{simulation_id}/rounds", response_model=list[TrainingRoundResponse])
@@ -718,7 +769,7 @@ async def get_simulation_rounds(
 ) -> list[TrainingRoundResponse]:
     """Retrieve all completed training rounds for a simulation."""
     sim = _simulation_results.get(simulation_id)
-    if not sim and simulation_id == "sim_fed_01":
+    if not sim and simulation_id == "sim_fed_01" and "sim_fed_01" not in _tombstones:
         _seed_canonical_simulation()
         sim = _simulation_results.get(simulation_id)
     if not sim:
@@ -759,7 +810,7 @@ async def get_comparison(simulation_id: str) -> ComparisonResponse:
     """Get local vs federated comparison for all banks."""
 
     sim = _simulation_results.get(simulation_id)
-    if not sim and simulation_id == "sim_fed_01":
+    if not sim and simulation_id == "sim_fed_01" and "sim_fed_01" not in _tombstones:
         _seed_canonical_simulation()
         sim = _simulation_results.get(simulation_id)
     if not sim:
@@ -822,7 +873,7 @@ async def get_simulation(simulation_id: str) -> SimulationDetailResponse:
     """Get full simulation details including metrics."""
 
     sim = _simulation_results.get(simulation_id)
-    if not sim and simulation_id == "sim_fed_01":
+    if not sim and simulation_id == "sim_fed_01" and "sim_fed_01" not in _tombstones:
         _seed_canonical_simulation()
         sim = _simulation_results.get(simulation_id)
     if not sim:

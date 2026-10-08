@@ -44,6 +44,7 @@ import type {
   SimulationStatusResponse,
   SimulationStopRequest,
   SimulationStopResponse,
+  SimulationDeleteResponse,
   SimulationSummary,
   TrainingRound,
   TrainingProgressResponse,
@@ -370,6 +371,37 @@ export function useStopSimulation() {
       queryClient.invalidateQueries({ queryKey: ['simulations'] });
       queryClient.invalidateQueries({ queryKey: ['simulation', simulation_id] });
       queryClient.invalidateQueries({ queryKey: ['simulation-status', simulation_id] });
+    },
+  });
+}
+
+export function useDeleteSimulation() {
+  const queryClient = useQueryClient();
+  return useMutation<SimulationDeleteResponse, Error, string, { previousSimulations?: SimulationSummary[] }>({
+    mutationFn: async (simulationId: string) => {
+      const { data } = await apiClient.delete<SimulationDeleteResponse>(`/api/v1/simulations/${simulationId}`);
+      return data;
+    },
+    onMutate: async (simulationId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['simulations'] });
+      const previousSimulations = queryClient.getQueryData<SimulationSummary[]>(['simulations']);
+      if (previousSimulations) {
+        queryClient.setQueryData<SimulationSummary[]>(
+          ['simulations'],
+          previousSimulations.filter((sim) => sim.id !== simulationId),
+        );
+      }
+      return { previousSimulations };
+    },
+    onError: (_err, _simulationId, context) => {
+      if (context?.previousSimulations) {
+        queryClient.setQueryData(['simulations'], context.previousSimulations);
+      }
+    },
+    onSettled: (_, __, simulationId) => {
+      queryClient.invalidateQueries({ queryKey: ['simulations'] });
+      queryClient.removeQueries({ queryKey: ['simulation', simulationId] });
+      queryClient.removeQueries({ queryKey: ['simulation-status', simulationId] });
     },
   });
 }

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useBanks, useSimulations } from '../api/queries';
+import { Trash2 } from 'lucide-react';
+import { useBanks, useDeleteSimulation, useSimulations } from '../api/queries';
 import BankCard from '../components/dashboard/BankCard';
 import DataDriftPanel from '../components/dashboard/DataDriftPanel';
 import SimulationControls from '../components/dashboard/SimulationControls';
@@ -11,11 +12,29 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { data: banks, isLoading: banksLoading } = useBanks();
   const { data: simulations, isLoading: simsLoading } = useSimulations();
+  const deleteSimulationMutation = useDeleteSimulation();
   const [, setLastSimId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-
-
-
+  const handleDeleteSimulation = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const shortId = id.slice(0, 8).toUpperCase();
+    if (
+      typeof window !== 'undefined' &&
+      window.confirm &&
+      !window.confirm(`Are you sure you want to delete Simulation #${shortId}? This will permanently remove all training metrics and telemetry.`)
+    ) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      await deleteSimulationMutation.mutateAsync(id);
+    } catch (err) {
+      console.error('Failed to delete simulation:', err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleSimulationCreated = (id: string) => {
     setLastSimId(id);
@@ -157,10 +176,18 @@ export default function Dashboard() {
                 const timeStr = new Date(sim.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
                 return (
-                  <button
+                  <div
                     key={sim.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => navigate(`/simulation/${sim.id}`)}
-                    className="w-full text-left p-3.5 rounded-xl bg-[var(--color-bg-elevated)] hover:bg-[var(--color-bg-card-hover)] border border-[var(--color-border-subtle)] hover:border-[var(--color-accent-indigo)]/50 transition-all duration-300 flex gap-3 items-center group relative overflow-hidden"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate(`/simulation/${sim.id}`);
+                      }
+                    }}
+                    className="w-full text-left p-3.5 rounded-xl bg-[var(--color-bg-elevated)] hover:bg-[var(--color-bg-card-hover)] border border-[var(--color-border-subtle)] hover:border-[var(--color-accent-indigo)]/50 transition-all duration-300 flex gap-3 items-center group relative overflow-hidden cursor-pointer"
                   >
                     {/* Status Icon Indicator */}
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
@@ -208,7 +235,23 @@ export default function Dashboard() {
                         </div>
                       )}
                     </div>
-                  </button>
+
+                    {/* Delete Simulation Button */}
+                    <button
+                      type="button"
+                      aria-label={`Delete Simulation #${idSlice}`}
+                      title="Delete simulation"
+                      disabled={deletingId === sim.id}
+                      onClick={(e) => handleDeleteSimulation(e, sim.id)}
+                      className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-rose-400 hover:bg-rose-500/15 border border-transparent hover:border-rose-500/30 transition-all shrink-0 cursor-pointer disabled:opacity-40"
+                    >
+                      {deletingId === sim.id ? (
+                        <div className="w-3.5 h-3.5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
                 );
               })}
             </div>

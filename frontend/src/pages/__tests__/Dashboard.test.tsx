@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import Dashboard from '../Dashboard';
@@ -103,4 +103,38 @@ describe('Dashboard (Federated Operations Home) Test Suite', () => {
     expect(screen.getByText(/Simulation Configuration/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Start Federated Training/i })).toBeInTheDocument();
   });
+
+  it('renders recent simulation cards with a delete button and handles deletion', async () => {
+    const mockMutateAsync = vi.fn().mockResolvedValue({
+      status: 'DELETED',
+      simulation_id: 'sim_active_01',
+      message: 'Deleted',
+    });
+    vi.spyOn(queries, 'useDeleteSimulation').mockReturnValue({
+      mutateAsync: mockMutateAsync,
+      mutate: vi.fn(),
+      isPending: false,
+    } as any);
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Dashboard />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText(/Simulation #SIM_ACTI/i)).toBeInTheDocument();
+    const deleteBtn = screen.getByRole('button', { name: /Delete Simulation #SIM_ACTI/i });
+    expect(deleteBtn).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(deleteBtn);
+    });
+    expect(window.confirm).toHaveBeenCalled();
+    expect(mockMutateAsync).toHaveBeenCalledWith('sim_active_01');
+  });
 });
+
