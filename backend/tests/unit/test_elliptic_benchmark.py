@@ -5,9 +5,11 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+import pytest
 from app.application.services.elliptic_benchmark_service import EllipticBenchmarkService
 
 
+@pytest.mark.real_data
 def test_elliptic_benchmark_service_execution():
     service = EllipticBenchmarkService()
     results = service.run_benchmark(n_samples=500, random_seed=42)

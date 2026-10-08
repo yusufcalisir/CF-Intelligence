@@ -298,6 +298,7 @@ class TestIEEECISFederatedTraining:
 class TestIEEECISEndToEndBenchmarkRunner:
     """Validates end-to-end benchmark execution, schema validation, and audit dossier creation."""
 
+    @pytest.mark.real_data
     def test_run_ieee_benchmark_end_to_end_synthetic(self, tmp_path: Path) -> None:
         out_dir = tmp_path / "ieee_cis_out"
         out_dir.mkdir()

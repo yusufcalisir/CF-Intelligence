@@ -294,7 +294,7 @@ def test_embeddings_and_similarity_endpoints() -> None:
     assert resp_missing.status_code == 404
 
 
-def test_streaming_and_benchmark_telemetry() -> None:
+def test_streaming_and_benchmark_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies Flink streaming status, edge processing, and Elliptic benchmark endpoints."""
     # Flink stream status
     resp_status = client.get("/api/v1/graph/stream/status")
@@ -314,6 +314,20 @@ def test_streaming_and_benchmark_telemetry() -> None:
     )
     assert resp_edge.status_code == 200
     assert resp_edge.json()["processed_count"] >= 1
+
+    # Mock cached elliptic benchmark result to verify API contract in standard CI
+    from app.presentation.routers import graph
+
+    mock_benchmark = {
+        "dataset": "Elliptic Bitcoin Dataset",
+        "source_type": "benchmark_cached",
+        "total_nodes": 200,
+        "total_edges": 300,
+        "samples_evaluated": 200,
+        "auc_roc": 0.85,
+        "metrics": {"federated_graph_pipeline": {"roc_auc": 0.85, "pr_auc": 0.70}},
+    }
+    monkeypatch.setattr(graph._elliptic_benchmark_service, "get_latest_benchmark_results", lambda: mock_benchmark)
 
     # Elliptic latest cached benchmark
     resp_benchmark = client.get("/api/v1/graph/benchmark/elliptic/latest")

@@ -245,6 +245,7 @@ class TestEllipticLoaderMockAndEdgeCases:
         with pytest.raises(FileNotFoundError, match="Real Elliptic Bitcoin dataset files not found"):
             load_elliptic(path=empty_dir)
 
+    @pytest.mark.real_data
     def test_graphsage_forward_and_masked_loss_on_elliptic(self):
         """Verify GraphSAGEModel processes 166-dim Elliptic features with edge_index and masked loss."""
         # Load a manageable slice for neural execution

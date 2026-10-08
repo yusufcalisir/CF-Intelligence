@@ -331,6 +331,7 @@ class TestMultiOptimizerBenchmark:
 class TestEndToEndPaySimBenchmarkPipeline:
     """Validates master benchmark execution and ExperimentResult schema compliance."""
 
+    @pytest.mark.real_data
     def test_end_to_end_paysim_runner_execution(self, tmp_path) -> None:
         from benchmarks.runners.run_paysim_benchmark import run_paysim_benchmark
 

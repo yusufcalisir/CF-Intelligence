@@ -14,6 +14,12 @@ from app.application.services.dataloader import (
     load_synthaml,
     partition_dataset_non_iid,
 )
+from app.application.services.synthetic_dataset_generators import (
+    generate_synthetic_creditcard,
+    generate_synthetic_elliptic,
+    generate_synthetic_ieee_cis,
+    generate_synthetic_paysim,
+)
 
 
 def test_dataset_registry_contains_all_targets():
@@ -22,7 +28,7 @@ def test_dataset_registry_contains_all_targets():
 
 
 def test_load_paysim_mock_structure():
-    data = load_paysim(n_mock_txns=2000)
+    data = generate_synthetic_paysim(n_mock_txns=2000)
     assert "X" in data
     assert "y" in data
     assert len(data["X"]) > 0
@@ -32,7 +38,7 @@ def test_load_paysim_mock_structure():
 
 
 def test_load_ieee_cis_mock_structure():
-    data = load_ieee_cis(n_mock_txns=1500)
+    data = generate_synthetic_ieee_cis(n_mock_txns=1500)
     assert "X" in data
     assert "y" in data
     assert len(data["X"]) > 0
@@ -42,7 +48,7 @@ def test_load_ieee_cis_mock_structure():
 
 
 def test_load_elliptic_mock_structure():
-    data = load_elliptic(n_mock_nodes=1000)
+    data = generate_synthetic_elliptic(n_mock_nodes=1000)
     assert "X" in data
     assert "y" in data
     assert "edges" in data
@@ -53,7 +59,7 @@ def test_load_elliptic_mock_structure():
 
 
 def test_load_creditcard_mock_structure():
-    data = load_creditcard_fraud(n_mock_txns=1200)
+    data = generate_synthetic_creditcard(n_mock_txns=1200)
     assert len(data["X"]) > 0
     assert len(data["y"]) == len(data["X"])
     assert data["X"].shape[1] == 29

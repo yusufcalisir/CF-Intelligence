@@ -63,6 +63,7 @@ class TestAMLNetLoader:
         assert 0.0001 <= fraud_ratio <= 0.05
         assert np.isclose(fraud_ratio, AMLNET_FRAUD_RATIO, atol=0.01)
 
+    @pytest.mark.real_data
     def test_amlnet_table_schemas_and_columns(self) -> None:
         """Verify transaction DataFrame strictly adheres to the 17-column AUSTRAC schema."""
         data = load_amlnet(require_real=False, nrows=200)
@@ -95,6 +96,7 @@ class TestAMLNetLoader:
         found_rails = set(df["type"].astype(str).str.upper().unique())
         assert found_rails.issubset(valid_rails), f"Unexpected payment rails: {found_rails - valid_rails}"
 
+    @pytest.mark.real_data
     def test_amlnet_feature_engineering_invariants(self) -> None:
         """Verify engineered 18-feature representation satisfies mathematical bounds."""
         data = load_amlnet(require_real=False, nrows=500)
@@ -135,6 +137,7 @@ class TestAMLNetLoader:
         b_ratio = X[:, feat_map["balance_orig_ratio"]]
         assert np.all(b_ratio >= 0.0)
 
+    @pytest.mark.real_data
     def test_amlnet_typology_distributions(self) -> None:
         """Verify laundering typologies align with valid AUSTRAC taxonomy."""
         data = load_amlnet(require_real=False, nrows=1000)
@@ -143,6 +146,7 @@ class TestAMLNetLoader:
         assert typologies.issubset(set(AMLNET_TYPOLOGIES)), f"Unknown typologies: {typologies - set(AMLNET_TYPOLOGIES)}"
         assert "normal" in typologies
 
+    @pytest.mark.real_data
     def test_amlnet_nrows_truncation(self) -> None:
         """Verify nrows parameter correctly truncates transactions and feature matrices."""
         data = load_amlnet(require_real=False, nrows=85)
@@ -176,6 +180,7 @@ class TestAMLNetLoader:
         with pytest.raises(FileNotFoundError, match="Real AMLNet dataset files not found"):
             load_amlnet(require_real=False, data_dir=empty_dir)
 
+    @pytest.mark.real_data
     def test_amlnet_registry_routing(self) -> None:
         """Verify convenience DATASET_REGISTRY resolves amlnet and aml_net."""
         d1 = load_dataset("amlnet", require_real=False, nrows=50)
@@ -185,6 +190,7 @@ class TestAMLNetLoader:
         d2 = load_dataset("aml_net", require_real=False, nrows=50)
         assert len(d2["y"]) == 50
 
+    @pytest.mark.real_data
     def test_amlnet_temporal_split_chronology(self) -> None:
         """Verify chronological temporal partitioning on AMLNet simulation timesteps."""
         split_data = load_dataset("amlnet", require_real=False, temporal_split=True, nrows=250)

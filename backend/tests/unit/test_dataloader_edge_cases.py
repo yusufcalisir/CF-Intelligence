@@ -158,16 +158,19 @@ class TestStrictRealModeGuards:
             load_paysim(path=empty_dir, require_real=True)
 
 
-    def test_load_dataset_case_insensitive_and_hyphen_tolerant(self) -> None:
-        data_1 = load_dataset("PaySim", nrows=100)
+    def test_load_dataset_case_insensitive_and_hyphen_tolerant(self, tmp_path: Path) -> None:
+        p1 = _get_or_create_real_path("paysim", tmp_path / "paysim")
+        data_1 = load_dataset("PaySim", nrows=100, path=p1)
         assert data_1["source"] in ("real_csv", "real_parquet", "mock_mpesa")
         assert data_1["X"].shape[0] > 0
 
-        data_2 = load_dataset("ieee-cis", nrows=100)
+        p2 = _get_or_create_real_path("ieee_cis", tmp_path / "ieee_cis")
+        data_2 = load_dataset("ieee-cis", nrows=100, path=p2)
         assert data_2["source"] in ("real_csv", "real_parquet", "mock_ieee_cis")
         assert data_2["X"].shape[0] > 0
 
-        data_3 = load_dataset("CreditCard", nrows=100)
+        p3 = _get_or_create_real_path("creditcard", tmp_path / "creditcard")
+        data_3 = load_dataset("CreditCard", nrows=100, path=p3)
         assert data_3["source"] in ("real_csv", "real_parquet", "mock_pca")
         assert data_3["X"].shape[0] > 0
 

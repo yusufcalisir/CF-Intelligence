@@ -48,6 +48,7 @@ def benchmark_service() -> EllipticBenchmarkService:
 class TestEllipticBenchmarkHardening:
     """Comprehensive test suite for STAGE_35 Elliptic Benchmark Subsystem."""
 
+    @pytest.mark.real_data
     def test_elliptic_schema_and_feature_dimension(self):
         """Vector 4: Verify Elliptic dataset produces 166 features and binary labels."""
         data = load_elliptic(n_mock_nodes=100, rng=np.random.default_rng(42))
@@ -143,6 +144,7 @@ class TestEllipticBenchmarkHardening:
 
         assert not torch.allclose(initial_sage_param, list(fed_model.sage_layers[0].parameters())[0])
 
+    @pytest.mark.real_data
     def test_empirical_metric_calculation_bounds(self, benchmark_service: EllipticBenchmarkService):
         """Vector 1 & 4: Verify empirical metrics are within valid probability ranges."""
         results = benchmark_service.run_benchmark(n_samples=150, random_seed=42, epochs=2)
@@ -160,6 +162,7 @@ class TestEllipticBenchmarkHardening:
         assert "roc_auc_gain" in adv
         assert "recall_gain" in adv
 
+    @pytest.mark.real_data
     def test_federated_graph_topology_advantage(self, benchmark_service: EllipticBenchmarkService):
         """Vector 3: Verify benchmark outputs valid comparative advantage between graph and isolated baseline."""
         results = benchmark_service.run_benchmark(n_samples=200, random_seed=123, epochs=3)
@@ -170,6 +173,7 @@ class TestEllipticBenchmarkHardening:
         assert results["illicit_node_count"] >= 2
         assert results["evaluated_test_nodes"] == 40  # 20% of 200
 
+    @pytest.mark.real_data
     def test_reproducibility_with_random_seed(self, benchmark_service: EllipticBenchmarkService):
         """Vector 7: Verify execution is deterministic when random seed is held constant."""
         run1 = benchmark_service.run_benchmark(n_samples=100, random_seed=77, epochs=2)
@@ -177,6 +181,7 @@ class TestEllipticBenchmarkHardening:
 
         assert run1["metrics"] == run2["metrics"]
 
+    @pytest.mark.real_data
     def test_thread_concurrency_and_rlock(self, benchmark_service: EllipticBenchmarkService):
         """Vector 16: Verify concurrent benchmark runs are safe under RLock synchronization."""
         def _worker(seed: int) -> dict:
@@ -191,6 +196,7 @@ class TestEllipticBenchmarkHardening:
             assert res["total_nodes"] == 100
             assert "metrics" in res
 
+    @pytest.mark.real_data
     def test_report_persistence_and_markdown_formatting(self, benchmark_service: EllipticBenchmarkService):
         """Vector 6 & 20: Verify JSON and Markdown report persistence with KaTeX compatibility."""
         results = benchmark_service.run_benchmark(n_samples=100, random_seed=42, epochs=2)
@@ -215,6 +221,7 @@ class TestEllipticBenchmarkHardening:
             assert "Federation Advantage" in content
             assert "PR-AUC" in content
 
+    @pytest.mark.real_data
     def test_fastapi_benchmark_endpoints(self, client: TestClient):
         """Vector 17: Verify POST and GET benchmark endpoints on /api/v1/graph."""
         # 1. Trigger benchmark run

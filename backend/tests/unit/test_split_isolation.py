@@ -171,7 +171,9 @@ class TestTemporalSplitIsolation:
 
     def test_dataloader_temporal_split_integration(self) -> None:
         """Verifies dataloader temporal split helper on PaySim mock dataset."""
-        paysim_data = load_paysim(n_mock_txns=200)
+        from app.application.services.synthetic_dataset_generators import generate_synthetic_paysim
+
+        paysim_data = generate_synthetic_paysim(n_mock_txns=200)
         split_result = temporal_split_dataset(
             paysim_data,
             train_ratio=0.70,

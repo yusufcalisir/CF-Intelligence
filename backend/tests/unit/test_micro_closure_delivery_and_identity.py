@@ -20,6 +20,7 @@ from app.application.services.coordinator_service import CoordinatorService
 from app.application.services.model_registry import ModelRegistry
 from app.infrastructure.connectors.kafka_streaming_connector import (
     CloudEvent,
+    InMemoryKafkaBroker,
     KafkaStreamingConnector,
 )
 
@@ -54,8 +55,8 @@ async def test_non_quorum_gradient_crash_window_and_work_loss() -> None:
        - In-flight gradient execution count in final model = 0
        - Replayed submission fails closed.
     """
-    connector = KafkaStreamingConnector()
-    broker = connector._broker
+    broker = InMemoryKafkaBroker()
+    connector = KafkaStreamingConnector(in_memory_broker=broker)
     topic = connector.transaction_topic
     group_id = connector.group_id
 

@@ -22,6 +22,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 from experiments.harness.schema import ExperimentResult
 from experiments.synthaml.run_synthaml_benchmark import (
@@ -39,6 +40,7 @@ from experiments.synthaml.run_synthaml_benchmark import (
 )
 
 
+@pytest.mark.real_data
 class TestSynthAMLPartitioner:
     """Validates multi-bank non-IID and institutional partitioning properties."""
 
@@ -235,6 +237,7 @@ class TestEndToEndSynthAMLBenchmark:
         assert len(fedprox_hist) == 2
         assert "pr_auc" in fedprox_metrics
 
+    @pytest.mark.real_data
     def test_run_synthaml_benchmark_small_execution(self, tmp_path: Path) -> None:
         """Verify run_synthaml_benchmark produces all expected artifact files."""
         results = run_synthaml_benchmark(

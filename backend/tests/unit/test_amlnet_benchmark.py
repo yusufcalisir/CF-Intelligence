@@ -22,6 +22,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 from experiments.amlnet.evaluate_imbalance import (
     AMLNetClassifier,
@@ -39,6 +40,7 @@ from experiments.amlnet.evaluate_imbalance import (
 from experiments.harness.schema import ExperimentResult
 
 
+@pytest.mark.real_data
 class TestAMLNetPartitioner:
     """Validates multi-bank non-IID and institutional partitioning properties for AMLNet."""
 
@@ -237,6 +239,7 @@ class TestEndToEndAMLNetBenchmark:
         fedprox_metrics, _ = f_trainer_fedprox.evaluate(X_test, y_test)
         assert "pr_auc" in fedprox_metrics
 
+    @pytest.mark.real_data
     def test_run_amlnet_benchmark_small_execution(self, tmp_path: Path) -> None:
         """Verify run_amlnet_benchmark produces all expected artifact files."""
         results = run_amlnet_benchmark(

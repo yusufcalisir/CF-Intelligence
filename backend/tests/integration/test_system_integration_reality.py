@@ -237,6 +237,7 @@ def test_missing_model_raises_explicit_error(client: TestClient) -> None:
 # ── 6. Core E2E Flow 4: Design Partner Evaluation Reality ─────────────────────
 
 
+@pytest.mark.real_data
 def test_design_partner_pilot_evaluation_reality() -> None:
     """Verify DesignPartnerPilotService trains PyTorch model and computes genuine PR-AUC."""
     service = DesignPartnerPilotService()

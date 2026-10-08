@@ -62,6 +62,7 @@ class TestSynthAMLLoader:
         assert 0.03 <= fraud_ratio <= 0.20
         assert np.isclose(fraud_ratio, SYNTHAML_FRAUD_RATIO, atol=0.04)
 
+    @pytest.mark.real_data
     def test_synthaml_table_schemas_and_columns(self) -> None:
         """Verify alert and transaction DataFrames adhere strictly to Spar Nord schema."""
         data = load_synthaml(require_real=False, nrows=200)
@@ -86,6 +87,7 @@ class TestSynthAMLLoader:
         found_entries = set(tx_df["ENTRY"].astype(str).str.lower().unique())
         assert found_entries.issubset(valid_entries)
 
+    @pytest.mark.real_data
     def test_synthaml_feature_engineering_invariants(self) -> None:
         """Verify aggregated alert features adhere to mathematical bounds."""
         data = load_synthaml(require_real=False, nrows=300)
@@ -112,6 +114,7 @@ class TestSynthAMLLoader:
         freq = X[:, feat_map["tx_frequency_per_day"]]
         assert np.all(freq >= 0.0)
 
+    @pytest.mark.real_data
     def test_synthaml_nrows_truncation(self) -> None:
         """Verify nrows parameter correctly truncates alerts and transaction slices."""
         data = load_synthaml(require_real=False, nrows=75)
@@ -148,6 +151,7 @@ class TestSynthAMLLoader:
         assert np.all(np.isin(data["y"], [0, 1]))
         assert data["feature_names"] == SYNTHAML_FEATURE_COLS
 
+    @pytest.mark.real_data
     def test_synthaml_registry_routing(self) -> None:
         """Verify convenience DATASET_REGISTRY resolves synthaml and synth_aml."""
         d1 = load_dataset("synthaml", require_real=False, nrows=50)
@@ -157,6 +161,7 @@ class TestSynthAMLLoader:
         d2 = load_dataset("synth_aml", require_real=False, nrows=50)
         assert len(d2["y"]) == 50
 
+    @pytest.mark.real_data
     def test_synthaml_temporal_split_chronology(self) -> None:
         """Verify chronological temporal partitioning on SynthAML alert dates."""
         split_data = load_dataset("synthaml", require_real=False, temporal_split=True, nrows=200)

@@ -49,6 +49,7 @@ async def test_invariant_5_missing_comparative_baselines_raises_503():
         assert "not available on disk" in exc_info.value.detail
 
 
+@pytest.mark.real_data
 def test_invariant_3_design_partner_inference_is_genuine_and_reproducible():
     """Invariant 3: Reference benchmark evaluation uses genuine model inference, not Beta synthesis."""
     service = DesignPartnerPilotService()

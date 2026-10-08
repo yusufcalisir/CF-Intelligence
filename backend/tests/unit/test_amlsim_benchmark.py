@@ -18,6 +18,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 from experiments.amlsim.evaluate_patterns import (
     GraphSAGELayer,
@@ -229,6 +230,7 @@ class TestSchemaAndArtifacts:
 class TestEndToEndBenchmark:
     """Verifies complete end-to-end benchmark execution on synthetic fallback."""
 
+    @pytest.mark.real_data
     def test_run_amlsim_pattern_benchmark_synthetic(self, tmp_path: Path) -> None:
         """Verify complete pipeline executes cleanly on synthetic data and emits artifacts."""
         output_dir = tmp_path / "test_benchmark_output"

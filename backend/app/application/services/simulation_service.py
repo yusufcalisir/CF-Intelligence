@@ -1107,7 +1107,8 @@ class SimulationService:
                         ):
                             effective_fedprox_mu = 0.01
 
-                        if bank.id in bank_data:
+                        bank_partition = bank_data.get(bank.id) or bank_data.get(bank.id.replace("-", "_"))
+                        if bank_partition is not None:
                             # Direct PyTorch local training on bank's partition
                             loc_model = self.model_service.create_model(
                                 input_dim=feature_dim, dp_compatible=use_opacus_dp
@@ -1123,8 +1124,8 @@ class SimulationService:
                                 loc_model, loss_hist, actual_eps = (
                                     self.model_service.train_local_with_opacus(
                                         loc_model,
-                                        bank_data[bank.id]["X_train"],
-                                        bank_data[bank.id]["y_train"],
+                                        bank_partition["X_train"],
+                                        bank_partition["y_train"],
                                         target_epsilon=config.dp_epsilon,
                                         target_delta=config.dp_delta,
                                         max_grad_norm=config.dp_max_grad_norm,
@@ -1136,7 +1137,7 @@ class SimulationService:
                                         moon_temperature=getattr(config, "moon_temperature", 0.5),
                                         global_weights=global_weights,
                                         prev_local_weights=prev_w,
-                                        sens_attr=bank_data[bank.id]["sens_train"],
+                                        sens_attr=bank_partition["sens_train"],
                                         enable_bias_mitigation=config.enable_bias_mitigation,
                                         fairness_lambda=config.fairness_lambda,
                                     )
@@ -1144,8 +1145,8 @@ class SimulationService:
                             else:
                                 loc_model, loss_hist, _c_local = self.model_service.train_local(
                                     loc_model,
-                                    bank_data[bank.id]["X_train"],
-                                    bank_data[bank.id]["y_train"],
+                                    bank_partition["X_train"],
+                                    bank_partition["y_train"],
                                     epochs=config.local_epochs,
                                     learning_rate=config.learning_rate,
                                     batch_size=config.batch_size,
@@ -1154,14 +1155,14 @@ class SimulationService:
                                     moon_temperature=getattr(config, "moon_temperature", 0.5),
                                     global_weights=global_weights,
                                     prev_local_weights=prev_w,
-                                    sens_attr=bank_data[bank.id]["sens_train"],
+                                    sens_attr=bank_partition["sens_train"],
                                     enable_bias_mitigation=config.enable_bias_mitigation,
                                     fairness_lambda=config.fairness_lambda,
                                 )
                                 actual_eps = None
                             local_w = self.model_service.get_parameters(loc_model)
                             local_loss = loss_hist[-1] if loss_hist else 0.1
-                            local_samples = len(bank_data[bank.id]["X_train"])
+                            local_samples = len(bank_partition["X_train"])
                             train_res: dict[str, Any] = {
                                 "bank_id": bank.id,
                                 "weights": local_w,
@@ -1371,18 +1372,18 @@ class SimulationService:
                     # Load aggregated weights into global structure
                     global_model = self.model_service.set_parameters(global_model, global_weights)
 
-                    # Evaluate global model on participating client nodes validation partitions
                     eval_losses = []
                     eval_aucs: dict[str, float] = {}
                     for bank in participating:
-                        if bank.id in bank_data:
+                        bank_partition = bank_data.get(bank.id) or bank_data.get(bank.id.replace("-", "_"))
+                        if bank_partition is not None:
                             eval_m = self.model_service.create_model(input_dim=feature_dim)
                             eval_m = self.model_service.set_parameters(eval_m, global_weights)
                             bank_eval = self.model_service.evaluate(
                                 eval_m,
-                                bank_data[bank.id]["X_val"],
-                                bank_data[bank.id]["y_val"],
-                                sens_attr=bank_data[bank.id]["sens_val"],
+                                bank_partition["X_val"],
+                                bank_partition["y_val"],
+                                sens_attr=bank_partition["sens_val"],
                             )
                             eval_losses.append(bank_eval["loss"])
                             eval_aucs[bank.id] = bank_eval["auc_roc"]
@@ -1401,7 +1402,13 @@ class SimulationService:
                             except Exception as exc:
                                 logger.error("Evaluation failed for bank %s: %s", bank.id, exc)
 
-                    round_loss = sum(eval_losses) / len(eval_losses) if eval_losses else 0.0
+                    computed_eval_loss = sum(eval_losses) / len(eval_losses) if eval_losses else 0.0
+                    if computed_eval_loss > 0.0:
+                        round_loss = computed_eval_loss
+                    elif per_bank_loss:
+                        round_loss = float(sum(per_bank_loss.values()) / len(per_bank_loss))
+                    else:
+                        round_loss = 0.0
 
                     # Global validation evaluation across concatenated bank validation sets
                     global_eval_m = self.model_service.create_model(input_dim=feature_dim)

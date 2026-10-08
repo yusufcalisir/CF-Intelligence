@@ -10,6 +10,7 @@ if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
 import benchmark  # noqa: E402
+import pytest
 
 from app.domain.metrics_service import (  # noqa: E402
     compute_pr_auc,
@@ -59,6 +60,7 @@ def test_compute_scientific_benchmark_aggregation() -> None:
     assert metrics.dp_epsilon == 2.0
 
 
+@pytest.mark.real_data
 def test_benchmark_suite_execution() -> None:
     """Verifies end-to-end execution of benchmark.py suite across all 6 model configurations."""
     results = benchmark.run_benchmark_suite()
