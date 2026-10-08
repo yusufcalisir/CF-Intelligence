@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import os
 import sys
-import uuid
 from pathlib import Path
 
 import torch
@@ -32,10 +31,18 @@ from hypothesis import HealthCheck, Phase, Verbosity, given, settings, strategie
 from app.application.services.idempotency import IdempotencyService
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import ModelService
+import pytest
 from app.config import get_settings
-from app.main import app
+from app.main import app, DDoSProtectionMiddleware
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def reset_ddos_limiter():
+    DDoSProtectionMiddleware.reset_state()
+    yield
+    DDoSProtectionMiddleware.reset_state()
 
 
 def _seed_global_model() -> None:
@@ -244,12 +251,18 @@ def test_property_response_header_metadata_invariant(endpoint):
 # Property 10: Malformed Syntax Handling Invariant
 # ------------------------------------------------------------------------------
 @given(
-    malformed_str=st.text(min_size=1, max_size=100, alphabet=st.characters(blacklist_characters=('"', '{', '}', ':')))
+    malformed_str=st.text(
+        min_size=1,
+        max_size=100,
+        alphabet=st.characters(codec="utf-8", blacklist_characters=('"', '{', '}', ':')),
+    )
 )
 def test_property_malformed_json_syntax_handling_invariant(malformed_str):
     """INVARIANT 10: Malformed non-JSON payloads MUST return HTTP 400 or 415/422, NEVER HTTP 500."""
+    DDoSProtectionMiddleware.reset_state()
     r = client.post("/api/v1/predict", content=f"{{ {malformed_str} ", headers={"Content-Type": "application/json"})
     assert r.status_code in (400, 415, 422), f"Expected 400/415/422 for malformed payload, got {r.status_code}"
+    assert r.status_code != 500, f"Malformed payload caused internal server error 500: {r.text}"
 
 
 if __name__ == "__main__":

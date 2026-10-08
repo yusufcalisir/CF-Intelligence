@@ -1,31 +1,31 @@
 {
-  "collection_latency_us": 0.458,
-  "collection_throughput_rps": 2185353.0,
+  "collection_latency_us": 0.22,
+  "collection_throughput_rps": 4552946.0,
   "sla_aggregation_scaling": [
     {
       "n": 10,
-      "latency_ms": 0.338
+      "latency_ms": 0.02
     },
     {
       "n": 100,
-      "latency_ms": 0.335
+      "latency_ms": 0.015
     },
     {
       "n": 1000,
-      "latency_ms": 0.123
+      "latency_ms": 0.059
     },
     {
       "n": 10000,
-      "latency_ms": 0.825
+      "latency_ms": 0.45
     },
     {
       "n": 50000,
-      "latency_ms": 0.795
+      "latency_ms": 0.452
     }
   ],
-  "prom_serialization_ms": 20.906,
-  "cef_serialization_us": 2.724,
-  "syslog_serialization_us": 33.738,
+  "prom_serialization_ms": 10.385,
+  "cef_serialization_us": 1.499,
+  "syslog_serialization_us": 17.07,
   "client_memory_scaling": [
     {
       "clients": 10,
@@ -33,16 +33,16 @@
     },
     {
       "clients": 100,
-      "memory_mb": 0.02
+      "memory_mb": 0.0
     },
     {
       "clients": 1000,
-      "memory_mb": 0.18
+      "memory_mb": 0.0
     },
     {
       "clients": 5000,
-      "memory_mb": 0.86
+      "memory_mb": 0.0
     }
   ],
-  "telemetry_overhead_pct": 0.0046
+  "telemetry_overhead_pct": 0.0022
 }

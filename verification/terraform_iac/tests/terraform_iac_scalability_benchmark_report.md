@@ -7,9 +7,9 @@
 
 | Cloud Provider | Total HCL Files | Average Reading & Validation Latency (ms) | Complexity |
 |:---:|:---:|:---:|:---:|
-| **AWS** | 3 .tf files | 0.6846 ms | $\mathcal{O}(1)$ Constant |
-| **AZURE** | 3 .tf files | 0.6939 ms | $\mathcal{O}(1)$ Constant |
-| **GCP** | 3 .tf files | 0.6509 ms | $\mathcal{O}(1)$ Constant |
+| **AWS** | 3 .tf files | 0.3313 ms | $\mathcal{O}(1)$ Constant |
+| **AZURE** | 3 .tf files | 0.3162 ms | $\mathcal{O}(1)$ Constant |
+| **GCP** | 3 .tf files | 0.3163 ms | $\mathcal{O}(1)$ Constant |
 
 ## Key Performance Observations
 

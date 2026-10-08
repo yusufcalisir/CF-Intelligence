@@ -22,9 +22,9 @@ VERIFICATION_DIR = REPO_ROOT / "verification"
 def run_all_verifications() -> bool:
     subsystems = sorted([
         d for d in VERIFICATION_DIR.iterdir()
-        if d.is_dir() and ((d / "tests").is_dir() or any(d.glob("test_*.py")))
+        if d.is_dir() and not d.name.startswith((".", "__")) and ((d / "tests").is_dir() or any(d.glob("test_*.py")))
     ])
-    total_dirs = len([d for d in VERIFICATION_DIR.iterdir() if d.is_dir()])
+    total_dirs = len([d for d in VERIFICATION_DIR.iterdir() if d.is_dir() and not d.name.startswith((".", "__"))])
 
     logger.info("==========================================================================")
     logger.info("STARTING MASTER SCIENTIFIC VERIFICATION SUITE ACROSS %d VERIFIED SUBSYSTEMS", len(subsystems))

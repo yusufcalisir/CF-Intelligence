@@ -1,6 +1,6 @@
 # Automated Scientific Self-Verification & Invariant Registry
 
-This directory contains internal scientific verification reports and automated test suites for every major subsystem of the **Privacy-Preserving Cross-Bank Fraud Detection Platform**.
+This directory contains internal scientific verification reports, invariant proofs, formal ledgers, and automated test suites (410 tests) across all 21 core subsystems of the **Privacy-Preserving Cross-Bank Fraud Detection Platform**.
 
 > **Verification Notice:**  
 > These reports document the internal formal verification and automated testing methodology applied across the codebase: mathematical correctness proofs, property-based testing results, adversarial robustness analyses, regulatory alignment assessments, and performance benchmarks. They provide transparent technical validation and regression baselines as internal design documentation prior to any external third-party certification audits.
@@ -66,9 +66,22 @@ verification/
 ├── federated_convergence/
 │   ├── scientific_audit_report.md
 │   └── test_test_set_isolation.py
-└── real_data_benchmark/
-    ├── README.md
-    └── benchmark_report.json
+├── real_data_benchmark/
+│   ├── README.md
+│   └── benchmark_report.json
+├── scientific_revalidation/
+│   ├── protocol.md
+│   ├── acceptance_criteria.json
+│   ├── claims_ledger.json
+│   ├── dataset_manifest.json
+│   ├── environment_manifest.json
+│   └── revalidation_units.json
+└── inventories/
+    ├── api_surface_inventory.json
+    ├── canonical_defect_registry.json
+    ├── exception_boundary_inventory.json
+    ├── frontend_surface_inventory.json
+    └── historical_defect_applicability.json
 ```
 
 ---
@@ -113,6 +126,8 @@ Every report in this registry follows the same structure:
 | Master Mathematical Protocol | [mathematical/scientific_audit_report.md](mathematical/scientific_audit_report.md) | 35 Formal Mathematical Invariants | Self-Verified |
 | Federated Convergence & Test Isolation | [federated_convergence/scientific_audit_report.md](federated_convergence/scientific_audit_report.md) | Set Disjointness & Zero Data Snooping | Self-Verified |
 | Real-World Graph Benchmark | [real_data_benchmark/README.md](real_data_benchmark/README.md) | Elliptic Bitcoin Dataset GNN Evaluation | Self-Verified |
+| Scientific Revalidation Protocol | [scientific_revalidation/protocol.md](scientific_revalidation/protocol.md) | Empirical Revalidation Units & Manifests | Self-Verified |
+| Invariant & Defect Inventories | [inventories/canonical_defect_registry.json](inventories/canonical_defect_registry.json) | API Surface, Defect Registries & Exception Boundaries | Self-Verified |
 
 ---
 
@@ -149,10 +164,10 @@ All internal self-verifications are conducted using a multi-phase testing method
 
 ## Running Verification Tests
 
-Each subsystem's tests are self-contained in its `tests/` directory.
+Each subsystem's tests are self-contained in its `tests/` directory. The automated verification suite encompasses 17 independent reference verification runners, 13 scalability benchmark runners, and 410 property-based (Hypothesis), adversarial robustness, and unit verification tests across all verified subsystems.
 
 ```bash
-# Run master automated verification suite across all subsystems
+# Run master automated verification suite across all subsystems (Phases 1-3)
 python scripts/run_all_verifications.py
 
 # Run all tests for a specific subsystem
@@ -161,7 +176,10 @@ pytest verification/<subsystem>/tests/
 # Run reference verification for a specific subsystem
 python verification/<subsystem>/tests/<subsystem>_reference_verification.py
 
-# Run the full verification suite across all subsystems
+# Run scalability benchmark for a specific subsystem
+python verification/<subsystem>/tests/<subsystem>_benchmark_scalability.py
+
+# Run the full verification pytest suite across all subsystems (410 tests)
 pytest verification/
 ```
 

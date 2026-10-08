@@ -13,7 +13,6 @@ Evaluates:
 from pathlib import Path
 import json
 import sys
-import psutil
 
 PROJECT_ROOT = str(Path(__file__).resolve().parents[3] / "backend")
 sys.path.insert(0, PROJECT_ROOT)

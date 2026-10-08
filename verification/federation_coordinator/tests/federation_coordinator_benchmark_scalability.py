@@ -16,7 +16,6 @@ from pathlib import Path
 import sys
 import json
 import time
-import psutil
 import numpy as np
 
 PROJECT_ROOT = str(Path(__file__).resolve().parents[3] / "backend")
@@ -24,9 +23,18 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from app.application.services.coordinator_service import CoordinatorService
 
+
+def _get_process_memory_mb() -> float:
+    try:
+        import psutil
+
+        return psutil.Process().memory_info().rss / (1024 * 1024)
+    except ImportError:
+        return 0.0
+
+
 def benchmark_coordinator():
     np.random.seed(42)
-    process = psutil.Process()
 
     results = {
         "client_registration_scaling": {},
@@ -46,14 +54,14 @@ def benchmark_coordinator():
 
     for N in client_counts:
         coord = CoordinatorService()
-        mem_before = process.memory_info().rss / 1024 / 1024
+        mem_before = _get_process_memory_mb()
 
         t0 = time.perf_counter()
         for i in range(N):
             coord.register_client(f"bank_bench_{i}", ram_gb=16.0)
         t1 = time.perf_counter()
 
-        mem_after = process.memory_info().rss / 1024 / 1024
+        mem_after = _get_process_memory_mb()
         total_time_ms = (t1 - t0) * 1000
         per_call_us = (total_time_ms / N) * 1000
         mem_added_mb = max(0.0, mem_after - mem_before)

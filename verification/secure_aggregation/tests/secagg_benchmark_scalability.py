@@ -19,7 +19,6 @@ sys.path.insert(0, str(backend_path))
 import gc
 import json
 import time
-import psutil
 import numpy as np
 from app.application.services.fl_engine import FederatedLearningEngine
 from app.domain.value_objects import ModelWeights
@@ -27,12 +26,20 @@ from app.domain.value_objects import ModelWeights
 _engine = FederatedLearningEngine(settings=None, model_service=None, privacy_service=None)
 
 
+def _get_process_memory_mb() -> float:
+    try:
+        import psutil
+
+        return psutil.Process().memory_info().rss / (1024 * 1024)
+    except ImportError:
+        return 0.0
+
+
 def benchmark_secagg():
     client_counts = [2, 5, 10, 20, 50, 100]
     model_dimensions = [1000, 10000, 100000, 1000000]
     
     results = []
-    process = psutil.Process()
     
     for d in model_dimensions:
         for n in client_counts:
@@ -41,7 +48,7 @@ def benchmark_secagg():
                 continue
                 
             gc.collect()
-            mem_before = process.memory_info().rss / (1024 * 1024)
+            mem_before = _get_process_memory_mb()
             
             raw_weights = [np.ones(d, dtype=np.float64) * (i + 1) for i in range(n)]
             model_weights = [ModelWeights(layer_shapes=[(d,)], flat_weights=w.tolist()) for w in raw_weights]
@@ -57,7 +64,7 @@ def benchmark_secagg():
             agg = _engine.aggregate_parameters(masked_weights, client_samples=samples)
             agg_time_ms = (time.perf_counter() - t1) * 1000.0
             
-            mem_after = process.memory_info().rss / (1024 * 1024)
+            mem_after = _get_process_memory_mb()
             peak_mem_mb = max(0.01, mem_after - mem_before)
             
             # 3. Payload size in MB (float64 = 8 bytes per parameter)

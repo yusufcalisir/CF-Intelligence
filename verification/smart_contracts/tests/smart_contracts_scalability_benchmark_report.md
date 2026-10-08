@@ -8,12 +8,12 @@
 
 | Consortium Size ($N$ Banks) | Distribute Incentives Gas | Claim Payout Gas | State Engine Latency (ms) | Scaling Complexity |
 |:---:|:---:|:---:|:---:|:---:|
-| **2 Banks** | 102,000 gas | 32,000 gas | 0.0047 ms | $\mathcal{O}(N)$ Linear |
-| **5 Banks** | 187,500 gas | 32,000 gas | 0.0075 ms | $\mathcal{O}(N)$ Linear |
-| **10 Banks** | 330,000 gas | 32,000 gas | 0.0127 ms | $\mathcal{O}(N)$ Linear |
-| **25 Banks** | 757,500 gas | 32,000 gas | 0.0312 ms | $\mathcal{O}(N)$ Linear |
-| **50 Banks** | 1,470,000 gas | 32,000 gas | 0.0541 ms | $\mathcal{O}(N)$ Linear |
-| **100 Banks** | 2,895,000 gas | 32,000 gas | 0.1056 ms | $\mathcal{O}(N)$ Linear |
+| **2 Banks** | 102,000 gas | 32,000 gas | 0.0034 ms | $\mathcal{O}(N)$ Linear |
+| **5 Banks** | 187,500 gas | 32,000 gas | 0.0041 ms | $\mathcal{O}(N)$ Linear |
+| **10 Banks** | 330,000 gas | 32,000 gas | 0.0069 ms | $\mathcal{O}(N)$ Linear |
+| **25 Banks** | 757,500 gas | 32,000 gas | 0.0152 ms | $\mathcal{O}(N)$ Linear |
+| **50 Banks** | 1,470,000 gas | 32,000 gas | 0.0285 ms | $\mathcal{O}(N)$ Linear |
+| **100 Banks** | 2,895,000 gas | 32,000 gas | 0.0564 ms | $\mathcal{O}(N)$ Linear |
 
 ## Key Performance Observations
 

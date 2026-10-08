@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 """Independent Verification Script for API Endpoints, Contracts, and Protocol Specs.
 
 Verifies:
@@ -121,9 +121,14 @@ def run_verification() -> dict:
 
     # 9. ABAC Security Evaluation & Tenant Isolation
     abac_payload = {
-        "user": {"sub": "usr1", "username": "analyst1", "bank_id": "bank_a", "roles": ["analyst"]},
-        "resource": {"resource_type": "api_route", "resource_id": "/api/v1/alerts", "bank_id": "bank_b"},
-        "action": "read"
+        "user_username": "analyst1",
+        "user_bank_id": "bank_a",
+        "user_roles": ["analyst"],
+        "user_clearance": 2,
+        "resource_type": "alert",
+        "resource_id": "alt_1001",
+        "resource_bank_id": "bank_b",
+        "action": "read",
     }
     r = client.post("/api/v1/security/abac/evaluate", json=abac_payload)
     is_denied = r.status_code == 200 and r.json().get("allowed") is False

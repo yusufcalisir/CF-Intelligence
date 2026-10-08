@@ -7,9 +7,9 @@
 
 | Total Policy Evaluated | Average Latency per Decision | Throughput (evaluations/sec) | Scaling Complexity |
 |:---:|:---:|:---:|:---:|
-| **1,000** | 0.00513 ms | **194,772 evals/sec** | $\mathcal{O}(1)$ Constant |
-| **10,000** | 0.00515 ms | **194,274 evals/sec** | $\mathcal{O}(1)$ Constant |
-| **50,000** | 0.0052 ms | **192,454 evals/sec** | $\mathcal{O}(1)$ Constant |
+| **1,000** | 0.00235 ms | **425,369 evals/sec** | $\mathcal{O}(1)$ Constant |
+| **10,000** | 0.00238 ms | **420,585 evals/sec** | $\mathcal{O}(1)$ Constant |
+| **50,000** | 0.00251 ms | **398,929 evals/sec** | $\mathcal{O}(1)$ Constant |
 
 ## Key Performance Observations
 
