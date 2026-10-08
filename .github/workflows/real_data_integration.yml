@@ -1,0 +1,93 @@
+name: Real-Data Integration & Benchmark Ingestion Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      require_real_data:
+        description: "Enforce real dataset execution (fails closed if datasets cannot be provisioned)"
+        required: false
+        default: true
+        type: boolean
+      dataset:
+        description: "Target dataset to provision and test (all, paysim, ieee_cis, creditcard, elliptic, amlsim, synthaml, amlnet)"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - paysim
+          - ieee_cis
+          - creditcard
+          - elliptic
+          - amlsim
+          - synthaml
+          - amlnet
+  # Weekly scheduled validation run on default branch
+  schedule:
+    - cron: "0 3 * * 0"
+
+permissions:
+  contents: read
+
+jobs:
+  real-data-integration:
+    name: Real-Data Benchmark Integration Gate
+    runs-on: ubuntu-latest
+    if: github.repository == 'yusufcalisir/CF-Intelligence'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv and System Dependencies
+        run: |
+          pip install uv kaggle
+          uv pip install --system -r backend/requirements.txt pytest pytest-cov pytest-asyncio
+
+      - name: Restore Dataset Cache (if available)
+        uses: actions/cache@v4
+        with:
+          path: backend/storage/datasets
+          key: ${{ runner.os }}-datasets-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-datasets-
+
+      - name: Check Provisioning Credentials & Configuration
+        id: creds_check
+        run: |
+          if [ -n "${{ secrets.KAGGLE_USERNAME }}" ] && [ -n "${{ secrets.KAGGLE_KEY }}" ]; then
+            echo "has_kaggle=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Kaggle API credentials detected."
+          else
+            echo "has_kaggle=false" >> "$GITHUB_OUTPUT"
+            echo "⚠️ Kaggle API credentials not configured in repository secrets."
+          fi
+
+      - name: Provision Benchmark Datasets
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        run: |
+          echo "Executing dataset provisioning tool..."
+          python scripts/download_real_benchmarks.py --dataset ${{ inputs.dataset || 'all' }}
+
+      - name: Execute Real-Data Integration Suite (Gate B)
+        env:
+          PYTHONPATH: backend
+        run: |
+          echo "Running Gate B real-data integration test suite..."
+          pytest backend/tests/integration/datasets/test_real_dataset_integration.py -v --require-real-data
+
+      - name: Report Gate Status
+        if: always()
+        run: |
+          echo "### Real-Data Integration Gate Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Workflow trigger: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Target dataset: ${{ inputs.dataset || 'all' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Mandatory real data required: ${{ inputs.require_real_data != false }}" >> $GITHUB_STEP_SUMMARY

@@ -439,3 +439,68 @@ Dataset integrity, zero lookahead leakage, schema conformance, and zero-mock err
 - [`backend/tests/unit/test_demographic_fairness_audit.py`](backend/tests/unit/test_demographic_fairness_audit.py): 8-dataset demographic attribute scan confirming 0/10 protected attributes (**10 tests, 100% passing**).
 - [`backend/tests/unit/test_split_isolation.py`](backend/tests/unit/test_split_isolation.py): Zero data snooping, training-only preprocessor fitting, and handling of unseen categorical test tokens (**7 tests, 100% passing**).
 - [`backend/tests/unit/test_feature_leakage.py`](backend/tests/unit/test_feature_leakage.py): Target proxy correlation audits, outcome feature detection, and entity memorization elimination (**6 tests, 100% passing**).
+- [`backend/tests/unit/test_ci_smoke_gates.py`](backend/tests/unit/test_ci_smoke_gates.py): Gate A dataset-independent smoke gates using schema fixtures (**10 tests, 100% passing**).
+- [`backend/tests/unit/test_dataset_provenance_and_smoke_contracts.py`](backend/tests/unit/test_dataset_provenance_and_smoke_contracts.py): Fail-closed contracts, empty directory defenses, and provenance verification (**7 tests, 100% passing**).
+- [`backend/tests/integration/datasets/test_real_dataset_integration.py`](backend/tests/integration/datasets/test_real_dataset_integration.py): Gate B physical real-dataset integration tests covering all 7 benchmarks (**7 tests, 100% passing**).
+
+---
+
+## 8. Continuous Integration & Real-Data Gating Architecture (Gates A & B)
+
+To ensure reliable, deterministic CI without brittle external network dependencies or multi-gigabyte data transfers while preserving rigorous empirical testing on real data, the platform implements a strict dual-gate testing architecture:
+
+### 8.1 Dual-Gate Architecture
+
+1. **Gate A: Standard CI Smoke Gates (Dataset-Independent)**
+   - **Scope**: Runs on every pull request and push to `main` without requiring external multi-gigabyte downloads.
+   - **Mechanism**: Exercises production data loaders against schema-valid deterministic fixtures created in temporary directories (`backend/tests/fixtures/dataloader_smoke_fixtures.py`).
+   - **Verification**: Verifies loader importability, configuration, schema validation, parsing algorithms, and fail-closed behavior without needing Kaggle credentials.
+   - **Execution Command**:
+     ```bash
+     cd backend && pytest tests/unit/test_ci_smoke_gates.py -v
+     ```
+
+2. **Gate B: Real-Data Integration Suite (`@pytest.mark.real_data`)**
+   - **Scope**: Exercises authentic physical files on disk across all 7 benchmark datasets (`paysim`, `ieee_cis`, `creditcard`, `elliptic`, `amlsim`, `synthaml`, `amlnet`).
+   - **Mechanism**: Dedicated suite in `backend/tests/integration/datasets/test_real_dataset_integration.py`.
+   - **Gating**: Marked with `@pytest.mark.real_data`. Skipped by default in standard CI.
+   - **Mandatory Enforcement**: When invoked with `--require-real-data`, missing dataset files cause an immediate **test failure** (`pytest.fail`), never a silent skip or synthetic fallback.
+   - **Execution Commands**:
+     ```bash
+     # Run all real-data integration tests (fails closed if files are missing):
+     cd backend && pytest tests/integration/datasets/ -v --require-real-data
+
+     # Include real data tests if present (skips if absent):
+     cd backend && pytest tests/integration/datasets/ -v --include-real-data
+     ```
+
+### 8.2 Provenance Taxonomy
+
+The repository strictly differentiates dataset origins and integrity levels:
+
+| Provenance Level | Description | Benchmark Datasets |
+|:---|:---|:---|
+| `EMPIRICAL_EXTERNAL_DATA` | Real observations from authentic commercial payment logs or public blockchain DAGs. | `ieee_cis`, `creditcard`, `elliptic` |
+| `PUBLIC_SIMULATED_DATASET` | Public agent-based simulations published with physical source files and published baseline distributions. | `paysim`, `amlsim` |
+| `CONTROLLED_PROJECT_SYNTHETIC` | Reproducible benchmark datasets generated via domain-specific statistical models or academic methodology. | `synthaml`, `amlnet`, `cross_bank` |
+| `TEST_FIXTURE` | Minimal in-process deterministic schema fixtures for unit testing and CI smoke gates (`is_synthetic=True`). | Generated in `dataloader_smoke_fixtures.py` |
+
+### 8.3 Provisioning Matrix & CI Reality
+
+| Dataset ID | Authoritative Source | Required Files & Format | Storage Location | Acquisition Method | Auth & License Requirements | Standard CI | Real-Data CI Gate | Local Execution |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|:---|
+| **`paysim`** | Kaggle `ealaxi/paysim1` | `PS_20174392719_1491204439457_log.csv` (CSV) | `backend/storage/datasets/paysim/` | Kaggle API / CLI | Kaggle API Key; CC BY-SA 4.0 | Schema Fixture | Provisions via Kaggle API | Real file on disk |
+| **`ieee_cis`** | Kaggle `c/ieee-fraud-detection` | `train_transaction.csv`, `train_identity.csv` (CSV) | `backend/storage/datasets/ieee_cis/` | Kaggle Competition CLI | Kaggle API Key + Competition Rules Acceptance | Schema Fixture | Requires Kaggle credentials & rules acceptance | Real file on disk |
+| **`creditcard`** | Kaggle `mlg-ulb/creditcardfraud` | `creditcard.csv` (CSV) | `backend/storage/datasets/creditcard/` | Kaggle API / CLI | Kaggle API Key; ODbL 1.0 | Schema Fixture | Provisions via Kaggle API | Real file on disk |
+| **`elliptic`** | Kaggle `ellipticco/elliptic-data-set` | `elliptic_txs_features.csv`, `elliptic_txs_classes.csv`, `elliptic_txs_edgelist.csv` (CSV) | `backend/storage/datasets/elliptic/` | Kaggle API / CLI | Kaggle API Key; CC BY 4.0 | Schema Fixture | Provisions via Kaggle API | Real file on disk |
+| **`amlsim`** | Kaggle `anshankul/ibm-amlsim-example-dataset` | `transactions.csv`, `accounts.csv`, `alerts.csv` (CSV) | `backend/storage/datasets/amlsim/` | Kaggle API / CLI | Kaggle API Key; Apache 2.0 | Schema Fixture | Provisions via Kaggle API | Real file on disk |
+| **`synthaml`** | Figshare / Nature Sci Data DOI: `10.1038/s41597-023-02569-2` | `alerts.csv`, `transactions.csv` (CSV/Parquet) | `backend/storage/datasets/synthaml/` | Direct Download / `generate_synthaml_dataset.py` | Open Access; CC BY 4.0 | Schema Fixture | Local cache / Generator script | Real file on disk |
+| **`amlnet`** | Zenodo DOI: `10.5281/zenodo.10058474` | `transactions.csv` (CSV/Parquet) | `backend/storage/datasets/amlnet/` | Direct Download / `generate_amlnet_dataset.py` | Open Access; CC BY-NC 4.0 | Schema Fixture | Local cache / Generator script | Real file on disk |
+
+### 8.4 Automated Provisioning Workflow
+
+The standalone GitHub Actions workflow `.github/workflows/real_data_integration.yml` provides a secure, gated pipeline for real-data integration:
+- Triggered manually via `workflow_dispatch` or on a weekly schedule.
+- Uses repository secrets `KAGGLE_USERNAME` and `KAGGLE_KEY`.
+- Executes `python scripts/download_real_benchmarks.py --dataset all`.
+- Fails closed if physical datasets cannot be provisioned when mandatory execution is requested.
