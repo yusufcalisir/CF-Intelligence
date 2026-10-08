@@ -770,6 +770,7 @@ async def get_comparison(simulation_id: str) -> ComparisonResponse:
 
     bank_comparisons = []
     total_improvement: dict[str, float] = {}
+    improvement_counts: dict[str, int] = {}
 
     for bank_data in sim.get("banks", []):
         local = bank_data.get("local_metrics")
@@ -782,7 +783,7 @@ async def get_comparison(simulation_id: str) -> ComparisonResponse:
         if local_resp is None or fed_resp is None:
             continue
 
-        improvement = bank_data.get("improvement", {})
+        improvement = bank_data.get("improvement") or {}
         bank_comparisons.append(
             BankComparisonResponse(
                 bank_id=bank_data["id"],
@@ -794,10 +795,17 @@ async def get_comparison(simulation_id: str) -> ComparisonResponse:
         )
 
         for k, v in improvement.items():
-            total_improvement[k] = total_improvement.get(k, 0) + v
+            if v is not None:
+                total_improvement[k] = total_improvement.get(k, 0.0) + v
+                improvement_counts[k] = improvement_counts.get(k, 0) + 1
 
-    n = len(bank_comparisons) or 1
-    avg_improvement = {k: round(v / n, 4) for k, v in total_improvement.items()}
+    all_improvement_keys = set().union(
+        *(b.get("improvement", {}).keys() for b in sim.get("banks", []) if b.get("improvement"))
+    )
+    avg_improvement: dict[str, float | None] = {}
+    for k in all_improvement_keys:
+        count = improvement_counts.get(k, 0)
+        avg_improvement[k] = round(total_improvement[k] / count, 4) if count > 0 else None
 
     return ComparisonResponse(
         simulation_id=simulation_id,

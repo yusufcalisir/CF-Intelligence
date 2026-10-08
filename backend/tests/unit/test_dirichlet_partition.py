@@ -17,6 +17,16 @@ if str(REPO_ROOT) not in sys.path:
 from experiments.baselines.comparative_runner import ComparativeBenchmarkEngine  # noqa: E402
 from experiments.paysim.partitioner import PaySimPartitioner  # noqa: E402
 
+from tests.fixtures.dataloader_smoke_fixtures import (  # noqa: E402
+    create_paysim_test_fixture,
+)
+
+
+@pytest.fixture
+def paysim_fixture_dir(tmp_path: Path) -> Path:
+    """Deterministic, schema-valid PaySim fixture for algorithm verification in standard CI."""
+    return create_paysim_test_fixture(tmp_path / "paysim_smoke_fixture", n_rows=2500)
+
 
 class TestDirichletPartitioner:
     """Test suite verifying federated Dirichlet non-IID partitioning and distribution metrics."""
@@ -41,10 +51,10 @@ class TestDirichletPartitioner:
         with pytest.raises(ValueError, match="test_ratio must be between 0 and 1"):
             PaySimPartitioner(test_ratio=1.5)
 
-    def test_partitioner_temporal_split_zero_leakage(self) -> None:
+    def test_partitioner_temporal_split_zero_leakage(self, paysim_fixture_dir: Path) -> None:
         """Verify strict past-to-future separation with zero temporal leakage."""
         p = PaySimPartitioner(alpha=0.5, num_clients=3, test_ratio=0.25)
-        p.load_data(nrows=1000)
+        p.load_data(path=paysim_fixture_dir, nrows=1000)
 
         assert p.X_train is not None and p.X_test is not None
         assert len(p.X_train) == 750
@@ -56,10 +66,10 @@ class TestDirichletPartitioner:
         min_test_step = float(np.min(p.steps_test))
         assert max_train_step <= min_test_step
 
-    def test_partitioner_sample_conservation_and_isolation(self) -> None:
+    def test_partitioner_sample_conservation_and_isolation(self, paysim_fixture_dir: Path) -> None:
         """Verify exact training sample conservation and strict client index disjointness."""
         p = PaySimPartitioner(alpha=0.5, num_clients=3)
-        p.load_data(nrows=1000)
+        p.load_data(path=paysim_fixture_dir, nrows=1000)
         partitions = p.partition_dirichlet()
 
         assert len(partitions) == 3
@@ -82,10 +92,10 @@ class TestDirichletPartitioner:
         assert total_partitioned == len(p.X_train)
         assert len(allocated_indices) == len(p.X_train)
 
-    def test_partitioner_multi_alpha_skew(self) -> None:
+    def test_partitioner_multi_alpha_skew(self, paysim_fixture_dir: Path) -> None:
         """Verify that smaller alpha (0.1) produces higher divergence and skew than alpha (1.0)."""
         p = PaySimPartitioner(num_clients=3)
-        p.load_data(nrows=2000)
+        p.load_data(path=paysim_fixture_dir, nrows=2000)
 
         reports = p.partition_multi_alpha([0.1, 0.5, 1.0])
         assert set(reports.keys()) == {0.1, 0.5, 1.0}
@@ -95,14 +105,14 @@ class TestDirichletPartitioner:
         kl_05 = reports[0.5]["consortium_metrics"]["mean_kl_divergence"]
         assert kl_01 >= kl_05 or reports[0.1]["consortium_metrics"]["fraud_ratio_std"] >= 0.0
 
-    def test_partitioner_reproducibility_with_seed(self) -> None:
+    def test_partitioner_reproducibility_with_seed(self, paysim_fixture_dir: Path) -> None:
         """Verify identical partitioning across deterministic runs with identical seeds."""
         p1 = PaySimPartitioner(alpha=0.5, num_clients=3, seed=123)
-        p1.load_data(nrows=500)
+        p1.load_data(path=paysim_fixture_dir, nrows=500)
         p1.partition_dirichlet()
 
         p2 = PaySimPartitioner(alpha=0.5, num_clients=3, seed=123)
-        p2.load_data(nrows=500)
+        p2.load_data(path=paysim_fixture_dir, nrows=500)
         p2.partition_dirichlet()
 
         for name in p1.client_names:
@@ -110,7 +120,7 @@ class TestDirichletPartitioner:
 
         # Different seed should diverge
         p3 = PaySimPartitioner(alpha=0.5, num_clients=3, seed=999)
-        p3.load_data(nrows=500)
+        p3.load_data(path=paysim_fixture_dir, nrows=500)
         p3.partition_dirichlet()
         diverged = False
         for name in p1.client_names:
@@ -119,10 +129,10 @@ class TestDirichletPartitioner:
                 break
         assert diverged is True
 
-    def test_partitioner_export_artifacts(self, tmp_path: Path) -> None:
+    def test_partitioner_export_artifacts(self, tmp_path: Path, paysim_fixture_dir: Path) -> None:
         """Verify export of summary JSON, NPZ indices, and client Parquet partitions."""
         p = PaySimPartitioner(alpha=0.5, num_clients=3)
-        p.load_data(nrows=600)
+        p.load_data(path=paysim_fixture_dir, nrows=600)
         p.partition_dirichlet()
 
         export_dir = tmp_path / "paysim_export"
@@ -142,10 +152,10 @@ class TestDirichletPartitioner:
         assert summary["feature_dim"] == 13
         assert "consortium_metrics" in summary["partition_diagnostics"]
 
-    def test_partitioner_integration_with_comparative_runner(self, tmp_path: Path) -> None:
+    def test_partitioner_integration_with_comparative_runner(self, tmp_path: Path, paysim_fixture_dir: Path) -> None:
         """Verify direct interface compatibility with ComparativeBenchmarkEngine."""
         p = PaySimPartitioner(alpha=0.5, num_clients=3)
-        p.load_data(nrows=400)
+        p.load_data(path=paysim_fixture_dir, nrows=400)
         p.partition_dirichlet()
 
         bank_train_partitions = p.get_bank_train_partitions()
@@ -173,3 +183,12 @@ class TestDirichletPartitioner:
         assert "silo_deficit_analysis" in report
         assert len(report["comparison_matrix"]) >= 4
         assert report["dataset_name"] == "PaySim_Federated_SubPlan_5_1"
+
+    @pytest.mark.real_data
+    def test_partitioner_authentic_paysim_ingestion(self) -> None:
+        """Gated: verify Dirichlet partitioning against authentic physical PaySim dataset."""
+        p = PaySimPartitioner(alpha=0.5, num_clients=3)
+        p.load_data(nrows=500, require_real=True)
+        partitions = p.partition_dirichlet()
+        assert len(partitions) == 3
+        assert set(partitions.keys()) == {"bank_a", "bank_b", "bank_c"}

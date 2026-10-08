@@ -159,6 +159,91 @@ def test_inject_simulated_pii_violation(client: TestClient, prefix: str) -> None
 # ── Benchmark Evaluation ─────────────────────────────────────────────────────
 
 
+@pytest.fixture
+def mock_pilot_benchmark(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Explicit, schema-valid benchmark payload fixture for standard CI API route testing."""
+    from app.presentation.routers import design_partner
+
+    payload = {
+        "dataset_name": "paysim",
+        "source_type": "BENCHMARK_REFERENCE",
+        "total_transactions_evaluated": 2000,
+        "actual_fraud_count": 25,
+        "actual_fraud_rate_percent": 1.25,
+        "evaluation_provenance": {
+            "model_type": "PYTORCH_FEDERATED_INFERENCE",
+            "probability_synthesis": "NONE_GENUINE_INFERENCE",
+            "is_synthetic_beta": False,
+            "input_features": 13,
+            "samples_evaluated": 2000,
+        },
+        "performance_comparison": {
+            "federated_learning": {
+                "roc_auc": 0.88,
+                "pr_auc": 0.75,
+                "recall_at_01_fpr": 0.65,
+                "cost_report": {
+                    "baseline_total_cost_dollars": 50000.0,
+                    "fl_total_cost_dollars": 20000.0,
+                    "total_saved_dollars": 30000.0,
+                    "operational_fte_hours_saved": 150.0,
+                    "roi_multiple": 2.5,
+                },
+            },
+            "isolated_local_model": {
+                "roc_auc": 0.72,
+                "pr_auc": 0.51,
+                "recall_at_01_fpr": 0.38,
+                "cost_report": {
+                    "baseline_total_cost_dollars": 50000.0,
+                    "fl_total_cost_dollars": 35000.0,
+                    "total_saved_dollars": 15000.0,
+                    "operational_fte_hours_saved": 75.0,
+                    "roi_multiple": 1.5,
+                },
+            },
+            "federated_advantage": {
+                "pr_auc_gain": 0.24,
+                "recall_at_01_fpr_gain": 0.27,
+                "daily_fraud_loss_saved_dollars": 15000.0,
+                "daily_investigation_saved_dollars": 15000.0,
+                "net_daily_economic_benefit_dollars": 30000.0,
+            },
+        },
+        "multi_threshold_confusion_matrices": [],
+        "distribution_fidelity": {
+            "wasserstein_distance": 0.045,
+            "ks_statistic": 0.082,
+            "ks_pvalue": 0.95,
+            "js_divergence": 0.012,
+            "drift_detected": False,
+            "fidelity_score": 0.94,
+            "metrics": {},
+        },
+        "bank_partitions": [
+            {"bank_id": "bank_a", "samples": 700, "fraud_count": 10, "fraud_ratio": 0.014},
+            {"bank_id": "bank_b", "samples": 700, "fraud_count": 8, "fraud_ratio": 0.011},
+            {"bank_id": "bank_c", "samples": 600, "fraud_count": 7, "fraud_ratio": 0.012},
+        ],
+    }
+    monkeypatch.setattr(
+        design_partner._pilot_service,
+        "evaluate_reference_benchmark",
+        lambda *args, **kwargs: payload,
+    )
+
+
+def test_evaluate_benchmark_contract_endpoint(client: TestClient, mock_pilot_benchmark: None) -> None:
+    """Verify OpenAPI contract for /evaluate-benchmark in standard CI without external files."""
+    response = client.get("/api/v1/design-partner/evaluate-benchmark?dataset=paysim&n_samples=2000&daily_volume=50000")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["dataset_name"] == "paysim"
+    assert data["total_transactions_evaluated"] == 2000
+    assert "performance_comparison" in data
+
+
+@pytest.mark.real_data
 @pytest.mark.parametrize("prefix", ["/api/v1/design-partner", "/v1/design-partner"])
 def test_evaluate_benchmark_paysim_success(client: TestClient, prefix: str) -> None:
     """Verify reference benchmark evaluation for PaySim dataset."""
@@ -188,8 +273,20 @@ def test_evaluate_benchmark_invalid_dataset_returns_422(client: TestClient) -> N
 # ── Distribution Fidelity ───────────────────────────────────────────────────
 
 
+def test_get_distribution_fidelity_contract(client: TestClient, mock_pilot_benchmark: None) -> None:
+    """Verify OpenAPI contract for /distribution-fidelity in standard CI without external files."""
+    response = client.get("/api/v1/design-partner/distribution-fidelity?dataset=paysim")
+    assert response.status_code == 200
+    data = response.json()
+    assert "wasserstein_distance" in data
+    assert "ks_statistic" in data
+    assert "fidelity_score" in data
+    assert isinstance(data["drift_detected"], bool)
+
+
+@pytest.mark.real_data
 def test_get_distribution_fidelity(client: TestClient) -> None:
-    """Verify distribution fidelity audit metrics."""
+    """Verify distribution fidelity audit metrics on authentic dataset."""
     response = client.get("/api/v1/design-partner/distribution-fidelity?dataset=paysim")
     assert response.status_code == 200
     data = response.json()

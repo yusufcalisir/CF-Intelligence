@@ -97,8 +97,12 @@ def test_e2e_real_federated_simulation_lifecycle(client: TestClient) -> None:
         assert b["id"] in ("bank_a", "bank_b", "bank_c")
         assert b["local_metrics"] is not None
         assert b["federated_metrics"] is not None
-        assert 0.0 <= b["local_metrics"]["auc_roc"] <= 1.0
-        assert 0.0 <= b["federated_metrics"]["auc_roc"] <= 1.0
+        if b["local_metrics"]["auc_roc"] is not None:
+            assert 0.0 <= b["local_metrics"]["auc_roc"] <= 1.0
+        if b["federated_metrics"]["auc_roc"] is not None:
+            assert 0.0 <= b["federated_metrics"]["auc_roc"] <= 1.0
+        if (b["local_metrics"]["auc_roc"] is None or b["federated_metrics"]["auc_roc"] is None) and b.get("improvement"):
+            assert b["improvement"].get("auc_roc") is None
 
     # 5. Check completed rounds endpoint
     rounds_res = client.get(f"/api/v1/simulations/{sim_id}/rounds")
@@ -344,3 +348,63 @@ def test_economic_roi_metrics_truthful_calculation() -> None:
     )
     assert roi_multiple == "ROI Multiple: Pending Evaluation"
     assert "8.4" not in roi_multiple
+
+
+def test_simulation_nullable_auc_roc_response_regression(client: TestClient) -> None:
+    """Regression test: verify that a completed simulation with undefined/None auc_roc
+    serializes as null without Pydantic ValidationError and can be retrieved via detail and comparison endpoints.
+    """
+    payload = {
+        "num_rounds": 1,
+        "local_epochs": 1,
+        "batch_size": 32,
+        "bank_a_transactions": 1000,
+        "bank_b_transactions": 1000,
+        "bank_c_transactions": 1000,
+        "aggregation_method": "fed_avg_weighted",
+        "fl_engine_type": "custom",
+        "enable_differential_privacy": False,
+        "enable_secure_aggregation": False,
+    }
+
+    create_res = client.post("/api/v1/simulations", json=payload)
+    assert create_res.status_code == 202
+    sim_id = create_res.json()["id"]
+
+    # Poll until completed
+    start_time = time.time()
+    completed = False
+    while time.time() - start_time < 90:
+        res = client.get(f"/api/v1/simulations/{sim_id}")
+        assert res.status_code == 200
+        detail = res.json()
+        if detail.get("status") == "completed":
+            completed = True
+            break
+        elif detail.get("status") in ("failed", "stopped"):
+            pytest.fail(f"Simulation ended in unexpected state: {detail.get('status')}")
+        time.sleep(1.0)
+
+    assert completed, f"Simulation {sim_id} did not complete in time"
+
+    # Verify detail response
+    detail_res = client.get(f"/api/v1/simulations/{sim_id}")
+    assert detail_res.status_code == 200
+    detail = detail_res.json()
+    assert detail["status"] == "completed"
+    assert len(detail["banks"]) == 3
+    for b in detail["banks"]:
+        assert "improvement" in b
+        if b["improvement"] is not None:
+            # auc_roc in improvement is either float or None (JSON null), never fake number
+            auc_imp = b["improvement"].get("auc_roc")
+            assert auc_imp is None or isinstance(auc_imp, float)
+
+    # Verify comparison response
+    comp_res = client.get(f"/api/v1/simulations/{sim_id}/comparison")
+    assert comp_res.status_code == 200
+    comp_data = comp_res.json()
+    assert "aggregate_improvement" in comp_data
+    assert comp_data["simulation_id"] == sim_id
+    for k, v in comp_data["aggregate_improvement"].items():
+        assert v is None or isinstance(v, float)

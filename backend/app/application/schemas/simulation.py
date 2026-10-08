@@ -235,7 +235,7 @@ class BankResponse(BaseModel):
     status: str
     local_metrics: MetricsResponse | None = None
     federated_metrics: MetricsResponse | None = None
-    improvement: dict[str, float] | None = None
+    improvement: dict[str, float | None] | None = None
     data_profile: DataProfileResponse | None = None
     contribution_score: float = 0.0
     quarantined: bool = False
@@ -303,7 +303,7 @@ class ComparisonResponse(BaseModel):
 
     simulation_id: str
     banks: list[BankComparisonResponse]
-    aggregate_improvement: dict[str, float]
+    aggregate_improvement: dict[str, float | None]
 
 
 class BankComparisonResponse(BaseModel):
@@ -313,7 +313,7 @@ class BankComparisonResponse(BaseModel):
     bank_name: str
     local_metrics: MetricsResponse
     federated_metrics: MetricsResponse
-    improvement: dict[str, float]
+    improvement: dict[str, float | None]
 
 
 class SimulationStatusResponse(BaseModel):
@@ -350,8 +350,8 @@ class TrainingRoundResponse(BaseModel):
     total_rounds: int
     global_loss: float | None = None
     auc: float | None = None
-    per_bank_auc: dict[str, float] = Field(default_factory=dict)
-    per_bank_loss: dict[str, float] = Field(default_factory=dict)
+    per_bank_auc: dict[str, float | None] = Field(default_factory=dict)
+    per_bank_loss: dict[str, float | None] = Field(default_factory=dict)
     participating_banks: list[str] = Field(default_factory=list)
     dropped_banks: list[str] = Field(default_factory=list)
     duration_ms: float = 0.0

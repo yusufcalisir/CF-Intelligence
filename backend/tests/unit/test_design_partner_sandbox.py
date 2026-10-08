@@ -49,6 +49,7 @@ def test_pilot_readiness_checklist_generation():
     assert len(checklist.compliance_items) >= 5
 
 
+@pytest.mark.real_data
 def test_evaluate_reference_benchmark_paysim_and_ieee():
     pilot = DesignPartnerPilotService()
     res = pilot.evaluate_reference_benchmark(dataset_name="paysim", n_samples=3000)
@@ -60,6 +61,7 @@ def test_evaluate_reference_benchmark_paysim_and_ieee():
     assert res["performance_comparison"]["federated_advantage"]["net_daily_economic_benefit_dollars"] > 0
 
 
+@pytest.mark.real_data
 def test_evaluate_reference_benchmark_scales_with_daily_volume():
     """Verify volume scaling linearity and economic benefit scaling across 50k, 100k, 500k volumes."""
     pilot = DesignPartnerPilotService()
@@ -84,6 +86,7 @@ def test_evaluate_reference_benchmark_scales_with_daily_volume():
     assert benefit_500k > benefit_100k
 
 
+@pytest.mark.real_data
 def test_evaluate_reference_benchmark_scales_with_sample_size():
     pilot = DesignPartnerPilotService()
     res_2k = pilot.evaluate_reference_benchmark(dataset_name="ieee_cis", n_samples=2000, daily_volume=100_000)
@@ -93,11 +96,87 @@ def test_evaluate_reference_benchmark_scales_with_sample_size():
     assert res_4k["total_transactions_evaluated"] == 4000
 
 
-def test_evaluate_reference_benchmark_fastapi_endpoints():
+def _make_schema_valid_benchmark_payload(dataset: str, n_samples: int, daily_volume: int) -> dict:
+    return {
+        "dataset_name": dataset,
+        "source_type": "BENCHMARK_REFERENCE",
+        "total_transactions_evaluated": n_samples,
+        "actual_fraud_count": max(1, n_samples // 100),
+        "actual_fraud_rate_percent": 1.0,
+        "evaluation_provenance": {
+            "model_type": "PYTORCH_FEDERATED_INFERENCE",
+            "probability_synthesis": "NONE_GENUINE_INFERENCE",
+            "is_synthetic_beta": False,
+            "input_features": 13,
+            "samples_evaluated": n_samples,
+        },
+        "performance_comparison": {
+            "federated_learning": {
+                "roc_auc": 0.88,
+                "pr_auc": 0.75,
+                "recall_at_01_fpr": 0.65,
+                "cost_report": {
+                    "baseline_total_cost_dollars": 50000.0,
+                    "fl_total_cost_dollars": 20000.0,
+                    "total_saved_dollars": 30000.0,
+                    "operational_fte_hours_saved": 150.0,
+                    "roi_multiple": 2.5,
+                    "false_positive_alerts_daily": 100,
+                },
+            },
+            "isolated_local_model": {
+                "roc_auc": 0.72,
+                "pr_auc": 0.51,
+                "recall_at_01_fpr": 0.38,
+                "cost_report": {
+                    "baseline_total_cost_dollars": 50000.0,
+                    "fl_total_cost_dollars": 35000.0,
+                    "total_saved_dollars": 15000.0,
+                    "operational_fte_hours_saved": 75.0,
+                    "roi_multiple": 1.5,
+                    "false_positive_alerts_daily": 250,
+                },
+            },
+            "federated_advantage": {
+                "pr_auc_gain": 0.24,
+                "recall_at_01_fpr_gain": 0.27,
+                "daily_fraud_loss_saved_dollars": 15000.0,
+                "daily_investigation_saved_dollars": 15000.0,
+                "net_daily_economic_benefit_dollars": 30000.0,
+            },
+        },
+        "multi_threshold_confusion_matrices": [],
+        "distribution_fidelity": {
+            "wasserstein_distance": 0.045,
+            "ks_statistic": 0.082,
+            "ks_pvalue": 0.95,
+            "js_divergence": 0.012,
+            "drift_detected": False,
+            "fidelity_score": 0.94,
+            "metrics": {},
+        },
+        "bank_partitions": [
+            {"bank_id": "bank_a", "samples": n_samples // 3, "fraud_count": 5, "fraud_ratio": 0.01},
+            {"bank_id": "bank_b", "samples": n_samples // 3, "fraud_count": 5, "fraud_ratio": 0.01},
+            {"bank_id": "bank_c", "samples": n_samples - 2 * (n_samples // 3), "fraud_count": 5, "fraud_ratio": 0.01},
+        ],
+    }
+
+
+def test_evaluate_reference_benchmark_fastapi_endpoints(monkeypatch: pytest.MonkeyPatch):
     import fastapi
     from fastapi.testclient import TestClient
 
+    from app.presentation.routers import design_partner
     from app.presentation.routers.design_partner import api_router, router
+
+    monkeypatch.setattr(
+        design_partner._pilot_service,
+        "evaluate_reference_benchmark",
+        lambda dataset_name, n_samples=2500, daily_volume=100000: _make_schema_valid_benchmark_payload(
+            dataset_name, n_samples, daily_volume
+        ),
+    )
 
     test_app = fastapi.FastAPI()
     test_app.include_router(router)
@@ -131,3 +210,23 @@ def test_evaluate_reference_benchmark_fastapi_endpoints():
     data2 = resp2.json()
     assert data2["dataset_name"] == "creditcard"
     assert data2["total_transactions_evaluated"] == 2000
+
+
+@pytest.mark.real_data
+def test_evaluate_reference_benchmark_fastapi_endpoints_authentic_datasets():
+    import fastapi
+    from fastapi.testclient import TestClient
+
+    from app.presentation.routers.design_partner import api_router, router
+
+    test_app = fastapi.FastAPI()
+    test_app.include_router(router)
+    test_app.include_router(api_router)
+    client = TestClient(test_app)
+
+    resp = client.get(
+        "/api/v1/design-partner/evaluate-benchmark",
+        params={"dataset": "elliptic", "n_samples": 2500, "daily_volume": 250000},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["dataset_name"] == "elliptic"
