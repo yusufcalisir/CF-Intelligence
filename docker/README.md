@@ -8,8 +8,8 @@ This directory contains production-hardened container manifests, multi-stage Doc
 
 ```text
 docker/
-├── Dockerfile.backend                 # Multi-stage hardened Python 3.12 API & FL runtime (non-root UID 1000)
-├── Dockerfile.frontend                # Multi-stage Node 20 / Nginx 1.27 Alpine SPA container
+├── Dockerfile.backend                 # Multi-stage hardened Python 3.12 API & FL runtime (non-root UID 1000, libpq drivers)
+├── Dockerfile.frontend                # Multi-stage Node 22 / Nginx 1.27 Alpine SPA container
 ├── nginx/
 │   ├── nginx.conf                     # Enterprise reverse proxy, WebSocket upgrade map & security headers
 │   └── frontend-nginx.conf            # SPA routing fallback, gzip compression & static asset caching
@@ -33,17 +33,17 @@ docker/
 ## 2. Multi-Stage Dockerfiles
 
 ### 2.1 Backend API & FL Engine (`Dockerfile.backend`)
-- **Stage 1 (Builder)**: `python:3.12-slim-bookworm` utilizing `uv` for reproducible, sub-second dependency installation into `/opt/venv`.
-- **Stage 2 (Runtime)**: Minimal slim image with pre-compiled wheels, zero build tools (`gcc`/`git` stripped).
+- **Stage 1 (Builder)**: `python:3.12-slim-bookworm` utilizing `uv` with `libpq-dev` for reproducible, sub-second dependency installation into `/opt/venv`.
+- **Stage 2 (Runtime)**: Minimal slim image with pre-compiled wheels, `libpq5` shared libraries, and zero build tools (`gcc`/`git` stripped).
 - **Security Posture**: Enforces non-root user `user:user` (UID `1000`, GID `1000`) with strict directory ownership.
 - **Ports Exposed**: `8000` (FastAPI HTTP / WebSocket) and `50051` (gRPC Mutual TLS Consortium Coordinator).
 - **Healthcheck Probe**: `curl -f http://127.0.0.1:8000/health || exit 1` (`interval=10s`, `timeout=3s`, `retries=3`).
 
 ### 2.2 Frontend SPA (`Dockerfile.frontend`)
-- **Stage 1 (Builder)**: `node:20-alpine` compiling React 19 + TypeScript bundle via `npm ci` and `npm run build`.
+- **Stage 1 (Builder)**: `node:22-alpine` compiling React 19 + TypeScript bundle via `npm ci` and `npm run build`.
 - **Stage 2 (Runtime)**: `nginx:1.27-alpine-slim` hardened web server serving compiled static assets.
 - **Routing**: Client-side SPA routing fallback (`try_files $uri $uri/ /index.html;`) with immutable cache headers for `/assets/`.
-- **Healthcheck Probe**: `wget -qO- http://127.0.0.1/health || exit 1`.
+- **Healthcheck Probe**: `wget -qO- http://127.0.0.1/health || exit 1` (supports `/health`, `/ready`, and `/live`).
 
 ---
 
@@ -55,8 +55,8 @@ The outer gateway (`cfi-gateway`) terminates HTTP/HTTPS traffic and routes reque
 |:---|:---|:---|
 | `/api/*` | `http://backend_api` (`cfi-api-server:8000`) | REST API with connection pooling (`keepalive 32`) |
 | `/ws/*` | `http://backend_api` (`cfi-api-server:8000`) | Bidirectional WebSockets with `Upgrade` headers & `86400s` timeout |
-| `/docs`, `/scalar`, `/openapi.json` | `http://backend_api` (`cfi-api-server:8000`) | Interactive OpenAPI documentation & schema |
-| `/health` | `http://backend_api` (`cfi-api-server:8000`) | Liveness and readiness endpoints |
+| `/docs`, `/redoc`, `/scalar`, `/openapi.json` | `http://backend_api` (`cfi-api-server:8000`) | Interactive OpenAPI, Swagger, ReDoc & Scalar documentation & schema |
+| `/health`, `/ready`, `/live` | `http://backend_api` (`cfi-api-server:8000`) | Health, readiness, and liveness probe endpoints |
 | `/gateway-health` | Local Nginx response | Gateway healthcheck probe (HTTP `200 "cfi_gateway_healthy"`) |
 | `/*` (Root Fallback) | `http://frontend_spa` (`cfi-frontend:80`) | Frontend Single Page Application |
 
