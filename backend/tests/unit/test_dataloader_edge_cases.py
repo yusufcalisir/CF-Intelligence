@@ -34,8 +34,12 @@ def _get_or_create_real_path(dataset_name: str, tmp_path: Path) -> Path | None:
         if feat.exists() and cls.exists():
             return None
         feat_rows = ["0,1," + ",".join(["0.1"] * 165), "1,1," + ",".join(["0.2"] * 165)]
-        (tmp_path / "elliptic_txs_features.csv").write_text("\n".join(feat_rows) + "\n", encoding="utf-8")
-        (tmp_path / "elliptic_txs_classes.csv").write_text("txId,class\n0,1\n1,2\n", encoding="utf-8")
+        (tmp_path / "elliptic_txs_features.csv").write_text(
+            "\n".join(feat_rows) + "\n", encoding="utf-8"
+        )
+        (tmp_path / "elliptic_txs_classes.csv").write_text(
+            "txId,class\n0,1\n1,2\n", encoding="utf-8"
+        )
         (tmp_path / "elliptic_txs_edgelist.csv").write_text("txId1,txId2\n0,1\n", encoding="utf-8")
         return tmp_path
 
@@ -48,14 +52,18 @@ def _get_or_create_real_path(dataset_name: str, tmp_path: Path) -> Path | None:
             "1,PAYMENT,100.0,C1,100.0,0.0,M1,0.0,100.0,0,0\n"
             "1,TRANSFER,500.0,C2,500.0,0.0,C3,0.0,500.0,1,0\n"
         )
-        (tmp_path / "PS_20174392719_1491204439457_log.csv").write_text(csv_content, encoding="utf-8")
+        (tmp_path / "PS_20174392719_1491204439457_log.csv").write_text(
+            csv_content, encoding="utf-8"
+        )
         return tmp_path
 
     if dataset_name == "ieee_cis":
         candidates = [root / "train_transaction.csv"] + list(root.glob("*.csv"))
         if any(c.exists() for c in candidates):
             return None
-        cols = ["TransactionID", "isFraud", "TransactionDT", "TransactionAmt", "ProductCD"] + [f"C{i}" for i in range(1, 15)]
+        cols = ["TransactionID", "isFraud", "TransactionDT", "TransactionAmt", "ProductCD"] + [
+            f"C{i}" for i in range(1, 15)
+        ]
         row1 = ["1", "0", "86400", "50.0", "W"] + ["1.0"] * 14
         row2 = ["2", "1", "86401", "150.0", "W"] + ["2.0"] * 14
         csv_content = ",".join(cols) + "\n" + ",".join(row1) + "\n" + ",".join(row2) + "\n"
@@ -74,10 +82,21 @@ def _get_or_create_real_path(dataset_name: str, tmp_path: Path) -> Path | None:
         return tmp_path
 
     if dataset_name == "amlsim":
-        candidates = [root / "transactions.parquet", root / "transactions.csv"] + list(root.glob("*.csv"))
+        candidates = [root / "transactions.parquet", root / "transactions.csv"] + list(
+            root.glob("*.csv")
+        )
         if any(c.exists() for c in candidates):
             return None
-        tx_cols = ["TX_ID", "SENDER_ACCOUNT_ID", "RECEIVER_ACCOUNT_ID", "TX_TYPE", "TX_AMOUNT", "TIMESTAMP", "IS_FRAUD", "ALERT_ID"]
+        tx_cols = [
+            "TX_ID",
+            "SENDER_ACCOUNT_ID",
+            "RECEIVER_ACCOUNT_ID",
+            "TX_TYPE",
+            "TX_AMOUNT",
+            "TIMESTAMP",
+            "IS_FRAUD",
+            "ALERT_ID",
+        ]
         row1 = ["1", "100", "200", "TRANSFER", "50.0", "0", "False", "-1"]
         row2 = ["2", "200", "300", "TRANSFER", "150.0", "1", "True", "10"]
         csv_content = ",".join(tx_cols) + "\n" + ",".join(row1) + "\n" + ",".join(row2) + "\n"
@@ -119,8 +138,12 @@ class TestRealDatasetLoading:
         assert len(data["y"]) == len(data["X"])
         assert set(np.unique(data["y"])).issubset({0, 1})
         assert not np.isnan(data["X"]).any(), "Feature matrix contains NaN values"
-        assert "TransactionDT" not in data["feature_names"], "TransactionDT must not leak into feature_names"
-        assert data["transaction_dt"] is not None, "TransactionDT must be retained separately as split axis"
+        assert "TransactionDT" not in data["feature_names"], (
+            "TransactionDT must not leak into feature_names"
+        )
+        assert data["transaction_dt"] is not None, (
+            "TransactionDT must be retained separately as split axis"
+        )
 
     def test_load_creditcard_real_dataset_integrity(self, tmp_path: Path) -> None:
         p = _get_or_create_real_path("creditcard", tmp_path)
@@ -157,7 +180,6 @@ class TestStrictRealModeGuards:
         empty_dir.mkdir()
         with pytest.raises(FileNotFoundError, match="Real PaySim dataset files not found"):
             load_paysim(path=empty_dir, require_real=True)
-
 
     def test_load_dataset_case_insensitive_and_hyphen_tolerant(self, tmp_path: Path) -> None:
         p1 = _get_or_create_real_path("paysim", tmp_path / "paysim")
@@ -202,7 +224,9 @@ class TestNonIIDPartitioningEdgeCases:
     def test_partition_invalid_alpha_raises(self) -> None:
         X = np.ones((10, 5))
         y = np.zeros(10)
-        with pytest.raises(ValueError, match="Dirichlet concentration parameter alpha must be strictly positive"):
+        with pytest.raises(
+            ValueError, match="Dirichlet concentration parameter alpha must be strictly positive"
+        ):
             partition_dataset_non_iid(X, y, alpha=-0.5)
 
     def test_partition_extreme_alpha_skew(self) -> None:
