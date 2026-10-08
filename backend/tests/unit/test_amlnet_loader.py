@@ -40,6 +40,7 @@ def _has_real_amlnet() -> bool:
 class TestAMLNetLoader:
     """Test suite validating AMLNet dataset loading, feature engineering, and temporal splitting."""
 
+    @pytest.mark.real_data
     def test_real_amlnet_loading_and_shapes(self) -> None:
         """Verify real AMLNet dataset loads from disk with expected shapes and features."""
         if not _has_real_amlnet():

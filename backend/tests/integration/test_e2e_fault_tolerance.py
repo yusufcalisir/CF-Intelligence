@@ -27,7 +27,8 @@ def test_bank_drops_mid_round_quorum_still_met() -> None:
 
     res_b = svc.on_gradient_received(1, "bank_beta", b"grad_beta")
     assert res_b["status"] == "COMPLETED"
-    assert res_b["is_champion"] is True
+    assert res_b["is_champion"] is False
+    assert res_b["model_status"] == "UNVERIFIED_NO_EVALUATION"
 
 
 def test_coordinator_restart_resumes_round() -> None:

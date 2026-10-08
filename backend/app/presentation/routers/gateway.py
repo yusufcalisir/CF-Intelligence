@@ -184,15 +184,25 @@ PATH_ROUTING = {
 # ── Gateway Helpers ───────────────────────────────────────────
 
 
-def get_api_keys() -> dict[str, tuple[str, str]]:
-    """Parse configured gateway API keys into map of key -> (identity, role)."""
+def get_api_keys() -> dict[str, tuple[str, str, int]]:
+    """Parse configured gateway API keys into map of key -> (identity, role, clearance_level)."""
     keys_map = {}
     for item in settings.gateway_api_keys.split(","):
         if not item:
             continue
         parts = item.split(":")
-        if len(parts) == 3:
-            keys_map[parts[0]] = (parts[1], parts[2])
+        if len(parts) >= 4:
+            try:
+                keys_map[parts[0]] = (parts[1], parts[2], int(parts[3]))
+            except ValueError:
+                keys_map[parts[0]] = (parts[1], parts[2], 1)
+        elif len(parts) == 3:
+            # Check authoritative registered user record in AuthenticationService
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            user = AuthenticationService.get_instance().get_user(parts[1])
+            clearance = user.clearance_level if user else 1
+            keys_map[parts[0]] = (parts[1], parts[2], clearance)
     return keys_map
 
 
@@ -271,12 +281,13 @@ def authenticate_request(
     if api_key:
         keys_map = get_api_keys()
         if api_key in keys_map:
-            identity, role = keys_map[api_key]
+            identity, role, clearance = keys_map[api_key]
             claims = UserClaims(
                 sub=f"apikey_{identity}",
                 username=identity,
                 bank_id=identity if role == "bank" else "global",
                 roles=[role],
+                clearance_level=clearance,
             )
             return identity, role, api_key, claims
 
@@ -289,6 +300,7 @@ def authenticate_request(
         username="analyst",
         bank_id="global",
         roles=["analyst"],
+        clearance_level=1,
     )
     return "analyst", "analyst", api_key, dev_claims
 

@@ -531,6 +531,32 @@ class TestThoughtMachineAmountIntegrity:
         assert txs[0].origin_country == "DE"
         assert txs[0].destination_country == "FR"
 
+    def test_no_fictitious_counterparty_account_fabricated(self) -> None:
+        """Constraint 5: Verifies that single-leg postings without authoritative metadata do not fabricate accounts."""
+        connector = ThoughtMachineConnector()
+        # Single-leg posting with only a debit leg and no target/counterparty metadata
+        payload_single_leg = {
+            "posting_instruction_batch": {
+                "id": "PIB_SINGLE_LEG",
+                "posting_instructions": [
+                    {
+                        "id": "INST_SINGLE_LEG",
+                        "custom_instruction": {
+                            "value_timestamp": "2026-03-01T10:00:00Z",
+                            "postings": [
+                                {"account_id": "ACC_SOLE_DEBITOR", "amount": "250.0", "credit": False},
+                            ],
+                        },
+                    }
+                ],
+            }
+        }
+        txs = connector.parse_batch(payload_single_leg)
+        # Incomplete single leg without authoritative counterparty metadata must be rejected / quarantined,
+        # never synthesized with a fabricated counterparty like 'tm_ext_ACC_SOLE_DEBITOR'.
+        assert len(txs) == 0
+        assert not any("tm_ext" in getattr(tx, "counterparty_account_id", "") for tx in txs)
+
 
 # ==============================================================================
 # RU-06 / Scientific Report Publication-State Integrity (AC-28 to AC-34)

@@ -170,6 +170,7 @@ class TestTransactionLifecycleAndSystemInvariants:
             "merchant_category": "grocery",
             "country_code": "DE",  # Germany
             "device_type": "web_browser",
+            "velocity": 1.0,
             "bank_id": "bank_b",
             "chargeback_count": 0,
         }

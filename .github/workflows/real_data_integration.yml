@@ -82,7 +82,7 @@ jobs:
           PYTHONPATH: backend
         run: |
           echo "Running Gate B real-data integration test suite..."
-          pytest backend/tests/integration/datasets/test_real_dataset_integration.py -v --require-real-data
+          pytest backend/tests/ -v -m real_data --require-real-data
 
       - name: Report Gate Status
         if: always()

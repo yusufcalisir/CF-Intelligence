@@ -6,10 +6,14 @@ round orchestration, real-time transaction scoring, case management, and GDPR er
 
 from __future__ import annotations
 
+import numpy as np
+
+from app.application.services.candidate_evaluator import CandidateModelEvaluator
 from app.application.services.case_service import CaseManagementService
 from app.application.services.coordinator_service import CoordinatorService
 from app.application.services.retention_engine import AutomatedRetentionEngine
-from app.domain.enums import CasePriority, CaseStatus
+from app.domain.enums import CasePriority, CaseStatus, DatasetProvenance
+from app.domain.value_objects import DesignatedHoldoutDataset
 from app.infrastructure.security.cert_generator import generate_self_signed_pem
 from app.presentation.routers.realtime_inference import (
     RealtimeInferenceRequest,
@@ -17,6 +21,20 @@ from app.presentation.routers.realtime_inference import (
     reset_model_cache,
     score_transaction_realtime,
 )
+
+
+class _SimulatedCandidateModel:
+    def __init__(self, invert: bool = False) -> None:
+        self.invert = invert
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        probs = []
+        for row in X:
+            p = 0.90 if row.sum() > 0.5 else 0.10
+            if self.invert:
+                p = 1.0 - p
+            probs.append([1.0 - p, p])
+        return np.array(probs, dtype=np.float32)
 
 
 def setup_function() -> None:
@@ -43,6 +61,19 @@ def test_complete_two_bank_fl_round() -> None:
     assert round_data["round_id"] == 1
     assert round_data["status"] in ("COLLECTING_GRADIENTS", "TRAINING")
     assert set(round_data["participating_banks"]) == {"bank_alpha", "bank_beta"}
+
+    # Bind designated holdout dataset and candidate model for quality gate evaluation
+    X_val = np.array([[0.0] * 10] * 4 + [[1.0] * 10] * 4, dtype=np.float32)
+    y_val = np.array([0, 0, 0, 0, 1, 1, 1, 1], dtype=int)
+    holdout = DesignatedHoldoutDataset(
+        dataset_id="canonical_lifecycle_holdout",
+        features=X_val,
+        labels=y_val,
+        provenance=DatasetProvenance.PUBLIC_SIMULATED_DATASET,
+    )
+    evaluator = CandidateModelEvaluator(holdout_dataset=holdout)
+    coordinator.set_evaluator(evaluator)
+    coordinator.set_round_candidate_model(1, _SimulatedCandidateModel(invert=False))
 
     # Assert gRPC StartRound notifications dispatched
     notifs = [n for n in coordinator.grpc_notifications if n["event"] == "StartRoundRequest"]

@@ -105,6 +105,7 @@ class SOC2EvidenceReportResponse(BaseModel):
     total_controls_audited: int
     passed_controls: int
     failed_controls: int
+    not_applicable_controls: int = 0
     controls: dict[str, SOC2ControlEvidenceItem]
 
 

@@ -146,23 +146,19 @@ class RiskScoringEngine:
                 if online_feats:
                     feats = online_feats[0]
                     # Map online features back to txn fields for scoring
-                    fs_velocity = feats.get("rolling_velocity_1h", 1.0)
-                    txn_eval["velocity"] = max(txn_eval.get("velocity", 1.0), fs_velocity)
-                    txn_eval["customer_history_score"] = feats.get(
-                        "customer_history_score", txn_eval.get("customer_history_score", 0.95)
-                    )
-                    txn_eval["account_age_days"] = feats.get(
-                        "account_age_days", txn_eval.get("account_age_days", 365)
-                    )
-                    txn_eval["chargeback_count"] = feats.get(
-                        "chargeback_count", txn_eval.get("chargeback_count", 0)
-                    )
-                    txn_eval["merchant_risk_score"] = feats.get(
-                        "merchant_risk_score", txn_eval.get("merchant_risk_score", 0.05)
-                    )
-                    txn_eval["merchant_category"] = feats.get(
-                        "merchant_category", txn_eval.get("merchant_category", "grocery")
-                    )
+                    fs_velocity = feats.get("rolling_velocity_1h")
+                    if fs_velocity is not None:
+                        txn_eval["velocity"] = max(txn_eval.get("velocity", 1.0), float(fs_velocity))
+                    if feats.get("customer_history_score") is not None:
+                        txn_eval["customer_history_score"] = float(feats["customer_history_score"])
+                    if feats.get("account_age_days") is not None:
+                        txn_eval["account_age_days"] = int(feats["account_age_days"])
+                    if feats.get("chargeback_count") is not None:
+                        txn_eval["chargeback_count"] = int(feats["chargeback_count"])
+                    if feats.get("merchant_risk_score") is not None:
+                        txn_eval["merchant_risk_score"] = float(feats["merchant_risk_score"])
+                    if feats.get("merchant_category") is not None:
+                        txn_eval["merchant_category"] = feats["merchant_category"]
                     logger.info(
                         "Online Feature Store retrieved successfully for entity %s", entity_hash
                     )

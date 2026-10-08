@@ -524,25 +524,54 @@ class CounterfactualService:
                 for f in alert.top_features
                 if isinstance(f, dict)
             }
+            top_values = {
+                f.get("feature"): f.get("value")
+                for f in alert.top_features
+                if isinstance(f, dict) and "value" in f
+            }
             has_high_amt = (
                 "HIGH-AMT" in alert.reason_codes
-                or orig_score > 600
                 or "transaction_amount" in top_feat_dict
             )
-            has_geo = "GEO-RISK" in alert.reason_codes or "country_code" in top_feat_dict or orig_score > 700
-            has_vel = "VEL-001" in alert.reason_codes or "velocity" in top_feat_dict or orig_score > 750
-            has_merch = "MERCH-RISK" in alert.reason_codes or "merchant_category" in top_feat_dict or orig_score > 650
+            has_geo = "GEO-RISK" in alert.reason_codes or "country_code" in top_feat_dict
+            has_vel = "VEL-001" in alert.reason_codes or "velocity" in top_feat_dict
+            has_merch = "MERCH-RISK" in alert.reason_codes or "merchant_category" in top_feat_dict
+            has_dev = "DEV-ANOMALY" in alert.reason_codes or "device_type" in top_feat_dict
+
+            def _get_float(key: str, default: float) -> float:
+                val = top_values.get(key)
+                if val is not None:
+                    try:
+                        return float(val)
+                    except (ValueError, TypeError):
+                        pass
+                return default
+
+            def _get_int(key: str, default: int) -> int:
+                val = top_values.get(key)
+                if val is not None:
+                    try:
+                        return int(val)
+                    except (ValueError, TypeError):
+                        pass
+                return default
+
+            def _get_str(key: str, default: str) -> str:
+                val = top_values.get(key)
+                if val is not None:
+                    return str(val)
+                return default
 
             working_txn = {
-                "transaction_amount": 4500.0 if has_high_amt else 150.0,
-                "country_code": "KP" if has_geo else "US",
-                "velocity": 12.0 if has_vel else 1.0,
-                "merchant_category": "gambling" if has_merch else "retail",
-                "device_type": "phone_banking" if orig_score > 700 else "web_browser",
-                "customer_history_score": 0.35 if orig_score > 600 else 0.85,
-                "merchant_risk_score": 0.85 if has_merch else 0.10,
-                "account_age_days": 20 if orig_score > 650 else 365,
-                "hour_of_day": 3 if orig_score > 750 else 14,
+                "transaction_amount": _get_float("transaction_amount", 4500.0 if has_high_amt else 150.0),
+                "country_code": _get_str("country_code", "KP" if has_geo else "US"),
+                "velocity": _get_float("velocity", 12.0 if has_vel else 1.0),
+                "merchant_category": _get_str("merchant_category", "gambling" if has_merch else "retail"),
+                "device_type": _get_str("device_type", "phone_banking" if has_dev else "web_browser"),
+                "customer_history_score": _get_float("customer_history_score", 0.35 if orig_score > 850 else 0.85),
+                "merchant_risk_score": _get_float("merchant_risk_score", 0.85 if has_merch else 0.10),
+                "account_age_days": _get_int("account_age_days", 20 if orig_score > 850 else 365),
+                "hour_of_day": _get_int("hour_of_day", 3 if orig_score > 850 else 14),
             }
 
             if has_high_amt and hasattr(self.engine, "register_baseline"):

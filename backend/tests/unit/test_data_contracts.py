@@ -109,7 +109,23 @@ class TestKafkaEventBus:
     def test_kafka_metadata_injected_when_enabled(self):
         settings = get_settings()
         original_use_kafka = settings.use_kafka
+        original_producer = event_bus._kafka_producer
         settings.use_kafka = True
+
+        class MockRecordMetadata:
+            topic = "domain_events.alert.created"
+            partition = 2
+            offset = 42
+
+        class MockFuture:
+            def get(self, timeout=None):
+                return MockRecordMetadata()
+
+        class MockProducer:
+            def send(self, topic, key=None, value=None):
+                return MockFuture()
+
+        event_bus.set_kafka_producer(MockProducer())
         try:
             event = AlertCreated(
                 alert_id="alert_kafka_test",
@@ -123,12 +139,14 @@ class TestKafkaEventBus:
             target = next(e for e in matching if getattr(e, "alert_id", "") == "alert_kafka_test")
             assert "kafka_publish" in target.metadata
             k = target.metadata["kafka_publish"]
+            assert k["status"] == "BROKER_ACKNOWLEDGED"
             assert k["topic"] == "domain_events.alert.created"
-            assert k["partition"] == hash("bank_b") % 3
-            assert isinstance(k["offset"], int)
+            assert k["partition"] == 2
+            assert k["offset"] == 42
             assert k["broker"] == settings.kafka_bootstrap_servers
         finally:
             settings.use_kafka = original_use_kafka
+            event_bus.set_kafka_producer(original_producer)
 
     def test_kafka_metadata_absent_when_disabled(self):
         settings = get_settings()
@@ -145,7 +163,11 @@ class TestKafkaEventBus:
 
             matching = event_bus.get_event_log(event_type="alert.created")
             target = next(e for e in matching if getattr(e, "alert_id", "") == "alert_no_kafka")
-            assert "kafka_publish" not in target.metadata
+            assert "kafka_publish" in target.metadata
+            k = target.metadata["kafka_publish"]
+            assert k["status"] == "IN_MEMORY_EVENT_BUS"
+            assert k["provenance"] == "IN_MEMORY"
+            assert k["broker"] is None
         finally:
             settings.use_kafka = original_use_kafka
 

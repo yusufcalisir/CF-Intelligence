@@ -22,15 +22,26 @@ def test_token_refreshed_before_expiry() -> None:
     connector._cached_token = "old_expiring_token_123"
     connector._token_expires_at = now + 120.0
 
-    with patch.object(
-        connector, "_get_oauth2_token", wraps=connector._get_oauth2_token
-    ) as mock_token_get:
+    mock_resp = MagicMock(spec=httpx.Response)
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "access_token": "new_refreshed_token_456",
+        "expires_in": 3600,
+    }
+
+    with (
+        patch("httpx.post", return_value=mock_resp) as mock_post,
+        patch.object(
+            connector, "_get_oauth2_token", wraps=connector._get_oauth2_token
+        ) as mock_token_get,
+    ):
         # Requesting headers triggers _refresh_token_if_expiring
         headers = connector._get_headers()
 
-        assert "Authorization" in headers
+        assert headers["Authorization"] == "Bearer new_refreshed_token_456"
         # Assert _get_oauth2_token was called with force_refresh=True during refresh
         mock_token_get.assert_any_call(force_refresh=True)
+        mock_post.assert_called_once()
 
 
 def test_rate_limit_retry_logic() -> None:

@@ -248,7 +248,7 @@ class MetricsResponse(BaseModel):
     precision: float
     recall: float
     f1_score: float
-    auc_roc: float
+    auc_roc: float | None = None
     loss: float
     confusion_matrix: list[list[int]]
     roc_fpr: list[float]

@@ -160,6 +160,15 @@ class ThoughtMachineConnector(BaseBankConnector):
             or inst
         )
 
+        # Parse and validate event timestamp first (fails closed on malformed values)
+        raw_ts = (
+            posting_data.get("value_timestamp")
+            or inst.get("value_timestamp")
+            or inst.get("insertion_timestamp")
+            or posting_data.get("timestamp")
+        )
+        event_time = self._parse_vault_timestamp(raw_ts)
+
         postings = posting_data.get("postings") or []
         if postings:
             # A double-entry transfer has debtor and creditor postings
@@ -196,20 +205,27 @@ class ThoughtMachineConnector(BaseBankConnector):
                     debtor_acc = clean_acc
                     amount = max(amount, raw_amt)
 
+            # Check if missing leg can be resolved through authoritative posting metadata
+            cpty = str(
+                posting_data.get("counterparty_account_id")
+                or posting_data.get("target_account_id")
+                or posting_data.get("contra_account_id")
+                or ""
+            ).strip()
+            if debtor_acc and not creditor_acc and cpty:
+                creditor_acc = cpty
+            elif creditor_acc and not debtor_acc and cpty:
+                debtor_acc = cpty
+
             if not debtor_acc or not creditor_acc:
-                logger.warning("Posting instruction %s missing debtor or creditor account", instruction_id)
+                logger.warning(
+                    "Posting instruction %s missing debtor or creditor account and no authoritative counterparty metadata found",
+                    instruction_id,
+                )
                 return None
             if amount <= 0.0:
                 logger.warning("Posting instruction %s has non-positive evaluated amount: %s", instruction_id, amount)
                 return None
-
-            raw_ts = (
-                posting_data.get("value_timestamp")
-                or inst.get("value_timestamp")
-                or inst.get("insertion_timestamp")
-                or posting_data.get("timestamp")
-            )
-            event_time = self._parse_vault_timestamp(raw_ts)
 
             origin_country = debtor_acc[:2].upper() if len(debtor_acc) >= 2 and debtor_acc[:2].isalpha() else None
             destination_country = creditor_acc[:2].upper() if len(creditor_acc) >= 2 and creditor_acc[:2].isalpha() else None
@@ -257,14 +273,6 @@ class ThoughtMachineConnector(BaseBankConnector):
                 return None
             amount = val
             currency = posting_data.get("denomination") or inst.get("currency") or "EUR"
-
-            raw_ts = (
-                posting_data.get("value_timestamp")
-                or inst.get("value_timestamp")
-                or inst.get("insertion_timestamp")
-                or posting_data.get("timestamp")
-            )
-            event_time = self._parse_vault_timestamp(raw_ts)
 
             origin_country = account_id[:2].upper() if len(account_id) >= 2 and account_id[:2].isalpha() else None
             destination_country = target_account[:2].upper() if len(target_account) >= 2 and target_account[:2].isalpha() else None

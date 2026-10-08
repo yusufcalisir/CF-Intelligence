@@ -93,6 +93,54 @@ def test_gateway_rate_limiting():
         settings.gateway_require_auth = original_require_auth
 
 
+def test_gateway_abac_clearance_regression():
+    """Positive and negative regression tests for ABAC clearance and fail-closed authorization."""
+    original_keys = settings.gateway_api_keys
+    original_require_auth = settings.gateway_require_auth
+    settings.gateway_require_auth = True
+    # Configure an unprivileged key with explicit clearance_level 0 and an authorized analyst key with clearance_level 2
+    settings.gateway_api_keys = (
+        "key_unprivileged:guest_entity:guest:0,"
+        "key_authorized_analyst:analyst_entity:analyst:2,"
+        "key_bank_a:bank_a:bank:1"
+    )
+    try:
+        # Negative test 1: Unprivileged key with clearance 0 fails closed with 403 Insufficient Clearance
+        res_unprivileged = client.get(
+            "/api/v1/simulations",
+            headers={"X-API-Key": "key_unprivileged"},
+        )
+        assert res_unprivileged.status_code == 403
+
+        # Negative test 2: Unauthenticated identity fails closed with 401
+        res_no_auth = client.get("/api/v1/simulations")
+        assert res_no_auth.status_code == 401
+
+        # Negative test 3: Bank role denied from other bank tenant
+        res_cross_tenant = client.get(
+            "/api/v1/alerts?bank_id=bank_b",
+            headers={"X-API-Key": "key_bank_a"},
+        )
+        assert res_cross_tenant.status_code == 403
+
+        # Positive test 1: Authorized analyst key with clearance 2 succeeds (not 401/403)
+        res_auth_analyst = client.get(
+            "/api/v1/simulations",
+            headers={"X-API-Key": "key_authorized_analyst"},
+        )
+        assert res_auth_analyst.status_code not in (401, 403)
+
+        # Positive test 2: Bank A key accessing Bank A resource succeeds (not 401/403)
+        res_auth_bank = client.get(
+            "/api/v1/alerts?bank_id=bank_a",
+            headers={"X-API-Key": "key_bank_a"},
+        )
+        assert res_auth_bank.status_code not in (401, 403)
+    finally:
+        settings.gateway_api_keys = original_keys
+        settings.gateway_require_auth = original_require_auth
+
+
 # Clean up environment variable after tests run
 if "SERVICE_NAME" in os.environ:
     del os.environ["SERVICE_NAME"]

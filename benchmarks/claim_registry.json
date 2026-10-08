@@ -111,8 +111,8 @@
       "dataset_scale": "590,540 Real Kaggle/Vesta transactions (80/20 chronological holdout, 4,064 test fraud)",
       "stated_value": 0.812,
       "stated_unit": "PR-AUC",
-      "empirical_measured_value": 0.3895,
-      "centralized_baseline_value": 0.4422,
+      "empirical_measured_value": 0.389172,
+      "centralized_baseline_value": 0.439861,
       "evaluation_type": "FEDERATED_VS_CENTRALIZED",
       "metric_definition": "sklearn.metrics.average_precision_score (reported as PR-AUC in project tables)",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
@@ -131,21 +131,21 @@
       "per_seed_results": [
         {
           "seed": 42,
-          "centralized_pr_auc": 0.4394,
-          "fedavg_pr_auc": 0.3813
+          "centralized_pr_auc": 0.437687,
+          "fedavg_pr_auc": 0.382905
         },
         {
           "seed": 123,
-          "centralized_pr_auc": 0.446,
-          "fedavg_pr_auc": 0.4037
+          "centralized_pr_auc": 0.447871,
+          "fedavg_pr_auc": 0.411691
         },
         {
           "seed": 456,
-          "centralized_pr_auc": 0.4412,
-          "fedavg_pr_auc": 0.3834
+          "centralized_pr_auc": 0.434025,
+          "fedavg_pr_auc": 0.37292
         }
       ],
-      "notes": "Empirically measured from 590,540 real IEEE-CIS transactions (434 merged columns, 421 numeric model inputs) under strict chronological out-of-time 80/20 holdout across 3 simulated bank clients (Dirichlet alpha=0.5 non-IID label skew) across seeds [42, 123, 456]. Centralized baseline AP: 0.4422 +/- 0.0034; FedAvg AP: 0.3895 +/- 0.0124; Paired Delta: -0.0527 +/- 0.0090 (approx. 11.9% relative reduction vs centralized mean). Client heterogeneity is one plausible contributor to the observed gap. The predefined engineering target of 0.8120 was not reached under the evaluated chronological holdout; temporal distribution shift is a plausible contributor, but this experiment did not isolate its causal effect. Historical synthetic smoke metrics (0.7811 / 0.7554) came from an earlier synthetic fallback experiment and are non-comparable.",
+      "notes": "Empirically measured from 590,540 real IEEE-CIS transactions (434 merged columns, 421 numeric model inputs) under strict chronological out-of-time 80/20 holdout across 3 simulated bank clients (Dirichlet alpha=0.5 non-IID label skew) across seeds [42, 123, 456]. Centralized baseline AP: 0.439861; FedAvg AP: 0.389172; Paired Delta: -0.050689. Client heterogeneity is one plausible contributor to the observed gap. The predefined engineering target of 0.8120 was not reached under the evaluated chronological holdout; temporal distribution shift is a plausible contributor, but this experiment did not isolate its causal effect. Historical synthetic smoke metrics (0.7811 / 0.7554) came from an earlier synthetic fallback experiment and are non-comparable.",
       "legacy_artifact": {
         "centralized_pr_auc": 0.7811,
         "fedavg_pr_auc": 0.7554,
@@ -164,8 +164,8 @@
       "dataset_scale": "590,540 Real Kaggle/Vesta transactions (80/20 chronological holdout, 4,064 test fraud, 114,044 test legit)",
       "stated_value": 0.589,
       "stated_unit": "Recall @ 0.1% FPR",
-      "empirical_measured_value": 0.1976,
-      "centralized_baseline_value": 0.2004,
+      "empirical_measured_value": 0.196194,
+      "centralized_baseline_value": 0.199967,
       "evaluation_type": "HIGH_PRECISION_OPERATIONAL_THRESHOLD",
       "metric_definition": "Recall at target FPR = 0.001 (0.1% FPR) evaluated as a test-set diagnostic operating point",
       "target_fpr": 0.001,
