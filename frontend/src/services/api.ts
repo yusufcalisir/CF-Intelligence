@@ -21,7 +21,7 @@ export async function checkSystemHealth(): Promise<SystemHealthStatus> {
       service: 'cfi-backend',
       environment: 'development',
       redis_connected: false,
-      version: '1.4.2',
+      version: '2.4.0',
     };
   }
 }

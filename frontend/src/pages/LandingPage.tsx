@@ -1652,7 +1652,7 @@ export default function LandingPage() {
                   <span>CF-Intelligence Network</span>
                   <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    v1.0.0 Live
+                    v2.4.0 Live
                   </span>
                 </div>
               </div>

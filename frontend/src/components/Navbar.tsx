@@ -50,7 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 Cross-Bank FL Fraud Intelligence
               </h1>
               <span className="hidden sm:inline-block text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-semibold">
-                v1.4.2
+                {health?.version ? `v${health.version}` : 'v2.4.0'}
               </span>
             </div>
             <p className="hidden sm:block text-xs text-slate-400">

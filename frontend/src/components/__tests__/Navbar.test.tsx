@@ -16,12 +16,13 @@ describe('Navbar Component (User Interaction)', () => {
           service: 'fraud-platform',
           environment: 'production',
           redis_connected: true,
-          version: '1.4.2',
+          version: '2.4.0',
         }}
       />
     );
 
     expect(screen.getByText(/Cross-Bank FL Fraud Intelligence/i)).toBeInTheDocument();
+    expect(screen.getByText(/v2.4.0/i)).toBeInTheDocument();
     expect(screen.getByText(/Backend Online/i)).toBeInTheDocument();
     expect(screen.getByText(/Graph Fraud Visualizer/i)).toBeInTheDocument();
     expect(screen.getByText(/Counterfactual Workbench/i)).toBeInTheDocument();
@@ -43,7 +44,7 @@ describe('Navbar Component (User Interaction)', () => {
           service: 'fraud-platform',
           environment: 'production',
           redis_connected: true,
-          version: '1.4.2',
+          version: '2.4.0',
         }}
       />
     );

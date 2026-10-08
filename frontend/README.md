@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Vite](https://img.shields.io/badge/Vite-6.0-646CFF.svg?style=flat&logo=vite&logoColor=white)](https://vitejs.dev)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.0-06B6D4.svg?style=flat&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![Vitest Passing](https://img.shields.io/badge/tests-355%2F355_passing-success.svg?style=flat&logo=vitest&logoColor=white)](https://vitest.dev)
+[![Vitest Passing](https://img.shields.io/badge/tests-373%2F373_passing-success.svg?style=flat&logo=vitest&logoColor=white)](https://vitest.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 
 This directory contains the production-grade **Enterprise Fraud Intelligence Web Console & Commercial Dashboard** for the **Collaborative Fraud Intelligence (CF-Intelligence)** platform. Built with React 19, TypeScript, and Vite, the frontend delivers a high-performance, real-time user interface for fraud analysts, compliance officers, and consortium operators.
@@ -110,18 +110,18 @@ The frontend enforces strict quality gates across multiple testing dimensions:
 │                     FRONTEND VERIFICATION PIPELINE                     │
 │                                                                        │
 │   [ Vitest Suite ]       [ TypeScript Engine ]     [ ESLint Engine ]   │
-│   (355 / 355 Tests)      (tsc -b Clean Build)      (0 Errors)          │
+│   (373 / 373 Tests)      (tsc -b Clean Build)      (0 Errors)          │
 │          │                         │                        │          │
 │          └─────────────────────────┼────────────────────────┘          │
 │                                    ▼                                   │
 │                     ┌─────────────────────────────┐                    │
 │                     │ Vite Production Bundle Pass │                    │
-│                     │ (3,108 Modules Transformed) │                    │
+│                     │ (3,109 Modules Transformed) │                    │
 │                     └─────────────────────────────┘                    │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-* **Vitest Unit & Component Suite**: 355 tests across 86 test files validating UI rendering, hook state lifecycles, and API query client contracts.
+* **Vitest Unit & Component Suite**: 373 tests across 87 test files validating UI rendering, hook state lifecycles, and API query client contracts.
 * **Static Type Checking**: `tsc -b` runs with zero compilation errors across all source files and test suites.
 * **Production Linting**: `eslint .` enforces zero errors across React Hooks, JSX syntax, and TypeScript invariants.
 * **End-to-End Playwright Automation**: Multi-device viewport validation (Desktop 1440, Laptop 1280), visual snapshot regression, and Axe-core accessibility compliance.

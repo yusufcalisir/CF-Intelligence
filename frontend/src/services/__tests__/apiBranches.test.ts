@@ -25,7 +25,7 @@ describe('API Service Comprehensive Branch Coverage Suite', () => {
         service: 'cfi-backend',
         environment: 'production',
         redis_connected: true,
-        version: '1.4.2',
+        version: '2.4.0',
       };
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
