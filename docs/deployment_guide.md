@@ -224,9 +224,13 @@ The Helm chart in [`deployments/helm/cfi-platform`](../deployments/helm/cfi-plat
 
 Validate all Helm templates and Kubernetes API contracts before cluster application:
 ```bash
+# Validate core microservices chart (16 resources)
 python scripts/validate_k8s_manifests.py
+
+# Validate all repository Helm charts (39 total resources across microservices, GitOps, and standalone charts)
+python scripts/validate_k8s_manifests.py --all
 ```
-*Output: 16 Kubernetes resources rendered and validated cleanly against Kubernetes API schemas.*
+*Output: All 39 Kubernetes resources rendered and validated cleanly against Kubernetes API schemas.*
 
 ## 3.3 Helm Deployment Execution
 

@@ -437,18 +437,24 @@ The platform implements multi-tenant database isolation informed by SOC 2 and PC
 │   │   └── presentation/         # API controllers & WebSocket streams
 │   │       ├── routers/             # 42 modular FastAPI REST endpoints (incl. FININT, SEPA Recalls, Sanctions, goAML, Open AML Adapter, Corporate UBO, European AML Scenarios, Asset Recovery)
 │   │       └── websockets/          # Real-time alert & training WebSockets
-│   └── tests/                    # 3,238 automated unit, integration, & security tests
+│   └── tests/                    # Comprehensive automated unit, integration, & security test suites
 ├── frontend/
 │   ├── src/
 │   │   ├── api/                  # TanStack Query clients & REST hooks
 │   │   ├── components/           # Reusable UI components, Charts, Ingestion Studio
-│   │   └── pages/                # 12 unified application views (Dashboard, Onboarding, etc.)
+│   │   └── pages/                # 19 Enterprise Commercial Console Views
 │   └── package.json              # React 19, Vite, Tailwind CSS dependencies
+├── experiments/                  # Unified empirical benchmarks (8 canonical datasets, 5-artifact standard)
 ├── deployments/
-│   ├── helm/cfi-platform/        # Production Helm 3 chart (HPA, NetPol, HSM)
+│   ├── helm/cfi-platform/        # Decomposed microservices Helm 3 chart (16 resources)
+│   ├── helm/cfi-platform-root/   # ArgoCD GitOps umbrella chart (19 resources)
 │   ├── terraform/                # Multi-cloud IaC (AWS EKS, Azure AKS, GCP GKE)
 │   ├── grafana/dashboards/       # Consortium overview & security audit dashboards
 │   └── prometheus/               # Metric scrape configs & alert rules
+├── helm/                         # Standalone unified Helm 3 application chart (4 resources)
+├── sdk/                          # Enterprise Bank Connector Integration SDK (cfi-connector-sdk)
+├── storage/                      # Tenant-isolated storage & cryptographic audit vaults
+├── verification/                 # Zero-trust independent verification & defect registries
 └── docs/                         # Architecture, Security Matrix, Threat Models, DR Specs
 ```
 

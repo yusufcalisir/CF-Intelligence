@@ -457,7 +457,7 @@ To satisfy strict regulatory requirements ("Right to Explanation" under GDPR Art
    - Formulates human-understandable remediation statements (e.g., *"Reduce amount by $45.00 AND originate transaction from US instead of RU"*).
 2. **Deterministic Decision Replay (Inference Audit)**:
    - Reproduces historical risk scoring decisions deterministically ($| \text{score}_{\text{replay}} - \text{score}_{\text{orig}} | < 0.01$).
-   - Retrieves model version metadata (`v1.4.2-champion`), feature vector snapshots, 9-signal policy rule outcomes, and graph snapshots at transaction timestamp.
+   - Retrieves model version metadata (`v2.4.0-champion`), feature vector snapshots, 9-signal policy rule outcomes, and graph snapshots at transaction timestamp.
 3. **GNNExplainer Subgraph Attribution**:
    - Calculates edge contribution percentages over entity 2-hop neighborhoods via message-passing masking.
    - Highlights specific relationship types (e.g., `SHARES_DEVICE` with known mule account) driving the GraphSAGE risk embedding.

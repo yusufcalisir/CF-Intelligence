@@ -31,7 +31,7 @@ All CF-Intelligence API endpoints follow strict Clean Architecture, OpenAPI 3.1.
 | :--- | :--- | :---: | :--- | :--- |
 | **18.1** | /api/v1/score-transaction | POST | Real-Time Scoring | Normalized transaction fraud risk scoring & feature attributions |
 | **18.2** | /api/v1/auth/login | POST | Authentication | Enterprise JWT session issuance & multi-factor verification |
-| **18.3** | /health, /health/ready | GET | System Probes | Deep database, cache, and inference engine readiness probes |
+| **18.3** | /health, /health/ready, /ready, /health/live, /live | GET | System Probes | Deep database, cache, and Kubernetes liveness & readiness probes |
 | **18.4** | /ws/telemetry | WS | Telemetry | Real-time multi-bank consortium WebSocket metrics broadcast |
 | **18.5** | /developer | GET | Developer Portal | Interactive Scalar API Gateway documentation |
 | **18.6** | /api/v1/scenarios/inject-attack | POST | Adversarial Simulation | Chaos & poisoning attack injection (label flipping, sign inversion) |

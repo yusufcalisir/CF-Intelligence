@@ -25,7 +25,7 @@ Built with **React 19, TypeScript 5.8, Vite, and TailwindCSS**, the console feat
 │  │  - Observability & Tracing (4) │  - Interactive API Documentation Deep Link      │  │
 │  ├────────────────────────────────┴─────────────────────────────────────────────────┤  │
 │  │ MULTI-ROLE ADAPTER (`EXECUTIVE`, `COMPLIANCE`, `ML_ENGINEER`, `INVESTIGATOR`)    │  │
-│  │  - 16 Modular Pages with React Suspense & Granular Error Boundaries              │  │
+│  │  - 19 Modular Views with React Suspense & Granular Error Boundaries              │  │
 │  └──────────────────────────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
