@@ -7,6 +7,7 @@ GraphSAGE embeddings, Cypher read-only safety, and streaming telemetry.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from datetime import UTC, datetime
 
 import pytest
@@ -21,7 +22,7 @@ client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def seed_test_graph_data() -> None:
+def seed_test_graph_data() -> Generator[None, None, None]:
     """Seed deterministically known entities and relationships for route testing."""
     e1 = Entity(
         id="cust_graph_test_1",
@@ -83,7 +84,7 @@ def seed_test_graph_data() -> None:
     _graph_engine._entities.set(e3.id, _entity_to_dict(e3))
     _graph_engine._relationships.set(r1.id, _relationship_to_dict(r1))
     _graph_engine._relationships.set(r2.id, _relationship_to_dict(r2))
-    _graph_engine._adjacency = None  # Force rebuild
+    _graph_engine._build_adjacency_list()
     yield
 
 

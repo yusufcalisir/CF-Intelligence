@@ -5,12 +5,13 @@ from __future__ import annotations
 import os
 import sys
 
+import pytest
+
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
 import benchmark  # noqa: E402
-import pytest
 
 from app.domain.metrics_service import (  # noqa: E402
     compute_pr_auc,
@@ -30,9 +31,9 @@ def test_scientific_metrics_calculations() -> None:
     recall_01_fpr = compute_recall_at_fpr(y_true, y_pred, target_fpr=0.001)
     prec_10 = compute_precision_at_k(y_true, y_pred, k=10)
 
-    assert 0.0 <= pr_auc <= 1.0
-    assert 0.0 <= recall_01_fpr <= 1.0
-    assert 0.0 <= prec_10 <= 1.0
+    assert pr_auc is not None and 0.0 <= pr_auc <= 1.0
+    assert recall_01_fpr is not None and 0.0 <= recall_01_fpr <= 1.0
+    assert prec_10 is not None and 0.0 <= prec_10 <= 1.0
     assert prec_10 == 1.0  # Top 10 predictions are all fraud (0.95 score)
 
 
@@ -53,8 +54,8 @@ def test_compute_scientific_benchmark_aggregation() -> None:
     )
 
     assert metrics.model_config_name == "FedGNN Test Config"
-    assert metrics.pr_auc > 0.5
-    assert metrics.roc_auc > 0.5
+    assert metrics.pr_auc is not None and metrics.pr_auc > 0.5
+    assert metrics.roc_auc is not None and metrics.roc_auc > 0.5
     assert metrics.detection_latency_ms == 6.5
     assert metrics.communication_payload_mb == 2.1
     assert metrics.dp_epsilon == 2.0

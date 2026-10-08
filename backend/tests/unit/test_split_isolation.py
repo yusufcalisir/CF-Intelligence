@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from app.application.services.dataloader import load_paysim, temporal_split_dataset
+from app.application.services.dataloader import temporal_split_dataset
 from app.application.services.feature_service import FeatureService
 from app.application.services.preprocessor import DataPreprocessor, PreprocessingStateError
 

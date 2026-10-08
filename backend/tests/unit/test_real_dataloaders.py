@@ -7,10 +7,6 @@ from app.application.services.dataloader import (
     DATASET_REGISTRY,
     load_amlnet,
     load_amlsim,
-    load_creditcard_fraud,
-    load_elliptic,
-    load_ieee_cis,
-    load_paysim,
     load_synthaml,
     partition_dataset_non_iid,
 )

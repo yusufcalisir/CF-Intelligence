@@ -121,7 +121,9 @@ class TestEllipticBenchmarkHardening:
         opt_local = torch.optim.Adam(local_model.parameters(), lr=0.01)
         criterion = torch.nn.BCELoss()
 
-        initial_param = local_model.net[0].weight.clone()
+        first_layer = local_model.net[0]
+        assert isinstance(first_layer, torch.nn.Linear)
+        initial_param = first_layer.weight.clone()
         opt_local.zero_grad()
         pred_local = local_model(X)
         loss_local = criterion(pred_local, y)
@@ -129,7 +131,7 @@ class TestEllipticBenchmarkHardening:
         opt_local.step()
 
         # Assert parameters updated via real backprop
-        assert not torch.allclose(initial_param, local_model.net[0].weight)
+        assert not torch.allclose(initial_param, first_layer.weight)
 
         # 2. Test GraphSAGE forward and backward
         fed_model = GraphSAGEModel(input_dim=ELLIPTIC_FEATURE_DIM, hidden_dim=16, embedding_dim=8)
