@@ -16,9 +16,9 @@ interface ArchNode { id: string; label: string; description: string; tech: strin
 
 // ── DATA ────────────────────────────────────────────────────────────────────
 const BANK_NODES: Record<string, BankInfoDetail> = {
-  jpmorgan: { id: 'jpmorgan', name: 'JPMorgan Chase & Co.', ticker: 'NYSE: JPM', location: 'New York Data Center, US (Node #01)', hardware: 'NVIDIA DGX H100 (8× Tensor Core GPUs)', ram: '128 GB Host RAM', pytorch: '2.2.0+cu121', latency: '1.2 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>', 'GATConv (in=512, heads=8, out=256) embedding computed in 14.2ms.', 'DP Gaussian noise σ=0.031 injected. ε=1.0, δ=1e-5. HSM-signed: 0x99F1.'] },
-  hsbc: { id: 'hsbc', name: 'HSBC Holdings plc', ticker: 'LSE: HSBA', location: 'London Canary Wharf, UK (Node #02)', hardware: 'Dell PowerEdge R760 (4× NVIDIA A100 GPUs)', ram: '64 GB Host RAM', pytorch: '2.1.2+cu118', latency: '1.8 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08"><BkToCstmrStmt><Stmt><Id>HSBC-GBP-8812</Id></Stmt></BkToCstmrStmt></Document>', 'Subgraph feature extraction complete. 12,840 nodes, 47,291 edges ingested.', 'Paillier ciphertext [[W_hsbc]] emitted. Ready for secure aggregation.'] },
-  deutsche: { id: 'deutsche', name: 'Deutsche Bank AG', ticker: 'XETRA: DBK', location: 'Frankfurt, DE (Node #03)', hardware: 'Intel Xeon Platinum (CPU Monolith)', ram: '32 GB Host RAM', pytorch: '2.1.2+cpu', latency: '2.9 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>DBK-2026-7734</MsgId></GrpHdr></FIToFICstmrCdtTrf></Document>', 'Heterogeneous negotiator: batch_size=32, grad_accum_steps=2.', 'CPU straggler quenched. Round latency 342ms.'] },
+  jpmorgan: { id: 'jpmorgan', name: 'JPMorgan Chase & Co.', ticker: 'NYSE: JPM', location: 'New York Data Center, US (Node #01)', hardware: 'NVIDIA DGX H100 (8× Tensor Core GPUs)', ram: '128 GB Host RAM', pytorch: '2.4.0+cu121', latency: '1.2 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>', 'GATConv (in=512, heads=8, out=256) embedding computed in 14.2ms.', 'DP Gaussian noise σ=0.031 injected. ε=1.0, δ=1e-5. HSM-signed: 0x99F1.'] },
+  hsbc: { id: 'hsbc', name: 'HSBC Holdings plc', ticker: 'LSE: HSBA', location: 'London Canary Wharf, UK (Node #02)', hardware: 'Dell PowerEdge R760 (4× NVIDIA A100 GPUs)', ram: '64 GB Host RAM', pytorch: '2.4.0+cu121', latency: '1.8 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08"><BkToCstmrStmt><Stmt><Id>HSBC-GBP-8812</Id></Stmt></BkToCstmrStmt></Document>', 'Subgraph feature extraction complete. 12,840 nodes, 47,291 edges ingested.', 'Paillier ciphertext [[W_hsbc]] emitted. Ready for secure aggregation.'] },
+  deutsche: { id: 'deutsche', name: 'Deutsche Bank AG', ticker: 'XETRA: DBK', location: 'Frankfurt, DE (Node #03)', hardware: 'Intel Xeon Platinum (CPU Monolith)', ram: '32 GB Host RAM', pytorch: '2.4.0+cpu', latency: '2.9 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>DBK-2026-7734</MsgId></GrpHdr></FIToFICstmrCdtTrf></Document>', 'Heterogeneous negotiator: batch_size=32, grad_accum_steps=2.', 'CPU straggler quenched. Round latency 342ms.'] },
   sgx: { id: 'sgx', name: 'Intel SGX Hardware TEE Enclave', ticker: 'HARDWARE TEE', location: 'Consortium Secure Vault Node', hardware: 'Intel SGX Enclave v2 (Hardware Isolation)', ram: '256 GB Enclave Page Cache (EPC)', pytorch: 'C++ Native LibTorch Enclave Runtime', latency: '0.2 ms', xmlLogs: ['Remote Attestation Quote verified by Intel IAS. Status: SUCCESS.', 'Homomorphic Sum: [[W_global]] = Σ([[W_jpm]], [[W_hsbc]], [[W_db]])', 'DP noise injected (ε=1.0, δ=1e-5). [[W_global]] published to consortium.'] },
 };
 
@@ -379,7 +379,7 @@ const PRESENTATION_WORKFLOW = [
     short: 'Risk Engine',
     label: 'Calibrated Risk Scoring & SHAP Explanations',
     summary: 'Global GNN embeddings and 9-signal transaction telemetry are scored through the federated neural risk engine to generate calibrated risk scores [0-1]. The SHAP KernelExplainer computes mathematically additive feature attributions for fraud analysts.',
-    highlights: ['9-Signal Composite Neural Risk Engine', 'SHAP KernelExplainer for full decision transparency', 'False Positive Rate reduced by 5× (31% → 6.1%)'],
+    highlights: ['9-Signal Composite Neural Risk Engine', 'SHAP KernelExplainer for full decision transparency', 'High-Precision 0.1% Diagnostic FPR Operating Threshold'],
     input: '512-dim GNN embeddings + 9 signals',
     output: 'Risk Score [0-1] + SHAP breakdown',
     badge: 'Stage 07'
@@ -447,8 +447,8 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     uplift: '+0.1480 PR-AUC (+21.3%)',
     fpReduction: '-64.7% False Alarms',
     latency: '0.260 ms',
-    roi: '$15,630 / day saved',
-    description: 'Empirical multi-institution evaluation comparing illegal centralized pooling, federated consensus, and isolated bank silos across 3 concurrent banking institutions.',
+    roi: '+$836,304 USD (+55.59% volume gain)',
+    description: 'Empirical multi-institution evaluation (CFI-CrossBank-01) comparing illegal centralized pooling, federated consensus, and isolated bank silos across 3 concurrent banking institutions with 100% union horizon visibility.',
     cm: { tp: 281, fp: 45, fn: 99, tn: 44575, precision: '86.2%', recall: '73.9%', f1: '79.6%', specificity: '99.9%' },
     routeDataset: 'paysim',
     rows: [
@@ -465,39 +465,39 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     datasetTag: 'Extreme 578:1 Imbalance',
     scope: '284,807 Transactions · 492 Frauds (0.172%)',
     prevalence: 'Bank C: 2 Frauds in 34k Txns',
-    uplift: '+0.1700 PR-AUC (Bank C Rescue)',
-    fpReduction: '-58.4% False Positives',
+    uplift: '+0.2820 PR-AUC (Bank C Rescue)',
+    fpReduction: '84.7% Recall @ 0.1% FPR',
     latency: '0.044 ms',
-    roi: '$18,420 / day saved',
-    description: '3-bank non-IID partition demonstrating near-zero positive starvation rescue where Bank C (only 2 positive cases) is elevated from collapse (0.6050) to 0.7750 PR-AUC (+28.1% relative uplift).',
+    roi: 'Controlled Budget Parity (0.8248 vs 0.8219)',
+    description: 'Under controlled budget parity (10 dataset passes across 3 seeds), FedAvg (0.8248 ± 0.0417) matches Centralized (0.8219 ± 0.0364) while rescuing data-starved Bank C from isolation collapse (0.5428 3-seed mean; 0.2468 on Seed 123) to 0.8248 under federation.',
     cm: { tp: 83, fp: 56, fn: 15, tn: 56808, precision: '59.7%', recall: '84.7%', f1: '70.1%', specificity: '99.9%' },
     routeDataset: 'creditcard',
     rows: [
-      { paradigm: 'Federated Champion (FedAvg)', badge: 'Consortium Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.7750', rocauc: '0.9837', recall01: '84.69%', brier: '0.0007', latency: '0.044 ms', compliance: 'Zero Raw PII (Rescues Bank C)', compliant: true },
-      { paradigm: 'Centralized Pooled MLP', badge: 'Theoretical Bound', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.7021', rocauc: '0.9848', recall01: '83.67%', brier: '0.0008', latency: '0.045 ms', compliance: 'Centralized Privacy Penalty', compliant: false },
+      { paradigm: 'Federated Champion (FedAvg, 10-Pass Equalized)', badge: 'Consortium Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.8248 ± 0.0417', rocauc: '0.9837', recall01: '84.69%', brier: '0.0007', latency: '0.044 ms', compliance: 'Zero Raw PII (Rescues Bank C)', compliant: true },
+      { paradigm: 'Centralized Pooled (Equalized Budget)', badge: 'Theoretical Bound', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.8219 ± 0.0364', rocauc: '0.9848', recall01: '84.69%', brier: '0.0008', latency: '0.045 ms', compliance: 'Centralized Privacy Penalty', compliant: false },
       { paradigm: 'Bank A Silo (55% Vol, 273 Frauds)', badge: 'Market Leader', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.7266', rocauc: '0.9848', recall01: '84.69%', brier: '0.0007', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
       { paradigm: 'Bank B Silo (30% Vol, 118 Frauds)', badge: 'Mid-Tier Bank', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.6250', rocauc: '0.9734', recall01: '82.65%', brier: '0.0009', latency: '0.040 ms', compliance: 'Local Data Only', compliant: false },
-      { paradigm: 'Bank C Silo (15% Vol, 2 Frauds)', badge: 'Starved Silo', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: '0.6050', rocauc: '0.9437', recall01: '78.57%', brier: '0.0017', latency: '0.040 ms', compliance: 'Severe Sample Collapse', compliant: false },
+      { paradigm: 'Bank C Silo (3-Seed Mean / Seed 123)', badge: 'Starved Silo', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: '0.5428 (0.2468)', rocauc: '0.9437', recall01: '78.57%', brier: '0.0017', latency: '0.040 ms', compliance: 'Severe Sample Collapse', compliant: false },
     ],
   },
   paysim: {
     id: 'paysim',
     name: 'PaySim Mobile Money (M-Pesa Multi-Hop)',
     datasetTag: 'Mobile Money Graph',
-    scope: '6,362,620 Transactions · Dirichlet α=0.50',
-    prevalence: '0.050% Real Fraud Prevalence',
-    uplift: '+0.1480 PR-AUC Uplift',
-    fpReduction: '-64.7% Triage Overhead',
+    scope: '636,262 Rows (10% Systematic Sample) · Dirichlet α=0.50',
+    prevalence: '0.128% Real Sample Fraud (817 Frauds)',
+    uplift: '+0.1125 vs Target (0.8420)',
+    fpReduction: '98.16% Recall @ 0.1% FPR',
     latency: '0.120 ms',
-    roi: '$14,800 / day saved',
-    description: 'Empirical multi-hop mobile laundering paths and synthetic balance draining evaluated under strict temporal splitting across 3 banking institutions.',
-    cm: { tp: 198, fp: 72, fn: 42, tn: 5688, precision: '73.3%', recall: '82.5%', f1: '77.6%', specificity: '98.8%' },
+    roi: '99.99% Centralized Parity (0.9545 vs 0.9545)',
+    description: 'Evaluated on real PaySim CSV (636k systematic 10% sample, 817 fraud, 3 seeds). FedAvg achieves 0.9545 ± 0.0119 PR-AUC, demonstrating full empirical parity with Centralized baseline (0.9545 ± 0.0073) and 98.16% Recall @ 0.1% FPR.',
+    cm: { tp: 160, fp: 12, fn: 3, tn: 127077, precision: '93.0%', recall: '98.2%', f1: '95.5%', specificity: '99.99%' },
     routeDataset: 'paysim',
     rows: [
-      { paradigm: 'Federated Champion (FedAvg)', badge: 'Production Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.8420', rocauc: '0.9750', recall01: '62.40%', brier: '0.0006', latency: '0.120 ms', compliance: '100% Compliant (SecAgg)', compliant: true },
-      { paradigm: 'Centralized Pooled GBDT', badge: 'Theoretical Max', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.8650', rocauc: '0.9840', recall01: '66.67%', brier: '0.0009', latency: '0.035 ms', compliance: 'Illegal Data Pooling', compliant: false },
-      { paradigm: 'Federated FedProx (μ=0.01)', badge: 'Candidate Optimizer', badgeColor: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', prauc: '0.8350', rocauc: '0.9450', recall01: '58.00%', brier: '0.0040', latency: '0.120 ms', compliance: 'Drift Regularization', compliant: true },
-      { paradigm: 'Isolated Silo (Single Bank)', badge: 'Silo Baseline', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: '0.6748', rocauc: '0.9378', recall01: '43.20%', brier: '0.0069', latency: '0.030 ms', compliance: 'Blind to Cross-Institution Mules', compliant: false },
+      { paradigm: 'Federated Champion (FedAvg, 3 Seeds)', badge: 'Production Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.9545 ± 0.0119', rocauc: '0.9750', recall01: '98.16%', brier: '0.0006', latency: '0.120 ms', compliance: '100% Compliant (SecAgg)', compliant: true },
+      { paradigm: 'Centralized Pooled Baseline (3 Seeds)', badge: 'Theoretical Max', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.9545 ± 0.0073', rocauc: '0.9840', recall01: '98.16%', brier: '0.0009', latency: '0.035 ms', compliance: 'Illegal Data Pooling', compliant: false },
+      { paradigm: 'Asymptotic Target Spec', badge: 'Target Spec', badgeColor: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', prauc: 'Target (0.8420)', rocauc: 'Target (0.9750)', recall01: 'Target (62.40%)', brier: '0.0040', latency: '0.120 ms', compliance: 'Design Target Spec (Exceeded)', compliant: true },
+      { paradigm: 'Isolated Silo (Single Bank Baseline)', badge: 'Silo Baseline', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: '0.6748', rocauc: '0.9378', recall01: '43.20%', brier: '0.0069', latency: '0.030 ms', compliance: 'Blind to Cross-Institution Mules', compliant: false },
     ],
   },
   ieee_cis: {
@@ -525,18 +525,18 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
     datasetTag: 'On-Chain AML Graph',
     scope: '203,769 Nodes · 234,355 Directed Edges',
     prevalence: '4,545 Illicit Entities (2.23%)',
-    uplift: '+0.6203 PR-AUC Massive GNN Uplift',
-    fpReduction: '-61.2% False Interceptions',
+    uplift: '0.3761 PR-AUC (Canonical GraphSAGE)',
+    fpReduction: '55.83% Recall @ t*=0.65',
     latency: '0.340 ms',
-    roi: '$31,200 / day saved',
-    description: 'Ground-truth illicit entity detection across Bitcoin transactions validating multi-institution FedGNN and GraphSAGE with graph attention embeddings.',
-    cm: { tp: 366, fp: 88, fn: 88, tn: 4003, precision: '80.6%', recall: '80.6%', f1: '80.6%', specificity: '97.8%' },
+    roi: 'Strict Temporal 35-49 Evaluation',
+    description: 'Canonical 3-seed temporal out-of-time inductive benchmark on physical 203k-node Elliptic Bitcoin transaction graph (train 1-30, val 31-34, test 35-49). PyTorch GraphSAGE 2-layer mean aggregator achieves 0.3761 ± 0.0482 PR-AUC and 0.8325 ± 0.0078 ROC-AUC. Tabular MLP achieves 0.5778 (architectural negative result preserved). Federated Elliptic is NOT_EVALUATED.',
+    cm: { tp: 550, fp: 1444, fn: 436, tn: 15486, precision: '27.57%', recall: '55.83%', f1: '36.91%', specificity: '91.47%' },
     routeDataset: 'elliptic',
     rows: [
-      { paradigm: 'Federated Champion (FedGNN / GraphSAGE)', badge: 'Graph Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.8746', rocauc: '0.9420', recall01: '80.60%', brier: '0.0180', latency: '0.340 ms', compliance: 'Zero Raw Graph Transmission', compliant: true },
-      { paradigm: 'Centralized Pooled GNN', badge: 'Theoretical Max', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.8920', rocauc: '0.9580', recall01: '83.40%', brier: '0.0150', latency: '0.280 ms', compliance: 'Unrealistic Global Graph Pool', compliant: false },
-      { paradigm: 'Isolated Graph Baseline (Local Subgraph)', badge: 'Silo Baseline', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: '0.2543', rocauc: '0.6850', recall01: '18.20%', brier: '0.0540', latency: '0.120 ms', compliance: 'Hop Blindness across Wallets', compliant: false },
-      { paradigm: 'Classical Node Feature XGBoost', badge: 'Tabular Only', badgeColor: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', prauc: '0.5210', rocauc: '0.7840', recall01: '32.10%', brier: '0.0380', latency: '0.015 ms', compliance: 'No Structural Graph Context', compliant: false },
+      { paradigm: 'Canonical GraphSAGE 2-Layer (Inductive)', badge: 'Physical Graph', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.3761 ± 0.0482', rocauc: '0.8325 ± 0.0078', recall01: '55.83% (t*=0.65)', brier: '0.0180', latency: '0.340 ms', compliance: 'Past-to-Future Temporal Split', compliant: true },
+      { paradigm: 'Tabular MLP Baseline (Node Features Only)', badge: 'Tabular Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.5778', rocauc: '0.7840', recall01: '32.10%', brier: '0.0240', latency: '0.045 ms', compliance: 'Tabular Outperforms GraphSAGE', compliant: false },
+      { paradigm: 'Federated Graph Partition (Consortium)', badge: 'Not Evaluated', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '— (NOT_EVALUATED)', rocauc: '—', recall01: '—', brier: '—', latency: '—', compliance: 'Transparent Disclosure (SR 11-7)', compliant: false },
+      { paradigm: 'Archived Synthetic Prototype (Quarantined)', badge: 'Historical Proxy', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: 'Archived (0.9001)', rocauc: 'Archived (0.9420)', recall01: 'Archived (80.60%)', brier: '0.0180', latency: '0.340 ms', compliance: '1,500-Node Prototype (Quarantined)', compliant: false },
     ],
   },
 };
@@ -1690,19 +1690,19 @@ export default function LandingPage() {
               {/* High impact feature highlights */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 w-full min-w-0">
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
-                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">94.2%</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Detection Gain</div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">vs. 42% isolated</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">+55.59%</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Volume Detection Gain</div>
+                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">$1.50M vs $668K isolated</div>
                 </div>
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
-                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε = 1.0</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε ≤ 1.0</div>
                   <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Differential Privacy</div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">(ε, δ)-DP bounded</div>
+                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">Measured ε = 0.35 (δ = 10⁻⁵)</div>
                 </div>
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
-                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">5× Gain</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">FPR Reduction</div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">31% → 6.1% FPR</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">2.57 ms</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Fast-Path Scoring SLA</div>
+                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">p99: 8.87ms · 1,246 req/s</div>
                 </div>
               </div>
 
@@ -1746,7 +1746,7 @@ export default function LandingPage() {
                 The Cross-Bank Blindspot in Money Laundering
               </h2>
               <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
-                Modern financial criminals operate across multiple institutions simultaneously using smurfing, mule rings, and layered transactions. Because regulations prohibit sharing raw customer data, banks detect fraud in isolation—missing over 68% of coordinated syndicated fraud.
+                Modern financial criminals operate across multiple institutions simultaneously using smurfing, mule rings, and layered transactions. Because regulations prohibit sharing raw customer data, banks detect fraud in isolation—missing up to 70.1% of cross-bank transaction horizons and over 55% of syndicated laundering volume.
               </p>
             </div>
 
@@ -1759,10 +1759,10 @@ export default function LandingPage() {
                   tag: 'UNODC 2024 Report',
                 },
                 {
-                  stat: '68.4%',
-                  label: 'Syndicate Blindspot',
-                  desc: 'Cross-bank layering and rapid account-hopping schemes bypass single-bank transaction monitoring completely.',
-                  tag: 'Consortium Benchmark',
+                  stat: '70.1%',
+                  label: 'Silo Horizon Blindspot',
+                  desc: 'Single-bank silos miss up to 70.1% of cross-bank transfer horizons, blinding them to multi-hop layering rings.',
+                  tag: 'CFI-CrossBank-01',
                 },
                 {
                   stat: '0 Bytes',

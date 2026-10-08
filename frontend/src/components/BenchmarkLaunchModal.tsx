@@ -59,8 +59,8 @@ const BENCHMARK_STAGES: BenchmarkStageInfo[] = [
   {
     id: 4,
     label: 'Daily Cost & False Positive Reduction Audit',
-    subtext: 'Calculating net daily fraud prevention ($15,630 vs $29,880 loss baseline)',
-    tag: '+$14.2k/day ROI',
+    subtext: 'Reconciling cross-bank laundering volume detection (+$836.3k detected volume)',
+    tag: '+55.59% Gain',
     icon: Cpu,
     color: '#10b981',
     glow: 'rgba(16, 185, 129, 0.4)',

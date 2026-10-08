@@ -697,30 +697,30 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
                   <tbody className="divide-y divide-slate-800/60 text-slate-300">
                     <tr className="hover:bg-slate-800/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
-                        PaySim Mobile Money (ROC-AUC)
+                        PaySim Mobile Money (PR-AUC)
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-slate-400">99.4%</td>
-                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">98.9%</td>
-                      <td className="p-3.5 sm:p-4 text-center text-rose-400">81.2%</td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">&epsilon; = 0.50 DP</td>
+                      <td className="p-3.5 sm:p-4 text-center text-slate-400">0.9545</td>
+                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">0.9545</td>
+                      <td className="p-3.5 sm:p-4 text-center text-rose-400">0.6748</td>
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">100% Compliant (SecAgg)</td>
                     </tr>
                     <tr className="hover:bg-slate-800/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
-                        IEEE-CIS Payment Gateways (ROC-AUC)
+                        IEEE-CIS Real Card Fraud (PR-AUC)
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-slate-400">94.8%</td>
-                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">93.6%</td>
-                      <td className="p-3.5 sm:p-4 text-center text-rose-400">76.4%</td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">&epsilon; = 0.50 DP</td>
+                      <td className="p-3.5 sm:p-4 text-center text-slate-400">0.4422</td>
+                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">0.3895</td>
+                      <td className="p-3.5 sm:p-4 text-center text-rose-400">N/A (Silo Blind)</td>
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">3 Simulated Banks</td>
                     </tr>
                     <tr className="hover:bg-slate-800/30">
                       <td className="p-3.5 sm:p-4 font-semibold text-white font-sans">
-                        Elliptic Bitcoin Graph Network (F1-Score)
+                        Elliptic Bitcoin Graph AML (PR-AUC)
                       </td>
-                      <td className="p-3.5 sm:p-4 text-center text-slate-400">89.2%</td>
-                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">88.1%</td>
-                      <td className="p-3.5 sm:p-4 text-center text-rose-400">62.8%</td>
-                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">Zero-PII Graph</td>
+                      <td className="p-3.5 sm:p-4 text-center text-slate-400">0.5778 (MLP)</td>
+                      <td className="p-3.5 sm:p-4 text-center text-cyan-400 font-bold">0.3761 (GraphSAGE)</td>
+                      <td className="p-3.5 sm:p-4 text-center text-rose-400">N/A (Temporal 35-49)</td>
+                      <td className="p-3.5 sm:p-4 text-right text-emerald-400 font-bold">Inductive Zero-PII</td>
                     </tr>
                   </tbody>
                 </table>
