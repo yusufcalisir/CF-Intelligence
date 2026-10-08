@@ -21,6 +21,7 @@ import pytest  # noqa: E402
 
 from tests.factories.data_factory import TestDataFactory  # noqa: E402
 
+
 # ── Real-Data Integration Test Flags & Gating ──────────────────────────────────
 def pytest_addoption(parser: pytest.Parser) -> None:
     """Register custom CLI options for real-data integration gating."""
