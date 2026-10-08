@@ -34,6 +34,24 @@ from app.domain.realtime_explainer import (
 # 1. Prediction & Model Binding (XAI-INV-01, XAI-INV-02)
 # ============================================================================
 
+def _full_txn(**overrides: object) -> dict[str, object]:
+    """Test fixture: complete canonical-feature transaction (production fails closed on missing features)."""
+    base: dict[str, object] = {
+        "transaction_amount": 100.0,
+        "merchant_category": "grocery",
+        "country_code": "US",
+        "device_type": "web_browser",
+        "velocity": 1.0,
+        "hour_of_day": 12.0,
+        "merchant_risk_score": 0.2,
+        "customer_history_score": 0.8,
+        "chargeback_count": 0.0,
+        "account_age_days": 365.0,
+    }
+    base.update(overrides)
+    return base
+
+
 def test_model_version_binding_and_hotswapping():
     """Verify that different models produce independently bound explanations (XAI-INV-02)."""
     service = ExplainabilityService()
@@ -56,13 +74,7 @@ def test_model_version_binding_and_hotswapping():
         cast("torch.nn.Linear", model_b.network[8]).weight[0, 0] = 1.0
     model_b.eval()
 
-    txn = {
-        "transaction_amount": 5000.0,
-        "velocity": 15.0,
-        "merchant_category": "grocery",
-        "country_code": "US",
-        "device_type": "web_browser",
-    }
+    txn = _full_txn(transaction_amount=5000.0, velocity=15.0)
 
     # Verify cache isolation and independent explainer construction
     res_a = service.compute_shap_values(txn, model=model_a)
@@ -210,10 +222,10 @@ def test_sign_oracle_directionality():
 
     # High amount (x0=1.0), high velocity (x4=1.0) vs zero baseline
     baseline = np.zeros((10, 10), dtype=np.float32)
-    txn = {
-        "transaction_amount": 10000.0,  # normalized to 1.0
-        "velocity": 20.0,               # normalized to 1.0
-    }
+    txn = _full_txn(
+        transaction_amount=10000.0,  # normalized to 1.0
+        velocity=20.0,               # normalized to 1.0
+    )
 
     res = service.compute_shap_values(txn, model=model, background_data=baseline)
     feat_map = {item["feature"]: item["contribution"] for item in res}
@@ -342,12 +354,9 @@ def test_alert_intelligence_service_preserves_actual_feature_values():
 def test_lime_surrogate_explanation_uses_canonical_preprocessing():
     """Verify compute_lime_explanation uses canonical preprocessing parity."""
     service = ExplainabilityService()
-    txn = {
-        "transaction_amount": 3200.0,
-        "merchant_category": "travel",
-        "country_code": "FR",
-        "velocity": 5.0,
-    }
+    txn = _full_txn(
+        transaction_amount=3200.0, merchant_category="travel", country_code="FR", velocity=5.0
+    )
 
     report = service.compute_lime_explanation(transaction=txn, num_samples=30)
     assert report.fidelity_r2 >= 0.0
@@ -429,13 +438,9 @@ def test_explainer_cache_distinguishes_equal_size_different_backgrounds() -> Non
     bg_a = np.zeros((30, 10), dtype=np.float32)
     bg_b = np.ones((30, 10), dtype=np.float32) * 0.85
 
-    txn = {
-        "transaction_amount": 5000.0,
-        "velocity": 5.0,
-        "merchant_category": "retail",
-        "country_code": "US",
-        "device_type": "mobile_app",
-    }
+    txn = _full_txn(
+        transaction_amount=5000.0, velocity=5.0, merchant_category="retail", device_type="mobile_app"
+    )
 
     service.compute_batch_shap_values([txn], model=model, background_data=bg_a, nsamples=20)
     assert len(service._explainer_cache) == 1
@@ -453,13 +458,9 @@ def test_explainer_cache_feature_schema_binding() -> None:
     model = FraudDetectionModel(input_dim=10)
     model.eval()
 
-    txn = {
-        "transaction_amount": 2500.0,
-        "velocity": 3.0,
-        "merchant_category": "travel",
-        "country_code": "DE",
-        "device_type": "web_browser",
-    }
+    txn = _full_txn(
+        transaction_amount=2500.0, velocity=3.0, merchant_category="travel", country_code="DE"
+    )
 
     service.compute_batch_shap_values([txn], model=model, nsamples=20)
     assert len(service._explainer_cache) == 1
@@ -534,12 +535,7 @@ def test_historical_graph_explanation_late_event_semantics() -> None:
 def test_lime_low_fidelity_truthfulness() -> None:
     """Verify that LIME exposes surrogate fidelity R^2 and appends low-fidelity caution when R^2 < 0.50 (XAI-INV-12)."""
     service = ExplainabilityService()
-    txn = {
-        "transaction_amount": 1000.0,
-        "merchant_category": "retail",
-        "country_code": "US",
-        "velocity": 1.0,
-    }
+    txn = _full_txn(transaction_amount=1000.0, merchant_category="retail")
 
     # Standard run: high or reasonable fidelity
     rep_normal = service.compute_lime_explanation(transaction=txn, num_samples=50, l2_reg=0.01)
@@ -558,13 +554,9 @@ def test_shap_predict_fn_matches_serving_prediction() -> None:
     model = FraudDetectionModel(input_dim=10)
     model.eval()
 
-    txn = {
-        "transaction_amount": 7500.0,
-        "merchant_category": "crypto_exchange",
-        "country_code": "US",
-        "device_type": "mobile_app",
-        "velocity": 8.0,
-    }
+    txn = _full_txn(
+        transaction_amount=7500.0, merchant_category="crypto_exchange", device_type="mobile_app", velocity=8.0
+    )
 
     tensor_input = preprocess_transaction(txn)
     with torch.no_grad():

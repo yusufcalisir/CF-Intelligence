@@ -278,7 +278,7 @@ def test_auto_rollback_manager_reentrant_lock_and_get_last() -> None:
     """Verifies AutoRollbackManager handles RLock re-entrancy, get_last_rollback, and NaN inputs."""
     manager = AutoRollbackManager(min_auc=0.70, max_latency_ms=150.0, max_fpr=0.05)
 
-    # NaN inputs should suppress rollback without exception
+    # Non-finite inputs fail closed: rollback is triggered with NON_FINITE_METRIC_ANOMALY
     triggered_nan, record_nan = manager.evaluate_model_health_and_rollback(
         active_model_version="v2",
         current_auc=float("nan"),
@@ -286,9 +286,12 @@ def test_auto_rollback_manager_reentrant_lock_and_get_last() -> None:
         current_fpr=0.01,
         fallback_model_version="v1",
     )
-    assert triggered_nan is False
-    assert record_nan is None
-    assert manager.get_last_rollback() is None
+    assert triggered_nan is True
+    assert record_nan is not None
+    assert record_nan.cause == RollbackCause.NON_FINITE_METRIC_ANOMALY
+    nan_last = manager.get_last_rollback()
+    assert nan_last is not None
+    assert nan_last.rollback_id == record_nan.rollback_id
 
     # Trigger legitimate rollback
     triggered, record = manager.evaluate_model_health_and_rollback(

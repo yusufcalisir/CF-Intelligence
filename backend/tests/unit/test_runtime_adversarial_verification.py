@@ -63,13 +63,27 @@ def test_random_value_cannot_substitute_for_missing_real_value() -> None:
 # ---------------------------------------------------------------------------
 # 2. Runtime prediction is not a constant
 # ---------------------------------------------------------------------------
-def test_runtime_prediction_is_not_constant() -> None:
-    """Distinct physical inputs must produce dynamically computed, non-identical forward scores."""
+def test_runtime_prediction_is_not_constant(tmp_path: "pytest.TempPathFactory", monkeypatch: "pytest.MonkeyPatch") -> None:
+    """Distinct physical inputs must produce dynamically computed, non-identical forward scores.
+
+    The test redirects the module-level model registry storage dir to a clean
+    temporary directory so that no stale global_model.pt (potentially saved with
+    a different input_dim) can be loaded.  With no file present, production code
+    falls through to the 'create fresh default model' path, which always uses
+    NUM_FEATURES as input_dim — matching preprocess_transaction output.
+    """
+    import app.presentation.routers.predict as _predict_module
     from app.presentation.routers.predict import (
         _eval_model,
         _get_cached_serving_model,
         preprocess_transaction,
     )
+
+    # Redirect the registry's storage_dir to a clean tmp dir and flush the
+    # module-level cache so _get_cached_serving_model reads from the new path.
+    monkeypatch.setattr(_predict_module._registry, "storage_dir", str(tmp_path))
+    monkeypatch.setattr(_predict_module, "_cached_serving_model", None)
+    monkeypatch.setattr(_predict_module, "_cached_serving_model_mtime", 0.0)
 
     model = _get_cached_serving_model(None)
 
@@ -79,6 +93,7 @@ def test_runtime_prediction_is_not_constant() -> None:
         "country_code": "US",
         "device_type": "web_browser",
         "velocity": 0.5,
+        "hour_of_day": 12.0,
         "merchant_risk_score": 0.01,
         "customer_history_score": 0.99,
         "chargeback_count": 0,
@@ -90,6 +105,7 @@ def test_runtime_prediction_is_not_constant() -> None:
         "country_code": "XX",
         "device_type": "unknown_proxy",
         "velocity": 45.0,
+        "hour_of_day": 3.0,
         "merchant_risk_score": 0.95,
         "customer_history_score": 0.05,
         "chargeback_count": 8,

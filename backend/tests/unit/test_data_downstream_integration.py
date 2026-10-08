@@ -430,8 +430,12 @@ def test_currency_default_entry_path_consistency() -> None:
                         "credit": True,
                         "amount": "250.0",
                         "account_id": "acc_tm_1",
-                        "account_address": "acc_tm_2",
-                    }
+                    },
+                    {
+                        "credit": False,
+                        "amount": "250.0",
+                        "account_id": "acc_tm_2",
+                    },
                 ]
             },
             "value_timestamp": "2026-10-04T12:00:00Z",

@@ -69,8 +69,24 @@ class TestISO20022ConnectorXSDValidation:
             stmt_id="STMT-CAMT053-VAL-01",
             account_iban="DE89370400440532013000",
             entries=[
-                {"ntry_ref": "N-01", "amount": 1000.00, "credit_debit": "CRDT"},
-                {"ntry_ref": "N-02", "amount": 2500.00, "credit_debit": "DBIT"},
+                {
+                    "ntry_ref": "N-01",
+                    "amount": 1000.00,
+                    "credit_debit": "CRDT",
+                    "debtor_name": "Client Alpha",
+                    "debtor_iban": "DE89370400440532013000",
+                    "creditor_name": "Merchant Beta",
+                    "creditor_iban": "FR1420041010050500013M02606",
+                },
+                {
+                    "ntry_ref": "N-02",
+                    "amount": 2500.00,
+                    "credit_debit": "DBIT",
+                    "debtor_name": "Client Gamma",
+                    "debtor_iban": "DE89370400440532013000",
+                    "creditor_name": "Supplier Delta",
+                    "creditor_iban": "NL91ABNA0417164300",
+                },
             ],
         )
         connector.validate_xml_schema(xml, "camt.053.001.08.xsd")

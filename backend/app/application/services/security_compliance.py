@@ -191,19 +191,31 @@ class SecurityComplianceEngine:
         }
 
         # CC9.1: Vendor risk — all third-party dependencies pinned in pyproject.toml
-        pyproject_path = Path(__file__).parents[3] / "pyproject.toml"
-        if not pyproject_path.exists():
-            cc9_1_status = "FAIL"
-            cc9_1_evidence = "Dependency manifest pyproject.toml not found; dependency versions cannot be verified."
-        else:
+        backend_root = Path(__file__).parents[3]
+        pyproject_path = backend_root / "pyproject.toml"
+        requirements_path = backend_root / "requirements.txt"
+        declared_in: str | None = None
+        if pyproject_path.exists():
             content = pyproject_path.read_text(encoding="utf-8")
-            has_deps = "dependencies = [" in content or "[project.dependencies]" in content or "[tool.poetry.dependencies]" in content
-            if has_deps:
-                cc9_1_status = "PASS"
-                cc9_1_evidence = f"Dependencies and version constraints defined in {pyproject_path.name}; exact cryptographic hash pinning requires lockfile audit."
-            else:
-                cc9_1_status = "FAIL"
-                cc9_1_evidence = f"Dependency manifest {pyproject_path.name} exists but contains no declared dependency section."
+            if "dependencies = [" in content or "[project.dependencies]" in content or "[tool.poetry.dependencies]" in content:
+                declared_in = pyproject_path.name
+        if declared_in is None and requirements_path.exists():
+            req_lines = [
+                ln.strip()
+                for ln in requirements_path.read_text(encoding="utf-8").splitlines()
+                if ln.strip() and not ln.strip().startswith("#")
+            ]
+            if any(any(op in ln for op in (">=", "==", "~=", "<")) for ln in req_lines):
+                declared_in = requirements_path.name
+        if declared_in is not None:
+            cc9_1_status = "PASS"
+            cc9_1_evidence = f"Dependencies and version constraints defined in {declared_in}; exact cryptographic hash pinning requires lockfile audit."
+        elif not pyproject_path.exists() and not requirements_path.exists():
+            cc9_1_status = "FAIL"
+            cc9_1_evidence = "No dependency manifest (pyproject.toml or requirements.txt) found; dependency versions cannot be verified."
+        else:
+            cc9_1_status = "FAIL"
+            cc9_1_evidence = "Dependency manifests exist but declare no version-constrained dependencies."
         controls_results["CC9.1"] = {
             "title": "Vendor Risk & Dependency Version Pinning",
             "status": cc9_1_status,

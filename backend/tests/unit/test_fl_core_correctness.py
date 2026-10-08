@@ -579,5 +579,5 @@ class TestLocalTrainingAndEvaluationIntegrity:
         # Single class edge case (all 0s)
         y_single = np.zeros(50, dtype=np.float32)
         single_metrics = model_service.evaluate(model, X_test, y_single)
-        # AUC should fall back gracefully to 0.5 without raising an uncaught exception
-        assert single_metrics["auc_roc"] == 0.5
+        # ROC-AUC is undefined for single-class data: must be None, never a fabricated 0.5
+        assert single_metrics["auc_roc"] is None

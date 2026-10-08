@@ -35,7 +35,7 @@ def test_soc2_evidence_endpoints(client: TestClient) -> None:
     res_api = client.get("/api/v1/compliance/soc2-evidence")
     assert res_api.status_code == 200
     data_api = res_api.json()
-    assert data_api["compliance_status"] == "COMPLIANT"
+    assert data_api["compliance_status"] == "LOCAL_CHECKS_PASS"
     assert data_api["total_controls_audited"] >= 5
     assert "CC6.1" in data_api["controls"]
     assert "CC6.2" in data_api["controls"]

@@ -267,7 +267,7 @@ def test_invariant_7_test_fixture_provenance_cannot_become_benchmark_provenance(
         assert fix["provenance"] != DatasetProvenance.EMPIRICAL_EXTERNAL_DATA.value
         assert fix["provenance"] != DatasetProvenance.REAL_DATA_EVIDENCE.value
 
-    # 2. SimulationService rejects synthetic mode for registered benchmark datasets
+    # 2. SimulationService labels synthetic-mode benchmark runs as TEST_FIXTURE, never real evidence
     service = create_test_simulation_service()
     cfg = SimulationConfig(
         dataset="paysim",
@@ -275,8 +275,12 @@ def test_invariant_7_test_fixture_provenance_cannot_become_benchmark_provenance(
         num_rounds=1,
     )
     res = service.run_simulation(cfg)
-    assert res.status == SimulationStatus.FAILED
-    assert "Registered benchmark datasets cannot be loaded in synthetic mode" in (res.error_message or "")
+    assert res.dataset_mode == DatasetMode.SYNTHETIC.value
+    assert res.dataset_provenance == DatasetProvenance.TEST_FIXTURE.value
+    assert res.dataset_provenance not in (
+        DatasetProvenance.EMPIRICAL_EXTERNAL_DATA.value,
+        DatasetProvenance.REAL_DATA_EVIDENCE.value,
+    )
 
 
 # ===========================================================================

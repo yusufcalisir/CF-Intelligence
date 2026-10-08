@@ -67,7 +67,7 @@ def test_generate_soc2_evidence_report():
     engine = SecurityComplianceEngine()
     report = engine.generate_soc2_evidence_report()
 
-    assert report["compliance_status"] == "COMPLIANT"
+    assert report["compliance_status"] == "LOCAL_CHECKS_PASS"
     assert report["total_controls_audited"] >= 6
     assert report["failed_controls"] == 0
     assert report["passed_controls"] == report["total_controls_audited"]
@@ -82,12 +82,12 @@ def test_soc2_evidence_endpoint():
     response_get = client.get("/v1/compliance/soc2-evidence")
     assert response_get.status_code == 200
     data_get = response_get.json()
-    assert data_get["compliance_status"] == "COMPLIANT"
+    assert data_get["compliance_status"] == "LOCAL_CHECKS_PASS"
 
     response_post = client.post("/v1/compliance/soc2-evidence")
     assert response_post.status_code == 200
     data_post = response_post.json()
-    assert data_post["compliance_status"] == "COMPLIANT"
+    assert data_post["compliance_status"] == "LOCAL_CHECKS_PASS"
 
 
 def test_sql_injection_rejected():
