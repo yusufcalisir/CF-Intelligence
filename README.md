@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-%E2%89%A50.115-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-%E2%89%A52.4-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Tests Collected](https://img.shields.io/badge/tests-4835_collected-blue.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Tests Collected](https://img.shields.io/badge/tests-5195_collected-blue.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -153,7 +153,7 @@ To adhere to rigorous empirical standards (ACM/IEEE reproducibility guidelines, 
 | :--- | :--- | :--- | :--- |
 | **[1. Verified Empirical Results](#15-empirical-performance--benchmark-suite)** | Quantified performance metrics & benchmarks | [`claim_registry.json`](benchmarks/claim_registry.json), [`results/raw/`](benchmarks/results/raw/) | Exact JSON artifact reconciliation |
 | **[2. Experimental Suite](#1511-master-empirical-comparative-benchmark-matrix-strict-null-representation)** | 8 canonical datasets, factorial ablations, sweeps | [`experiments/`](experiments/), [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) | Standardized 5-artifact hierarchy |
-| **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (3,982 collected tests), `ci.yml` | Binary PASS/FAIL, zero-mock |
+| **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (4,370 collected tests), `ci.yml` | Binary PASS/FAIL, zero-mock |
 | **[4. Research Prototypes](#19-tier-2-research-prototypes--experimental-explorations)** | Exploratory algorithms & mathematical models | `experiments/`, GNN/PSI/CKKS drivers | Research proofs & simulation logs |
 | **[5. Limitations & Scope](#14-limitations--what-this-is-not)** | Real-world constraints, synthetic scope, caveats | [`LIMITATIONS.md`](docs/LIMITATIONS.md), [`verification_taxonomy_spec.md`](docs/verification_taxonomy_spec.md) | SR 11-7 model risk boundaries |
 
@@ -617,7 +617,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (3,982 Collected Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (4,370 Collected Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -626,15 +626,12 @@ CF-Intelligence/
 ├── frontend/                                        # React 19 / Vite TypeScript Web Console
 │   ├── README.md                                    # Web console architecture, component topology, testing & operations
 │   ├── middleware.ts                                # Vercel Security Middleware (Node.js runtime & security guards)
-│   ├── e2e-workflows/                               # Playwright Real-Browser Multi-Device E2E Suite (10 Tests)
-│   ├── e2e-visual/                                  # Playwright Visual Regression Suite (Strict baseline comparison)
-│   │   ├── auth_session_flow.spec.ts                # Session token lifecycle, navigation & security header validation
-│   │   ├── federated_training_lifecycle.spec.ts     # FL coordinator rounds, weight sync & live telemetry convergence
-│   │   ├── investigation_four_eyes_sar.spec.ts      # Four-Eyes dual supervisor approval & FinCEN SAR XML export
-│   │   ├── chaos_attack_simulation.spec.ts          # Interactive Byzantine gradient injection & Krum quarantine
-│   │   └── dataset_custom_ingest_flow.spec.ts       # CSV/Parquet drag-and-drop & GE data contract gating
+│   ├── e2e-workflows/                               # Playwright Real-Browser Multi-Device E2E Suite (5 files, 10 tests)
+│   ├── e2e-visual/                                  # Playwright Visual Regression Suite (4 files, 9 tests)
+│   ├── e2e-a11y/                                    # Playwright Axe WCAG & Keyboard Accessibility Suite (3 files, 3 tests)
+│   ├── e2e-responsive/                              # Playwright Responsive Layout & Viewport Suite (6 files, 23 tests)
 │   ├── src/
-│   │   ├── pages/                                   # 19 Enterprise Web Console Views
+│   │   ├── pages/                                   # 21 Enterprise Web Console Views
 │   │   │   ├── LandingPage.tsx                      # High-converting SaaS landing page, interactive demo & feature matrices
 │   │   │   ├── Dashboard.tsx                        # Executive KPI dashboard, risk distributions & fraud metrics
 │   │   │   ├── LiveOperationsView.tsx               # Real-time transaction streaming terminal & manual transaction scoring
@@ -649,6 +646,8 @@ CF-Intelligence/
 │   │   │   ├── CoordinatorPage.tsx                  # Federated learning coordinator console & client node status
 │   │   │   ├── BankOnboardingPage.tsx               # Self-service bank consortium onboarding & mTLS certificate wizard
 │   │   │   ├── BenchmarkHubPage.tsx                 # Real-time benchmark comparison hub (FL vs. Isolated across 4 open datasets)
+│   │   │   ├── ConsortiumPage.tsx                   # Multi-bank consortium node management & consensus governance
+│   │   │   ├── CounterfactualPage.tsx               # Algorithmic recourse & counterfactual explanation exploration
 │   │   │   ├── ApiDocsPage.tsx                      # Interactive API documentation portal & live OpenAPI request runner (/developer)
 │   │   │   ├── PoliciesPage.tsx                     # Dynamic AML risk policy rule manager & threshold tuning
 │   │   │   ├── PsiPage.tsx                          # Private Set Intersection (Fuzzy PSI) cross-bank entity lookup
@@ -704,9 +703,7 @@ CF-Intelligence/
 │   │   ├── hooks/                                   # Custom React Hooks
 │   │   ├── utils/                                   # Cryptographic helpers, number formatters & mutant killers
 │   │   │   └── piiSanitizer.ts                      # Luhn algorithm, IBAN/TCKN regex & Type-Salted HMAC Zero-PII sanitizer
-│   │   └── e2e/                                     # Playwright end-to-end browser user workflow specs
-│   │
-│   └── tests/                                       # Vitest & React Testing Library Suite (401 Collected Tests across 105 Files)
+│   └── tests/                                       # Vitest & React Testing Library Suite (373 Collected Tests across 87 Files)
 │
 ├── sdk/                                             # Official Consortium Client SDK
 │   ├── README.md                                    # Top-level SDK overview & quick-start guide
@@ -736,16 +733,18 @@ CF-Intelligence/
 │   ├── real_world_benchmarks.md                     # Empirical validation on PaySim, IEEE-CIS & Elliptic datasets
 │   └── ...                                          # Additional operational, API, and deployment documentation
 │
-├── verification/                                    # 19 Scientific Subsystem Self-Verification Modules
+├── verification/                                    # 21 Scientific Subsystem Self-Verification Modules (410 Collected Tests)
 │   ├── README.md                                    # Master scientific audit catalog & mathematical verification index
 │   ├── mathematical/                                # Master mathematical protocol & 35 formal invariant proofs
 │   ├── federated_learning/                          # FL convergence, Non-IID Dirichlet skew & optimizer audits
+│   ├── federated_convergence/                       # Non-IID convergence bounds & test set isolation verification
 │   ├── differential_privacy/                        # Opacus DP noise scale & Rényi DP moments accountant verification (test_dp_bounds.py)
 │   ├── secure_aggregation/                          # Curve25519 SecAgg pairwise masking, Shamir recovery & zero-knowledge boundary audits
 │   ├── zero_trust_pki/                              # Vault PKI, mTLS certificate lifecycles & ABAC policy audits
 │   ├── risk_scoring/                                # 9-Signal composite scoring & sub-100ms inference SLA audit
 │   ├── explainability/                              # SHAP feature attributions & counterfactual generator audits
 │   ├── real_data_benchmark/                         # Elliptic Bitcoin AML graph dataset empirical benchmark
+│   ├── scientific_revalidation/                     # Cross-bank claims ledger & statistical reproduction protocol
 │   ├── api/                                         # 100% REST endpoint & Pydantic schema contract verification
 │   ├── telemetry/                                   # Prometheus metrics export & OpenTelemetry trace audit
 │   ├── audit_logging/                               # Immutable SHA-256 audit chain & tamper-evidence verification
@@ -755,7 +754,8 @@ CF-Intelligence/
 │   ├── federation_coordinator/                      # Consortium consensus, round quorum & canary promotion audit
 │   ├── graph_intelligence/                          # Inductive GraphSAGE relational embedding verification
 │   ├── smart_contracts/                             # Consortium incentive settlement smart contract audit
-│   └── terraform_iac/                               # Multi-cloud Terraform IaC & Cloudflare perimeter security audit
+│   ├── terraform_iac/                               # Multi-cloud Terraform IaC & Cloudflare perimeter security audit
+│   └── inventories/                                 # Defect registries, surface inventories & historical applicability audits
 │
 ├── deployments/                                     # Infrastructure as Code (IaC) & Cloud Orchestration
 │   ├── terraform/                                   # Multi-cloud Terraform IaC (AWS, GCP, Azure, Cloudflare WAF)
@@ -1359,8 +1359,8 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 │ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
 │ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ Validated by 4,403 Python tests,     │ Evaluated across 8 canonical datasets│
-│ 401 Vitest components, 31 Hardhat.   │ via benchmarks/runners/ & harness.   │
+│ Validated by 4,791 Python tests,     │ Evaluated across 8 canonical datasets│
+│ 373 Vitest components, 31 Hardhat.   │ via benchmarks/runners/ & harness.   │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
 │ NOT prove fraud detection capability.│ if the gateway crashes or leaks PII. │
@@ -1406,7 +1406,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-SECAGG-CURVE25519`** | SecAgg Curve25519 Masking Throughput | `> 250k param/s` | `~513,000 param/s` | [`p2p_secagg_driver.py`](backend/app/infrastructure/security/p2p_secagg_driver.py) | `pytest backend/tests/unit/test_shamir_p2p_secagg.py -v` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-SECAGG-NUMPY`** | SecAgg NumPy Vectorized Masking | `> 1.0M param/s` | `~5,630,000 param/s` | [`fl_engine.py`](backend/app/application/services/fl_engine.py) | `python benchmarks/runners/secagg_benchmark_scalability.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-DR-FAILOVER-RTO`** | Disaster Recovery Failover (RTO) | `< 30.0 s` | `15.01 s` (RPO = 0 records) | [`chaos_dr_drill.py`](backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py) | `python backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
-| **`CLM-TEST-SUITE-PASS-RATE`** | Unit & Integration Test Inventory | `4,835 Tests` | `4,835 Collected Tests` (4,403 Python Core, 401 Vitest, 31 Smart Contracts) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `pytest & npm test discovery` | `EMPIRICAL_PARITY_VERIFIED` |
+| **`CLM-TEST-SUITE-PASS-RATE`** | Unit & Integration Test Inventory | `5,195 Tests` | `5,195 Collected Tests` (4,791 Python [4,370 Backend + 410 Verification + 11 SDK], 373 Vitest, 31 Smart Contracts) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `pytest & npm test discovery` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-AMLSIM-GRAPHSAGE-PRAUC`** | IBM AMLSim Multi-Hop GraphSAGE PR-AUC | `—` (Agent Simulation) | `0.6527` (Inductive GraphSAGE 2-Layer) | [`results.json`](experiments/amlsim/results.json) | `python experiments/amlsim/evaluate_patterns.py` | `VERIFIED_MEASURED` |
 | **`CLM-SYNTHAML-ALERTMLP-PRAUC`** | Danish Spar Nord Bank SynthAML AlertMLP PR-AUC | `—` (Project Synthetic) | `0.9924` (FedAvg) / `0.9341` (Centralized) | [`fraud_benchmark_synthaml.json`](benchmarks/results/raw/fraud_benchmark_synthaml.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset synthaml` | `VERIFIED_MEASURED` |
 | **`CLM-AMLNET-FEDAVG-PRAUC`** | AUSTRAC AMLNet Structuring Detection PR-AUC | `—` (Project Synthetic) | `1.0000` (Synthetic Structuring Separability) | [`results.json`](experiments/amlnet/results.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset amlnet` | `VERIFIED_MEASURED` |
@@ -1434,7 +1434,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | $\mathbf{\epsilon = 0.3497}$ at $\sigma=3.0, \delta=10^{-5}$ (Opacus PRVAccountant; Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Opacus DP-SGD benchmark; PRV accounting via `run_dp_tradeoff.py`)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Unit & Integration Test Inventory** | **4,835 Collected Tests** | **4,835 Collected Tests** (3,982 Backend Pytest + 410 Scientific Verification + 11 Python SDK + 401 Frontend Vitest + 31 Smart Contracts) | `Static Runner Discovery` | `45 defined Playwright E2E tests across 18 files (405 browser viewport runs)` |
+| **Unit & Integration Test Inventory** | **5,195 Collected Tests** | **5,195 Collected Tests** (4,370 Backend Pytest + 410 Scientific Verification + 11 Python SDK + 373 Frontend Vitest + 31 Smart Contracts) | `Static Runner Discovery` | `45 defined Playwright E2E tests across 18 files (405 browser viewport runs)` |
 
 ---
 
@@ -1801,7 +1801,7 @@ python scripts/verify_reproducibility.py --all
   3. *Benchmark Matrices & Invariants (6/6)*: Master matrix schema, Strict Null Representation Invariant, evaluated zero distinction, cross-dataset numerical parity, 16-configuration factorial ablation matrix, 5-seed statistical robustness matrix (Student-t 95% CIs).
   4. *Claim Registry & Governance (6/6)*: 19 empirical claims reconciled with raw JSON execution outputs, 4-rule Anti-Metric Shopping Protocol, zero marketing superlatives, unified continuous metric definitions ([`docs/METRICS.md`](docs/METRICS.md)), demographic data minimization ($0/10$ protected attributes).
   5. *Cryptographic & Security Invariants (5/5)*: Strict zero-leakage federated partition contract, Rényi DP moments accounting ([`rdp_accountant.py`](backend/app/infrastructure/security/rdp_accountant.py)), pairwise zero-sum SecAgg ($\|\sum m_i\|_{\infty} < 10^{-4}$), Byzantine tolerance breakdown limits ($f < n/2$), multi-tenant BOLA/IDOR isolation with HMAC-SHA256 pseudonymization.
-  6. *Code Quality, CI/CD & Automated Test Suites (5/5)*: Deterministic CI smoke gates ($< 20\text{s}$), 3,982 Backend Pytest tests, 401 Frontend Vitest tests, 410 Scientific Verification tests, 11 Python SDK tests, 31 Smart Contract tests (4,835 total collected tests) and clean static analysis (0 Ruff errors).
+  6. *Code Quality, CI/CD & Automated Test Suites (5/5)*: Deterministic CI smoke gates ($< 20\text{s}$), 4,370 Backend Pytest tests, 373 Frontend Vitest tests, 410 Scientific Verification tests, 11 Python SDK tests, 31 Smart Contract tests (5,195 total collected tests) and clean static analysis (0 Ruff errors).
 - **Authoritative Attestation Document:** Full attestation sign-off codified in Section 8 of [`docs/engineering-audit.md`](docs/engineering-audit.md).
 
 ---
@@ -1834,7 +1834,7 @@ The technical architecture of CF-Intelligence explores how system design pattern
 
 ## 17. Software Correctness & Subsystem Self-Verification Reports (`verification/`)
 
-Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **3,982 collected Pytest backend tests**, **401 Vitest frontend tests**, **11 Python SDK tests**, **31 Hardhat EVM smart contracts**, and **410 mathematical self-verification tests** across 21 verification modules (totaling **4,835 collected tests** across independent runner discovery). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
+Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **4,370 collected Pytest backend tests**, **373 Vitest frontend tests**, **11 Python SDK tests**, **31 Hardhat EVM smart contracts**, and **410 mathematical self-verification tests** across 21 verification modules (totaling **5,195 collected tests** across independent runner discovery). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
 
 The reports below document the internal scientific verification suites validating mathematical invariants, differential privacy bounds, cryptographic drivers, and algorithmic implementations:
 
@@ -1860,6 +1860,8 @@ The reports below document the internal scientific verification suites validatin
 | **Master Mathematical Protocol**| 35 Formal Mathematical Invariants | [Verification Report ↗](verification/mathematical/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
 | **Federated Convergence & Test Isolation** | `dataloader.py`, `fl_engine.py` | [Verification Report ↗](verification/federated_convergence/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
 | **Real-World Graph Benchmark** | `Elliptic AML Bitcoin Graph Dataset` | [Verification Report ↗](verification/real_data_benchmark/README.md) | `Self-Verified (Internal Test Suite)` |
+| **Scientific Revalidation & Ledger** | `claims_ledger.json`, `protocol.json` | [Protocol Doc ↗](verification/scientific_revalidation/protocol.md) | `Self-Verified (Internal Test Suite)` |
+| **Canonical Inventories & Defect Registry** | `canonical_defect_registry.json`, `api_surface_inventory.json` | [Defect Registry ↗](verification/inventories/canonical_defect_registry.json) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -2172,16 +2174,16 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (4,403 Core Python / 4,835 Total Collected Tests)
+### Step 5: Master Test Suites Execution (4,780 Core Python [4,791 with SDK] / 5,195 Total Collected Tests)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (3,982 collected tests)
+# 1. Run full backend pytest suite (4,370 collected tests)
 pytest backend/tests/ -v
 
 # 2. Run Interactive POC Sandbox Replay CLI evaluation
 python benchmark.py --poc-replay
 
-# 3. Run full frontend vitest suite (401 tests across 105 test files)
+# 3. Run full frontend vitest suite (373 tests across 87 test files)
 npm --prefix frontend test
 
 # 4. Run Playwright real-browser multi-device E2E suite (10 browser tests)

@@ -624,7 +624,7 @@
       "category": "platform_reliability_and_governance",
       "title": "Repository-Wide Test Suite Pass Rate",
       "dataset": "full_codebase",
-      "dataset_scale": "4,360 Collected Tests Across 4 Suites",
+      "dataset_scale": "5,195 Collected Tests Across Test Suites",
       "stated_value": 100.0,
       "stated_unit": "% Pass Rate",
       "empirical_measured_value": 100.0,
@@ -634,7 +634,7 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "README.md Section 15.1",
       "runner_script": "scripts/run_all_tests.py",
-      "notes": "Automated test inventory comprises 4,360 uniquely collected tests across 4 disjoint suites: 3,564 backend pytests, 409 scientific verification tests across 21 modules, 356 frontend vitest tests, and 31 smart contract tests. Core Python suites (3,973 collected tests: 3,564 backend + 409 verification) maintain 100% pass rate in CI.",
+      "notes": "Automated test inventory comprises 5,195 uniquely collected tests across independent runner discovery: 4,370 backend pytests, 410 scientific verification tests across 21 modules, 11 Python SDK tests, 373 frontend vitest tests across 87 test files, and 31 smart contract tests. Core Python suites (4,780 collected tests [4,791 with SDK]: 4,370 backend + 410 verification) maintain 100% pass rate in CI.",
       "claim_type": "MEASURED"
     },
     {

@@ -487,14 +487,14 @@ class ReproducibilityVerifier:
         b_ok = b_test_file.exists()
         self._record(
             "ITEM-35",
-            "Backend Pytest Suite (3,298+ Automated Tests)",
+            "Backend Pytest Suite (4,370 Automated Tests)",
             cat,
             b_ok,
             "Exhaustive test suite covering domain logic, application orchestration, and security drivers",
             "backend/tests/",
         )
 
-        # ITEM-36: Frontend Vitest Suite (86 Files, 355 Tests)
+        # ITEM-36: Frontend Vitest Suite (87 Files, 373 Tests)
         fe_pkg = self.root / "frontend" / "package.json"
         fe_ok = fe_pkg.exists()
         if fe_ok:
@@ -502,14 +502,14 @@ class ReproducibilityVerifier:
             fe_ok = "vitest" in fe_text
         self._record(
             "ITEM-36",
-            "Frontend Vitest Suite (86 Files, 355 Tests)",
+            "Frontend Vitest Suite (87 Files, 373 Tests)",
             cat,
             fe_ok,
             "Component, view, navigation, and integration test coverage across all investigation portals",
             "frontend/src/",
         )
 
-        # ITEM-37: Scientific Invariant Verification Suite (21 Modules, 409 Tests)
+        # ITEM-37: Scientific Invariant Verification Suite (21 Modules, 410 Tests)
         v_dir = self.root / "verification"
         v_ok = v_dir.exists() and (v_dir / "README.md").exists()
         if v_ok:
@@ -517,7 +517,7 @@ class ReproducibilityVerifier:
             v_ok = "Module 21" in v_text or "test_test_set_isolation.py" in v_text
         self._record(
             "ITEM-37",
-            "Scientific Verification Suite (21 Modules, 409 Tests)",
+            "Scientific Verification Suite (21 Modules, 410 Tests)",
             cat,
             v_ok,
             "Mathematical self-verification asserting differential privacy bounds, Byzantine tolerance, and test isolation",
