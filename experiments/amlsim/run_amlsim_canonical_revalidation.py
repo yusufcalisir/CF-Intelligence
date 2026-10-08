@@ -17,7 +17,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import platform
 import subprocess
 import sys
 import time
@@ -26,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -108,7 +108,7 @@ def run_ru_aml_02_preflight(dataset_path: Path) -> dict[str, Any]:
         raise ValueError("DATA-006 Guard: NaN values detected in label column. Cannot coerce to positive.")
 
     unique_vals = set(df_sample["IS_FRAUD"].unique())
-    if not unique_vals.issubset({False, True, 0, 1}):
+    if not unique_vals.issubset({False, True}):
         raise ValueError(f"DATA-006 Guard: Unexpected values in label column: {unique_vals}")
 
     pos_count = (df_sample["IS_FRAUD"] == True).sum()  # noqa: E712
