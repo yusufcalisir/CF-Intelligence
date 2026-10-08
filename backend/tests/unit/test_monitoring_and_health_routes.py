@@ -43,7 +43,7 @@ class TestHealthAndReadinessProbes:
         assert "timestamp" in data
         assert data["uptime_seconds"] >= 0
 
-    @pytest.mark.parametrize("prefix", ["/health/live", "/api/v1/health/live", "/v1/health/live"])
+    @pytest.mark.parametrize("prefix", ["/health/live", "/api/v1/health/live", "/v1/health/live", "/live"])
     def test_kubernetes_liveness_multi_prefix(self, prefix: str):
         """Verify Kubernetes K8s liveness probes across all prefixes."""
         resp = client.get(prefix)
@@ -52,7 +52,7 @@ class TestHealthAndReadinessProbes:
         assert data["status"] == "alive"
         assert "timestamp" in data
 
-    @pytest.mark.parametrize("prefix", ["/health/ready", "/api/v1/health/ready", "/v1/health/ready"])
+    @pytest.mark.parametrize("prefix", ["/health/ready", "/api/v1/health/ready", "/v1/health/ready", "/ready"])
     def test_readiness_probe_healthy_state(self, prefix: str):
         """Verify readiness probe returns HTTP 200 when all dependencies are healthy."""
         healthy_redis = DependencyHealthStatus(status="HEALTHY", latency_ms=1.2)

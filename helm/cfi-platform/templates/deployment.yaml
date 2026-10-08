@@ -42,16 +42,16 @@ spec:
               protocol: TCP
           livenessProbe:
             httpGet:
-              path: /health
+              path: {{ .Values.probes.liveness.path | default "/health" }}
               port: http
-            initialDelaySeconds: 15
-            periodSeconds: 10
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds | default 15 }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds | default 10 }}
           readinessProbe:
             httpGet:
-              path: /ready
+              path: {{ .Values.probes.readiness.path | default "/ready" }}
               port: http
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds | default 5 }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds | default 5 }}
           resources:
             limits:
               cpu: {{ .Values.resources.limits.cpu | quote }}

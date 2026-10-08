@@ -269,12 +269,14 @@ async def health_root() -> HealthCheckResponse:
 
 
 @router.get("/health/live", response_model=LivenessResponse, status_code=status.HTTP_200_OK)
+@router.get("/live", response_model=LivenessResponse, status_code=status.HTTP_200_OK)
 async def liveness_root() -> LivenessResponse:
     """Kubernetes liveness probe endpoint."""
     return _build_liveness_response()
 
 
 @router.get("/health/ready", response_model=ReadinessResponse)
+@router.get("/ready", response_model=ReadinessResponse)
 async def readiness_root(response: Response) -> ReadinessResponse:
     """Readiness probe. Checks downstream dependencies (Database, Redis, Vault, TEE).
 

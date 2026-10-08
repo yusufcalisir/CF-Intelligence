@@ -10,8 +10,8 @@ This directory contains the standalone, unified production Helm chart for deploy
 helm/
 ├── README.md                          # Helm architecture, configuration reference & validation guide
 └── cfi-platform/                      # Unified Helm 3 application chart
-    ├── Chart.yaml                     # Chart metadata (Version: 1.0.0, AppVersion: 1.4.2)
-    ├── values.yaml                    # Default values (replicas, security contexts, ingress, autoscaling)
+    ├── Chart.yaml                     # Chart metadata (Version: 1.0.0, AppVersion: 2.4.0)
+    ├── values.yaml                    # Default values (replicas, security contexts, probes, ingress, autoscaling)
     └── templates/
         ├── deployment.yaml            # Backend API & FL engine deployment (ports 8000, 50051)
         ├── service.yaml               # ClusterIP service routing HTTP & gRPC traffic
@@ -56,6 +56,12 @@ The chart renders and deploys **4 validated Kubernetes resources**:
 | `autoscaling.minReplicas` | `int` | `2` | Minimum autoscaling replicas |
 | `autoscaling.maxReplicas` | `int` | `20` | Maximum autoscaling replicas |
 | `autoscaling.targetCPUUtilizationPercentage` | `int` | `70` | Target CPU utilization percentage for autoscaling |
+| `probes.liveness.path` | `string` | `/health` | Kubernetes container liveness probe endpoint path |
+| `probes.liveness.initialDelaySeconds` | `int` | `15` | Liveness probe initial delay in seconds |
+| `probes.liveness.periodSeconds` | `int` | `10` | Liveness probe check period in seconds |
+| `probes.readiness.path` | `string` | `/ready` | Kubernetes container readiness probe endpoint path |
+| `probes.readiness.initialDelaySeconds` | `int` | `5` | Readiness probe initial delay in seconds |
+| `probes.readiness.periodSeconds` | `int` | `5` | Readiness probe check period in seconds |
 | `env.APP_ENV` | `string` | `production` | Application deployment environment identifier |
 | `env.REDIS_URL` | `string` | `redis://cfi-redis:6379/0` | Upstream Redis cluster connection URI |
 | `env.TELEMETRY_ENABLED` | `string` | `true` | OpenTelemetry and Prometheus metric collection flag |

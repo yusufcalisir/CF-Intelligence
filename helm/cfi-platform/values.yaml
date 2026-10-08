@@ -56,6 +56,16 @@ autoscaling:
   maxReplicas: 20
   targetCPUUtilizationPercentage: 70
 
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 15
+    periodSeconds: 10
+  readiness:
+    path: /ready
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
 env:
   APP_ENV: production
   REDIS_URL: "redis://cfi-redis:6379/0"
