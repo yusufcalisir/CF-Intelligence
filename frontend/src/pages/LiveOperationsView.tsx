@@ -205,11 +205,11 @@ export default function LiveOperationsView() {
     };
     return {
       round: roundNum,
-      auc: parseFloat(globalAuc.toFixed(4)),
-      bankA: parseFloat(getBankVal('alpha', 0).toFixed(4)),
-      bankB: parseFloat(getBankVal('beta', 1).toFixed(4)),
-      bankC: parseFloat(getBankVal('gamma', 2).toFixed(4)),
-      loss: parseFloat(loss.toFixed(4)),
+      auc: globalAuc != null && !isNaN(globalAuc) ? parseFloat(globalAuc.toFixed(4)) : fallbackAuc,
+      bankA: getBankVal('alpha', 0) != null && !isNaN(getBankVal('alpha', 0)) ? parseFloat(getBankVal('alpha', 0).toFixed(4)) : fallbackAuc,
+      bankB: getBankVal('beta', 1) != null && !isNaN(getBankVal('beta', 1)) ? parseFloat(getBankVal('beta', 1).toFixed(4)) : fallbackAuc,
+      bankC: getBankVal('gamma', 2) != null && !isNaN(getBankVal('gamma', 2)) ? parseFloat(getBankVal('gamma', 2).toFixed(4)) : fallbackAuc,
+      loss: loss != null && !isNaN(loss) ? parseFloat(loss.toFixed(4)) : 0,
     };
   }, []);
 
@@ -786,11 +786,11 @@ export default function LiveOperationsView() {
               const existingIdx = prev.findIndex((r) => r.round === roundNum);
               const newPoint = {
                 round: roundNum,
-                auc: parseFloat(globalAuc.toFixed(4)),
-                bankA: parseFloat(bankA_auc.toFixed(4)),
-                bankB: parseFloat(bankB_auc.toFixed(4)),
-                bankC: parseFloat(bankC_auc.toFixed(4)),
-                loss: parseFloat(roundLoss.toFixed(4)),
+                auc: globalAuc != null && !isNaN(globalAuc) ? parseFloat(globalAuc.toFixed(4)) : fallbackAuc,
+                bankA: bankA_auc != null && !isNaN(bankA_auc) ? parseFloat(bankA_auc.toFixed(4)) : fallbackAuc,
+                bankB: bankB_auc != null && !isNaN(bankB_auc) ? parseFloat(bankB_auc.toFixed(4)) : fallbackAuc,
+                bankC: bankC_auc != null && !isNaN(bankC_auc) ? parseFloat(bankC_auc.toFixed(4)) : fallbackAuc,
+                loss: roundLoss != null && !isNaN(roundLoss) ? parseFloat(roundLoss.toFixed(4)) : 0,
               };
               if (existingIdx >= 0) {
                 const next = [...prev];
@@ -1159,7 +1159,7 @@ export default function LiveOperationsView() {
                 Active Champion AUC
               </span>
               <span className="text-base sm:text-lg font-bold font-mono" style={{ color: selectedProfile.color }}>
-                {effectiveChampionAuc.toFixed(4)}
+                {effectiveChampionAuc != null && !isNaN(effectiveChampionAuc) ? effectiveChampionAuc.toFixed(4) : '0.0000'}
               </span>
             </div>
 
@@ -1419,7 +1419,7 @@ export default function LiveOperationsView() {
                     domain={[0.65, 1.0]}
                     stroke="var(--color-text-muted)"
                     fontSize={11}
-                    tickFormatter={(v: number) => v.toFixed(2)}
+                    tickFormatter={(v: number) => (v != null && !isNaN(v) ? v.toFixed(2) : '')}
                   />
                   <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => Number(v ?? 0).toFixed(4)} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
@@ -1463,7 +1463,7 @@ export default function LiveOperationsView() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                   <XAxis dataKey="round" stroke="var(--color-text-muted)" fontSize={11} />
-                  <YAxis stroke="var(--color-text-muted)" fontSize={11} tickFormatter={(v: number) => v.toFixed(2)} />
+                  <YAxis stroke="var(--color-text-muted)" fontSize={11} tickFormatter={(v: number) => (v != null && !isNaN(v) ? v.toFixed(2) : '')} />
                   <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => Number(v ?? 0).toFixed(4)} />
                   <Area type="monotone" dataKey="loss" name="Loss" stroke="var(--color-accent-rose)" fill="url(#lossGrad)" strokeWidth={2} dot={false} isAnimationActive={true} />
                 </AreaChart>
@@ -1549,7 +1549,7 @@ export default function LiveOperationsView() {
                     ● {bank.status === 'QUARANTINED' ? 'QUARANTINED BY KRUM' : bank.status}
                   </span>
                 </div>
-                {bankAuc !== undefined && (
+                {bankAuc != null && !isNaN(bankAuc) && (
                   <div className="flex items-center gap-2 mt-1">
                     <div className="flex-1 h-1.5 bg-[var(--color-bg-elevated)] rounded-full overflow-hidden">
                       <motion.div
@@ -1690,30 +1690,30 @@ export default function LiveOperationsView() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="rounded-xl bg-emerald-950/40 border border-emerald-500/15 p-3 text-center">
               <p className="text-[10px] font-mono text-slate-400 mb-1">EUR Frozen</p>
-              <p className="text-xl font-bold text-emerald-300 font-mono">€{(arSummary.total_eur_frozen / 1_000_000).toFixed(2)}M</p>
+              <p className="text-xl font-bold text-emerald-300 font-mono">€{(((arSummary.total_eur_frozen ?? 0) / 1_000_000)).toFixed(2)}M</p>
               <p className="text-[9px] text-slate-500 mt-0.5">via camt.056 recalls</p>
             </div>
             <div className="rounded-xl bg-cyan-950/40 border border-cyan-500/15 p-3 text-center">
               <p className="text-[10px] font-mono text-slate-400 mb-1">EUR Recovered</p>
-              <p className="text-xl font-bold text-cyan-300 font-mono">€{(arSummary.total_eur_recovered / 1_000_000).toFixed(2)}M</p>
+              <p className="text-xl font-bold text-cyan-300 font-mono">€{(((arSummary.total_eur_recovered ?? 0) / 1_000_000)).toFixed(2)}M</p>
               <p className="text-[9px] text-slate-500 mt-0.5">successful recalls</p>
             </div>
             <div className="rounded-xl bg-indigo-950/40 border border-indigo-500/15 p-3 text-center">
               <p className="text-[10px] font-mono text-slate-400 mb-1">MTTR Reduction</p>
-              <p className="text-xl font-bold text-indigo-300 font-mono">{arSummary.mttr_reduction_pct.toFixed(1)}%</p>
+              <p className="text-xl font-bold text-indigo-300 font-mono">{(arSummary.mttr_reduction_pct ?? 0).toFixed(1)}%</p>
               <p className="text-[9px] text-slate-500 mt-0.5">vs. 48h baseline</p>
             </div>
             <div className="rounded-xl bg-purple-950/40 border border-purple-500/15 p-3 text-center">
               <p className="text-[10px] font-mono text-slate-400 mb-1">Containment Rate</p>
-              <p className="text-xl font-bold text-purple-300 font-mono">{(arSummary.contagion_containment_rate * 100).toFixed(0)}%</p>
+              <p className="text-xl font-bold text-purple-300 font-mono">{(((arSummary.contagion_containment_rate ?? 0) * 100)).toFixed(0)}%</p>
               <p className="text-[9px] text-slate-500 mt-0.5">&lt;60min freezes</p>
             </div>
           </div>
 
           {/* Sub-metrics bar */}
           <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-mono text-slate-400">
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">MTTR P50 {arSummary.mttr_p50_minutes.toFixed(1)}min</span>
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">MTTR P90 {arSummary.mttr_p90_minutes.toFixed(1)}min</span>
+            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">MTTR P50 {(arSummary.mttr_p50_minutes ?? 0).toFixed(1)}min</span>
+            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">MTTR P90 {(arSummary.mttr_p90_minutes ?? 0).toFixed(1)}min</span>
             <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">{arSummary.mule_chains_disrupted} mule chains disrupted</span>
             <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">{arSummary.active_provisional_holds} active holds</span>
             <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">{arSummary.consortium_banks_active} consortium nodes</span>

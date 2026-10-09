@@ -42,7 +42,7 @@ export default function ConfusionMatrix({
     fp = matrix.false_positives ?? 0;
     fn = matrix.false_negatives ?? 0;
     tp = matrix.true_positives ?? 0;
-    if (!subheading && matrix.threshold !== undefined) {
+    if (!subheading && matrix.threshold != null && !isNaN(matrix.threshold)) {
       subheading = `Decision Threshold τ = ${matrix.threshold.toFixed(2)}`;
     }
   } else if (bank) {
@@ -75,7 +75,7 @@ export default function ConfusionMatrix({
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
           {heading}
         </h3>
-        {matrix?.threshold !== undefined && (
+        {matrix?.threshold != null && !isNaN(matrix.threshold) && (
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
             τ = {matrix.threshold.toFixed(2)}
           </span>
@@ -127,11 +127,11 @@ export default function ConfusionMatrix({
       </div>
 
       {/* Operational metrics summary if provided */}
-      {matrix && matrix.precision !== undefined && (
+      {matrix && matrix.precision != null && (
         <div className="grid grid-cols-4 gap-2 mt-4 pt-3 border-t border-[var(--color-border-subtle)] text-center text-[10px]">
           <div>
             <div className="text-[var(--color-text-muted)]">Precision</div>
-            <div className="font-mono font-bold text-[var(--color-text-primary)]">{(matrix.precision * 100).toFixed(1)}%</div>
+            <div className="font-mono font-bold text-[var(--color-text-primary)]">{((matrix.precision ?? 0) * 100).toFixed(1)}%</div>
           </div>
           <div>
             <div className="text-[var(--color-text-muted)]">Recall</div>

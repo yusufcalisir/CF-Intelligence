@@ -231,19 +231,19 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
                 <div>
                   <div className="text-[8px] text-[var(--color-text-muted)] uppercase">AUC-ROC</div>
                   <div className="text-xs font-bold font-mono text-[var(--color-accent-teal)]">
-                    {activeVersion.metrics.auc_roc.toFixed(4)}
+                    {activeVersion.metrics?.auc_roc != null ? activeVersion.metrics.auc_roc.toFixed(4) : '—'}
                   </div>
                 </div>
                 <div>
                   <div className="text-[8px] text-[var(--color-text-muted)] uppercase">F1-Score</div>
                   <div className="text-xs font-bold font-mono text-[var(--color-accent-indigo-light)]">
-                    {activeVersion.metrics.f1_score.toFixed(4)}
+                    {activeVersion.metrics?.f1_score != null ? activeVersion.metrics.f1_score.toFixed(4) : '—'}
                   </div>
                 </div>
                 <div>
                   <div className="text-[8px] text-[var(--color-text-muted)] uppercase">Loss</div>
                   <div className="text-xs font-bold font-mono text-[var(--color-text-primary)]">
-                    {activeVersion.metrics.loss.toFixed(4)}
+                    {activeVersion.metrics?.loss != null ? activeVersion.metrics.loss.toFixed(4) : '—'}
                   </div>
                 </div>
               </div>
@@ -314,20 +314,20 @@ export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryP
                     <div>
                       <div className="text-[8px] text-[var(--color-text-muted)] uppercase">PR-AUC</div>
                       <div className="font-bold text-[var(--color-accent-teal)]">
-                        {ver.metrics.auc_roc.toFixed(4)}
+                        {ver.metrics?.auc_roc != null ? ver.metrics.auc_roc.toFixed(4) : '—'}
                       </div>
                     </div>
                     <div className="w-[1px] bg-[var(--color-border-subtle)]" />
                     <div>
                       <div className="text-[8px] text-[var(--color-text-muted)] uppercase">F1</div>
                       <div className="font-bold text-[var(--color-accent-indigo-light)]">
-                        {ver.metrics.f1_score.toFixed(4)}
+                        {ver.metrics?.f1_score != null ? ver.metrics.f1_score.toFixed(4) : '—'}
                       </div>
                     </div>
                     <div className="w-[1px] bg-[var(--color-border-subtle)]" />
                     <div>
                       <div className="text-[8px] text-[var(--color-text-muted)] uppercase">Loss</div>
-                      <div className="font-bold">{ver.metrics.loss.toFixed(4)}</div>
+                      <div className="font-bold">{ver.metrics?.loss != null ? ver.metrics.loss.toFixed(4) : '—'}</div>
                     </div>
                   </div>
 

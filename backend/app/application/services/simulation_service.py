@@ -1801,6 +1801,28 @@ class SimulationService:
                 threshold_prov,
             )
 
+            # Authoritative Final Global Evaluation across validation partition
+            sens_val_list = [
+                data["sens_val"]
+                for data in bank_data.values()
+                if data.get("sens_val") is not None
+            ]
+            sens_val_global = (
+                np.concatenate(sens_val_list, axis=0)
+                if len(sens_val_list) == len(bank_data)
+                else None
+            )
+            final_global_eval = self.model_service.evaluate(
+                global_model,
+                X_val_global,
+                y_val_global,
+                sens_attr=sens_val_global,
+                threshold=operating_threshold,
+                threshold_provenance=threshold_prov,
+            )
+            global_auc = final_global_eval.get("auc_roc")
+            global_f1 = final_global_eval.get("f1_score")
+
             client_counts = []
             eval_dicts = {}
             for bank in banks:
@@ -1815,7 +1837,9 @@ class SimulationService:
                         threshold_provenance=threshold_prov,
                     )
                     eval_dicts[bank.id] = fed_eval
-                    fed_feat_imp = self.model_service.get_feature_importance(global_model)
+                    fed_feat_imp = self.model_service.get_feature_importance(
+                        global_model, X_val_global, feature_names=feature_names
+                    )
                     bank.federated_metrics = self.metrics_service.from_eval_dict(
                         fed_eval,
                         fed_feat_imp,

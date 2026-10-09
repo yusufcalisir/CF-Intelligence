@@ -88,7 +88,7 @@ export default function ComplianceReportPanel({ simulationId = '', banks }: Comp
               </span>
             </div>
             <p className="text-2xl font-bold font-mono text-[var(--color-text-primary)] mt-2">
-              {disparateImpact.toFixed(3)}
+              {disparateImpact != null && !isNaN(disparateImpact) ? disparateImpact.toFixed(3) : '0.000'}
             </p>
             <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
               Protected selection rate: <span className="font-mono">{formatPercent(protectedRate)}</span> vs Reference selection rate: <span className="font-mono">{formatPercent(referenceRate)}</span>
@@ -131,7 +131,7 @@ export default function ComplianceReportPanel({ simulationId = '', banks }: Comp
               </span>
             </div>
             <p className="text-2xl font-bold font-mono text-[var(--color-text-primary)] mt-2">
-              {eqOppDiff.toFixed(3)}
+              {eqOppDiff != null && !isNaN(eqOppDiff) ? eqOppDiff.toFixed(3) : '0.000'}
             </p>
             <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
               Absolute gap in model recall (True Positive Rate) across demography slices. Limit is &lt; 0.100.

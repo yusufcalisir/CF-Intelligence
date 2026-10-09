@@ -199,6 +199,25 @@ class FraudFlowerClient(fl.client.NumPyClient):
                 "loss": float(loss_hist[-1]) if loss_hist else 0.0,
             }
 
+        # Evaluate local model on client test partition for legitimate per-bank AUC reporting
+        if (
+            "X_test" in self.data
+            and "y_test" in self.data
+            and self.data["X_test"] is not None
+            and self.data["y_test"] is not None
+            and len(self.data["y_test"]) > 0
+        ):
+            with contextlib.suppress(Exception):
+                if len(np.unique(self.data["y_test"])) >= 2:
+                    client_eval = self.model_service.evaluate(
+                        self.model,
+                        self.data["X_test"],
+                        self.data["y_test"],
+                    )
+                    c_auc = client_eval.get("auc_roc")
+                    if c_auc is not None and isinstance(c_auc, (int, float)):
+                        metrics["auc"] = float(c_auc)
+
         updated_params = _weights_to_ndarrays(self.model_service, self.model)
         _cleanup_pytorch_memory()
         return updated_params, n_samples, metrics
@@ -238,6 +257,8 @@ class CallbackFedAvg(fl.server.strategy.FedAvg):
         round_results: list[dict[str, Any]],
         progress_callback: ProgressCallback,
         simulation_id: str,
+        model_service: ModelService | None = None,
+        global_model: Any = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -247,6 +268,9 @@ class CallbackFedAvg(fl.server.strategy.FedAvg):
         self.round_results = round_results
         self.progress_callback = progress_callback
         self.simulation_id = simulation_id
+        self.model_service = model_service
+        self.global_model = global_model
+        self.latest_parameters: list[np.ndarray] | None = None
 
     def aggregate_fit(
         self,
@@ -259,6 +283,7 @@ class CallbackFedAvg(fl.server.strategy.FedAvg):
         round_duration = (time.perf_counter() - round_start) * 1000
 
         per_bank_loss: dict[str, float] = {}
+        per_bank_auc: dict[str, float] = {}
         for idx, (client_proxy, fit_res) in enumerate(results):
             metrics = getattr(fit_res, "metrics", {}) or {}
             bid = metrics.get("bank_id")
@@ -272,23 +297,47 @@ class CallbackFedAvg(fl.server.strategy.FedAvg):
                 except Exception:
                     if 0 <= idx < len(self.bank_ids):
                         bid = self.bank_ids[idx]
-            if bid and bid in self.bank_ids and "loss" in metrics and metrics["loss"] is not None:
-                per_bank_loss[bid] = float(metrics["loss"])
+            if bid and bid in self.bank_ids:
+                if "loss" in metrics and metrics["loss"] is not None:
+                    per_bank_loss[bid] = float(metrics["loss"])
+                if "auc" in metrics and metrics["auc"] is not None:
+                    per_bank_auc[bid] = float(metrics["auc"])
 
         reporting_losses = list(per_bank_loss.values())
         avg_loss = sum(reporting_losses) / len(reporting_losses) if reporting_losses else 0.0
         reporting_bank_ids = list(per_bank_loss.keys())
         dropped_bank_ids = [b for b in self.bank_ids if b not in per_bank_loss]
+        avg_auc = (
+            sum(per_bank_auc.values()) / len(per_bank_auc)
+            if per_bank_auc
+            else None
+        )
+
+        # Synchronize aggregated weights into global_model if available
+        if aggregated is not None and aggregated[0] is not None:
+            try:
+                latest_ndarrays = fl.common.parameters_to_ndarrays(aggregated[0])
+                self.latest_parameters = latest_ndarrays
+                if self.model_service is not None and self.global_model is not None:
+                    _ndarrays_to_model(self.model_service, self.global_model, latest_ndarrays)
+            except Exception as e:
+                logger.debug("[Flower] Parameters extraction note: %s", e)
 
         round_info = {
             "round_number": server_round,
             "global_loss": avg_loss,
+            "global_auc": avg_auc,
             "per_bank_loss": per_bank_loss,
+            "per_bank_auc": per_bank_auc,
             "participating_bank_ids": reporting_bank_ids,
             "dropped_bank_ids": dropped_bank_ids,
             "aggregation_time_ms": round_duration,
             "round_duration_ms": round_duration,
-            "per_bank_samples": {bid: len(self.bank_data[bid]["X_train"]) for bid in self.bank_ids if bid in self.bank_data},
+            "per_bank_samples": {
+                bid: len(self.bank_data[bid]["X_train"])
+                for bid in self.bank_ids
+                if bid in self.bank_data
+            },
         }
         self.round_results.append(round_info)
 
@@ -300,6 +349,8 @@ class CallbackFedAvg(fl.server.strategy.FedAvg):
                     "round": server_round,
                     "total": self.num_rounds,
                     "loss": avg_loss,
+                    "auc": avg_auc,
+                    "per_bank_auc": per_bank_auc,
                     "participants": self.bank_ids,
                     "dropped": [],
                     "duration_ms": round_duration,
@@ -308,10 +359,11 @@ class CallbackFedAvg(fl.server.strategy.FedAvg):
             )
 
         logger.info(
-            "[Flower] Round %d/%d | avg loss: %.4f, duration: %.0fms",
+            "[Flower] Round %d/%d | avg loss: %.4f | avg auc: %s | duration: %.0fms",
             server_round,
             self.num_rounds,
             avg_loss,
+            f"{avg_auc:.4f}" if avg_auc is not None else "N/A",
             round_duration,
         )
 
@@ -477,6 +529,8 @@ class FlowerFLEngine:
             round_results=round_results,
             progress_callback=progress_callback,
             simulation_id=simulation_id,
+            model_service=model_service,
+            global_model=global_model,
             fraction_fit=1.0,
             fraction_evaluate=1.0,
             min_fit_clients=len(bank_ids),
@@ -611,6 +665,10 @@ class FlowerFLEngine:
                     client_resources={"num_cpus": 0.5, "num_gpus": 0.0},
                 )
 
+            # Ensure final global_model weights are loaded from strategy
+            if hasattr(strategy, "latest_parameters") and strategy.latest_parameters is not None:
+                _ndarrays_to_model(model_service, global_model, strategy.latest_parameters)
+
             if ray.is_initialized():
                 time.sleep(0.2)
                 ray.shutdown()
@@ -690,6 +748,7 @@ class FlowerFLEngine:
         for r in range(1, config.num_rounds + 1):
             round_start = time.perf_counter()
             per_bank_loss: dict[str, float] = {}
+            per_bank_auc: dict[str, float] = {}
             client_weights: list[list[np.ndarray]] = []
             client_samples: list[int] = []
 
@@ -761,6 +820,21 @@ class FlowerFLEngine:
                     b_loss = 0.0
 
                 per_bank_loss[bid] = b_loss
+                # Evaluate local client model on its holdout test partition for legitimate AUC observability
+                x_test = data.get("X_test")
+                y_test = data.get("y_test")
+                if (
+                    x_test is not None
+                    and y_test is not None
+                    and len(y_test) > 0
+                ):
+                    with contextlib.suppress(Exception):
+                        if len(np.unique(y_test)) >= 2:
+                            c_eval = self.model_service.evaluate(client_model, x_test, y_test)
+                            c_auc = c_eval.get("auc_roc")
+                            if c_auc is not None and isinstance(c_auc, (int, float)):
+                                per_bank_auc[bid] = float(c_auc)
+
                 client_weights.append(_weights_to_ndarrays(self.model_service, client_model))
 
             # Aggregate client weights via FedAvg
@@ -783,11 +857,16 @@ class FlowerFLEngine:
             avg_loss = (
                 sum(per_bank_loss.values()) / len(per_bank_loss) if per_bank_loss else 0.0
             )
+            avg_auc = (
+                sum(per_bank_auc.values()) / len(per_bank_auc) if per_bank_auc else None
+            )
 
             round_info = {
                 "round_number": r,
                 "global_loss": avg_loss,
+                "global_auc": avg_auc,
                 "per_bank_loss": per_bank_loss,
+                "per_bank_auc": per_bank_auc,
                 "participating_bank_ids": bank_ids,
                 "dropped_bank_ids": [],
                 "aggregation_time_ms": round_duration,
@@ -806,6 +885,8 @@ class FlowerFLEngine:
                         "round": r,
                         "total": config.num_rounds,
                         "loss": avg_loss,
+                        "auc": avg_auc,
+                        "per_bank_auc": per_bank_auc,
                         "participants": bank_ids,
                         "dropped": [],
                         "duration_ms": round_duration,
