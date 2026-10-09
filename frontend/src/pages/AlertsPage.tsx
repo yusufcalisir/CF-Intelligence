@@ -392,17 +392,17 @@ export default function AlertsPage() {
 
       {/* Mobile Explainability Modal */}
       {selectedAlert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm lg:hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm lg:hidden">
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="glass-card w-full max-w-lg max-h-[85vh] overflow-y-auto relative flex flex-col p-0"
+            className="glass-card w-full max-w-lg max-h-[90vh] overflow-hidden relative flex flex-col p-0 border border-slate-700/80 shadow-2xl bg-slate-950"
           >
-            <div className="p-4 border-b border-[var(--color-border)] flex items-center justify-between sticky top-0 bg-[var(--color-bg-card)] z-10">
-              <h3 className="font-bold text-[var(--color-text-primary)]">Alert Details</h3>
+            <div className="p-3.5 sm:p-4 border-b border-[var(--color-border)] flex items-center justify-between sticky top-0 bg-slate-950/95 backdrop-blur z-10 shrink-0">
+              <h3 className="font-bold text-sm sm:text-base text-[var(--color-text-primary)]">Alert Details</h3>
               <button
                 onClick={handleClearSelectedAlert}
-                className="p-1 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card-hover)] focus:outline-none"
+                className="p-1 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card-hover)] focus:outline-none cursor-pointer"
                 aria-label="Close details"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -410,12 +410,13 @@ export default function AlertsPage() {
                 </svg>
               </button>
             </div>
-            <div className="p-5 overflow-y-auto">
+            <div className="p-3 sm:p-5 overflow-y-auto">
               <ExplainabilityPanel
                 alert={selectedAlert}
                 onClose={handleClearSelectedAlert}
                 onEscalate={handleEscalateAlertToCase}
                 isEscalating={escalatingAlertId === selectedAlert.id}
+                isModal={true}
               />
             </div>
           </motion.div>
@@ -593,12 +594,14 @@ export function ExplainabilityPanel({
   onEscalate,
   isEscalating,
   hideEscalateButton,
+  isModal,
 }: {
   alert: Alert;
   onClose?: () => void;
   onEscalate?: (alert: Alert) => void;
   isEscalating?: boolean;
   hideEscalateButton?: boolean;
+  isModal?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<'attribution' | 'counterfactuals' | 'audit' | 'gnn'>('attribution');
   const { data: report, isLoading: isReportLoading } = useAlertExplainability(alert.id);
@@ -611,9 +614,13 @@ export function ExplainabilityPanel({
       key={alert.id}
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="glass-card p-5 sticky top-6 space-y-4 border border-[var(--color-border)] shadow-2xl bg-slate-950/90 text-slate-100"
+      className={`space-y-4 text-slate-100 min-w-0 ${
+        isModal
+          ? 'p-0 bg-transparent'
+          : 'glass-card p-3.5 sm:p-5 lg:sticky lg:top-6 border border-[var(--color-border)] shadow-2xl bg-slate-950/90'
+      }`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3 min-w-0">
         <h3 className="text-xs sm:text-sm font-bold uppercase text-slate-200 tracking-wider flex items-center gap-1.5 min-w-0">
           <span className="shrink-0">🧠</span>
           <span className="truncate">AI Explainability Portal</span>
@@ -622,10 +629,10 @@ export function ExplainabilityPanel({
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold">
             GDPR Art. 22 Compliant
           </span>
-          {onClose && (
+          {onClose && !isModal && (
             <button
               onClick={onClose}
-              className="p-1 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+              className="p-1 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors cursor-pointer"
               title="Close panel"
               aria-label="Close explainability panel"
             >
@@ -640,22 +647,22 @@ export function ExplainabilityPanel({
       {/* AML Case Escalation Action Banner */}
       {!hideEscalateButton && (
         <div className="p-3.5 bg-gradient-to-r from-indigo-950/90 via-purple-950/80 to-slate-900/90 rounded-xl border border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-amber-400 font-bold text-xs uppercase tracking-wider flex items-center gap-1">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-amber-400 font-bold text-xs uppercase tracking-wider flex items-center gap-1 shrink-0">
                 <span>⚡</span> Triage Action
               </span>
               {alert.status === 'escalated' ? (
-                <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
                   ESCALATED TO CASE
                 </span>
               ) : (
-                <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
                   CRITICAL DISPOSITION
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-300 mt-1 leading-normal">
+            <p className="text-[11px] text-slate-300 mt-1 leading-normal break-words">
               {alert.status === 'escalated'
                 ? 'This alert is linked to an AML investigation case with cryptographically chained evidence.'
                 : 'Convert alert telemetry, SHAP attributions, and suspect graph entities into an AML case.'}
@@ -666,7 +673,7 @@ export function ExplainabilityPanel({
             type="button"
             onClick={() => onEscalate && onEscalate(alert)}
             disabled={isEscalating}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:brightness-110 shadow-md shadow-indigo-600/30 border border-indigo-400/40 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
+            className="w-full sm:w-auto px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:brightness-110 shadow-md shadow-indigo-600/30 border border-indigo-400/40 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
             title="Escalate alert to official AML Investigation Case"
           >
             {isEscalating ? (
@@ -688,26 +695,30 @@ export function ExplainabilityPanel({
       {alert.involved_entity_ids && alert.involved_entity_ids.length > 0 && (
         <div className="p-3 bg-slate-900/90 rounded-xl border border-indigo-500/25 space-y-2">
           <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 uppercase tracking-wider">
-            <span className="flex items-center gap-1.5 text-indigo-300">
-              <span>🕸️</span> Suspect Graph Entities
+            <span className="flex items-center gap-1.5 text-indigo-300 min-w-0">
+              <span className="shrink-0">🕸️</span>
+              <span className="truncate">Suspect Graph Entities</span>
             </span>
-            <span className="text-[10px] font-mono text-indigo-400">
+            <span className="text-[10px] font-mono text-indigo-400 shrink-0">
               {alert.involved_entity_ids.length} linked
             </span>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {alert.involved_entity_ids.map((entityId) => (
               <div
                 key={entityId}
-                className="flex items-center justify-between p-2 rounded-lg bg-slate-950/70 border border-slate-800/80 gap-2"
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80 gap-2 min-w-0"
               >
-                <span className="font-mono text-xs text-indigo-200 truncate font-semibold" title={entityId}>
-                  {entityId}
-                </span>
-                <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+                  <span className="font-mono text-xs text-indigo-200 truncate font-semibold min-w-0" title={entityId}>
+                    {entityId}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <Link
                     to={`/graph?entity_id=${encodeURIComponent(entityId)}&depth=2`}
-                    className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 transition-colors flex items-center gap-1"
+                    className="px-2 py-1 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 transition-colors flex items-center gap-1 whitespace-nowrap"
                     title={`Explore 2-hop ego network for ${entityId}`}
                   >
                     <span>2-Hop</span>
@@ -715,7 +726,7 @@ export function ExplainabilityPanel({
                   </Link>
                   <Link
                     to={`/graph?entity_id=${encodeURIComponent(entityId)}&depth=3`}
-                    className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 transition-colors flex items-center gap-1"
+                    className="px-2 py-1 rounded text-[10px] font-mono font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 transition-colors flex items-center gap-1 whitespace-nowrap"
                     title={`Explore 3-hop ring network for ${entityId}`}
                   >
                     <span>3-Hop</span>
@@ -723,7 +734,7 @@ export function ExplainabilityPanel({
                   </Link>
                   <Link
                     to={`/psi?entity_id=${encodeURIComponent(entityId)}&auto_match=true`}
-                    className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/40 transition-colors flex items-center gap-1"
+                    className="px-2 py-1 rounded text-[10px] font-mono font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/40 transition-colors flex items-center gap-1 whitespace-nowrap"
                     title={`Check PSI Consortium Intersection for ${entityId}`}
                   >
                     <span>🔍 Check PSI</span>
@@ -776,7 +787,7 @@ export function ExplainabilityPanel({
                   {(report.risk_factors ?? []).map((factor, i) => (
                     <li key={i} className="text-xs flex items-start gap-2 bg-rose-500/10 border border-rose-500/20 p-2 rounded-lg text-rose-200 font-medium leading-normal">
                       <span className="text-rose-400 font-bold shrink-0 mt-0.5">•</span>
-                      <span>{factor}</span>
+                      <span className="break-words min-w-0">{factor}</span>
                     </li>
                   ))}
                 </ul>
@@ -817,11 +828,11 @@ export function ExplainabilityPanel({
 
                     return (
                       <div key={i} className="text-xs space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-200 capitalize">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-slate-200 capitalize truncate min-w-0">
                             {f.feature.replace(/_/g, ' ')}
                           </span>
-                          <span className={`font-mono font-bold ${isPositive ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          <span className={`font-mono font-bold shrink-0 ${isPositive ? 'text-rose-400' : 'text-emerald-400'}`}>
                             {isPositive ? '+' : '-'}{pct.toFixed(0)}%
                           </span>
                         </div>
@@ -847,7 +858,8 @@ export function ExplainabilityPanel({
               {(report.risk_score_breakdown ?? []).length > 0 && (
                 <div>
                   <h4 className="text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>⚡</span> 9-Signal Composite Pipeline
+                    <span className="shrink-0">⚡</span>
+                    <span className="truncate">9-Signal Composite Pipeline</span>
                   </h4>
                   <div className="space-y-2.5">
                     {(report.risk_score_breakdown ?? [])
@@ -856,11 +868,11 @@ export function ExplainabilityPanel({
                       .slice(0, 5)
                       .map((sig, i) => (
                         <div key={i} className="text-xs space-y-1">
-                          <div className="flex justify-between items-center">
-                            <span className="font-semibold text-slate-200 capitalize">
+                          <div className="flex justify-between items-center gap-2">
+                            <span className="font-semibold text-slate-200 capitalize truncate min-w-0">
                               {sig.signal_name.replace(/_/g, ' ').replace('rules', '')}
                             </span>
-                            <span className="font-mono text-emerald-400 font-bold">
+                            <span className="font-mono text-emerald-400 font-bold shrink-0">
                               {((sig.contribution ?? 0) * 100).toFixed(0)}%
                             </span>
                           </div>
@@ -890,7 +902,7 @@ export function ExplainabilityPanel({
               <div>No pre-computed counterfactual report available for this alert.</div>
               <Link
                 to={`/workbench?alert_id=${encodeURIComponent(alert.id)}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/40 transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/40 transition-colors w-full sm:w-auto"
               >
                 <span>🎛️ Launch Counterfactual Workbench</span>
                 <span className="text-[10px]">➔</span>
@@ -899,18 +911,19 @@ export function ExplainabilityPanel({
           ) : (
             <>
               {/* Direct Deep Link to Counterfactual Workbench */}
-              <div className="p-3 bg-gradient-to-r from-cyan-950/80 via-slate-900/90 to-purple-950/80 rounded-xl border border-cyan-500/30 flex items-center justify-between gap-3 shadow-lg">
-                <div>
+              <div className="p-3 bg-gradient-to-r from-cyan-950/80 via-slate-900/90 to-purple-950/80 rounded-xl border border-cyan-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+                <div className="min-w-0 flex-1">
                   <div className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>🎛️</span> Interactive Parameter Workbench
+                    <span className="shrink-0">🎛️</span>
+                    <span className="truncate">Interactive Parameter Workbench</span>
                   </div>
-                  <p className="text-[10px] text-slate-300 mt-0.5 leading-normal">
+                  <p className="text-[10px] text-slate-300 mt-0.5 leading-normal break-words">
                     Tune transaction amount, velocity, and risk sliders dynamically to simulate optimal remediation paths.
                   </p>
                 </div>
                 <Link
                   to={`/workbench?alert_id=${encodeURIComponent(alert.id)}`}
-                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 shadow-md shadow-cyan-600/30 border border-cyan-400/40 transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer"
+                  className="w-full sm:w-auto justify-center px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 shadow-md shadow-cyan-600/30 border border-cyan-400/40 transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer"
                   title="Open Counterfactual Workbench for this alert"
                 >
                   <span>Open Workbench</span>
@@ -949,13 +962,13 @@ export function ExplainabilityPanel({
                 <div className="space-y-2">
                   {(cfReport.changes ?? []).map((change, i) => (
                     <div key={i} className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1">
-                      <div className="flex items-center justify-between font-bold text-slate-200 capitalize">
-                        <span>{change.feature.replace(/_/g, ' ')}</span>
-                        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5 font-bold text-slate-200 capitalize">
+                        <span className="truncate min-w-0">{change.feature.replace(/_/g, ' ')}</span>
+                        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20 shrink-0">
                           {change.original_value} ➔ {change.remediated_value}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                      <p className="text-[11px] text-slate-300 leading-relaxed break-words">
                         {change.delta_explanation}
                       </p>
                     </div>
@@ -1003,15 +1016,15 @@ export function ExplainabilityPanel({
                 </h4>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                   {(auditReport.policy_rules_evaluated ?? []).map((rule, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 bg-slate-900/80 rounded-lg border border-slate-800">
-                      <div className="flex items-center gap-2 min-w-0">
+                    <div key={i} className="flex items-center justify-between p-2 bg-slate-900/80 rounded-lg border border-slate-800 gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span
                           className={`w-2 h-2 rounded-full shrink-0 ${
                             rule.triggered ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
                           }`}
                         />
                         <span className="font-mono font-bold text-[10px] text-indigo-400 shrink-0">{rule.rule_code}</span>
-                        <span className="text-slate-300 capitalize truncate w-28 text-xs">
+                        <span className="text-slate-300 capitalize truncate text-xs min-w-0">
                           {rule.signal_name.replace(/_/g, ' ')}
                         </span>
                       </div>
@@ -1062,7 +1075,7 @@ export function ExplainabilityPanel({
               </div>
 
               <div>
-                <h4 className="text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider flex items-center justify-between">
+                <h4 className="text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider flex flex-wrap items-center justify-between gap-1">
                   <span>Top Graph Edge Contributors</span>
                   <span className="text-[9px] font-mono text-slate-400">Click node to inspect ego graph</span>
                 </h4>
@@ -1070,23 +1083,23 @@ export function ExplainabilityPanel({
                   {(gnnReport.top_contributing_edges ?? []).map((edge, i) => (
                     <div key={i} className="p-2.5 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1.5">
                       <div className="flex items-center justify-between font-mono text-[11px] font-bold text-slate-200">
-                        <span className="text-indigo-400 capitalize">{(edge.relationship_type ?? '').replace(/_/g, ' ')}</span>
-                        <span className="text-emerald-400 font-bold">
+                        <span className="text-indigo-400 capitalize truncate min-w-0">{(edge.relationship_type ?? '').replace(/_/g, ' ')}</span>
+                        <span className="text-emerald-400 font-bold shrink-0 ml-2">
                           {(edge.contribution_percentage ?? ((edge.weight ?? 0) * 100)).toFixed(0)}%
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                      <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono text-slate-400">
                         <Link
                           to={`/graph?entity_id=${encodeURIComponent(edge.source)}&depth=2`}
-                          className="truncate max-w-[110px] text-cyan-400 hover:text-cyan-200 hover:underline"
+                          className="truncate max-w-[120px] text-cyan-400 hover:text-cyan-200 hover:underline"
                           title={`Trace graph for ${edge.source}`}
                         >
                           {edge.source}
                         </Link>
-                        <span className="text-slate-500">➔</span>
+                        <span className="text-slate-500 shrink-0">➔</span>
                         <Link
                           to={`/graph?entity_id=${encodeURIComponent(edge.target)}&depth=2`}
-                          className="truncate max-w-[110px] text-cyan-400 hover:text-cyan-200 hover:underline"
+                          className="truncate max-w-[120px] text-cyan-400 hover:text-cyan-200 hover:underline"
                           title={`Trace graph for ${edge.target}`}
                         >
                           {edge.target}
