@@ -173,7 +173,7 @@ class VaultClient:
                 return ciphertext
         except Exception as exc:
             self._record_failure(exc)
-            raise VaultUnavailableError(f"Vault Transit encryption failed: {exc}") from exc"
+            raise VaultUnavailableError(f"Vault Transit encryption failed: {exc}") from exc
 
     def decrypt(self, bank_id: str, ciphertext: str) -> bytes:
         """Decrypt ciphertext using Vault Transit Secrets Engine (POST /v1/transit/decrypt/tenant_{bank_id})."""
