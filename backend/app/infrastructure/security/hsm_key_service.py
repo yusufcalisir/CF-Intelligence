@@ -407,6 +407,8 @@ class HSMKeyService:
             raise RuntimeError("Vault Transit envelope encryption returned an unsuccessful response")
 
         # Software / PKCS#11 enclave encryption
+        if not _CRYPTO_AVAILABLE:
+            raise RuntimeError("Authenticated AES-GCM encryption is unavailable; refusing insecure XOR fallback")
         enclave_key = hashlib.sha256(
             self.hsm_signer.sign_data(key_label.encode(), key_label=key_label)
         ).digest()
@@ -431,7 +433,9 @@ class HSMKeyService:
         nonce_b64: str | None = None,
     ) -> bytes:
         """Decrypts envelope ciphertext inside the hardware boundary."""
-        if self.provider == HSMProvider.VAULT_TRANSIT and ciphertext_b64.startswith("vault:v1:"):
+        if self.provider == HSMProvider.VAULT_TRANSIT:
+            if not ciphertext_b64.startswith("vault:v"):
+                raise ValueError("Vault Transit provider requires Vault-formatted ciphertext")
             try:
                 url = f"{self.vault_url}/v1/{self.transit_mount}/decrypt/{key_label}"
                 payload = json.dumps({"ciphertext": ciphertext_b64}).encode("utf-8")
@@ -455,6 +459,8 @@ class HSMKeyService:
                 raise RuntimeError("Vault Transit envelope decryption failed") from exc
             raise RuntimeError("Vault Transit envelope decryption returned an unsuccessful response")
 
+        if not _CRYPTO_AVAILABLE:
+            raise RuntimeError("Authenticated AES-GCM decryption is unavailable; refusing insecure XOR fallback")
         enclave_key = hashlib.sha256(
             self.hsm_signer.sign_data(key_label.encode(), key_label=key_label)
         ).digest()
