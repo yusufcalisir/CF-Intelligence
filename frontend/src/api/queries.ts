@@ -1887,9 +1887,10 @@ export interface BenchmarkDatasetStatusItem {
   has_real_files: boolean;
   resolved_path: string;
   synthetic_available: boolean;
+  kaggle_configured?: boolean;
 }
 
-export type BenchmarkDatasetsStatusResponse = Record<string, BenchmarkDatasetStatusItem>;
+export type BenchmarkDatasetsStatusResponse = Record<string, any>;
 
 export function useBenchmarkDatasetsStatus() {
   return useQuery<BenchmarkDatasetsStatusResponse>({

@@ -292,10 +292,22 @@ async def enroll_dataset_to_consortium(req: DatasetConsortiumEnrollRequest) -> D
 
 async def get_benchmarks_status() -> dict[str, Any]:
     """Check availability of real physical Kaggle benchmark datasets on disk."""
+    import os
+    from pathlib import Path
+
     from app.application.services.dataloader import has_real_benchmark_files, resolve_dataset_dir
 
+    has_kaggle_creds = bool(
+        (os.environ.get("KAGGLE_USERNAME") and os.environ.get("KAGGLE_KEY"))
+        or (Path.home() / ".kaggle" / "kaggle.json").exists()
+    )
+
     benchmarks = ["paysim", "ieee_cis", "elliptic", "creditcard"]
-    result: dict[str, Any] = {}
+    result: dict[str, Any] = {
+        "_meta": {
+            "kaggle_configured": has_kaggle_creds,
+        }
+    }
     for b in benchmarks:
         has_real = has_real_benchmark_files(b)
         resolved_path = str(resolve_dataset_dir(b))
@@ -303,6 +315,7 @@ async def get_benchmarks_status() -> dict[str, Any]:
             "has_real_files": has_real,
             "resolved_path": resolved_path,
             "synthetic_available": True,
+            "kaggle_configured": has_kaggle_creds,
         }
     return result
 

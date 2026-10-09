@@ -27,6 +27,9 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
   const isBenchmark = selectedDataset && selectedDataset !== 'synthetic';
   const hasRealFiles = isBenchmark ? Boolean(benchmarkStatus?.[selectedDataset]?.has_real_files) : false;
   const effectiveMode = config.dataset_mode ?? (hasRealFiles ? 'real' : 'synthetic');
+  const serverHasKaggleCreds = Boolean(
+    benchmarkStatus?._meta?.kaggle_configured ?? (selectedDataset ? benchmarkStatus?.[selectedDataset]?.kaggle_configured : false)
+  );
 
   // Downloader state for Hugging Face Spaces & container environments
   const [showDownloadPanel, setShowDownloadPanel] = useState(false);
@@ -331,36 +334,45 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                             </label>
                           </div>
 
-                          {(downloadSource === 'kaggle' || selectedDataset === 'paysim' || selectedDataset === 'ieee_cis') && (
-                            <div className="space-y-1.5 p-2 rounded bg-[var(--color-bg-elevated)] border border-[var(--color-border)]">
-                              <div className="flex justify-between items-center text-[10px] text-[var(--color-text-muted)]">
-                                <span>Optional if set in HF Secrets (KAGGLE_USERNAME / KAGGLE_KEY)</span>
-                                <a
-                                  href="https://www.kaggle.com/settings"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[var(--color-accent-indigo)] hover:underline"
-                                >
-                                  Get Token ↗
-                                </a>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <input
-                                  type="text"
-                                  placeholder="Kaggle Username"
-                                  value={kaggleUsername}
-                                  onChange={(e) => setKaggleUsername(e.target.value)}
-                                  className="px-2 py-1 text-xs bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded text-[var(--color-text-primary)]"
-                                />
-                                <input
-                                  type="password"
-                                  placeholder="Kaggle API Key"
-                                  value={kaggleKey}
-                                  onChange={(e) => setKaggleKey(e.target.value)}
-                                  className="px-2 py-1 text-xs bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded text-[var(--color-text-primary)]"
-                                />
-                              </div>
+                          {serverHasKaggleCreds ? (
+                            <div className="p-2 rounded bg-[var(--color-accent-emerald)]/10 border border-[var(--color-accent-emerald)]/30 flex items-center justify-between text-xs text-[var(--color-accent-emerald)]">
+                              <span className="flex items-center gap-1.5 font-medium text-[11px]">
+                                <span>🔒</span>
+                                <span>Hugging Face Kaggle Secrets detected. Server ready for 1-click download!</span>
+                              </span>
                             </div>
+                          ) : (
+                            (downloadSource === 'kaggle' || selectedDataset === 'paysim' || selectedDataset === 'ieee_cis') && (
+                              <div className="space-y-1.5 p-2 rounded bg-[var(--color-bg-elevated)] border border-[var(--color-border)]">
+                                <div className="flex justify-between items-center text-[10px] text-[var(--color-text-muted)]">
+                                  <span>Optional if set in HF Secrets (KAGGLE_USERNAME / KAGGLE_KEY)</span>
+                                  <a
+                                    href="https://www.kaggle.com/settings"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[var(--color-accent-indigo)] hover:underline"
+                                  >
+                                    Get Token ↗
+                                  </a>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Kaggle Username"
+                                    value={kaggleUsername}
+                                    onChange={(e) => setKaggleUsername(e.target.value)}
+                                    className="px-2 py-1 text-xs bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded text-[var(--color-text-primary)]"
+                                  />
+                                  <input
+                                    type="password"
+                                    placeholder="Kaggle API Key"
+                                    value={kaggleKey}
+                                    onChange={(e) => setKaggleKey(e.target.value)}
+                                    className="px-2 py-1 text-xs bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded text-[var(--color-text-primary)]"
+                                  />
+                                </div>
+                              </div>
+                            )
                           )}
 
                           <div className="flex justify-end gap-2 pt-1">
