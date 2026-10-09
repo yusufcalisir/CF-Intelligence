@@ -30,21 +30,18 @@ ProgressCallback = Callable[[str, str, dict[str, Any]], None] | None
 def _ray_worker_process_setup_hook() -> None:
     """Setup hook executed inside Ray worker processes on Windows to prevent faulthandler dump on actor exit."""
     import atexit
+    import contextlib
     import faulthandler
     import os
 
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
     os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
-    try:
+    with contextlib.suppress(Exception):
         faulthandler.disable()
-    except Exception:
-        pass
-    try:
+    with contextlib.suppress(Exception):
         import ray._private.worker as rw
 
         atexit.unregister(rw.shutdown)
-    except Exception:
-        pass
 
 
 _FLWR_ACTOR_POOL_PATCHED = False
@@ -60,37 +57,29 @@ def _patch_flwr_ray_actor_pool() -> None:
         import flwr.simulation.ray_transport.ray_actor as ra
         from flwr.common.logger import log
 
-        if not getattr(ra, "_cfi_patched", False):
+        def _graceful_terminate_all_actors(self: Any) -> None:
+            futures = []
+            for actor in getattr(self, "pool", []):
+                with contextlib.suppress(Exception):
+                    futures.append(actor.terminate.remote())
+            if futures:
+                with contextlib.suppress(Exception):
+                    import ray
 
-            def _graceful_terminate_all_actors(self: Any) -> None:
-                futures = []
-                for actor in getattr(self, "pool", []):
-                    try:
-                        futures.append(actor.terminate.remote())
-                    except Exception:
-                        pass
-                if futures:
-                    try:
-                        import ray
+                    ray.get(futures, timeout=2.0)
+            import time
 
-                        ray.get(futures, timeout=2.0)
-                    except Exception:
-                        pass
-                import time
+            time.sleep(0.3)
 
-                time.sleep(0.3)
+        ra.BasicActorPool.terminate_all_actors = _graceful_terminate_all_actors
 
-            setattr(ra.BasicActorPool, "terminate_all_actors", _graceful_terminate_all_actors)
+        def _graceful_actor_terminate(self: Any) -> None:
+            log(logging.INFO, "Gracefully stopping %s", self.__class__.__name__)
+            import ray
 
-            def _graceful_actor_terminate(self: Any) -> None:
-                log(logging.INFO, "Gracefully stopping %s", self.__class__.__name__)
-                import ray
+            ray.actor.exit_actor()
 
-                ray.actor.exit_actor()
-
-            setattr(ra.VirtualClientEngineActor, "terminate", _graceful_actor_terminate)
-            setattr(ra, "_cfi_patched", True)
-
+        ra.VirtualClientEngineActor.terminate = _graceful_actor_terminate
         _FLWR_ACTOR_POOL_PATCHED = True
     except Exception:
         pass
@@ -571,7 +560,7 @@ class FlowerFLEngine:
                 # Replaces deprecated start_simulation() with ClientApp, ServerApp & _run_simulation
                 from flwr.client import ClientApp
                 from flwr.compat.server import ServerAppComponents
-                from flwr.server import Server, ServerConfig, ServerApp
+                from flwr.server import Server, ServerApp, ServerConfig
                 from flwr.server.client_manager import SimpleClientManager
                 from flwr.simulation.app import _run_simulation
                 from flwr.supercore.telemetry import EventType
