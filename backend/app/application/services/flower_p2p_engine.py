@@ -53,7 +53,7 @@ def _ndarrays_to_model(
     import torch
 
     for param, arr in zip(model.parameters(), ndarrays, strict=False):
-        param.data = torch.FloatTensor(arr).to(device)
+        param.data = torch.tensor(arr, dtype=torch.float32, device=device)
     return model
 
 

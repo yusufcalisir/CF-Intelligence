@@ -58,7 +58,7 @@ def _ndarrays_to_model(
         if isinstance(params, Iterable):
             for param, arr in zip(params, ndarrays, strict=False):
                 if hasattr(param, "data") and isinstance(arr, np.ndarray):
-                    param.data = torch.FloatTensor(arr).to(device)
+                    param.data = torch.tensor(arr, dtype=torch.float32, device=device)
     return model
 
 

@@ -286,7 +286,7 @@ class DesignPartnerPilotService:
             local_model.eval()
             fl_model.eval()
             with torch.no_grad():
-                X_tensor = torch.FloatTensor(X).to(model_service.device)
+                X_tensor = torch.tensor(X, dtype=torch.float32, device=model_service.device)
                 out_local = local_model(X_tensor)
                 out_fl = fl_model(X_tensor)
                 if hasattr(out_local, "cpu"):

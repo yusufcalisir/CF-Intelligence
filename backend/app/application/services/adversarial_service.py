@@ -119,7 +119,7 @@ class AdversarialDefenseService:
         alpha = max(0.0, alpha)
         model.eval()
         # Initialize x_adv with uniform random noise inside L_inf ball
-        x_adv = x.clone().detach() + torch.FloatTensor(x.shape).uniform_(-epsilon, epsilon)
+        x_adv = x.clone().detach() + torch.empty(x.shape, device=x.device, dtype=torch.float32).uniform_(-epsilon, epsilon)
         x_adv = self.project_tabular_constraints(x_adv, x, epsilon)
 
         with _disable_opacus_hooks(model):

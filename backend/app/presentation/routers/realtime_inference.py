@@ -262,7 +262,7 @@ def score_transaction_realtime(
             0.0,  # chargeback_count
             0.365,  # account_age_days (365/1000)
         ]
-        input_tensor = torch.FloatTensor([features])
+        input_tensor = torch.tensor([features], dtype=torch.float32)
 
         # 4. TorchScript JIT Inference
         with torch.no_grad():

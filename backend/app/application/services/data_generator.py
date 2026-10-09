@@ -159,7 +159,7 @@ def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
             val_norm = 0.0
         vals.append(val_norm)
 
-    return torch.FloatTensor([vals])
+    return torch.tensor([vals], dtype=torch.float32)
 
 
 class DataGenerator:

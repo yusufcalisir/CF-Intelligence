@@ -38,6 +38,21 @@ logger = logging.getLogger(__name__)
 NUM_FEATURES = 10
 
 
+def _to_tensor(
+    data: Any,
+    device: torch.device | str = "cpu",
+    dtype: torch.dtype = torch.float32,
+) -> torch.Tensor:
+    """Safely convert array/tensor data to a PyTorch tensor on the specified device.
+
+    Avoids PyTorch UserWarning when NumPy arrays are read-only (e.g. deserialized from Ray/pickle)
+    by ensuring proper memory ownership via torch.tensor().
+    """
+    if isinstance(data, torch.Tensor):
+        return data.to(device=device, dtype=dtype)
+    return torch.tensor(data, dtype=dtype, device=device)
+
+
 class FraudDetectionModel(nn.Module):
     """3-layer MLP for binary fraud classification.
 
@@ -170,13 +185,13 @@ class ModelService:
 
         # Build tensor dataset including sensitive attribute
         if sens_attr is not None:
-            sens_tensor = torch.FloatTensor(sens_attr).to(self.device)
+            sens_tensor = _to_tensor(sens_attr, device=self.device)
         else:
-            sens_tensor = torch.zeros(len(y_train)).to(self.device)
+            sens_tensor = torch.zeros(len(y_train), device=self.device)
 
         dataset = TensorDataset(
-            torch.FloatTensor(X_train).to(self.device),
-            torch.FloatTensor(y_train).to(self.device),
+            _to_tensor(X_train, device=self.device),
+            _to_tensor(y_train, device=self.device),
             sens_tensor,
         )
         drop_last_batch = len(dataset) > batch_size and (len(dataset) % batch_size == 1)
@@ -368,13 +383,13 @@ class ModelService:
 
         # Build tensor dataset including sensitive attribute
         if sens_attr is not None:
-            sens_tensor = torch.FloatTensor(sens_attr).to(self.device)
+            sens_tensor = _to_tensor(sens_attr, device=self.device)
         else:
-            sens_tensor = torch.zeros(len(y_train)).to(self.device)
+            sens_tensor = torch.zeros(len(y_train), device=self.device)
 
         dataset = TensorDataset(
-            torch.FloatTensor(X_train).to(self.device),
-            torch.FloatTensor(y_train).to(self.device),
+            _to_tensor(X_train, device=self.device),
+            _to_tensor(y_train, device=self.device),
             sens_tensor,
         )
         drop_last_batch = len(dataset) > batch_size and (len(dataset) % batch_size == 1)
@@ -539,11 +554,11 @@ class ModelService:
         """
         model.eval()
         with torch.no_grad():
-            X_tensor = torch.FloatTensor(X_test).to(self.device)
-            y_tensor = torch.FloatTensor(y_test).to(self.device)
+            X_tensor = _to_tensor(X_test, device=self.device)
+            y_tensor = _to_tensor(y_test, device=self.device)
             probs = model(X_tensor).cpu().numpy()
             loss_tensor = nn.BCELoss()(
-                torch.FloatTensor(probs).to(self.device),
+                _to_tensor(probs, device=self.device),
                 y_tensor,
             )
             loss = loss_tensor.item()
@@ -647,8 +662,8 @@ class ModelService:
         adv_service = AdversarialDefenseService.get_instance()
         adv_eval_size = min(500, len(X_test))
         test_dataset = TensorDataset(
-            torch.FloatTensor(X_test[:adv_eval_size]).to(self.device),
-            torch.FloatTensor(y_test[:adv_eval_size]).to(self.device),
+            _to_tensor(X_test[:adv_eval_size], device=self.device),
+            _to_tensor(y_test[:adv_eval_size], device=self.device),
         )
         test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
         adv_report = adv_service.evaluate_adversarial_robustness(
@@ -788,7 +803,7 @@ class ModelService:
                 )
             numel = math.prod(shape)
             param_data = weights.flat_weights[offset : offset + numel]
-            param.data = torch.FloatTensor(param_data).reshape(shape).to(self.device)
+            param.data = _to_tensor(param_data, device=self.device).reshape(shape)
             offset += numel
 
         return model
@@ -867,7 +882,7 @@ class ModelService:
         else:
             # Calculate Integrated Gradients on reference data
             ref_size = min(100, len(X_ref))
-            input_tensor = torch.FloatTensor(X_ref[:ref_size]).to(self.device)
+            input_tensor = _to_tensor(X_ref[:ref_size], device=self.device)
             attributions = self.compute_integrated_gradients(model, input_tensor)
             importance = np.mean(np.abs(attributions), axis=0)
 

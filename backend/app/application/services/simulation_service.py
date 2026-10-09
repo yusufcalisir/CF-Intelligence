@@ -750,7 +750,7 @@ class SimulationService:
                 # Select local operating threshold on validation split (strictly leak-free)
                 model.eval()
                 with torch.no_grad():
-                    val_t = torch.FloatTensor(data["X_val"]).to(self.model_service.device)
+                    val_t = torch.tensor(data["X_val"], dtype=torch.float32, device=self.model_service.device)
                     loc_val_probs = model(val_t).cpu().numpy()
                     del val_t
 
@@ -1467,7 +1467,7 @@ class SimulationService:
                     global_eval_m = self.model_service.create_model(input_dim=feature_dim)
                     global_eval_m = self.model_service.set_parameters(global_eval_m, global_weights)
                     with torch.no_grad():
-                        val_t = torch.FloatTensor(X_val_global).to(self.model_service.device)
+                        val_t = torch.tensor(X_val_global, dtype=torch.float32, device=self.model_service.device)
                         round_val_probs = global_eval_m(val_t).cpu().numpy()
                         del val_t
 
@@ -1783,7 +1783,7 @@ class SimulationService:
             # Calibrate threshold on global validation partition (strictly leak-free)
             global_model.eval()
             with torch.no_grad():
-                val_t = torch.FloatTensor(X_val_global).to(self.model_service.device)
+                val_t = torch.tensor(X_val_global, dtype=torch.float32, device=self.model_service.device)
                 final_val_probs = global_model(val_t).cpu().numpy()
                 del val_t
 
