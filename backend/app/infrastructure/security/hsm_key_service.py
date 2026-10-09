@@ -398,10 +398,13 @@ class HSMKeyService:
                 with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310
                     if resp.status == 200:
                         body = json.loads(resp.read().decode("utf-8"))
-                        vault_ciphertext = body.get("data", {}).get("ciphertext", "")
+                        vault_ciphertext = body.get("data", {}).get("ciphertext")
+                        if not isinstance(vault_ciphertext, str) or not vault_ciphertext.startswith("vault:v"):
+                            raise ValueError("Vault Transit returned no valid ciphertext")
                         return {"ciphertext": vault_ciphertext, "format": "vault_transit"}
             except Exception as exc:
-                logger.debug("Vault Transit encrypt call failed (%s); using local enclave.", exc)
+                raise RuntimeError("Vault Transit envelope encryption failed") from exc
+            raise RuntimeError("Vault Transit envelope encryption returned an unsuccessful response")
 
         # Software / PKCS#11 enclave encryption
         enclave_key = hashlib.sha256(
@@ -413,7 +416,7 @@ class HSMKeyService:
             aesgcm = AESGCM(enclave_key)
             ct = aesgcm.encrypt(nonce, plaintext, None)
         else:
-            ct = bytes(b ^ enclave_key[i % len(enclave_key)] for i, b in enumerate(plaintext)) + hashlib.sha256(plaintext).digest()[:16]
+            raise RuntimeError("Authenticated AES-GCM encryption is unavailable; refusing insecure XOR fallback")
 
         return {
             "ciphertext": base64.urlsafe_b64encode(ct).decode().rstrip("="),
@@ -444,23 +447,29 @@ class HSMKeyService:
                 with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310
                     if resp.status == 200:
                         body = json.loads(resp.read().decode("utf-8"))
-                        pt_b64 = body.get("data", {}).get("plaintext", "")
-                        return base64.b64decode(pt_b64)
+                        pt_b64 = body.get("data", {}).get("plaintext")
+                        if not isinstance(pt_b64, str):
+                            raise ValueError("Vault Transit returned no plaintext")
+                        return base64.b64decode(pt_b64, validate=True)
             except Exception as exc:
-                logger.debug("Vault Transit decrypt call failed (%s); using local enclave.", exc)
+                raise RuntimeError("Vault Transit envelope decryption failed") from exc
+            raise RuntimeError("Vault Transit envelope decryption returned an unsuccessful response")
 
         enclave_key = hashlib.sha256(
             self.hsm_signer.sign_data(key_label.encode(), key_label=key_label)
         ).digest()
         ct = base64.urlsafe_b64decode(ciphertext_b64 + "==")
-        nonce = base64.urlsafe_b64decode(nonce_b64 + "==") if nonce_b64 else os.urandom(12)
+        if not nonce_b64:
+            raise ValueError("Envelope decryption requires the original AES-GCM nonce")
+        nonce = base64.urlsafe_b64decode(nonce_b64 + "==")
+        if len(nonce) != 12:
+            raise ValueError("Invalid AES-GCM envelope nonce length")
 
         if _CRYPTO_AVAILABLE:
             aesgcm = AESGCM(enclave_key)
             return aesgcm.decrypt(nonce, ct, None)
         else:
-            raw = ct[:-16]
-            return bytes(b ^ enclave_key[i % len(enclave_key)] for i, b in enumerate(raw))
+            raise RuntimeError("Authenticated AES-GCM decryption is unavailable; refusing insecure XOR fallback")
 
     # ── Automated Consortium mTLS 1.3 Certificate Rotation ───────────────────
 
