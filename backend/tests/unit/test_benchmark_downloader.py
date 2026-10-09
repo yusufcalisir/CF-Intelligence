@@ -69,7 +69,8 @@ class TestBenchmarkDownloadEndpoints:
             assert "status" in data
             assert "percent" in data
 
-    async def test_post_download_endpoint_validation(self) -> None:
+    @patch("app.application.services.benchmark_downloader._download_worker")
+    async def test_post_download_endpoint_validation(self, mock_worker: MagicMock) -> None:
         """Verify POST /api/v1/datasets/benchmarks/download triggers download workflow."""
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

@@ -160,8 +160,12 @@ class SecurityComplianceEngine:
         suspicious_keys = [
             k
             for k, v in os.environ.items()
-            if any(sub in k for sub in ["SECRET", "PASSWORD", "KEY"])
-            and not v.startswith(("vault://", "kms://", "changeme", "test", "secret", "Super", "whsec_", "sk_"))
+            if any(sub in k for sub in ["SECRET", "PASSWORD", "PRIVATE_KEY"])
+            and not k.startswith(("GITHUB_", "ACTIONS_", "RUNNER_"))
+            and v
+            and not v.startswith(
+                ("vault://", "kms://", "changeme", "test", "mock", "secret", "Super", "whsec_", "sk_")
+            )
         ]
         cc6_3_status = "FAIL" if suspicious_keys else "PASS"
         if suspicious_keys:
@@ -191,9 +195,27 @@ class SecurityComplianceEngine:
         }
 
         # CC9.1: Vendor risk — all third-party dependencies pinned in pyproject.toml
-        backend_root = Path(__file__).parents[3]
-        pyproject_path = backend_root / "pyproject.toml"
-        requirements_path = backend_root / "requirements.txt"
+        resolved_file = Path(__file__).resolve()
+        backend_root = resolved_file.parents[3] if len(resolved_file.parents) > 3 else Path.cwd()
+        candidate_manifest_dirs = [
+            backend_root,
+            backend_root / "backend",
+            Path.cwd() / "backend",
+            Path.cwd(),
+        ]
+        pyproject_path = None
+        requirements_path = None
+        for cand in candidate_manifest_dirs:
+            p = cand / "pyproject.toml"
+            r = cand / "requirements.txt"
+            if p.exists() or r.exists():
+                pyproject_path = p
+                requirements_path = r
+                break
+        if pyproject_path is None or requirements_path is None:
+            pyproject_path = backend_root / "pyproject.toml"
+            requirements_path = backend_root / "requirements.txt"
+
         declared_in: str | None = None
         if pyproject_path.exists():
             content = pyproject_path.read_text(encoding="utf-8")

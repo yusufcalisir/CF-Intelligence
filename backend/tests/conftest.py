@@ -167,6 +167,10 @@ def clear_fallback_stores():
         a_svc.reset_dedup_records()
     except Exception:
         pass
+    for k in ("KAGGLE_USERNAME", "KAGGLE_KEY"):
+        val = os.environ.get(k)
+        if val and (val.startswith(("test", "mock")) or val == "mock_key"):
+            os.environ.pop(k, None)
     yield
     RedisStore._shared_fallback_stores.clear()
     try:
@@ -181,6 +185,10 @@ def clear_fallback_stores():
         a_svc.reset_dedup_records()
     except Exception:
         pass
+    for k in ("KAGGLE_USERNAME", "KAGGLE_KEY"):
+        val = os.environ.get(k)
+        if val and (val.startswith(("test", "mock")) or val == "mock_key"):
+            os.environ.pop(k, None)
 
 
 # ── Clean C++ Extension Interpreter Teardown ──────────────────────────────────

@@ -198,6 +198,8 @@ def _download_worker(
     target_dir.mkdir(parents=True, exist_ok=True)
 
     # Apply provided credentials to environment if present
+    orig_kaggle_user = os.environ.get("KAGGLE_USERNAME")
+    orig_kaggle_key = os.environ.get("KAGGLE_KEY")
     if kaggle_username and kaggle_key:
         os.environ["KAGGLE_USERNAME"] = kaggle_username.strip()
         os.environ["KAGGLE_KEY"] = kaggle_key.strip()
@@ -259,6 +261,17 @@ def _download_worker(
             message=f"Download failed: {exc}",
             error=str(exc),
         )
+    finally:
+        # Clean up temporary credentials applied for this specific job
+        if kaggle_username and kaggle_key:
+            if orig_kaggle_user is not None:
+                os.environ["KAGGLE_USERNAME"] = orig_kaggle_user
+            else:
+                os.environ.pop("KAGGLE_USERNAME", None)
+            if orig_kaggle_key is not None:
+                os.environ["KAGGLE_KEY"] = orig_kaggle_key
+            else:
+                os.environ.pop("KAGGLE_KEY", None)
 
 
 def _download_via_mirrors(dataset: str, cfg: dict[str, Any], target_dir: Path) -> None:
