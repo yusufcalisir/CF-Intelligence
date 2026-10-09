@@ -127,17 +127,16 @@ class RESTBankConnector(BaseBankConnector):
     def _get_client(self) -> httpx.Client:
         import os
 
-        # Mutual TLS support hook
-        if self.auth_type == "mtls" and self.client_cert_path and self.client_key_path:
-            if os.path.exists(self.client_cert_path) and os.path.exists(self.client_key_path):
-                logger.info("Configuring Mutual TLS with cert: %s", self.client_cert_path)
-                return httpx.Client(cert=(self.client_cert_path, self.client_key_path))
-            else:
-                logger.warning(
-                    "mTLS configured but certificate/key files do not exist: %s, %s. Using default client.",
-                    self.client_cert_path,
-                    self.client_key_path,
-                )
+        # Never silently downgrade a bank connection configured for mutual TLS.
+        if self.auth_type == "mtls":
+            if (
+                not self.client_cert_path
+                or not self.client_key_path
+                or not os.path.isfile(self.client_cert_path)
+                or not os.path.isfile(self.client_key_path)
+            ):
+                raise AuthenticationError("mTLS is required but a valid client certificate/key is unavailable")
+            return httpx.Client(cert=(self.client_cert_path, self.client_key_path))
         return httpx.Client()
 
     def initialize(
