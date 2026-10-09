@@ -371,7 +371,6 @@ class FlowerFLEngine:
     ) -> dict[str, Any]:
         """Execute federated training using Flower's simulation engine."""
         from flwr.common import ndarrays_to_parameters
-        from flwr.simulation import start_simulation
 
         sim_config = config
         bank_ids = list(bank_data.keys())
@@ -490,13 +489,61 @@ class FlowerFLEngine:
                 },
             )
 
-            history = start_simulation(
-                client_fn=client_fn,
-                num_clients=len(bank_ids),
-                config=fl.server.ServerConfig(num_rounds=sim_config.num_rounds),
-                strategy=strategy,
-                client_resources={"num_cpus": 0.5, "num_gpus": 0.0},
-            )
+            try:
+                # Modern Flower (Flower >= 1.10+) App Simulation Runtime
+                # Replaces deprecated start_simulation() with ClientApp, ServerApp & _run_simulation
+                from flwr.client import ClientApp
+                from flwr.compat.server import ServerAppComponents
+                from flwr.server import Server, ServerConfig, ServerApp
+                from flwr.server.client_manager import SimpleClientManager
+                from flwr.simulation.app import _run_simulation
+                from flwr.supercore.telemetry import EventType
+
+                class _RecordingServer(Server):
+                    """Server subclass to capture simulation History cleanly during fit execution."""
+
+                    def __init__(self, *args: Any, **kwargs: Any) -> None:
+                        super().__init__(*args, **kwargs)
+                        self.simulation_history: Any = None
+
+                    def fit(self, num_rounds: int, timeout: float | None) -> tuple[Any, float]:
+                        hist, elapsed = super().fit(num_rounds, timeout)
+                        self.simulation_history = hist
+                        return hist, elapsed
+
+                recording_server = _RecordingServer(
+                    client_manager=SimpleClientManager(),
+                    strategy=strategy,
+                )
+                client_app = ClientApp(client_fn=client_fn)
+                server_app = ServerApp(
+                    server_fn=lambda _ctx: ServerAppComponents(
+                        server=recording_server,
+                        config=ServerConfig(num_rounds=sim_config.num_rounds),
+                    )
+                )
+
+                _run_simulation(
+                    num_supernodes=len(bank_ids),
+                    client_app=client_app,
+                    server_app=server_app,
+                    app_dir=backend_dir,
+                    exit_event=EventType.START_SIMULATION_LEAVE,
+                    backend_config={"client_resources": {"num_cpus": 0.5, "num_gpus": 0.0}},
+                )
+                history = recording_server.simulation_history
+                if history is None:
+                    history = fl.server.history.History()
+            except (ImportError, AttributeError):
+                from flwr.simulation import start_simulation
+
+                history = start_simulation(
+                    client_fn=client_fn,
+                    num_clients=len(bank_ids),
+                    config=fl.server.ServerConfig(num_rounds=sim_config.num_rounds),
+                    strategy=strategy,
+                    client_resources={"num_cpus": 0.5, "num_gpus": 0.0},
+                )
 
             ray.shutdown()
 
