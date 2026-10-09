@@ -47,8 +47,15 @@ def _ray_worker_process_setup_hook() -> None:
         pass
 
 
+_FLWR_ACTOR_POOL_PATCHED = False
+
+
 def _patch_flwr_ray_actor_pool() -> None:
     """Ensure Flower's Ray actor pool terminates actors cleanly without tripping Raylet shutdown faulthandler."""
+    global _FLWR_ACTOR_POOL_PATCHED
+    if _FLWR_ACTOR_POOL_PATCHED:
+        return
+
     try:
         import flwr.simulation.ray_transport.ray_actor as ra
         from flwr.common.logger import log
@@ -73,7 +80,7 @@ def _patch_flwr_ray_actor_pool() -> None:
 
                 time.sleep(0.3)
 
-            ra.BasicActorPool.terminate_all_actors = _graceful_terminate_all_actors
+            setattr(ra.BasicActorPool, "terminate_all_actors", _graceful_terminate_all_actors)
 
             def _graceful_actor_terminate(self: Any) -> None:
                 log(logging.INFO, "Gracefully stopping %s", self.__class__.__name__)
@@ -81,8 +88,10 @@ def _patch_flwr_ray_actor_pool() -> None:
 
                 ray.actor.exit_actor()
 
-            ra.VirtualClientEngineActor.terminate = _graceful_actor_terminate
-            ra._cfi_patched = True
+            setattr(ra.VirtualClientEngineActor, "terminate", _graceful_actor_terminate)
+            setattr(ra, "_cfi_patched", True)
+
+        _FLWR_ACTOR_POOL_PATCHED = True
     except Exception:
         pass
 
