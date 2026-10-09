@@ -59,6 +59,34 @@ def _compute_hmac(secret: str, payload_bytes: bytes) -> str:
 # ── 1. Mambu Connector Ingestion & Security Tests ─────────────────────────────
 
 
+
+def _signed_mambu_event(connector: MambuConnector, payload: dict):
+    raw_body = json.dumps(payload).encode("utf-8")
+    return connector.parse_webhook_event(
+        payload, signature_header=_compute_hmac(connector.webhook_secret, raw_body), raw_body=raw_body
+    )
+
+
+def _signed_thought_machine_event(connector: ThoughtMachineConnector, payload: dict):
+    raw_body = json.dumps(payload).encode("utf-8")
+    return connector.parse_webhook_event(
+        payload, signature_header=_compute_hmac(connector.webhook_secret, raw_body), raw_body=raw_body
+    )
+
+
+def _post_signed_webhook(path: str, payload: dict, provider: str):
+    raw_body = json.dumps(payload).encode("utf-8")
+    if provider == "mambu":
+        header = "X-Mambu-Signature"
+        secret = "test_mambu_secret_key_2026"
+    else:
+        header = "X-Vault-Signature"
+        secret = "test_vault_core_secret_key_2026"
+    return client.post(
+        path, content=raw_body,
+        headers={"Content-Type": "application/json", header: _compute_hmac(secret, raw_body)},
+    )
+
 class TestMambuConnector:
     """Tests Mambu Cloud Core Banking Connector functionality."""
 
@@ -73,7 +101,7 @@ class TestMambuConnector:
             "channel": "ONLINE",
             "mcc": "6012",
         }
-        normalized = mambu_connector.parse_webhook_event(payload)
+        normalized = _signed_mambu_event(mambu_connector, payload)
         assert isinstance(normalized, NormalizedTransaction)
         assert normalized.transaction_id == "TX_MAMBU_98231"
         assert normalized.account_id == "ACC_DE_881920"
@@ -90,7 +118,7 @@ class TestMambuConnector:
             "lastName": "Doe",
             "clientTier": "ENTERPRISE",
         }
-        result = mambu_connector.parse_webhook_event(payload)
+        result = _signed_mambu_event(mambu_connector, payload)
         assert isinstance(result, dict)
         assert result["event_type"] == "CLIENT_PSEUDONYMIZED"
         assert result["provider"] == "MAMBU"
@@ -107,7 +135,7 @@ class TestMambuConnector:
             "reason": "EPC_SCT_INST_CAMT056_RECALL",
             "blockId": "BLK_99182",
         }
-        result = mambu_connector.parse_webhook_event(payload)
+        result = _signed_mambu_event(mambu_connector, payload)
         assert isinstance(result, dict)
         assert result["event_type"] == "ACCOUNT_HOLD_NOTIFICATION"
         assert result["account_id"] == "ACC_HOLD_5541"
@@ -246,7 +274,7 @@ class TestThoughtMachineConnector:
                 ],
             }
         }
-        txs = thought_machine_connector.parse_webhook_event(payload)
+        txs = _signed_thought_machine_event(thought_machine_connector, payload)
         assert len(txs) == 1
         tx = txs[0]
         assert tx.transaction_id == "INST_01"
@@ -366,6 +394,19 @@ class TestThoughtMachineConnector:
 class TestCoreBankingGatewayRouter:
     """Tests API Gateway routes for core banking integration."""
 
+    @pytest.fixture(autouse=True)
+    def _authenticated_gateway_connectors(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.presentation.routers import core_banking_gateway as gateway
+        monkeypatch.setattr(
+            gateway, "_mambu_connector",
+            MambuConnector(webhook_secret="test_mambu_secret_key_2026"),
+        )
+        monkeypatch.setattr(
+            gateway, "_thought_machine_connector",
+            ThoughtMachineConnector(webhook_secret="test_vault_core_secret_key_2026"),
+        )
+
+
     def test_mambu_webhook_endpoint_success(self) -> None:
         payload = {
             "type": "deposit-transaction.created",
@@ -374,7 +415,7 @@ class TestCoreBankingGatewayRouter:
             "amount": 2500.0,
             "currencyCode": "EUR",
         }
-        res = client.post("/connectors/core-banking/mambu/webhook", json=payload)
+        res = _post_signed_webhook("/connectors/core-banking/mambu/webhook", payload, "mambu")
         assert res.status_code == 200
         data = res.json()
         assert data["status"] == "ACCEPTED"
@@ -388,7 +429,7 @@ class TestCoreBankingGatewayRouter:
             "firstName": "Alice",
             "lastName": "Smith",
         }
-        res = client.post("/api/v1/connectors/core-banking/mambu/webhook", json=payload)
+        res = _post_signed_webhook("/api/v1/connectors/core-banking/mambu/webhook", payload, "mambu")
         assert res.status_code == 200
         data = res.json()
         assert data["status"] == "ACCEPTED"
@@ -422,7 +463,7 @@ class TestCoreBankingGatewayRouter:
                 ],
             }
         }
-        res = client.post("/connectors/core-banking/thought-machine/webhook", json=payload)
+        res = _post_signed_webhook("/connectors/core-banking/thought-machine/webhook", payload, "thought_machine")
         assert res.status_code == 200
         data = res.json()
         assert data["status"] == "ACCEPTED"
@@ -432,7 +473,7 @@ class TestCoreBankingGatewayRouter:
 
     def test_thought_machine_webhook_v1_dual_prefix(self) -> None:
         payload = {"posting_instruction_batch": {"id": "PIB_V1", "posting_instructions": []}}
-        res = client.post("/api/v1/connectors/core-banking/thought-machine/webhook", json=payload)
+        res = _post_signed_webhook("/api/v1/connectors/core-banking/thought-machine/webhook", payload, "thought_machine")
         assert res.status_code == 200
         assert res.json()["status"] == "ACCEPTED"
 
