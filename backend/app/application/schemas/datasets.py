@@ -118,3 +118,30 @@ class DatasetConsortiumEnrollResponse(BaseModel):
     features_dimension: int
     partition_assigned: str
     next_action_url: str
+
+
+class BenchmarkDownloadRequest(BaseModel):
+    """Payload to trigger server-side benchmark dataset acquisition."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    dataset: str = Field(..., description="Target dataset identifier (e.g. creditcard, paysim, elliptic, ieee_cis)")
+    kaggle_username: str | None = Field(default=None, description="Optional Kaggle username")
+    kaggle_key: str | None = Field(default=None, description="Optional Kaggle API key")
+    source: Literal["auto", "mirror", "kaggle"] = Field(default="auto", description="Download source strategy")
+
+
+class BenchmarkDownloadStatusResponse(BaseModel):
+    """Real-time progress or completion status of benchmark dataset acquisition."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    dataset: str
+    status: Literal["idle", "in_progress", "completed", "failed", "already_exists"]
+    percent: float = Field(0.0, ge=0.0, le=100.0)
+    downloaded_bytes: int = Field(0, ge=0)
+    total_bytes: int = Field(0, ge=0)
+    message: str
+    error: str | None = None
+    target_dir: str | None = None
+    files: list[str] = Field(default_factory=list)

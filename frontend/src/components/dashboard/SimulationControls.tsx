@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { useCreateSimulation, useBenchmarkDatasetsStatus } from '../../api/queries';
+import {
+  useCreateSimulation,
+  useBenchmarkDatasetsStatus,
+  useDownloadBenchmarkDataset,
+  useBenchmarkDownloadStatus,
+} from '../../api/queries';
 import { DEFAULT_SIMULATION_CONFIG } from '../../utils/constants';
 import type { SimulationConfig } from '../../api/types';
 
@@ -22,6 +27,45 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
   const isBenchmark = selectedDataset && selectedDataset !== 'synthetic';
   const hasRealFiles = isBenchmark ? Boolean(benchmarkStatus?.[selectedDataset]?.has_real_files) : false;
   const effectiveMode = config.dataset_mode ?? (hasRealFiles ? 'real' : 'synthetic');
+
+  // Downloader state for Hugging Face Spaces & container environments
+  const [showDownloadPanel, setShowDownloadPanel] = useState(false);
+  const [downloadSource, setDownloadSource] = useState<'auto' | 'mirror' | 'kaggle'>('auto');
+  const [kaggleUsername, setKaggleUsername] = useState(() => {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem('cfi_kaggle_username') || '' : '';
+  });
+  const [kaggleKey, setKaggleKey] = useState(() => {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem('cfi_kaggle_key') || '' : '';
+  });
+
+  const downloadMutation = useDownloadBenchmarkDataset();
+  const { data: downloadStatus } = useBenchmarkDownloadStatus(
+    isBenchmark ? selectedDataset : undefined,
+    Boolean(isBenchmark && !hasRealFiles)
+  );
+
+  const isDownloading = downloadStatus?.status === 'in_progress' || downloadMutation.isPending;
+
+  useEffect(() => {
+    if (downloadStatus?.status === 'completed' && isBenchmark) {
+      setConfig((prev) => ({ ...prev, dataset_mode: 'real' }));
+      setShowDownloadPanel(false);
+    }
+  }, [downloadStatus?.status, isBenchmark]);
+
+  const handleStartDownload = () => {
+    if (!selectedDataset || selectedDataset === 'synthetic') return;
+    if (typeof localStorage !== 'undefined') {
+      if (kaggleUsername) localStorage.setItem('cfi_kaggle_username', kaggleUsername);
+      if (kaggleKey) localStorage.setItem('cfi_kaggle_key', kaggleKey);
+    }
+    downloadMutation.mutate({
+      dataset: selectedDataset,
+      kaggle_username: kaggleUsername || undefined,
+      kaggle_key: kaggleKey || undefined,
+      source: downloadSource,
+    });
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -189,9 +233,157 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                     {effectiveMode === 'real'
                       ? hasRealFiles
                         ? '✓ Real Kaggle benchmark dataset files verified on disk. Partitioned Non-IID across banks with dynamic PyTorch model sizing.'
-                        : '⚠️ Real files not detected in storage. Training in real mode will fail closed unless physical CSV/Parquet files are mounted.'
+                        : '⚠️ Real files not detected in storage. Training in real mode will fail closed unless physical CSV/Parquet files are mounted or downloaded.'
                       : '⚡ High-fidelity synthetic benchmark fixture preserving exact dataset schema and feature columns for fast offline testing.'}
                   </p>
+
+                  {/* Benchmark Downloader Card for Hugging Face Spaces & Cloud/Container environments */}
+                  {selectedDataset && !hasRealFiles && (
+                    <div className="mt-2.5 p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs text-amber-400 font-medium">
+                          <span>⚠️ Real files missing on server</span>
+                        </div>
+                        {!isDownloading && (
+                          <button
+                            type="button"
+                            onClick={() => setShowDownloadPanel((prev) => !prev)}
+                            className="px-2.5 py-1 text-xs font-medium rounded bg-[var(--color-accent-indigo)] text-white hover:opacity-90 transition-opacity flex items-center gap-1 shadow-sm"
+                          >
+                            <span>📥</span>
+                            <span>{showDownloadPanel ? 'Close Downloader' : 'Download to Server'}</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Live Progress Bar when downloading */}
+                      {isDownloading && (
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex justify-between text-[11px] text-[var(--color-text-secondary)]">
+                            <span className="font-medium text-[var(--color-accent-indigo)]">
+                              {downloadStatus?.message || 'Downloading dataset files...'}
+                            </span>
+                            <span className="font-mono font-bold text-[var(--color-text-primary)]">
+                              {downloadStatus?.percent ?? 0}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-[var(--color-bg-elevated)] h-2 rounded-full overflow-hidden border border-[var(--color-border)]">
+                            <div
+                              className="bg-gradient-to-r from-[var(--color-accent-indigo)] to-[var(--color-accent-emerald)] h-full transition-all duration-300 rounded-full"
+                              style={{ width: `${Math.max(5, downloadStatus?.percent ?? 0)}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-[var(--color-text-muted)] italic">
+                            Files are saved directly to server storage (/app/storage/datasets). Once complete, real federated training is unlocked permanently.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Failure Alert */}
+                      {downloadStatus?.status === 'failed' && (
+                        <div className="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs space-y-1">
+                          <p className="font-medium">Download Error:</p>
+                          <p className="text-[11px] font-mono break-all">{downloadStatus.error || downloadStatus.message}</p>
+                        </div>
+                      )}
+
+                      {/* Config Panel for Download */}
+                      {showDownloadPanel && !isDownloading && (
+                        <div className="pt-2 border-t border-[var(--color-border-subtle)] space-y-2.5">
+                          <div className="text-[11px] text-[var(--color-text-secondary)]">
+                            Source strategy for <span className="font-semibold text-[var(--color-text-primary)]">{selectedDataset.toUpperCase()}</span>:
+                          </div>
+                          <div className="flex flex-wrap gap-3 text-xs">
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="downloadSource"
+                                value="auto"
+                                checked={downloadSource === 'auto'}
+                                onChange={() => setDownloadSource('auto')}
+                                className="text-[var(--color-accent-indigo)]"
+                              />
+                              <span>Auto (Mirror / Kaggle)</span>
+                            </label>
+                            {(selectedDataset === 'creditcard' || selectedDataset === 'elliptic') && (
+                              <label className="flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="downloadSource"
+                                  value="mirror"
+                                  checked={downloadSource === 'mirror'}
+                                  onChange={() => setDownloadSource('mirror')}
+                                  className="text-[var(--color-accent-indigo)]"
+                                />
+                                <span>Public Mirror (1-Click, No API key)</span>
+                              </label>
+                            )}
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="downloadSource"
+                                value="kaggle"
+                                checked={downloadSource === 'kaggle'}
+                                onChange={() => setDownloadSource('kaggle')}
+                                className="text-[var(--color-accent-indigo)]"
+                              />
+                              <span>Kaggle API</span>
+                            </label>
+                          </div>
+
+                          {(downloadSource === 'kaggle' || selectedDataset === 'paysim' || selectedDataset === 'ieee_cis') && (
+                            <div className="space-y-1.5 p-2 rounded bg-[var(--color-bg-elevated)] border border-[var(--color-border)]">
+                              <div className="flex justify-between items-center text-[10px] text-[var(--color-text-muted)]">
+                                <span>Optional if set in HF Secrets (KAGGLE_USERNAME / KAGGLE_KEY)</span>
+                                <a
+                                  href="https://www.kaggle.com/settings"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[var(--color-accent-indigo)] hover:underline"
+                                >
+                                  Get Token ↗
+                                </a>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Kaggle Username"
+                                  value={kaggleUsername}
+                                  onChange={(e) => setKaggleUsername(e.target.value)}
+                                  className="px-2 py-1 text-xs bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded text-[var(--color-text-primary)]"
+                                />
+                                <input
+                                  type="password"
+                                  placeholder="Kaggle API Key"
+                                  value={kaggleKey}
+                                  onChange={(e) => setKaggleKey(e.target.value)}
+                                  className="px-2 py-1 text-xs bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded text-[var(--color-text-primary)]"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowDownloadPanel(false)}
+                              className="px-2 py-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleStartDownload}
+                              disabled={downloadMutation.isPending}
+                              className="px-3 py-1 text-xs font-medium rounded bg-[var(--color-accent-emerald)] text-black hover:opacity-90 disabled:opacity-50 transition-opacity"
+                            >
+                              {downloadMutation.isPending ? 'Starting...' : 'Start Download'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

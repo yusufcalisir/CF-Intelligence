@@ -1907,6 +1907,66 @@ export function useBenchmarkDatasetsStatus() {
   });
 }
 
+export interface BenchmarkDownloadRequestPayload {
+  dataset: string;
+  kaggle_username?: string;
+  kaggle_key?: string;
+  source?: 'auto' | 'mirror' | 'kaggle';
+}
+
+export interface BenchmarkDownloadStatus {
+  dataset: string;
+  status: 'idle' | 'in_progress' | 'completed' | 'failed' | 'already_exists';
+  percent: number;
+  downloaded_bytes: number;
+  total_bytes: number;
+  message: string;
+  error?: string | null;
+  target_dir?: string | null;
+  files?: string[];
+}
+
+export function useDownloadBenchmarkDataset() {
+  const queryClient = useQueryClient();
+  return useMutation<BenchmarkDownloadStatus, Error, BenchmarkDownloadRequestPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<BenchmarkDownloadStatus>('/api/v1/datasets/benchmarks/download', payload);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['benchmark-download-status', data.dataset] });
+      queryClient.invalidateQueries({ queryKey: ['benchmark-datasets-status'] });
+    },
+  });
+}
+
+export function useBenchmarkDownloadStatus(dataset: string | undefined, enabled = true) {
+  return useQuery<BenchmarkDownloadStatus>({
+    queryKey: ['benchmark-download-status', dataset],
+    queryFn: async () => {
+      if (!dataset) {
+        return {
+          dataset: '',
+          status: 'idle',
+          percent: 0,
+          downloaded_bytes: 0,
+          total_bytes: 0,
+          message: '',
+        };
+      }
+      const { data } = await apiClient.get<BenchmarkDownloadStatus>('/api/v1/datasets/benchmarks/download/status', {
+        params: { dataset },
+      });
+      return data;
+    },
+    enabled: Boolean(dataset) && enabled,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === 'in_progress' ? 1000 : false;
+    },
+  });
+}
+
 
 export function useValidateDatasetPreview() {
   return useMutation<DatasetPreviewResponse, Error, DatasetPreviewRequest>({

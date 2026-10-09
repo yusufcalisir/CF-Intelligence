@@ -14,6 +14,8 @@ from typing import Any, Literal
 from fastapi import APIRouter
 
 from app.application.schemas.datasets import (
+    BenchmarkDownloadRequest,
+    BenchmarkDownloadStatusResponse,
     ColumnMappingItem,
     DatasetConsortiumEnrollRequest,
     DatasetConsortiumEnrollResponse,
@@ -305,6 +307,27 @@ async def get_benchmarks_status() -> dict[str, Any]:
     return result
 
 
+async def download_benchmark(req: BenchmarkDownloadRequest) -> BenchmarkDownloadStatusResponse:
+    """Trigger background download of authentic Kaggle or mirror benchmark files."""
+    from app.application.services.benchmark_downloader import start_benchmark_download
+
+    status = start_benchmark_download(
+        dataset=req.dataset,
+        kaggle_username=req.kaggle_username,
+        kaggle_key=req.kaggle_key,
+        source=req.source,
+    )
+    return BenchmarkDownloadStatusResponse(**status)
+
+
+async def get_benchmark_download_status_endpoint(dataset: str) -> BenchmarkDownloadStatusResponse:
+    """Retrieve current background download progress or verification status for target dataset."""
+    from app.application.services.benchmark_downloader import get_download_status
+
+    status = get_download_status(dataset=dataset)
+    return BenchmarkDownloadStatusResponse(**status)
+
+
 # ── Route Binding to Router Variants ──────────────────────────
 
 for prefix_tag, r in [("v1", router), ("api_v1", api_router)]:
@@ -315,6 +338,22 @@ for prefix_tag, r in [("v1", router), ("api_v1", api_router)]:
         response_model=dict[str, Any],
         summary="Benchmark Datasets Physical File Status & Readiness Probe",
         operation_id=f"{prefix_tag}_get_benchmarks_status",
+    )
+    r.add_api_route(
+        "/benchmarks/download",
+        download_benchmark,
+        methods=["POST"],
+        response_model=BenchmarkDownloadStatusResponse,
+        summary="Trigger Server-Side Benchmark Dataset Download (Kaggle API or Mirror)",
+        operation_id=f"{prefix_tag}_download_benchmark",
+    )
+    r.add_api_route(
+        "/benchmarks/download/status",
+        get_benchmark_download_status_endpoint,
+        methods=["GET"],
+        response_model=BenchmarkDownloadStatusResponse,
+        summary="Get Real-Time Benchmark Dataset Download Progress",
+        operation_id=f"{prefix_tag}_get_benchmark_download_status",
     )
     r.add_api_route(
         "/validate-preview",
