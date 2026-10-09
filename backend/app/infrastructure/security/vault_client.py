@@ -144,8 +144,7 @@ class VaultClient:
                 return {"key_name": key_name, "status": "EXISTS"}
         except Exception as exc:
             self._record_failure(exc)
-            # Return local fallback descriptor if Vault unconfigured/offline
-            return {"key_name": key_name, "type": "aes256-gcm96", "status": "SIMULATED_FALLBACK"}
+            raise VaultUnavailableError(f"Vault Transit key creation failed: {exc}") from exc
 
     def encrypt(self, bank_id: str, plaintext_bytes: bytes) -> str:
         """Encrypt plaintext using Vault Transit Secrets Engine (POST /v1/transit/encrypt/tenant_{bank_id})."""
@@ -167,14 +166,14 @@ class VaultClient:
         try:
             with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
                 result = json.loads(resp.read().decode("utf-8"))
+                ciphertext = result.get("data", {}).get("ciphertext")
+                if not isinstance(ciphertext, str) or not ciphertext.startswith("vault:v"):
+                    raise ValueError("Vault Transit response has no valid ciphertext")
                 self._record_success()
-                return str(result.get("data", {}).get("ciphertext", f"vault:v1:{b64_data}"))
+                return ciphertext
         except Exception as exc:
             self._record_failure(exc)
-            # Circuit breaker raised on strike 3
-            if not self._vault_available:
-                raise VaultUnavailableError(f"Vault encrypt failed: {exc}") from exc
-            return f"vault:v1:{b64_data}"
+            raise VaultUnavailableError(f"Vault Transit encryption failed: {exc}") from exc"
 
     def decrypt(self, bank_id: str, ciphertext: str) -> bytes:
         """Decrypt ciphertext using Vault Transit Secrets Engine (POST /v1/transit/decrypt/tenant_{bank_id})."""
@@ -195,17 +194,15 @@ class VaultClient:
         try:
             with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
                 result = json.loads(resp.read().decode("utf-8"))
-                b64_pt = result.get("data", {}).get("plaintext", "")
+                b64_pt = result.get("data", {}).get("plaintext")
+                if not isinstance(b64_pt, str):
+                    raise ValueError("Vault Transit response is missing plaintext")
+                plaintext = base64.b64decode(b64_pt, validate=True)
                 self._record_success()
-                return base64.b64decode(b64_pt)
+                return plaintext
         except Exception as exc:
             self._record_failure(exc)
-            if not self._vault_available:
-                raise VaultUnavailableError(f"Vault decrypt failed: {exc}") from exc
-            # Fallback for vault:v1 format
-            if ciphertext.startswith("vault:v1:"):
-                return base64.b64decode(ciphertext.replace("vault:v1:", ""))
-            return ciphertext.encode("utf-8")
+            raise VaultUnavailableError(f"Vault Transit decryption failed: {exc}") from exc
 
     def rotate_transit_key(self, bank_id: str) -> None:
         """Rotate tenant transit key (POST /v1/transit/keys/tenant_{bank_id}/rotate)."""
