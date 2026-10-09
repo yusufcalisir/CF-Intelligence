@@ -263,6 +263,15 @@ class Settings(BaseSettings):
         if self.app_debug:
             violations.append("app_debug must be False in production.")
 
+        if not self.gateway_require_auth:
+            violations.append("gateway_require_auth must be True in production.")
+
+        if self.oidc_enabled and self.oidc_jwt_signing_secret in (
+            "",
+            "cfi_oidc_jwt_secret_key_2026_enterprise_hs256",
+        ):
+            violations.append("oidc_jwt_signing_secret must not use a development default in production.")
+
         if self.payload_signing_secret in (
             "cfi_local_secret_key_2026_change_me_in_production",
             "change_me_in_production",
