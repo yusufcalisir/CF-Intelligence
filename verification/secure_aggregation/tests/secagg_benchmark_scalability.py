@@ -19,11 +19,12 @@ sys.path.insert(0, str(backend_path))
 import gc
 import json
 import time
+from typing import Any, cast
 import numpy as np
 from app.application.services.fl_engine import FederatedLearningEngine
 from app.domain.value_objects import ModelWeights
 
-_engine = FederatedLearningEngine(settings=None, model_service=None, privacy_service=None)
+_engine = FederatedLearningEngine(settings=cast(Any, None), model_service=cast(Any, None), privacy_service=cast(Any, None))
 
 
 def _get_process_memory_mb() -> float:
