@@ -58,7 +58,7 @@ class MambuConnector(BaseBankConnector):
         resolved_url = base_url if base_url is not None else os.getenv("MAMBU_BASE_URL", "https://api.mambu.com")
         self.base_url = resolved_url.rstrip("/")
         self.api_key = api_key or os.getenv("MAMBU_API_KEY", "")
-        self.webhook_secret = webhook_secret or os.getenv("MAMBU_WEBHOOK_SECRET", "mambu_consortium_secret_key_2026")
+        self.webhook_secret = webhook_secret if webhook_secret is not None else os.getenv("MAMBU_WEBHOOK_SECRET", "")
         self.tenant_id = tenant_id
         self._buffer: deque[NormalizedTransaction] = deque(maxlen=max_buffer_size)
         self._audit_holds: list[dict[str, Any]] = []
@@ -69,7 +69,7 @@ class MambuConnector(BaseBankConnector):
     def _verify_signature(self, raw_payload: bytes | str, signature_header: str | None) -> bool:
         """Verifies HMAC-SHA256 signature of Mambu webhook payload."""
         if not signature_header or not self.webhook_secret:
-            return True  # If no header provided and secret not enforced, allow open test mode
+            return False
 
         payload_bytes = raw_payload.encode() if isinstance(raw_payload, str) else raw_payload
         secret_bytes = self.webhook_secret.encode()
@@ -93,8 +93,8 @@ class MambuConnector(BaseBankConnector):
         raw_body: bytes | str | None = None,
     ) -> NormalizedTransaction | dict[str, Any]:
         """Parses and normalizes Mambu webhook events into internal entities."""
-        if signature_header and raw_body is not None and not self._verify_signature(raw_body, signature_header):
-            raise MambuWebhookSignatureError("Invalid Mambu HMAC-SHA256 webhook signature.")
+        if raw_body is None or not self._verify_signature(raw_body, signature_header):
+            raise MambuWebhookSignatureError("Missing or invalid Mambu HMAC-SHA256 webhook signature or signing configuration.")
 
         event_type = payload.get("type") or payload.get("eventType") or "deposit-transaction.created"
         self._events_ingested += 1
