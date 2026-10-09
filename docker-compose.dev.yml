@@ -22,6 +22,7 @@ services:
     volumes:
       - ./backend:/app/backend
       - storage-data:/app/storage
+      - ./backend/storage/datasets:/app/storage/datasets:ro
       - logs-data:/app/logs
     ports:
       - "8000:8000"

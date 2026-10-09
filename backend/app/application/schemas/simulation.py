@@ -51,6 +51,14 @@ class SimulationConfigRequest(BaseModel):
         default="synthetic",
         description="Dataset source: synthetic, paysim, ieee_cis, elliptic, creditcard",
     )
+    dataset_mode: str | None = Field(
+        default=None,
+        description=(
+            "Dataset mode: 'real' (load physical Kaggle/benchmark files), "
+            "'synthetic' (use deterministic synthetic benchmark fixture), "
+            "or None (auto: prefer real if files exist, fallback to synthetic fixture with truthful provenance if files absent)"
+        ),
+    )
     bank_a_transactions: int = Field(default=50000, ge=1000, le=200000)
     bank_b_transactions: int = Field(default=30000, ge=1000, le=200000)
     bank_c_transactions: int = Field(default=20000, ge=1000, le=200000)

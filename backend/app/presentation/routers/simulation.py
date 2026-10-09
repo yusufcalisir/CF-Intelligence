@@ -499,6 +499,7 @@ async def create_simulation(
             PrivacyMechanism.BOTH,
         ),
         "dataset": getattr(config, "dataset", "synthetic"),
+        "dataset_mode": getattr(config, "dataset_mode", None),
         "bank_a_transactions": config.bank_a_transactions,
         "bank_b_transactions": config.bank_b_transactions,
         "bank_c_transactions": config.bank_c_transactions,

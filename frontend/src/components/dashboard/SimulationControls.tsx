@@ -121,7 +121,11 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
             <div>
               <h4 className="text-xs font-medium text-[var(--color-text-secondary)] mb-3 uppercase tracking-wider flex items-center justify-between">
                 <span>Benchmark Dataset</span>
-                <span className="text-[10px] text-[var(--color-accent-emerald)] font-mono">Real Kaggle Engine</span>
+                <span className="text-[10px] text-[var(--color-accent-emerald)] font-mono">
+                  {config.dataset && config.dataset !== 'synthetic' && config.dataset_mode === 'synthetic'
+                    ? 'Synthetic Fixture'
+                    : 'Real Kaggle Engine'}
+                </span>
               </h4>
               <select
                 value={config.dataset ?? 'synthetic'}
@@ -135,9 +139,40 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                 <option value="creditcard">European Credit Card Fraud (284K txns, 29 features)</option>
               </select>
               {config.dataset && config.dataset !== 'synthetic' && (
-                <p className="text-[10px] text-[var(--color-accent-emerald)] mt-1">
-                  ✓ Real Kaggle benchmark dataset will be partitioned Non-IID across banks with dynamic PyTorch model sizing.
-                </p>
+                <div className="mt-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-[var(--color-text-secondary)]">Dataset Source Mode:</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => updateConfig('dataset_mode', 'real')}
+                        className={`px-2 py-0.5 text-xs rounded border transition-colors ${
+                          (config.dataset_mode ?? 'real') === 'real'
+                            ? 'bg-[var(--color-accent-emerald)]/10 text-[var(--color-accent-emerald)] border-[var(--color-accent-emerald)]/40 font-medium'
+                            : 'bg-transparent text-[var(--color-text-muted)] border-[var(--color-border)] hover:text-[var(--color-text-primary)]'
+                        }`}
+                      >
+                        Real Kaggle Files
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateConfig('dataset_mode', 'synthetic')}
+                        className={`px-2 py-0.5 text-xs rounded border transition-colors ${
+                          config.dataset_mode === 'synthetic'
+                            ? 'bg-[var(--color-accent-indigo)]/10 text-[var(--color-accent-indigo)] border-[var(--color-accent-indigo)]/40 font-medium'
+                            : 'bg-transparent text-[var(--color-text-muted)] border-[var(--color-border)] hover:text-[var(--color-text-primary)]'
+                        }`}
+                      >
+                        Synthetic Fixture
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-[var(--color-accent-emerald)] mt-1">
+                    {(config.dataset_mode ?? 'real') === 'real'
+                      ? '✓ Real Kaggle benchmark dataset will be partitioned Non-IID across banks with dynamic PyTorch model sizing.'
+                      : '⚡ High-fidelity synthetic benchmark fixture preserving exact dataset schema and feature columns for fast offline testing.'}
+                  </p>
+                </div>
               )}
             </div>
 

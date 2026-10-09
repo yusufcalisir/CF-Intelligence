@@ -18,6 +18,7 @@ export interface SimulationConfig {
   dp_max_grad_norm: number;
   dp_mode?: 'post_hoc' | 'opacus';
   dataset?: 'synthetic' | 'paysim' | 'ieee_cis' | 'elliptic' | 'creditcard';
+  dataset_mode?: 'real' | 'synthetic';
   bank_a_transactions: number;
   bank_b_transactions: number;
   bank_c_transactions: number;

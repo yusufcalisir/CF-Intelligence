@@ -89,6 +89,7 @@ services:
         condition: service_healthy
     volumes:
       - storage-data:/app/storage
+      - ./backend/storage/datasets:/app/storage/datasets:ro
       - logs-data:/app/logs
     networks:
       - cfi-network

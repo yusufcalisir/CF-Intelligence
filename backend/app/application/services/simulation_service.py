@@ -348,17 +348,18 @@ class SimulationService:
                     partition_dataset_non_iid,
                 )
 
-                dataset_mode_req = getattr(config, "dataset_mode", "real")
-                if dataset_mode_req == "synthetic":
-                    from app.application.services import synthetic_dataset_generators as sdg
+                dataset_mode_req = getattr(config, "dataset_mode", None)
+                from app.application.services import synthetic_dataset_generators as sdg
 
-                    synthetic_generators: dict[str, Callable[..., dict[str, Any]]] = {
-                        "paysim": sdg.generate_synthetic_paysim,
-                        "ieee_cis": sdg.generate_synthetic_ieee_cis,
-                        "elliptic": sdg.generate_synthetic_elliptic,
-                        "creditcard": sdg.generate_synthetic_creditcard,
-                        "credit_card": sdg.generate_synthetic_creditcard,
-                    }
+                synthetic_generators: dict[str, Callable[..., dict[str, Any]]] = {
+                    "paysim": sdg.generate_synthetic_paysim,
+                    "ieee_cis": sdg.generate_synthetic_ieee_cis,
+                    "elliptic": sdg.generate_synthetic_elliptic,
+                    "creditcard": sdg.generate_synthetic_creditcard,
+                    "credit_card": sdg.generate_synthetic_creditcard,
+                }
+
+                if dataset_mode_req == "synthetic":
                     gen_fn = synthetic_generators.get(dataset_choice)
                     if gen_fn is None:
                         raise ValueError(
@@ -376,7 +377,7 @@ class SimulationService:
                     dataset_data = gen_fn()
                     simulation.dataset_mode = DatasetMode.SYNTHETIC.value
                     simulation.dataset_provenance = DatasetProvenance.TEST_FIXTURE.value
-                else:
+                elif dataset_mode_req == "real":
                     self._notify(
                         progress_callback,
                         simulation.id,
@@ -405,6 +406,58 @@ class SimulationService:
                             f"Dataset '{dataset_choice}' loader contract violation: missing authoritative provenance metadata."
                         )
                     simulation.dataset_provenance = loader_provenance
+                else:
+                    # Auto mode (dataset_mode_req is None): prefer real files if present;
+                    # if physical dataset files are missing, fall back to schema-preserving synthetic benchmark fixture.
+                    n_samples_req = max(
+                        6000,
+                        config.bank_a_transactions
+                        + config.bank_b_transactions
+                        + config.bank_c_transactions,
+                    )
+                    try:
+                        self._notify(
+                            progress_callback,
+                            simulation.id,
+                            "status",
+                            {
+                                "status": simulation.status,
+                                "message": f"Loading benchmark dataset: {dataset_choice.upper()} (mode: real)",
+                            },
+                        )
+                        dataset_data = load_dataset(
+                            dataset_choice,
+                            nrows=n_samples_req,
+                        )
+                        simulation.dataset_mode = DatasetMode.REAL.value
+                        loader_provenance = dataset_data.get("provenance")
+                        if not loader_provenance:
+                            raise ValueError(
+                                f"Dataset '{dataset_choice}' loader contract violation: missing authoritative provenance metadata."
+                            )
+                        simulation.dataset_provenance = loader_provenance
+                    except FileNotFoundError as fnf_err:
+                        gen_fn = synthetic_generators.get(dataset_choice)
+                        if gen_fn is None:
+                            raise fnf_err
+                        logger.warning(
+                            "Real benchmark dataset '%s' files not found on disk (%s). "
+                            "Activating registered synthetic benchmark fixture with explicit TEST_FIXTURE provenance.",
+                            dataset_choice,
+                            fnf_err,
+                        )
+                        self._notify(
+                            progress_callback,
+                            simulation.id,
+                            "status",
+                            {
+                                "status": simulation.status,
+                                "message": f"Real files missing; loaded synthetic benchmark fixture: {dataset_choice.upper()} [TEST_FIXTURE]",
+                            },
+                        )
+                        dataset_data = gen_fn()
+                        simulation.dataset_mode = DatasetMode.SYNTHETIC.value
+                        simulation.dataset_provenance = DatasetProvenance.TEST_FIXTURE.value
 
                 X_full = np.nan_to_num(dataset_data["X"], nan=0.0, posinf=0.0, neginf=0.0).astype(
                     np.float32

@@ -366,3 +366,67 @@ def test_bank_data_validation_contract_aliasing_rejected():
     }
     with pytest.raises(ValueError, match="violates data separation"):
         validate_bank_data_contract(bank_data)
+
+
+def test_simulation_config_request_dataset_mode_schema():
+    """Verify SimulationConfigRequest accepts dataset_mode and maintains schema parity."""
+    from app.application.schemas.simulation import SimulationConfigRequest
+
+    req_default = SimulationConfigRequest(dataset="paysim")
+    assert req_default.dataset_mode is None
+
+    req_real = SimulationConfigRequest(dataset="paysim", dataset_mode="real")
+    assert req_real.dataset_mode == "real"
+
+    req_synth = SimulationConfigRequest(dataset="paysim", dataset_mode="synthetic")
+    assert req_synth.dataset_mode == "synthetic"
+
+
+def test_auto_mode_falls_back_to_synthetic_fixture_when_real_files_missing(
+    simulation_service: SimulationService, monkeypatch: pytest.MonkeyPatch
+):
+    """When dataset_mode is None (auto) and real files raise FileNotFoundError, activate synthetic fixture truthfully."""
+    def _mock_missing_loader(*args, **kwargs):
+        raise FileNotFoundError("Simulated unmounted storage volume")
+
+    monkeypatch.setattr("app.application.services.dataloader.load_dataset", _mock_missing_loader)
+
+    config = SimulationConfig(
+        num_rounds=1,
+        local_epochs=1,
+        batch_size=32,
+        dataset="paysim",
+        dataset_mode=None,  # Auto mode
+        bank_a_transactions=100,
+        bank_b_transactions=100,
+        bank_c_transactions=100,
+    )
+    result = simulation_service.run_simulation(config)
+    assert result.status == SimulationStatus.COMPLETED
+    assert result.dataset_mode == "synthetic"
+    assert result.dataset_provenance == "TEST_FIXTURE"
+
+
+def test_real_mode_fails_closed_when_real_files_missing(
+    simulation_service: SimulationService, monkeypatch: pytest.MonkeyPatch
+):
+    """When dataset_mode='real' explicitly and files are missing, fail closed without synthetic fallback."""
+    def _mock_missing_loader(*args, **kwargs):
+        raise FileNotFoundError("Simulated unmounted storage volume")
+
+    monkeypatch.setattr("app.application.services.dataloader.load_dataset", _mock_missing_loader)
+
+    config = SimulationConfig(
+        num_rounds=1,
+        local_epochs=1,
+        batch_size=32,
+        dataset="paysim",
+        dataset_mode="real",
+        bank_a_transactions=100,
+        bank_b_transactions=100,
+        bank_c_transactions=100,
+    )
+    result = simulation_service.run_simulation(config)
+    assert result.status == SimulationStatus.FAILED
+    assert "Simulated unmounted storage volume" in (result.error_message or "")
+
