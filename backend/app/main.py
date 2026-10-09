@@ -25,6 +25,8 @@ os.environ["NUMEXPR_NUM_THREADS"] = "2"
 os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 os.environ["DISABLE_PANDERA_IMPORT_WARNING"] = "True"
 os.environ["TQDM_DISABLE"] = "1"
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
 
 print(">>> Python main.py loaded successfully! <<<", flush=True)
 
@@ -516,6 +518,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "(expected degraded mode in HF Spaces / no-Redis deployments)",
                 type(_re).__name__,
             )
+            try:
+                from app.infrastructure.redis_store import RedisStore
+
+                RedisStore._global_redis_unavailable = True
+            except Exception:
+                pass
     else:
         logger.info(
             "Redis: not configured — WebSocket will use in-process event bus "

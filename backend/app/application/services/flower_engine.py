@@ -27,6 +27,66 @@ logger = logging.getLogger(__name__)
 ProgressCallback = Callable[[str, str, dict[str, Any]], None] | None
 
 
+def _ray_worker_process_setup_hook() -> None:
+    """Setup hook executed inside Ray worker processes on Windows to prevent faulthandler dump on actor exit."""
+    import atexit
+    import faulthandler
+    import os
+
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+    os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
+    try:
+        faulthandler.disable()
+    except Exception:
+        pass
+    try:
+        import ray._private.worker as rw
+
+        atexit.unregister(rw.shutdown)
+    except Exception:
+        pass
+
+
+def _patch_flwr_ray_actor_pool() -> None:
+    """Ensure Flower's Ray actor pool terminates actors cleanly without tripping Raylet shutdown faulthandler."""
+    try:
+        import flwr.simulation.ray_transport.ray_actor as ra
+        from flwr.common.logger import log
+
+        if not getattr(ra, "_cfi_patched", False):
+
+            def _graceful_terminate_all_actors(self: Any) -> None:
+                futures = []
+                for actor in getattr(self, "pool", []):
+                    try:
+                        futures.append(actor.terminate.remote())
+                    except Exception:
+                        pass
+                if futures:
+                    try:
+                        import ray
+
+                        ray.get(futures, timeout=2.0)
+                    except Exception:
+                        pass
+                import time
+
+                time.sleep(0.3)
+
+            ra.BasicActorPool.terminate_all_actors = _graceful_terminate_all_actors
+
+            def _graceful_actor_terminate(self: Any) -> None:
+                log(logging.INFO, "Gracefully stopping %s", self.__class__.__name__)
+                import ray
+
+                ray.actor.exit_actor()
+
+            ra.VirtualClientEngineActor.terminate = _graceful_actor_terminate
+            ra._cfi_patched = True
+    except Exception:
+        pass
+
+
 def _weights_to_ndarrays(
     model_service: ModelService,
     model: Any,
@@ -382,6 +442,7 @@ class FlowerFLEngine:
         round_results: list[dict[str, Any]] = []
 
         def client_fn(context: Any) -> fl.client.Client:
+            _ray_worker_process_setup_hook()
             if (
                 hasattr(context, "node_config")
                 and isinstance(context.node_config, dict)
@@ -470,6 +531,10 @@ class FlowerFLEngine:
                     f"{backend_dir}{os.pathsep}{current_pp}" if current_pp else backend_dir
                 )
 
+            _patch_flwr_ray_actor_pool()
+            os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+            os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
+
             if ray.is_initialized():
                 ray.shutdown()
             ray.init(
@@ -477,6 +542,7 @@ class FlowerFLEngine:
                 num_cpus=2,
                 include_dashboard=False,
                 ignore_reinit_error=True,
+                logging_level=logging.ERROR,
                 _system_config={
                     "object_store_full_delay_ms": 100,
                 },
@@ -485,7 +551,9 @@ class FlowerFLEngine:
                     "env_vars": {
                         "PYTHONPATH": os.environ["PYTHONPATH"],
                         "RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO": "0",
+                        "KMP_DUPLICATE_LIB_OK": "TRUE",
                     },
+                    "worker_process_setup_hook": _ray_worker_process_setup_hook,
                 },
             )
 
@@ -545,7 +613,9 @@ class FlowerFLEngine:
                     client_resources={"num_cpus": 0.5, "num_gpus": 0.0},
                 )
 
-            ray.shutdown()
+            if ray.is_initialized():
+                time.sleep(0.2)
+                ray.shutdown()
 
             logger.info(
                 "[Flower] Simulation complete. History losses: %s",
@@ -593,6 +663,7 @@ class FlowerFLEngine:
                 import ray
 
                 if ray.is_initialized():
+                    time.sleep(0.2)
                     ray.shutdown()
             except Exception:
                 pass

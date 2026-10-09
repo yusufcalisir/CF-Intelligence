@@ -44,15 +44,18 @@ def dummy_bank_data() -> dict[str, dict[str, np.ndarray]]:
 @pytest.fixture(autouse=True)
 def cleanup_ray() -> Generator[None, None, None]:
     import sys
+    import time
 
     if "ray" in sys.modules:
         ray = sys.modules["ray"]
         if hasattr(ray, "is_initialized") and ray.is_initialized():
+            time.sleep(0.1)
             ray.shutdown()
     yield
     if "ray" in sys.modules:
         ray = sys.modules["ray"]
         if hasattr(ray, "is_initialized") and ray.is_initialized():
+            time.sleep(0.1)
             ray.shutdown()
 
 

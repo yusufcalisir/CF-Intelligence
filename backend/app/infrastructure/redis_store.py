@@ -129,10 +129,21 @@ class RedisStore:
                         pass
 
                 if not recovered:
-                    logger.warning(
-                        f"Redis connection failed for prefix '{self.prefix}': {e}. "
-                        "Falling back to local in-memory storage for all stores."
-                    )
+                    if getattr(self.settings, "app_env", "development") == "development":
+                        logger.info(
+                            "Redis: connection not established for prefix '%s' (%s: %s). "
+                            "Using local in-memory storage fallback (standalone/development mode).",
+                            self.prefix,
+                            type(e).__name__,
+                            e,
+                        )
+                    else:
+                        logger.warning(
+                            "Redis connection failed for prefix '%s': %s. "
+                            "Falling back to local in-memory storage for all stores.",
+                            self.prefix,
+                            e,
+                        )
                     self._redis_client = None
                     self._redis_failed = True
                     RedisStore._global_redis_unavailable = True
