@@ -407,6 +407,36 @@ class TestCoreBankingGatewayRouter:
         )
 
 
+    @pytest.mark.parametrize(
+        "endpoint",
+        [
+            "/connectors/core-banking/mambu/webhook",
+            "/api/v1/connectors/core-banking/mambu/webhook",
+        ],
+    )
+    def test_mambu_webhook_without_signature_rejected(self, endpoint: str) -> None:
+        response = client.post(
+            endpoint,
+            json={"type": "deposit-transaction.created", "transactionId": "unsigned"},
+        )
+        assert response.status_code == 401
+        assert "Invalid Mambu HMAC-SHA256" in response.json()["detail"]
+
+    @pytest.mark.parametrize(
+        "endpoint",
+        [
+            "/connectors/core-banking/thought-machine/webhook",
+            "/api/v1/connectors/core-banking/thought-machine/webhook",
+        ],
+    )
+    def test_thought_machine_webhook_without_signature_rejected(self, endpoint: str) -> None:
+        response = client.post(
+            endpoint,
+            json={"posting_instruction_batch": {"id": "unsigned", "posting_instructions": []}},
+        )
+        assert response.status_code == 401
+        assert "Invalid Thought Machine HMAC-SHA256" in response.json()["detail"]
+
     def test_mambu_webhook_endpoint_success(self) -> None:
         payload = {
             "type": "deposit-transaction.created",
