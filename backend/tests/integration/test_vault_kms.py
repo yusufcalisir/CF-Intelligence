@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 
 import pytest
 from cryptography import x509
@@ -14,17 +15,21 @@ from app.infrastructure.security.vault_client import VaultClient, VaultUnavailab
 
 
 def test_transit_key_created() -> None:
-    """Verifies creation of Vault Transit key for tenant."""
-    vault = VaultClient(vault_url="http://localhost:8200")
+    """Live Vault integration; opt in only when a Transit server is configured."""
+    if os.getenv("CFI_TEST_REAL_VAULT") != "1":
+        pytest.skip("Requires a real Vault Transit server (CFI_TEST_REAL_VAULT=1)")
+    vault = VaultClient(vault_url=os.getenv("VAULT_ADDR", "http://localhost:8200"))
     res = vault.create_transit_key("test_bank")
 
     assert res["key_name"] == "tenant_test_bank"
-    assert res["status"] in ("CREATED", "EXISTS", "SIMULATED_FALLBACK")
+    assert res["status"] in ("CREATED", "EXISTS")
 
 
 def test_encrypt_decrypt_roundtrip() -> None:
-    """Verifies Vault Transit encrypt and decrypt roundtrip."""
-    vault = VaultClient(vault_url="http://localhost:8200")
+    """Live encryption roundtrip; never allow offline Base64 fallback to simulate success."""
+    if os.getenv("CFI_TEST_REAL_VAULT") != "1":
+        pytest.skip("Requires a real Vault Transit server (CFI_TEST_REAL_VAULT=1)")
+    vault = VaultClient(vault_url=os.getenv("VAULT_ADDR", "http://localhost:8200"))
     raw_bytes = b"secret_transaction_payload_2026"
 
     ciphertext = vault.encrypt("test_bank", raw_bytes)
