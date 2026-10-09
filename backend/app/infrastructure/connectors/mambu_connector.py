@@ -94,7 +94,7 @@ class MambuConnector(BaseBankConnector):
     ) -> NormalizedTransaction | dict[str, Any]:
         """Parses and normalizes Mambu webhook events into internal entities."""
         if raw_body is None or not self._verify_signature(raw_body, signature_header):
-            raise MambuWebhookSignatureError("Missing or invalid Mambu HMAC-SHA256 webhook signature or signing configuration.")
+            raise MambuWebhookSignatureError("Invalid Mambu HMAC-SHA256 webhook signature (missing signature, raw body, or signing configuration).")
 
         event_type = payload.get("type") or payload.get("eventType") or "deposit-transaction.created"
         self._events_ingested += 1
