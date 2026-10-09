@@ -224,16 +224,20 @@ class TestVaultTransitProvider:
         assert meta.key_id.startswith("vault_transit_")
         assert meta.is_exportable is False
 
-    def test_vault_transit_envelope_offline_resilience(self) -> None:
+    def test_vault_transit_unavailable_fails_closed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import app.infrastructure.security.hsm_key_service as hsm_module
+
+        def reject_connection(*args: object, **kwargs: object) -> None:
+            raise OSError("test Vault unavailable")
+
+        monkeypatch.setattr(hsm_module.urllib.request, "urlopen", reject_connection)
         service = HSMKeyService(
             provider=HSMProvider.VAULT_TRANSIT,
-            vault_url="http://nonexistent-vault.internal:8200",
+            vault_url="http://vault.invalid:8200",
             transit_mount="transit",
         )
-        # Resilient fallback handles offline Vault safely without crashing
-        data = b"offline_vault_resilience_test"
-        envelope = service.encrypt_envelope(data, key_label="resilience_key")
-        assert "ciphertext" in envelope
+        with pytest.raises(RuntimeError, match="Vault Transit envelope encryption failed"):
+            service.encrypt_envelope(b"test confidential payload", key_label="resilience_key")
 
 
 class TestConsortiumCertificateRotation:
