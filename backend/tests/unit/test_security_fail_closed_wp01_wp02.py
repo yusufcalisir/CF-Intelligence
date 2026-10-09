@@ -22,6 +22,7 @@ from app.infrastructure.connectors.thought_machine_connector import (
     ThoughtMachineConnector,
     ThoughtMachineSignatureError,
 )
+from app.infrastructure.connectors.rest_connector import AuthenticationError, RESTBankConnector
 from app.infrastructure.security import hsm_key_service as hsm_module
 from app.infrastructure.security import vault_client as vault_module
 from app.infrastructure.security.hsm_key_service import HSMKeyService, HSMProvider
@@ -172,3 +173,19 @@ def test_missing_webhook_secret_fails_closed(monkeypatch: pytest.MonkeyPatch, co
     raw = json.dumps(payload).encode("utf-8")
     with pytest.raises((MambuWebhookSignatureError, ThoughtMachineSignatureError)):
         connector.parse_webhook_event(payload, signature_header="a" * 64, raw_body=raw)
+
+@pytest.mark.parametrize(
+    ("cert_path", "key_path"),
+    [("", ""), ("/nonexistent/client.crt", "/nonexistent/client.key")],
+)
+def test_rest_bank_connector_never_downgrades_missing_mtls_credentials(
+    cert_path: str, key_path: str,
+) -> None:
+    connector = RESTBankConnector(
+        base_url="https://bank.invalid",
+        auth_type="mtls",
+        client_cert_path=cert_path,
+        client_key_path=key_path,
+    )
+    with pytest.raises(AuthenticationError, match="mTLS is required"):
+        connector._get_client()
