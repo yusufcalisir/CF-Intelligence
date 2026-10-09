@@ -58,7 +58,7 @@ class ThoughtMachineConnector(BaseBankConnector):
         resolved_url = base_url if base_url is not None else os.getenv("VAULT_CORE_BASE_URL", "https://vault-core.internal:8080")
         self.base_url = resolved_url.rstrip("/")
         self.api_key = api_key or os.getenv("VAULT_CORE_API_KEY", "")
-        self.webhook_secret = webhook_secret or os.getenv("VAULT_CORE_WEBHOOK_SECRET", "thought_machine_consortium_2026")
+        self.webhook_secret = webhook_secret if webhook_secret is not None else os.getenv("VAULT_CORE_WEBHOOK_SECRET", "")
         self.tenant_id = tenant_id
         self._buffer: deque[NormalizedTransaction] = deque(maxlen=max_buffer_size)
         self._audit_restrictions: list[dict[str, Any]] = []
@@ -69,7 +69,7 @@ class ThoughtMachineConnector(BaseBankConnector):
     def _verify_signature(self, raw_payload: bytes | str, signature_header: str | None) -> bool:
         """Verifies HMAC-SHA256 signature of Thought Machine webhook payload."""
         if not signature_header or not self.webhook_secret:
-            return True
+            return False
 
         payload_bytes = raw_payload.encode() if isinstance(raw_payload, str) else raw_payload
         secret_bytes = self.webhook_secret.encode()
@@ -85,8 +85,8 @@ class ThoughtMachineConnector(BaseBankConnector):
         raw_body: bytes | str | None = None,
     ) -> list[NormalizedTransaction]:
         """Parses and normalizes Vault Core posting instruction batches into NormalizedTransactions."""
-        if signature_header and raw_body is not None and not self._verify_signature(raw_body, signature_header):
-            raise ThoughtMachineSignatureError("Invalid Thought Machine HMAC-SHA256 webhook signature.")
+        if raw_body is None or not self._verify_signature(raw_body, signature_header):
+            raise ThoughtMachineSignatureError("Missing or invalid Thought Machine HMAC-SHA256 webhook signature or signing configuration.")
 
         self._events_ingested += 1
         return self._extract_transactions_from_pib(payload)
