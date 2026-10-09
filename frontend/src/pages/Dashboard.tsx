@@ -204,16 +204,11 @@ export default function Dashboard() {
 
                     {/* Simulation Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <span className="text-xs font-semibold text-[var(--color-text-primary)] group-hover:text-[var(--color-accent-indigo-light)] transition-colors truncate">
-                          Simulation #{idSlice}
-                        </span>
-                        <span className="text-[10px] text-[var(--color-text-muted)] font-mono shrink-0">
-                          {timeStr}
-                        </span>
+                      <div className="text-xs font-semibold text-[var(--color-text-primary)] group-hover:text-[var(--color-accent-indigo-light)] transition-colors truncate">
+                        Simulation #{idSlice}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-[var(--color-text-secondary)]">
+                      <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-[var(--color-text-secondary)] mt-1.5">
                         <span className="px-1.5 py-0.5 rounded bg-[var(--color-bg-primary)] border border-[var(--color-border-subtle)]">
                           Rounds: {sim.current_round}/{sim.total_rounds}
                         </span>
@@ -227,7 +222,7 @@ export default function Dashboard() {
 
                       {/* Micro progress bar */}
                       {isRunning && (
-                        <div className="w-full h-1 bg-[var(--color-bg-primary)] rounded-full mt-2.5 overflow-hidden">
+                        <div className="w-full h-1 bg-[var(--color-bg-primary)] rounded-full mt-2 overflow-hidden">
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-[var(--color-accent-indigo)] to-[var(--color-accent-teal)] transition-all duration-500"
                             style={{ width: `${sim.progress_pct}%` }}
@@ -236,21 +231,26 @@ export default function Dashboard() {
                       )}
                     </div>
 
-                    {/* Delete Simulation Button */}
-                    <button
-                      type="button"
-                      aria-label={`Delete Simulation #${idSlice}`}
-                      title="Delete simulation"
-                      disabled={deletingId === sim.id}
-                      onClick={(e) => handleDeleteSimulation(e, sim.id)}
-                      className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-rose-400 hover:bg-rose-500/15 border border-transparent hover:border-rose-500/30 transition-all shrink-0 cursor-pointer disabled:opacity-40"
-                    >
-                      {deletingId === sim.id ? (
-                        <div className="w-3.5 h-3.5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Trash2 className="w-3.5 h-3.5" />
-                      )}
-                    </button>
+                    {/* Timestamp & Actions */}
+                    <div className="flex items-center gap-2.5 shrink-0 pl-1">
+                      <span className="text-[10px] text-[var(--color-text-muted)] font-mono">
+                        {timeStr}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`Delete Simulation #${idSlice}`}
+                        title="Delete simulation"
+                        disabled={deletingId === sim.id}
+                        onClick={(e) => handleDeleteSimulation(e, sim.id)}
+                        className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-rose-400 hover:bg-rose-500/15 border border-transparent hover:border-rose-500/30 transition-all cursor-pointer disabled:opacity-40"
+                      >
+                        {deletingId === sim.id ? (
+                          <div className="w-3.5 h-3.5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
