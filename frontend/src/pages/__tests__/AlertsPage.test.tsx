@@ -409,5 +409,47 @@ describe('AlertsPage Integration Test Suite', () => {
       })
     );
   });
+
+  it('handles 422 validation error responses gracefully without crashing React', async () => {
+    const user = userEvent.setup();
+    const validationError = {
+      response: {
+        status: 422,
+        data: {
+          detail: [
+            {
+              type: 'string_pattern_mismatch',
+              loc: ['body', 'author'],
+              msg: "String should match pattern '^[a-zA-Z0-9_\\-\\.\\@]+$'",
+              input: 'AI Triage Engine',
+              ctx: { pattern: '^[a-zA-Z0-9_\\-\\.\\@]+$' },
+            },
+          ],
+        },
+      },
+    };
+
+    vi.spyOn(queries, 'useCreateCase').mockReturnValue({
+      mutateAsync: vi.fn().mockRejectedValue(validationError),
+      isPending: false,
+    } as any);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AlertsPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    const alertCard = screen.getByText('VELOCITY_BURST');
+    await user.click(alertCard);
+
+    const escalateButtons = screen.getAllByRole('button', { name: /Escalate to AML Investigation Case/i });
+    await user.click(escalateButtons[0]!);
+
+    // Should render the formatted error message without crashing React (Minified React Error #31)
+    expect(screen.getByText(/String should match pattern/i)).toBeInTheDocument();
+  });
 });
 

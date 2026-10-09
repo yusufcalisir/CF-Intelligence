@@ -13,6 +13,7 @@ import {
 } from '../api/queries';
 
 import { CASE_STATUS_LABELS, PRIORITY_LABELS, CopilotQueryResponse } from '../api/types';
+import { formatApiError } from '../api/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { ExplainabilityPanel } from './AlertsPage';
 import { Bot, Sparkles, Copy, Check, FileText, ShieldAlert } from 'lucide-react';
@@ -243,9 +244,7 @@ export default function CaseDetailPage() {
     } catch (err: unknown) {
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-        || 'Four-Eyes authorization failed.';
+      const detail = formatApiError(err, 'Four-Eyes authorization failed.');
       setStatusError(`❌ ${detail}`);
       throw err;
     }
@@ -276,9 +275,7 @@ export default function CaseDetailPage() {
     } catch (err: unknown) {
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-        || 'Status transition failed. Check your permissions and try again.';
+      const detail = formatApiError(err, 'Status transition failed. Check your permissions and try again.');
       setStatusError(`❌ ${detail}`);
     }
   };
@@ -332,9 +329,7 @@ export default function CaseDetailPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err: unknown) {
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-        || 'FinCEN XML export failed. Please verify case supervisor signatures.';
+      const detail = formatApiError(err, 'FinCEN XML export failed. Please verify case supervisor signatures.');
       setStatusError(`❌ ${detail}`);
     } finally {
       setIsExportingXml(false);

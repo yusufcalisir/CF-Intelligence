@@ -16,7 +16,7 @@ import {
   useWebhookTestDispatchMutation,
 } from '../api/queries';
 import type { WebhookEventType } from '../api/types';
-import { apiClient } from '../api/client';
+import { apiClient, formatApiError } from '../api/client';
 
 type SecurityTabId = 'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp' | 'unlearning' | 'pqc' | 'bridge' | 'rdp' | 'webhooks';
 
@@ -232,9 +232,7 @@ export default function SecurityPage() {
       setWebhookRegSuccess(`✅ Webhook registered! ID: ${res.subscription_id}. Secret: ${res.secret_key.slice(0, 8)}...`);
       setWebhookUrl('');
     } catch (err: unknown) {
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-        || 'Failed to register webhook. SSRF validation or network rejection.';
+      const detail = formatApiError(err, 'Failed to register webhook. SSRF validation or network rejection.');
       setWebhookRegError(`❌ ${detail}`);
     }
   };
@@ -248,9 +246,7 @@ export default function SecurityPage() {
       });
       setTestDispatchStatus(`✅ Dispatched to ${res.dispatched_count} subscriber(s). Event: ${res.event_type}. Signature: ${res.sample_signature ? res.sample_signature.slice(0, 16) + '...' : 'N/A'}`);
     } catch (err: unknown) {
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-        || 'Webhook test dispatch failed.';
+      const detail = formatApiError(err, 'Webhook test dispatch failed.');
       setTestDispatchStatus(`❌ ${detail}`);
     }
   };

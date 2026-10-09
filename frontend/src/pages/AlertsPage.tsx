@@ -13,6 +13,7 @@ import {
   useAddCaseNote,
   useAddEvidence,
 } from '../api/queries';
+import { formatApiError } from '../api/client';
 import { BANK_NAMES, SEVERITY_COLORS } from '../api/types';
 import type { Alert } from '../api/types';
 
@@ -234,7 +235,7 @@ export default function AlertsPage() {
 
       await addCaseNote.mutateAsync({
         caseId: newCase.id,
-        author: 'AI Triage Engine',
+        author: 'ai_triage_engine',
         content: forensicContent,
       });
 
@@ -258,17 +259,14 @@ export default function AlertsPage() {
         title: `Alert Telemetry & SHAP Dossier (${alertToEscalate.id.slice(0, 8)})`,
         file_path: `evidence/alerts/alert_${alertToEscalate.id.slice(0, 8)}_dossier.json`,
         content: evidencePayload,
-        uploaded_by: 'AI Triage Engine',
+        uploaded_by: 'ai_triage_engine',
       });
 
       // 7. Route directly to /cases/:newCaseId
       navigate(`/cases/${newCase.id}`);
     } catch (err: unknown) {
       console.error('Failed to escalate alert to case:', err);
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-        || (err as Error)?.message
-        || 'Failed to escalate alert to investigation case. Please try again.';
+      const detail = formatApiError(err, 'Failed to escalate alert to investigation case. Please try again.');
       setEscalationError(detail);
       setEscalatingAlertId(null);
     }

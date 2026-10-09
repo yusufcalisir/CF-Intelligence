@@ -97,7 +97,7 @@ class CaseNoteRequest(BaseModel):
         min_length=1,
         max_length=128,
         description="Author identifier",
-        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
+        pattern=r"^[a-zA-Z0-9 _\-\.@:]+$",
     )
     content: str = Field(
         ...,

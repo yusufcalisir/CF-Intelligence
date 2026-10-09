@@ -65,3 +65,44 @@ export function switchActiveTenant(queryClient: { clear: () => void }, newTenant
   setClientTenant(newTenantId);
   queryClient.clear();
 }
+
+/**
+ * Safely extract and format an API error message into a displayable string.
+ * Prevents React Minified Error #31 caused by rendering raw error objects or
+ * FastAPI/Pydantic validation error detail arrays: [{ loc, msg, type }].
+ */
+export function formatApiError(err: unknown, defaultMessage = 'An unexpected error occurred'): string {
+  if (!err) return defaultMessage;
+  const anyErr = err as any;
+  const detail = anyErr?.response?.data?.detail ?? anyErr?.data?.detail;
+
+  if (typeof detail === 'string') {
+    return detail.trim() || defaultMessage;
+  }
+
+  if (Array.isArray(detail)) {
+    const formatted = detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          const locStr = Array.isArray(item.loc) ? item.loc.join('.') : '';
+          const msg = item.msg || item.message || JSON.stringify(item);
+          return locStr ? `${locStr}: ${msg}` : msg;
+        }
+        return String(item);
+      })
+      .filter(Boolean)
+      .join('; ');
+    return formatted || defaultMessage;
+  }
+
+  if (detail && typeof detail === 'object') {
+    return (detail as any).msg || (detail as any).message || JSON.stringify(detail);
+  }
+
+  if (typeof anyErr?.message === 'string') {
+    return anyErr.message;
+  }
+
+  return defaultMessage;
+}
