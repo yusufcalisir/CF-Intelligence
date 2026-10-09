@@ -69,6 +69,11 @@ def resolve_dataset_dir(dataset_name: str, explicit_path: Path | str | None = No
     # Storage dir from centralized utility
     candidates.append(Path(get_storage_dir()) / "datasets" / clean_name)
 
+    # Container candidate paths
+    candidates.append(Path("/app/backend/storage/datasets") / clean_name)
+    candidates.append(Path("/app/storage/datasets") / clean_name)
+    candidates.append(Path("/datasets") / clean_name)
+
     # Walk up to locate project root from this source file
     here = Path(__file__).resolve()
     curr = here
@@ -99,6 +104,47 @@ def resolve_dataset_dir(dataset_name: str, explicit_path: Path | str | None = No
             return c
 
     return candidates[0]
+
+
+def has_real_benchmark_files(dataset_name: str, path: Path | str | None = None) -> bool:
+    """Check if real physical files for benchmark dataset exist on disk."""
+    clean_name = dataset_name.lower().replace("-", "_").strip()
+    try:
+        root = resolve_dataset_dir(clean_name, explicit_path=path)
+    except Exception:
+        return False
+    if not root.exists():
+        return False
+    if root.is_file():
+        return True
+
+    if clean_name == "paysim":
+        return any(
+            (root / f).exists()
+            for f in ["paysim.parquet", "PS_20174392719_1491204439457_log.csv", "paysim.csv", "paysim1.csv"]
+        ) or any(root.glob("*.parquet")) or any(root.glob("*paysim*.csv")) or any(root.glob("*PS*.csv"))
+    if clean_name == "ieee_cis":
+        return (
+            (root / "train_transaction.csv").exists()
+            or (root / "ieee_cis.parquet").exists()
+            or any(root.glob("*.parquet"))
+            or any(root.glob("*transaction*.csv"))
+        )
+    if clean_name == "elliptic":
+        return (
+            (root / "elliptic_cache.parquet").exists()
+            or ((root / "elliptic_txs_features.csv").exists() and (root / "elliptic_txs_classes.csv").exists())
+            or any(root.glob("*.parquet"))
+        )
+    if clean_name in ("creditcard", "credit_card"):
+        return (
+            (root / "creditcard.parquet").exists()
+            or (root / "creditcard.csv").exists()
+            or any(root.glob("*.parquet"))
+            or any(root.glob("*credit*.csv"))
+        )
+    return any(root.glob("*.csv")) or any(root.glob("*.parquet"))
+
 
 
 def _get_datasets_root() -> Path:

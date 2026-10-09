@@ -288,9 +288,34 @@ async def enroll_dataset_to_consortium(req: DatasetConsortiumEnrollRequest) -> D
     )
 
 
+async def get_benchmarks_status() -> dict[str, Any]:
+    """Check availability of real physical Kaggle benchmark datasets on disk."""
+    from app.application.services.dataloader import has_real_benchmark_files, resolve_dataset_dir
+
+    benchmarks = ["paysim", "ieee_cis", "elliptic", "creditcard"]
+    result: dict[str, Any] = {}
+    for b in benchmarks:
+        has_real = has_real_benchmark_files(b)
+        resolved_path = str(resolve_dataset_dir(b))
+        result[b] = {
+            "has_real_files": has_real,
+            "resolved_path": resolved_path,
+            "synthetic_available": True,
+        }
+    return result
+
+
 # ── Route Binding to Router Variants ──────────────────────────
 
 for prefix_tag, r in [("v1", router), ("api_v1", api_router)]:
+    r.add_api_route(
+        "/benchmarks/status",
+        get_benchmarks_status,
+        methods=["GET"],
+        response_model=dict[str, Any],
+        summary="Benchmark Datasets Physical File Status & Readiness Probe",
+        operation_id=f"{prefix_tag}_get_benchmarks_status",
+    )
     r.add_api_route(
         "/validate-preview",
         validate_dataset_preview,
@@ -315,3 +340,4 @@ for prefix_tag, r in [("v1", router), ("api_v1", api_router)]:
         summary="Assign Audited Dataset Partition to Bank Node Partition",
         operation_id=f"{prefix_tag}_enroll_dataset_to_consortium",
     )
+

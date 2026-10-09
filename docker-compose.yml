@@ -90,7 +90,9 @@ services:
     volumes:
       - storage-data:/app/storage
       - ./backend/storage/datasets:/app/storage/datasets:ro
+      - ./backend/storage/datasets:/app/backend/storage/datasets:ro
       - logs-data:/app/logs
+
     networks:
       - cfi-network
     healthcheck:

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { useCreateSimulation } from '../../api/queries';
+import { useCreateSimulation, useBenchmarkDatasetsStatus } from '../../api/queries';
 import { DEFAULT_SIMULATION_CONFIG } from '../../utils/constants';
 import type { SimulationConfig } from '../../api/types';
 
@@ -15,7 +15,13 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
   });
   const [isExpanded, setIsExpanded] = useState(false);
   const createMutation = useCreateSimulation();
+  const { data: benchmarkStatus } = useBenchmarkDatasetsStatus();
   const isSubmittingRef = useRef(false);
+
+  const selectedDataset = config.dataset;
+  const isBenchmark = selectedDataset && selectedDataset !== 'synthetic';
+  const hasRealFiles = isBenchmark ? Boolean(benchmarkStatus?.[selectedDataset]?.has_real_files) : false;
+  const effectiveMode = config.dataset_mode ?? (hasRealFiles ? 'real' : 'synthetic');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -32,6 +38,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
     const clientOpId = 'sim_op_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2));
     createMutation.mutate({
       ...config,
+      ...(isBenchmark ? { dataset_mode: effectiveMode } : {}),
       clientOperationId: clientOpId,
       idempotencyKey: clientOpId,
     }, {
@@ -43,6 +50,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
       },
     });
   };
+
 
   const updateConfig = <K extends keyof SimulationConfig>(key: K, value: SimulationConfig[K]) => {
     setConfig((prev) => ({ ...prev, [key]: value }));
@@ -121,15 +129,25 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
             <div>
               <h4 className="text-xs font-medium text-[var(--color-text-secondary)] mb-3 uppercase tracking-wider flex items-center justify-between">
                 <span>Benchmark Dataset</span>
-                <span className="text-[10px] text-[var(--color-accent-emerald)] font-mono">
-                  {config.dataset && config.dataset !== 'synthetic' && config.dataset_mode === 'synthetic'
-                    ? 'Synthetic Fixture'
-                    : 'Real Kaggle Engine'}
+                <span className={`text-[10px] font-mono ${effectiveMode === 'real' ? 'text-[var(--color-accent-emerald)]' : 'text-[var(--color-accent-indigo)]'}`}>
+                  {isBenchmark
+                    ? effectiveMode === 'real'
+                      ? '✓ Real Kaggle Dataset'
+                      : '⚡ Synthetic Fixture'
+                    : 'Synthetic Generator'}
                 </span>
               </h4>
               <select
                 value={config.dataset ?? 'synthetic'}
-                onChange={(e) => updateConfig('dataset', e.target.value as SimulationConfig['dataset'])}
+                onChange={(e) => {
+                  const newDs = e.target.value as SimulationConfig['dataset'];
+                  const realAvailable = newDs && newDs !== 'synthetic' ? Boolean(benchmarkStatus?.[newDs]?.has_real_files) : false;
+                  setConfig((prev) => ({
+                    ...prev,
+                    dataset: newDs,
+                    dataset_mode: newDs && newDs !== 'synthetic' ? (realAvailable ? 'real' : 'synthetic') : undefined,
+                  }));
+                }}
                 className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent-indigo)] transition-colors"
               >
                 <option value="synthetic">Synthetic Multi-Bank Generator (10 features)</option>
@@ -138,7 +156,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                 <option value="elliptic">Elliptic Bitcoin AML Graph (203K txns, 166 features)</option>
                 <option value="creditcard">European Credit Card Fraud (284K txns, 29 features)</option>
               </select>
-              {config.dataset && config.dataset !== 'synthetic' && (
+              {isBenchmark && (
                 <div className="mt-2 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] text-[var(--color-text-secondary)]">Dataset Source Mode:</span>
@@ -147,18 +165,18 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                         type="button"
                         onClick={() => updateConfig('dataset_mode', 'real')}
                         className={`px-2 py-0.5 text-xs rounded border transition-colors ${
-                          (config.dataset_mode ?? 'real') === 'real'
+                          effectiveMode === 'real'
                             ? 'bg-[var(--color-accent-emerald)]/10 text-[var(--color-accent-emerald)] border-[var(--color-accent-emerald)]/40 font-medium'
                             : 'bg-transparent text-[var(--color-text-muted)] border-[var(--color-border)] hover:text-[var(--color-text-primary)]'
                         }`}
                       >
-                        Real Kaggle Files
+                        Real Kaggle Files {hasRealFiles ? '✓' : ''}
                       </button>
                       <button
                         type="button"
                         onClick={() => updateConfig('dataset_mode', 'synthetic')}
                         className={`px-2 py-0.5 text-xs rounded border transition-colors ${
-                          config.dataset_mode === 'synthetic'
+                          effectiveMode === 'synthetic'
                             ? 'bg-[var(--color-accent-indigo)]/10 text-[var(--color-accent-indigo)] border-[var(--color-accent-indigo)]/40 font-medium'
                             : 'bg-transparent text-[var(--color-text-muted)] border-[var(--color-border)] hover:text-[var(--color-text-primary)]'
                         }`}
@@ -167,14 +185,17 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                       </button>
                     </div>
                   </div>
-                  <p className="text-[10px] text-[var(--color-accent-emerald)] mt-1">
-                    {(config.dataset_mode ?? 'real') === 'real'
-                      ? '✓ Real Kaggle benchmark dataset will be partitioned Non-IID across banks with dynamic PyTorch model sizing.'
+                  <p className={`text-[10px] mt-1 ${effectiveMode === 'real' ? (hasRealFiles ? 'text-[var(--color-accent-emerald)]' : 'text-amber-400') : 'text-[var(--color-accent-indigo)]'}`}>
+                    {effectiveMode === 'real'
+                      ? hasRealFiles
+                        ? '✓ Real Kaggle benchmark dataset files verified on disk. Partitioned Non-IID across banks with dynamic PyTorch model sizing.'
+                        : '⚠️ Real files not detected in storage. Training in real mode will fail closed unless physical CSV/Parquet files are mounted.'
                       : '⚡ High-fidelity synthetic benchmark fixture preserving exact dataset schema and feature columns for fast offline testing.'}
                   </p>
                 </div>
               )}
             </div>
+
 
             {/* FL Engine Selection */}
             <div>

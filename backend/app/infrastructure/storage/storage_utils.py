@@ -40,21 +40,37 @@ def get_storage_dir() -> str:
     if env_dir:
         candidates.append(os.path.abspath(env_dir))
 
-    # 2. Container standard storage paths
-    candidates.append("/app/storage")
-    candidates.append("/tmp/cfi_storage")  # nosec B108
-
-    # 3. Project root directory candidates
+    # 2. Existing project storage directories (prefer ones already containing datasets)
     here = os.path.abspath(__file__)
     curr = here
+    project_candidates: list[str] = []
     for _ in range(5):
         curr = os.path.dirname(curr)
-        candidates.append(os.path.join(curr, "storage"))
-        candidates.append(os.path.join(curr, "backend", "storage"))
+        project_candidates.append(os.path.join(curr, "backend", "storage"))
+        project_candidates.append(os.path.join(curr, "storage"))
 
-    # 4. OS temp directories
+    for pc in project_candidates:
+        if os.path.isdir(os.path.join(pc, "datasets")) and pc not in candidates:
+            candidates.append(pc)
+
+    for pc in project_candidates:
+        if os.path.isdir(pc) and pc not in candidates:
+            candidates.append(pc)
+
+    # 3. Container standard storage paths (POSIX / container environment only)
+    if os.name != "nt":
+        candidates.append("/app/storage")
+        candidates.append("/tmp/cfi_storage")  # nosec B108
+
+    # 4. Fallback project root candidates
+    for pc in project_candidates:
+        if pc not in candidates:
+            candidates.append(pc)
+
+    # 5. OS temp directories
     candidates.append(os.path.join(tempfile.gettempdir(), "cfi_storage"))
     candidates.append(os.path.join(tempfile.gettempdir(), "storage"))
+
 
     for target in candidates:
         try:

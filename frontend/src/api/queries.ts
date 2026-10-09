@@ -1883,6 +1883,31 @@ export function useTestConnector() {
 
 // ── Real Dataset Ingestion Studio Hooks ──────────
 
+export interface BenchmarkDatasetStatusItem {
+  has_real_files: boolean;
+  resolved_path: string;
+  synthetic_available: boolean;
+}
+
+export type BenchmarkDatasetsStatusResponse = Record<string, BenchmarkDatasetStatusItem>;
+
+export function useBenchmarkDatasetsStatus() {
+  return useQuery<BenchmarkDatasetsStatusResponse>({
+    queryKey: ['benchmark-datasets-status'],
+    queryFn: async () => {
+      try {
+        const { data } = await apiClient.get<BenchmarkDatasetsStatusResponse>('/api/v1/datasets/benchmarks/status');
+        return data;
+      } catch {
+        return {};
+      }
+    },
+    staleTime: 30000,
+    retry: 1,
+  });
+}
+
+
 export function useValidateDatasetPreview() {
   return useMutation<DatasetPreviewResponse, Error, DatasetPreviewRequest>({
     mutationFn: async (payload) => {

@@ -21,9 +21,10 @@ services:
       - KAFKA_ENABLED=true
     volumes:
       - ./backend:/app/backend
-      - storage-data:/app/storage
       - ./backend/storage/datasets:/app/storage/datasets:ro
+      - ./backend/storage/datasets:/app/backend/storage/datasets:ro
       - logs-data:/app/logs
+
     ports:
       - "8000:8000"
       - "50051:50051"
