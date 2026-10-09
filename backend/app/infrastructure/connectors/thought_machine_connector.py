@@ -86,7 +86,7 @@ class ThoughtMachineConnector(BaseBankConnector):
     ) -> list[NormalizedTransaction]:
         """Parses and normalizes Vault Core posting instruction batches into NormalizedTransactions."""
         if raw_body is None or not self._verify_signature(raw_body, signature_header):
-            raise ThoughtMachineSignatureError("Missing or invalid Thought Machine HMAC-SHA256 webhook signature or signing configuration.")
+            raise ThoughtMachineSignatureError("Invalid Thought Machine HMAC-SHA256 webhook signature (missing signature, raw body, or signing configuration).")
 
         self._events_ingested += 1
         return self._extract_transactions_from_pib(payload)
