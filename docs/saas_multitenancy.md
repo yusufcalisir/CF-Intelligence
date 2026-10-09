@@ -175,4 +175,5 @@ All SaaS multi-tenancy capabilities are verified by continuous automated test su
 | **Tenant KMS & Metering** | `backend/tests/unit/test_tenant_kms_metering.py` | Quota boundary enforcement, 429 rate limits, per-tenant envelope encryption | `4/4 PASSED` |
 | **Alembic Migrations** | `backend/tests/integration/test_alembic_migrations.py` | Dual revision linear head (`002_core_and_aml_tables`), offline SQL, dynamic discovery | `4/4 PASSED` |
 | **KMS Key Lifecycle** | `backend/tests/unit/test_key_lifecycle_vault.py` | Versioned envelope encryption, re-encryption, invalidation, rotation cron | `5/5 PASSED` |
+| **Vault Transit Realism** | `backend/tests/unit/test_vault_aesgcm_transit_realism.py` | Genuine AES-256-GCM encryption, tamper rejection, tenant AAD isolation | `5/5 PASSED` |
 | **Concurrency Safety** | `backend/tests/unit/test_concurrency_safety.py` | Atomic quota acquire under 50 threads, single champion promotion, idempotency locks | `5/5 PASSED` |

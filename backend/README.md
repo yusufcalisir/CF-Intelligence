@@ -90,7 +90,7 @@ The backend codebase strictly follows the **Ports & Adapters (Clean Architecture
   - Differential Privacy: Renyi Differential Privacy (`RDPAccountant`), Gaussian noise calibration, and $L_2$ gradient clipping.
   - Trusted Execution Environments: `TEEDriver` with software emulation transparency.
   - Zero-Knowledge & Verification: `ZKSNARKVerifier`, Shamir secret sharing, and immutable cryptographic hash chains.
-  - Hardware Security: `HSMKeyService`, `VaultClient`, and PKI certificate binders.
+  - Hardware Security: `HSMKeyService`, `VaultClient` (HashiCorp Transit + local authenticated AES-256-GCM AEAD engine), and PKI certificate binders.
 - **Persistence & Caching**:
   - PostgreSQL / SQLite via SQLAlchemy 2.0 async sessions.
   - Redis persistence with synchronized `threading.RLock()` in-memory fallbacks for resilient multi-threaded operation.
