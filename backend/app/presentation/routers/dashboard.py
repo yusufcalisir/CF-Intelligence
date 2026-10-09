@@ -268,6 +268,8 @@ async def get_comparative_baselines() -> ComparativeBenchmarkResponseSchema:
         Path("experiments/results/comparative_baselines.json"),
         Path("../experiments/results/comparative_baselines.json"),
         Path(__file__).resolve().parents[4] / "experiments" / "results" / "comparative_baselines.json",
+        Path(__file__).resolve().parents[2] / "static" / "comparative_baselines.json",
+        Path("backend/app/static/comparative_baselines.json"),
     ]
 
     for p in candidates:
