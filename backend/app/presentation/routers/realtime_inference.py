@@ -20,6 +20,10 @@ from app.application.schemas.transaction import (
     RealtimeInferenceRequest,
     RealtimeInferenceResponse,
 )
+from app.application.services.training_provenance_service import (
+    DOMAIN_MODEL_CACHE,
+    derive_domain_key,
+)
 from app.config import get_settings
 from app.dependencies import TenantDep
 from app.domain.inference_fallback import (
@@ -56,6 +60,7 @@ class ModelCacheEntry:
         artifact_sha256: str,
         from_redis: bool,
         cached_at: float,
+        generation: int = 1,
     ) -> None:
         self.model = model
         self.version = version
@@ -63,6 +68,7 @@ class ModelCacheEntry:
         self.artifact_sha256 = artifact_sha256
         self.from_redis = from_redis
         self.cached_at = cached_at
+        self.generation = generation
 
 
 class LocalModelCache:
@@ -81,16 +87,21 @@ class LocalModelCache:
             if current_meta is None:
                 self._entry = None
                 return None
+            meta_gen = current_meta.get("generation")
+            gen_matches = True if meta_gen is None else (self._entry.generation == meta_gen)
             if (
                 self._entry.version == current_meta.get("version")
                 and self._entry.simulation_id == current_meta.get("simulation_id")
                 and self._entry.artifact_sha256 == current_meta.get("sha256")
+                and gen_matches
             ):
                 return self._entry.model, self._entry.from_redis
             logger.info(
-                "Local process cache is stale (cached v%s, active v%s). Evicting.",
+                "Local process cache is stale (cached v%s gen %s, active v%s gen %s). Evicting.",
                 self._entry.version,
+                self._entry.generation,
                 current_meta.get("version"),
+                meta_gen,
             )
             self._entry = None
             return None
@@ -101,7 +112,8 @@ class LocalModelCache:
         version: int,
         simulation_id: str,
         artifact_sha256: str,
-        from_redis: bool,
+        from_redis: bool = False,
+        generation: int = 1,
     ) -> None:
         """Atomically store a verified champion model bound to its version identity."""
         with self._lock:
@@ -112,6 +124,7 @@ class LocalModelCache:
                 artifact_sha256=artifact_sha256,
                 from_redis=from_redis,
                 cached_at=time.time(),
+                generation=generation,
             )
 
     def clear(self) -> None:
@@ -146,7 +159,7 @@ def _is_demo_mode_active() -> bool:
     return env in ("demo", "simulation") or settings.enable_demo_fallback
 
 
-def get_scripted_model() -> tuple[Any, bool]:
+def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
     """Retrieve or compile PyTorch TorchScript JIT champion model with secure Redis caching.
 
     Enforces cryptographic provenance, trusted local champion loading, version binding,
@@ -160,7 +173,7 @@ def get_scripted_model() -> tuple[Any, bool]:
     registry = ModelRegistry()
 
     # 1. Fast path: lightweight manifest identity check (avoids reading and hashing champion weights on every warm request - Defect F)
-    champion_ident = registry.get_active_champion_identity()
+    champion_ident = registry.get_active_champion_identity(simulation_id=simulation_id)
     if champion_ident is not None:
         cached = _local_cache.get(champion_ident)
         if cached is not None:
@@ -170,7 +183,7 @@ def get_scripted_model() -> tuple[Any, bool]:
     with _local_cache._single_flight_lock:
         while True:
             # Re-check lightweight identity inside lock
-            champion_ident = registry.get_active_champion_identity()
+            champion_ident = registry.get_active_champion_identity(simulation_id=simulation_id)
             if champion_ident is not None:
                 cached = _local_cache.get(champion_ident)
                 if cached is not None:
@@ -178,7 +191,7 @@ def get_scripted_model() -> tuple[Any, bool]:
 
             # Resolve full champion metadata and verify artifact integrity
             try:
-                current_meta = registry.get_champion_metadata()
+                current_meta = registry.get_champion_metadata(simulation_id=simulation_id)
             except ModelIntegrityError:
                 _local_cache.clear()
                 raise
@@ -214,13 +227,19 @@ def get_scripted_model() -> tuple[Any, bool]:
                             canonical_meta_str = json.dumps(
                                 meta_to_verify, sort_keys=True, separators=(",", ":")
                             )
-                            expected_hmac = hmac.new(
+                            domain_key = derive_domain_key(settings.payload_signing_secret, DOMAIN_MODEL_CACHE)
+                            expected_hmac_domain = hmac.new(
+                                domain_key,
+                                canonical_meta_str.encode("utf-8") + b":" + cached_bytes,
+                                hashlib.sha256,
+                            ).hexdigest()
+                            expected_hmac_raw = hmac.new(
                                 settings.payload_signing_secret.encode("utf-8"),
                                 canonical_meta_str.encode("utf-8") + b":" + cached_bytes,
                                 hashlib.sha256,
                             ).hexdigest()
 
-                            if not hmac.compare_digest(expected_hmac, claimed_hmac):
+                            if not (hmac.compare_digest(expected_hmac_domain, claimed_hmac) or hmac.compare_digest(expected_hmac_raw, claimed_hmac)):
                                 logger.warning("Redis model cache failed HMAC authenticity verification.")
                             else:
                                 # MANDATORY FIELD VALIDATION (Defect C):
@@ -269,7 +288,7 @@ def get_scripted_model() -> tuple[Any, bool]:
                                     if not hmac.compare_digest(expected_model_sha, claimed_model_sha):
                                         logger.warning("Redis model cache SHA-256 digest mismatch. Evicting.")
                                         with contextlib.suppress(Exception):
-                                            redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
+                                             redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                     elif (
                                         auth_data["serialization_version"] != 2
                                         or auth_data["version"] != current_meta.get("version")
@@ -306,6 +325,7 @@ def get_scripted_model() -> tuple[Any, bool]:
                                                     simulation_id=current_meta["simulation_id"],
                                                     artifact_sha256=current_meta["sha256"],
                                                     from_redis=True,
+                                                    generation=current_meta.get("generation", 1),
                                                 )
                                                 logger.info(
                                                     "Loaded authenticated champion v%d TorchScript model from Redis cache.",
@@ -360,6 +380,7 @@ def get_scripted_model() -> tuple[Any, bool]:
                 simulation_id=current_meta["simulation_id"],
                 artifact_sha256=current_meta["sha256"],
                 from_redis=False,
+                generation=current_meta.get("generation", 1),
             )
 
             # 7. Securely populate Redis cache using atomic pipeline ONLY (Defect D)
@@ -375,6 +396,7 @@ def get_scripted_model() -> tuple[Any, bool]:
 
                     meta_to_sign = {
                         "version": current_meta["version"],
+                        "generation": current_meta.get("generation", 1),
                         "simulation_id": current_meta["simulation_id"],
                         "artifact_sha256": current_meta["sha256"],
                         "model_sha256": model_sha256,
@@ -388,8 +410,9 @@ def get_scripted_model() -> tuple[Any, bool]:
                     canonical_meta_str = json.dumps(
                         meta_to_sign, sort_keys=True, separators=(",", ":")
                     )
+                    domain_key = derive_domain_key(settings.payload_signing_secret, DOMAIN_MODEL_CACHE)
                     envelope_hmac = hmac.new(
-                        settings.payload_signing_secret.encode("utf-8"),
+                        domain_key,
                         canonical_meta_str.encode("utf-8") + b":" + model_bytes,
                         hashlib.sha256,
                     ).hexdigest()
@@ -549,7 +572,7 @@ def score_transaction_realtime(
 
     # 3. Retrieve verified champion model (fail-closed if unavailable or corrupt)
     try:
-        scripted_model, from_redis = get_scripted_model()
+        scripted_model, from_redis = get_scripted_model(simulation_id=payload.simulation_id)
     except ModelNotAvailableError as exc:
         logger.warning("Champion model unavailable for transaction %s: %s", payload.transaction_id, exc)
         if demo_active:
@@ -601,28 +624,71 @@ def score_transaction_realtime(
 
     # 4. Construct feature tensor (10 features)
     try:
-        from app.application.services.data_generator import MERCHANT_CATEGORIES
+        from app.application.services.data_generator import preprocess_transaction
+
+        if is_production:
+            required_fields = {
+                "customer_history_score": payload.customer_history_score,
+                "chargeback_count": payload.chargeback_count,
+                "account_age_days": payload.account_age_days,
+                "country_code": payload.country_code,
+                "device_type": payload.device_type,
+            }
+            for field_name, field_val in required_fields.items():
+                if field_val is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail={
+                            "code": "MISSING_REQUIRED_FEATURES",
+                            "message": f"Required feature '{field_name}' is missing or None. Production scoring cannot fabricate feature inputs.",
+                        },
+                    )
+
+        has_simulated_features = (
+            payload.customer_history_score is None
+            or payload.chargeback_count is None
+            or payload.account_age_days is None
+            or payload.country_code is None
+            or payload.device_type is None
+        )
 
         cat_str = payload.merchant_category.lower()
-        merchant_risk = 0.50 if cat_str in ("crypto_exchange", "crypto", "gambling") else 0.10
-        cat_idx = float(
-            MERCHANT_CATEGORIES.index(cat_str) if cat_str in MERCHANT_CATEGORIES else 0
+        merchant_risk = (
+            payload.merchant_risk_score
+            if payload.merchant_risk_score is not None
+            else (0.50 if cat_str in ("crypto_exchange", "crypto", "gambling") else 0.10)
         )
-        hour_now = float(time.gmtime().tm_hour)
+        hour_val = (
+            float(payload.hour_of_day)
+            if payload.hour_of_day is not None
+            else float(time.gmtime().tm_hour)
+        )
 
-        features = [
-            min(1.0, max(0.0, payload.amount / 5000.0)),
-            min(1.0, max(0.0, cat_idx / 19.0)),
-            0.0,  # country_code index (US default)
-            0.25,  # device_type (mobile_app / web_browser default)
-            min(1.0, max(0.0, float(payload.velocity_1h) / 30.0)),
-            min(1.0, max(0.0, hour_now / 23.0)),
-            merchant_risk,
-            0.90,  # customer_history_score
-            0.0,  # chargeback_count
-            0.365,  # account_age_days (365/1000)
-        ]
-        input_tensor = torch.tensor([features], dtype=torch.float32)
+        txn_dict = {
+            "transaction_amount": payload.amount,
+            "merchant_category": payload.merchant_category,
+            "country_code": payload.country_code or "US",
+            "device_type": payload.device_type or "mobile_app",
+            "velocity": float(payload.velocity_1h),
+            "hour_of_day": hour_val,
+            "merchant_risk_score": merchant_risk,
+            "customer_history_score": (
+                payload.customer_history_score
+                if payload.customer_history_score is not None
+                else 0.90
+            ),
+            "chargeback_count": (
+                float(payload.chargeback_count)
+                if payload.chargeback_count is not None
+                else 0.0
+            ),
+            "account_age_days": (
+                float(payload.account_age_days)
+                if payload.account_age_days is not None
+                else 365.0
+            ),
+        }
+        input_tensor = preprocess_transaction(txn_dict)
 
         # 5. Execute inference and validate model output contract
         with torch.no_grad():
@@ -663,7 +729,8 @@ def score_transaction_realtime(
 
         latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
         source_label = "Redis Cache JIT" if from_redis else "PyTorch JIT"
-        explanation = f"ML Model ({source_label}): " + (
+        sim_tag = " [Simulated Features]" if has_simulated_features else ""
+        explanation = f"ML Model ({source_label}){sim_tag}: " + (
             "; ".join(reasons) if reasons else "Normal risk profile"
         )
 

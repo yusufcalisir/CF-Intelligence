@@ -324,14 +324,14 @@ class RealtimeInferenceRequest(BaseModel):
         json_schema_extra={"example": "USD"},
     )
     source_account: str = Field(
-        ...,
+        "acc_src_default",
         min_length=3,
         max_length=128,
         pattern=r"^[a-zA-Z0-9_\-]+$",
         json_schema_extra={"example": "acc_src_991"},
     )
     target_account: str = Field(
-        ...,
+        "acc_dst_default",
         min_length=3,
         max_length=128,
         pattern=r"^[a-zA-Z0-9_\-]+$",
@@ -353,6 +353,54 @@ class RealtimeInferenceRequest(BaseModel):
     force_fallback: bool = Field(
         False,
         description="Simulate model timeout/failure to test fallback engine.",
+    )
+    country_code: str | None = Field(
+        None,
+        max_length=64,
+        description="Observed country code of originating transaction.",
+    )
+    device_type: str | None = Field(
+        None,
+        max_length=64,
+        description="Observed device type (e.g. mobile_app, web_browser).",
+    )
+    customer_history_score: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Observed customer trustworthiness score.",
+    )
+    chargeback_count: float | None = Field(
+        None,
+        ge=0.0,
+        description="Historical customer chargeback count.",
+    )
+    account_age_days: float | None = Field(
+        None,
+        ge=0.0,
+        description="Age of customer account in days.",
+    )
+    merchant_risk_score: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Historical merchant risk score.",
+    )
+    hour_of_day: float | None = Field(
+        None,
+        ge=0.0,
+        le=23.0,
+        description="Hour of day (0-23) of transaction.",
+    )
+    bank_id: str | None = Field(
+        None,
+        max_length=128,
+        description="Originating bank or institution identifier.",
+    )
+    simulation_id: str | None = Field(
+        None,
+        max_length=128,
+        description="Target simulation run ID for versioned model routing.",
     )
 
 

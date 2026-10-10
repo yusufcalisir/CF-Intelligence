@@ -16,11 +16,19 @@ import os
 import shutil
 import tempfile
 import threading
+import time
 from datetime import UTC, datetime
 from typing import Any
 
 import torch
+from filelock import FileLock
 
+from app.application.services.training_provenance_service import (
+    DOMAIN_APPROVAL_SIGNOFF,
+    TrainingExecutionReceipt,
+    TrainingReceiptAuthority,
+    derive_domain_key,
+)
 from app.domain.model_serving_errors import (
     ModelCompatibilityError,
     ModelIntegrityError,
@@ -28,6 +36,18 @@ from app.domain.model_serving_errors import (
 )
 
 logger = logging.getLogger(__name__)
+
+_REGISTRY_FILE_LOCKS: dict[str, FileLock] = {}
+_REGISTRY_LOCKS_GUARD = threading.Lock()
+
+
+def _get_registry_file_lock(sim_dir: str) -> FileLock:
+    """Return shared FileLock instance for simulation dir to ensure process-local reentrancy."""
+    lock_path = os.path.abspath(os.path.join(sim_dir, "registry.lock"))
+    with _REGISTRY_LOCKS_GUARD:
+        if lock_path not in _REGISTRY_FILE_LOCKS:
+            _REGISTRY_FILE_LOCKS[lock_path] = FileLock(lock_path, timeout=15)
+        return _REGISTRY_FILE_LOCKS[lock_path]
 
 
 def compute_file_sha256(filepath: str) -> str:
@@ -53,7 +73,8 @@ def generate_signoff_signature(
     secret = signing_secret or get_settings().payload_signing_secret
     norm_role = "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
     canonical_payload = f"{simulation_id}:{version}:{artifact_sha256}:{norm_role}:{user}"
-    return hmac.new(secret.encode("utf-8"), canonical_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    domain_key = derive_domain_key(secret, DOMAIN_APPROVAL_SIGNOFF)
+    return hmac.new(domain_key, canonical_payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def _validate_training_evidence(
@@ -123,6 +144,7 @@ def validate_production_admission(
     - UNVERIFIED, STRUCTURAL_FIXTURE, and LEGACY_UNVERIFIED cannot become operational champions.
     - Only models with verified/recorded training provenance are eligible.
     - Models with is_production_eligible == False are rejected.
+    - Revoked models are strictly rejected.
     - Artifacts missing integrity digest (sha256) are rejected.
     """
     from app.config import get_settings
@@ -136,6 +158,10 @@ def validate_production_admission(
     sha256_val: str | None = None
 
     if isinstance(entry_or_provenance, dict):
+        if entry_or_provenance.get("is_revoked") is True:
+            raise ModelIntegrityError(
+                f"Production admission rejected: model version has been revoked ({context})."
+            )
         prov = str(entry_or_provenance.get("provenance_type", "UNVERIFIED")).strip().upper()
         is_eligible = entry_or_provenance.get("is_production_eligible")
         sha256_val = entry_or_provenance.get("sha256")
@@ -219,8 +245,9 @@ class ModelRegistry:
         return sim_dir
 
     def _load_manifest(self, simulation_id: str) -> list[dict[str, Any]]:
-        with self._lock:
-            sim_dir = self._get_sim_dir(simulation_id)
+        sim_dir = self._get_sim_dir(simulation_id)
+        file_lock = _get_registry_file_lock(sim_dir)
+        with self._lock, file_lock:
             manifest_path = os.path.join(sim_dir, "registry.json")
             if not os.path.exists(manifest_path):
                 return []
@@ -234,19 +261,27 @@ class ModelRegistry:
             return []
 
     def _save_manifest(self, simulation_id: str, manifest: list[dict[str, Any]]) -> None:
-        with self._lock:
-            sim_dir = self._get_sim_dir(simulation_id)
+        sim_dir = self._get_sim_dir(simulation_id)
+        file_lock = _get_registry_file_lock(sim_dir)
+        with self._lock, file_lock:
             manifest_path = os.path.join(sim_dir, "registry.json")
-            tmp_manifest_path = os.path.join(sim_dir, f"registry_{os.getpid()}_{threading.get_ident()}.tmp")
+            tmp_manifest_path = os.path.join(
+                sim_dir, f"registry_{os.getpid()}_{threading.get_ident()}_{int(time.time() * 1000)}.tmp"
+            )
             try:
                 with open(tmp_manifest_path, "w", encoding="utf-8") as f:
                     json.dump(manifest, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
                 os.replace(tmp_manifest_path, manifest_path)
             except Exception as e:
-                logger.error("Failed to save registry manifest for %s: %s", simulation_id, e)
+                logger.error("Authoritative manifest persistence failed for %s: %s", simulation_id, e)
                 if os.path.exists(tmp_manifest_path):
                     with contextlib.suppress(OSError):
                         os.remove(tmp_manifest_path)
+                raise ModelIntegrityError(
+                    f"Authoritative manifest persistence failed for simulation '{simulation_id}': {e}"
+                ) from e
 
     def save_version(
         self,
@@ -262,6 +297,8 @@ class ModelRegistry:
         training_run_id: str | None = None,
         dataset_manifest_id: str | None = None,
         training_evidence: dict[str, Any] | None = None,
+        training_receipt: dict[str, Any] | TrainingExecutionReceipt | None = None,
+        artifact_bytes: bytes | None = None,
     ) -> dict[str, Any]:
         """Save a new version of the global model weights.
 
@@ -279,18 +316,44 @@ class ModelRegistry:
             training_run_id: Identifier of the training job.
             dataset_manifest_id: Identifier of the training dataset manifest.
             training_evidence: Execution evidence produced during training.
+            training_receipt: Cryptographically signed training execution receipt from trusted authority.
 
         Returns:
             The created version entry metadata.
         """
-        # Validate provenance classification and authentic execution evidence
+        from app.config import get_settings
+        settings = get_settings()
+
+        # Parse training receipt if provided
+        receipt_dict: dict[str, Any] | None = None
+        has_valid_receipt = False
+        if training_receipt is not None:
+            if isinstance(training_receipt, TrainingExecutionReceipt):
+                receipt_dict = training_receipt.to_dict()
+            elif isinstance(training_receipt, dict):
+                receipt_dict = dict(training_receipt)
+
         clean_prov = provenance_type.strip() if provenance_type else "UNVERIFIED"
         clean_upper = clean_prov.upper()
 
         has_recorded_evidence = _validate_training_evidence(training_run_id, training_evidence)
 
         attestation_status = "NONE"
-        if clean_upper in ("TRAINED", "TRAINING_RECORDED"):
+        if receipt_dict is not None:
+            auth = TrainingReceiptAuthority(settings.payload_signing_secret)
+            is_valid_rcpt, rcpt_reason = auth.verify_receipt(
+                receipt_dict,
+                candidate_artifact_sha256=None,
+                simulation_id=simulation_id,
+            )
+            if is_valid_rcpt:
+                has_valid_receipt = True
+                final_provenance = "TRAINING_RECORDED"
+                attestation_status = "RECEIPT_VERIFIED_TRAINING_AUTHORITY"
+            else:
+                final_provenance = "UNVERIFIED"
+                attestation_status = f"INVALID_RECEIPT: {rcpt_reason}"
+        elif clean_upper in ("TRAINED", "TRAINING_RECORDED"):
             final_provenance = "TRAINING_RECORDED" if has_recorded_evidence else "UNVERIFIED"
         elif clean_upper == "TRAINING_EVIDENCE_VERIFIED":
             attestation_status = "INDEPENDENT_ATTESTATION_UNAVAILABLE"
@@ -302,39 +365,51 @@ class ModelRegistry:
 
         is_prod_eligible = final_provenance in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED")
 
-        # Centralized production admission check on promotion
-        from app.config import get_settings
-        settings = get_settings()
-        if is_promoted:
-            validate_production_admission(final_provenance, context="save_version")
+        sim_dir = self._get_sim_dir(simulation_id)
+        file_lock = _get_registry_file_lock(sim_dir)
 
-        with self._lock:
+        with self._lock, file_lock:
             manifest = self._load_manifest(simulation_id)
             next_version = 1
             if manifest:
                 next_version = max(entry["version"] for entry in manifest) + 1
 
-            sim_dir = self._get_sim_dir(simulation_id)
             filename = f"model_v{next_version}.pt"
             filepath = os.path.join(sim_dir, filename)
 
             try:
-                torch.save(state_dict, filepath)
+                if artifact_bytes is not None:
+                    with open(filepath, "wb") as f:
+                        f.write(artifact_bytes)
+                else:
+                    torch.save(state_dict, filepath)
                 logger.info("Saved model version %d to %s", next_version, filepath)
             except Exception as e:
                 logger.error("Failed to save model file: %s", e)
                 raise
 
-            # If this new version is promoted, set other versions to inactive
-            if is_promoted:
-                for entry in manifest:
-                    entry["is_active"] = False
-                    if entry.get("status") == "champion":
-                        entry["status"] = "inactive"
-
             file_sha256 = compute_file_sha256(filepath)
-            entry = {
+
+            # If receipt provided, verify artifact SHA256 binding
+            if receipt_dict is not None:
+                auth = TrainingReceiptAuthority(settings.payload_signing_secret)
+                is_valid_binding, binding_reason = auth.verify_receipt(
+                    receipt_dict,
+                    candidate_artifact_sha256=file_sha256,
+                    simulation_id=simulation_id,
+                )
+                if not is_valid_binding:
+                    has_valid_receipt = False
+                    final_provenance = "UNVERIFIED"
+                    attestation_status = f"INVALID_RECEIPT: {binding_reason}"
+                    is_prod_eligible = False
+
+            max_gen = max((e.get("generation", 0) for e in manifest), default=0)
+            entry_gen = (max_gen + 1) if is_promoted else (max_gen if max_gen > 0 else 1)
+
+            entry: dict[str, Any] = {
                 "version": next_version,
+                "generation": entry_gen,
                 "filename": filename,
                 "metrics": metrics,
                 "metrics_provenance": "CALLER_SUPPLIED_UNVERIFIED",
@@ -350,10 +425,23 @@ class ModelRegistry:
                 "training_run_id": training_run_id or "unspecified",
                 "dataset_manifest_id": dataset_manifest_id or "unspecified",
                 "training_evidence": training_evidence or {},
+                "training_receipt": receipt_dict if has_valid_receipt else None,
                 "attestation_status": attestation_status,
                 "sign_offs": [],
                 "created_at": datetime.now(UTC).isoformat(),
             }
+
+            # Centralized production admission check on promotion
+            if is_promoted:
+                validate_production_admission(entry, context="save_version")
+
+            # If this new version is promoted, set other versions to inactive
+            if is_promoted:
+                for existing_entry in manifest:
+                    existing_entry["is_active"] = False
+                    if existing_entry.get("status") == "champion":
+                        existing_entry["status"] = "inactive"
+
             manifest.append(entry)
             # Authoritative manifest is saved FIRST (Section 9.1)
             self._save_manifest(simulation_id, manifest)
@@ -520,21 +608,31 @@ class ModelRegistry:
                     comp_s = comp_signs[0]
                     # Four-Eyes Principle check: distinct individuals
                     if ml_s.get("user") != comp_s.get("user"):
-                        expected_ml_sig = hmac.new(
+                        domain_key = derive_domain_key(settings.payload_signing_secret, DOMAIN_APPROVAL_SIGNOFF)
+                        expected_ml_sig_domain = hmac.new(
+                            domain_key,
+                            f"{sim_id}:{version_val}:{actual_sha256}:ml_engineer:{ml_s.get('user')}".encode(),
+                            hashlib.sha256,
+                        ).hexdigest()
+                        expected_ml_sig_raw = hmac.new(
                             settings.payload_signing_secret.encode(),
                             f"{sim_id}:{version_val}:{actual_sha256}:ml_engineer:{ml_s.get('user')}".encode(),
                             hashlib.sha256,
                         ).hexdigest()
-                        expected_comp_sig = hmac.new(
+                        expected_comp_sig_domain = hmac.new(
+                            domain_key,
+                            f"{sim_id}:{version_val}:{actual_sha256}:compliance:{comp_s.get('user')}".encode(),
+                            hashlib.sha256,
+                        ).hexdigest()
+                        expected_comp_sig_raw = hmac.new(
                             settings.payload_signing_secret.encode(),
                             f"{sim_id}:{version_val}:{actual_sha256}:compliance:{comp_s.get('user')}".encode(),
                             hashlib.sha256,
                         ).hexdigest()
 
-                        if (
-                            hmac.compare_digest(ml_s.get("signature", ""), expected_ml_sig)
-                            and hmac.compare_digest(comp_s.get("signature", ""), expected_comp_sig)
-                        ):
+                        ml_ok = hmac.compare_digest(ml_s.get("signature", ""), expected_ml_sig_domain) or hmac.compare_digest(ml_s.get("signature", ""), expected_ml_sig_raw)
+                        comp_ok = hmac.compare_digest(comp_s.get("signature", ""), expected_comp_sig_domain) or hmac.compare_digest(comp_s.get("signature", ""), expected_comp_sig_raw)
+                        if ml_ok and comp_ok:
                             hmac_valid = True
 
                 if hmac_valid:
@@ -550,6 +648,7 @@ class ModelRegistry:
 
             resolved_metadata = {
                 "version": version_val,
+                "generation": entry.get("generation", 1),
                 "filename": entry.get("filename", os.path.basename(filepath)),
                 "simulation_id": sim_id,
                 "artifact_path": filepath,
@@ -639,6 +738,7 @@ class ModelRegistry:
                     return None
             return {
                 "version": entry.get("version"),
+                "generation": entry.get("generation", 1),
                 "simulation_id": s_id,
                 "sha256": entry.get("sha256"),
                 "filename": entry.get("filename"),
@@ -706,13 +806,14 @@ class ModelRegistry:
         if target_status not in ("champion", "challenger"):
             raise ValueError(f"Target status must be 'champion' or 'challenger', got '{target_status}'")
 
-        with self._lock:
+        sim_dir = self._get_sim_dir(simulation_id)
+        file_lock = _get_registry_file_lock(sim_dir)
+        with self._lock, file_lock:
             manifest = self._load_manifest(simulation_id)
             target_entry = next((e for e in manifest if e["version"] == version), None)
             if not target_entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
 
-            sim_dir = self._get_sim_dir(simulation_id)
             filepath = os.path.join(sim_dir, target_entry["filename"])
             if not os.path.exists(filepath):
                 raise FileNotFoundError(f"Model file {filepath} not found on disk")
@@ -722,7 +823,9 @@ class ModelRegistry:
             if target_status == "champion":
                 validate_production_admission(target_entry, context="promote_version")
 
+            max_gen = max((e.get("generation", 0) for e in manifest), default=0)
             if target_status == "champion":
+                target_entry["generation"] = max_gen + 1
                 for entry in manifest:
                     entry["is_active"] = entry["version"] == version
                     if entry["version"] == version:
@@ -756,13 +859,14 @@ class ModelRegistry:
 
     def rollback(self, simulation_id: str, version: int) -> dict[str, Any]:
         """Rollback/promote a specific historical version as the active model."""
-        with self._lock:
+        sim_dir = self._get_sim_dir(simulation_id)
+        file_lock = _get_registry_file_lock(sim_dir)
+        with self._lock, file_lock:
             manifest = self._load_manifest(simulation_id)
             target_entry = next((e for e in manifest if e["version"] == version), None)
             if not target_entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
 
-            sim_dir = self._get_sim_dir(simulation_id)
             filepath = os.path.join(sim_dir, target_entry["filename"])
             if not os.path.exists(filepath):
                 raise FileNotFoundError(f"Model file {filepath} not found on disk")
@@ -770,6 +874,9 @@ class ModelRegistry:
             from app.config import get_settings
             settings = get_settings()
             validate_production_admission(target_entry, context="rollback")
+
+            max_gen = max((e.get("generation", 0) for e in manifest), default=0)
+            target_entry["generation"] = max_gen + 1
 
             # Mark target as active, all others as inactive
             for entry in manifest:
@@ -793,7 +900,7 @@ class ModelRegistry:
 
                 ModelService(settings).invalidate_model_cache()
 
-            logger.info("Rolled back registry of %s to version %d", simulation_id, version)
+            logger.info("Rolled back registry of %s to version %d (generation %d)", simulation_id, version, target_entry["generation"])
             return target_entry
 
     def sign_off(
@@ -812,7 +919,9 @@ class ModelRegistry:
         Promotes version to challenger/champion if ML engineer and compliance officer have signed off.
         Enforces Four-Eyes principle (distinct individuals) and binds cryptographic signature to canonical payload.
         """
-        with self._lock:
+        sim_dir = self._get_sim_dir(simulation_id)
+        file_lock = _get_registry_file_lock(sim_dir)
+        with self._lock, file_lock:
             manifest = self._load_manifest(simulation_id)
             entry = next((e for e in manifest if e["version"] == version), None)
             if not entry:
@@ -820,6 +929,16 @@ class ModelRegistry:
 
             if role not in ("compliance", "compliance_officer", "ml_engineer"):
                 raise ValueError("Role must be 'compliance' or 'ml_engineer'")
+
+            from app.config import get_settings
+            settings = get_settings()
+
+            # Prevent development seeded accounts from signing off in production
+            SEEDED_ACCOUNTS = {"admin", "analyst_a1", "analyst_b1", "analyst_c1", "auditor"}
+            if settings.app_env.lower() == "production" and user in SEEDED_ACCOUNTS:
+                raise ModelIntegrityError(
+                    f"Production promotion rejected: development seeded account '{user}' cannot authorize promotion."
+                )
 
             norm_role = "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
 
@@ -857,19 +976,27 @@ class ModelRegistry:
                     is_role_verified = any(r in ("ml_engineer", "ml_lead") for r in user_roles)
 
             # Cryptographic signature verification over canonical payload
-            sim_dir = self._get_sim_dir(simulation_id)
             artifact_sha = entry.get("sha256") or compute_file_sha256(os.path.join(sim_dir, entry["filename"]))
             canonical_payload = f"{simulation_id}:{version}:{artifact_sha}:{norm_role}:{user}"
 
-            from app.config import get_settings
-            settings = get_settings()
-            expected_sig = hmac.new(
+            domain_key = derive_domain_key(settings.payload_signing_secret, DOMAIN_APPROVAL_SIGNOFF)
+            expected_sig_domain = hmac.new(
+                domain_key,
+                canonical_payload.encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()
+            expected_sig_raw = hmac.new(
                 settings.payload_signing_secret.encode("utf-8"),
                 canonical_payload.encode("utf-8"),
                 hashlib.sha256,
             ).hexdigest()
 
-            is_signature_valid = bool(signature and hmac.compare_digest(signature, expected_sig))
+            is_signature_valid = bool(
+                signature and (
+                    hmac.compare_digest(signature, expected_sig_domain)
+                    or hmac.compare_digest(signature, expected_sig_raw)
+                )
+            )
 
             # Append new sign-off details
             entry["sign_offs"].append(
@@ -921,6 +1048,8 @@ class ModelRegistry:
                     # Promote directly to champion
                     entry["status"] = "champion"
                     entry["is_active"] = True
+                    max_gen = max((e.get("generation", 0) for e in manifest), default=0)
+                    entry["generation"] = max_gen + 1
 
                     # Deactivate all other entries
                     for e in manifest:
@@ -929,7 +1058,6 @@ class ModelRegistry:
                             if e.get("status") == "champion":
                                 e["status"] = "inactive"
 
-                    sim_dir = self._get_sim_dir(simulation_id)
                     filepath = os.path.join(sim_dir, entry["filename"])
                     # Manifest is saved FIRST
                     self._save_manifest(simulation_id, manifest)
