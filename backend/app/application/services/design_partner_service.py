@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 from app.application.services.model_service import ModelService
 from app.config import get_settings
+from app.domain.value_objects import ModelWeights
 from app.domain.distribution_fidelity_service import (
     audit_distribution_fidelity,
 )
@@ -272,15 +273,43 @@ class DesignPartnerPilotService:
                 batch_size=min(64, max(16, len(p0_y))),
             )
 
-            # 2. Fit collaborative federated model across all banks
+            # 2. Fit collaborative federated model across all banks via decentralized local training and FedAvg
             fl_model = model_service.create_model(input_dim=input_dim, dp_compatible=False)
-            fl_model, _, _ = model_service.train_local(
-                model=fl_model,
-                X_train=X,
-                y_train=y,
-                epochs=2,
-                batch_size=min(64, max(16, len(y))),
-            )
+            fl_rounds = 2
+            for _ in range(fl_rounds):
+                global_weights = model_service.get_parameters(fl_model)
+                client_weights_list: list[ModelWeights] = []
+                sample_counts: list[int] = []
+
+                for part in partitions:
+                    p_X, p_y = part["X"], part["y"]
+                    if len(p_y) == 0:
+                        continue
+                    client_model = model_service.create_model(input_dim=input_dim, dp_compatible=False)
+                    client_model = model_service.set_parameters(client_model, global_weights)
+                    client_model, _, _ = model_service.train_local(
+                        model=client_model,
+                        X_train=p_X,
+                        y_train=p_y,
+                        epochs=2,
+                        learning_rate=0.005,
+                        batch_size=min(32, max(16, len(p_y))),
+                    )
+                    client_weights_list.append(model_service.get_parameters(client_model))
+                    sample_counts.append(len(p_y))
+
+                if client_weights_list and sum(sample_counts) > 0:
+                    total_samples = sum(sample_counts)
+                    agg_flat = np.zeros(len(global_weights.flat_weights), dtype=np.float32)
+                    for c_weights, count in zip(client_weights_list, sample_counts, strict=True):
+                        factor = count / total_samples
+                        agg_flat += np.asarray(c_weights.flat_weights, dtype=np.float32) * factor
+
+                    aggregated_weights = ModelWeights(
+                        layer_shapes=global_weights.layer_shapes,
+                        flat_weights=agg_flat.tolist(),
+                    )
+                    fl_model = model_service.set_parameters(fl_model, aggregated_weights)
 
             # 3. Generate actual model inference probabilities on test set X
             local_model.eval()

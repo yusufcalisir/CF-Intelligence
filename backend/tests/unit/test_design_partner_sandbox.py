@@ -230,3 +230,19 @@ def test_evaluate_reference_benchmark_fastapi_endpoints_authentic_datasets():
     )
     assert resp.status_code == 200
     assert resp.json()["dataset_name"] == "elliptic"
+
+
+def test_evaluate_reference_benchmark_federated_partitions_isolated():
+    """Verifies that the FL model is trained strictly over isolated bank partitions and not pooled."""
+    pilot = DesignPartnerPilotService()
+    res = pilot.evaluate_reference_benchmark(dataset_name="paysim", n_samples=300)
+
+    assert "bank_partitions" in res
+    assert len(res["bank_partitions"]) == 3
+    total_partition_samples = sum(p["samples"] for p in res["bank_partitions"])
+    assert total_partition_samples == res["total_transactions_evaluated"]
+    prov = res["evaluation_provenance"]
+    assert prov["model_type"] == "PYTORCH_FEDERATED_INFERENCE"
+    assert prov["probability_synthesis"] == "NONE_GENUINE_INFERENCE"
+    assert prov["is_synthetic_beta"] is False
+
