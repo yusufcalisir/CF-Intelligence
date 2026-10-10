@@ -158,15 +158,8 @@ async def analyze_model_drift(severe_drift: bool = False) -> DriftAnalysisRespon
         y_prob=_sample_probs,
     )
 
-    # Record metrics in Prometheus gauges
-    telemetry.cfi_concept_drift_psi.record(rpt.concept_drift_psi)
-    if rpt.feature_drifts:
-        telemetry.cfi_feature_drift_ks_stat.record(
-            max(fd.ks_statistic for fd in rpt.feature_drifts)
-        )
-    if rpt.calibration:
-        telemetry.cfi_model_brier_score.record(rpt.calibration.brier_score)
-        telemetry.cfi_model_ece.record(rpt.calibration.expected_calibration_error)
+    # Synthetic simulation analysis does not mutate operational Prometheus metrics.
+    # Production telemetry is recorded exclusively via POST /drift/evaluate with genuine feature payloads.
 
     # Dynamically register alert if drift thresholds are breached
     now_str = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -250,14 +243,30 @@ async def get_concept_drift_psi() -> ConceptDriftPsiResponse:
 @api_router.get("/fairness", response_model=FairnessMetricsResponse, status_code=status.HTTP_200_OK)
 async def get_fairness_metrics() -> FairnessMetricsResponse:
     """Retrieve consortium model fairness, demographic parity, and EEOC 80% disparate impact ratio."""
-    # Simulated fair baseline: disparate impact ratio 0.88 (satisfies 80% four-fifths rule)
+    from app.application.services.model_governance_service import ModelGovernanceService
+
+    assessment = ModelGovernanceService.get_latest_fairness_assessment()
+    if assessment is None:
+        raw = ModelGovernanceService().audit_canonical_fairness_baseline()
+        assessment = {
+            "demographic_parity_ratio": float(raw["disparate_impact_ratio"]),
+            "disparate_impact_ratio": float(raw["disparate_impact_ratio"]),
+            "equalized_odds_difference": float(raw.get("equal_opportunity_difference", 0.0)),
+            "satisfies_four_fifths_rule": bool(raw["eeoc_80_percent_rule"] == "PASSED"),
+            "evaluated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "protected_attributes": ["consortium_bank_tier", "channel_type"],
+        }
+        ModelGovernanceService.record_fairness_assessment(assessment)
+
     return FairnessMetricsResponse(
-        demographic_parity_ratio=0.91,
-        disparate_impact_ratio=0.88,
-        equalized_odds_difference=0.04,
-        satisfies_four_fifths_rule=True,
-        evaluated_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        protected_attributes=["jurisdiction", "bank_tier", "merchant_category"],
+        demographic_parity_ratio=float(assessment["demographic_parity_ratio"]),
+        disparate_impact_ratio=float(assessment["disparate_impact_ratio"]),
+        equalized_odds_difference=float(assessment["equalized_odds_difference"]),
+        satisfies_four_fifths_rule=bool(assessment["satisfies_four_fifths_rule"]),
+        evaluated_at=str(assessment["evaluated_at"]),
+        protected_attributes=list(
+            assessment.get("protected_attributes", ["consortium_bank_tier", "channel_type"])
+        ),
     )
 
 

@@ -40,10 +40,7 @@ class TelemetryRegistry:
         self._lock = threading.Lock()
         self._counters: dict[str, float] = {}
         self._counter_labels: dict[str, dict[str, float]] = {}
-        self._gauges: dict[str, float] = {
-            "cfi_active_bank_nodes": 3.0,
-            "cfi_champion_model_auc": 0.885,
-        }
+        self._gauges: dict[str, float] = {}
         self._gauge_labels: dict[str, dict[str, float]] = {}
         self._histograms: dict[str, list[float]] = {}
         self._histogram_labels: dict[str, dict[str, list[float]]] = {}

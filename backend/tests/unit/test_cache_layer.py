@@ -63,8 +63,12 @@ async def test_graceful_degradation_when_redis_unavailable(cache_service: CacheS
     # Health check should return False
     assert await cache_service.health() is False
 
-    # Rate limiter should fail open (return True)
+    # Rate limiter enforces sliding window locally when Redis is down without failing open
     assert await cache_service.rate_limit_check("test-ip", limit=5) is True
+    for _ in range(4):
+        assert await cache_service.rate_limit_check("test-ip", limit=5) is True
+    # 6th request must be rejected under strict rate limiting
+    assert await cache_service.rate_limit_check("test-ip", limit=5) is False
 
 
 @pytest.mark.asyncio

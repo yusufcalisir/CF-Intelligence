@@ -1955,6 +1955,29 @@ class SimulationService:
             g_ref_tpr = g_ref_tp / (g_ref_tp + g_ref_fn) if (g_ref_tp + g_ref_fn) > 0 else 1.0
             g_equal_opportunity_diff = abs(g_prot_tpr - g_ref_tpr)
 
+            try:
+                from app.application.services.model_governance_service import (
+                    ModelGovernanceService,
+                )
+
+                ModelGovernanceService.record_fairness_assessment(
+                    {
+                        "demographic_parity_ratio": round(
+                            g_prot_sel / g_ref_sel if g_ref_sel > 0 else 1.0, 4
+                        ),
+                        "disparate_impact_ratio": round(g_disparate_impact, 4),
+                        "equalized_odds_difference": round(g_equal_opportunity_diff, 4),
+                        "satisfies_four_fifths_rule": bool(g_disparate_impact >= 0.80),
+                        "evaluated_at": _now().isoformat(),
+                        "protected_attributes": [
+                            "consortium_bank_tier",
+                            "transaction_velocity_group",
+                        ],
+                    }
+                )
+            except Exception as e:
+                logger.warning("Failed to record global fairness assessment: %s", e)
+
             # Update each bank's federated metrics with the aggregated global fairness stats
             for bank in banks:
                 if bank.federated_metrics:

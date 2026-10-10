@@ -29,6 +29,7 @@ import inspect
 import json
 import logging
 import secrets
+import threading
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -62,6 +63,8 @@ class CacheService:
     _instance: CacheService | None = None
     _client: aioredis.Redis | None = None
     _unavailable: bool = False  # once True, skip all Redis attempts
+    _local_rate_limits: dict[str, list[float]] = {}
+    _local_lock: threading.Lock = threading.Lock()
 
     # ── Singleton ──────────────────────────────────────────────────────
 
@@ -280,20 +283,42 @@ class CacheService:
         """Increment sliding-window counter. Return True if request is allowed.
 
         Uses Redis INCR + EXPIRE so the counter resets after the window.
-        Falls back to True (allow) when Redis is unavailable.
+        Falls back to in-memory sliding window when Redis is unavailable,
+        strictly enforcing the rate limit and preventing silent fail-open security bypass.
         """
         c = self.client
-        if c is None:
-            return True  # graceful degradation — allow all when cache down
-        try:
-            rk = f"ratelimit:{key}"
-            count = await c.incr(rk)
-            if count == 1:
-                await c.expire(rk, window)
-            return count <= limit
-        except Exception as exc:
-            logger.debug("Rate limit check error key=%s: %s", key, exc)
-            return True  # fail open
+        if c is not None:
+            try:
+                rk = f"ratelimit:{key}"
+                count = await c.incr(rk)
+                if count == 1:
+                    await c.expire(rk, window)
+                return count <= limit
+            except Exception as exc:
+                logger.warning(
+                    "Redis rate limit check failed key=%s: %s; falling back to local sliding window",
+                    key,
+                    exc,
+                )
+
+        # Authentic in-memory sliding window fallback
+        now = time.monotonic()
+        with self._local_lock:
+            timestamps = self._local_rate_limits.setdefault(key, [])
+            cutoff = now - window
+            # Prune expired entries
+            valid_timestamps = [t for t in timestamps if t > cutoff]
+            if len(valid_timestamps) >= limit:
+                self._local_rate_limits[key] = valid_timestamps
+                logger.warning(
+                    "Rate limit exceeded (in-memory sliding window fallback) key=%s limit=%d",
+                    key,
+                    limit,
+                )
+                return False
+            valid_timestamps.append(now)
+            self._local_rate_limits[key] = valid_timestamps
+            return True
 
     # ── Tenant Resource Namespace Isolation ────────────────────────────
 
