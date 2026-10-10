@@ -1241,7 +1241,9 @@ def test_tc06_cryptographic_signoff_verification_and_replay_rejection(temp_regis
 
     meta = reg2.get_champion_metadata(simulation_id="sim_tc06_b")
     assert meta is not None
-    assert meta["authenticity_status"] == "CRYPTOGRAPHICALLY_AUTHORIZED"
+    assert meta["authenticity_status"] == "APPLICATION_HMAC_AUTHENTICATED"
+    assert meta["is_independent_human_authorization"] is False
+    assert meta["authorization_scheme"] == "APPLICATION_HMAC_SHA256"
 
     # 3. Replay attack: try replaying v2's signatures on v3 (which has different version & hash)
     m3 = svc.create_model(dp_compatible=True)
@@ -1253,7 +1255,7 @@ def test_tc06_cryptographic_signoff_verification_and_replay_rejection(temp_regis
     assert meta3 is not None
     assert meta3["version"] == 2
     assert meta3["authenticity_status"] == "SIGNOFFS_RECORDED_UNVERIFIED"
-    assert meta3["authenticity_status"] != "CRYPTOGRAPHICALLY_AUTHORIZED"
+    assert meta3["authenticity_status"] != "APPLICATION_HMAC_AUTHENTICATED"
 
 
 # ── TC-07: Direct Promotion Bypass Fails Closed in Production ─────────────────
@@ -1605,3 +1607,331 @@ def test_tc16_rollback_freshness_and_identity_restoration(temp_registry_dir: str
         model_v1, _ = get_scripted_model()
         active_meta = reg.get_champion_metadata()
         assert active_meta is not None and active_meta["version"] == 1
+
+
+# ── P01: Default UNVERIFIED Model Rejected in Production ─────────────────────
+def test_p01_default_unverified_model_rejected_in_production(temp_registry_dir: str) -> None:
+    """P01: save_version with default provenance/UNVERIFIED and is_promoted=True fails closed in production."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+    m = svc.create_model(dp_compatible=True)
+
+    with (
+        patch.object(settings, "app_env", "production"),
+        pytest.raises(ModelIntegrityError, match="Production admission rejected: model provenance 'UNVERIFIED' is ineligible"),
+    ):
+        reg.save_version(
+            simulation_id="sim_p01",
+            state_dict=m.state_dict(),
+            metrics={"auc_roc": 0.85},
+            is_promoted=True,
+        )
+
+
+# ── P02: Direct Promotion Bypass Rejected in Production ───────────────────────
+def test_p02_direct_promotion_bypass_rejected_in_production(temp_registry_dir: str) -> None:
+    """P02: Saving unverified candidate without promotion, then invoking promote_version() in production fails closed."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+    m = svc.create_model(dp_compatible=True)
+
+    # Save inactive in development
+    v1 = reg.save_version(
+        simulation_id="sim_p02",
+        state_dict=m.state_dict(),
+        metrics={"auc_roc": 0.82},
+        is_promoted=False,
+        status="inactive",
+    )
+    assert v1["provenance_type"] == "UNVERIFIED"
+
+    with (
+        patch.object(settings, "app_env", "production"),
+        pytest.raises(ModelIntegrityError, match="Production admission rejected: model provenance 'UNVERIFIED' is ineligible"),
+    ):
+        reg.promote_version("sim_p02", version=v1["version"], target_status="champion")
+
+
+# ── P03: Rollback Bypass Rejected in Production ──────────────────────────────
+def test_p03_rollback_bypass_rejected_in_production(temp_registry_dir: str) -> None:
+    """P03: Attempting rollback to an unverified historical model in production fails closed."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+    m = svc.create_model(dp_compatible=True)
+
+    # Save v1 unverified
+    v1 = reg.save_version(
+        simulation_id="sim_p03",
+        state_dict=m.state_dict(),
+        metrics={"auc_roc": 0.70},
+        is_promoted=False,
+        status="inactive",
+    )
+
+    with (
+        patch.object(settings, "app_env", "production"),
+        pytest.raises(ModelIntegrityError, match="Production admission rejected: model provenance 'UNVERIFIED' is ineligible"),
+    ):
+        reg.rollback("sim_p03", version=v1["version"])
+
+
+# ── P04: Sign-Off Promotion Bypass Rejected in Production ─────────────────────
+def test_p04_signoff_promotion_bypass_rejected_in_production(temp_registry_dir: str) -> None:
+    """P04: Dual sign-off cannot promote an unverified model to champion in production."""
+    from app.application.services.model_registry import generate_signoff_signature
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+    m = svc.create_model(dp_compatible=True)
+
+    auth_svc = AuthenticationService.get_instance()
+    auth_svc.register_user("ml_lead_user", "Pass1234!ml", "bank_a", roles=["ml_lead"])
+    auth_svc.register_user("comp_officer_user", "Pass1234!comp", "bank_a", roles=["compliance_officer"])
+
+    v1 = reg.save_version(
+        simulation_id="sim_p04",
+        state_dict=m.state_dict(),
+        metrics={"auc_roc": 0.85},
+        is_promoted=False,
+        status="inactive",
+        provenance_type="UNVERIFIED",
+    )
+    v1_sha = v1["sha256"]
+
+    sig_ml = generate_signoff_signature("sim_p04", v1["version"], v1_sha, "ml_engineer", "ml_lead_user")
+    sig_comp = generate_signoff_signature("sim_p04", v1["version"], v1_sha, "compliance", "comp_officer_user")
+
+    with patch.object(settings, "app_env", "production"):
+        reg.sign_off("sim_p04", v1["version"], "ml_engineer", user="ml_lead_user", signature=sig_ml)
+        with pytest.raises(ModelIntegrityError, match="Production admission rejected: model provenance 'UNVERIFIED' is ineligible"):
+            reg.sign_off("sim_p04", v1["version"], "compliance", user="comp_officer_user", signature=sig_comp)
+
+
+# ── P05: Operational Serving Bypass Returns HTTP 503 ──────────────────────────
+def test_p05_operational_serving_bypass_returns_503(temp_registry_dir: str) -> None:
+    """P05: Injected manifest declaring an UNVERIFIED model active returns HTTP 503 instead of ML_MODEL in production."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+    m = svc.create_model(dp_compatible=True)
+
+    # Create model artifact and manifest with unverified active champion
+    sim_dir = reg._get_sim_dir("sim_p05")
+    filepath = os.path.join(sim_dir, "model_v1.pt")
+    torch.save(m.state_dict(), filepath)
+    from app.application.services.model_registry import compute_file_sha256
+    file_sha = compute_file_sha256(filepath)
+
+    manifest_entry = {
+        "version": 1,
+        "filename": "model_v1.pt",
+        "metrics": {"auc_roc": 0.85},
+        "metrics_provenance": "CALLER_SUPPLIED_UNVERIFIED",
+        "is_active": True,
+        "status": "champion",
+        "sha256": file_sha,
+        "provenance_type": "UNVERIFIED",
+        "is_production_eligible": False,
+        "training_run_id": "fake_run",
+        "created_at": "2026-10-10T00:00:00Z",
+    }
+    reg._save_manifest("sim_p05", [manifest_entry])
+
+    reset_model_cache()
+    payload = {
+        "transaction_id": "tx_p05_bypass",
+        "amount": 100.0,
+        "currency": "USD",
+        "source_account": "acc_1",
+        "target_account": "acc_2",
+        "merchant_category": "retail",
+        "velocity_1h": 1,
+    }
+
+    with (
+        patch.object(settings, "app_env", "production"),
+        patch("app.infrastructure.cache.get_redis_client", return_value=None),
+    ):
+        resp = client.post("/v1/inference/score", json=payload)
+        assert resp.status_code == 503, f"Expected HTTP 503, got {resp.status_code}: {resp.text}"
+        data = resp.json()
+        assert data["detail"]["code"] == "MODEL_NOT_READY"
+
+
+# ── P06: Fabricated Training Metadata Rejected ───────────────────────────────
+def test_p06_fabricated_training_metadata_rejected(temp_registry_dir: str) -> None:
+    """P06: Arbitrary run IDs and string evidence without genuine numeric metrics cannot confer TRAINING_RECORDED."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+    m = svc.create_model(dp_compatible=True)
+
+    entry = reg.save_version(
+        simulation_id="sim_p06",
+        state_dict=m.state_dict(),
+        metrics={"auc_roc": 0.99},
+        is_promoted=False,
+        provenance_type="TRAINING_RECORDED",
+        training_run_id="fake_run_id_123",
+        training_evidence={"commit": "abcdef", "tag": "release", "note": "fabricated training note"},
+    )
+    assert entry["provenance_type"] == "UNVERIFIED"
+    assert entry["is_production_eligible"] is False
+
+
+# ── P07: Fake Training Attestation Rejected ──────────────────────────────────
+def test_p07_fake_training_attestation_rejected(temp_registry_dir: str) -> None:
+    """P07: Caller-supplied attestation string does not confer TRAINING_EVIDENCE_VERIFIED."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+    m = svc.create_model(dp_compatible=True)
+
+    entry = reg.save_version(
+        simulation_id="sim_p07",
+        state_dict=m.state_dict(),
+        metrics={"loss": 0.25, "auc_roc": 0.85},
+        is_promoted=False,
+        provenance_type="TRAINING_EVIDENCE_VERIFIED",
+        training_run_id="run_p07_real",
+        training_evidence={
+            "loss": 0.25,
+            "epochs": 2,
+            "batch_size": 32,
+            "attestation": "fake_enclave_attestation_string_xyz",
+        },
+    )
+    # Must NOT confer TRAINING_EVIDENCE_VERIFIED without an independent hardware/PKI verifier
+    assert entry["provenance_type"] != "TRAINING_EVIDENCE_VERIFIED"
+    assert entry["provenance_type"] == "TRAINING_RECORDED"
+    assert entry["attestation_status"] == "INDEPENDENT_ATTESTATION_UNAVAILABLE"
+
+
+# ── P08: Forged Dual Identity Not Reported as Human Authorized ────────────────
+def test_p08_forged_dual_identity_not_reported_as_human_authorized(temp_registry_dir: str) -> None:
+    """P08: Valid application-secret HMAC sign-offs are classified as APPLICATION_HMAC_AUTHENTICATED, not independent human authorization."""
+    from app.application.services.model_registry import generate_signoff_signature
+
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+    m = svc.create_model(dp_compatible=True)
+
+    entry = reg.save_version("sim_p08", m.state_dict(), {"auc": 0.80}, is_promoted=True)
+    v_sha = entry["sha256"]
+
+    sig_ml = generate_signoff_signature("sim_p08", 1, v_sha, "ml_engineer", "invented_user_1")
+    sig_comp = generate_signoff_signature("sim_p08", 1, v_sha, "compliance", "invented_user_2")
+
+    reg.sign_off("sim_p08", 1, "ml_engineer", user="invented_user_1", signature=sig_ml)
+    reg.sign_off("sim_p08", 1, "compliance", user="invented_user_2", signature=sig_comp)
+
+    meta = reg.get_champion_metadata("sim_p08")
+    assert meta is not None
+    assert meta["authenticity_status"] == "APPLICATION_HMAC_AUTHENTICATED"
+    assert meta["authenticity_status"] != "CRYPTOGRAPHICALLY_AUTHORIZED"
+    assert meta["is_independent_human_authorization"] is False
+    assert meta["authorization_scheme"] == "APPLICATION_HMAC_SHA256"
+
+
+# ── P09: Missing Role Authority Cannot Satisfy Promotion Authorization ────────
+def test_p09_missing_role_authority_cannot_promote_in_production(temp_registry_dir: str) -> None:
+    """P09: A user lacking verified role membership cannot satisfy production promotion authorization."""
+    from app.application.services.model_registry import generate_signoff_signature
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+    m = svc.create_model(dp_compatible=True)
+
+    auth_svc = AuthenticationService.get_instance()
+    # Register an analyst who does NOT hold compliance or ml_engineer roles
+    auth_svc.register_user("analyst_only", "Pass1234!", "bank_a", roles=["analyst"])
+    auth_svc.register_user("real_ml_eng", "Pass1234!", "bank_a", roles=["ml_engineer"])
+
+    entry = reg.save_version(
+        "sim_p09",
+        m.state_dict(),
+        {"loss": 0.2, "auc_roc": 0.85},
+        is_promoted=False,
+        status="inactive",
+        provenance_type="TRAINING_RECORDED",
+        training_run_id="run_p09",
+        training_evidence={"loss": 0.2, "epochs": 1, "batch_size": 32},
+    )
+    v_sha = entry["sha256"]
+
+    sig_ml = generate_signoff_signature("sim_p09", 1, v_sha, "ml_engineer", "real_ml_eng")
+    sig_comp = generate_signoff_signature("sim_p09", 1, v_sha, "compliance", "analyst_only")
+
+    # ML engineer signs off
+    reg.sign_off("sim_p09", 1, "ml_engineer", user="real_ml_eng", signature=sig_ml)
+
+    # Analyst claims compliance role in production
+    with (
+        patch.object(settings, "app_env", "production"),
+        pytest.raises(ModelIntegrityError, match="Production promotion rejected: sign-off missing verified role authority"),
+    ):
+        reg.sign_off("sim_p09", 1, "compliance", user="analyst_only", signature=sig_comp)
+
+
+# ── P10: Legitimate Training Compatibility ────────────────────────────────────
+def test_p10_legitimate_training_compatibility(temp_registry_dir: str) -> None:
+    """P10: Real training execution artifacts and recorded evidence remain usable in production."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    model = svc.create_model(dp_compatible=True)
+    X = np.random.randn(64, NUM_FEATURES).astype(np.float32)
+    y = np.random.randint(0, 2, size=(64,)).astype(np.float32)
+    trained, losses, _ = svc.train_local(model, X, y, epochs=1, batch_size=32)
+
+    with patch.object(settings, "app_env", "production"):
+        entry = reg.save_version(
+            simulation_id="sim_p10",
+            state_dict=trained.state_dict(),
+            metrics={"loss": float(losses[-1]), "auc_roc": 0.85},
+            is_promoted=True,
+            training_run_id="run_p10_job",
+            training_evidence={"loss": float(losses[-1]), "epochs": 1, "batch_size": 32},
+            provenance_type="TRAINING_RECORDED",
+        )
+        assert entry["provenance_type"] == "TRAINING_RECORDED"
+        assert entry["is_production_eligible"] is True
+
+        champ = svc.get_champion(dp_compatible=True, registry=reg)
+        assert champ is not None
+        champ_meta = getattr(champ, "champion_metadata")
+        assert champ_meta["provenance_type"] == "TRAINING_RECORDED"
+
+
+# ── P11: Development/Demo Preservation ────────────────────────────────────────
+def test_p11_development_demo_preservation(temp_registry_dir: str) -> None:
+    """P11: Non-production demonstrations work, remain accurately labeled, and do not acquire production authorization."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+    m = svc.create_model(dp_compatible=True)
+
+    with patch.object(settings, "app_env", "development"):
+        entry = reg.save_version(
+            simulation_id="sim_p11",
+            state_dict=m.state_dict(),
+            metrics={"auc_roc": 0.70},
+            is_promoted=True,
+            provenance_type="UNVERIFIED",
+        )
+        assert entry["provenance_type"] == "UNVERIFIED"
+        assert entry["is_production_eligible"] is False
+
+        meta = reg.get_champion_metadata("sim_p11")
+        assert meta is not None
+        assert meta["provenance_type"] == "UNVERIFIED"
+        assert meta["is_production_eligible"] is False

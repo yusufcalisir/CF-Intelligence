@@ -177,7 +177,11 @@ def get_scripted_model() -> tuple[Any, bool]:
                     return cached
 
             # Resolve full champion metadata and verify artifact integrity
-            current_meta = registry.get_champion_metadata()
+            try:
+                current_meta = registry.get_champion_metadata()
+            except ModelIntegrityError:
+                _local_cache.clear()
+                raise
             if current_meta is None:
                 _local_cache.clear()
                 raise ModelNotAvailableError("No verified active champion model artifact found in registry.")
@@ -275,6 +279,11 @@ def get_scripted_model() -> tuple[Any, bool]:
                                         )
                                         or auth_data["input_dim"] != NUM_FEATURES
                                         or auth_data["architecture"] != current_meta.get("architecture", "FraudDetectionModel-GroupNorm")
+                                        or (
+                                            settings.app_env.lower() == "production"
+                                            and str(auth_data.get("provenance_type", "UNVERIFIED")).strip().upper()
+                                            not in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED")
+                                        )
                                     ):
                                         logger.warning(
                                             "Redis cache entry does not match current champion identity or contract. Evicting."
@@ -374,6 +383,7 @@ def get_scripted_model() -> tuple[Any, bool]:
                         ),
                         "input_dim": NUM_FEATURES,
                         "serialization_version": 2,
+                        "provenance_type": current_meta.get("provenance_type", "UNVERIFIED"),
                     }
                     canonical_meta_str = json.dumps(
                         meta_to_sign, sort_keys=True, separators=(",", ":")

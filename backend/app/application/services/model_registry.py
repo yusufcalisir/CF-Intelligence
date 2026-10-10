@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 import logging
+import math
 import os
 import shutil
 import tempfile
@@ -53,6 +54,120 @@ def generate_signoff_signature(
     norm_role = "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
     canonical_payload = f"{simulation_id}:{version}:{artifact_sha256}:{norm_role}:{user}"
     return hmac.new(secret.encode("utf-8"), canonical_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _validate_training_evidence(
+    training_run_id: str | None,
+    training_evidence: dict[str, Any] | None,
+) -> bool:
+    """Validate whether genuine recorded training execution evidence is present.
+
+    Requires:
+    1. A valid, non-empty training run identifier.
+    2. A structured training evidence dictionary containing verifiable numeric execution artifacts:
+       - Finite numeric loss (or non-empty list of finite float losses),
+       - Positive integer epochs or rounds (>= 1),
+       - Positive integer batch_size or dataset sample count (> 0).
+    Arbitrary strings, empty dicts, or unverified caller assertions do NOT qualify.
+    """
+    if not training_run_id or not isinstance(training_run_id, str) or not training_run_id.strip():
+        return False
+    if training_run_id.strip().lower() in ("unknown", "unspecified", "none"):
+        return False
+    if not isinstance(training_evidence, dict) or not training_evidence:
+        return False
+
+    has_loss = False
+    if "loss" in training_evidence:
+        val = training_evidence["loss"]
+        if isinstance(val, (int, float)) and math.isfinite(val):
+            has_loss = True
+    elif "losses" in training_evidence:
+        losses = training_evidence["losses"]
+        if (
+            isinstance(losses, (list, tuple))
+            and len(losses) > 0
+            and all(isinstance(x, (int, float)) and math.isfinite(x) for x in losses)
+        ):
+            has_loss = True
+
+    has_progress = False
+    for k in ("epochs", "epoch", "rounds", "round", "steps", "num_rounds"):
+        if k in training_evidence:
+            val = training_evidence[k]
+            if isinstance(val, int) and val >= 1:
+                has_progress = True
+                break
+
+    has_samples = False
+    for k in ("samples", "sample_count", "batch_size", "dataset_samples", "num_samples", "participants"):
+        if k in training_evidence:
+            val = training_evidence[k]
+            if isinstance(val, int) and val > 0:
+                has_samples = True
+                break
+            if isinstance(val, (list, tuple)) and len(val) > 0:
+                has_samples = True
+                break
+
+    return has_loss and (has_progress or has_samples)
+
+
+def validate_production_admission(
+    entry_or_provenance: dict[str, Any] | str,
+    context: str = "production_admission",
+) -> None:
+    """Centralized production admission gate.
+
+    In production (app_env == 'production'), strictly enforces:
+    - UNVERIFIED, STRUCTURAL_FIXTURE, and LEGACY_UNVERIFIED cannot become operational champions.
+    - Only models with verified/recorded training provenance are eligible.
+    - Models with is_production_eligible == False are rejected.
+    - Artifacts missing integrity digest (sha256) are rejected.
+    """
+    from app.config import get_settings
+
+    settings = get_settings()
+    if settings.app_env.lower() != "production":
+        return
+
+    prov: str
+    is_eligible: bool | None = None
+    sha256_val: str | None = None
+
+    if isinstance(entry_or_provenance, dict):
+        prov = str(entry_or_provenance.get("provenance_type", "UNVERIFIED")).strip().upper()
+        is_eligible = entry_or_provenance.get("is_production_eligible")
+        sha256_val = entry_or_provenance.get("sha256")
+    else:
+        prov = entry_or_provenance.strip().upper()
+
+    if prov == "STRUCTURAL_FIXTURE":
+        raise ModelIntegrityError(
+            f"Production admission rejected: Structural fixture cannot be promoted to champion in production environment ({context}). "
+            f"Structural test fixture cannot be promoted."
+        )
+
+    if prov in ("UNVERIFIED", "LEGACY_UNVERIFIED"):
+        raise ModelIntegrityError(
+            f"Production admission rejected: model provenance '{prov}' is ineligible for "
+            f"operational champion serving in production environment ({context})."
+        )
+
+    if prov not in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED"):
+        raise ModelIntegrityError(
+            f"Production admission rejected: model provenance '{prov}' is not production-eligible ({context})."
+        )
+
+    if is_eligible is False:
+        raise ModelIntegrityError(
+            f"Production admission rejected: model is explicitly marked as not production-eligible ({context})."
+        )
+
+    if isinstance(entry_or_provenance, dict) and sha256_val is not None and not sha256_val.strip():
+        raise ModelIntegrityError(
+            f"Production admission rejected: model artifact digest is missing or empty ({context})."
+        )
 
 
 class ModelRegistry:
@@ -168,43 +283,30 @@ class ModelRegistry:
         Returns:
             The created version entry metadata.
         """
-        # Validate provenance classification (Defect A)
+        # Validate provenance classification and authentic execution evidence
         clean_prov = provenance_type.strip() if provenance_type else "UNVERIFIED"
-
-        has_training_evidence = bool(
-            (training_run_id and bool(training_run_id.strip()))
-            or (training_evidence and isinstance(training_evidence, dict) and len(training_evidence) > 0)
-            or (
-                dataset_hash
-                and dataset_hash != "unknown"
-                and git_commit_hash
-                and git_commit_hash != "unknown"
-                and bool(training_run_id)
-            )
-        )
-
         clean_upper = clean_prov.upper()
+
+        has_recorded_evidence = _validate_training_evidence(training_run_id, training_evidence)
+
+        attestation_status = "NONE"
         if clean_upper in ("TRAINED", "TRAINING_RECORDED"):
-            final_provenance = "TRAINING_RECORDED" if has_training_evidence else "UNVERIFIED"
+            final_provenance = "TRAINING_RECORDED" if has_recorded_evidence else "UNVERIFIED"
         elif clean_upper == "TRAINING_EVIDENCE_VERIFIED":
-            if has_training_evidence and training_evidence and training_evidence.get("attestation"):
-                final_provenance = "TRAINING_EVIDENCE_VERIFIED"
-            elif has_training_evidence:
-                final_provenance = "TRAINING_RECORDED"
-            else:
-                final_provenance = "UNVERIFIED"
+            attestation_status = "INDEPENDENT_ATTESTATION_UNAVAILABLE"
+            final_provenance = "TRAINING_RECORDED" if has_recorded_evidence else "UNVERIFIED"
         elif clean_upper in ("STRUCTURAL_FIXTURE", "LEGACY_UNVERIFIED", "UNVERIFIED"):
             final_provenance = clean_prov
         else:
             final_provenance = "UNVERIFIED"
 
-        # Production admission policy check on promotion
+        is_prod_eligible = final_provenance in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED")
+
+        # Centralized production admission check on promotion
         from app.config import get_settings
         settings = get_settings()
-        if settings.app_env.lower() == "production" and is_promoted and clean_upper == "STRUCTURAL_FIXTURE":
-            raise ModelIntegrityError(
-                "Structural fixture cannot be promoted to champion in production environment."
-            )
+        if is_promoted:
+            validate_production_admission(final_provenance, context="save_version")
 
         with self._lock:
             manifest = self._load_manifest(simulation_id)
@@ -244,9 +346,11 @@ class ModelRegistry:
                 "dp_noise_profile": dp_noise_profile
                 or {"mechanism": "none", "epsilon": 0.0, "delta": 0.0},
                 "provenance_type": final_provenance,
+                "is_production_eligible": is_prod_eligible,
                 "training_run_id": training_run_id or "unspecified",
                 "dataset_manifest_id": dataset_manifest_id or "unspecified",
                 "training_evidence": training_evidence or {},
+                "attestation_status": attestation_status,
                 "sign_offs": [],
                 "created_at": datetime.now(UTC).isoformat(),
             }
@@ -394,24 +498,23 @@ class ModelRegistry:
             if version_val is None or not isinstance(version_val, int) or version_val < 1:
                 raise ModelIntegrityError("Champion manifest entry contains invalid or missing version number.")
 
-            # Provenance checks (Defect A)
+            # Provenance checks via centralized production admission policy
             provenance_type = entry.get("provenance_type", "UNVERIFIED")
             from app.config import get_settings
             settings = get_settings()
-            if settings.app_env.lower() == "production" and provenance_type == "STRUCTURAL_FIXTURE":
-                raise ModelIntegrityError(
-                    f"Model v{version_val} is classified as 'STRUCTURAL_FIXTURE' and cannot be served as an operational production champion."
-                )
+            validate_production_admission(entry, context="resolve_and_verify_champion")
 
-            # Separate recorded approvals from verified authorization (Defect B)
+            # Truthful classification of sign-offs
             sign_offs = entry.get("sign_offs", [])
             authenticity_status = "INTEGRITY_VERIFIED_UNAUTHENTICATED_MANIFEST"
+            authorization_scheme = "NONE"
+            is_independent_human = False
 
             if isinstance(sign_offs, list) and len(sign_offs) > 0:
                 ml_signs = [s for s in sign_offs if s.get("role") in ("ml_engineer", "ml_lead")]
                 comp_signs = [s for s in sign_offs if s.get("role") in ("compliance", "compliance_officer")]
 
-                crypto_valid = False
+                hmac_valid = False
                 if ml_signs and comp_signs:
                     ml_s = ml_signs[0]
                     comp_s = comp_signs[0]
@@ -432,13 +535,16 @@ class ModelRegistry:
                             hmac.compare_digest(ml_s.get("signature", ""), expected_ml_sig)
                             and hmac.compare_digest(comp_s.get("signature", ""), expected_comp_sig)
                         ):
-                            crypto_valid = True
+                            hmac_valid = True
 
-                if crypto_valid:
-                    authenticity_status = "CRYPTOGRAPHICALLY_AUTHORIZED"
+                if hmac_valid:
+                    authenticity_status = "APPLICATION_HMAC_AUTHENTICATED"
+                    authorization_scheme = "APPLICATION_HMAC_SHA256"
+                    is_independent_human = False
                 else:
-                    # Role strings exist but lack cryptographic verification against trusted key
                     authenticity_status = "SIGNOFFS_RECORDED_UNVERIFIED"
+                    authorization_scheme = "UNVERIFIED"
+                    is_independent_human = False
 
             is_prod_eligible = provenance_type in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED")
 
@@ -453,6 +559,8 @@ class ModelRegistry:
                 "is_active": True,
                 "is_verified": True,
                 "authenticity_status": authenticity_status,
+                "is_independent_human_authorization": is_independent_human,
+                "authorization_scheme": authorization_scheme,
                 "architecture": entry.get("architecture", "FraudDetectionModel-GroupNorm"),
                 "input_dim": entry.get("input_dim", 10),
                 "metrics": entry.get("metrics", {}),
@@ -464,6 +572,7 @@ class ModelRegistry:
                 "is_production_eligible": is_prod_eligible,
                 "training_run_id": entry.get("training_run_id", "unspecified"),
                 "dataset_manifest_id": entry.get("dataset_manifest_id", "unspecified"),
+                "attestation_status": entry.get("attestation_status", "NONE"),
                 "sign_offs": sign_offs,
                 "created_at": entry.get("created_at"),
             }
@@ -519,6 +628,15 @@ class ModelRegistry:
                 return None
 
             s_id, entry = candidates[0]
+            from app.config import get_settings
+            settings = get_settings()
+            if settings.app_env.lower() == "production":
+                prov = str(entry.get("provenance_type", "UNVERIFIED")).strip().upper()
+                if prov in ("UNVERIFIED", "STRUCTURAL_FIXTURE", "LEGACY_UNVERIFIED") or prov not in (
+                    "TRAINING_RECORDED",
+                    "TRAINING_EVIDENCE_VERIFIED",
+                ):
+                    return None
             return {
                 "version": entry.get("version"),
                 "simulation_id": s_id,
@@ -601,14 +719,8 @@ class ModelRegistry:
 
             from app.config import get_settings
             settings = get_settings()
-            if (
-                settings.app_env.lower() == "production"
-                and target_status == "champion"
-                and target_entry.get("provenance_type") == "STRUCTURAL_FIXTURE"
-            ):
-                raise ModelIntegrityError(
-                    "Structural test fixture cannot be promoted to champion in production environment."
-                )
+            if target_status == "champion":
+                validate_production_admission(target_entry, context="promote_version")
 
             if target_status == "champion":
                 for entry in manifest:
@@ -657,10 +769,7 @@ class ModelRegistry:
 
             from app.config import get_settings
             settings = get_settings()
-            if settings.app_env.lower() == "production" and target_entry.get("provenance_type") == "STRUCTURAL_FIXTURE":
-                raise ModelIntegrityError(
-                    "Structural test fixture cannot be activated as champion in production environment."
-                )
+            validate_production_admission(target_entry, context="rollback")
 
             # Mark target as active, all others as inactive
             for entry in manifest:
@@ -733,6 +842,20 @@ class ModelRegistry:
                     f"Four-Eyes Principle violation: user '{user}' cannot approve multiple roles on the same version"
                 )
 
+            # Verify identity and role membership against AuthenticationService
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            user_rec = AuthenticationService.get_instance().get_user(user)
+            is_identity_verified = user_rec is not None
+            is_role_verified = False
+
+            if user_rec is not None:
+                user_roles = [r.lower().strip() for r in user_rec.roles]
+                if norm_role == "compliance":
+                    is_role_verified = any(r in ("compliance", "compliance_officer", "admin") for r in user_roles)
+                elif norm_role == "ml_engineer":
+                    is_role_verified = any(r in ("ml_engineer", "ml_lead") for r in user_roles)
+
             # Cryptographic signature verification over canonical payload
             sim_dir = self._get_sim_dir(simulation_id)
             artifact_sha = entry.get("sha256") or compute_file_sha256(os.path.join(sim_dir, entry["filename"]))
@@ -754,7 +877,11 @@ class ModelRegistry:
                     "role": norm_role,
                     "user": user,
                     "signature": signature,
+                    "signature_scheme": "APPLICATION_HMAC_SHA256",
                     "is_signature_valid": is_signature_valid,
+                    "is_identity_verified": is_identity_verified,
+                    "is_role_verified": is_role_verified,
+                    "is_independent_human_authorization": False,
                     "payload_bound": canonical_payload,
                     "timestamp": datetime.now(UTC).isoformat(),
                     "fairness_score": fairness_score,
@@ -769,12 +896,20 @@ class ModelRegistry:
                 for s in entry["sign_offs"]
             ]
             if "compliance" in signed_roles and "ml_engineer" in signed_roles:
-                # In production environment, require genuine cryptographic verification
-                all_valid = all(s.get("is_signature_valid", False) for s in entry["sign_offs"])
-                if settings.app_env.lower() == "production" and not all_valid:
-                    logger.warning("Sign-offs present but lack valid cryptographic signatures in production environment.")
-                    self._save_manifest(simulation_id, manifest)
-                    return entry
+                if settings.app_env.lower() == "production":
+                    all_sigs_valid = all(s.get("is_signature_valid", False) for s in entry["sign_offs"])
+                    all_roles_valid = all(s.get("is_role_verified", False) for s in entry["sign_offs"])
+                    if not all_sigs_valid:
+                        self._save_manifest(simulation_id, manifest)
+                        raise ModelIntegrityError(
+                            "Production promotion rejected: sign-offs lack valid cryptographic signatures."
+                        )
+                    if not all_roles_valid:
+                        self._save_manifest(simulation_id, manifest)
+                        raise ModelIntegrityError(
+                            "Production promotion rejected: sign-off missing verified role authority."
+                        )
+                    validate_production_admission(entry, context="sign_off")
 
                 # Check if there is another active champion model in the manifest
                 has_other_champion = any(

@@ -932,6 +932,9 @@ class ModelService:
 
         artifact_path, bytes_data, metadata = resolved
 
+        from app.application.services.model_registry import validate_production_admission
+        validate_production_admission(metadata, context="ModelService.get_champion")
+
         # TOCTOU-safe deserialization from verified memory snapshot
         try:
             buffer = io.BytesIO(bytes_data)
