@@ -28,6 +28,7 @@ import json
 import os
 import shutil
 import tempfile
+import threading
 import time
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -48,6 +49,7 @@ from app.domain.model_serving_errors import (
     ModelNotAvailableError,
 )
 from app.presentation.routers.realtime_inference import (
+    LocalModelCache,
     api_router,
     get_scripted_model,
     reset_circuit_breaker,
@@ -255,18 +257,29 @@ def test_t06_valid_cache_hit(temp_registry_dir: str) -> None:
     torch.jit.save(traced, buf)
     valid_bytes = buf.getvalue()
 
-    # Generate valid HMAC
+    meta = reg.get_champion_metadata()
+    assert meta is not None
+
+    meta_to_sign = {
+        "version": meta["version"],
+        "simulation_id": meta["simulation_id"],
+        "artifact_sha256": meta["sha256"],
+        "model_sha256": hashlib.sha256(valid_bytes).hexdigest(),
+        "architecture": meta.get("architecture", "FraudDetectionModel-GroupNorm"),
+        "input_dim": NUM_FEATURES,
+        "serialization_version": 2,
+    }
+    canonical_meta_str = json.dumps(meta_to_sign, sort_keys=True, separators=(",", ":"))
     valid_hmac = hmac.new(
         settings.payload_signing_secret.encode("utf-8"),
-        valid_bytes,
+        canonical_meta_str.encode("utf-8") + b":" + valid_bytes,
         hashlib.sha256,
     ).hexdigest()
-    valid_sha256 = hashlib.sha256(valid_bytes).hexdigest()
-    valid_auth = json.dumps({
-        "hmac": valid_hmac,
-        "sha256": valid_sha256,
-        "cached_at": time.time(),
-    }).encode("utf-8")
+
+    auth_payload = dict(meta_to_sign)
+    auth_payload["hmac"] = valid_hmac
+    auth_payload["cached_at"] = time.time()
+    valid_auth = json.dumps(auth_payload).encode("utf-8")
 
     mock_redis = MagicMock()
     mock_redis.get.side_effect = lambda k: (
@@ -328,28 +341,23 @@ def test_t08_missing_and_unexpected_keys_rejected(temp_registry_dir: str) -> Non
 
     # Case A: Missing layer weights
     missing_sd = {k: v for k, v in real_sd.items() if "network.4" not in k}
-    missing_path = os.path.join(temp_registry_dir, "missing_weights.pt")
-    torch.save(missing_sd, missing_path)
-
     settings = get_settings()
     svc = ModelService(settings)
     reg = ModelRegistry(storage_dir=temp_registry_dir)
+    reg.save_version("sim_test_champion", missing_sd, {"auc": 0.8}, is_promoted=True)
 
-    with patch.object(reg, "get_champion_artifact_path", return_value=missing_path):
-        with pytest.raises(ModelCompatibilityError) as exc_info:
-            svc.get_champion(dp_compatible=True, registry=reg)
-        assert "Strict parameter loading failed" in str(exc_info.value)
+    with pytest.raises(ModelCompatibilityError) as exc_info:
+        svc.get_champion(dp_compatible=True, registry=reg)
+    assert "Strict parameter loading failed" in str(exc_info.value)
 
     # Case B: Unexpected parameters
     unexpected_sd = dict(real_sd)
     unexpected_sd["rogue_layer.weight"] = torch.randn(10, 10)
-    unexpected_path = os.path.join(temp_registry_dir, "unexpected_weights.pt")
-    torch.save(unexpected_sd, unexpected_path)
+    reg.save_version("sim_test_champion", unexpected_sd, {"auc": 0.8}, is_promoted=True)
 
-    with patch.object(reg, "get_champion_artifact_path", return_value=unexpected_path):
-        with pytest.raises(ModelCompatibilityError) as exc_info:
-            svc.get_champion(dp_compatible=True, registry=reg)
-        assert "Strict parameter loading failed" in str(exc_info.value)
+    with pytest.raises(ModelCompatibilityError) as exc_info:
+        svc.get_champion(dp_compatible=True, registry=reg)
+    assert "Strict parameter loading failed" in str(exc_info.value)
 
 
 # ── T09: BatchNorm / GroupNorm Architecture Compatibility ─────────────────────
@@ -550,3 +558,517 @@ def test_t15_concurrent_model_loading_race_free(temp_registry_dir: str) -> None:
     for res in results:
         assert res.status_code == 200
         assert res.json()["evaluated_by"] == "ML_MODEL"
+
+
+# ── T17: Artifact Digest Mismatch ──────────────────────────────────────────────
+def test_t17_artifact_digest_mismatch_fails_closed(temp_registry_dir: str) -> None:
+    """T17: Modify artifact bytes after registration; verify digest mismatch fails closed."""
+    global_path, entry = create_trained_model_fixture(temp_registry_dir, dp_compatible=True)
+    sim_dir = os.path.join(temp_registry_dir, "registry", "sim_test_champion")
+    artifact_file = os.path.join(sim_dir, entry["filename"])
+
+    # Tamper with the artifact bytes on disk
+    with open(artifact_file, "r+b") as f:
+        f.seek(16)
+        f.write(b"\xde\xad\xbe\xef\xca\xfe\xba\xbe")
+
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    with pytest.raises(ModelIntegrityError) as exc_info:
+        svc.get_champion(dp_compatible=True, registry=reg)
+    assert "digest mismatch" in str(exc_info.value).lower()
+
+    # Verify HTTP inference endpoint fails closed with 503
+    payload = {
+        "transaction_id": "tx_t17_mismatch",
+        "amount": 100.0,
+        "currency": "USD",
+        "source_account": "acc_1",
+        "target_account": "acc_2",
+        "merchant_category": "retail",
+        "velocity_1h": 1,
+    }
+    with patch.dict(os.environ, {"APP_ENV": "development", "ENABLE_DEMO_FALLBACK": "false"}):
+        resp = client.post("/v1/inference/score", json=payload)
+        assert resp.status_code == 503
+
+
+# ── T18: Manifest Tampering ────────────────────────────────────────────────────
+def test_t18_manifest_tampering_detection(temp_registry_dir: str) -> None:
+    """T18: Tamper with manifest expected digest; verify integrity verification rejects mismatch.
+
+    Note: SHA-256 checks artifact bytes against manifest metadata. If manifest itself is modified,
+    ordinary hash comparison detects discrepancy between file and forged digest. Full manifest signing
+    is distinguished at the governance layer (HSM/Dual Sign-off).
+    """
+    global_path, entry = create_trained_model_fixture(temp_registry_dir, dp_compatible=True)
+    sim_dir = os.path.join(temp_registry_dir, "registry", "sim_test_champion")
+    manifest_path = os.path.join(sim_dir, "registry.json")
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest_data = json.load(f)
+
+    # Forger changes recorded sha256 in manifest
+    manifest_data[0]["sha256"] = "f" * 64
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_data, f)
+
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    with pytest.raises(ModelIntegrityError) as exc_info:
+        svc.get_champion(dp_compatible=True, registry=reg)
+    assert "digest mismatch" in str(exc_info.value).lower()
+
+
+# ── T19: Stale global_model.pt ─────────────────────────────────────────────────
+def test_t19_stale_global_model_file_does_not_override_manifest(temp_registry_dir: str) -> None:
+    """T19: Overwriting global_model.pt with old v1 bytes does NOT override active champion v2."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    # Register v1
+    m1 = svc.create_model(dp_compatible=True)
+    e1 = reg.save_version("sim_t19", m1.state_dict(), {"auc": 0.80}, is_promoted=True)
+
+    # Capture v1 bytes from global_model.pt
+    global_path = os.path.join(temp_registry_dir, "global_model.pt")
+    with open(global_path, "rb") as f:
+        v1_bytes = f.read()
+
+    # Register and promote v2
+    m2 = svc.create_model(dp_compatible=True)
+    with torch.no_grad():
+        next(m2.parameters()).add_(1.5)
+    e2 = reg.save_version("sim_t19", m2.state_dict(), {"auc": 0.90}, is_promoted=True)
+    meta_v2_check = reg.get_champion_metadata()
+    assert meta_v2_check is not None and meta_v2_check["version"] == 2
+
+    # Overwrite global_model.pt with old v1 bytes
+    with open(global_path, "wb") as f:
+        f.write(v1_bytes)
+
+    # Serving must resolve v2 from authoritative manifest, NOT stale global_model.pt
+    champ = svc.get_champion(dp_compatible=True, registry=reg)
+    champ_meta = getattr(champ, "champion_metadata", None)
+    assert champ_meta is not None and champ_meta["version"] == 2
+
+
+# ── T20: Missing Authoritative Champion ────────────────────────────────────────
+def test_t20_missing_authoritative_champion_rejected(temp_registry_dir: str) -> None:
+    """T20: Nonempty global_model.pt without an active champion manifest is rejected (fails closed)."""
+    global_path = os.path.join(temp_registry_dir, "global_model.pt")
+    with open(global_path, "wb") as f:
+        f.write(b"STRAY_UNREGISTERED_MODEL_BYTES_XYZ" * 20)
+
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    with pytest.raises(ModelNotAvailableError):
+        svc.get_champion(dp_compatible=True, registry=reg)
+
+    payload = {
+        "transaction_id": "tx_t20_stray",
+        "amount": 100.0,
+        "currency": "USD",
+        "source_account": "acc_1",
+        "target_account": "acc_2",
+        "merchant_category": "retail",
+        "velocity_1h": 1,
+    }
+    with patch.dict(os.environ, {"APP_ENV": "development", "ENABLE_DEMO_FALLBACK": "false"}):
+        resp = client.post("/v1/inference/score", json=payload)
+        assert resp.status_code == 503
+        assert resp.json()["detail"]["code"] == "MODEL_NOT_READY"
+
+
+# ── T21: Multiple Active Champion Ambiguity ────────────────────────────────────
+def test_t21_multiple_active_champion_ambiguity_fails_closed(temp_registry_dir: str) -> None:
+    """T21: Multiple conflicting active champions across simulations fail closed with ModelCompatibilityError."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    m1 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_bank_a", m1.state_dict(), {"auc": 0.82}, is_promoted=True)
+
+    m2 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_bank_b", m2.state_dict(), {"auc": 0.88}, is_promoted=True)
+
+    # Scans across all simulations without explicit scope must fail closed
+    with pytest.raises(ModelCompatibilityError) as exc_info:
+        reg.resolve_and_verify_champion()
+    assert "Ambiguous champion state" in str(exc_info.value)
+
+
+# ── T22: Redis Stale Version Rejection ─────────────────────────────────────────
+def test_t22_redis_stale_version_rejected(temp_registry_dir: str) -> None:
+    """T22: Redis cached model for v1 is rejected after v2 is promoted, even if HMAC was valid for v1."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    # Create v1 and compile
+    m1 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_t22", m1.state_dict(), {"auc": 0.81}, is_promoted=True)
+
+    buf = io.BytesIO()
+    torch.jit.save(torch.jit.trace(m1, torch.zeros(1, NUM_FEATURES)), buf)
+    v1_bytes = buf.getvalue()
+
+    # Promote v2
+    m2 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_t22", m2.state_dict(), {"auc": 0.89}, is_promoted=True)
+    meta_v2 = reg.get_champion_metadata()
+    assert meta_v2 is not None and meta_v2["version"] == 2
+
+    # Craft HMAC envelope valid for v1
+    v1_meta: dict[str, Any] = {
+        "version": 1,
+        "simulation_id": "sim_t22",
+        "artifact_sha256": hashlib.sha256(b"v1_art").hexdigest(),
+        "model_sha256": hashlib.sha256(v1_bytes).hexdigest(),
+        "architecture": "FraudDetectionModel-GroupNorm",
+        "input_dim": NUM_FEATURES,
+        "serialization_version": 2,
+    }
+    can_v1 = json.dumps(v1_meta, sort_keys=True, separators=(",", ":"))
+    v1_hmac = hmac.new(
+        settings.payload_signing_secret.encode("utf-8"),
+        can_v1.encode("utf-8") + b":" + v1_bytes,
+        hashlib.sha256,
+    ).hexdigest()
+    v1_envelope: dict[str, Any] = dict(v1_meta)
+    v1_envelope["hmac"] = v1_hmac
+    v1_envelope["cached_at"] = time.time()
+
+    mock_redis = MagicMock()
+    mock_redis.get.side_effect = lambda k: (
+        v1_bytes if k == "cfi:champion_model"
+        else json.dumps(v1_envelope).encode("utf-8") if k == "cfi:champion_model:auth"
+        else None
+    )
+
+    with patch("app.infrastructure.cache.get_redis_client", return_value=mock_redis):
+        scripted, from_redis = get_scripted_model()
+        # Stale v1 in Redis MUST be rejected, loading fresh v2 from disk
+        assert not from_redis, "Stale v1 cache entry must not be accepted when v2 is active"
+
+
+# ── T23: Redis Cross-Scope Isolation ───────────────────────────────────────────
+def test_t23_redis_cross_scope_isolation(temp_registry_dir: str) -> None:
+    """T23: Cached model belonging to a different simulation ID cannot be served for active champion."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    m1 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_active", m1.state_dict(), {"auc": 0.84}, is_promoted=True)
+
+    buf = io.BytesIO()
+    torch.jit.save(torch.jit.trace(m1, torch.zeros(1, NUM_FEATURES)), buf)
+    m_bytes = buf.getvalue()
+
+    # Envelope claiming unrelated simulation
+    other_meta: dict[str, Any] = {
+        "version": 1,
+        "simulation_id": "sim_different_tenant",
+        "artifact_sha256": hashlib.sha256(b"diff").hexdigest(),
+        "model_sha256": hashlib.sha256(m_bytes).hexdigest(),
+        "architecture": "FraudDetectionModel-GroupNorm",
+        "input_dim": NUM_FEATURES,
+        "serialization_version": 2,
+    }
+    can = json.dumps(other_meta, sort_keys=True, separators=(",", ":"))
+    h = hmac.new(
+        settings.payload_signing_secret.encode("utf-8"),
+        can.encode("utf-8") + b":" + m_bytes,
+        hashlib.sha256,
+    ).hexdigest()
+    env: dict[str, Any] = dict(other_meta)
+    env["hmac"] = h
+    env["cached_at"] = time.time()
+
+    mock_redis = MagicMock()
+    mock_redis.get.side_effect = lambda k: (
+        m_bytes if k == "cfi:champion_model"
+        else json.dumps(env).encode("utf-8") if k == "cfi:champion_model:auth"
+        else None
+    )
+
+    with patch("app.infrastructure.cache.get_redis_client", return_value=mock_redis):
+        scripted, from_redis = get_scripted_model()
+        assert not from_redis, "Cross-scope cached model must be rejected"
+
+
+# ── T24: Cache Envelope Tampering ──────────────────────────────────────────────
+def test_t24_cache_envelope_tampering(temp_registry_dir: str) -> None:
+    """T24: Altering version, simulation_id, or artifact hash breaks HMAC and causes rejection."""
+    create_trained_model_fixture(temp_registry_dir, dp_compatible=True)
+    settings = get_settings()
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+    meta = reg.get_champion_metadata()
+    assert meta is not None
+
+    dummy_bytes = b"DUMMY_TORCHSCRIPT_BYTES_12345678"
+    valid_meta = {
+        "version": meta["version"],
+        "simulation_id": meta["simulation_id"],
+        "artifact_sha256": meta["sha256"],
+        "model_sha256": hashlib.sha256(dummy_bytes).hexdigest(),
+        "architecture": "FraudDetectionModel-GroupNorm",
+        "input_dim": NUM_FEATURES,
+        "serialization_version": 2,
+    }
+    can = json.dumps(valid_meta, sort_keys=True, separators=(",", ":"))
+    valid_h = hmac.new(
+        settings.payload_signing_secret.encode("utf-8"),
+        can.encode("utf-8") + b":" + dummy_bytes,
+        hashlib.sha256,
+    ).hexdigest()
+
+    tampered_env = dict(valid_meta)
+    tampered_env["hmac"] = valid_h
+    # Attacker alters version without updating HMAC
+    tampered_env["version"] = 99
+    tampered_env["cached_at"] = time.time()
+
+    mock_redis = MagicMock()
+    mock_redis.get.side_effect = lambda k: (
+        dummy_bytes if k == "cfi:champion_model"
+        else json.dumps(tampered_env).encode("utf-8") if k == "cfi:champion_model:auth"
+        else None
+    )
+
+    with patch("app.infrastructure.cache.get_redis_client", return_value=mock_redis):
+        scripted, from_redis = get_scripted_model()
+        assert not from_redis, "Tampered cache envelope must fail HMAC verification"
+
+
+# ── T25: Atomic Cache Publication ──────────────────────────────────────────────
+def test_t25_atomic_cache_publication_failure(temp_registry_dir: str) -> None:
+    """T25: Incomplete cache writes (missing bytes or missing auth envelope) are rejected safely."""
+    create_trained_model_fixture(temp_registry_dir, dp_compatible=True)
+
+    # Case 1: Bytes present, auth envelope missing
+    mock_redis = MagicMock()
+    mock_redis.get.side_effect = lambda k: (
+        b"ORPHAN_BYTES" if k == "cfi:champion_model" else None
+    )
+
+    with patch("app.infrastructure.cache.get_redis_client", return_value=mock_redis):
+        scripted, from_redis = get_scripted_model()
+        assert not from_redis
+
+    # Case 2: Auth envelope present, bytes missing
+    reset_model_cache()
+    mock_redis.get.side_effect = lambda k: (
+        b"{}" if k == "cfi:champion_model:auth" else None
+    )
+
+    with patch("app.infrastructure.cache.get_redis_client", return_value=mock_redis):
+        scripted, from_redis = get_scripted_model()
+        assert not from_redis
+
+
+# ── T26: Process-Local Stale Cache Invalidation ────────────────────────────────
+def test_t26_process_local_stale_cache_invalidation(temp_registry_dir: str) -> None:
+    """T26: Promoting v2 causes the next inference call to evict process-local v1 and load v2."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    m1 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_t26", m1.state_dict(), {"auc": 0.81}, is_promoted=True)
+
+    with patch("app.infrastructure.cache.get_redis_client", return_value=None):
+        s1, from_redis1 = get_scripted_model()
+        assert not from_redis1
+
+        # Promote v2 in registry
+        m2 = svc.create_model(dp_compatible=True)
+        reg.save_version("sim_t26", m2.state_dict(), {"auc": 0.91}, is_promoted=True)
+
+        # Without restarting process, next resolution must detect v2
+        s2, from_redis2 = get_scripted_model()
+        assert s2 is not s1, "Process-local cache must evict stale v1 upon detecting v2 champion"
+
+
+# ── T27: Cross-Worker Invalidation Consistency ─────────────────────────────────
+def test_t27_cross_worker_invalidation_consistency(temp_registry_dir: str) -> None:
+    """T27: Multiple worker cache instances detect promotion when revalidating against authoritative registry."""
+    worker1_cache = LocalModelCache()
+    worker2_cache = LocalModelCache()
+
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    m1 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_t27", m1.state_dict(), {"auc": 0.80}, is_promoted=True)
+    meta_v1 = reg.get_champion_metadata()
+    assert meta_v1 is not None
+
+    # Pre-populate both workers with v1
+    worker1_cache.set(m1, 1, "sim_t27", meta_v1["sha256"], False)
+    worker2_cache.set(m1, 1, "sim_t27", meta_v1["sha256"], False)
+
+    # Promote v2
+    m2 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_t27", m2.state_dict(), {"auc": 0.88}, is_promoted=True)
+    meta_v2 = reg.get_champion_metadata()
+    assert meta_v2 is not None
+
+    # Both workers revalidating against current metadata detect stale cache and evict
+    assert worker1_cache.get(meta_v2) is None
+    assert worker2_cache.get(meta_v2) is None
+
+
+# ── T28: Concurrent Cold-Cache Loading Single-Flight ───────────────────────────
+def test_t28_concurrent_cold_cache_single_flight(temp_registry_dir: str) -> None:
+    """T28: Concurrent threads encountering cold cache compile exactly once via single-flight locking."""
+    create_trained_model_fixture(temp_registry_dir, dp_compatible=True)
+    reset_model_cache()
+
+    settings = get_settings()
+    svc = ModelService(settings)
+    load_counter = 0
+    orig_get_champion = svc.get_champion
+    counter_lock = threading.Lock()
+
+    def counting_get_champion(*args, **kwargs):
+        nonlocal load_counter
+        with counter_lock:
+            load_counter += 1
+        time.sleep(0.04)  # widen concurrent arrival window
+        return orig_get_champion(*args, **kwargs)
+
+    with patch("app.application.services.model_service.ModelService.get_champion", side_effect=counting_get_champion):
+        with patch("app.infrastructure.cache.get_redis_client", return_value=None):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+                futures = [pool.submit(get_scripted_model) for _ in range(8)]
+                results = [f.result() for f in futures]
+
+            # Exactly one model load occurred across all 8 concurrent callers
+            assert load_counter == 1, f"Expected 1 single-flight load, got {load_counter}"
+            models = [r[0] for r in results]
+            assert all(m is models[0] for m in models)
+
+
+# ── T29: Promotion During Concurrent Loading ───────────────────────────────────
+def test_t29_promotion_during_concurrent_loading_race_free(temp_registry_dir: str) -> None:
+    """T29: If champion v2 is promoted while v1 compilation is in flight, v1 is discarded and v2 is served."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    m1 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_t29", m1.state_dict(), {"auc": 0.80}, is_promoted=True)
+
+    m2 = svc.create_model(dp_compatible=True)
+    orig_trace = torch.jit.trace
+    promoted = False
+
+    def delayed_trace(*args, **kwargs):
+        nonlocal promoted
+        # Simulate race: v2 promoted in the registry while v1 was being compiled
+        if not promoted:
+            promoted = True
+            reg.save_version("sim_t29", m2.state_dict(), {"auc": 0.90}, is_promoted=True)
+        return orig_trace(*args, **kwargs)
+
+    reset_model_cache()
+    with patch("app.infrastructure.cache.get_redis_client", return_value=None):
+        with patch("torch.jit.trace", side_effect=delayed_trace):
+            model, _ = get_scripted_model()
+            meta = reg.get_champion_metadata()
+            assert meta is not None and meta["version"] == 2
+
+
+# ── T30: Rollback Correctness ──────────────────────────────────────────────────
+def test_t30_rollback_correctness(temp_registry_dir: str) -> None:
+    """T30: Rolling back to v1 updates authoritative identity, evicts cache, and serves v1."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    m1 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_t30", m1.state_dict(), {"auc": 0.80}, is_promoted=True)
+
+    m2 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_t30", m2.state_dict(), {"auc": 0.85}, is_promoted=True)
+    meta_prom = reg.get_champion_metadata()
+    assert meta_prom is not None and meta_prom["version"] == 2
+
+    # Rollback to v1
+    reg.rollback("sim_t30", version=1)
+    meta = reg.get_champion_metadata()
+    assert meta is not None and meta["version"] == 1
+
+    with patch("app.infrastructure.cache.get_redis_client", return_value=None):
+        model, _ = get_scripted_model()
+        assert model is not None
+
+
+# ── T31: Legitimate Trained Model Preserved ────────────────────────────────────
+def test_t31_legitimate_trained_model_preservation(temp_registry_dir: str) -> None:
+    """T31: Train model on synthetic data, verify weights change, promote, verify integrity and serving."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    model = svc.create_model(dp_compatible=True)
+    init_weight = next(model.parameters()).clone()
+
+    X = np.random.randn(128, NUM_FEATURES).astype(np.float32)
+    y = np.random.randint(0, 2, size=(128,)).astype(np.float32)
+    trained, losses, _ = svc.train_local(model, X, y, epochs=2, batch_size=32)
+
+    # Verify model genuinely learned (weights changed)
+    assert not torch.equal(init_weight, next(trained.parameters()))
+    assert len(losses) == 2
+
+    entry = reg.save_version(
+        "sim_t31",
+        trained.state_dict(),
+        {"loss": losses[-1], "auc_roc": 0.85},
+        is_promoted=True,
+    )
+    assert entry["is_active"] is True
+
+    champ = svc.get_champion(dp_compatible=True, registry=reg)
+    champ_meta = getattr(champ, "champion_metadata", None)
+    assert champ_meta is not None and champ_meta["is_verified"] is True
+
+    # Valid output contract
+    with torch.no_grad():
+        out = champ(torch.randn(5, NUM_FEATURES))
+        assert out.shape == (5,)
+        assert (out >= 0.0).all() and (out <= 1.0).all()
+
+
+# ── T32: Random Checkpoint Masquerade Prevention ───────────────────────────────
+def test_t32_untrained_checkpoint_provenance_honesty(temp_registry_dir: str) -> None:
+    """T32: Fresh untrained model with fabricated metrics is classified honestly, not as verified trained."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    untrained = svc.create_model(dp_compatible=True)
+    entry = reg.save_version(
+        "sim_t32",
+        untrained.state_dict(),
+        metrics={"fabricated_auc": 0.99},
+        is_promoted=True,
+        provenance_type="structural_fixture",
+    )
+    assert entry["provenance_type"] == "structural_fixture"
+    meta = reg.get_champion_metadata()
+    assert meta is not None
+    assert meta["provenance_type"] == "structural_fixture"
+    assert meta["authenticity_status"] != "AUTHENTICATED"

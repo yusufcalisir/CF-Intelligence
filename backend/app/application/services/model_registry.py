@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -18,6 +19,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 import torch
+
+from app.domain.model_serving_errors import (
+    ModelCompatibilityError,
+    ModelIntegrityError,
+    ModelNotAvailableError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +126,7 @@ class ModelRegistry:
         dataset_hash: str | None = None,
         dp_noise_profile: dict[str, Any] | None = None,
         status: str = "inactive",
+        provenance_type: str = "trained",
     ) -> dict[str, Any]:
         """Save a new version of the global model weights.
 
@@ -131,6 +139,7 @@ class ModelRegistry:
             dataset_hash: Hash of the training dataset.
             dp_noise_profile: DP mechanism profile details.
             status: Initial status of the version.
+            provenance_type: Provenance classification ('trained', 'structural_fixture', 'legacy').
 
         Returns:
             The created version entry metadata.
@@ -171,6 +180,7 @@ class ModelRegistry:
                 "sha256": file_sha256,
                 "dp_noise_profile": dp_noise_profile
                 or {"mechanism": "none", "epsilon": 0.0, "delta": 0.0},
+                "provenance_type": provenance_type,
                 "sign_offs": [],
                 "created_at": datetime.now(UTC).isoformat(),
             }
@@ -180,74 +190,191 @@ class ModelRegistry:
             # If promoted, also copy/link this version to the main global model path for backward compatibility
             if is_promoted:
                 self._update_global_model_link(simulation_id, filepath)
+                with contextlib.suppress(Exception):
+                    from app.config import get_settings
+                    from app.application.services.model_service import ModelService
+
+                    ModelService(get_settings()).invalidate_model_cache()
 
             return entry
 
-    def get_champion_artifact_path(self) -> str | None:
-        """Resolve the active champion model file path on disk.
+    def resolve_and_verify_champion(
+        self, simulation_id: str | None = None
+    ) -> tuple[str, bytes, dict[str, Any]] | None:
+        """Resolve, verify integrity, and return (artifact_path, bytes_data, metadata) for active champion.
 
-        Checks global_model.pt in storage_dir first.
-        If absent, scans simulation manifests to locate any active champion.
-        Returns the existing file path or None if no champion exists.
+        Enforces:
+        1. Registry manifest is the single source of truth (status='champion' and is_active=True).
+        2. Rejects ambiguous multiple active champions deterministically.
+        3. Verifies file existence, containment within storage, regular file type, non-emptiness.
+        4. Verifies in-memory snapshot SHA-256 against recorded manifest digest.
+        5. Returns in-memory bytes to eliminate TOCTOU races during model loading.
         """
         with self._lock:
-            global_path = os.path.join(self.storage_dir, "global_model.pt")
-            if os.path.isfile(global_path) and os.path.getsize(global_path) > 0:
-                return global_path
-
-            if os.path.isdir(self.registry_root):
-                for sim_id in os.listdir(self.registry_root):
-                    sim_dir = os.path.join(self.registry_root, sim_id)
-                    if not os.path.isdir(sim_dir):
-                        continue
-                    manifest = self._load_manifest(sim_id)
-                    for entry in manifest:
-                        if entry.get("status") == "champion" and entry.get("is_active"):
-                            candidate = os.path.join(sim_dir, entry.get("filename", ""))
-                            if os.path.isfile(candidate) and os.path.getsize(candidate) > 0:
-                                return candidate
-            return None
-
-    def get_champion_metadata(self) -> dict[str, Any] | None:
-        """Return metadata for the currently active champion model."""
-        with self._lock:
-            path = self.get_champion_artifact_path()
-            if not path:
+            if not os.path.isdir(self.registry_root):
                 return None
 
-            if os.path.isdir(self.registry_root):
-                for sim_id in os.listdir(self.registry_root):
-                    sim_dir = os.path.join(self.registry_root, sim_id)
-                    if not os.path.isdir(sim_dir):
-                        continue
-                    manifest = self._load_manifest(sim_id)
-                    for entry in manifest:
-                        if entry.get("status") == "champion" and entry.get("is_active"):
-                            meta = dict(entry)
-                            meta["simulation_id"] = sim_id
-                            meta["artifact_path"] = path
-                            if "sha256" not in meta:
-                                meta["sha256"] = compute_file_sha256(path)
-                            return meta
+            candidates: list[tuple[str, dict[str, Any], str]] = []
 
-            return {
-                "version": 1,
-                "filename": os.path.basename(path),
+            sim_dirs = [simulation_id] if simulation_id else sorted(os.listdir(self.registry_root))
+            for s_id in sim_dirs:
+                sim_path = os.path.join(self.registry_root, s_id)
+                if not os.path.isdir(sim_path):
+                    continue
+                manifest = self._load_manifest(s_id)
+                active_entries = [
+                    e for e in manifest if e.get("status") == "champion" and e.get("is_active")
+                ]
+                if len(active_entries) > 1:
+                    raise ModelIntegrityError(
+                        f"Corrupt manifest in simulation '{s_id}': multiple active champion entries found "
+                        f"({[e.get('version') for e in active_entries]})."
+                    )
+                if len(active_entries) == 1:
+                    entry = active_entries[0]
+                    fname = entry.get("filename") or f"model_v{entry.get('version')}.pt"
+                    fpath = os.path.join(sim_path, fname)
+                    candidates.append((s_id, entry, fpath))
+
+            if not candidates:
+                return None
+
+            if len(candidates) > 1:
+                conflicting_sims = [c[0] for c in candidates]
+                raise ModelCompatibilityError(
+                    f"Ambiguous champion state: multiple conflicting active champions exist across simulations: "
+                    f"{conflicting_sims}. Deterministic resolution requires specifying simulation_id or deactivating conflicting champions."
+                )
+
+            sim_id, entry, filepath = candidates[0]
+
+            # Path & regular file validation
+            if not os.path.exists(filepath):
+                raise ModelNotAvailableError(
+                    f"Active champion artifact file '{filepath}' for simulation '{sim_id}' does not exist on disk."
+                )
+            if not os.path.isfile(filepath):
+                raise ModelIntegrityError(
+                    f"Active champion artifact path '{filepath}' is not a regular file."
+                )
+
+            # Containment check (must reside inside storage directory)
+            abs_filepath = os.path.abspath(filepath)
+            abs_storage = os.path.abspath(self.storage_dir)
+            try:
+                rel = os.path.relpath(abs_filepath, abs_storage)
+                if rel.startswith("..") or os.path.isabs(rel):
+                    raise ModelIntegrityError(
+                        f"Active champion artifact path '{filepath}' is located outside trusted storage directory '{self.storage_dir}'."
+                    )
+            except ValueError as exc:
+                raise ModelIntegrityError(
+                    f"Path validation failed for artifact '{filepath}': {exc}"
+                ) from exc
+
+            # Non-empty check
+            if os.path.getsize(filepath) == 0:
+                raise ModelIntegrityError(
+                    f"Active champion artifact file '{filepath}' is empty (0 bytes)."
+                )
+
+            # Read bytes into memory snapshot to eliminate TOCTOU vulnerability
+            try:
+                with open(filepath, "rb") as f:
+                    bytes_data = f.read()
+            except Exception as exc:
+                raise ModelIntegrityError(
+                    f"Failed to read champion artifact '{filepath}': {exc}"
+                ) from exc
+
+            actual_sha256 = hashlib.sha256(bytes_data).hexdigest()
+            expected_sha256 = entry.get("sha256")
+            if not expected_sha256:
+                raise ModelIntegrityError(
+                    f"Champion manifest entry for simulation '{sim_id}' v{entry.get('version')} lacks recorded sha256."
+                )
+            if not hmac.compare_digest(actual_sha256, expected_sha256):
+                raise ModelIntegrityError(
+                    f"Champion artifact SHA-256 digest mismatch for simulation '{sim_id}' v{entry.get('version')}: "
+                    f"expected '{expected_sha256}', actual '{actual_sha256}'."
+                )
+
+            version_val = entry.get("version")
+            if version_val is None or not isinstance(version_val, int) or version_val < 1:
+                raise ModelIntegrityError("Champion manifest entry contains invalid or missing version number.")
+
+            # Authenticity status distinction (Section 3.3)
+            sign_offs = entry.get("sign_offs", [])
+            has_dual_signoff = (
+                isinstance(sign_offs, list)
+                and any(s.get("role") == "ml_engineer" for s in sign_offs)
+                and any(s.get("role") == "compliance" for s in sign_offs)
+            )
+            authenticity_status = (
+                "DUAL_SIGNOFF_AUTHORIZED"
+                if has_dual_signoff
+                else "INTEGRITY_VERIFIED_UNAUTHENTICATED_MANIFEST"
+            )
+
+            resolved_metadata = {
+                "version": version_val,
+                "filename": entry.get("filename", os.path.basename(filepath)),
+                "simulation_id": sim_id,
+                "artifact_path": filepath,
+                "sha256": actual_sha256,
+                "expected_sha256": expected_sha256,
                 "status": "champion",
                 "is_active": True,
-                "artifact_path": path,
-                "sha256": compute_file_sha256(path),
-                "created_at": datetime.now(UTC).isoformat(),
+                "is_verified": True,
+                "authenticity_status": authenticity_status,
+                "architecture": entry.get("architecture", "FraudDetectionModel-GroupNorm"),
+                "input_dim": entry.get("input_dim", 10),
+                "metrics": entry.get("metrics", {}),
+                "git_commit_hash": entry.get("git_commit_hash", "unknown"),
+                "dataset_hash": entry.get("dataset_hash", "unknown"),
+                "dp_noise_profile": entry.get("dp_noise_profile", {}),
+                "provenance_type": entry.get("provenance_type", "trained"),
+                "sign_offs": sign_offs,
+                "created_at": entry.get("created_at"),
             }
 
+            return filepath, bytes_data, resolved_metadata
+
+    def get_champion_artifact_path(self, simulation_id: str | None = None) -> str | None:
+        """Resolve the active champion model file path on disk.
+
+        Identified strictly via authoritative registry manifest.
+        Returns None if no active champion exists in the registry.
+        """
+        with self._lock:
+            resolved = self.resolve_and_verify_champion(simulation_id=simulation_id)
+            if resolved is not None:
+                return resolved[0]
+            return None
+
+    def get_champion_metadata(self, simulation_id: str | None = None) -> dict[str, Any] | None:
+        """Return metadata for the currently active champion model."""
+        with self._lock:
+            resolved = self.resolve_and_verify_champion(simulation_id=simulation_id)
+            if resolved is not None:
+                return resolved[2]
+            return None
+
     def _update_global_model_link(self, simulation_id: str, filepath: str) -> None:
-        """Update the root global_model.pt file to point to the active version."""
+        """Update the root global_model.pt file to point to the active version atomically."""
         global_path = os.path.join(self.storage_dir, "global_model.pt")
+        tmp_global_path = os.path.join(
+            self.storage_dir, f"global_model_{os.getpid()}_{threading.get_ident()}.tmp"
+        )
         try:
-            shutil.copy2(filepath, global_path)
+            shutil.copy2(filepath, tmp_global_path)
+            os.replace(tmp_global_path, global_path)
             logger.info("Updated global_model.pt with version from %s", filepath)
         except Exception as e:
             logger.error("Failed to link/copy active version to global_model.pt: %s", e)
+            if os.path.exists(tmp_global_path):
+                with contextlib.suppress(OSError):
+                    os.remove(tmp_global_path)
 
     def list_versions(self, simulation_id: str) -> list[dict[str, Any]]:
         """List all model versions tracked in this simulation registry."""
@@ -311,6 +438,11 @@ class ModelRegistry:
                     elif entry.get("status") == "champion":
                         entry["status"] = "inactive"
                 self._update_global_model_link(simulation_id, filepath)
+                with contextlib.suppress(Exception):
+                    from app.config import get_settings
+                    from app.application.services.model_service import ModelService
+
+                    ModelService(get_settings()).invalidate_model_cache()
             else:  # challenger
                 for entry in manifest:
                     if entry["version"] == version:
@@ -346,6 +478,11 @@ class ModelRegistry:
 
             self._save_manifest(simulation_id, manifest)
             self._update_global_model_link(simulation_id, filepath)
+            with contextlib.suppress(Exception):
+                from app.config import get_settings
+                from app.application.services.model_service import ModelService
+
+                ModelService(get_settings()).invalidate_model_cache()
 
             logger.info("Rolled back registry of %s to version %d", simulation_id, version)
             return target_entry

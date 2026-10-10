@@ -8,6 +8,7 @@ is the federated learning architecture, not model complexity.
 from __future__ import annotations
 
 import contextlib
+import io
 import logging
 import math
 from typing import TYPE_CHECKING, Any, cast
@@ -914,20 +915,29 @@ class ModelService:
         """Retrieve and validate the active trained champion model for production scoring.
 
         Loads actual trained weights from ModelRegistry.
+        Verifies artifact integrity against the manifest digest in memory snapshot (eliminates TOCTOU).
         Rejects missing models, invalid parameters, or incompatible normalization.
-        Returns the verified model in evaluation mode.
+        Returns the verified model in evaluation mode with attached provenance metadata.
         """
         from app.application.services.model_registry import ModelRegistry
 
         reg = registry or ModelRegistry()
-        artifact_path = reg.get_champion_artifact_path()
-        if not artifact_path:
-            raise ModelNotAvailableError("No trained champion model artifact found in registry.")
+        if hasattr(reg, "resolve_and_verify_champion"):
+            resolved = reg.resolve_and_verify_champion()
+        else:
+            resolved = None
 
+        if resolved is None:
+            raise ModelNotAvailableError("No verified active champion model artifact found in registry.")
+
+        artifact_path, bytes_data, metadata = resolved
+
+        # TOCTOU-safe deserialization from verified memory snapshot
         try:
-            state_dict = torch.load(artifact_path, map_location=self.device, weights_only=True)
+            buffer = io.BytesIO(bytes_data)
+            state_dict = torch.load(buffer, map_location=self.device, weights_only=True)
         except Exception as exc:
-            logger.error("Failed to load champion artifact %s: %s", artifact_path, exc)
+            logger.error("Failed to deserialize champion artifact %s: %s", artifact_path, exc)
             raise ModelIntegrityError(f"Champion artifact could not be deserialized: {exc}") from exc
 
         if not isinstance(state_dict, dict):
@@ -991,6 +1001,7 @@ class ModelService:
         except Exception as exc:
             raise ModelExecutionError(f"Champion sanity check forward pass failed: {exc}") from exc
 
+        object.__setattr__(model, "champion_metadata", metadata)
         return model
 
     def invalidate_model_cache(self) -> None:

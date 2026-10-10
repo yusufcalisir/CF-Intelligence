@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import io
@@ -39,13 +40,87 @@ api_router = APIRouter(prefix="/api/v1/inference", tags=["Real-Time Inference"])
 
 fallback_engine = InferenceFallbackEngine()
 
-# Circuit Breaker & Redis Cache State
+# Circuit Breaker State
 _cb_lock = threading.Lock()
 _consecutive_failures: int = 0
 _circuit_open: bool = False
 _circuit_opened_at: float = 0.0
-_cached_scripted_model: Any | None = None
-_cached_from_redis: bool = False
+
+
+class ModelCacheEntry:
+    def __init__(
+        self,
+        model: Any,
+        version: int,
+        simulation_id: str,
+        artifact_sha256: str,
+        from_redis: bool,
+        cached_at: float,
+    ) -> None:
+        self.model = model
+        self.version = version
+        self.simulation_id = simulation_id
+        self.artifact_sha256 = artifact_sha256
+        self.from_redis = from_redis
+        self.cached_at = cached_at
+
+
+class LocalModelCache:
+    """Thread-safe, version-bound process-local champion model cache with single-flight compilation."""
+
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self._single_flight_lock = threading.RLock()
+        self._entry: ModelCacheEntry | None = None
+
+    def get(self, current_meta: dict[str, Any] | None) -> tuple[Any, bool] | None:
+        """Return cached model if valid and matches current authoritative champion metadata."""
+        with self._lock:
+            if self._entry is None:
+                return None
+            if current_meta is None:
+                self._entry = None
+                return None
+            if (
+                self._entry.version == current_meta.get("version")
+                and self._entry.simulation_id == current_meta.get("simulation_id")
+                and self._entry.artifact_sha256 == current_meta.get("sha256")
+            ):
+                return self._entry.model, self._entry.from_redis
+            logger.info(
+                "Local process cache is stale (cached v%s, active v%s). Evicting.",
+                self._entry.version,
+                current_meta.get("version"),
+            )
+            self._entry = None
+            return None
+
+    def set(
+        self,
+        model: Any,
+        version: int,
+        simulation_id: str,
+        artifact_sha256: str,
+        from_redis: bool,
+    ) -> None:
+        """Atomically store a verified champion model bound to its version identity."""
+        with self._lock:
+            self._entry = ModelCacheEntry(
+                model=model,
+                version=version,
+                simulation_id=simulation_id,
+                artifact_sha256=artifact_sha256,
+                from_redis=from_redis,
+                cached_at=time.time(),
+            )
+
+    def clear(self) -> None:
+        """Evict local cached model."""
+        with self._lock:
+            self._entry = None
+
+
+_local_cache = LocalModelCache()
 
 
 def reset_circuit_breaker() -> None:
@@ -59,10 +134,7 @@ def reset_circuit_breaker() -> None:
 
 def reset_model_cache() -> None:
     """Clear local and Redis cached scripted model."""
-    global _cached_scripted_model, _cached_from_redis
-    with _cb_lock:
-        _cached_scripted_model = None
-        _cached_from_redis = False
+    _local_cache.clear()
 
 
 def _is_demo_mode_active() -> bool:
@@ -77,144 +149,224 @@ def _is_demo_mode_active() -> bool:
 def get_scripted_model() -> tuple[Any, bool]:
     """Retrieve or compile PyTorch TorchScript JIT champion model with secure Redis caching.
 
-    Enforces cryptographic provenance, trusted local champion loading, and strict parameter verification.
+    Enforces cryptographic provenance, trusted local champion loading, version binding,
+    and strict parameter verification. Single-flight compilation prevents concurrency races.
     Never falls back to unsafe deserialization (pickle) or random weights.
     """
-    global _cached_scripted_model, _cached_from_redis
-
-    # 1. Thread-safe check of process-local cache
-    with _cb_lock:
-        if _cached_scripted_model is not None:
-            return _cached_scripted_model, _cached_from_redis
-
     settings = get_settings()
+    from app.application.services.model_registry import ModelRegistry
     from app.application.services.model_service import NUM_FEATURES, ModelService
 
-    # 2. Try Redis cache with strict HMAC authentication and SHA-256 integrity verification
-    try:
-        from app.infrastructure.cache import get_redis_client
-
-        redis_client = get_redis_client()
-        if redis_client:
-            cached_bytes = redis_client.get("cfi:champion_model")
-            cached_auth_bytes = redis_client.get("cfi:champion_model:auth")
-
-            if cached_bytes:
-                if not cached_auth_bytes:
-                    logger.warning(
-                        "Redis model cache entry missing HMAC authentication envelope (cfi:champion_model:auth); "
-                        "rejecting unauthenticated payload."
-                    )
-                else:
-                    try:
-                        auth_data = json.loads(
-                            cached_auth_bytes.decode("utf-8")
-                            if isinstance(cached_auth_bytes, bytes)
-                            else cached_auth_bytes
-                        )
-                        expected_hmac = hmac.new(
-                            settings.payload_signing_secret.encode("utf-8"),
-                            cached_bytes,
-                            hashlib.sha256,
-                        ).hexdigest()
-                        claimed_hmac = auth_data.get("hmac", "")
-
-                        if not hmac.compare_digest(expected_hmac, claimed_hmac):
-                            logger.warning(
-                                "Redis model cache failed HMAC authenticity verification; "
-                                "rejecting untrusted/poisoned payload."
-                            )
-                        else:
-                            expected_sha256 = hashlib.sha256(cached_bytes).hexdigest()
-                            claimed_sha256 = auth_data.get("sha256", "")
-                            if not hmac.compare_digest(expected_sha256, claimed_sha256):
-                                logger.warning(
-                                    "Redis model cache SHA-256 digest mismatch; corrupt cached bytes."
-                                )
-                            else:
-                                # Authenticated! Load via TorchScript JIT only. Never use pickle.
-                                buffer = io.BytesIO(cached_bytes)
-                                loaded_jit = torch.jit.load(buffer, map_location="cpu")
-                                loaded_jit.eval()
-
-                                # Forward sanity check
-                                dummy = torch.zeros(1, NUM_FEATURES)
-                                with torch.no_grad():
-                                    test_val = loaded_jit(dummy)
-                                    if torch.isfinite(test_val).all():
-                                        with _cb_lock:
-                                            _cached_scripted_model = loaded_jit
-                                            _cached_from_redis = True
-                                        logger.info(
-                                            "Loaded authenticated champion TorchScript model from Redis cache."
-                                        )
-                                        return loaded_jit, True
-                                    logger.warning(
-                                        "Cached TorchScript model sanity check produced non-finite values."
-                                    )
-                    except Exception as parse_err:
-                        logger.warning(
-                            "Failed to load authenticated model from Redis cache: %s; falling back to local registry.",
-                            parse_err,
-                        )
-    except Exception as exc:
-        logger.debug("Redis cache read error or unavailable: %s", exc)
-
-    # 3. Load genuine champion model from ModelRegistry via ModelService
-    svc = ModelService(settings)
-    from app.application.services.model_registry import ModelRegistry
-
     registry = ModelRegistry()
+    current_meta = registry.get_champion_metadata()
+    if current_meta is None:
+        _local_cache.clear()
+        raise ModelNotAvailableError("No verified active champion model artifact found in registry.")
 
-    # Loads actual trained weights; strictly rejects missing, incomplete, or incompatible checkpoints
-    champion_model = svc.get_champion(dp_compatible=True, registry=registry)
-    champion_model.eval()
+    # 1. Fast path: check process-local cache bound to current champion identity
+    cached = _local_cache.get(current_meta)
+    if cached is not None:
+        return cached
 
-    # 4. Compile TorchScript JIT model
-    dummy_input = torch.zeros(1, NUM_FEATURES)
-    try:
-        scripted = torch.jit.trace(champion_model, dummy_input, check_trace=False)
-        if isinstance(scripted, torch.nn.Module):
-            scripted.eval()
-        logger.info("TorchScript JIT model compiled successfully from verified champion weights.")
-    except Exception as exc:
-        logger.warning("TorchScript tracing failed (%s); using verified PyTorch model directly", exc)
-        scripted = champion_model
+    # 2. Cache miss -> Acquire single-flight lock
+    with _local_cache._single_flight_lock:
+        while True:
+            # Re-check current champion metadata in case promotion occurred while acquiring lock
+            current_meta = registry.get_champion_metadata()
+            if current_meta is None:
+                _local_cache.clear()
+                raise ModelNotAvailableError("No verified active champion model artifact found in registry.")
 
-    # Atomic publication to local cache under thread lock
-    with _cb_lock:
-        _cached_scripted_model = scripted
-        _cached_from_redis = False
+            # Double check local cache
+            cached = _local_cache.get(current_meta)
+            if cached is not None:
+                return cached
 
-    # 5. Securely populate Redis cache with authenticated envelope (never pickle)
-    try:
-        from app.infrastructure.cache import get_redis_client
+            # 3. Try Redis cache with strict HMAC authentication AND champion identity binding
+            try:
+                from app.infrastructure.cache import get_redis_client
 
-        redis_client = get_redis_client()
-        if redis_client:
-            buffer = io.BytesIO()
-            torch.jit.save(scripted, buffer)
-            model_bytes = buffer.getvalue()
-            model_hmac = hmac.new(
-                settings.payload_signing_secret.encode("utf-8"),
-                model_bytes,
-                hashlib.sha256,
-            ).hexdigest()
-            model_sha256 = hashlib.sha256(model_bytes).hexdigest()
-            auth_envelope = json.dumps(
-                {
-                    "hmac": model_hmac,
-                    "sha256": model_sha256,
-                    "cached_at": time.time(),
-                }
+                redis_client = get_redis_client()
+                if redis_client:
+                    cached_bytes = redis_client.get("cfi:champion_model")
+                    cached_auth_bytes = redis_client.get("cfi:champion_model:auth")
+
+                    if cached_bytes and cached_auth_bytes:
+                        try:
+                            auth_data = json.loads(
+                                cached_auth_bytes.decode("utf-8")
+                                if isinstance(cached_auth_bytes, bytes)
+                                else cached_auth_bytes
+                            )
+                            claimed_hmac = auth_data.get("hmac", "")
+                            meta_to_verify = {
+                                k: v for k, v in auth_data.items() if k != "hmac" and k != "cached_at"
+                            }
+                            canonical_meta_str = json.dumps(
+                                meta_to_verify, sort_keys=True, separators=(",", ":")
+                            )
+                            expected_hmac = hmac.new(
+                                settings.payload_signing_secret.encode("utf-8"),
+                                canonical_meta_str.encode("utf-8") + b":" + cached_bytes,
+                                hashlib.sha256,
+                            ).hexdigest()
+
+                            if not hmac.compare_digest(expected_hmac, claimed_hmac):
+                                logger.warning("Redis model cache failed HMAC authenticity verification.")
+                            else:
+                                expected_model_sha = hashlib.sha256(cached_bytes).hexdigest()
+                                claimed_model_sha = auth_data.get("model_sha256") or auth_data.get("sha256", "")
+                                if not hmac.compare_digest(expected_model_sha, claimed_model_sha):
+                                    logger.warning("Redis model cache SHA-256 digest mismatch.")
+                                else:
+                                    # Enforce champion version and scope binding
+                                    cached_version = auth_data.get("version")
+                                    cached_sim_id = auth_data.get("simulation_id")
+                                    cached_artifact_sha = auth_data.get("artifact_sha256")
+
+                                    if (
+                                        cached_version is None
+                                        or cached_version != current_meta.get("version")
+                                        or (cached_sim_id and cached_sim_id != current_meta.get("simulation_id"))
+                                        or (
+                                            cached_artifact_sha
+                                            and not hmac.compare_digest(
+                                                cached_artifact_sha, current_meta.get("sha256", "")
+                                            )
+                                        )
+                                    ):
+                                        logger.warning(
+                                            "Redis cache entry is stale or wrong scope (cached v%s, active v%s). Evicting.",
+                                            cached_version,
+                                            current_meta.get("version"),
+                                        )
+                                        with contextlib.suppress(Exception):
+                                            redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
+                                    else:
+                                        # Authenticated and matches current active champion!
+                                        buffer = io.BytesIO(cached_bytes)
+                                        loaded_jit = torch.jit.load(buffer, map_location="cpu")
+                                        loaded_jit.eval()
+
+                                        dummy = torch.zeros(1, NUM_FEATURES)
+                                        with torch.no_grad():
+                                            test_val = loaded_jit(dummy)
+                                            if torch.isfinite(test_val).all():
+                                                _local_cache.set(
+                                                    model=loaded_jit,
+                                                    version=current_meta["version"],
+                                                    simulation_id=current_meta["simulation_id"],
+                                                    artifact_sha256=current_meta["sha256"],
+                                                    from_redis=True,
+                                                )
+                                                logger.info(
+                                                    "Loaded authenticated champion v%d TorchScript model from Redis cache.",
+                                                    current_meta["version"],
+                                                )
+                                                return loaded_jit, True
+                        except Exception as err:
+                            logger.warning(
+                                "Failed to validate/load Redis cache: %s; falling back to registry.", err
+                            )
+            except Exception as exc:
+                logger.debug("Redis cache read error: %s", exc)
+
+            # 4. Load genuine champion model from ModelRegistry via ModelService
+            svc = ModelService(settings)
+            champion_model = svc.get_champion(dp_compatible=True, registry=registry)
+            champion_model.eval()
+
+            # 5. Compile TorchScript JIT model
+            dummy_input = torch.zeros(1, NUM_FEATURES)
+            try:
+                scripted = torch.jit.trace(champion_model, dummy_input, check_trace=False)
+                if isinstance(scripted, torch.nn.Module):
+                    scripted.eval()
+                logger.info("TorchScript JIT model compiled successfully from verified champion weights.")
+            except Exception as exc:
+                logger.warning("TorchScript tracing failed (%s); using verified PyTorch model directly", exc)
+                scripted = champion_model
+
+            # 6. Race check: Did a promotion happen during compilation?
+            latest_meta = registry.get_champion_metadata()
+            if (
+                latest_meta is None
+                or latest_meta.get("version") != current_meta.get("version")
+                or latest_meta.get("sha256") != current_meta.get("sha256")
+                or latest_meta.get("simulation_id") != current_meta.get("simulation_id")
+            ):
+                logger.warning(
+                    "Champion metadata changed during model compilation (v%s -> v%s); discarding stale compilation.",
+                    current_meta.get("version"),
+                    latest_meta.get("version") if latest_meta else "none",
+                )
+                if latest_meta is None:
+                    _local_cache.clear()
+                    raise ModelNotAvailableError("Active champion model removed during compilation.")
+                continue
+
+            # Publish to local process cache
+            _local_cache.set(
+                model=scripted,
+                version=current_meta["version"],
+                simulation_id=current_meta["simulation_id"],
+                artifact_sha256=current_meta["sha256"],
+                from_redis=False,
             )
-            redis_client.set("cfi:champion_model", model_bytes, ex=3600)
-            redis_client.set("cfi:champion_model:auth", auth_envelope, ex=3600)
-            logger.info("Cached champion model in Redis with HMAC authentication envelope.")
-    except Exception as exc:
-        logger.debug("Failed to store champion model in Redis: %s", exc)
 
-    return scripted, False
+            # 7. Securely populate Redis cache using atomic pipeline
+            try:
+                from app.infrastructure.cache import get_redis_client
+
+                redis_client = get_redis_client()
+                if redis_client:
+                    buffer = io.BytesIO()
+                    torch.jit.save(scripted, buffer)
+                    model_bytes = buffer.getvalue()
+                    model_sha256 = hashlib.sha256(model_bytes).hexdigest()
+
+                    meta_to_sign = {
+                        "version": current_meta["version"],
+                        "simulation_id": current_meta["simulation_id"],
+                        "artifact_sha256": current_meta["sha256"],
+                        "model_sha256": model_sha256,
+                        "architecture": current_meta.get(
+                            "architecture", "FraudDetectionModel-GroupNorm"
+                        ),
+                        "input_dim": NUM_FEATURES,
+                        "serialization_version": 2,
+                    }
+                    canonical_meta_str = json.dumps(
+                        meta_to_sign, sort_keys=True, separators=(",", ":")
+                    )
+                    envelope_hmac = hmac.new(
+                        settings.payload_signing_secret.encode("utf-8"),
+                        canonical_meta_str.encode("utf-8") + b":" + model_bytes,
+                        hashlib.sha256,
+                    ).hexdigest()
+
+                    auth_envelope = dict(meta_to_sign)
+                    auth_envelope["hmac"] = envelope_hmac
+                    auth_envelope["cached_at"] = time.time()
+                    auth_envelope_str = json.dumps(auth_envelope)
+
+                    if hasattr(redis_client, "pipeline"):
+                        pipe = redis_client.pipeline()
+                        pipe.set("cfi:champion_model", model_bytes, ex=3600)
+                        pipe.set("cfi:champion_model:auth", auth_envelope_str, ex=3600)
+                        pipe.execute()
+                    else:
+                        redis_client.set("cfi:champion_model", model_bytes, ex=3600)
+                        redis_client.set("cfi:champion_model:auth", auth_envelope_str, ex=3600)
+
+                    logger.info(
+                        "Cached champion v%d in Redis with version-bound HMAC envelope.",
+                        current_meta["version"],
+                    )
+            except Exception as exc:
+                logger.debug("Failed to store champion model in Redis: %s", exc)
+
+            return scripted, False
 
 
 @router.get("/quota", response_model=InferenceQuotaResponse)
