@@ -2,12 +2,17 @@
 
 from datetime import datetime
 
+import pytest
+
 from app.config import Settings
 from app.infrastructure.connectors.base_connector import NormalizedTransaction
 from app.infrastructure.connectors.batch_connector import BatchEODFileConnector
 from app.infrastructure.connectors.factory import BankConnectorFactory
 from app.infrastructure.connectors.iso20022_connector import ISO20022MessagingConnector
-from app.infrastructure.connectors.rest_connector import RESTBankConnector
+from app.infrastructure.connectors.rest_connector import (
+    AuthenticationError,
+    RESTBankConnector,
+)
 from app.infrastructure.connectors.streaming_connector import StreamingPaymentConnector
 
 
@@ -181,9 +186,6 @@ def test_rest_connector_signs_payload_with_hmac():
 
 def test_rest_connector_missing_signing_secret_fails_closed():
     """Verify RESTBankConnector refuses outbound dispatch when signing secret is empty."""
-    import pytest
-    from app.infrastructure.connectors.rest_connector import AuthenticationError
-
     connector = RESTBankConnector(
         base_url="http://localhost:8000",
         signing_secret="",

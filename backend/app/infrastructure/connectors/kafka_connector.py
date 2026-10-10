@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 from app.application.interfaces.bank_connector import BankConnectorInterface
+from app.config import get_settings
 from app.domain.enums import KafkaDeliveryStatus
 
 if TYPE_CHECKING:
@@ -38,9 +40,6 @@ class KafkaBankConnector(BankConnectorInterface):
 
     def _dispatch(self, topic: str, payload: dict[str, Any]) -> str:
         """Dispatches payload to configured Kafka producer, enforcing fail-closed checks in production."""
-        import os
-        from app.config import get_settings
-
         cfg = get_settings()
         app_env = os.getenv("APP_ENV", cfg.app_env).lower()
         if app_env == "production" and self.producer is None:

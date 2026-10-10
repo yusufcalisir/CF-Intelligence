@@ -24,7 +24,6 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
-import torch.nn as nn
 
 from app.application.services.graph_embedding_model import (
     NODE_FEATURE_DIM,

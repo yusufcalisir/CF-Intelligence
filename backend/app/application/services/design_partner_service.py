@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 
 from app.application.services.model_service import ModelService
 from app.config import get_settings
-from app.domain.value_objects import ModelWeights
 from app.domain.distribution_fidelity_service import (
     audit_distribution_fidelity,
 )
@@ -31,6 +30,7 @@ from app.domain.metrics_service import (
     compute_multi_threshold_confusion_matrix,
     compute_recall_at_fpr,
 )
+from app.domain.value_objects import ModelWeights
 
 logger = logging.getLogger(__name__)
 
@@ -222,7 +222,8 @@ class DesignPartnerPilotService:
         crypto_secagg_passed = False
         try:
             from app.infrastructure.security.p2p_secagg_driver import P2PSecAggDriver
-            crypto_secagg_passed = True
+
+            crypto_secagg_passed = P2PSecAggDriver is not None
         except Exception:
             crypto_secagg_passed = False
 
@@ -239,8 +240,11 @@ class DesignPartnerPilotService:
         # 5. Right to Erasure & Unlearning (GDPR Art 17)
         unlearning_passed = False
         try:
-            from app.application.services.federated_unlearning_engine import FederatedUnlearningEngine
-            unlearning_passed = True
+            from app.application.services.federated_unlearning_engine import (
+                FederatedUnlearningEngine,
+            )
+
+            unlearning_passed = FederatedUnlearningEngine is not None
         except Exception:
             unlearning_passed = False
 

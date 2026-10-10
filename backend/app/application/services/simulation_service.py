@@ -1214,13 +1214,15 @@ class SimulationService:
                                 )
                                 actual_eps = None
                             local_w = self.model_service.get_parameters(loc_model)
+                            local_loss: float | None = None
                             if loss_hist:
-                                local_loss = loss_hist[-1]
+                                local_loss = float(loss_hist[-1])
                             elif len(bank_partition["X_train"]) > 0:
                                 eval_res = self.model_service.evaluate(
                                     loc_model, bank_partition["X_train"], bank_partition["y_train"]
                                 )
-                                local_loss = eval_res.get("loss")
+                                raw_loss = eval_res.get("loss")
+                                local_loss = float(raw_loss) if raw_loss is not None else None
                             else:
                                 local_loss = None
                             local_samples = len(bank_partition["X_train"])

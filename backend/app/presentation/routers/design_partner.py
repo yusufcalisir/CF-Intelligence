@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import threading
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -29,14 +28,13 @@ from app.application.schemas.design_partner import (
     PilotLeadResponse,
 )
 from app.application.services.design_partner_service import DesignPartnerPilotService
+from app.infrastructure.storage.pilot_lead_store import PilotLeadStore
 
 logger = logging.getLogger(__name__)
 
 # Multi-prefix router declarations for zero-breakage backward compatibility
 router = APIRouter(prefix="/api/v1/design-partner", tags=["design-partner"])
 api_router = APIRouter(prefix="/v1/design-partner", tags=["design-partner"])
-
-from app.infrastructure.storage.pilot_lead_store import PilotLeadStore
 
 _pilot_service = DesignPartnerPilotService()
 _lead_store = PilotLeadStore.get_instance()
