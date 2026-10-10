@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import math
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -2299,61 +2300,119 @@ class SimulationService:
                     get_default_training_issuer,
                 )
 
-                fl_rounds_executed = len(rounds) if rounds else getattr(config, "num_rounds", 1)
-                fl_epochs_executed = getattr(config, "local_epochs", 1) * fl_rounds_executed
+                # Strictly observe executed rounds — never substitute planned/configured counts
+                fl_rounds_executed = len(rounds) if rounds else 0
+                fl_epochs_executed = 0
+                for r in (rounds or []):
+                    if hasattr(r, "per_bank_epochs") and isinstance(r.per_bank_epochs, dict):
+                        fl_epochs_executed += sum(r.per_bank_epochs.values())
 
+                # Strictly observe participant sample counts — never invent arbitrary counts or fall back to 100
                 total_fl_samples = 0
                 for b in banks:
-                    if b.id in bank_data:
+                    if b.id in bank_data and "X_train" in bank_data[b.id]:
                         total_fl_samples += len(bank_data[b.id]["X_train"])
                 if total_fl_samples <= 0 and final_round_samples:
-                    total_fl_samples = sum(final_round_samples)
-                if total_fl_samples <= 0:
-                    total_fl_samples = 100
+                    total_fl_samples = sum(s for s in final_round_samples if s > 0)
 
+                loss_metric = final_metrics.get("loss")
+                has_finite_loss = (
+                    loss_metric is not None
+                    and isinstance(loss_metric, (int, float))
+                    and math.isfinite(loss_metric)
+                )
+
+                has_valid_observations = (
+                    fl_rounds_executed >= 1
+                    and total_fl_samples > 0
+                    and has_finite_loss
+                )
+
+                fnames_list = list(feature_names) if feature_names is not None else list(FEATURE_NAMES)
                 now_ts = _now()
                 completed_at_str = now_ts.isoformat() if hasattr(now_ts, "isoformat") else str(now_ts)
-                fnames_list = list(feature_names) if feature_names is not None else list(FEATURE_NAMES)
+                artifact_sha = hashlib.sha256(model_bytes).hexdigest()
 
-                fl_evidence = TrainingExecutionEvidence(
-                    training_run_id=f"fl_run_{simulation.id}",
-                    job_id=f"job_{simulation.id}",
-                    simulation_id=simulation.id,
-                    completed_at=completed_at_str,
-                    status="COMPLETED",
-                    executed_rounds=fl_rounds_executed,
-                    executed_epochs=fl_epochs_executed,
-                    sample_count=total_fl_samples,
-                    observed_metrics=final_metrics,
-                    artifact_sha256=hashlib.sha256(model_bytes).hexdigest(),
-                    architecture="FraudDetectionNN",
-                    feature_schema_version="v1",
-                    feature_names=fnames_list,
-                    producer_id="FEDERATED_SIMULATION_SERVICE",
-                    git_commit_hash=git_commit,
-                    dataset_manifest_id=dataset_hash,
-                )
+                fl_receipt = None
+                if has_valid_observations:
+                    from app.application.services.training_provenance_service import (
+                        record_training_job_completion,
+                    )
 
-                issuer = get_default_training_issuer()
-                fl_receipt = issuer.issue_receipt(
-                    evidence=fl_evidence,
-                    model_bytes=model_bytes,
-                    dp_noise_profile=dp_noise_profile,
-                )
+                    worker_token = os.environ.get("CFI_TRAINING_WORKER_TOKEN") or getattr(
+                        self.settings, "training_worker_token", None
+                    )
+                    record_training_job_completion(
+                        job_id=f"job_{simulation.id}",
+                        training_run_id=f"fl_run_{simulation.id}",
+                        simulation_id=simulation.id,
+                        executed_rounds=fl_rounds_executed,
+                        executed_epochs=fl_epochs_executed,
+                        sample_count=total_fl_samples,
+                        observed_metrics=final_metrics,
+                        artifact_sha256=artifact_sha,
+                        architecture="FraudDetectionNN",
+                        feature_schema_version="v1.0",
+                        feature_names=fnames_list,
+                        worker_id="FEDERATED_SIMULATION_SERVICE",
+                        git_commit_hash=git_commit,
+                        dataset_manifest_id=dataset_hash,
+                        worker_token=worker_token,
+                    )
+
+                    fl_evidence = TrainingExecutionEvidence(
+                        training_run_id=f"fl_run_{simulation.id}",
+                        job_id=f"job_{simulation.id}",
+                        simulation_id=simulation.id,
+                        completed_at=completed_at_str,
+                        status="COMPLETED",
+                        executed_rounds=fl_rounds_executed,
+                        executed_epochs=fl_epochs_executed,
+                        sample_count=total_fl_samples,
+                        observed_metrics=final_metrics,
+                        artifact_sha256=artifact_sha,
+                        architecture="FraudDetectionNN",
+                        feature_schema_version="v1.0",
+                        feature_names=fnames_list,
+                        producer_id="FEDERATED_SIMULATION_SERVICE",
+                        git_commit_hash=git_commit,
+                        dataset_manifest_id=dataset_hash,
+                    )
+
+                    issuer = get_default_training_issuer()
+                    fl_receipt = issuer.issue_receipt(
+                        evidence=fl_evidence,
+                        model_bytes=model_bytes,
+                        dp_noise_profile=dp_noise_profile,
+                    )
+                else:
+                    logger.warning(
+                        "Simulation %s completed ML run but lacked necessary training observations "
+                        "(rounds=%d, samples=%d, finite_loss=%s) to issue a trusted execution receipt. "
+                        "Registering model truthfully as unverified without fabricated receipt.",
+                        simulation.id,
+                        fl_rounds_executed,
+                        total_fl_samples,
+                        has_finite_loss,
+                    )
 
                 self.model_registry.save_version(
                     simulation_id=simulation.id,
                     state_dict=global_model.state_dict(),
                     metrics=final_metrics,
-                    is_promoted=True,
+                    is_promoted=fl_receipt is not None,
                     git_commit_hash=git_commit,
                     dataset_hash=dataset_hash,
                     dp_noise_profile=dp_noise_profile,
-                    status="champion",
-                    provenance_type="TRAINING_RECORDED",
+                    status="champion" if fl_receipt is not None else "inactive",
+                    provenance_type="TRAINING_RECORDED" if fl_receipt is not None else "UNVERIFIED",
                     training_run_id=f"fl_run_{simulation.id}",
                     training_receipt=fl_receipt,
                     artifact_bytes=model_bytes,
+                    expected_architecture="FraudDetectionNN",
+                    expected_feature_schema_version="v1.0",
+                    expected_input_dim=len(fnames_list),
+                    expected_feature_names=fnames_list,
                 )
                 logger.info("Saved and versioned global model in model registry.")
             except Exception as e:

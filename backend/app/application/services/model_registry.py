@@ -381,6 +381,11 @@ class ModelRegistry:
         training_receipt: dict[str, Any] | TrainingExecutionReceipt | None = None,
         artifact_bytes: bytes | None = None,
         provenance_receipt: dict[str, Any] | TrainingExecutionReceipt | None = None,
+        expected_architecture: str | None = None,
+        expected_feature_schema_version: str | None = None,
+        expected_input_dim: int | None = None,
+        expected_feature_names: list[str] | tuple[str, ...] | None = None,
+        model_contract: Any | None = None,
     ) -> dict[str, Any]:
         """Save a new version of the global model weights.
 
@@ -401,12 +406,43 @@ class ModelRegistry:
             training_receipt: Cryptographically signed training execution receipt from trusted authority.
             artifact_bytes: Raw bytes of the model artifact.
             provenance_receipt: Alias for training_receipt.
+            expected_architecture: Expected model architecture name derived from candidate contract.
+            expected_feature_schema_version: Expected feature schema version derived from candidate contract.
+            expected_input_dim: Expected input dimension derived from candidate contract.
+            expected_feature_names: Expected feature names list with exact ordering.
+            model_contract: Optional candidate model contract object/dict providing expected schema.
 
         Returns:
             The created version entry metadata.
         """
         from app.config import get_settings
         settings = get_settings()
+
+        # Derive expected contract parameters if model_contract provided
+        exp_arch = expected_architecture
+        exp_schema_ver = expected_feature_schema_version
+        exp_dim = expected_input_dim
+        exp_names = expected_feature_names
+
+        if model_contract is not None:
+            if isinstance(model_contract, dict):
+                if exp_arch is None:
+                    exp_arch = model_contract.get("architecture") or model_contract.get("expected_architecture")
+                if exp_schema_ver is None:
+                    exp_schema_ver = model_contract.get("feature_schema_version") or model_contract.get("expected_feature_schema_version")
+                if exp_dim is None:
+                    exp_dim = model_contract.get("input_dim") or model_contract.get("expected_input_dim")
+                if exp_names is None:
+                    exp_names = model_contract.get("feature_names") or model_contract.get("expected_feature_names")
+            else:
+                if exp_arch is None:
+                    exp_arch = getattr(model_contract, "architecture", None) or getattr(model_contract, "expected_architecture", None)
+                if exp_schema_ver is None:
+                    exp_schema_ver = getattr(model_contract, "feature_schema_version", None) or getattr(model_contract, "expected_feature_schema_version", None)
+                if exp_dim is None:
+                    exp_dim = getattr(model_contract, "input_dim", None) or getattr(model_contract, "expected_input_dim", None)
+                if exp_names is None:
+                    exp_names = getattr(model_contract, "feature_names", None) or getattr(model_contract, "expected_feature_names", None)
 
         # Parse training receipt if provided
         receipt_dict: dict[str, Any] | None = None
@@ -430,6 +466,10 @@ class ModelRegistry:
                 receipt_dict,
                 candidate_artifact_sha256=None,
                 simulation_id=simulation_id,
+                expected_architecture=exp_arch,
+                expected_feature_schema_version=exp_schema_ver,
+                expected_input_dim=exp_dim,
+                expected_feature_names=exp_names,
             )
             if is_valid_rcpt:
                 has_valid_receipt = True
@@ -482,13 +522,17 @@ class ModelRegistry:
 
             file_sha256 = compute_file_sha256(filepath)
 
-            # If receipt provided, verify artifact SHA256 binding
+            # If receipt provided, verify artifact SHA256 binding and schema constraints
             if receipt_dict is not None and has_valid_receipt:
                 verifier = get_default_training_verifier()
                 is_valid_binding, binding_reason = verifier.verify_receipt(
                     receipt_dict,
                     candidate_artifact_sha256=file_sha256,
                     simulation_id=simulation_id,
+                    expected_architecture=exp_arch,
+                    expected_feature_schema_version=exp_schema_ver,
+                    expected_input_dim=exp_dim,
+                    expected_feature_names=exp_names,
                 )
                 if not is_valid_binding:
                     has_valid_receipt = False
@@ -499,10 +543,24 @@ class ModelRegistry:
             max_gen = max((e.get("generation", 0) for e in manifest), default=0)
             entry_gen = (max_gen + 1) if is_promoted else (max_gen if max_gen > 0 else 1)
 
+            verified_schema_meta = None
+            if has_valid_receipt and receipt_dict is not None:
+                verified_schema_meta = {
+                    "architecture": receipt_dict.get("architecture"),
+                    "feature_schema_version": receipt_dict.get("feature_schema_version"),
+                    "input_dim": receipt_dict.get("input_dim"),
+                    "feature_names": list(receipt_dict.get("feature_names", [])),
+                }
+
             entry: dict[str, Any] = {
                 "version": next_version,
                 "generation": entry_gen,
                 "filename": filename,
+                "architecture": verified_schema_meta["architecture"] if verified_schema_meta else exp_arch,
+                "feature_schema_version": verified_schema_meta["feature_schema_version"] if verified_schema_meta else exp_schema_ver,
+                "input_dim": verified_schema_meta["input_dim"] if verified_schema_meta else exp_dim,
+                "feature_names": verified_schema_meta["feature_names"] if verified_schema_meta else (list(exp_names) if exp_names is not None else None),
+                "verified_schema": verified_schema_meta,
                 "metrics": metrics,
                 "metrics_provenance": "CALLER_SUPPLIED_UNVERIFIED",
                 "is_active": is_promoted,
@@ -754,6 +812,10 @@ class ModelRegistry:
                 "authorization_scheme": authorization_scheme,
                 "architecture": entry.get("architecture", "FraudDetectionModel-GroupNorm"),
                 "input_dim": entry.get("input_dim", 10),
+                "feature_schema_version": entry.get("feature_schema_version"),
+                "feature_names": entry.get("feature_names"),
+                "verified_schema": entry.get("verified_schema"),
+                "training_receipt": entry.get("training_receipt"),
                 "metrics": entry.get("metrics", {}),
                 "metrics_provenance": entry.get("metrics_provenance", "CALLER_SUPPLIED_UNVERIFIED"),
                 "git_commit_hash": entry.get("git_commit_hash", "unknown"),
@@ -836,6 +898,9 @@ class ModelRegistry:
                 "filename": entry.get("filename"),
                 "architecture": entry.get("architecture", "FraudDetectionModel-GroupNorm"),
                 "input_dim": entry.get("input_dim", 10),
+                "feature_schema_version": entry.get("feature_schema_version"),
+                "feature_names": entry.get("feature_names"),
+                "verified_schema": entry.get("verified_schema"),
                 "provenance_type": entry.get("provenance_type", "UNVERIFIED"),
             }
 

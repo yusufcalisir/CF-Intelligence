@@ -140,6 +140,22 @@ class Settings(BaseSettings):
         ),
         description="Expected key ID for authorized training receipt issuer.",
     )
+    training_worker_token: str = Field(
+        default="cfi_authorized_training_worker_secret_v1",
+        validation_alias=AliasChoices(
+            "training_worker_token",
+            "cfi_training_worker_token",
+        ),
+        description="Authorization secret for training workers to register completed job executions.",
+    )
+    training_receipt_trust_store_path: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "training_receipt_trust_store_path",
+            "cfi_training_receipt_trust_store",
+        ),
+        description="Path to durable training receipt trust store registry file.",
+    )
 
     # ── Enterprise Security Suite ─────────────
     mtls_enabled: bool = True

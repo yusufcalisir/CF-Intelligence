@@ -12,6 +12,7 @@ Establishes a verifiable, asymmetric chain of training execution:
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import hashlib
 import hmac
@@ -19,7 +20,10 @@ import json
 import logging
 import math
 import os
+import threading
+import types
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -44,6 +48,12 @@ class TrainingProvenanceConfigurationError(Exception):
     pass
 
 
+class TrainingProvenanceSecurityError(ValueError, PermissionError):
+    """Raised when an unauthenticated or unauthorized party attempts to issue or forge a receipt."""
+
+    pass
+
+
 def derive_domain_key(secret: str, domain: str) -> bytes:
     """Derive cryptographically separated domain key using HMAC-SHA256."""
     return hmac.new(secret.encode("utf-8"), domain.encode("utf-8"), hashlib.sha256).digest()
@@ -64,11 +74,22 @@ class TrainingExecutionEvidence:
     artifact_sha256: str
     architecture: str
     feature_schema_version: str
-    feature_names: list[str]
+    feature_names: Sequence[str] | list[str] | tuple[str, ...]
     producer_id: str = "TRAINING_EXECUTOR"
     status: str = "COMPLETED"
     git_commit_hash: str | None = None
     dataset_manifest_id: str | None = None
+
+    def __post_init__(self) -> None:
+        """Enforce strict immutability on nested collections."""
+        if isinstance(self.feature_names, (list, tuple)):
+            object.__setattr__(self, "feature_names", tuple(self.feature_names))
+        if isinstance(self.observed_metrics, dict):
+            object.__setattr__(
+                self,
+                "observed_metrics",
+                types.MappingProxyType(dict(self.observed_metrics)),
+            )
 
     def validate(self) -> None:
         """Validate execution evidence invariants."""
@@ -93,7 +114,7 @@ class TrainingExecutionEvidence:
             raise ValueError("Executed rounds or epochs must be at least 1.")
         if self.sample_count <= 0:
             raise ValueError(f"Training sample count must be positive, got: {self.sample_count}")
-        if not self.observed_metrics or not isinstance(self.observed_metrics, dict):
+        if not self.observed_metrics or not isinstance(self.observed_metrics, (dict, types.MappingProxyType)):
             raise ValueError("observed_metrics must be a non-empty dictionary.")
 
         loss_val = None
@@ -103,6 +124,405 @@ class TrainingExecutionEvidence:
                 break
         if loss_val is None or not isinstance(loss_val, (int, float)) or not math.isfinite(loss_val):
             raise ValueError("Training metrics must contain a finite numeric loss.")
+
+
+@dataclasses.dataclass(frozen=True)
+class CompletedJobExecutionRecord:
+    """Authoritative execution record registered directly by an authorized training worker runtime."""
+
+    job_id: str
+    training_run_id: str
+    simulation_id: str
+    completed_at: str
+    executed_rounds: int
+    executed_epochs: int
+    sample_count: int
+    observed_metrics: dict[str, float]
+    artifact_sha256: str
+    architecture: str = "FraudDetectionNN"
+    feature_schema_version: str = "v1.0"
+    input_dim: int | None = None
+    feature_names: Sequence[str] | list[str] | tuple[str, ...] = ()
+    worker_id: str = "TRAINING_EXECUTOR"
+    status: str = "COMPLETED"
+    git_commit_hash: str | None = None
+    dataset_manifest_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.feature_names, (list, tuple)):
+            object.__setattr__(self, "feature_names", tuple(self.feature_names))
+        if self.input_dim is None and self.feature_names:
+            object.__setattr__(self, "input_dim", len(self.feature_names))
+        if isinstance(self.observed_metrics, dict):
+            object.__setattr__(
+                self,
+                "observed_metrics",
+                types.MappingProxyType(dict(self.observed_metrics)),
+            )
+
+    def validate(self) -> None:
+        if not self.job_id or not self.job_id.strip():
+            raise ValueError("job_id must be non-empty.")
+        if not self.training_run_id or not self.training_run_id.strip():
+            raise ValueError("training_run_id must be non-empty.")
+        if len(self.artifact_sha256.strip()) != 64:
+            raise ValueError(
+                f"artifact_sha256 must be a 64-char hex SHA-256 digest, got: {self.artifact_sha256!r}"
+            )
+        if self.status != "COMPLETED":
+            raise ValueError(f"Job execution status must be 'COMPLETED', got: {self.status!r}")
+        if self.executed_rounds < 1 and self.executed_epochs < 1:
+            raise ValueError("Executed rounds or epochs must be at least 1.")
+        if self.sample_count <= 0:
+            raise ValueError(f"Training sample count must be positive, got: {self.sample_count}")
+        if not self.observed_metrics:
+            raise ValueError("observed_metrics must be non-empty.")
+        loss_val = None
+        for k in ("loss", "final_loss", "train_loss", "val_loss"):
+            if k in self.observed_metrics:
+                loss_val = self.observed_metrics[k]
+                break
+        if loss_val is None or not isinstance(loss_val, (int, float)) or not math.isfinite(loss_val):
+            raise ValueError("Training metrics must contain a finite numeric loss.")
+
+
+class TrustedTrainingJobRecordSource:
+    """Protected source of completed training execution records.
+
+    Only authenticated training workers may register execution records.
+    TrainingReceiptIssuer queries this source in production to verify that
+    execution actually occurred before issuing a receipt.
+    """
+
+    def __init__(self, worker_token: str | None = None) -> None:
+        self._lock = threading.Lock()
+        self._worker_token = worker_token
+        self._records_by_job_id: dict[str, CompletedJobExecutionRecord] = {}
+        self._records_by_run_id: dict[str, CompletedJobExecutionRecord] = {}
+
+    def record_job_completion(
+        self,
+        record: CompletedJobExecutionRecord | None = None,
+        worker_token: str | None = None,
+        *,
+        job_id: str | None = None,
+        training_run_id: str | None = None,
+        simulation_id: str = "sim_default",
+        executed_rounds: int = 1,
+        executed_epochs: int = 0,
+        sample_count: int = 100,
+        metrics: dict[str, float] | None = None,
+        model_artifact_sha256: str = "",
+        architecture: str = "FraudDetectionNN",
+        feature_schema_version: str = "v1.0",
+        input_dim: int = 10,
+        feature_names: Sequence[str] | list[str] | tuple[str, ...] = (),
+        git_commit_hash: str | None = None,
+        dataset_manifest_id: str | None = None,
+    ) -> None:
+        """Register an authenticated completed job record.
+
+        In production, verifies worker_token against configured authorization secret.
+        """
+        if record is None:
+            if not job_id or not training_run_id:
+                raise ValueError("Either 'record' or both 'job_id' and 'training_run_id' must be provided.")
+            record = CompletedJobExecutionRecord(
+                job_id=job_id,
+                training_run_id=training_run_id,
+                simulation_id=simulation_id,
+                completed_at=datetime.now(UTC).isoformat(),
+                executed_rounds=executed_rounds,
+                executed_epochs=executed_epochs,
+                sample_count=sample_count,
+                observed_metrics=metrics or {},
+                artifact_sha256=model_artifact_sha256,
+                architecture=architecture,
+                feature_schema_version=feature_schema_version,
+                input_dim=input_dim,
+                feature_names=tuple(feature_names),
+                git_commit_hash=git_commit_hash,
+                dataset_manifest_id=dataset_manifest_id,
+            )
+
+        record.validate()
+        settings = get_settings()
+        is_prod = settings.app_env.lower() == "production"
+
+        expected_token = (
+            self._worker_token
+            or os.environ.get("CFI_TRAINING_WORKER_TOKEN")
+            or getattr(settings, "training_worker_token", None)
+            or "cfi_authorized_training_worker_secret_v1"
+        )
+
+        if is_prod:
+            if not worker_token or not hmac.compare_digest(worker_token, expected_token):
+                raise TrainingProvenanceSecurityError(
+                    "Unauthorized training worker: caller lacks valid worker authorization token."
+                )
+        else:
+            if worker_token is not None and not hmac.compare_digest(worker_token, expected_token):
+                raise TrainingProvenanceSecurityError("Unauthorized training worker: invalid worker token.")
+
+        with self._lock:
+            self._records_by_job_id[record.job_id] = record
+            self._records_by_run_id[record.training_run_id] = record
+
+    def get_completed_job(self, identifier: str) -> CompletedJobExecutionRecord | None:
+        """Retrieve completed execution record by job_id or training_run_id."""
+        with self._lock:
+            if identifier in self._records_by_job_id:
+                return self._records_by_job_id[identifier]
+            if identifier in self._records_by_run_id:
+                return self._records_by_run_id[identifier]
+            return None
+
+    def has_completed_job(self, identifier: str) -> bool:
+        with self._lock:
+            return identifier in self._records_by_job_id or identifier in self._records_by_run_id
+
+    def clear(self) -> None:
+        with self._lock:
+            self._records_by_job_id.clear()
+            self._records_by_run_id.clear()
+
+
+class DurableTrustStore:
+    """Administratively controlled, durable key trust configuration.
+
+    Supports:
+    - Revocation due to compromise (all receipts signed by this key are rejected).
+    - Lifecycle retirement (key cannot issue new receipts; receipts signed before retirement remain valid).
+    - Duplicate key ID rejection (rejects unauthorized public key substitution).
+    - Cross-worker / cross-process freshness contract via atomic reload on mtime change.
+    """
+
+    def __init__(
+        self,
+        trust_file_path: str | None = None,
+        in_memory: bool = False,
+    ) -> None:
+        self._lock = threading.Lock()
+        self._in_memory = in_memory
+        if self._in_memory:
+            self._trust_file_path = ""
+        else:
+            settings = get_settings()
+            configured_path = (
+                trust_file_path
+                or os.environ.get("CFI_TRAINING_RECEIPT_TRUST_STORE")
+                or getattr(settings, "training_receipt_trust_store_path", None)
+            )
+            if not configured_path:
+                from app.infrastructure.storage.storage_utils import get_storage_dir
+
+                configured_path = os.path.join(get_storage_dir(), "training_trust_registry.json")
+
+            self._trust_file_path = configured_path
+        self._approved_keys: dict[str, dict[str, str]] = {}
+        self._revoked_keys: dict[str, dict[str, str]] = {}
+        self._retired_keys: dict[str, dict[str, str]] = {}
+        self._last_mtime: float = 0.0
+
+        if not self._in_memory:
+            self.reload()
+
+    def reload(self) -> None:
+        if self._in_memory or not self._trust_file_path:
+            return
+        with self._lock:
+            if os.path.exists(self._trust_file_path):
+                try:
+                    mtime = os.path.getmtime(self._trust_file_path)
+                    with open(self._trust_file_path, encoding="utf-8") as f:
+                        data = json.load(f)
+                    self._approved_keys = data.get("approved_keys", {})
+                    self._revoked_keys = data.get("revoked_keys", {})
+                    self._retired_keys = data.get("retired_keys", {})
+                    self._last_mtime = mtime
+                except Exception as exc:
+                    logger.warning("Failed to reload durable trust store from %s: %s", self._trust_file_path, exc)
+
+    def reload_if_modified(self) -> None:
+        """Check mtime and reload if modified on disk (cross-worker freshness contract)."""
+        if self._in_memory or not self._trust_file_path:
+            return
+        if os.path.exists(self._trust_file_path):
+            with contextlib.suppress(OSError):
+                mtime = os.path.getmtime(self._trust_file_path)
+                if mtime > self._last_mtime:
+                    self.reload()
+
+    def _persist(self) -> None:
+        """Atomically persist trust registry to disk."""
+        if self._in_memory or not self._trust_file_path:
+            return
+        data = {
+            "approved_keys": self._approved_keys,
+            "revoked_keys": self._revoked_keys,
+            "retired_keys": self._retired_keys,
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        parent_dir = os.path.dirname(os.path.abspath(self._trust_file_path))
+        os.makedirs(parent_dir, exist_ok=True)
+        tmp_path = f"{self._trust_file_path}.{os.getpid()}.{threading.get_ident()}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp_path, self._trust_file_path)
+        with contextlib.suppress(OSError):
+            self._last_mtime = os.path.getmtime(self._trust_file_path)
+
+    def register_approved_key(
+        self,
+        key_id: str,
+        public_key_hex: str,
+        authorized_replacement: bool = False,
+    ) -> None:
+        """Register an approved key ID and public key."""
+        with self._lock:
+            self.reload_if_modified()
+            clean_kid = key_id.strip()
+            clean_hex = public_key_hex.strip().lower()
+
+            if clean_kid in self._revoked_keys:
+                raise ValueError(
+                    f"Cannot register key_id '{clean_kid}' because it has been revoked due to compromise."
+                )
+
+            if clean_kid in self._approved_keys:
+                existing_hex = self._approved_keys[clean_kid].get("public_key_hex", "").strip().lower()
+                if existing_hex != clean_hex and not authorized_replacement:
+                    raise ValueError(
+                        f"Unauthorized public key substitution rejected: key_id '{clean_kid}' is already "
+                        f"registered with a different public key."
+                    )
+
+            self._approved_keys[clean_kid] = {
+                "public_key_hex": clean_hex,
+                "registered_at": datetime.now(UTC).isoformat(),
+            }
+            self._persist()
+
+    def revoke_key(self, key_id: str, reason: str = "compromise") -> None:
+        """Revoke key due to compromise (all receipts signed by this key are rejected)."""
+        with self._lock:
+            self.reload_if_modified()
+            clean_kid = key_id.strip()
+            self._revoked_keys[clean_kid] = {
+                "reason": reason,
+                "revoked_at": datetime.now(UTC).isoformat(),
+                "revoked_by": "admin",
+            }
+            self._approved_keys.pop(clean_kid, None)
+            self._persist()
+
+    def retire_key(self, key_id: str, reason: str = "lifecycle_rotation") -> None:
+        """Retire key from active issuance; existing receipts created before retirement remain valid."""
+        with self._lock:
+            self.reload_if_modified()
+            clean_kid = key_id.strip()
+            self._retired_keys[clean_kid] = {
+                "reason": reason,
+                "retired_at": datetime.now(UTC).isoformat(),
+            }
+            self._persist()
+
+    def is_key_revoked(self, key_id: str) -> bool:
+        self.reload_if_modified()
+        return key_id.strip() in self._revoked_keys
+
+    def is_key_retired(self, key_id: str, at_timestamp: str | None = None) -> tuple[bool, str | None]:
+        self.reload_if_modified()
+        clean_kid = key_id.strip()
+        if clean_kid not in self._retired_keys:
+            return False, None
+        retired_info = self._retired_keys[clean_kid]
+        retired_at_str = retired_info.get("retired_at", "")
+        if at_timestamp and retired_at_str:
+            if at_timestamp > retired_at_str:
+                return True, retired_at_str
+            return False, retired_at_str
+        return True, retired_at_str
+
+    def clear(self) -> None:
+        with self._lock:
+            self._approved_keys.clear()
+            self._revoked_keys.clear()
+            self._retired_keys.clear()
+            if os.path.exists(self._trust_file_path):
+                with contextlib.suppress(OSError):
+                    os.remove(self._trust_file_path)
+            self._last_mtime = 0.0
+
+
+_DEFAULT_JOB_RECORD_SOURCE: TrustedTrainingJobRecordSource | None = None
+_DEFAULT_TRUST_STORE: DurableTrustStore | None = None
+
+
+def get_default_training_job_record_source() -> TrustedTrainingJobRecordSource:
+    global _DEFAULT_JOB_RECORD_SOURCE
+    if _DEFAULT_JOB_RECORD_SOURCE is None:
+        _DEFAULT_JOB_RECORD_SOURCE = TrustedTrainingJobRecordSource()
+    return _DEFAULT_JOB_RECORD_SOURCE
+
+
+def reset_default_training_job_record_source() -> None:
+    global _DEFAULT_JOB_RECORD_SOURCE
+    _DEFAULT_JOB_RECORD_SOURCE = None
+
+
+def get_default_trust_store() -> DurableTrustStore:
+    global _DEFAULT_TRUST_STORE
+    if _DEFAULT_TRUST_STORE is None:
+        _DEFAULT_TRUST_STORE = DurableTrustStore()
+    return _DEFAULT_TRUST_STORE
+
+
+def reset_default_trust_store() -> None:
+    global _DEFAULT_TRUST_STORE
+    _DEFAULT_TRUST_STORE = None
+
+
+def record_training_job_completion(
+    job_id: str,
+    training_run_id: str,
+    simulation_id: str,
+    executed_rounds: int,
+    sample_count: int,
+    observed_metrics: dict[str, float],
+    artifact_sha256: str,
+    architecture: str,
+    feature_schema_version: str,
+    feature_names: list[str] | tuple[str, ...],
+    worker_id: str = "TRAINING_EXECUTOR",
+    executed_epochs: int = 0,
+    git_commit_hash: str | None = None,
+    dataset_manifest_id: str | None = None,
+    worker_token: str | None = None,
+) -> CompletedJobExecutionRecord:
+    """Convenience helper for genuine training workers to record completed training runs."""
+    rec = CompletedJobExecutionRecord(
+        job_id=job_id,
+        training_run_id=training_run_id,
+        simulation_id=simulation_id,
+        completed_at=datetime.now(UTC).isoformat(),
+        executed_rounds=executed_rounds,
+        executed_epochs=executed_epochs,
+        sample_count=sample_count,
+        observed_metrics=observed_metrics,
+        artifact_sha256=artifact_sha256,
+        architecture=architecture,
+        feature_schema_version=feature_schema_version,
+        feature_names=tuple(feature_names),
+        worker_id=worker_id,
+        status="COMPLETED",
+        git_commit_hash=git_commit_hash,
+        dataset_manifest_id=dataset_manifest_id,
+    )
+    get_default_training_job_record_source().record_job_completion(rec, worker_token=worker_token)
+    return rec
+
 
 
 @dataclasses.dataclass(frozen=True)
@@ -251,10 +671,21 @@ class TrainingReceiptIssuer:
         self,
         private_key: ed25519.Ed25519PrivateKey | bytes | str | None = None,
         key_id: str = DEFAULT_TRAINING_KEY_ID,
+        job_record_source: TrustedTrainingJobRecordSource | None = None,
+        require_authenticated_job: bool | None = None,
+        trust_store: DurableTrustStore | None = None,
     ) -> None:
         self.key_id = key_id
+        self._job_record_source = job_record_source or get_default_training_job_record_source()
+        self._require_authenticated_job = require_authenticated_job
+        self._trust_store = trust_store or get_default_trust_store()
         settings = get_settings()
         is_prod = settings.app_env.lower() == "production"
+
+        if self._trust_store.is_key_revoked(self.key_id):
+            raise ValueError(
+                f"Cannot initialize TrainingReceiptIssuer: key_id '{self.key_id}' has been revoked due to compromise."
+            )
 
         if private_key is not None:
             if isinstance(private_key, ed25519.Ed25519PrivateKey):
@@ -329,7 +760,7 @@ class TrainingReceiptIssuer:
         architecture: str | None = None,
         feature_schema_version: str | None = None,
         input_dim: int | None = None,
-        feature_names: list[str] | None = None,
+        feature_names: Sequence[str] | list[str] | tuple[str, ...] | None = None,
         producer_id: str = "TRAINING_EXECUTOR",
         git_commit_hash: str | None = None,
         dataset_manifest_id: str | None = None,
@@ -439,6 +870,55 @@ class TrainingReceiptIssuer:
             if loss_val is None or not isinstance(loss_val, (int, float)) or not math.isfinite(loss_val):
                 raise ValueError("Training metrics must contain a finite numeric loss.")
 
+        # Check revocation and retirement of signing key
+        if self._trust_store.is_key_revoked(self.key_id):
+            raise ValueError(f"Cannot issue receipt: key_id '{self.key_id}' has been revoked due to compromise.")
+        is_ret, ret_at = self._trust_store.is_key_retired(self.key_id)
+        if is_ret:
+            raise ValueError(
+                f"Cannot issue receipt: key_id '{self.key_id}' was retired from active issuance at {ret_at}."
+            )
+
+        # Enforce authenticated execution record from trusted job completion source
+        enforce_record = (
+            self._require_authenticated_job
+            if self._require_authenticated_job is not None
+            else is_prod
+        )
+        if enforce_record:
+            target_job = target_job_id or f"job_{target_run_id}"
+            rec = self._job_record_source.get_completed_job(target_job)
+            if rec is None and target_run_id:
+                rec = self._job_record_source.get_completed_job(target_run_id)
+
+            if rec is None:
+                raise TrainingProvenanceSecurityError(
+                    f"Production receipt issuance rejected: job '{target_job}' has no authenticated execution record "
+                    "from the trusted training-job completion source. Arbitrary caller-supplied claims cannot authorize receipt issuance."
+                )
+
+            if rec.status != "COMPLETED":
+                raise ValueError(
+                    f"Job '{target_job}' in trusted completion source is not in 'COMPLETED' status (got '{rec.status}')."
+                )
+
+            if target_rounds != rec.executed_rounds:
+                raise ValueError(
+                    f"Executed rounds mismatch: caller claimed {target_rounds}, but trusted record observed {rec.executed_rounds}."
+                )
+            if target_epochs != rec.executed_epochs:
+                raise ValueError(
+                    f"Executed epochs mismatch: caller claimed {target_epochs}, but trusted record observed {rec.executed_epochs}."
+                )
+            if target_samples != rec.sample_count:
+                raise ValueError(
+                    f"Sample count mismatch: caller claimed {target_samples}, but trusted record observed {rec.sample_count}."
+                )
+            if not hmac.compare_digest(target_sha, rec.artifact_sha256):
+                raise ValueError(
+                    f"Artifact digest mismatch: caller provided {target_sha}, but trusted record observed {rec.artifact_sha256}."
+                )
+
         receipt_id = f"rcpt_{uuid.uuid4().hex}"
         created_at = datetime.now(UTC).isoformat()
 
@@ -456,7 +936,7 @@ class TrainingReceiptIssuer:
             "executed_rounds": target_rounds,
             "executed_epochs": target_epochs,
             "sample_count": target_samples,
-            "metrics": target_metrics,
+            "metrics": dict(target_metrics),
             "producer_id": target_producer,
             "schema_version": "1.0",
             "created_at": created_at,
@@ -482,7 +962,7 @@ class TrainingReceiptIssuer:
             executed_rounds=target_rounds,
             executed_epochs=target_epochs,
             sample_count=target_samples,
-            metrics=target_metrics,
+            metrics=dict(target_metrics),
             producer_id=target_producer,
             schema_version="1.0",
             created_at=created_at,
@@ -504,9 +984,16 @@ class TrainingReceiptVerifier:
     def __init__(
         self,
         trusted_keys: dict[str, ed25519.Ed25519PublicKey | bytes | str] | None = None,
+        trust_store: DurableTrustStore | None = None,
     ) -> None:
         self._trusted_keys: dict[str, ed25519.Ed25519PublicKey] = {}
         self._revoked_keys: set[str] = set()
+        if trust_store is not None:
+            self._trust_store = trust_store
+        elif trusted_keys is not None:
+            self._trust_store = DurableTrustStore(in_memory=True)
+        else:
+            self._trust_store = get_default_trust_store()
 
         if trusted_keys is not None:
             for kid, k_val in trusted_keys.items():
@@ -544,7 +1031,7 @@ class TrainingReceiptVerifier:
                     ) from exc
 
             if pub_source:
-                self.register_trusted_key(key_id, pub_source)
+                self.register_trusted_key(key_id, pub_source, authorized_replacement=True)
 
             revoked_env = os.environ.get("CFI_TRAINING_RECEIPT_REVOKED_KEYS", "").strip()
             if revoked_env:
@@ -563,49 +1050,92 @@ class TrainingReceiptVerifier:
                 dev_seed = hashlib.sha256(b"cfi_dev_ed25519_training_issuer_seed_v1").digest()
                 dev_priv = ed25519.Ed25519PrivateKey.from_private_bytes(dev_seed)
                 dev_pub = dev_priv.public_key()
-                self.register_trusted_key(DEFAULT_TRAINING_KEY_ID, dev_pub)
+                self.register_trusted_key(DEFAULT_TRAINING_KEY_ID, dev_pub, authorized_replacement=True)
 
     def register_trusted_key(
         self,
         key_id: str,
         public_key: ed25519.Ed25519PublicKey | bytes | str,
+        authorized_replacement: bool = False,
     ) -> None:
         """Register an authorized verification public key."""
         if not key_id or not key_id.strip():
             raise ValueError("key_id cannot be empty.")
-        if key_id in self._revoked_keys:
-            raise ValueError(f"Cannot register key_id '{key_id}' because it has been revoked.")
+
+        clean_kid = key_id.strip()
+        if clean_kid in self._revoked_keys or self._trust_store.is_key_revoked(clean_kid):
+            raise ValueError(
+                f"Cannot register key_id '{clean_kid}' because it has been revoked due to compromise."
+            )
 
         if isinstance(public_key, ed25519.Ed25519PublicKey):
-            self._trusted_keys[key_id] = public_key
+            parsed_pub = public_key
         elif isinstance(public_key, bytes):
             if len(public_key) == 32:
-                self._trusted_keys[key_id] = ed25519.Ed25519PublicKey.from_public_bytes(public_key)
+                parsed_pub = ed25519.Ed25519PublicKey.from_public_bytes(public_key)
             else:
                 loaded = serialization.load_pem_public_key(public_key)
                 if not isinstance(loaded, ed25519.Ed25519PublicKey):
                     raise TypeError(f"Expected Ed25519PublicKey, got {type(loaded)}")
-                self._trusted_keys[key_id] = loaded
+                parsed_pub = loaded
         elif isinstance(public_key, str):
             cleaned = public_key.strip()
             if len(cleaned) == 64:
-                self._trusted_keys[key_id] = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(cleaned))
+                parsed_pub = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(cleaned))
             else:
                 loaded = serialization.load_pem_public_key(cleaned.encode())
                 if not isinstance(loaded, ed25519.Ed25519PublicKey):
                     raise TypeError(f"Expected Ed25519PublicKey, got {type(loaded)}")
-                self._trusted_keys[key_id] = loaded
+                parsed_pub = loaded
         else:
             raise TypeError(f"Unsupported public key type: {type(public_key)}")
 
+        if clean_kid in self._trusted_keys:
+            existing_pub = self._trusted_keys[clean_kid]
+            existing_bytes = existing_pub.public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw,
+            )
+            new_bytes = parsed_pub.public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw,
+            )
+            if existing_bytes != new_bytes and not authorized_replacement:
+                raise ValueError(
+                    f"Unauthorized public key substitution rejected: key_id '{clean_kid}' is already "
+                    f"registered with different public key material."
+                )
+
+        new_bytes = parsed_pub.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        self._trust_store.register_approved_key(
+            clean_kid, new_bytes.hex(), authorized_replacement=authorized_replacement
+        )
+        self._trusted_keys[clean_kid] = parsed_pub
+
     def revoke_key(self, key_id: str, reason: str = "compromise") -> None:
         """Revoke a trusted key ID so receipts signed with it will be rejected."""
-        self._revoked_keys.add(key_id)
-        self._trusted_keys.pop(key_id, None)
-        logger.warning("Revoked training receipt key_id '%s' (reason: %s)", key_id, reason)
+        clean_kid = key_id.strip()
+        self._revoked_keys.add(clean_kid)
+        self._trusted_keys.pop(clean_kid, None)
+        self._trust_store.revoke_key(clean_kid, reason=reason)
+        logger.warning("Revoked training receipt key_id '%s' (reason: %s)", clean_kid, reason)
+
+    def retire_key(self, key_id: str, reason: str = "lifecycle_rotation") -> None:
+        """Retire a trusted key ID from active issuance (historical verification preserved)."""
+        clean_kid = key_id.strip()
+        self._trust_store.retire_key(clean_kid, reason=reason)
+        logger.info("Retired training receipt key_id '%s' (reason: %s)", clean_kid, reason)
 
     def is_key_trusted(self, key_id: str) -> bool:
-        return key_id in self._trusted_keys and key_id not in self._revoked_keys
+        self._trust_store.reload_if_modified()
+        return (
+            key_id in self._trusted_keys
+            and key_id not in self._revoked_keys
+            and not self._trust_store.is_key_revoked(key_id)
+        )
 
     def verify(
         self,
@@ -654,9 +1184,20 @@ class TrainingReceiptVerifier:
         if receipt_obj.schema_version not in ("1.0", "1.1"):
             return False, f"Unsupported receipt schema version: {receipt_obj.schema_version}"
 
-        # Key ID validation & revocation check
-        if receipt_obj.key_id in self._revoked_keys:
+        # Key ID validation & revocation check across processes
+        self._trust_store.reload_if_modified()
+        if receipt_obj.key_id in self._revoked_keys or self._trust_store.is_key_revoked(receipt_obj.key_id):
             return False, f"Receipt key_id '{receipt_obj.key_id}' has been explicitly revoked."
+
+        # Key ID lifecycle retirement check
+        is_ret, ret_at = self._trust_store.is_key_retired(
+            receipt_obj.key_id, at_timestamp=receipt_obj.created_at
+        )
+        if is_ret:
+            return False, (
+                f"Receipt key_id '{receipt_obj.key_id}' was retired before receipt creation "
+                f"({receipt_obj.created_at} > {ret_at})."
+            )
 
         if expected_key_id and receipt_obj.key_id != expected_key_id:
             return False, f"Receipt key_id mismatch: expected '{expected_key_id}', got '{receipt_obj.key_id}'."
@@ -773,6 +1314,7 @@ def reset_default_training_verifier() -> None:
     """Reset the cached default verifier instance (primarily for test isolation)."""
     global _DEFAULT_VERIFIER
     _DEFAULT_VERIFIER = None
+    reset_default_trust_store()
 
 
 def reset_default_training_issuer() -> None:
@@ -806,9 +1348,13 @@ class TrainingReceiptAuthority:
             if signing_secret is not None and signing_secret != default_secret:
                 dev_seed = hashlib.sha256(signing_secret.encode("utf-8")).digest()
                 self._issuer_priv = ed25519.Ed25519PrivateKey.from_private_bytes(dev_seed)
-                self._issuer = TrainingReceiptIssuer(private_key=self._issuer_priv)
+                isolated_store = DurableTrustStore(in_memory=True)
+                self._issuer = TrainingReceiptIssuer(
+                    private_key=self._issuer_priv, trust_store=isolated_store
+                )
                 self._verifier = TrainingReceiptVerifier(
-                    trusted_keys={self._issuer.key_id: self._issuer.public_key}
+                    trusted_keys={self._issuer.key_id: self._issuer.public_key},
+                    trust_store=isolated_store,
                 )
             else:
                 self._issuer = get_default_training_issuer()
@@ -837,7 +1383,7 @@ class TrainingReceiptAuthority:
         architecture: str = "FraudDetectionModel-GroupNorm",
         feature_schema_version: str = "v1.0",
         input_dim: int = 10,
-        feature_names: list[str] | None = None,
+        feature_names: Sequence[str] | list[str] | tuple[str, ...] | None = None,
         producer_id: str = "TRAINING_EXECUTOR",
         git_commit_hash: str | None = None,
         dataset_manifest_id: str | None = None,

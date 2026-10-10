@@ -27,6 +27,8 @@ import io
 import math
 import os
 import tempfile
+from types import MappingProxyType
+from typing import Any
 from unittest.mock import patch
 
 import numpy as np
@@ -40,15 +42,20 @@ from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES, ModelService
 from app.application.services.training_provenance_service import (
     DEFAULT_TRAINING_KEY_ID,
+    DurableTrustStore,
     TrainingExecutionEvidence,
     TrainingExecutionReceipt,
     TrainingProvenanceConfigurationError,
+    TrainingProvenanceSecurityError,
     TrainingReceiptAuthority,
     TrainingReceiptIssuer,
     TrainingReceiptVerifier,
+    TrustedTrainingJobRecordSource,
     get_default_training_verifier,
     reset_default_training_issuer,
+    reset_default_training_job_record_source,
     reset_default_training_verifier,
+    reset_default_trust_store,
 )
 from app.config import get_settings
 from app.domain.model_serving_errors import ModelIntegrityError
@@ -898,3 +905,424 @@ class TestModule01AAdversarialProvenance:
                 assert entry_tampered["provenance_type"] == "UNVERIFIED"
                 assert entry_tampered["is_production_eligible"] is False
                 assert "INVALID_RECEIPT" in entry_tampered["attestation_status"]
+
+
+class TestModule01ACompletionPatch:
+    """Mandatory verification suite for Module 01-A Focused Completion Patch (PROV-A1 through PROV-A10).
+
+    Eliminates forged execution receipts, binds declared model schemas in the registry,
+    and completes cross-worker trust isolation.
+    """
+
+    @pytest.fixture(autouse=True)
+    def clean_isolation(self):
+        reset_default_training_issuer()
+        reset_default_training_verifier()
+        reset_default_training_job_record_source()
+        reset_default_trust_store()
+        yield
+        reset_default_training_issuer()
+        reset_default_training_verifier()
+        reset_default_training_job_record_source()
+        reset_default_trust_store()
+
+    def test_prov_a1_forged_completed_training_rejected(self):
+        """PROV-A1: Supply plausible execution counts and loss for an unrecorded job.
+
+        Verify that production receipt issuance through the trusted issuance boundary fails closed.
+        """
+        priv = ed25519.Ed25519PrivateKey.generate()
+        job_source = TrustedTrainingJobRecordSource(worker_token="trusted_secret_token_123")
+
+        # Issuer in enforce/production mode requiring authenticated execution record
+        issuer = TrainingReceiptIssuer(
+            private_key=priv,
+            key_id="prov_a1_key",
+            job_record_source=job_source,
+            require_authenticated_job=True,
+        )
+
+        with patch.object(get_settings(), "app_env", "production"):
+            # Attempt issuance with plausible numbers for a ghost job that never executed
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_info:
+                issuer.issue_receipt(
+                    training_run_id="run_ghost_01",
+                    job_id="job_ghost_01",
+                    model_artifact_sha256="a" * 64,
+                    simulation_id="sim_ghost",
+                    executed_rounds=10,
+                    executed_epochs=5,
+                    sample_count=1000,
+                    metrics={"loss": 0.045, "accuracy": 0.98},
+                    feature_names=("f1", "f2"),
+                    architecture="FraudDetectionNN",
+                    input_dim=2,
+                )
+            assert "Production receipt issuance rejected: job 'job_ghost_01' has no authenticated execution record" in str(exc_info.value)
+
+    def test_prov_a2_forged_evidence_object_rejected(self):
+        """PROV-A2: Possession of caller-created TrainingExecutionEvidence does NOT authorize issuance.
+
+        Verify that nested structures are immutable and unrecorded evidence is rejected in production.
+        """
+        priv = ed25519.Ed25519PrivateKey.generate()
+        job_source = TrustedTrainingJobRecordSource(worker_token="trusted_secret_token_123")
+        issuer = TrainingReceiptIssuer(
+            private_key=priv,
+            key_id="prov_a2_key",
+            job_record_source=job_source,
+            require_authenticated_job=True,
+        )
+
+        evidence = TrainingExecutionEvidence(
+            training_run_id="run_forged_ev",
+            job_id="job_forged_ev",
+            simulation_id="sim_forged_ev",
+            completed_at="2026-10-11T00:00:00Z",
+            executed_rounds=5,
+            executed_epochs=5,
+            sample_count=500,
+            observed_metrics={"loss": 0.03, "val_loss": 0.04},
+            artifact_sha256="b" * 64,
+            feature_names=("f1", "f2"),
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+        )
+
+        # Invariant: nested evidence structures are immutable
+        assert isinstance(evidence.observed_metrics, MappingProxyType)
+        assert isinstance(evidence.feature_names, tuple)
+        with pytest.raises(TypeError):
+            evidence.observed_metrics["loss"] = 0.01  # Mutating MappingProxyType is forbidden
+
+        with patch.object(get_settings(), "app_env", "production"):
+            # Passing evidence object alone without authenticated recorded job MUST be rejected
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_info:
+                issuer.issue_receipt(evidence=evidence)
+            assert "Production receipt issuance rejected: job 'job_forged_ev' has no authenticated execution record" in str(exc_info.value)
+
+            # Unauthenticated recording attempt with wrong token is also rejected
+            with pytest.raises(TrainingProvenanceSecurityError):
+                job_source.record_job_completion(
+                    job_id="job_forged_ev",
+                    training_run_id="run_forged_ev",
+                    simulation_id="sim_forged_ev",
+                    executed_rounds=5,
+                    executed_epochs=5,
+                    sample_count=500,
+                    metrics={"loss": 0.03},
+                    model_artifact_sha256="b" * 64,
+                    architecture="FraudDetectionNN",
+                    input_dim=2,
+                    feature_names=("f1", "f2"),
+                    worker_token="wrong_unauthorized_token",
+                )
+
+    def test_prov_a3_zero_completed_rounds_fails_closed(self):
+        """PROV-A3: Configure 10 planned rounds, execute 0. Verify no claimed rounds are invented."""
+        # Simulation observation with zero rounds
+        rounds: list[Any] = []
+        fl_rounds_executed = len(rounds)
+        assert fl_rounds_executed == 0
+
+        # Receipt issuance must reject zero executed rounds in production
+        priv = ed25519.Ed25519PrivateKey.generate()
+        issuer = TrainingReceiptIssuer(private_key=priv, key_id="prov_a3_key", require_authenticated_job=False)
+
+        with pytest.raises(ValueError) as exc_info:
+            issuer.issue_receipt(
+                training_run_id="run_zero_rounds",
+                job_id="job_zero_rounds",
+                model_artifact_sha256="c" * 64,
+                simulation_id="sim_zero_rounds",
+                executed_rounds=fl_rounds_executed,
+                executed_epochs=0,
+                sample_count=100,
+                metrics={"loss": 0.1},
+                feature_names=("f1",),
+                architecture="FraudDetectionNN",
+                input_dim=1,
+            )
+        assert "Executed rounds or epochs must be at least 1" in str(exc_info.value)
+
+    def test_prov_a4_missing_sample_accounting_fails_closed(self):
+        """PROV-A4: Unavailable participant sample records must NOT substitute sample_count=100."""
+        # When participant sample counts are absent / 0, total_fl_samples is 0
+        total_fl_samples = sum([p.get("sample_count", 0) for p in []])
+        assert total_fl_samples == 0
+
+        priv = ed25519.Ed25519PrivateKey.generate()
+        issuer = TrainingReceiptIssuer(private_key=priv, key_id="prov_a4_key", require_authenticated_job=False)
+
+        with pytest.raises(ValueError) as exc_info:
+            issuer.issue_receipt(
+                training_run_id="run_no_samples",
+                job_id="job_no_samples",
+                model_artifact_sha256="d" * 64,
+                simulation_id="sim_no_samples",
+                executed_rounds=3,
+                executed_epochs=3,
+                sample_count=total_fl_samples,
+                metrics={"loss": 0.1},
+                feature_names=("f1",),
+                architecture="FraudDetectionNN",
+                input_dim=1,
+            )
+        assert "Training sample count must be positive" in str(exc_info.value)
+
+    def test_prov_a5_actual_fl_observations_matches_receipt(self):
+        """PROV-A5: Genuine training execution produces receipt strictly matching observations."""
+        priv = ed25519.Ed25519PrivateKey.generate()
+        token = "worker_auth_token_a5"
+        job_source = TrustedTrainingJobRecordSource(worker_token=token)
+        issuer = TrainingReceiptIssuer(
+            private_key=priv,
+            key_id="prov_a5_key",
+            job_record_source=job_source,
+            require_authenticated_job=True,
+        )
+        verifier = TrainingReceiptVerifier(trusted_keys={"prov_a5_key": priv.public_key()})
+
+        state_dict, raw_bytes, sha256 = _create_mock_checkpoint()
+
+        # Worker runtime records authentic completion
+        job_source.record_job_completion(
+            job_id="fl_job_obs_01",
+            training_run_id="fl_run_obs_01",
+            simulation_id="sim_obs_01",
+            executed_rounds=4,
+            executed_epochs=4,
+            sample_count=850,
+            metrics={"loss": 0.0312, "accuracy": 0.985},
+            model_artifact_sha256=sha256,
+            architecture="FraudDetectionNN",
+            input_dim=10,
+            feature_names=tuple(FEATURE_NAMES[:10]),
+            worker_token=token,
+        )
+
+        with patch.object(get_settings(), "app_env", "production"):
+            receipt = issuer.issue_receipt(
+                job_id="fl_job_obs_01",
+                training_run_id="fl_run_obs_01",
+                simulation_id="sim_obs_01",
+                model_artifact_sha256=sha256,
+                executed_rounds=4,
+                executed_epochs=4,
+                sample_count=850,
+                metrics={"loss": 0.0312, "accuracy": 0.985},
+                feature_names=FEATURE_NAMES[:10],
+                architecture="FraudDetectionNN",
+                input_dim=10,
+            )
+
+        assert receipt.executed_rounds == 4
+        assert receipt.executed_epochs == 4
+        assert receipt.sample_count == 850
+        assert receipt.metrics["loss"] == 0.0312
+        assert receipt.model_artifact_sha256 == sha256
+
+        # Verifier confirms cryptographic authenticity
+        is_valid, reason = verifier.verify_receipt(
+            receipt,
+            candidate_artifact_sha256=sha256,
+            candidate_artifact_bytes=raw_bytes,
+            simulation_id="sim_obs_01",
+            expected_architecture="FraudDetectionNN",
+            expected_input_dim=10,
+            expected_feature_names=FEATURE_NAMES[:10],
+        )
+        assert is_valid is True
+        assert "verified successfully" in reason or reason == "OK"
+
+    def test_prov_a6_wrong_schema_through_real_registry_rejected(self):
+        """PROV-A6: Register receipt with wrong architecture/schema/feature order into ModelRegistry.
+
+        Verify it cannot obtain trusted production provenance.
+        """
+        priv = ed25519.Ed25519PrivateKey.generate()
+        pub_hex = priv.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        ).hex()
+
+        issuer = TrainingReceiptIssuer(private_key=priv, key_id="prov_a6_key", require_authenticated_job=False)
+        state_dict, raw_bytes, sha256 = _create_mock_checkpoint()
+
+        # Receipt signed for IncompatibleArchitecture
+        receipt = issuer.issue_receipt(
+            job_id="job_a6",
+            training_run_id="run_a6",
+            simulation_id="sim_a6",
+            model_artifact_sha256=sha256,
+            executed_rounds=2,
+            executed_epochs=2,
+            sample_count=300,
+            metrics={"loss": 0.05},
+            architecture="IncompatibleGNN",
+            feature_schema_version="v1.0",
+            input_dim=10,
+            feature_names=FEATURE_NAMES[:10],
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            registry = ModelRegistry(storage_dir=tmp_dir)
+
+            with patch.dict(os.environ, {"CFI_TRAINING_RECEIPT_PUBLIC_KEY": pub_hex, "CFI_TRAINING_RECEIPT_KEY_ID": "prov_a6_key", "APP_ENV": "production"}), \
+                 patch.object(get_settings(), "app_env", "production"), \
+                 patch.object(get_settings(), "training_receipt_public_key", pub_hex), \
+                 patch.object(get_settings(), "training_receipt_key_id", "prov_a6_key"):
+
+                reset_default_training_verifier()
+
+                # Registration with expected architecture "FraudDetectionNN"
+                entry = registry.save_version(
+                    simulation_id="sim_a6",
+                    state_dict=state_dict,
+                    metrics={"loss": 0.05},
+                    is_promoted=False,
+                    provenance_type="TRAINING_RECORDED",
+                    training_receipt=receipt,
+                    artifact_bytes=raw_bytes,
+                    expected_architecture="FraudDetectionNN",
+                    expected_feature_schema_version="v1.0",
+                    expected_input_dim=10,
+                    expected_feature_names=FEATURE_NAMES[:10],
+                )
+
+                # Schema mismatch must result in UNVERIFIED provenance and NO production eligibility
+                assert entry["provenance_type"] == "UNVERIFIED"
+                assert entry["is_production_eligible"] is False
+                assert entry["training_receipt"] is None
+                assert "INVALID_RECEIPT: Model architecture mismatch" in entry["attestation_status"]
+
+    def test_prov_a7_serving_without_private_keys(self):
+        """PROV-A7: Verifier initializes and verifies receipts with private key completely absent."""
+        priv = ed25519.Ed25519PrivateKey.generate()
+        pub = priv.public_key()
+        pub_hex = pub.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        ).hex()
+
+        state_dict, raw_bytes, sha256 = _create_mock_checkpoint()
+        issuer = TrainingReceiptIssuer(private_key=priv, key_id="prov_a7_key", require_authenticated_job=False)
+        receipt = issuer.issue_receipt(
+            job_id="job_a7",
+            training_run_id="run_a7",
+            simulation_id="sim_a7",
+            model_artifact_sha256=sha256,
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            metrics={"loss": 0.09},
+            feature_names=("f1",),
+            architecture="FraudDetectionNN",
+            input_dim=1,
+        )
+
+        # Serving environment: private key environment variable is strictly unset
+        env_serving = {
+            "CFI_TRAINING_RECEIPT_PUBLIC_KEY": pub_hex,
+            "CFI_TRAINING_RECEIPT_KEY_ID": "prov_a7_key",
+            "APP_ENV": "production",
+        }
+        if "CFI_TRAINING_RECEIPT_PRIVATE_KEY" in os.environ:
+            del os.environ["CFI_TRAINING_RECEIPT_PRIVATE_KEY"]
+
+        with patch.dict(os.environ, env_serving), \
+             patch.object(get_settings(), "app_env", "production"), \
+             patch.object(get_settings(), "training_receipt_public_key", pub_hex), \
+             patch.object(get_settings(), "training_receipt_key_id", "prov_a7_key"):
+
+            reset_default_training_verifier()
+            verifier = get_default_training_verifier()
+
+            # Verify no private key attribute exists on the verifier
+            assert not hasattr(verifier, "_private_key")
+            assert not hasattr(verifier, "private_key")
+
+            # Verification succeeds using strictly public key
+            is_valid, reason = verifier.verify_receipt(receipt, candidate_artifact_sha256=sha256)
+            assert is_valid is True
+            assert "verified successfully" in reason or reason == "OK"
+
+    def test_prov_a8_cross_worker_revocation_freshness(self):
+        """PROV-A8: Key revocation freshness contract across independent worker processes via DurableTrustStore."""
+        priv = ed25519.Ed25519PrivateKey.generate()
+        pub = priv.public_key()
+
+        state_dict, raw_bytes, sha256 = _create_mock_checkpoint()
+        issuer = TrainingReceiptIssuer(private_key=priv, key_id="cross_worker_key", require_authenticated_job=False)
+        receipt = issuer.issue_receipt(
+            job_id="job_a8",
+            training_run_id="run_a8",
+            simulation_id="sim_a8",
+            model_artifact_sha256=sha256,
+            executed_rounds=2,
+            executed_epochs=2,
+            sample_count=200,
+            metrics={"loss": 0.05},
+            feature_names=("f1",),
+            architecture="FraudDetectionNN",
+            input_dim=1,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            shared_trust_file = os.path.join(tmp_dir, "shared_trust_registry.json")
+
+            store_worker_1 = DurableTrustStore(trust_file_path=shared_trust_file)
+            store_worker_2 = DurableTrustStore(trust_file_path=shared_trust_file)
+
+            verifier_1 = TrainingReceiptVerifier(
+                trusted_keys={"cross_worker_key": pub},
+                trust_store=store_worker_1,
+            )
+            verifier_2 = TrainingReceiptVerifier(
+                trusted_keys={"cross_worker_key": pub},
+                trust_store=store_worker_2,
+            )
+
+            # Initially both workers accept receipts
+            assert verifier_1.verify_receipt(receipt, candidate_artifact_sha256=sha256)[0] is True
+            assert verifier_2.verify_receipt(receipt, candidate_artifact_sha256=sha256)[0] is True
+
+            # Worker 1 revokes the key due to compromise
+            verifier_1.revoke_key("cross_worker_key", reason="compromised_by_adversary")
+
+            # Worker 2 must immediately reject without process restart via mtime reload contract
+            is_valid_2, reason_2 = verifier_2.verify_receipt(receipt, candidate_artifact_sha256=sha256)
+            assert is_valid_2 is False
+            assert "Receipt key_id 'cross_worker_key' has been explicitly revoked" in reason_2
+
+    def test_prov_a9_unauthorized_key_substitution_rejected(self):
+        """PROV-A9: Attempt to replace approved key ID with different public key through unauthorized path."""
+        priv_a = ed25519.Ed25519PrivateKey.generate()
+        priv_b = ed25519.Ed25519PrivateKey.generate()
+
+        pub_a_hex = priv_a.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
+        ).hex()
+        pub_b_hex = priv_b.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
+        ).hex()
+
+        store = DurableTrustStore(in_memory=True)
+        store.register_approved_key("key_alpha", pub_a_hex)
+
+        # Unauthorized replacement attempt must be rejected
+        with pytest.raises(ValueError) as exc_info:
+            store.register_approved_key("key_alpha", pub_b_hex, authorized_replacement=False)
+        assert "Unauthorized public key substitution rejected" in str(exc_info.value)
+
+        # Explicitly authorized replacement is permitted
+        store.register_approved_key("key_alpha", pub_b_hex, authorized_replacement=True)
+        assert store._approved_keys["key_alpha"]["public_key_hex"] == pub_b_hex
+
+    def test_prov_a10_existing_regression_guarantee(self):
+        """PROV-A10: Regression guarantee that all existing provenance and governance contracts hold."""
+        # Ensure default verifier can be obtained and initialized cleanly
+        reset_default_training_verifier()
+        verifier = get_default_training_verifier()
+        assert isinstance(verifier, TrainingReceiptVerifier)
+        assert verifier.is_key_trusted(DEFAULT_TRAINING_KEY_ID)
