@@ -27,6 +27,12 @@ from sklearn.metrics import (
 )
 from torch.utils.data import DataLoader, TensorDataset
 
+from app.domain.model_serving_errors import (
+    ModelCompatibilityError,
+    ModelExecutionError,
+    ModelIntegrityError,
+    ModelNotAvailableError,
+)
 from app.domain.value_objects import ModelWeights
 
 if TYPE_CHECKING:
@@ -900,20 +906,101 @@ class ModelService:
 
         return {name: float(imp) for name, imp in zip(names, importance, strict=False)}
 
-    def get_champion(self) -> FraudDetectionModel:
-        """Retrieve or instantiate active champion model for production scoring."""
-        model = self.create_model(dp_compatible=True)
+    def get_champion(
+        self,
+        dp_compatible: bool | None = True,
+        registry: Any | None = None,
+    ) -> FraudDetectionModel:
+        """Retrieve and validate the active trained champion model for production scoring.
+
+        Loads actual trained weights from ModelRegistry.
+        Rejects missing models, invalid parameters, or incompatible normalization.
+        Returns the verified model in evaluation mode.
+        """
+        from app.application.services.model_registry import ModelRegistry
+
+        reg = registry or ModelRegistry()
+        artifact_path = reg.get_champion_artifact_path()
+        if not artifact_path:
+            raise ModelNotAvailableError("No trained champion model artifact found in registry.")
+
+        try:
+            state_dict = torch.load(artifact_path, map_location=self.device, weights_only=True)
+        except Exception as exc:
+            logger.error("Failed to load champion artifact %s: %s", artifact_path, exc)
+            raise ModelIntegrityError(f"Champion artifact could not be deserialized: {exc}") from exc
+
+        if not isinstance(state_dict, dict):
+            raise ModelIntegrityError("Champion artifact is not a valid state dictionary.")
+
+        # Check normalization compatibility
+        is_batchnorm = any(
+            "running_mean" in k or "running_var" in k or "num_batches_tracked" in k
+            for k in state_dict
+        )
+
+        effective_dp: bool
+        if dp_compatible is None:
+            effective_dp = not is_batchnorm
+        else:
+            effective_dp = dp_compatible
+            if effective_dp and is_batchnorm:
+                raise ModelCompatibilityError(
+                    "Champion artifact was trained with BatchNorm, which is incompatible "
+                    "with GroupNorm (dp_compatible=True). Automatic conversion is prohibited."
+                )
+            if not effective_dp and not is_batchnorm:
+                raise ModelCompatibilityError(
+                    "Champion artifact was trained with GroupNorm, which is incompatible "
+                    "with BatchNorm (dp_compatible=False)."
+                )
+
+        # Dimension validation
+        first_layer_weight = state_dict.get("network.0.weight")
+        if first_layer_weight is not None:
+            in_dim = int(first_layer_weight.shape[1])
+            if in_dim != NUM_FEATURES:
+                raise ModelCompatibilityError(
+                    f"Model input dimension mismatch: artifact expects {in_dim} features, "
+                    f"but system requires {NUM_FEATURES}."
+                )
+
+        model = self.create_model(input_dim=NUM_FEATURES, dp_compatible=effective_dp)
+
+        try:
+            model.load_state_dict(state_dict, strict=True)
+        except (RuntimeError, ValueError) as exc:
+            raise ModelCompatibilityError(
+                f"Strict parameter loading failed for champion model: {exc}"
+            ) from exc
+
         model.eval()
+
+        # Sanity check forward pass
+        try:
+            with torch.no_grad():
+                dummy_input = torch.zeros(1, NUM_FEATURES, device=self.device)
+                test_out = model(dummy_input)
+                if not torch.isfinite(test_out).all():
+                    raise ModelExecutionError("Champion sanity check produced non-finite values (NaN/Inf).")
+                val = float(test_out.item()) if hasattr(test_out, "item") else float(test_out[0])
+                if not (0.0 <= val <= 1.0):
+                    raise ModelExecutionError(f"Champion sanity check produced invalid score {val} outside [0.0, 1.0].")
+        except ModelExecutionError:
+            raise
+        except Exception as exc:
+            raise ModelExecutionError(f"Champion sanity check forward pass failed: {exc}") from exc
+
         return model
 
     def invalidate_model_cache(self) -> None:
-        """Deletes Redis champion model cache key and publishes model_updated event to Redis PubSub."""
+        """Deletes Redis champion model cache keys and publishes model_updated event to Redis PubSub."""
         try:
             from app.infrastructure.cache import get_redis_client
 
             client = get_redis_client()
             if client:
-                client.delete("cfi:champion_model")
+                client.delete("cfi:champion_model", "cfi:champion_model:auth")
                 client.publish("cfi:model_events", "model_updated")
                 logger.info(
                     "Invalidated Redis champion model cache (cfi:champion_model) and published PubSub event."

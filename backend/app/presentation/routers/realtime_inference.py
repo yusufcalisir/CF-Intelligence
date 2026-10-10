@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import io
+import json
 import logging
-import pickle
 import threading
 import time
 from typing import Any
 
 import torch
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Header, HTTPException, Request, status
 
 from app.application.schemas.transaction import (
     InferenceQuotaResponse,
@@ -23,13 +25,17 @@ from app.domain.inference_fallback import (
     InferenceDecision,
     InferenceFallbackEngine,
 )
+from app.domain.model_serving_errors import (
+    ModelCompatibilityError,
+    ModelExecutionError,
+    ModelIntegrityError,
+    ModelNotAvailableError,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/inference", tags=["Real-Time Inference"])
 api_router = APIRouter(prefix="/api/v1/inference", tags=["Real-Time Inference"])
-
-
 
 fallback_engine = InferenceFallbackEngine()
 
@@ -59,105 +65,156 @@ def reset_model_cache() -> None:
         _cached_from_redis = False
 
 
-def get_scripted_model() -> tuple[Any, bool]:
-    """Retrieve or compile PyTorch TorchScript JIT champion model with Redis caching.
+def _is_demo_mode_active() -> bool:
+    """Check if demonstration/simulation fallback is explicitly permitted."""
+    settings = get_settings()
+    env = settings.app_env.lower()
+    if env == "production":
+        return False
+    return env in ("demo", "simulation") or settings.enable_demo_fallback
 
-    Uses dp_compatible=True (GroupNorm) to ensure deterministic forward pass
-    required by torch.jit.trace sanity checks.
+
+def get_scripted_model() -> tuple[Any, bool]:
+    """Retrieve or compile PyTorch TorchScript JIT champion model with secure Redis caching.
+
+    Enforces cryptographic provenance, trusted local champion loading, and strict parameter verification.
+    Never falls back to unsafe deserialization (pickle) or random weights.
     """
     global _cached_scripted_model, _cached_from_redis
 
-    if _cached_scripted_model is not None:
-        return _cached_scripted_model, _cached_from_redis
+    # 1. Thread-safe check of process-local cache
+    with _cb_lock:
+        if _cached_scripted_model is not None:
+            return _cached_scripted_model, _cached_from_redis
 
-    # Try Redis cache first
+    settings = get_settings()
+    from app.application.services.model_service import NUM_FEATURES, ModelService
+
+    # 2. Try Redis cache with strict HMAC authentication and SHA-256 integrity verification
     try:
         from app.infrastructure.cache import get_redis_client
 
         redis_client = get_redis_client()
         if redis_client:
             cached_bytes = redis_client.get("cfi:champion_model")
+            cached_auth_bytes = redis_client.get("cfi:champion_model:auth")
+
             if cached_bytes:
-                try:
-                    buffer = io.BytesIO(cached_bytes)
-                    _cached_scripted_model = torch.jit.load(buffer)
-                except Exception:
-                    _cached_scripted_model = pickle.loads(cached_bytes)  # nosec B301
-                _cached_from_redis = True
-                logger.info(
-                    "Loaded champion TorchScript model from Redis cache (cfi:champion_model)."
-                )
-                return _cached_scripted_model, True
+                if not cached_auth_bytes:
+                    logger.warning(
+                        "Redis model cache entry missing HMAC authentication envelope (cfi:champion_model:auth); "
+                        "rejecting unauthenticated payload."
+                    )
+                else:
+                    try:
+                        auth_data = json.loads(
+                            cached_auth_bytes.decode("utf-8")
+                            if isinstance(cached_auth_bytes, bytes)
+                            else cached_auth_bytes
+                        )
+                        expected_hmac = hmac.new(
+                            settings.payload_signing_secret.encode("utf-8"),
+                            cached_bytes,
+                            hashlib.sha256,
+                        ).hexdigest()
+                        claimed_hmac = auth_data.get("hmac", "")
+
+                        if not hmac.compare_digest(expected_hmac, claimed_hmac):
+                            logger.warning(
+                                "Redis model cache failed HMAC authenticity verification; "
+                                "rejecting untrusted/poisoned payload."
+                            )
+                        else:
+                            expected_sha256 = hashlib.sha256(cached_bytes).hexdigest()
+                            claimed_sha256 = auth_data.get("sha256", "")
+                            if not hmac.compare_digest(expected_sha256, claimed_sha256):
+                                logger.warning(
+                                    "Redis model cache SHA-256 digest mismatch; corrupt cached bytes."
+                                )
+                            else:
+                                # Authenticated! Load via TorchScript JIT only. Never use pickle.
+                                buffer = io.BytesIO(cached_bytes)
+                                loaded_jit = torch.jit.load(buffer, map_location="cpu")
+                                loaded_jit.eval()
+
+                                # Forward sanity check
+                                dummy = torch.zeros(1, NUM_FEATURES)
+                                with torch.no_grad():
+                                    test_val = loaded_jit(dummy)
+                                    if torch.isfinite(test_val).all():
+                                        with _cb_lock:
+                                            _cached_scripted_model = loaded_jit
+                                            _cached_from_redis = True
+                                        logger.info(
+                                            "Loaded authenticated champion TorchScript model from Redis cache."
+                                        )
+                                        return loaded_jit, True
+                                    logger.warning(
+                                        "Cached TorchScript model sanity check produced non-finite values."
+                                    )
+                    except Exception as parse_err:
+                        logger.warning(
+                            "Failed to load authenticated model from Redis cache: %s; falling back to local registry.",
+                            parse_err,
+                        )
     except Exception as exc:
-        logger.debug("Redis cache miss or read error: %s", exc)
+        logger.debug("Redis cache read error or unavailable: %s", exc)
 
-    # Compile fresh TorchScript model — always use dp_compatible=True (GroupNorm)
-    # so the forward graph is fully deterministic and passes jit.trace sanity checks.
-    from app.application.services.model_service import NUM_FEATURES, ModelService
-
-    settings = get_settings()
+    # 3. Load genuine champion model from ModelRegistry via ModelService
     svc = ModelService(settings)
-
-    # Build a fresh GroupNorm model and attempt to load existing champion weights.
-    # If weights are incompatible (e.g. BatchNorm keys), fall back to a randomly
-    # initialised GroupNorm model which is still safe for serving.
-    import os
-
     from app.application.services.model_registry import ModelRegistry
 
     registry = ModelRegistry()
-    fresh_model = svc.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
-    global_path = os.path.join(registry.storage_dir, "global_model.pt")
-    if os.path.exists(global_path):
-        try:
-            state_dict = torch.load(global_path, map_location="cpu", weights_only=True)
-            # Only load keys that match the GroupNorm architecture
-            compatible = {
-                k: v
-                for k, v in state_dict.items()
-                if "running_mean" not in k
-                and "running_var" not in k
-                and "num_batches_tracked" not in k
-            }
-            missing, unexpected = fresh_model.load_state_dict(compatible, strict=False)
-            if missing:
-                logger.debug("JIT model: %d keys not loaded (expected for GroupNorm)", len(missing))
-        except Exception as exc:
-            logger.warning(
-                "Champion weights incompatible with GroupNorm model: %s — using random init", exc
-            )
 
-    fresh_model.eval()
+    # Loads actual trained weights; strictly rejects missing, incomplete, or incompatible checkpoints
+    champion_model = svc.get_champion(dp_compatible=True, registry=registry)
+    champion_model.eval()
 
-    # Use torch.jit.trace with check_trace=False to avoid stochastic sanity check failures.
-    # The GroupNorm model is deterministic; we skip the re-trace check for performance.
+    # 4. Compile TorchScript JIT model
     dummy_input = torch.zeros(1, NUM_FEATURES)
     try:
-        scripted = torch.jit.trace(fresh_model, dummy_input, check_trace=False)
-        logger.info("TorchScript JIT model compiled successfully (GroupNorm, check_trace=False).")
+        scripted = torch.jit.trace(champion_model, dummy_input, check_trace=False)
+        if isinstance(scripted, torch.nn.Module):
+            scripted.eval()
+        logger.info("TorchScript JIT model compiled successfully from verified champion weights.")
     except Exception as exc:
-        logger.warning("TorchScript tracing failed (%s); using raw PyTorch model", exc)
-        scripted = fresh_model
+        logger.warning("TorchScript tracing failed (%s); using verified PyTorch model directly", exc)
+        scripted = champion_model
 
-    _cached_scripted_model = scripted
-    _cached_from_redis = False
+    # Atomic publication to local cache under thread lock
+    with _cb_lock:
+        _cached_scripted_model = scripted
+        _cached_from_redis = False
 
-    # Store in Redis safely using io.BytesIO buffer
+    # 5. Securely populate Redis cache with authenticated envelope (never pickle)
     try:
         from app.infrastructure.cache import get_redis_client
 
         redis_client = get_redis_client()
         if redis_client:
-            try:
-                buffer = io.BytesIO()
-                torch.jit.save(scripted, buffer)
-                redis_client.set("cfi:champion_model", buffer.getvalue(), ex=3600)
-            except Exception:
-                redis_client.set("cfi:champion_model", pickle.dumps(scripted), ex=3600)  # nosec B301
+            buffer = io.BytesIO()
+            torch.jit.save(scripted, buffer)
+            model_bytes = buffer.getvalue()
+            model_hmac = hmac.new(
+                settings.payload_signing_secret.encode("utf-8"),
+                model_bytes,
+                hashlib.sha256,
+            ).hexdigest()
+            model_sha256 = hashlib.sha256(model_bytes).hexdigest()
+            auth_envelope = json.dumps(
+                {
+                    "hmac": model_hmac,
+                    "sha256": model_sha256,
+                    "cached_at": time.time(),
+                }
+            )
+            redis_client.set("cfi:champion_model", model_bytes, ex=3600)
+            redis_client.set("cfi:champion_model:auth", auth_envelope, ex=3600)
+            logger.info("Cached champion model in Redis with HMAC authentication envelope.")
     except Exception as exc:
         logger.debug("Failed to store champion model in Redis: %s", exc)
 
-    return _cached_scripted_model, False
+    return scripted, False
 
 
 @router.get("/quota", response_model=InferenceQuotaResponse)
@@ -199,11 +256,14 @@ def get_inference_quota(
 def score_transaction_realtime(
     payload: RealtimeInferenceRequest,
 ) -> RealtimeInferenceResponse:
-    """Scores an incoming transaction in real time with JIT model, Redis cache hit, and circuit breaker."""
+    """Scores an incoming transaction in real time with verified champion model, Redis caching, and circuit breaker."""
     global _consecutive_failures, _circuit_open, _circuit_opened_at
 
     start_time = time.perf_counter()
     now = time.time()
+    settings = get_settings()
+    is_production = settings.app_env.lower() == "production"
+    demo_active = _is_demo_mode_active()
 
     # 1. Check Circuit Breaker State (60s cooldown) under thread lock
     with _cb_lock:
@@ -215,9 +275,78 @@ def score_transaction_realtime(
             logger.info("Circuit Breaker cooldown elapsed. Attempting model recovery...")
             reset_circuit_breaker()
         else:
-            logger.warning(
-                "Circuit Breaker is OPEN (3 consecutive failures). Routing directly to heuristic fallback."
+            logger.warning("Circuit Breaker is OPEN (3 consecutive failures).")
+            if demo_active:
+                decision, risk_score, explanation = fallback_engine.evaluate_heuristic_fallback(
+                    amount=payload.amount,
+                    velocity_1h=payload.velocity_1h,
+                    merchant_category=payload.merchant_category,
+                )
+                latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                return RealtimeInferenceResponse(
+                    transaction_id=payload.transaction_id,
+                    risk_score=risk_score,
+                    decision=decision,
+                    latency_ms=latency_ms,
+                    evaluated_by="HEURISTIC_FALLBACK",
+                    explanation=f"[Circuit Breaker Open] {explanation}",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": "CIRCUIT_BREAKER_OPEN",
+                    "message": "Inference circuit breaker is open due to consecutive failures; scoring unavailable.",
+                },
             )
+
+    # 2. Check Simulation Fallback request
+    if payload.force_fallback:
+        if is_production:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "SIMULATION_NOT_ALLOWED",
+                    "message": "Simulation fallback is disabled in production environment.",
+                },
+            )
+        if not demo_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "DEMO_MODE_DISABLED",
+                    "message": "Simulation fallback is not enabled.",
+                },
+            )
+        # Record failure strike in demo mode
+        with _cb_lock:
+            _consecutive_failures += 1
+            cur_failures = _consecutive_failures
+            if cur_failures >= 3:
+                _circuit_open = True
+                _circuit_opened_at = time.time()
+                logger.error("Inference Circuit Breaker TRIPPED OPEN after 3 simulated failures!")
+
+        decision, risk_score, explanation = fallback_engine.evaluate_heuristic_fallback(
+            amount=payload.amount,
+            velocity_1h=payload.velocity_1h,
+            merchant_category=payload.merchant_category,
+        )
+        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        return RealtimeInferenceResponse(
+            transaction_id=payload.transaction_id,
+            risk_score=risk_score,
+            decision=decision,
+            latency_ms=latency_ms,
+            evaluated_by="HEURISTIC_FALLBACK",
+            explanation=f"[Simulation Fallback] {explanation}",
+        )
+
+    # 3. Retrieve verified champion model (fail-closed if unavailable or corrupt)
+    try:
+        scripted_model, from_redis = get_scripted_model()
+    except ModelNotAvailableError as exc:
+        logger.warning("Champion model unavailable for transaction %s: %s", payload.transaction_id, exc)
+        if demo_active:
             decision, risk_score, explanation = fallback_engine.evaluate_heuristic_fallback(
                 amount=payload.amount,
                 velocity_1h=payload.velocity_1h,
@@ -230,17 +359,42 @@ def score_transaction_realtime(
                 decision=decision,
                 latency_ms=latency_ms,
                 evaluated_by="HEURISTIC_FALLBACK",
-                explanation=f"[Circuit Breaker Open] {explanation}",
+                explanation=f"[Model Not Ready - Demo Fallback] {explanation}",
             )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "MODEL_NOT_READY",
+                "message": "A verified champion model is not currently available.",
+            },
+        ) from exc
+    except (ModelIntegrityError, ModelCompatibilityError) as exc:
+        logger.error("Champion model verification failed for transaction %s: %s", payload.transaction_id, exc)
+        if demo_active:
+            decision, risk_score, explanation = fallback_engine.evaluate_heuristic_fallback(
+                amount=payload.amount,
+                velocity_1h=payload.velocity_1h,
+                merchant_category=payload.merchant_category,
+            )
+            latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            return RealtimeInferenceResponse(
+                transaction_id=payload.transaction_id,
+                risk_score=risk_score,
+                decision=decision,
+                latency_ms=latency_ms,
+                evaluated_by="HEURISTIC_FALLBACK",
+                explanation=f"[Model Verification Failed - Demo Fallback] {explanation}",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "MODEL_NOT_READY",
+                "message": "A verified champion model is not currently available.",
+            },
+        ) from exc
 
+    # 4. Construct feature tensor (10 features)
     try:
-        if payload.force_fallback:
-            raise RuntimeError("Forced simulation fallback")
-
-        # 2. Get TorchScript Model (Redis cache or JIT)
-        scripted_model, from_redis = get_scripted_model()
-
-        # 3. Construct canonical input feature vector (10 features) aligned with FEATURE_NAMES
         from app.application.services.data_generator import MERCHANT_CATEGORIES
 
         cat_str = payload.merchant_category.lower()
@@ -264,16 +418,25 @@ def score_transaction_realtime(
         ]
         input_tensor = torch.tensor([features], dtype=torch.float32)
 
-        # 4. TorchScript JIT Inference
+        # 5. Execute inference and validate model output contract
         with torch.no_grad():
             output = scripted_model(input_tensor)
-            model_score = float(output.item()) if hasattr(output, "item") else float(output[0])
 
-        # Reset consecutive failures on success
+            # Contract validation
+            if not isinstance(output, torch.Tensor):
+                raise ModelExecutionError(f"Model returned non-tensor output of type {type(output)}")
+            if not torch.isfinite(output).all():
+                raise ModelExecutionError("Model inference produced non-finite output (NaN or Inf).")
+
+            model_score = float(output.item()) if hasattr(output, "item") else float(output[0])
+            if not (0.0 <= model_score <= 1.0):
+                raise ModelExecutionError(f"Model output score {model_score} outside valid range [0.0, 1.0].")
+
+        # Success: reset consecutive failures under lock
         with _cb_lock:
             _consecutive_failures = 0
 
-        # High amount rule overlay
+        # Business rule overlay
         reasons: list[str] = []
         final_score = model_score
         if payload.amount > 20000.0:
@@ -298,7 +461,6 @@ def score_transaction_realtime(
             "; ".join(reasons) if reasons else "Normal risk profile"
         )
 
-        # Record telemetry
         from app.infrastructure import telemetry
 
         telemetry.cfi_inference_latency_ms.observe(latency_ms)
@@ -312,7 +474,10 @@ def score_transaction_realtime(
             explanation=explanation,
         )
 
+    except HTTPException:
+        raise
     except Exception as exc:
+        # Runtime inference execution failure trips circuit breaker
         with _cb_lock:
             _consecutive_failures += 1
             cur_failures = _consecutive_failures
@@ -322,24 +487,32 @@ def score_transaction_realtime(
                 logger.error("Inference Circuit Breaker TRIPPED OPEN after 3 failures!")
 
         logger.warning(
-            "Primary ML inference failed for tx %s (strike %d/3: %s).",
+            "Primary ML inference execution failed for tx %s (strike %d/3: %s).",
             payload.transaction_id,
             cur_failures,
             exc,
         )
 
-        decision, risk_score, explanation = fallback_engine.evaluate_heuristic_fallback(
-            amount=payload.amount,
-            velocity_1h=payload.velocity_1h,
-            merchant_category=payload.merchant_category,
-        )
-        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        if demo_active:
+            decision, risk_score, explanation = fallback_engine.evaluate_heuristic_fallback(
+                amount=payload.amount,
+                velocity_1h=payload.velocity_1h,
+                merchant_category=payload.merchant_category,
+            )
+            latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            return RealtimeInferenceResponse(
+                transaction_id=payload.transaction_id,
+                risk_score=risk_score,
+                decision=decision,
+                latency_ms=latency_ms,
+                evaluated_by="HEURISTIC_FALLBACK",
+                explanation=f"[Inference Error - Demo Fallback] {explanation}",
+            )
 
-        return RealtimeInferenceResponse(
-            transaction_id=payload.transaction_id,
-            risk_score=risk_score,
-            decision=decision,
-            latency_ms=latency_ms,
-            evaluated_by="HEURISTIC_FALLBACK",
-            explanation=explanation,
-        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "INFERENCE_FAILED",
+                "message": "Inference execution failed.",
+            },
+        ) from exc

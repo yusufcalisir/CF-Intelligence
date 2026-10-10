@@ -30,6 +30,14 @@ def setup_function() -> None:
     """Reset circuit breaker and model cache state before each test."""
     reset_circuit_breaker()
     reset_model_cache()
+    get_settings().enable_demo_fallback = True
+
+
+def teardown_function() -> None:
+    """Clean up demo fallback state after test."""
+    reset_circuit_breaker()
+    reset_model_cache()
+    get_settings().enable_demo_fallback = False
 
 
 def test_heuristic_fallback_engine_evaluations() -> None:

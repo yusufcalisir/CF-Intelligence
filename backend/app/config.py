@@ -36,6 +36,11 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("enable_demo_data_seeding", "cfi_enable_demo_seeding"),
         description="Explicit opt-in required to generate mock/demo data. Never runs by default.",
     )
+    enable_demo_fallback: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("enable_demo_fallback", "cfi_enable_demo_fallback"),
+        description="Explicit opt-in required to allow heuristic fallback for simulated workflows. Disabled by default in production.",
+    )
 
     # ── FastAPI & CORS ────────────────────────
     api_host: str = "0.0.0.0"  # nosec B104

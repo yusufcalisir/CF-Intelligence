@@ -7,6 +7,7 @@ Global models are saved per simulation run with metrics metadata.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import logging
 import os
@@ -19,6 +20,15 @@ from typing import Any
 import torch
 
 logger = logging.getLogger(__name__)
+
+
+def compute_file_sha256(filepath: str) -> str:
+    """Compute SHA-256 hex digest of a file on disk."""
+    hasher = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        while chunk := f.read(65536):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 class ModelRegistry:
@@ -149,6 +159,7 @@ class ModelRegistry:
                     if entry.get("status") == "champion":
                         entry["status"] = "inactive"
 
+            file_sha256 = compute_file_sha256(filepath)
             entry = {
                 "version": next_version,
                 "filename": filename,
@@ -157,6 +168,7 @@ class ModelRegistry:
                 "status": status if status != "inactive" or not is_promoted else "champion",
                 "git_commit_hash": git_commit_hash or "unknown",
                 "dataset_hash": dataset_hash or "unknown",
+                "sha256": file_sha256,
                 "dp_noise_profile": dp_noise_profile
                 or {"mechanism": "none", "epsilon": 0.0, "delta": 0.0},
                 "sign_offs": [],
@@ -170,6 +182,63 @@ class ModelRegistry:
                 self._update_global_model_link(simulation_id, filepath)
 
             return entry
+
+    def get_champion_artifact_path(self) -> str | None:
+        """Resolve the active champion model file path on disk.
+
+        Checks global_model.pt in storage_dir first.
+        If absent, scans simulation manifests to locate any active champion.
+        Returns the existing file path or None if no champion exists.
+        """
+        with self._lock:
+            global_path = os.path.join(self.storage_dir, "global_model.pt")
+            if os.path.isfile(global_path) and os.path.getsize(global_path) > 0:
+                return global_path
+
+            if os.path.isdir(self.registry_root):
+                for sim_id in os.listdir(self.registry_root):
+                    sim_dir = os.path.join(self.registry_root, sim_id)
+                    if not os.path.isdir(sim_dir):
+                        continue
+                    manifest = self._load_manifest(sim_id)
+                    for entry in manifest:
+                        if entry.get("status") == "champion" and entry.get("is_active"):
+                            candidate = os.path.join(sim_dir, entry.get("filename", ""))
+                            if os.path.isfile(candidate) and os.path.getsize(candidate) > 0:
+                                return candidate
+            return None
+
+    def get_champion_metadata(self) -> dict[str, Any] | None:
+        """Return metadata for the currently active champion model."""
+        with self._lock:
+            path = self.get_champion_artifact_path()
+            if not path:
+                return None
+
+            if os.path.isdir(self.registry_root):
+                for sim_id in os.listdir(self.registry_root):
+                    sim_dir = os.path.join(self.registry_root, sim_id)
+                    if not os.path.isdir(sim_dir):
+                        continue
+                    manifest = self._load_manifest(sim_id)
+                    for entry in manifest:
+                        if entry.get("status") == "champion" and entry.get("is_active"):
+                            meta = dict(entry)
+                            meta["simulation_id"] = sim_id
+                            meta["artifact_path"] = path
+                            if "sha256" not in meta:
+                                meta["sha256"] = compute_file_sha256(path)
+                            return meta
+
+            return {
+                "version": 1,
+                "filename": os.path.basename(path),
+                "status": "champion",
+                "is_active": True,
+                "artifact_path": path,
+                "sha256": compute_file_sha256(path),
+                "created_at": datetime.now(UTC).isoformat(),
+            }
 
     def _update_global_model_link(self, simulation_id: str, filepath: str) -> None:
         """Update the root global_model.pt file to point to the active version."""
