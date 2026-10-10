@@ -158,6 +158,17 @@ def test_request_with_expired_timestamp_is_rejected() -> None:
     assert "expired" in resp.json()["detail"]
 
 
+def test_unconfigured_signing_secret_on_node_fails_closed(monkeypatch: Any) -> None:
+    """If the bank client node has an empty signing secret, requests fail-closed with 500."""
+    from app.presentation.routers import bank_client
+    monkeypatch.setattr(bank_client._settings, "payload_signing_secret", "")
+
+    payload = {"bank_id": "bank_a", "num_transactions": 500, "seed": 42}
+    resp = client.post("/api/v1/bank-client/initialize", json=payload)
+    assert resp.status_code == 500
+    assert "Payload signing secret is not configured" in resp.json()["detail"]
+
+
 # ── Distributed Simulation Tests ─────────────────────────────────────────────
 
 

@@ -35,6 +35,7 @@ class RESTBankConnector(BaseBankConnector):
         oauth_token_url: str = "",
         client_cert_path: str = "",
         client_key_path: str = "",
+        signing_secret: str | None = None,
     ) -> None:
         self.base_url = base_url
         self.auth_type = auth_type
@@ -48,6 +49,7 @@ class RESTBankConnector(BaseBankConnector):
         from app.config import get_settings
 
         self.settings = get_settings()
+        self.signing_secret = signing_secret
 
     def _get_headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -64,9 +66,11 @@ class RESTBankConnector(BaseBankConnector):
         import json
 
         body_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        secret = self.settings.payload_signing_secret
-        if not secret:
-            return body_bytes, headers
+        secret = self.signing_secret or self.settings.payload_signing_secret
+        if not secret or not str(secret).strip():
+            raise AuthenticationError(
+                "Outbound bank dispatch requires a configured, non-empty payload_signing_secret"
+            )
         import hashlib
         import hmac
         import time

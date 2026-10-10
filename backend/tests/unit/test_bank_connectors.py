@@ -155,3 +155,42 @@ def test_factory_connector_resolution():
     assert isinstance(conn_a, StreamingPaymentConnector)
     assert isinstance(conn_b, ISO20022MessagingConnector)
     assert isinstance(conn_c, BatchEODFileConnector)
+
+
+def test_rest_connector_signs_payload_with_hmac():
+    """Verify RESTBankConnector generates valid HMAC-SHA256 headers."""
+    connector = RESTBankConnector(
+        base_url="http://localhost:8000",
+        signing_secret="test_secret_key_12345",
+    )
+    payload = {"bank_id": "bank_a", "step": "init"}
+    body_bytes, headers = connector._sign_payload(payload, {"Content-Type": "application/json"})
+
+    assert "X-Payload-Signature" in headers
+    assert "X-Payload-Timestamp" in headers
+    import hashlib
+    import hmac
+
+    expected = hmac.new(
+        b"test_secret_key_12345",
+        headers["X-Payload-Timestamp"].encode("utf-8") + b"." + body_bytes,
+        hashlib.sha256,
+    ).hexdigest()
+    assert headers["X-Payload-Signature"] == expected
+
+
+def test_rest_connector_missing_signing_secret_fails_closed():
+    """Verify RESTBankConnector refuses outbound dispatch when signing secret is empty."""
+    import pytest
+    from app.infrastructure.connectors.rest_connector import AuthenticationError
+
+    connector = RESTBankConnector(
+        base_url="http://localhost:8000",
+        signing_secret="",
+    )
+    # Also override settings to empty
+    connector.settings.payload_signing_secret = ""
+
+    payload = {"bank_id": "bank_a", "step": "init"}
+    with pytest.raises(AuthenticationError, match="requires a configured, non-empty payload_signing_secret"):
+        connector._sign_payload(payload, {})

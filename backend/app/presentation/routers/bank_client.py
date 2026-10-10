@@ -52,12 +52,13 @@ async def verify_payload_signature(request: Request) -> None:
     The coordinator signs every outbound REST payload with the shared
     ``payload_signing_secret``.  Bank clients verify the signature to
     guarantee authenticity and reject tampered / replayed requests.
-
-    If the secret is empty (local dev mode), verification is skipped.
     """
     secret = _settings.payload_signing_secret
-    if not secret:
-        return  # signing disabled in local dev
+    if not secret or not str(secret).strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Payload signing secret is not configured on the bank node.",
+        )
 
     signature = request.headers.get("X-Payload-Signature")
     timestamp = request.headers.get("X-Payload-Timestamp")
