@@ -267,18 +267,21 @@ class HSMKeyService:
         secret is returned.
         """
         with self._lock:
+            if not _CRYPTO_AVAILABLE:
+                raise RuntimeError("Curve25519 ECDH shared secret derivation requires the cryptography library.")
+
             if key_label not in self._keys:
                 self.generate_key(key_label=key_label, algorithm=KeyAlgorithm.CURVE25519)
 
-            if _CRYPTO_AVAILABLE and key_label in self._ecdh_enclaves:
-                x25519_priv: X25519PrivateKey = self._ecdh_enclaves[key_label]
-                peer_pub = X25519PublicKey.from_public_bytes(peer_public_key_bytes)
-                shared_secret = x25519_priv.exchange(peer_pub)
-                return shared_secret
-            else:
-                # Deterministic enclave emulation
-                secret_seed = self.hsm_signer.sign_data(peer_public_key_bytes, key_label=key_label)
-                return hashlib.sha256(secret_seed + peer_public_key_bytes).digest()
+            if key_label not in self._ecdh_enclaves:
+                raise ValueError(
+                    f"Key '{key_label}' is not a hardware-isolated Curve25519 key handle. "
+                    "ECDH shared secret derivation requires a Curve25519 key."
+                )
+
+            x25519_priv: X25519PrivateKey = self._ecdh_enclaves[key_label]
+            peer_pub = X25519PublicKey.from_public_bytes(peer_public_key_bytes)
+            return x25519_priv.exchange(peer_pub)
 
     # ── Hardware Digital Signatures & Verification ──────────────────────────
 
