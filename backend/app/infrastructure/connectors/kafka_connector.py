@@ -26,6 +26,7 @@ class KafkaBankConnector(BankConnectorInterface):
         sasl_mechanism: str = "SCRAM-SHA-256",
         sasl_username: str = "",
         sasl_password: str = "",
+        producer: Any = None,
     ) -> None:
         self.bootstrap_servers = bootstrap_servers
         self.topic_prefix = topic_prefix
@@ -33,6 +34,32 @@ class KafkaBankConnector(BankConnectorInterface):
         self.sasl_mechanism = sasl_mechanism
         self.sasl_username = sasl_username
         self.sasl_password = sasl_password
+        self.producer = producer
+
+    def _dispatch(self, topic: str, payload: dict[str, Any]) -> str:
+        """Dispatches payload to configured Kafka producer, enforcing fail-closed checks in production."""
+        import os
+        from app.config import get_settings
+
+        cfg = get_settings()
+        app_env = os.getenv("APP_ENV", cfg.app_env).lower()
+        if app_env == "production" and self.producer is None:
+            raise RuntimeError(
+                f"Production KafkaBankConnector requires an active Kafka producer connection to {self.bootstrap_servers}. "
+                "Refusing mock command dispatch in production (APP_ENV=production)."
+            )
+
+        raw_payload = json.dumps(payload)
+        if self.producer is not None:
+            if hasattr(self.producer, "send"):
+                self.producer.send(topic, value=raw_payload.encode("utf-8"))
+            elif callable(self.producer):
+                self.producer(topic, raw_payload)
+            logger.info("Kafka dispatched command to %s via connected producer", topic)
+            return KafkaDeliveryStatus.BROKER_ACKNOWLEDGED.value
+        else:
+            logger.info("Kafka queued command request for topic %s (bootstrap=%s)", topic, self.bootstrap_servers)
+            return KafkaDeliveryStatus.SEND_REQUESTED.value
 
     def initialize(
         self,
@@ -48,11 +75,11 @@ class KafkaBankConnector(BankConnectorInterface):
             "seed": seed,
             "security_protocol": self.security_protocol,
         }
-        logger.info("Kafka initialized topic %s for bank %s", topic, bank_id)
+        delivery_status = self._dispatch(topic, payload)
         return {
             "bank_id": bank_id,
             "status": "INITIALIZED",
-            "delivery_status": KafkaDeliveryStatus.SEND_REQUESTED.value,
+            "delivery_status": delivery_status,
             "num_transactions": num_transactions,
             "topic": topic,
             "raw_payload": json.dumps(payload),
@@ -89,14 +116,14 @@ class KafkaBankConnector(BankConnectorInterface):
             "dp_epsilon": dp_epsilon,
             "weights": {
                 "layer_shapes": [list(shape) for shape in weights.layer_shapes],
-                "flat_weights": weights.flat_weights[:10],
+                "flat_weights": list(weights.flat_weights),
             },
         }
-        logger.info("Kafka published training command to %s for bank %s", topic, bank_id)
+        delivery_status = self._dispatch(topic, payload)
         return {
             "bank_id": bank_id,
             "status": "COMMAND_PUBLISHED",
-            "delivery_status": KafkaDeliveryStatus.SEND_REQUESTED.value,
+            "delivery_status": delivery_status,
             "command_type": "TRAIN",
             "correlation_id": correlation_id,
             "run_id": run_id,
@@ -124,12 +151,16 @@ class KafkaBankConnector(BankConnectorInterface):
             "run_id": run_id,
             "round_id": round_id,
             "command_type": "EVALUATE",
+            "weights": {
+                "layer_shapes": [list(shape) for shape in weights.layer_shapes],
+                "flat_weights": list(weights.flat_weights),
+            },
         }
-        logger.info("Kafka published evaluation command to %s for bank %s", topic, bank_id)
+        delivery_status = self._dispatch(topic, payload)
         return {
             "bank_id": bank_id,
             "status": "COMMAND_PUBLISHED",
-            "delivery_status": KafkaDeliveryStatus.SEND_REQUESTED.value,
+            "delivery_status": delivery_status,
             "command_type": "EVALUATE",
             "correlation_id": correlation_id,
             "run_id": run_id,
