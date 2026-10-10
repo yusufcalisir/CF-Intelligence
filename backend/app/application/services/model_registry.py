@@ -191,8 +191,8 @@ class ModelRegistry:
             if is_promoted:
                 self._update_global_model_link(simulation_id, filepath)
                 with contextlib.suppress(Exception):
-                    from app.config import get_settings
                     from app.application.services.model_service import ModelService
+                    from app.config import get_settings
 
                     ModelService(get_settings()).invalidate_model_cache()
 
@@ -439,8 +439,8 @@ class ModelRegistry:
                         entry["status"] = "inactive"
                 self._update_global_model_link(simulation_id, filepath)
                 with contextlib.suppress(Exception):
-                    from app.config import get_settings
                     from app.application.services.model_service import ModelService
+                    from app.config import get_settings
 
                     ModelService(get_settings()).invalidate_model_cache()
             else:  # challenger
@@ -479,8 +479,8 @@ class ModelRegistry:
             self._save_manifest(simulation_id, manifest)
             self._update_global_model_link(simulation_id, filepath)
             with contextlib.suppress(Exception):
-                from app.config import get_settings
                 from app.application.services.model_service import ModelService
+                from app.config import get_settings
 
                 ModelService(get_settings()).invalidate_model_cache()
 

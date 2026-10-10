@@ -39,12 +39,11 @@ import torch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.application.services.model_registry import ModelRegistry, compute_file_sha256
-from app.application.services.model_service import NUM_FEATURES, FraudDetectionModel, ModelService
+from app.application.services.model_registry import ModelRegistry
+from app.application.services.model_service import NUM_FEATURES, ModelService
 from app.config import Settings, get_settings
 from app.domain.model_serving_errors import (
     ModelCompatibilityError,
-    ModelExecutionError,
     ModelIntegrityError,
     ModelNotAvailableError,
 )
@@ -203,14 +202,16 @@ def test_t04_malicious_pickle_rejection(temp_registry_dir: str) -> None:
         fake_pickle_payload if key == "cfi:champion_model" else None
     )
 
-    with patch("app.infrastructure.cache.get_redis_client", return_value=mock_redis):
-        with patch("pickle.loads") as mock_pickle_loads:
-            # Model serving should ignore unauthenticated pickle payload and fall back to disk champion
-            scripted, from_redis = get_scripted_model()
-            assert not from_redis
-            assert scripted is not None
-            # Verify pickle.loads was NEVER called
-            mock_pickle_loads.assert_not_called()
+    with (
+        patch("app.infrastructure.cache.get_redis_client", return_value=mock_redis),
+        patch("pickle.loads") as mock_pickle_loads,
+    ):
+        # Model serving should ignore unauthenticated pickle payload and fall back to disk champion
+        scripted, from_redis = get_scripted_model()
+        assert not from_redis
+        assert scripted is not None
+        # Verify pickle.loads was NEVER called
+        mock_pickle_loads.assert_not_called()
 
 
 # ── T05: Redis Cache Poisoning Rejection ───────────────────────────────────────
@@ -421,17 +422,19 @@ def test_t11_circuit_breaker_trips_and_fails_closed(temp_registry_dir: str) -> N
         "velocity_1h": 1,
     }
 
-    with patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(mock_failing_model, False)):
-        with patch.dict(os.environ, {"APP_ENV": "development", "ENABLE_DEMO_FALLBACK": "false"}):
-            # 3 failures to trip circuit breaker
-            for _ in range(3):
-                r = client.post("/v1/inference/score", json=payload)
-                assert r.status_code == 503
+    with (
+        patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(mock_failing_model, False)),
+        patch.dict(os.environ, {"APP_ENV": "development", "ENABLE_DEMO_FALLBACK": "false"}),
+    ):
+        # 3 failures to trip circuit breaker
+        for _ in range(3):
+            r = client.post("/v1/inference/score", json=payload)
+            assert r.status_code == 503
 
-            # 4th request while circuit breaker is OPEN
-            r4 = client.post("/v1/inference/score", json=payload)
-            assert r4.status_code == 503
-            assert r4.json()["detail"]["code"] == "CIRCUIT_BREAKER_OPEN"
+        # 4th request while circuit breaker is OPEN
+        r4 = client.post("/v1/inference/score", json=payload)
+        assert r4.status_code == 503
+        assert r4.json()["detail"]["code"] == "CIRCUIT_BREAKER_OPEN"
 
 
 # ── T12: Production Demo Isolation ─────────────────────────────────────────────
@@ -607,7 +610,7 @@ def test_t18_manifest_tampering_detection(temp_registry_dir: str) -> None:
     sim_dir = os.path.join(temp_registry_dir, "registry", "sim_test_champion")
     manifest_path = os.path.join(sim_dir, "registry.json")
 
-    with open(manifest_path, "r", encoding="utf-8") as f:
+    with open(manifest_path, encoding="utf-8") as f:
         manifest_data = json.load(f)
 
     # Forger changes recorded sha256 in manifest
@@ -633,7 +636,7 @@ def test_t19_stale_global_model_file_does_not_override_manifest(temp_registry_di
 
     # Register v1
     m1 = svc.create_model(dp_compatible=True)
-    e1 = reg.save_version("sim_t19", m1.state_dict(), {"auc": 0.80}, is_promoted=True)
+    reg.save_version("sim_t19", m1.state_dict(), {"auc": 0.80}, is_promoted=True)
 
     # Capture v1 bytes from global_model.pt
     global_path = os.path.join(temp_registry_dir, "global_model.pt")
@@ -644,7 +647,7 @@ def test_t19_stale_global_model_file_does_not_override_manifest(temp_registry_di
     m2 = svc.create_model(dp_compatible=True)
     with torch.no_grad():
         next(m2.parameters()).add_(1.5)
-    e2 = reg.save_version("sim_t19", m2.state_dict(), {"auc": 0.90}, is_promoted=True)
+    reg.save_version("sim_t19", m2.state_dict(), {"auc": 0.90}, is_promoted=True)
     meta_v2_check = reg.get_champion_metadata()
     assert meta_v2_check is not None and meta_v2_check["version"] == 2
 
@@ -948,16 +951,18 @@ def test_t28_concurrent_cold_cache_single_flight(temp_registry_dir: str) -> None
         time.sleep(0.04)  # widen concurrent arrival window
         return orig_get_champion(*args, **kwargs)
 
-    with patch("app.application.services.model_service.ModelService.get_champion", side_effect=counting_get_champion):
-        with patch("app.infrastructure.cache.get_redis_client", return_value=None):
-            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-                futures = [pool.submit(get_scripted_model) for _ in range(8)]
-                results = [f.result() for f in futures]
+    with (
+        patch("app.application.services.model_service.ModelService.get_champion", side_effect=counting_get_champion),
+        patch("app.infrastructure.cache.get_redis_client", return_value=None),
+        concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool,
+    ):
+        futures = [pool.submit(get_scripted_model) for _ in range(8)]
+        results = [f.result() for f in futures]
 
-            # Exactly one model load occurred across all 8 concurrent callers
-            assert load_counter == 1, f"Expected 1 single-flight load, got {load_counter}"
-            models = [r[0] for r in results]
-            assert all(m is models[0] for m in models)
+    # Exactly one model load occurred across all 8 concurrent callers
+    assert load_counter == 1, f"Expected 1 single-flight load, got {load_counter}"
+    models = [r[0] for r in results]
+    assert all(m is models[0] for m in models)
 
 
 # ── T29: Promotion During Concurrent Loading ───────────────────────────────────
@@ -983,11 +988,13 @@ def test_t29_promotion_during_concurrent_loading_race_free(temp_registry_dir: st
         return orig_trace(*args, **kwargs)
 
     reset_model_cache()
-    with patch("app.infrastructure.cache.get_redis_client", return_value=None):
-        with patch("torch.jit.trace", side_effect=delayed_trace):
-            model, _ = get_scripted_model()
-            meta = reg.get_champion_metadata()
-            assert meta is not None and meta["version"] == 2
+    with (
+        patch("app.infrastructure.cache.get_redis_client", return_value=None),
+        patch("torch.jit.trace", side_effect=delayed_trace),
+    ):
+        model, _ = get_scripted_model()
+        meta = reg.get_champion_metadata()
+        assert meta is not None and meta["version"] == 2
 
 
 # ── T30: Rollback Correctness ──────────────────────────────────────────────────
