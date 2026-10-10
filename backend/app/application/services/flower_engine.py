@@ -71,7 +71,7 @@ def _patch_flwr_ray_actor_pool() -> None:
 
             time.sleep(0.3)
 
-        ra.BasicActorPool.terminate_all_actors = _graceful_terminate_all_actors
+        ra.BasicActorPool.terminate_all_actors = _graceful_terminate_all_actors  # type: ignore[method-assign]
 
         def _graceful_actor_terminate(self: Any) -> None:
             log(logging.INFO, "Gracefully stopping %s", self.__class__.__name__)
@@ -79,7 +79,7 @@ def _patch_flwr_ray_actor_pool() -> None:
 
             ray.actor.exit_actor()
 
-        ra.VirtualClientEngineActor.terminate = _graceful_actor_terminate
+        ra.VirtualClientEngineActor.terminate = _graceful_actor_terminate  # type: ignore[method-assign]
         _FLWR_ACTOR_POOL_PATCHED = True
     except Exception:
         pass

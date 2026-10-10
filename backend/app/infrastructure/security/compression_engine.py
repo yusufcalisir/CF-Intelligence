@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # Optional zstandard support with automatic fallback to zlib
 try:
-    import zstandard as zstd  # type: ignore[import-untyped]
+    import zstandard as zstd  # type: ignore[import-not-found,import-untyped]
     HAS_ZSTD = True
 except ImportError:
     zstd = None

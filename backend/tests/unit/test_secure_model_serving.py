@@ -105,6 +105,10 @@ def create_trained_model_fixture(storage_dir: str, dp_compatible: bool = True) -
         metrics=metrics,
         is_promoted=True,
         git_commit_hash="abcdef1234567890",
+        dataset_hash="dataset_synthetic_hash_123",
+        training_run_id="run_sim_test_01",
+        training_evidence={"loss": 0.32, "epochs": 1, "samples": 64},
+        provenance_type="TRAINING_RECORDED",
     )
     global_path = os.path.join(storage_dir, "global_model.pt")
     assert os.path.exists(global_path), "global_model.pt must be created upon promotion"
@@ -1079,3 +1083,525 @@ def test_t32_untrained_checkpoint_provenance_honesty(temp_registry_dir: str) -> 
     assert meta is not None
     assert meta["provenance_type"] == "structural_fixture"
     assert meta["authenticity_status"] != "AUTHENTICATED"
+
+
+# ── TC-01: No Implicit Trained Provenance ──────────────────────────────────────
+def test_tc01_no_implicit_trained_provenance(temp_registry_dir: str) -> None:
+    """TC-01: Saving a fresh random model without specifying provenance must default to UNVERIFIED."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    model = svc.create_model(dp_compatible=True)
+    entry = reg.save_version(
+        "sim_tc01",
+        model.state_dict(),
+        metrics={"auc": 0.50},
+        is_promoted=True,
+    )
+    assert entry["provenance_type"] == "UNVERIFIED"
+    meta = reg.get_champion_metadata()
+    assert meta is not None
+    assert meta["provenance_type"] == "UNVERIFIED"
+    assert meta["is_production_eligible"] is False
+
+
+# ── TC-02: Caller-Supplied Trained Label Rejected Without Evidence ─────────────
+def test_tc02_caller_supplied_trained_label_rejected_without_evidence(temp_registry_dir: str) -> None:
+    """TC-02: Supplying 'trained' or 'TRAINING_RECORDED' without training execution evidence is downgraded to UNVERIFIED."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    model = svc.create_model(dp_compatible=True)
+    # Caller tries to claim "trained" without any run ID or evidence
+    entry = reg.save_version(
+        "sim_tc02",
+        model.state_dict(),
+        metrics={"auc": 0.95},
+        is_promoted=True,
+        provenance_type="trained",
+    )
+    assert entry["provenance_type"] == "UNVERIFIED"
+    meta = reg.get_champion_metadata()
+    assert meta is not None
+    assert meta["provenance_type"] == "UNVERIFIED"
+    assert meta["is_production_eligible"] is False
+
+
+# ── TC-03: Genuine Training Evidence Recorded Truthfully ───────────────────────
+def test_tc03_genuine_training_evidence_recorded_truthfully(temp_registry_dir: str) -> None:
+    """TC-03: Executing a minimal real training workflow records actual evidence and yields TRAINING_RECORDED."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    model = svc.create_model(dp_compatible=True)
+    X = np.random.randn(64, NUM_FEATURES).astype(np.float32)
+    y = np.random.randint(0, 2, size=(64,)).astype(np.float32)
+    trained, losses, _ = svc.train_local(model, X, y, epochs=1, batch_size=32)
+
+    entry = reg.save_version(
+        "sim_tc03",
+        trained.state_dict(),
+        metrics={"loss": float(losses[-1]), "auc_roc": 0.82},
+        is_promoted=True,
+        training_run_id="run_tc03_job_99",
+        training_evidence={"loss": float(losses[-1]), "epochs": 1, "batch_size": 32},
+        provenance_type="TRAINING_RECORDED",
+    )
+    assert entry["provenance_type"] == "TRAINING_RECORDED"
+    assert entry["training_run_id"] == "run_tc03_job_99"
+    meta = reg.get_champion_metadata()
+    assert meta is not None
+    assert meta["provenance_type"] == "TRAINING_RECORDED"
+    assert meta["is_production_eligible"] is True
+
+
+# ── TC-04: Fabricated Evaluation Metrics Classified Honestly ───────────────────
+def test_tc04_fabricated_evaluation_metrics_unverified(temp_registry_dir: str) -> None:
+    """TC-04: Caller-supplied metric values are labeled as CALLER_SUPPLIED_UNVERIFIED."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    model = svc.create_model(dp_compatible=True)
+    entry = reg.save_version(
+        "sim_tc04",
+        model.state_dict(),
+        metrics={"fabricated_auc": 0.9999, "fake_recall": 1.0},
+        is_promoted=True,
+    )
+    assert entry["metrics_provenance"] == "CALLER_SUPPLIED_UNVERIFIED"
+    meta = reg.get_champion_metadata()
+    assert meta is not None
+    assert meta["metrics_provenance"] == "CALLER_SUPPLIED_UNVERIFIED"
+
+
+# ── TC-05: Forged Role Fields Cannot Confer Cryptographic Authorization ─────────
+def test_tc05_forged_role_fields_not_cryptographically_authorized(temp_registry_dir: str) -> None:
+    """TC-05: Merely inserting role strings into sign_offs produces SIGNOFFS_RECORDED_UNVERIFIED, not CRYPTOGRAPHICALLY_AUTHORIZED."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    model = svc.create_model(dp_compatible=True)
+    entry = reg.save_version("sim_tc05", model.state_dict(), {"auc": 0.80}, is_promoted=True)
+
+    # Forged signoffs without valid HMAC signatures
+    reg.sign_off(
+        simulation_id="sim_tc05",
+        version=entry["version"],
+        role="compliance",
+        user="officer_alice",
+        signature="unverified_fake_signature_abc",
+    )
+    reg.sign_off(
+        simulation_id="sim_tc05",
+        version=entry["version"],
+        role="ml_engineer",
+        user="engineer_bob",
+        signature="unverified_fake_signature_xyz",
+    )
+
+    meta = reg.get_champion_metadata()
+    assert meta is not None
+    assert meta["authenticity_status"] == "SIGNOFFS_RECORDED_UNVERIFIED"
+    assert meta["authenticity_status"] != "CRYPTOGRAPHICALLY_AUTHORIZED"
+
+
+# ── TC-06: Cryptographic Sign-Off Verification, Binding, and Replay Rejection ───
+def test_tc06_cryptographic_signoff_verification_and_replay_rejection(temp_registry_dir: str) -> None:
+    """TC-06: Valid signatures bind canonical payload; invalid/replayed/self-approved signatures fail closed."""
+    from app.application.services.model_registry import generate_signoff_signature
+
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    m1 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_tc06", m1.state_dict(), {"auc": 0.80}, is_promoted=True)
+
+    # 1. Four-Eyes violation: same user approves both roles -> rejected
+    reg.sign_off("sim_tc06", 1, "compliance", user="sam_same", signature="sig1")
+    with pytest.raises(ValueError, match="Four-Eyes Principle violation"):
+        reg.sign_off("sim_tc06", 1, "ml_engineer", user="sam_same", signature="sig2")
+
+    # 2. Genuine HMAC signatures binding canonical payload
+    reg2 = ModelRegistry(storage_dir=temp_registry_dir)
+    m2 = svc.create_model(dp_compatible=True)
+    v2 = reg2.save_version("sim_tc06_b", m2.state_dict(), {"auc": 0.80}, is_promoted=True)
+    v2_sha = v2["sha256"]
+
+    sig_comp = generate_signoff_signature("sim_tc06_b", 1, v2_sha, "compliance", "officer_alice")
+    sig_ml = generate_signoff_signature("sim_tc06_b", 1, v2_sha, "ml_engineer", "engineer_bob")
+
+    reg2.sign_off("sim_tc06_b", 1, "compliance", user="officer_alice", signature=sig_comp)
+    reg2.sign_off("sim_tc06_b", 1, "ml_engineer", user="engineer_bob", signature=sig_ml)
+
+    meta = reg2.get_champion_metadata(simulation_id="sim_tc06_b")
+    assert meta is not None
+    assert meta["authenticity_status"] == "CRYPTOGRAPHICALLY_AUTHORIZED"
+
+    # 3. Replay attack: try replaying v2's signatures on v3 (which has different version & hash)
+    m3 = svc.create_model(dp_compatible=True)
+    reg2.save_version("sim_tc06_b", m3.state_dict(), {"auc": 0.85}, is_promoted=True)
+    reg2.sign_off("sim_tc06_b", 2, "compliance", user="officer_alice", signature=sig_comp)
+    reg2.sign_off("sim_tc06_b", 2, "ml_engineer", user="engineer_bob", signature=sig_ml)
+
+    meta3 = reg2.get_champion_metadata(simulation_id="sim_tc06_b")
+    assert meta3 is not None
+    assert meta3["version"] == 2
+    assert meta3["authenticity_status"] == "SIGNOFFS_RECORDED_UNVERIFIED"
+    assert meta3["authenticity_status"] != "CRYPTOGRAPHICALLY_AUTHORIZED"
+
+
+# ── TC-07: Direct Promotion Bypass Fails Closed in Production ─────────────────
+def test_tc07_direct_promotion_bypass_prevented_in_production(temp_registry_dir: str) -> None:
+    """TC-07: In production environment, direct promotion of structural fixtures is blocked."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    model = svc.create_model(dp_compatible=True)
+    with patch.object(settings, "app_env", "production"):
+        # 1. save_version with is_promoted=True on structural fixture must fail
+        with pytest.raises(ModelIntegrityError, match="Structural fixture cannot be promoted"):
+            reg.save_version(
+                "sim_tc07",
+                model.state_dict(),
+                {"auc": 0.5},
+                is_promoted=True,
+                provenance_type="STRUCTURAL_FIXTURE",
+            )
+
+        # 2. promote_version on an unpromoted structural fixture must fail
+        with patch.object(settings, "app_env", "development"):
+            v1 = reg.save_version(
+                "sim_tc07",
+                model.state_dict(),
+                {"auc": 0.5},
+                is_promoted=False,
+                provenance_type="STRUCTURAL_FIXTURE",
+            )
+        with pytest.raises(ModelIntegrityError, match="Structural test fixture cannot be promoted"):
+            reg.promote_version("sim_tc07", v1["version"], target_status="champion")
+
+
+# ── TC-08: Missing Redis Identity Fields Rejected Even With Valid HMAC ────────
+def test_tc08_missing_redis_identity_fields_rejected(temp_registry_dir: str) -> None:
+    """TC-08: Redis cache envelope missing ANY mandatory identity field is rejected and evicted."""
+    global_path, meta = create_trained_model_fixture(temp_registry_dir, dp_compatible=True)
+    settings = get_settings()
+    svc = ModelService(settings)
+    champ = svc.get_champion(dp_compatible=True)
+    dummy_input = torch.zeros(1, NUM_FEATURES)
+    scripted = torch.jit.trace(champ, dummy_input)
+
+    buffer = io.BytesIO()
+    torch.jit.save(scripted, buffer)
+    model_bytes = buffer.getvalue()
+    model_sha256 = hashlib.sha256(model_bytes).hexdigest()
+
+    mandatory_keys = [
+        "serialization_version",
+        "version",
+        "simulation_id",
+        "artifact_sha256",
+        "model_sha256",
+        "architecture",
+        "input_dim",
+    ]
+
+    for missing_key in mandatory_keys:
+        full_meta = {
+            "version": meta["version"],
+            "simulation_id": "sim_test_champion",
+            "artifact_sha256": meta["sha256"],
+            "model_sha256": model_sha256,
+            "architecture": "FraudDetectionModel-GroupNorm",
+            "input_dim": NUM_FEATURES,
+            "serialization_version": 2,
+        }
+        del full_meta[missing_key]
+
+        # Construct mathematically valid HMAC over incomplete metadata + bytes
+        canon = json.dumps(full_meta, sort_keys=True, separators=(",", ":"))
+        valid_hmac = hmac.new(
+            settings.payload_signing_secret.encode("utf-8"),
+            canon.encode("utf-8") + b":" + model_bytes,
+            hashlib.sha256,
+        ).hexdigest()
+
+        auth_envelope = dict(full_meta)
+        auth_envelope["hmac"] = valid_hmac
+        auth_bytes = json.dumps(auth_envelope).encode("utf-8")
+
+        mock_redis = MagicMock()
+        mock_redis.get.side_effect = lambda k, ab=auth_bytes: model_bytes if k == "cfi:champion_model" else ab
+
+        reset_model_cache()
+        with patch("app.infrastructure.cache.get_redis_client", return_value=mock_redis):
+            model, from_redis = get_scripted_model()
+            # Must NOT load from Redis cache!
+            assert from_redis is False
+            # Verify eviction was triggered
+            mock_redis.delete.assert_called_with("cfi:champion_model", "cfi:champion_model:auth")
+
+
+# ── TC-09: Empty or Malformed Redis Identity Fields Rejected ──────────────────
+def test_tc09_malformed_redis_identity_fields_rejected(temp_registry_dir: str) -> None:
+    """TC-09: Empty strings, incorrect types, unsupported serialization versions are evicted."""
+    global_path, meta = create_trained_model_fixture(temp_registry_dir, dp_compatible=True)
+    settings = get_settings()
+    svc = ModelService(settings)
+    champ = svc.get_champion(dp_compatible=True)
+    scripted = torch.jit.trace(champ, torch.zeros(1, NUM_FEATURES))
+
+    buffer = io.BytesIO()
+    torch.jit.save(scripted, buffer)
+    model_bytes = buffer.getvalue()
+    model_sha256 = hashlib.sha256(model_bytes).hexdigest()
+
+    malformed_variations: list[dict[str, Any]] = [
+        {"simulation_id": ""},                   # empty string
+        {"version": "one"},                       # wrong type
+        {"serialization_version": 99},            # unsupported version
+        {"input_dim": "10"},                      # wrong type (str instead of int)
+        {"artifact_sha256": "short_digest"},      # malformed digest mismatch
+    ]
+
+    for mutation in malformed_variations:
+        full_meta: dict[str, Any] = {
+            "version": meta["version"],
+            "simulation_id": "sim_test_champion",
+            "artifact_sha256": meta["sha256"],
+            "model_sha256": model_sha256,
+            "architecture": "FraudDetectionModel-GroupNorm",
+            "input_dim": NUM_FEATURES,
+            "serialization_version": 2,
+        }
+        full_meta.update(mutation)
+
+        canon = json.dumps(full_meta, sort_keys=True, separators=(",", ":"))
+        valid_hmac = hmac.new(
+            settings.payload_signing_secret.encode("utf-8"),
+            canon.encode("utf-8") + b":" + model_bytes,
+            hashlib.sha256,
+        ).hexdigest()
+
+        auth_envelope = dict(full_meta)
+        auth_envelope["hmac"] = valid_hmac
+        auth_bytes = json.dumps(auth_envelope).encode("utf-8")
+
+        mock_redis = MagicMock()
+        mock_redis.get.side_effect = lambda k, ab=auth_bytes: model_bytes if k == "cfi:champion_model" else ab
+
+        reset_model_cache()
+        with patch("app.infrastructure.cache.get_redis_client", return_value=mock_redis):
+            model, from_redis = get_scripted_model()
+            assert from_redis is False
+            mock_redis.delete.assert_called_with("cfi:champion_model", "cfi:champion_model:auth")
+
+
+# ── TC-10: Redis Atomic Publication Enforced, No Non-Atomic Fallback ──────────
+def test_tc10_redis_atomic_publication_enforced(temp_registry_dir: str) -> None:
+    """TC-10: Redis publication uses pipeline(transaction=True); clients without pipeline do not trigger non-atomic writes."""
+    global_path, meta = create_trained_model_fixture(temp_registry_dir, dp_compatible=True)
+
+    # 1. Supported client with pipeline
+    mock_redis = MagicMock()
+    mock_pipe = MagicMock()
+    mock_redis.pipeline.return_value = mock_pipe
+    mock_redis.get.return_value = None  # force cache write
+
+    reset_model_cache()
+    with patch("app.infrastructure.cache.get_redis_client", return_value=mock_redis):
+        model, from_redis = get_scripted_model()
+        assert model is not None
+        mock_redis.pipeline.assert_called_once_with(transaction=True)
+        mock_pipe.execute.assert_called_once()
+
+    # 2. Client without pipeline attribute (must skip publication, never call set; set)
+    class NonPipelineRedis:
+        def get(self, key):
+            return None
+        def set(self, key, val, **kwargs):
+            raise AssertionError("Non-atomic set called on Redis client without pipeline support!")
+
+    reset_model_cache()
+    with patch("app.infrastructure.cache.get_redis_client", return_value=NonPipelineRedis()):
+        model, from_redis = get_scripted_model()
+        assert model is not None
+
+
+# ── TC-11: Cache Publication Interruption Recovery ─────────────────────────────
+def test_tc11_cache_publication_interruption_recovery(temp_registry_dir: str) -> None:
+    """TC-11: Simulated Redis failure during publication preserves registry integrity and serving."""
+    global_path, meta = create_trained_model_fixture(temp_registry_dir, dp_compatible=True)
+
+    mock_redis = MagicMock()
+    mock_pipe = MagicMock()
+    mock_pipe.execute.side_effect = RuntimeError("Redis connection lost during pipeline.execute()")
+    mock_redis.pipeline.return_value = mock_pipe
+    mock_redis.get.return_value = None
+
+    reset_model_cache()
+    with patch("app.infrastructure.cache.get_redis_client", return_value=mock_redis):
+        # Should not raise exception; must serve model safely from verified local champion
+        model, from_redis = get_scripted_model()
+        assert model is not None
+        assert from_redis is False
+
+
+# ── TC-12: Symlink Escape Rejected ─────────────────────────────────────────────
+def test_tc12_symlink_escape_rejected(temp_registry_dir: str) -> None:
+    """TC-12: An artifact symlink resolving outside the trusted registry root is rejected with ModelIntegrityError."""
+    global_path, meta = create_trained_model_fixture(temp_registry_dir, dp_compatible=True)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    # Create external file outside storage_dir
+    outside_dir = tempfile.mkdtemp(prefix="cfi_outside_")
+    outside_file = os.path.join(outside_dir, "outside_model.pt")
+    shutil.copy2(global_path, outside_file)
+
+    sim_dir = reg._get_sim_dir("sim_symlink_test")
+    symlink_path = os.path.join(sim_dir, "model_v1.pt")
+
+    try:
+        os.symlink(outside_file, symlink_path)
+    except (OSError, NotImplementedError):
+        pytest.skip("Symlink creation not permitted in this OS / filesystem environment.")
+
+    # Manifest pointing to symlink
+    manifest = [{
+        "version": 1,
+        "filename": "model_v1.pt",
+        "sha256": meta["sha256"],
+        "is_active": True,
+        "status": "champion",
+        "provenance_type": "TRAINING_RECORDED",
+    }]
+    reg._save_manifest("sim_symlink_test", manifest)
+
+    with pytest.raises(ModelIntegrityError, match="outside trusted storage"):
+        reg.resolve_and_verify_champion("sim_symlink_test")
+
+    shutil.rmtree(outside_dir, ignore_errors=True)
+
+
+# ── TC-13: Manifest Filename Path Traversal Rejected ───────────────────────────
+def test_tc13_manifest_filename_path_traversal_rejected(temp_registry_dir: str) -> None:
+    """TC-13: Manifest filenames containing path traversal (..) are rejected deterministically."""
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+    manifest = [{
+        "version": 1,
+        "filename": "../../etc/shadow.pt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "is_active": True,
+        "status": "champion",
+    }]
+    reg._save_manifest("sim_tc13", manifest)
+
+    with pytest.raises(ModelIntegrityError, match="Path traversal detected"):
+        reg.resolve_and_verify_champion("sim_tc13")
+
+
+# ── TC-14: Warm-Cache I/O Benchmark: Avoid Unnecessary Rehashing ───────────────
+def test_tc14_warm_cache_avoids_unnecessary_rehashing(temp_registry_dir: str) -> None:
+    """TC-14: Warm inference requests avoid opening model weights and computing SHA-256."""
+    global_path, meta = create_trained_model_fixture(temp_registry_dir, dp_compatible=True)
+
+    reset_model_cache()
+    orig_open = open
+    model_reads = 0
+    sha256_computes = 0
+
+    import hashlib
+    orig_sha256 = hashlib.sha256
+
+    def counting_sha256(*args, **kwargs):
+        nonlocal sha256_computes
+        if args and isinstance(args[0], (bytes, bytearray)) and len(args[0]) > 1000:
+            sha256_computes += 1
+        return orig_sha256(*args, **kwargs)
+
+    def counting_open(file, *args, **kwargs):
+        nonlocal model_reads
+        if str(file).endswith(".pt"):
+            model_reads += 1
+        return orig_open(file, *args, **kwargs)
+
+    with (
+        patch("app.infrastructure.cache.get_redis_client", return_value=None),
+        patch("builtins.open", side_effect=counting_open),
+        patch("hashlib.sha256", side_effect=counting_sha256),
+    ):
+        # Cold request (loads model from disk champion and traces JIT)
+        m_cold, _ = get_scripted_model()
+        cold_reads = model_reads
+        cold_hashes = sha256_computes
+        assert cold_reads >= 1
+        assert cold_hashes >= 1
+
+        # Warm requests: 50 successive calls
+        for _ in range(50):
+            m_warm, from_redis = get_scripted_model()
+            assert m_warm is not None
+            assert from_redis is False
+
+        # Verify NO additional model artifact reads or SHA-256 computations on warm requests
+        assert model_reads == cold_reads, f"Warm requests triggered disk reads! {model_reads} > {cold_reads}"
+        assert sha256_computes == cold_hashes, f"Warm requests triggered re-hashing! {sha256_computes} > {cold_hashes}"
+
+
+# ── TC-15: Promotion Freshness and Cache Revalidation ──────────────────────────
+def test_tc15_promotion_freshness_and_cache_revalidation(temp_registry_dir: str) -> None:
+    """TC-15: Promoting v2 causes serving path to detect change and load authoritative v2."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    m1 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_tc15", m1.state_dict(), {"auc": 0.80}, is_promoted=True, training_run_id="run_v1", provenance_type="TRAINING_RECORDED")
+
+    reset_model_cache()
+    with patch("app.infrastructure.cache.get_redis_client", return_value=None):
+        model_v1, _ = get_scripted_model()
+        assert model_v1 is not None
+
+        # Promote v2
+        m2 = svc.create_model(dp_compatible=True)
+        reg.save_version("sim_tc15", m2.state_dict(), {"auc": 0.88}, is_promoted=True, training_run_id="run_v2", provenance_type="TRAINING_RECORDED")
+
+        # Next inference request must detect v2
+        model_v2, _ = get_scripted_model()
+        assert model_v2 is not None
+        active_meta = reg.get_champion_metadata()
+        assert active_meta is not None and active_meta["version"] == 2
+
+
+# ── TC-16: Rollback Freshness and Identity Restoration ─────────────────────────
+def test_tc16_rollback_freshness_and_identity_restoration(temp_registry_dir: str) -> None:
+    """TC-16: Rollback to v1 restores v1 identity and serves v1."""
+    settings = get_settings()
+    svc = ModelService(settings)
+    reg = ModelRegistry(storage_dir=temp_registry_dir)
+
+    m1 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_tc16", m1.state_dict(), {"auc": 0.80}, is_promoted=True, training_run_id="run_v1", provenance_type="TRAINING_RECORDED")
+
+    m2 = svc.create_model(dp_compatible=True)
+    reg.save_version("sim_tc16", m2.state_dict(), {"auc": 0.88}, is_promoted=True, training_run_id="run_v2", provenance_type="TRAINING_RECORDED")
+
+    reset_model_cache()
+    with patch("app.infrastructure.cache.get_redis_client", return_value=None):
+        model_v2, _ = get_scripted_model()
+
+        # Roll back to v1
+        reg.rollback("sim_tc16", version=1)
+
+        # Serving path serves v1
+        model_v1, _ = get_scripted_model()
+        active_meta = reg.get_champion_metadata()
+        assert active_meta is not None and active_meta["version"] == 1

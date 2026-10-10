@@ -33,12 +33,40 @@ extraPaths = [
 python_version = "3.12"
 strict = false
 warn_return_any = false
-warn_unused_configs = true
+warn_unused_configs = false
 disallow_untyped_defs = false
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["celery.*", "redis.*", "alembic", "alembic.*", "tenseal.*", "opacus.*", "shap.*", "optuna.*"]
+module = [
+    "celery.*",
+    "redis.*",
+    "alembic",
+    "alembic.*",
+    "tenseal.*",
+    "opacus.*",
+    "shap.*",
+    "optuna.*",
+    "pandas",
+    "pandas.*",
+    "sklearn.*",
+    "scipy",
+    "scipy.*",
+    "networkx",
+    "networkx.*",
+    "defusedxml",
+    "defusedxml.*",
+    "great_expectations",
+    "great_expectations.*",
+    "pandera",
+    "pandera.*",
+    "pika",
+    "pika.*",
+    "prometheus_fastapi_instrumentator",
+    "prometheus_fastapi_instrumentator.*",
+    "zstandard",
+    "zstandard.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -158,20 +158,25 @@ def get_scripted_model() -> tuple[Any, bool]:
     from app.application.services.model_service import NUM_FEATURES, ModelService
 
     registry = ModelRegistry()
-    current_meta = registry.get_champion_metadata()
-    if current_meta is None:
-        _local_cache.clear()
-        raise ModelNotAvailableError("No verified active champion model artifact found in registry.")
 
-    # 1. Fast path: check process-local cache bound to current champion identity
-    cached = _local_cache.get(current_meta)
-    if cached is not None:
-        return cached
+    # 1. Fast path: lightweight manifest identity check (avoids reading and hashing champion weights on every warm request - Defect F)
+    champion_ident = registry.get_active_champion_identity()
+    if champion_ident is not None:
+        cached = _local_cache.get(champion_ident)
+        if cached is not None:
+            return cached
 
-    # 2. Cache miss -> Acquire single-flight lock
+    # 2. Cold start or cache miss -> Acquire single-flight lock
     with _local_cache._single_flight_lock:
         while True:
-            # Re-check current champion metadata in case promotion occurred while acquiring lock
+            # Re-check lightweight identity inside lock
+            champion_ident = registry.get_active_champion_identity()
+            if champion_ident is not None:
+                cached = _local_cache.get(champion_ident)
+                if cached is not None:
+                    return cached
+
+            # Resolve full champion metadata and verify artifact integrity
             current_meta = registry.get_champion_metadata()
             if current_meta is None:
                 _local_cache.clear()
@@ -214,36 +219,70 @@ def get_scripted_model() -> tuple[Any, bool]:
                             if not hmac.compare_digest(expected_hmac, claimed_hmac):
                                 logger.warning("Redis model cache failed HMAC authenticity verification.")
                             else:
-                                expected_model_sha = hashlib.sha256(cached_bytes).hexdigest()
-                                claimed_model_sha = auth_data.get("model_sha256") or auth_data.get("sha256", "")
-                                if not hmac.compare_digest(expected_model_sha, claimed_model_sha):
-                                    logger.warning("Redis model cache SHA-256 digest mismatch.")
-                                else:
-                                    # Enforce champion version and scope binding
-                                    cached_version = auth_data.get("version")
-                                    cached_sim_id = auth_data.get("simulation_id")
-                                    cached_artifact_sha = auth_data.get("artifact_sha256")
-
-                                    if (
-                                        cached_version is None
-                                        or cached_version != current_meta.get("version")
-                                        or (cached_sim_id and cached_sim_id != current_meta.get("simulation_id"))
-                                        or (
-                                            cached_artifact_sha
-                                            and not hmac.compare_digest(
-                                                cached_artifact_sha, current_meta.get("sha256", "")
-                                            )
+                                # MANDATORY FIELD VALIDATION (Defect C):
+                                # Every mandatory field must be present, non-empty, and correctly typed.
+                                mandatory_fields = {
+                                    "serialization_version": int,
+                                    "version": int,
+                                    "simulation_id": str,
+                                    "artifact_sha256": str,
+                                    "model_sha256": str,
+                                    "architecture": str,
+                                    "input_dim": int,
+                                }
+                                schema_valid = True
+                                for f_name, exp_type in mandatory_fields.items():
+                                    val = auth_data.get(f_name)
+                                    if val is None:
+                                        logger.warning(
+                                            "Redis cache envelope missing mandatory field '%s'. Evicting.", f_name
                                         )
+                                        schema_valid = False
+                                        break
+                                    if not isinstance(val, exp_type):
+                                        logger.warning(
+                                            "Redis cache field '%s' type mismatch (expected %s, got %s). Evicting.",
+                                            f_name,
+                                            exp_type,
+                                            type(val),
+                                        )
+                                        schema_valid = False
+                                        break
+                                    if isinstance(val, str) and not val.strip():
+                                        logger.warning(
+                                            "Redis cache field '%s' is empty. Evicting.", f_name
+                                        )
+                                        schema_valid = False
+                                        break
+
+                                if not schema_valid:
+                                    with contextlib.suppress(Exception):
+                                        redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
+                                else:
+                                    expected_model_sha = hashlib.sha256(cached_bytes).hexdigest()
+                                    claimed_model_sha = auth_data["model_sha256"]
+
+                                    if not hmac.compare_digest(expected_model_sha, claimed_model_sha):
+                                        logger.warning("Redis model cache SHA-256 digest mismatch. Evicting.")
+                                        with contextlib.suppress(Exception):
+                                            redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
+                                    elif (
+                                        auth_data["serialization_version"] != 2
+                                        or auth_data["version"] != current_meta.get("version")
+                                        or auth_data["simulation_id"] != current_meta.get("simulation_id")
+                                        or not hmac.compare_digest(
+                                            auth_data["artifact_sha256"], current_meta.get("sha256", "")
+                                        )
+                                        or auth_data["input_dim"] != NUM_FEATURES
+                                        or auth_data["architecture"] != current_meta.get("architecture", "FraudDetectionModel-GroupNorm")
                                     ):
                                         logger.warning(
-                                            "Redis cache entry is stale or wrong scope (cached v%s, active v%s). Evicting.",
-                                            cached_version,
-                                            current_meta.get("version"),
+                                            "Redis cache entry does not match current champion identity or contract. Evicting."
                                         )
                                         with contextlib.suppress(Exception):
                                             redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                     else:
-                                        # Authenticated and matches current active champion!
+                                        # Authenticated, complete schema, and strictly matches current active champion!
                                         buffer = io.BytesIO(cached_bytes)
                                         loaded_jit = torch.jit.load(buffer, map_location="cpu")
                                         loaded_jit.eval()
@@ -314,7 +353,7 @@ def get_scripted_model() -> tuple[Any, bool]:
                 from_redis=False,
             )
 
-            # 7. Securely populate Redis cache using atomic pipeline
+            # 7. Securely populate Redis cache using atomic pipeline ONLY (Defect D)
             try:
                 from app.infrastructure.cache import get_redis_client
 
@@ -351,18 +390,23 @@ def get_scripted_model() -> tuple[Any, bool]:
                     auth_envelope_str = json.dumps(auth_envelope)
 
                     if hasattr(redis_client, "pipeline"):
-                        pipe = redis_client.pipeline()
-                        pipe.set("cfi:champion_model", model_bytes, ex=3600)
-                        pipe.set("cfi:champion_model:auth", auth_envelope_str, ex=3600)
-                        pipe.execute()
+                        try:
+                            pipe = redis_client.pipeline(transaction=True)
+                            pipe.set("cfi:champion_model", model_bytes, ex=3600)
+                            pipe.set("cfi:champion_model:auth", auth_envelope_str, ex=3600)
+                            pipe.execute()
+                            logger.info(
+                                "Cached champion v%d in Redis atomically with version-bound HMAC envelope.",
+                                current_meta["version"],
+                            )
+                        except Exception as pipe_err:
+                            logger.warning(
+                                "Redis atomic pipeline write failed (%s); skipping cache publication.", pipe_err
+                            )
                     else:
-                        redis_client.set("cfi:champion_model", model_bytes, ex=3600)
-                        redis_client.set("cfi:champion_model:auth", auth_envelope_str, ex=3600)
-
-                    logger.info(
-                        "Cached champion v%d in Redis with version-bound HMAC envelope.",
-                        current_meta["version"],
-                    )
+                        logger.warning(
+                            "Redis client does not support atomic pipeline/transaction; skipping cache publication to preserve atomicity."
+                        )
             except Exception as exc:
                 logger.debug("Failed to store champion model in Redis: %s", exc)
 

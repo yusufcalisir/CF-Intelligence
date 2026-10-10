@@ -38,6 +38,23 @@ def compute_file_sha256(filepath: str) -> str:
     return hasher.hexdigest()
 
 
+def generate_signoff_signature(
+    simulation_id: str,
+    version: int,
+    artifact_sha256: str,
+    role: str,
+    user: str,
+    signing_secret: str | None = None,
+) -> str:
+    """Generate canonical HMAC-SHA256 signature binding simulation, version, artifact digest, role, and user."""
+    from app.config import get_settings
+
+    secret = signing_secret or get_settings().payload_signing_secret
+    norm_role = "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
+    canonical_payload = f"{simulation_id}:{version}:{artifact_sha256}:{norm_role}:{user}"
+    return hmac.new(secret.encode("utf-8"), canonical_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
 class ModelRegistry:
     """Manages versioned model artifacts and registry manifests.
 
@@ -126,7 +143,10 @@ class ModelRegistry:
         dataset_hash: str | None = None,
         dp_noise_profile: dict[str, Any] | None = None,
         status: str = "inactive",
-        provenance_type: str = "trained",
+        provenance_type: str = "UNVERIFIED",
+        training_run_id: str | None = None,
+        dataset_manifest_id: str | None = None,
+        training_evidence: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Save a new version of the global model weights.
 
@@ -139,11 +159,53 @@ class ModelRegistry:
             dataset_hash: Hash of the training dataset.
             dp_noise_profile: DP mechanism profile details.
             status: Initial status of the version.
-            provenance_type: Provenance classification ('trained', 'structural_fixture', 'legacy').
+            provenance_type: Provenance classification ('UNVERIFIED', 'STRUCTURAL_FIXTURE',
+                             'TRAINING_RECORDED', 'TRAINING_EVIDENCE_VERIFIED', 'LEGACY_UNVERIFIED').
+            training_run_id: Identifier of the training job.
+            dataset_manifest_id: Identifier of the training dataset manifest.
+            training_evidence: Execution evidence produced during training.
 
         Returns:
             The created version entry metadata.
         """
+        # Validate provenance classification (Defect A)
+        clean_prov = provenance_type.strip() if provenance_type else "UNVERIFIED"
+
+        has_training_evidence = bool(
+            (training_run_id and bool(training_run_id.strip()))
+            or (training_evidence and isinstance(training_evidence, dict) and len(training_evidence) > 0)
+            or (
+                dataset_hash
+                and dataset_hash != "unknown"
+                and git_commit_hash
+                and git_commit_hash != "unknown"
+                and bool(training_run_id)
+            )
+        )
+
+        clean_upper = clean_prov.upper()
+        if clean_upper in ("TRAINED", "TRAINING_RECORDED"):
+            final_provenance = "TRAINING_RECORDED" if has_training_evidence else "UNVERIFIED"
+        elif clean_upper == "TRAINING_EVIDENCE_VERIFIED":
+            if has_training_evidence and training_evidence and training_evidence.get("attestation"):
+                final_provenance = "TRAINING_EVIDENCE_VERIFIED"
+            elif has_training_evidence:
+                final_provenance = "TRAINING_RECORDED"
+            else:
+                final_provenance = "UNVERIFIED"
+        elif clean_upper in ("STRUCTURAL_FIXTURE", "LEGACY_UNVERIFIED", "UNVERIFIED"):
+            final_provenance = clean_prov
+        else:
+            final_provenance = "UNVERIFIED"
+
+        # Production admission policy check on promotion
+        from app.config import get_settings
+        settings = get_settings()
+        if settings.app_env.lower() == "production" and is_promoted and clean_upper == "STRUCTURAL_FIXTURE":
+            raise ModelIntegrityError(
+                "Structural fixture cannot be promoted to champion in production environment."
+            )
+
         with self._lock:
             manifest = self._load_manifest(simulation_id)
             next_version = 1
@@ -173,6 +235,7 @@ class ModelRegistry:
                 "version": next_version,
                 "filename": filename,
                 "metrics": metrics,
+                "metrics_provenance": "CALLER_SUPPLIED_UNVERIFIED",
                 "is_active": is_promoted,
                 "status": status if status != "inactive" or not is_promoted else "champion",
                 "git_commit_hash": git_commit_hash or "unknown",
@@ -180,23 +243,30 @@ class ModelRegistry:
                 "sha256": file_sha256,
                 "dp_noise_profile": dp_noise_profile
                 or {"mechanism": "none", "epsilon": 0.0, "delta": 0.0},
-                "provenance_type": provenance_type,
+                "provenance_type": final_provenance,
+                "training_run_id": training_run_id or "unspecified",
+                "dataset_manifest_id": dataset_manifest_id or "unspecified",
+                "training_evidence": training_evidence or {},
                 "sign_offs": [],
                 "created_at": datetime.now(UTC).isoformat(),
             }
             manifest.append(entry)
+            # Authoritative manifest is saved FIRST (Section 9.1)
             self._save_manifest(simulation_id, manifest)
 
-            # If promoted, also copy/link this version to the main global model path for backward compatibility
+            # If promoted, update secondary link and invalidate cache
             if is_promoted:
-                self._update_global_model_link(simulation_id, filepath)
+                try:
+                    self._update_global_model_link(simulation_id, filepath)
+                except Exception as link_err:
+                    logger.error("Failed to update global model link: %s", link_err)
                 with contextlib.suppress(Exception):
                     from app.application.services.model_service import ModelService
-                    from app.config import get_settings
 
-                    ModelService(get_settings()).invalidate_model_cache()
+                    ModelService(settings).invalidate_model_cache()
 
             return entry
+
 
     def resolve_and_verify_champion(
         self, simulation_id: str | None = None
@@ -248,39 +318,60 @@ class ModelRegistry:
 
             sim_id, entry, filepath = candidates[0]
 
+            fname = entry.get("filename", os.path.basename(filepath))
+            if ".." in fname or os.path.isabs(fname):
+                raise ModelIntegrityError(
+                    f"Path traversal detected in manifest filename '{fname}'."
+                )
+
+            # Resolve real filesystem paths to eliminate symlink traversal and escapes (Defect E)
+            real_filepath = os.path.realpath(filepath)
+            real_storage = os.path.realpath(self.storage_dir)
+
             # Path & regular file validation
-            if not os.path.exists(filepath):
+            if not os.path.exists(real_filepath):
                 raise ModelNotAvailableError(
                     f"Active champion artifact file '{filepath}' for simulation '{sim_id}' does not exist on disk."
                 )
-            if not os.path.isfile(filepath):
+            if os.path.isdir(real_filepath) or not os.path.isfile(real_filepath):
                 raise ModelIntegrityError(
                     f"Active champion artifact path '{filepath}' is not a regular file."
                 )
 
-            # Containment check (must reside inside storage directory)
-            abs_filepath = os.path.abspath(filepath)
-            abs_storage = os.path.abspath(self.storage_dir)
+            # Strict containment check: realpath must be strictly contained within real_storage
             try:
-                rel = os.path.relpath(abs_filepath, abs_storage)
-                if rel.startswith("..") or os.path.isabs(rel):
+                common = os.path.commonpath([real_filepath, real_storage])
+                if common != real_storage:
                     raise ModelIntegrityError(
-                        f"Active champion artifact path '{filepath}' is located outside trusted storage directory '{self.storage_dir}'."
+                        f"Active champion artifact path '{filepath}' (realpath: '{real_filepath}') is located outside trusted storage directory '{self.storage_dir}'."
                     )
             except ValueError as exc:
                 raise ModelIntegrityError(
-                    f"Path validation failed for artifact '{filepath}': {exc}"
+                    f"Path containment check failed for artifact '{filepath}': {exc}"
                 ) from exc
 
+            # Explicit check if filepath is a symlink: reject if symlink targets outside storage root
+            if os.path.islink(filepath):
+                try:
+                    symlink_target = os.path.realpath(os.readlink(filepath) if hasattr(os, "readlink") else filepath)
+                    if os.path.commonpath([symlink_target, real_storage]) != real_storage:
+                        raise ModelIntegrityError(
+                            f"Active champion symlink '{filepath}' targets external path '{symlink_target}' outside trusted storage directory."
+                        )
+                except (OSError, ValueError) as exc:
+                    raise ModelIntegrityError(
+                        f"Symlink validation failed for '{filepath}': {exc}"
+                    ) from exc
+
             # Non-empty check
-            if os.path.getsize(filepath) == 0:
+            if os.path.getsize(real_filepath) == 0:
                 raise ModelIntegrityError(
                     f"Active champion artifact file '{filepath}' is empty (0 bytes)."
                 )
 
-            # Read bytes into memory snapshot to eliminate TOCTOU vulnerability
+            # Read bytes into memory snapshot directly from resolved realpath to eliminate TOCTOU races
             try:
-                with open(filepath, "rb") as f:
+                with open(real_filepath, "rb") as f:
                     bytes_data = f.read()
             except Exception as exc:
                 raise ModelIntegrityError(
@@ -303,18 +394,53 @@ class ModelRegistry:
             if version_val is None or not isinstance(version_val, int) or version_val < 1:
                 raise ModelIntegrityError("Champion manifest entry contains invalid or missing version number.")
 
-            # Authenticity status distinction (Section 3.3)
+            # Provenance checks (Defect A)
+            provenance_type = entry.get("provenance_type", "UNVERIFIED")
+            from app.config import get_settings
+            settings = get_settings()
+            if settings.app_env.lower() == "production" and provenance_type == "STRUCTURAL_FIXTURE":
+                raise ModelIntegrityError(
+                    f"Model v{version_val} is classified as 'STRUCTURAL_FIXTURE' and cannot be served as an operational production champion."
+                )
+
+            # Separate recorded approvals from verified authorization (Defect B)
             sign_offs = entry.get("sign_offs", [])
-            has_dual_signoff = (
-                isinstance(sign_offs, list)
-                and any(s.get("role") == "ml_engineer" for s in sign_offs)
-                and any(s.get("role") == "compliance" for s in sign_offs)
-            )
-            authenticity_status = (
-                "DUAL_SIGNOFF_AUTHORIZED"
-                if has_dual_signoff
-                else "INTEGRITY_VERIFIED_UNAUTHENTICATED_MANIFEST"
-            )
+            authenticity_status = "INTEGRITY_VERIFIED_UNAUTHENTICATED_MANIFEST"
+
+            if isinstance(sign_offs, list) and len(sign_offs) > 0:
+                ml_signs = [s for s in sign_offs if s.get("role") in ("ml_engineer", "ml_lead")]
+                comp_signs = [s for s in sign_offs if s.get("role") in ("compliance", "compliance_officer")]
+
+                crypto_valid = False
+                if ml_signs and comp_signs:
+                    ml_s = ml_signs[0]
+                    comp_s = comp_signs[0]
+                    # Four-Eyes Principle check: distinct individuals
+                    if ml_s.get("user") != comp_s.get("user"):
+                        expected_ml_sig = hmac.new(
+                            settings.payload_signing_secret.encode(),
+                            f"{sim_id}:{version_val}:{actual_sha256}:ml_engineer:{ml_s.get('user')}".encode(),
+                            hashlib.sha256,
+                        ).hexdigest()
+                        expected_comp_sig = hmac.new(
+                            settings.payload_signing_secret.encode(),
+                            f"{sim_id}:{version_val}:{actual_sha256}:compliance:{comp_s.get('user')}".encode(),
+                            hashlib.sha256,
+                        ).hexdigest()
+
+                        if (
+                            hmac.compare_digest(ml_s.get("signature", ""), expected_ml_sig)
+                            and hmac.compare_digest(comp_s.get("signature", ""), expected_comp_sig)
+                        ):
+                            crypto_valid = True
+
+                if crypto_valid:
+                    authenticity_status = "CRYPTOGRAPHICALLY_AUTHORIZED"
+                else:
+                    # Role strings exist but lack cryptographic verification against trusted key
+                    authenticity_status = "SIGNOFFS_RECORDED_UNVERIFIED"
+
+            is_prod_eligible = provenance_type in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED")
 
             resolved_metadata = {
                 "version": version_val,
@@ -330,10 +456,14 @@ class ModelRegistry:
                 "architecture": entry.get("architecture", "FraudDetectionModel-GroupNorm"),
                 "input_dim": entry.get("input_dim", 10),
                 "metrics": entry.get("metrics", {}),
+                "metrics_provenance": entry.get("metrics_provenance", "CALLER_SUPPLIED_UNVERIFIED"),
                 "git_commit_hash": entry.get("git_commit_hash", "unknown"),
                 "dataset_hash": entry.get("dataset_hash", "unknown"),
                 "dp_noise_profile": entry.get("dp_noise_profile", {}),
-                "provenance_type": entry.get("provenance_type", "trained"),
+                "provenance_type": provenance_type,
+                "is_production_eligible": is_prod_eligible,
+                "training_run_id": entry.get("training_run_id", "unspecified"),
+                "dataset_manifest_id": entry.get("dataset_manifest_id", "unspecified"),
                 "sign_offs": sign_offs,
                 "created_at": entry.get("created_at"),
             }
@@ -359,6 +489,45 @@ class ModelRegistry:
             if resolved is not None:
                 return resolved[2]
             return None
+
+    def get_active_champion_identity(self, simulation_id: str | None = None) -> dict[str, Any] | None:
+        """Lightweight resolution of current active champion identity.
+
+        Reads only manifest metadata without opening the model artifact file or computing SHA-256.
+        Used on warm inference paths to revalidate champion version without avoidable I/O.
+        Returns None if no active champion exists.
+        """
+        with self._lock:
+            if not os.path.isdir(self.registry_root):
+                return None
+
+            candidates = []
+            sim_dirs = [simulation_id] if simulation_id else sorted(os.listdir(self.registry_root))
+            for s_id in sim_dirs:
+                sim_path = os.path.join(self.registry_root, s_id)
+                if not os.path.isdir(sim_path):
+                    continue
+                manifest = self._load_manifest(s_id)
+                active_entries = [
+                    e for e in manifest if e.get("status") == "champion" and e.get("is_active")
+                ]
+                if len(active_entries) == 1:
+                    entry = active_entries[0]
+                    candidates.append((s_id, entry))
+
+            if len(candidates) != 1:
+                return None
+
+            s_id, entry = candidates[0]
+            return {
+                "version": entry.get("version"),
+                "simulation_id": s_id,
+                "sha256": entry.get("sha256"),
+                "filename": entry.get("filename"),
+                "architecture": entry.get("architecture", "FraudDetectionModel-GroupNorm"),
+                "input_dim": entry.get("input_dim", 10),
+                "provenance_type": entry.get("provenance_type", "UNVERIFIED"),
+            }
 
     def _update_global_model_link(self, simulation_id: str, filepath: str) -> None:
         """Update the root global_model.pt file to point to the active version atomically."""
@@ -430,6 +599,17 @@ class ModelRegistry:
             if not os.path.exists(filepath):
                 raise FileNotFoundError(f"Model file {filepath} not found on disk")
 
+            from app.config import get_settings
+            settings = get_settings()
+            if (
+                settings.app_env.lower() == "production"
+                and target_status == "champion"
+                and target_entry.get("provenance_type") == "STRUCTURAL_FIXTURE"
+            ):
+                raise ModelIntegrityError(
+                    "Structural test fixture cannot be promoted to champion in production environment."
+                )
+
             if target_status == "champion":
                 for entry in manifest:
                     entry["is_active"] = entry["version"] == version
@@ -437,12 +617,6 @@ class ModelRegistry:
                         entry["status"] = "champion"
                     elif entry.get("status") == "champion":
                         entry["status"] = "inactive"
-                self._update_global_model_link(simulation_id, filepath)
-                with contextlib.suppress(Exception):
-                    from app.application.services.model_service import ModelService
-                    from app.config import get_settings
-
-                    ModelService(get_settings()).invalidate_model_cache()
             else:  # challenger
                 for entry in manifest:
                     if entry["version"] == version:
@@ -451,7 +625,20 @@ class ModelRegistry:
                     elif entry.get("status") == "challenger":
                         entry["status"] = "inactive"
 
+            # Authoritative manifest is saved FIRST (Section 9.1)
             self._save_manifest(simulation_id, manifest)
+
+            # Secondary global model link updated SECOND
+            if target_status == "champion":
+                try:
+                    self._update_global_model_link(simulation_id, filepath)
+                except Exception as link_err:
+                    logger.error("Failed to update global model link: %s", link_err)
+                with contextlib.suppress(Exception):
+                    from app.application.services.model_service import ModelService
+
+                    ModelService(settings).invalidate_model_cache()
+
             logger.info("Promoted model version %d to %s for %s", version, target_status, simulation_id)
             return target_entry
 
@@ -468,6 +655,13 @@ class ModelRegistry:
             if not os.path.exists(filepath):
                 raise FileNotFoundError(f"Model file {filepath} not found on disk")
 
+            from app.config import get_settings
+            settings = get_settings()
+            if settings.app_env.lower() == "production" and target_entry.get("provenance_type") == "STRUCTURAL_FIXTURE":
+                raise ModelIntegrityError(
+                    "Structural test fixture cannot be activated as champion in production environment."
+                )
+
             # Mark target as active, all others as inactive
             for entry in manifest:
                 entry["is_active"] = entry["version"] == version
@@ -476,13 +670,19 @@ class ModelRegistry:
                 elif entry.get("status") == "champion":
                     entry["status"] = "inactive"
 
+            # Authoritative manifest is saved FIRST (Section 9.1)
             self._save_manifest(simulation_id, manifest)
-            self._update_global_model_link(simulation_id, filepath)
+
+            # Secondary global model link updated SECOND
+            try:
+                self._update_global_model_link(simulation_id, filepath)
+            except Exception as link_err:
+                logger.error("Failed to update global model link during rollback: %s", link_err)
+
             with contextlib.suppress(Exception):
                 from app.application.services.model_service import ModelService
-                from app.config import get_settings
 
-                ModelService(get_settings()).invalidate_model_cache()
+                ModelService(settings).invalidate_model_cache()
 
             logger.info("Rolled back registry of %s to version %d", simulation_id, version)
             return target_entry
@@ -498,9 +698,10 @@ class ModelRegistry:
         bias_metric: float = 0.0,
         drift_divergence: float = 0.0,
     ) -> dict[str, Any]:
-        """Approve a model version by adding a cryptographic sign-off.
+        """Approve a model version by adding a sign-off.
 
         Promotes version to challenger/champion if ML engineer and compliance officer have signed off.
+        Enforces Four-Eyes principle (distinct individuals) and binds cryptographic signature to canonical payload.
         """
         with self._lock:
             manifest = self._load_manifest(simulation_id)
@@ -508,24 +709,53 @@ class ModelRegistry:
             if not entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
 
-            if role not in ("compliance", "ml_engineer"):
+            if role not in ("compliance", "compliance_officer", "ml_engineer"):
                 raise ValueError("Role must be 'compliance' or 'ml_engineer'")
+
+            norm_role = "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
 
             # Initialize sign_offs list if not present (backward compatibility)
             if "sign_offs" not in entry:
                 entry["sign_offs"] = []
 
             # Prevent duplicate sign-offs for the same role
-            existing_roles = [s["role"] for s in entry["sign_offs"]]
-            if role in existing_roles:
+            existing_roles = [
+                ("compliance" if s["role"] in ("compliance", "compliance_officer") else "ml_engineer")
+                for s in entry["sign_offs"]
+            ]
+            if norm_role in existing_roles:
                 raise ValueError(f"Role '{role}' has already signed off on this version")
+
+            # Four-Eyes Principle: Prevent same user from approving multiple roles on the same version
+            existing_users = [s["user"] for s in entry["sign_offs"]]
+            if user in existing_users:
+                raise ValueError(
+                    f"Four-Eyes Principle violation: user '{user}' cannot approve multiple roles on the same version"
+                )
+
+            # Cryptographic signature verification over canonical payload
+            sim_dir = self._get_sim_dir(simulation_id)
+            artifact_sha = entry.get("sha256") or compute_file_sha256(os.path.join(sim_dir, entry["filename"]))
+            canonical_payload = f"{simulation_id}:{version}:{artifact_sha}:{norm_role}:{user}"
+
+            from app.config import get_settings
+            settings = get_settings()
+            expected_sig = hmac.new(
+                settings.payload_signing_secret.encode("utf-8"),
+                canonical_payload.encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()
+
+            is_signature_valid = bool(signature and hmac.compare_digest(signature, expected_sig))
 
             # Append new sign-off details
             entry["sign_offs"].append(
                 {
-                    "role": role,
+                    "role": norm_role,
                     "user": user,
                     "signature": signature,
+                    "is_signature_valid": is_signature_valid,
+                    "payload_bound": canonical_payload,
                     "timestamp": datetime.now(UTC).isoformat(),
                     "fairness_score": fairness_score,
                     "bias_metric": bias_metric,
@@ -534,14 +764,25 @@ class ModelRegistry:
             )
 
             # Check if both compliance and ml_engineer have signed off
-            signed_roles = [s["role"] for s in entry["sign_offs"]]
+            signed_roles = [
+                ("compliance" if s["role"] in ("compliance", "compliance_officer") else "ml_engineer")
+                for s in entry["sign_offs"]
+            ]
             if "compliance" in signed_roles and "ml_engineer" in signed_roles:
-                # Check if there is an active champion model in the manifest
-                has_champion = any(
-                    e.get("status") == "champion" and e.get("is_active") for e in manifest
+                # In production environment, require genuine cryptographic verification
+                all_valid = all(s.get("is_signature_valid", False) for s in entry["sign_offs"])
+                if settings.app_env.lower() == "production" and not all_valid:
+                    logger.warning("Sign-offs present but lack valid cryptographic signatures in production environment.")
+                    self._save_manifest(simulation_id, manifest)
+                    return entry
+
+                # Check if there is another active champion model in the manifest
+                has_other_champion = any(
+                    e.get("status") == "champion" and e.get("is_active") and e.get("version") != version
+                    for e in manifest
                 )
 
-                if not has_champion:
+                if not has_other_champion:
                     # Promote directly to champion
                     entry["status"] = "champion"
                     entry["is_active"] = True
@@ -555,7 +796,13 @@ class ModelRegistry:
 
                     sim_dir = self._get_sim_dir(simulation_id)
                     filepath = os.path.join(sim_dir, entry["filename"])
-                    self._update_global_model_link(simulation_id, filepath)
+                    # Manifest is saved FIRST
+                    self._save_manifest(simulation_id, manifest)
+                    try:
+                        self._update_global_model_link(simulation_id, filepath)
+                    except Exception as err:
+                        logger.error("Failed to update global link after signoff: %s", err)
+                    return entry
                 else:
                     # Set as challenger
                     entry["status"] = "challenger"
