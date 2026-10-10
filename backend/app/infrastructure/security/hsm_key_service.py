@@ -403,17 +403,20 @@ class HSMKeyService:
             except Exception as exc:
                 logger.debug("Vault Transit encrypt call failed (%s); using local enclave.", exc)
 
-        # Software / PKCS#11 enclave encryption
+        # Software / PKCS#11 enclave encryption via authenticated AES-256-GCM
+        if not _CRYPTO_AVAILABLE:
+            raise RuntimeError(
+                "Cryptographic engine unavailable: authenticated hardware envelope encryption "
+                "requires AES-256-GCM from the cryptography library."
+            )
+
         enclave_key = hashlib.sha256(
             self.hsm_signer.sign_data(key_label.encode(), key_label=key_label)
         ).digest()
         nonce = os.urandom(12)
-
-        if _CRYPTO_AVAILABLE:
-            aesgcm = AESGCM(enclave_key)
-            ct = aesgcm.encrypt(nonce, plaintext, None)
-        else:
-            ct = bytes(b ^ enclave_key[i % len(enclave_key)] for i, b in enumerate(plaintext)) + hashlib.sha256(plaintext).digest()[:16]
+        aesgcm = AESGCM(enclave_key)
+        aad = f"hsm_enclave:{key_label}".encode()
+        ct = aesgcm.encrypt(nonce, plaintext, aad)
 
         return {
             "ciphertext": base64.urlsafe_b64encode(ct).decode().rstrip("="),
@@ -447,20 +450,30 @@ class HSMKeyService:
                         pt_b64 = body.get("data", {}).get("plaintext", "")
                         return base64.b64decode(pt_b64)
             except Exception as exc:
-                logger.debug("Vault Transit decrypt call failed (%s); using local enclave.", exc)
+                logger.warning("Vault Transit decrypt call failed (%s); unable to decrypt remote transit ciphertext.", exc)
+                raise RuntimeError(f"Vault Transit envelope decryption failed: {exc}") from exc
+
+        if not _CRYPTO_AVAILABLE:
+            raise RuntimeError(
+                "Cryptographic engine unavailable: authenticated hardware envelope decryption "
+                "requires AES-256-GCM from the cryptography library."
+            )
+
+        if not nonce_b64:
+            raise ValueError("nonce_b64 is required to decrypt hsm_envelope_v1 ciphertext")
 
         enclave_key = hashlib.sha256(
             self.hsm_signer.sign_data(key_label.encode(), key_label=key_label)
         ).digest()
         ct = base64.urlsafe_b64decode(ciphertext_b64 + "==")
-        nonce = base64.urlsafe_b64decode(nonce_b64 + "==") if nonce_b64 else os.urandom(12)
-
-        if _CRYPTO_AVAILABLE:
-            aesgcm = AESGCM(enclave_key)
+        nonce = base64.urlsafe_b64decode(nonce_b64 + "==")
+        aesgcm = AESGCM(enclave_key)
+        aad = f"hsm_enclave:{key_label}".encode()
+        try:
+            return aesgcm.decrypt(nonce, ct, aad)
+        except Exception:
+            # Backward compatibility fallback for ciphertexts encrypted without AAD
             return aesgcm.decrypt(nonce, ct, None)
-        else:
-            raw = ct[:-16]
-            return bytes(b ^ enclave_key[i % len(enclave_key)] for i, b in enumerate(raw))
 
     # ── Automated Consortium mTLS 1.3 Certificate Rotation ───────────────────
 

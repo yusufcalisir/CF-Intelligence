@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from cryptography import x509
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
@@ -207,6 +208,46 @@ class TestHSMEnvelopeEncryption:
         env1 = service.encrypt_envelope(b"payload_alpha", key_label="env_key")
         env2 = service.encrypt_envelope(b"payload_beta", key_label="env_key")
         assert env1["ciphertext"] != env2["ciphertext"]
+
+    def test_tampered_ciphertext_fails_closed(self) -> None:
+        """Verifies that tampering with even a single bit in the ciphertext raises InvalidTag."""
+        service = HSMKeyService(provider=HSMProvider.PKCS11)
+        envelope = service.encrypt_envelope(b"authentic_confidential_data", key_label="env_key")
+
+        raw_ct = bytearray(base64.urlsafe_b64decode(envelope["ciphertext"] + "=="))
+        raw_ct[-1] ^= 0x01  # Tamper with GCM authentication tag byte
+        tampered_ct_b64 = base64.urlsafe_b64encode(raw_ct).decode().rstrip("=")
+
+        with pytest.raises(InvalidTag):
+            service.decrypt_envelope(
+                tampered_ct_b64,
+                key_label="env_key",
+                nonce_b64=envelope.get("nonce"),
+            )
+
+    def test_aad_key_label_isolation_fails_closed(self) -> None:
+        """Verifies that ciphertext encrypted under key_label_A cannot be decrypted under key_label_B."""
+        service = HSMKeyService(provider=HSMProvider.PKCS11)
+        envelope = service.encrypt_envelope(b"tenant_alpha_payload", key_label="tenant_alpha_key")
+
+        with pytest.raises(InvalidTag):
+            service.decrypt_envelope(
+                envelope["ciphertext"],
+                key_label="tenant_beta_key",
+                nonce_b64=envelope.get("nonce"),
+            )
+
+    def test_missing_nonce_raises_value_error(self) -> None:
+        """Verifies that attempting decryption without nonce_b64 raises ValueError."""
+        service = HSMKeyService(provider=HSMProvider.PKCS11)
+        envelope = service.encrypt_envelope(b"some_payload", key_label="env_key")
+
+        with pytest.raises(ValueError, match="nonce_b64 is required"):
+            service.decrypt_envelope(
+                envelope["ciphertext"],
+                key_label="env_key",
+                nonce_b64=None,
+            )
 
 
 class TestVaultTransitProvider:

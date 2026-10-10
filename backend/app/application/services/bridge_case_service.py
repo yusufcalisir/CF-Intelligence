@@ -51,16 +51,16 @@ except ImportError:  # pragma: no cover
 
 def _hkdf_derive(shared_secret: bytes, salt: bytes, info: bytes = b"finint-aes256-gcm") -> bytes:
     """Derive a 256-bit AES key from ECDH shared secret via HKDF-SHA256."""
-    if _CRYPTO_AVAILABLE:
-        hkdf = HKDF(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            info=info,
-        )
-        return hkdf.derive(shared_secret)
-    # Software-mode fallback (test environments without cryptography package)
-    return hashlib.sha256(shared_secret + salt + info).digest()
+    if not _CRYPTO_AVAILABLE:
+        raise RuntimeError("HKDF-SHA256 key derivation requires the cryptography library.")
+
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        info=info,
+    )
+    return hkdf.derive(shared_secret)
 
 
 def encrypt_payload(plaintext: bytes, recipient_public_key_b64: str) -> tuple[str, str, str]:
@@ -73,38 +73,25 @@ def encrypt_payload(plaintext: bytes, recipient_public_key_b64: str) -> tuple[st
     Returns:
         Tuple of (ciphertext_b64, nonce_b64, ephemeral_pubkey_b64) — all base64url-safe.
     """
+    if not _CRYPTO_AVAILABLE:
+        raise RuntimeError("Curve25519 ECDH and AES-256-GCM authenticated encryption require the cryptography library.")
+
     recipient_pub_bytes = base64.urlsafe_b64decode(recipient_public_key_b64 + "==")
+    ephemeral_priv = X25519PrivateKey.generate()
+    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey
 
-    if _CRYPTO_AVAILABLE:
-        ephemeral_priv = X25519PrivateKey.generate()
-        from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey
-
-        recipient_pub = X25519PublicKey.from_public_bytes(recipient_pub_bytes)
-        shared_secret = ephemeral_priv.exchange(recipient_pub)
-        ephem_pub_bytes = ephemeral_priv.public_key().public_bytes(
-            serialization.Encoding.Raw, serialization.PublicFormat.Raw
-        )
-    else:
-        # Software-mode: generate deterministic ephemeral key pair
-        ephem_priv_bytes = hashlib.sha256(recipient_pub_bytes + b"ephemeral").digest()
-        ephem_pub_bytes = hashlib.sha256(ephem_priv_bytes).digest()[:32]
-        shared_secret = hashlib.sha256(ephem_priv_bytes + recipient_pub_bytes).digest()
+    recipient_pub = X25519PublicKey.from_public_bytes(recipient_pub_bytes)
+    shared_secret = ephemeral_priv.exchange(recipient_pub)
+    ephem_pub_bytes = ephemeral_priv.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw
+    )
 
     salt = ephem_pub_bytes  # use ephemeral public key bytes as HKDF salt
     aes_key = _hkdf_derive(shared_secret, salt)
     nonce = os.urandom(12)  # 96-bit GCM nonce
 
-    if _CRYPTO_AVAILABLE:
-        aesgcm = AESGCM(aes_key)
-        ciphertext = aesgcm.encrypt(nonce, plaintext, None)
-    else:
-        # XOR-based software fallback for test environments
-        import itertools
-
-        key_stream = bytes(
-            a ^ b for a, b in zip(plaintext, itertools.cycle(aes_key + nonce))
-        )
-        ciphertext = key_stream + hashlib.sha256(key_stream).digest()[:16]
+    aesgcm = AESGCM(aes_key)
+    ciphertext = aesgcm.encrypt(nonce, plaintext, None)
 
     return (
         base64.urlsafe_b64encode(ciphertext).decode(),
@@ -148,14 +135,7 @@ def decrypt_payload(
         aesgcm = AESGCM(aes_key)
         return aesgcm.decrypt(nonce, ciphertext, None)
     else:
-        shared_secret = hashlib.sha256(priv_bytes + ephem_pub_bytes).digest()
-        aes_key = _hkdf_derive(shared_secret, salt=ephem_pub_bytes)
-        import itertools
-
-        raw = ciphertext[:-16]  # strip software-mode tag
-        return bytes(
-            a ^ b for a, b in zip(raw, itertools.cycle(aes_key + nonce))
-        )
+        raise RuntimeError("Curve25519 ECDH and AES-256-GCM authenticated decryption require the cryptography library.")
 
 
 def decrypt_payload_with_hsm(
@@ -177,14 +157,11 @@ def decrypt_payload_with_hsm(
     shared_secret = hsm_key_service.derive_shared_secret(ephem_pub_bytes, key_label=key_label)
     aes_key = _hkdf_derive(shared_secret, salt=ephem_pub_bytes)
 
-    if _CRYPTO_AVAILABLE:
-        aesgcm = AESGCM(aes_key)
-        return aesgcm.decrypt(nonce, ciphertext, None)
-    else:
-        import itertools
+    if not _CRYPTO_AVAILABLE:
+        raise RuntimeError("AES-256-GCM authenticated decryption requires the cryptography library.")
 
-        raw = ciphertext[:-16]
-        return bytes(a ^ b for a, b in zip(raw, itertools.cycle(aes_key + nonce)))
+    aesgcm = AESGCM(aes_key)
+    return aesgcm.decrypt(nonce, ciphertext, None)
 
 
 def generate_bank_keypair() -> tuple[str, str]:
@@ -193,17 +170,16 @@ def generate_bank_keypair() -> tuple[str, str]:
     Returns:
         (private_key_b64, public_key_b64) both base64url-safe encoded.
     """
-    if _CRYPTO_AVAILABLE:
-        priv = X25519PrivateKey.generate()
-        priv_bytes = priv.private_bytes(
-            serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption()
-        )
-        pub_bytes = priv.public_key().public_bytes(
-            serialization.Encoding.Raw, serialization.PublicFormat.Raw
-        )
-    else:
-        priv_bytes = os.urandom(32)
-        pub_bytes = hashlib.sha256(priv_bytes).digest()
+    if not _CRYPTO_AVAILABLE:
+        raise RuntimeError("Curve25519 key generation requires the cryptography library.")
+
+    priv = X25519PrivateKey.generate()
+    priv_bytes = priv.private_bytes(
+        serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption()
+    )
+    pub_bytes = priv.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw
+    )
 
     return (
         base64.urlsafe_b64encode(priv_bytes).decode().rstrip("="),

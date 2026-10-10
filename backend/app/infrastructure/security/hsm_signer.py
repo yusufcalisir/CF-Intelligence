@@ -123,7 +123,9 @@ class HSMSignerEngine:
         if key_label not in self._key_handles:
             self.generate_key_pair(key_label=key_label)
 
-        secret = self._mock_secrets.get(key_label, b"fallback_enclave_secret")
+        secret = self._enclave_secrets.get(key_label)
+        if secret is None:
+            raise KeyError(f"Enclave key secret for label '{key_label}' not found.")
 
         # Hardware enclave signature operation S = Sign_HSM(digest)
         signature = hmac.new(secret, digest_bytes + algorithm.encode(), hashlib.sha256).digest()
