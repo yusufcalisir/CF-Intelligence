@@ -78,6 +78,19 @@ class AuditChainVerifyResponse(BaseModel):
     verified_at: str
 
 
+class HSMStatusResponse(BaseModel):
+    """Hardware Security Module and Enclave telemetry report."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    is_hardware_backed: bool
+    compliance_level: str
+    driver: str
+    key_isolation: str
+    status: str
+
+
 class SecurityStatusResponse(BaseModel):
     """Telemetry report covering enterprise security layers."""
 
@@ -88,6 +101,7 @@ class SecurityStatusResponse(BaseModel):
     abac: dict[str, Any]
     vault: dict[str, Any]
     audit_chain: dict[str, Any]
+    hsm: dict[str, Any] = Field(default_factory=dict)
 
 
 # ── Zero-Knowledge Proof (zk-SNARK) Schemas ────────────────────────────

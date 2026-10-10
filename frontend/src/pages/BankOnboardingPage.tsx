@@ -167,30 +167,33 @@ export default function BankOnboardingPage() {
   };
 
   // Step 5 Connection polling
+  // Step 5 Genuine connection polling
   useEffect(() => {
     if (step !== 5) return;
 
+    let isMounted = true;
     const pollStatus = async () => {
       try {
-        const res = await fetch(`/api/v1/onboarding/banks/${formData.bank_id}/status`);
-        if (res.ok) {
+        const res = await fetch(`/api/v1/onboarding/banks/${encodeURIComponent(formData.bank_id)}/status`);
+        if (res.ok && isMounted) {
           const data = await res.json();
           if (data.status === 'ACTIVE' || data.status === 'ACTIVE_NODE') {
             setNodeStatus('ACTIVE');
+          } else if (data.status) {
+            setNodeStatus(data.status);
           }
         }
       } catch {
-        // Mock success fallback after 5 seconds
+        // Network error during polling; preserve authentic pending state without fabricating active status
       }
     };
 
-    const timer = setTimeout(() => {
-      setNodeStatus('ACTIVE');
-    }, 5000);
-
+    // Immediate initial probe followed by recurring 3s polling
+    pollStatus();
     const interval = setInterval(pollStatus, 3000);
+
     return () => {
-      clearTimeout(timer);
+      isMounted = false;
       clearInterval(interval);
     };
   }, [step, formData.bank_id]);

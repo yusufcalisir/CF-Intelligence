@@ -27,6 +27,7 @@ from app.application.schemas.security import (
     EncapsulatePQCResponse,
     GeneratePQCKeypairRequest,
     GeneratePQCKeypairResponse,
+    HSMStatusResponse,
     KMSKeyMetadataResponse,
     KMSKeyRotateRequest,
     KMSKeyRotateResponse,
@@ -93,6 +94,18 @@ async def get_security_status() -> SecurityStatusResponse:
     chain_rpt = _audit_chain.verify_chain_integrity()
     vault_meta = _vault_client.get_secret_metadata("database/credentials")
 
+    from app.infrastructure.security.hsm_key_service import HSMKeyService, HSMProvider
+    hsm_service = HSMKeyService()
+    hsm_is_hw = hsm_service.provider in (HSMProvider.PKCS11, HSMProvider.AWS_CLOUDHSM)
+    hsm_meta = {
+        "provider": hsm_service.provider.value,
+        "is_hardware_backed": False if hsm_service.provider == HSMProvider.LOCAL_EMULATED else hsm_is_hw,
+        "compliance_level": "FIPS 140-2 Level 3 (Physical HSM)" if hsm_is_hw else "Software Emulated (SoftHSM2 Sandbox)",
+        "driver": f"Slot #{hsm_service._session_config.slot_id} ({hsm_service.provider.value})",
+        "key_isolation": "Hardware Non-Exportable" if hsm_is_hw else "In-Memory Process Sandbox (Emulated)",
+        "status": "HARDWARE_ACTIVE" if hsm_is_hw else "SOFTWARE_EMULATED",
+    }
+
     return SecurityStatusResponse(
         mtls={
             "enabled": settings.mtls_enabled,
@@ -143,6 +156,7 @@ async def get_security_status() -> SecurityStatusResponse:
             "last_hash": chain_rpt.last_hash,
             "hashing_algorithm": "SHA-256 Chain (H_i = SHA256(L_i || H_{i-1}))",
         },
+        hsm=hsm_meta,
     )
 
 
@@ -539,6 +553,22 @@ async def get_vault_seal_status() -> VaultSealStatusResponse:
     )
 
 
+async def get_hsm_status() -> HSMStatusResponse:
+    """Inspect Hardware Security Module (HSM) and TEE enclave status."""
+    from app.infrastructure.security.hsm_key_service import HSMKeyService, HSMProvider
+
+    hsm_service = HSMKeyService()
+    hsm_is_hw = hsm_service.provider in (HSMProvider.PKCS11, HSMProvider.AWS_CLOUDHSM)
+    return HSMStatusResponse(
+        provider=hsm_service.provider.value,
+        is_hardware_backed=False if hsm_service.provider == HSMProvider.LOCAL_EMULATED else hsm_is_hw,
+        compliance_level="FIPS 140-2 Level 3 (Physical HSM)" if hsm_is_hw else "Software Emulated (SoftHSM2 Sandbox)",
+        driver=f"Slot #{hsm_service._session_config.slot_id} ({hsm_service.provider.value})",
+        key_isolation="Hardware Non-Exportable" if hsm_is_hw else "In-Memory Process Sandbox (Emulated)",
+        status="HARDWARE_ACTIVE" if hsm_is_hw else "SOFTWARE_EMULATED",
+    )
+
+
 # ── Route Binding to Router Variants ──────────────────────────
 
 for prefix_tag, r in [("v1", router), ("api_v1", api_router)]:
@@ -709,4 +739,20 @@ for prefix_tag, r in [("v1", router), ("api_v1", api_router)]:
         response_model=VaultSealStatusResponse,
         summary="Get HashiCorp Vault Seal and HA Status",
         operation_id=f"{prefix_tag}_get_vault_seal_status",
+    )
+    r.add_api_route(
+        "/hsm/status",
+        get_hsm_status,
+        methods=["GET"],
+        response_model=HSMStatusResponse,
+        summary="Get Hardware Security Module (HSM) Status",
+        operation_id=f"{prefix_tag}_get_hsm_status",
+    )
+    r.add_api_route(
+        "/hardware-enclave/status",
+        get_hsm_status,
+        methods=["GET"],
+        response_model=HSMStatusResponse,
+        summary="Get Hardware Enclave / TEE Status (Alias)",
+        operation_id=f"{prefix_tag}_get_hardware_enclave_status",
     )

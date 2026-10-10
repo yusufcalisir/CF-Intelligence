@@ -1220,6 +1220,14 @@ export interface SecurityStatus {
     last_hash: string;
     hashing_algorithm: string;
   };
+  hsm?: {
+    provider: string;
+    is_hardware_backed: boolean;
+    compliance_level: string;
+    driver: string;
+    key_isolation: string;
+    status: string;
+  };
 }
 
 export interface ABACEvalRequest {

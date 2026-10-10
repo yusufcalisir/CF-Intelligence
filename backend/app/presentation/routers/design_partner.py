@@ -36,28 +36,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/design-partner", tags=["design-partner"])
 api_router = APIRouter(prefix="/v1/design-partner", tags=["design-partner"])
 
-_pilot_service = DesignPartnerPilotService()
+from app.infrastructure.storage.pilot_lead_store import PilotLeadStore
 
-# Thread-safe in-memory storage for commercial pilot leads
-_leads_lock = threading.Lock()
-_enrolled_leads: list[dict[str, Any]] = [
-    {
-        "lead_id": "lead-tier1-alpha-001",
-        "institution_name": "EuroClear Bank Consortium",
-        "status": "APPROVED_FOR_PILOT",
-        "assigned_tier": "TIER_1",
-        "sandbox_provisioned": True,
-        "created_at": "2026-08-15T10:00:00Z",
-    },
-    {
-        "lead_id": "lead-tier1-beta-002",
-        "institution_name": "Nordic Cross-Border Payment Rail",
-        "status": "SANDBOX_ACTIVE",
-        "assigned_tier": "TIER_1",
-        "sandbox_provisioned": True,
-        "created_at": "2026-09-01T14:30:00Z",
-    },
-]
+_pilot_service = DesignPartnerPilotService()
+_lead_store = PilotLeadStore.get_instance()
 
 
 @router.post(
@@ -383,18 +365,36 @@ async def enroll_pilot_lead(request: PilotLeadRequest) -> PilotLeadResponse:
     """Registers a prospective bank or fintech into the Design Partner POC sandbox."""
     lead_id = f"lead-{uuid.uuid4().hex[:12]}"
     created_at = datetime.now(UTC).isoformat()
+
+    # Rule 2 / Rule 19: Genuine qualification checks
+    is_institutional_tier = request.tier in ("TIER_1", "TIER_2", "COMMUNITY_BANK", "FINTECH")
+    known_jurisdictions = {"EU", "TR", "US", "UK", "CH", "GLOBAL"}
+    jurisdiction_valid = request.jurisdiction.upper() in known_jurisdictions
+
+    # Minimum transaction volume threshold for automated sandbox provisioning: 100,000 tx/month
+    if is_institutional_tier and jurisdiction_valid and request.monthly_tx_volume >= 100_000:
+        status_val = "APPROVED_FOR_PILOT"
+        sandbox_provisioned = True
+    else:
+        status_val = "PENDING_REVIEW"
+        sandbox_provisioned = False
+
     record = {
         "lead_id": lead_id,
         "institution_name": request.institution_name,
-        "status": "APPROVED_FOR_PILOT",
+        "contact_name": request.contact_name,
+        "contact_email": request.contact_email,
+        "status": status_val,
         "assigned_tier": request.tier,
-        "sandbox_provisioned": True,
+        "sandbox_provisioned": sandbox_provisioned,
+        "jurisdiction": request.jurisdiction,
+        "monthly_tx_volume": request.monthly_tx_volume,
+        "notes": request.notes,
         "created_at": created_at,
     }
-    with _leads_lock:
-        _enrolled_leads.append(record)
+    _lead_store.insert_lead(record)
 
-    logger.info("Enrolled design partner lead: %s (%s)", request.institution_name, lead_id)
+    logger.info("Enrolled design partner lead: %s (%s, status=%s)", request.institution_name, lead_id, status_val)
     return PilotLeadResponse.model_validate(record)
 
 
@@ -412,8 +412,8 @@ async def enroll_pilot_lead(request: PilotLeadRequest) -> PilotLeadResponse:
 )
 async def list_pilot_leads() -> list[PilotLeadResponse]:
     """Returns active design partner commercial pilot leads and sandbox provisioning statuses."""
-    with _leads_lock:
-        return [PilotLeadResponse(**item) for item in _enrolled_leads]
+    leads = _lead_store.list_leads()
+    return [PilotLeadResponse(**item) for item in leads]
 
 
 @router.get(
@@ -428,9 +428,7 @@ async def list_pilot_leads() -> list[PilotLeadResponse]:
 )
 async def get_pilot_overview() -> dict[str, Any]:
     """Returns a consolidated summary of active design partner pilots and benchmark sandboxes."""
-    with _leads_lock:
-        total_leads = len(_enrolled_leads)
-        active_sandboxes = sum(1 for lead in _enrolled_leads if lead.get("sandbox_provisioned"))
+    total_leads, active_sandboxes = _lead_store.get_overview_counts()
 
     return {
         "sandbox_status": "ACTIVE",

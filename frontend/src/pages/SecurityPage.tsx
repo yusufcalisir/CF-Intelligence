@@ -58,6 +58,7 @@ export default function SecurityPage() {
   const [activeTab, setActiveTab] = useState<SecurityTabId>('mtls');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'identity' | 'crypto' | 'governance'>('all');
   const { data: status, isLoading: isStatusLoading } = useSecurityStatus();
+  const isHsmHw = status?.hsm?.is_hardware_backed === true;
   const { data: auditEntries, isLoading: isAuditLoading } = useAuditChain(30);
   const { data: vaultStatus } = useVaultSealStatus();
   const { data: zkStatus } = useZKVerifierStatus();
@@ -331,8 +332,20 @@ export default function SecurityPage() {
             ISO 27001, SOC2 Type II, PCI-DSS 4.0 compliance: mTLS 1.3, OIDC JWT, ABAC, HashiCorp Vault HSM & SHA-256 Audit Chain
           </p>
           <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
-            {['ISO 27001', 'SOC2 Type II', 'PCI-DSS 4.0', 'FIPS 140-3 HSM'].map((badge) => (
-              <span key={badge} className="px-2 py-0.5 rounded text-[9.5px] font-mono font-semibold bg-white/5 border border-white/10 text-slate-300">
+            {[
+              'ISO 27001',
+              'SOC2 Type II',
+              'PCI-DSS 4.0',
+              isHsmHw ? 'FIPS 140-3 HSM (Hardware)' : 'SoftHSM2 (Software Emulated)',
+            ].map((badge) => (
+              <span
+                key={badge}
+                className={`px-2 py-0.5 rounded text-[9.5px] font-mono font-semibold border ${
+                  badge.includes('Software Emulated')
+                    ? 'bg-amber-500/10 border-amber-500/25 text-amber-300'
+                    : 'bg-white/5 border-white/10 text-slate-300'
+                }`}
+              >
                 {badge}
               </span>
             ))}
@@ -743,19 +756,31 @@ export default function SecurityPage() {
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
                     <span>🛡️ Vault PKI Root CA — PKCS#11 Hardware HSM Interface</span>
                   </h3>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                    ✓ PKCS#11 READY (FIPS 140-2 L3 Compatible)
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                      isHsmHw
+                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                        : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    }`}
+                  >
+                    {isHsmHw
+                      ? '✓ PHYSICAL HSM ACTIVE (FIPS 140-2 L3)'
+                      : '⚠️ SOFTWARE EMULATED (SoftHSM2 Sandbox)'}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">HSM Slot & Driver</div>
-                    <div className="font-mono font-bold text-indigo-300">Slot #0 (PKCS#11 / SoftHSM2 Dev)</div>
+                    <div className="font-mono font-bold text-indigo-300">
+                      {status?.hsm?.driver || 'Slot #0 (PKCS#11 / SoftHSM2 Dev)'}
+                    </div>
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">Private Key Guarantee</div>
-                    <div className="font-mono font-bold text-emerald-400">🔒 Non-Exportable (Zero-Disk)</div>
+                    <div className="font-mono font-bold text-emerald-400">
+                      {isHsmHw ? '🔒 Hardware Non-Exportable (Zero-Disk)' : '🔒 Process Memory Sandbox (Emulated)'}
+                    </div>
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">Root CA Algorithm</div>
@@ -763,15 +788,18 @@ export default function SecurityPage() {
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">Hardware Target</div>
-                    <div className="font-mono font-bold text-amber-300">FIPS 140-2 Level 3 Ready</div>
+                    <div className="font-mono font-bold text-amber-300">
+                      {status?.hsm?.compliance_level || (isHsmHw ? 'FIPS 140-2 Level 3 (Physical HSM)' : 'Software Emulated (Zero Physical HSM)')}
+                    </div>
                   </div>
                 </div>
 
                 <div className="p-3 rounded-lg border border-indigo-500/20 bg-indigo-500/10 text-xs space-y-1 text-indigo-200">
                   <div className="font-bold">Hardware-Anchored Root CA Key Invariant:</div>
                   <p className="text-[10px] opacity-90 leading-relaxed">
-                    HashiCorp Vault's PKI engine delegates root CA key generation, certificate signing (CSR), and CRL signing
-                    operations to an HSM enclave interface via VaultHSMPKIBinder. Private root CA key material never leaves the hardware boundary.
+                    {isHsmHw
+                      ? "HashiCorp Vault's PKI engine delegates root CA key generation, certificate signing (CSR), and CRL signing operations to a physical FIPS 140-2 Level 3 HSM hardware module. Private root CA key material never leaves the hardware boundary."
+                      : "Zero physical HSM detected in active runtime environment. Cryptographic root operations execute in verified SoftHSM2 process memory sandbox emulation without claiming physical hardware enclave security."}
                   </p>
                 </div>
               </div>
