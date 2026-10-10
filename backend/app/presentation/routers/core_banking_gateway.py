@@ -155,6 +155,11 @@ async def _handle_mambu_webhook(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(sig_err),
         ) from sig_err
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(val_err),
+        ) from val_err
 
     if isinstance(result, NormalizedTransaction):
         return MambuWebhookResponse(

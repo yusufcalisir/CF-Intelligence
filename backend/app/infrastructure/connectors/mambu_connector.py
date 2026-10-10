@@ -69,7 +69,7 @@ class MambuConnector(BaseBankConnector):
     def _verify_signature(self, raw_payload: bytes | str, signature_header: str | None) -> bool:
         """Verifies HMAC-SHA256 signature of Mambu webhook payload."""
         if not signature_header or not self.webhook_secret:
-            return True  # If no header provided and secret not enforced, allow open test mode
+            return False
 
         payload_bytes = raw_payload.encode() if isinstance(raw_payload, str) else raw_payload
         secret_bytes = self.webhook_secret.encode()
@@ -91,10 +91,17 @@ class MambuConnector(BaseBankConnector):
         payload: dict[str, Any],
         signature_header: str | None = None,
         raw_body: bytes | str | None = None,
+        require_signature: bool = False,
     ) -> NormalizedTransaction | dict[str, Any]:
         """Parses and normalizes Mambu webhook events into internal entities."""
-        if signature_header and raw_body is not None and not self._verify_signature(raw_body, signature_header):
-            raise MambuWebhookSignatureError("Invalid Mambu HMAC-SHA256 webhook signature.")
+        # When raw body is provided (HTTP ingress) or require_signature is True, signature is mandatory
+        if raw_body is not None or require_signature:
+            if not signature_header:
+                raise MambuWebhookSignatureError("Missing required X-Mambu-Signature webhook header.")
+            if not self._verify_signature(raw_body or b"", signature_header):
+                raise MambuWebhookSignatureError("Invalid Mambu HMAC-SHA256 webhook signature.")
+        elif signature_header:
+            raise MambuWebhookSignatureError("Cannot verify signature without raw payload bytes.")
 
         event_type = payload.get("type") or payload.get("eventType") or "deposit-transaction.created"
         self._events_ingested += 1
@@ -115,29 +122,35 @@ class MambuConnector(BaseBankConnector):
             payload.get("transactionId")
             or payload.get("id")
             or payload.get("encodedKey")
-            or f"mambu_tx_{uuid.uuid4().hex[:12]}"
         )
+        if not tx_id or not str(tx_id).strip():
+            raise ValueError("Mambu transaction payload missing required transactionId or encodedKey")
+
         account_id = (
             payload.get("accountId")
             or payload.get("parentAccountKey")
             or payload.get("accountKey")
-            or "ACC_UNKNOWN"
         )
+        if not account_id or not str(account_id).strip():
+            raise ValueError("Mambu transaction payload missing required accountId or accountKey")
+
         counterparty_id = (
             payload.get("counterpartyAccountId")
             or payload.get("destinationAccountId")
             or payload.get("targetAccountId")
-            or f"mambu_cpty_{account_id[-6:] if len(account_id) >= 6 else '000000'}"
+            or f"{account_id}:EXTERNAL"
         )
+
         raw_amount = payload.get("amount") if payload.get("amount") is not None else payload.get("transactionAmount")
         if raw_amount is None:
-            raw_amount = 100.0
+            raise ValueError("Mambu transaction payload missing required amount")
         try:
             amount = float(raw_amount)
-            if not math.isfinite(amount):
-                amount = 1.0
-        except (ValueError, TypeError):
-            amount = 1.0
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"Invalid Mambu transaction amount: {raw_amount}") from exc
+
+        if not math.isfinite(amount) or amount <= 0:
+            raise ValueError(f"Mambu transaction amount must be positive and finite, got {raw_amount}")
 
         currency = payload.get("currencyCode") or payload.get("currency") or "EUR"
         channel = str(payload.get("channel") or payload.get("transactionType") or "ONLINE").upper()

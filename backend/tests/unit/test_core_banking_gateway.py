@@ -115,7 +115,12 @@ class TestMambuConnector:
         assert result["hold_id"] == "BLK_99182"
 
     def test_mambu_webhook_signature_verification_success(self, mambu_connector: MambuConnector) -> None:
-        payload = {"type": "deposit-transaction.created", "amount": 150.0}
+        payload = {
+            "type": "deposit-transaction.created",
+            "transactionId": "TX_MAMBU_SIG_01",
+            "accountId": "ACC_MAMBU_01",
+            "amount": 150.0,
+        }
         raw_body = json.dumps(payload).encode()
         sig = _compute_hmac(mambu_connector.webhook_secret, raw_body)
 
@@ -128,7 +133,12 @@ class TestMambuConnector:
         assert norm.amount == 150.0
 
     def test_mambu_webhook_signature_verification_failure(self, mambu_connector: MambuConnector) -> None:
-        payload = {"type": "deposit-transaction.created", "amount": 999.0}
+        payload = {
+            "type": "deposit-transaction.created",
+            "transactionId": "TX_MAMBU_SIG_ERR",
+            "accountId": "ACC_MAMBU_ERR",
+            "amount": 999.0,
+        }
         raw_body = json.dumps(payload).encode()
         bad_sig = "0" * 64
 
@@ -136,6 +146,22 @@ class TestMambuConnector:
             mambu_connector.parse_webhook_event(
                 payload=payload,
                 signature_header=bad_sig,
+                raw_body=raw_body,
+            )
+
+    def test_mambu_webhook_missing_signature_failure(self, mambu_connector: MambuConnector) -> None:
+        payload = {
+            "type": "deposit-transaction.created",
+            "transactionId": "TX_MAMBU_NO_SIG",
+            "accountId": "ACC_MAMBU_NO_SIG",
+            "amount": 250.0,
+        }
+        raw_body = json.dumps(payload).encode()
+
+        with pytest.raises(MambuWebhookSignatureError, match="Missing required X-Mambu-Signature"):
+            mambu_connector.parse_webhook_event(
+                payload=payload,
+                signature_header=None,
                 raw_body=raw_body,
             )
 
@@ -191,8 +217,8 @@ class TestMambuConnector:
 
     def test_mambu_streaming_and_batch(self, mambu_connector: MambuConnector) -> None:
         batch_payload = [
-            {"type": "deposit-transaction.created", "transactionId": "TX1", "amount": 100.0},
-            {"type": "deposit-transaction.created", "transactionId": "TX2", "amount": 200.0},
+            {"type": "deposit-transaction.created", "transactionId": "TX1", "accountId": "ACC_BATCH_01", "amount": 100.0},
+            {"type": "deposit-transaction.created", "transactionId": "TX2", "accountId": "ACC_BATCH_02", "amount": 200.0},
         ]
         parsed = mambu_connector.parse_batch(batch_payload)
         assert len(parsed) == 2
@@ -367,6 +393,8 @@ class TestCoreBankingGatewayRouter:
     """Tests API Gateway routes for core banking integration."""
 
     def test_mambu_webhook_endpoint_success(self) -> None:
+        from app.presentation.routers.core_banking_gateway import get_mambu_connector
+
         payload = {
             "type": "deposit-transaction.created",
             "transactionId": "TX_API_MAMBU_01",
@@ -374,7 +402,13 @@ class TestCoreBankingGatewayRouter:
             "amount": 2500.0,
             "currencyCode": "EUR",
         }
-        res = client.post("/connectors/core-banking/mambu/webhook", json=payload)
+        raw_body = json.dumps(payload).encode()
+        sig = _compute_hmac(get_mambu_connector().webhook_secret, raw_body)
+        res = client.post(
+            "/connectors/core-banking/mambu/webhook",
+            content=raw_body,
+            headers={"Content-Type": "application/json", "X-Mambu-Signature": f"sha256={sig}"},
+        )
         assert res.status_code == 200
         data = res.json()
         assert data["status"] == "ACCEPTED"
@@ -382,21 +416,45 @@ class TestCoreBankingGatewayRouter:
         assert data["amount"] == 2500.0
 
     def test_mambu_webhook_v1_endpoint_dual_prefix(self) -> None:
+        from app.presentation.routers.core_banking_gateway import get_mambu_connector
+
         payload = {
             "type": "client.created",
             "clientKey": "CLIENT_V1_KEY",
             "firstName": "Alice",
             "lastName": "Smith",
         }
-        res = client.post("/api/v1/connectors/core-banking/mambu/webhook", json=payload)
+        raw_body = json.dumps(payload).encode()
+        sig = _compute_hmac(get_mambu_connector().webhook_secret, raw_body)
+        res = client.post(
+            "/api/v1/connectors/core-banking/mambu/webhook",
+            content=raw_body,
+            headers={"Content-Type": "application/json", "X-Mambu-Signature": f"sha256={sig}"},
+        )
         assert res.status_code == 200
         data = res.json()
         assert data["status"] == "ACCEPTED"
         assert data["event_type"] == "CLIENT_PSEUDONYMIZED"
         assert "Alice" not in str(data)
 
+    def test_mambu_webhook_missing_signature_401(self) -> None:
+        payload = {
+            "type": "deposit-transaction.created",
+            "transactionId": "TX_API_MAMBU_UNSIGNED",
+            "accountId": "ACC_API_UNSIGNED",
+            "amount": 500.0,
+        }
+        res = client.post("/connectors/core-banking/mambu/webhook", json=payload)
+        assert res.status_code == 401
+        assert "Missing required X-Mambu-Signature" in res.json()["detail"]
+
     def test_mambu_webhook_invalid_signature_401(self) -> None:
-        payload = {"type": "deposit-transaction.created", "amount": 10.0}
+        payload = {
+            "type": "deposit-transaction.created",
+            "transactionId": "TX_API_MAMBU_BAD_SIG",
+            "accountId": "ACC_API_BAD_SIG",
+            "amount": 10.0,
+        }
         res = client.post(
             "/connectors/core-banking/mambu/webhook",
             json=payload,
