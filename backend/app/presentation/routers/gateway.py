@@ -291,10 +291,15 @@ def authenticate_request(
             )
             return identity, role, api_key, claims
 
-    if settings.gateway_require_auth:
+    # Production and staging environments must strictly enforce authentication regardless of overrides
+    if settings.gateway_require_auth or settings.app_env.lower() not in ("development", "test"):
         return "", "", api_key or bearer_token, None
 
-    # Default dev fallback
+    # Development-only unauthenticated fallback when gateway_require_auth is explicitly configured False
+    logger.warning(
+        "Gateway authentication disabled via explicit configuration in %s environment. Falling back to dev identity.",
+        settings.app_env,
+    )
     dev_claims = UserClaims(
         sub="usr_analyst_default",
         username="analyst",

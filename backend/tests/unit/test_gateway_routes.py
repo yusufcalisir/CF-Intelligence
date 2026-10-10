@@ -108,8 +108,11 @@ def test_proxy_invalid_api_version(client: TestClient) -> None:
 
 
 def test_proxy_unmapped_service_returns_404(client: TestClient) -> None:
-    """Verify proxy returns RFC 7807 404 Not Found for unmapped endpoints."""
-    response = client.get("/api/v1/gateway/proxy/api/v1/nonexistent_microservice/endpoint")
+    """Verify proxy returns RFC 7807 404 Not Found for unmapped endpoints when authenticated."""
+    response = client.get(
+        "/api/v1/gateway/proxy/api/v1/nonexistent_microservice/endpoint",
+        headers={"X-API-Key": "key_analyst"},
+    )
     assert response.status_code == 404
     assert response.headers.get("content-type") == "application/problem+json"
     data = response.json()
@@ -184,3 +187,43 @@ def test_sliding_window_rate_limiter_enforcement() -> None:
     assert allowed is False
     assert remaining == 0
     assert reset > 0
+
+
+def test_gateway_auth_mandatory_default_and_production_fail_closed(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Verify gateway_require_auth is True by default, blocks unauthenticated ingress, and fails closed in production."""
+    from app.config import Settings
+
+    # 1. Config invariant: gateway_require_auth is True by default
+    fresh_settings = Settings()
+    assert fresh_settings.gateway_require_auth is True
+
+    # 2. Ingress route without auth returns 401 with problem details
+    resp_no_auth = client.get("/api/v1/gateway/proxy/api/v1/simulations")
+    assert resp_no_auth.status_code == 401
+    assert resp_no_auth.headers.get("WWW-Authenticate") == "Bearer"
+    assert resp_no_auth.json()["status"] == 401
+
+    # 3. Ingress route with invalid API key returns 401
+    resp_bad_key = client.get(
+        "/api/v1/gateway/proxy/api/v1/simulations",
+        headers={"X-API-Key": "invalid_unregistered_key"},
+    )
+    assert resp_bad_key.status_code == 401
+
+    # 4. Ingress route with invalid Bearer token returns 401
+    resp_bad_jwt = client.get(
+        "/api/v1/gateway/proxy/api/v1/simulations",
+        headers={"Authorization": "Bearer not.a.valid.jwt"},
+    )
+    assert resp_bad_jwt.status_code == 401
+
+    # 5. Production environment fails closed even if gateway_require_auth is misconfigured to False
+    settings = get_settings()
+    monkeypatch.setattr(settings, "app_env", "production")
+    monkeypatch.setattr(settings, "gateway_require_auth", False)
+    resp_prod_misconfig = client.get("/api/v1/gateway/proxy/api/v1/simulations")
+    assert resp_prod_misconfig.status_code == 401
+    assert resp_prod_misconfig.json()["status"] == 401
+

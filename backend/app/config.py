@@ -106,7 +106,11 @@ class Settings(BaseSettings):
     )
 
     # ── API Gateway Security ──────────────────
-    gateway_require_auth: bool = False
+    gateway_require_auth: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("gateway_require_auth", "cfi_gateway_require_auth"),
+        description="Enforces mandatory OIDC Bearer token or registered API key authentication on ingress routes.",
+    )
     gateway_rate_limit: int = 120  # requests per minute
     gateway_api_keys: str = "key_bank_a:bank_a:bank,key_bank_b:bank_b:bank,key_bank_c:bank_c:bank,key_analyst:analyst:analyst"
     payload_signing_secret: str = Field(
