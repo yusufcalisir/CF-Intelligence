@@ -210,6 +210,11 @@ async def _handle_thought_machine_webhook(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(sig_err),
         ) from sig_err
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(val_err),
+        ) from val_err
 
     batch_id = str(payload.get("id") or payload.get("posting_instruction_batch", {}).get("id") or "pib_unknown")
     tx_ids = [tx.transaction_id for tx in normalized_txs]

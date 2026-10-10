@@ -310,6 +310,20 @@ class TestThoughtMachineConnector:
                 raw_body=raw_body,
             )
 
+    def test_thought_machine_missing_signature_failure(
+        self,
+        thought_machine_connector: ThoughtMachineConnector,
+    ) -> None:
+        payload = {"posting_instruction_batch": {"id": "PIB_UNSIGNED"}}
+        raw_body = json.dumps(payload).encode()
+
+        with pytest.raises(ThoughtMachineSignatureError, match="Missing required X-Vault-Signature"):
+            thought_machine_connector.parse_webhook_event(
+                payload=payload,
+                signature_header=None,
+                raw_body=raw_body,
+            )
+
     @pytest.mark.asyncio
     async def test_thought_machine_provisional_restriction_dispatch(
         self,
@@ -464,6 +478,8 @@ class TestCoreBankingGatewayRouter:
         assert "Invalid Mambu HMAC-SHA256" in res.json()["detail"]
 
     def test_thought_machine_webhook_endpoint_success(self) -> None:
+        from app.presentation.routers.core_banking_gateway import get_thought_machine_connector
+
         payload = {
             "posting_instruction_batch": {
                 "id": "PIB_API_001",
@@ -480,7 +496,13 @@ class TestCoreBankingGatewayRouter:
                 ],
             }
         }
-        res = client.post("/connectors/core-banking/thought-machine/webhook", json=payload)
+        raw_body = json.dumps(payload).encode()
+        sig = _compute_hmac(get_thought_machine_connector().webhook_secret, raw_body)
+        res = client.post(
+            "/connectors/core-banking/thought-machine/webhook",
+            content=raw_body,
+            headers={"Content-Type": "application/json", "X-Vault-Signature": f"sha256={sig}"},
+        )
         assert res.status_code == 200
         data = res.json()
         assert data["status"] == "ACCEPTED"
@@ -489,10 +511,34 @@ class TestCoreBankingGatewayRouter:
         assert "INST_API_1" in data["transaction_ids"]
 
     def test_thought_machine_webhook_v1_dual_prefix(self) -> None:
+        from app.presentation.routers.core_banking_gateway import get_thought_machine_connector
+
         payload = {"posting_instruction_batch": {"id": "PIB_V1", "posting_instructions": []}}
-        res = client.post("/api/v1/connectors/core-banking/thought-machine/webhook", json=payload)
+        raw_body = json.dumps(payload).encode()
+        sig = _compute_hmac(get_thought_machine_connector().webhook_secret, raw_body)
+        res = client.post(
+            "/api/v1/connectors/core-banking/thought-machine/webhook",
+            content=raw_body,
+            headers={"Content-Type": "application/json", "X-Vault-Signature": f"sha256={sig}"},
+        )
         assert res.status_code == 200
         assert res.json()["status"] == "ACCEPTED"
+
+    def test_thought_machine_webhook_missing_signature_401(self) -> None:
+        payload = {"posting_instruction_batch": {"id": "PIB_NO_SIG", "posting_instructions": []}}
+        res = client.post("/connectors/core-banking/thought-machine/webhook", json=payload)
+        assert res.status_code == 401
+        assert "Missing required X-Vault-Signature" in res.json()["detail"]
+
+    def test_thought_machine_webhook_invalid_signature_401(self) -> None:
+        payload = {"posting_instruction_batch": {"id": "PIB_BAD_SIG", "posting_instructions": []}}
+        res = client.post(
+            "/connectors/core-banking/thought-machine/webhook",
+            json=payload,
+            headers={"X-Vault-Signature": "invalid_signature_hex"},
+        )
+        assert res.status_code == 401
+        assert "Invalid Thought Machine HMAC-SHA256" in res.json()["detail"]
 
     def test_provisional_hold_endpoint_mambu_simulation(self) -> None:
         hold_req = {

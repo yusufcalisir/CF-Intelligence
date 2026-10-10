@@ -69,7 +69,7 @@ class ThoughtMachineConnector(BaseBankConnector):
     def _verify_signature(self, raw_payload: bytes | str, signature_header: str | None) -> bool:
         """Verifies HMAC-SHA256 signature of Thought Machine webhook payload."""
         if not signature_header or not self.webhook_secret:
-            return True
+            return False
 
         payload_bytes = raw_payload.encode() if isinstance(raw_payload, str) else raw_payload
         secret_bytes = self.webhook_secret.encode()
@@ -83,10 +83,17 @@ class ThoughtMachineConnector(BaseBankConnector):
         payload: dict[str, Any],
         signature_header: str | None = None,
         raw_body: bytes | str | None = None,
+        require_signature: bool = False,
     ) -> list[NormalizedTransaction]:
         """Parses and normalizes Vault Core posting instruction batches into NormalizedTransactions."""
-        if signature_header and raw_body is not None and not self._verify_signature(raw_body, signature_header):
-            raise ThoughtMachineSignatureError("Invalid Thought Machine HMAC-SHA256 webhook signature.")
+        # When raw body is provided (HTTP ingress) or require_signature is True, signature is mandatory
+        if raw_body is not None or require_signature:
+            if not signature_header:
+                raise ThoughtMachineSignatureError("Missing required X-Vault-Signature webhook header.")
+            if not self._verify_signature(raw_body or b"", signature_header):
+                raise ThoughtMachineSignatureError("Invalid Thought Machine HMAC-SHA256 webhook signature.")
+        elif signature_header:
+            raise ThoughtMachineSignatureError("Cannot verify signature without raw payload bytes.")
 
         self._events_ingested += 1
         return self._extract_transactions_from_pib(payload)
