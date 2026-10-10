@@ -178,6 +178,58 @@ class TestSecureAggregation:
 
         np.testing.assert_allclose(plain_avg.flat_weights, masked_avg.flat_weights, atol=1e-10)
 
+    def test_decentralized_p2p_secagg_pairwise_ecdh_cancellation(
+        self,
+        fl_engine: FederatedLearningEngine,
+    ) -> None:
+        """Verifies multi-client decentralized Curve25519 ECDH pairwise SecAgg masking and cancellation."""
+        shapes: list[tuple[int, ...]] = [(4,)]
+        clients = [
+            ModelWeights(layer_shapes=shapes, flat_weights=[1.0, 2.0, 3.0, 4.0]),
+            ModelWeights(layer_shapes=shapes, flat_weights=[5.0, 6.0, 7.0, 8.0]),
+            ModelWeights(layer_shapes=shapes, flat_weights=[9.0, 10.0, 11.0, 12.0]),
+            ModelWeights(layer_shapes=shapes, flat_weights=[13.0, 14.0, 15.0, 16.0]),
+        ]
+        client_ids = ["bank_nordic", "bank_alpine", "bank_iberian", "bank_rhine"]
+
+        # 1. Unweighted multi-peer execution
+        masked = fl_engine.apply_secure_aggregation_masks(
+            clients,
+            round_id=42,
+            client_ids=client_ids,
+        )
+
+        assert len(masked) == 4
+        # Every client's parameters are obscured
+        for orig, m in zip(clients, masked, strict=True):
+            assert orig.flat_weights != m.flat_weights
+
+        # Sum of masks is identically zero (unweighted pairwise cancellation)
+        orig_sum = np.sum([c.flat_weights for c in clients], axis=0)
+        masked_sum = np.sum([m.flat_weights for m in masked], axis=0)
+        np.testing.assert_allclose(orig_sum, masked_sum, atol=1e-12)
+
+        # 2. Weighted multi-peer execution
+        samples = [1000, 2500, 1500, 5000]
+        masked_weighted = fl_engine.apply_secure_aggregation_masks(
+            clients,
+            client_samples=samples,
+            round_id=43,
+            client_ids=client_ids,
+        )
+
+        plain_weighted_avg = fl_engine.aggregate_parameters(
+            clients, samples, method=AggregationMethod.FED_AVG_WEIGHTED
+        )
+        masked_weighted_avg = fl_engine.aggregate_parameters(
+            masked_weighted, samples, method=AggregationMethod.FED_AVG_WEIGHTED
+        )
+        np.testing.assert_allclose(
+            plain_weighted_avg.flat_weights,
+            masked_weighted_avg.flat_weights,
+            atol=1e-10,
+        )
+
 
 class TestByzantineRobustness:
     def test_krum_robustness_selects_closest(
