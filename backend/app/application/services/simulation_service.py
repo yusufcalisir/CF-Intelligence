@@ -1969,7 +1969,7 @@ class SimulationService:
                         ),
                         "disparate_impact_ratio": round(g_disparate_impact, 4),
                         "equalized_odds_difference": round(g_equal_opportunity_diff, 4),
-                        "satisfies_four_fifths_rule": bool(g_disparate_impact >= 0.80),
+                        "satisfies_four_fifths_rule": g_disparate_impact >= 0.80,
                         "evaluated_at": _now().isoformat(),
                         "protected_attributes": [
                             "consortium_bank_tier",
