@@ -77,33 +77,54 @@ class LocalModelCache:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._single_flight_lock = threading.RLock()
-        self._entry: ModelCacheEntry | None = None
+        self._entries: dict[str, ModelCacheEntry] = {}
+
+    @property
+    def _entry(self) -> ModelCacheEntry | None:
+        with self._lock:
+            if not self._entries:
+                return None
+            return next(iter(self._entries.values()))
+
+    @_entry.setter
+    def _entry(self, val: ModelCacheEntry | None) -> None:
+        with self._lock:
+            if val is None:
+                self._entries.clear()
+            else:
+                self._entries[val.simulation_id or "default"] = val
 
     def get(self, current_meta: dict[str, Any] | None) -> tuple[Any, bool] | None:
         """Return cached model if valid and matches current authoritative champion metadata."""
         with self._lock:
-            if self._entry is None:
-                return None
             if current_meta is None:
-                self._entry = None
+                self.clear()
                 return None
+            sim_key = str(current_meta.get("simulation_id") or "default")
+            entry = self._entries.get(sim_key)
+            if entry is None:
+                return None
+
             meta_gen = current_meta.get("generation")
-            gen_matches = True if meta_gen is None else (self._entry.generation == meta_gen)
+            gen_matches = True if meta_gen is None else (entry.generation == meta_gen)
+
             if (
-                self._entry.version == current_meta.get("version")
-                and self._entry.simulation_id == current_meta.get("simulation_id")
-                and self._entry.artifact_sha256 == current_meta.get("sha256")
+                entry.version == current_meta.get("version")
+                and entry.simulation_id == current_meta.get("simulation_id")
+                and entry.artifact_sha256 == current_meta.get("sha256")
                 and gen_matches
             ):
-                return self._entry.model, self._entry.from_redis
+                return entry.model, entry.from_redis
+
             logger.info(
-                "Local process cache is stale (cached v%s gen %s, active v%s gen %s). Evicting.",
-                self._entry.version,
-                self._entry.generation,
+                "Local process cache is stale for '%s' (cached v%s gen %s, active v%s gen %s). Evicting.",
+                sim_key,
+                entry.version,
+                entry.generation,
                 current_meta.get("version"),
                 meta_gen,
             )
-            self._entry = None
+            self._entries.pop(sim_key, None)
             return None
 
     def set(
@@ -117,7 +138,8 @@ class LocalModelCache:
     ) -> None:
         """Atomically store a verified champion model bound to its version identity."""
         with self._lock:
-            self._entry = ModelCacheEntry(
+            sim_key = simulation_id or "default"
+            self._entries[sim_key] = ModelCacheEntry(
                 model=model,
                 version=version,
                 simulation_id=simulation_id,
@@ -127,10 +149,13 @@ class LocalModelCache:
                 generation=generation,
             )
 
-    def clear(self) -> None:
+    def clear(self, simulation_id: str | None = None) -> None:
         """Evict local cached model."""
         with self._lock:
-            self._entry = None
+            if simulation_id:
+                self._entries.pop(simulation_id, None)
+            else:
+                self._entries.clear()
 
 
 _local_cache = LocalModelCache()
@@ -145,9 +170,25 @@ def reset_circuit_breaker() -> None:
         _circuit_opened_at = 0.0
 
 
-def reset_model_cache() -> None:
+def _get_redis_client() -> Any:
+    """Retrieve Redis client via infrastructure cache."""
+    try:
+        from app.infrastructure.cache import get_redis_client
+
+        return get_redis_client()
+    except Exception:
+        return None
+
+
+def reset_model_cache(simulation_id: str | None = None) -> None:
     """Clear local and Redis cached scripted model."""
-    _local_cache.clear()
+    _local_cache.clear(simulation_id)
+    with contextlib.suppress(Exception):
+        rc = _get_redis_client()
+        if rc:
+            if simulation_id:
+                rc.delete(f"cfi:champion_model:{simulation_id}", f"cfi:champion_model:{simulation_id}:auth")
+            rc.delete("cfi:champion_model", "cfi:champion_model:auth")
 
 
 def _is_demo_mode_active() -> bool:
@@ -206,12 +247,17 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
 
             # 3. Try Redis cache with strict HMAC authentication AND champion identity binding
             try:
-                from app.infrastructure.cache import get_redis_client
-
-                redis_client = get_redis_client()
+                redis_client = _get_redis_client()
                 if redis_client:
-                    cached_bytes = redis_client.get("cfi:champion_model")
-                    cached_auth_bytes = redis_client.get("cfi:champion_model:auth")
+                    sim_scope = current_meta.get("simulation_id")
+                    scoped_model_key = f"cfi:champion_model:{sim_scope}" if sim_scope else "cfi:champion_model"
+                    scoped_auth_key = f"cfi:champion_model:{sim_scope}:auth" if sim_scope else "cfi:champion_model:auth"
+
+                    cached_bytes = redis_client.get(scoped_model_key)
+                    cached_auth_bytes = redis_client.get(scoped_auth_key)
+                    if not cached_bytes and not sim_scope:
+                        cached_bytes = redis_client.get("cfi:champion_model")
+                        cached_auth_bytes = redis_client.get("cfi:champion_model:auth")
 
                     if cached_bytes and cached_auth_bytes:
                         try:
@@ -220,118 +266,162 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                 if isinstance(cached_auth_bytes, bytes)
                                 else cached_auth_bytes
                             )
-                            claimed_hmac = auth_data.get("hmac", "")
-                            meta_to_verify = {
-                                k: v for k, v in auth_data.items() if k != "hmac" and k != "cached_at"
-                            }
-                            canonical_meta_str = json.dumps(
-                                meta_to_verify, sort_keys=True, separators=(",", ":")
+                            claimed_hmac = (
+                                auth_data.get("signature", "")
+                                or auth_data.get("hmac", "")
                             )
-                            domain_key = derive_domain_key(settings.payload_signing_secret, DOMAIN_MODEL_CACHE)
-                            expected_hmac_domain = hmac.new(
-                                domain_key,
-                                canonical_meta_str.encode("utf-8") + b":" + cached_bytes,
-                                hashlib.sha256,
-                            ).hexdigest()
-                            expected_hmac_raw = hmac.new(
-                                settings.payload_signing_secret.encode("utf-8"),
-                                canonical_meta_str.encode("utf-8") + b":" + cached_bytes,
-                                hashlib.sha256,
-                            ).hexdigest()
+                            claimed_key_id = auth_data.get("key_id", "cfi_model_cache_key_v1")
 
-                            if not (hmac.compare_digest(expected_hmac_domain, claimed_hmac) or hmac.compare_digest(expected_hmac_raw, claimed_hmac)):
-                                logger.warning("Redis model cache failed HMAC authenticity verification.")
-                            else:
-                                # MANDATORY FIELD VALIDATION (Defect C):
-                                # Every mandatory field must be present, non-empty, and correctly typed.
-                                mandatory_fields = {
-                                    "serialization_version": int,
-                                    "version": int,
-                                    "simulation_id": str,
-                                    "artifact_sha256": str,
-                                    "model_sha256": str,
-                                    "architecture": str,
-                                    "input_dim": int,
-                                }
-                                schema_valid = True
-                                for f_name, exp_type in mandatory_fields.items():
-                                    val = auth_data.get(f_name)
-                                    if val is None:
-                                        logger.warning(
-                                            "Redis cache envelope missing mandatory field '%s'. Evicting.", f_name
-                                        )
-                                        schema_valid = False
-                                        break
-                                    if not isinstance(val, exp_type):
-                                        logger.warning(
-                                            "Redis cache field '%s' type mismatch (expected %s, got %s). Evicting.",
-                                            f_name,
-                                            exp_type,
-                                            type(val),
-                                        )
-                                        schema_valid = False
-                                        break
-                                    if isinstance(val, str) and not val.strip():
-                                        logger.warning(
-                                            "Redis cache field '%s' is empty. Evicting.", f_name
-                                        )
-                                        schema_valid = False
-                                        break
-
-                                if not schema_valid:
-                                    with contextlib.suppress(Exception):
+                            # Enforce trusted key_id
+                            if claimed_key_id != "cfi_model_cache_key_v1":
+                                logger.warning(
+                                    "Redis cache envelope has untrusted key_id '%s'. Evicting.", claimed_key_id
+                                )
+                                with contextlib.suppress(Exception):
+                                    redis_client.delete(scoped_model_key, scoped_auth_key)
+                                    if not sim_scope:
                                         redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
+                            else:
+                                # Normalize payload dictionary
+                                if "payload" in auth_data and isinstance(auth_data["payload"], dict):
+                                    payload_dict = dict(auth_data["payload"])
+                                    if "serialization_version" not in payload_dict and "serialization_version" in auth_data:
+                                        payload_dict["serialization_version"] = auth_data["serialization_version"]
+                                    if "key_id" not in payload_dict and "key_id" in auth_data:
+                                        payload_dict["key_id"] = auth_data["key_id"]
+                                    meta_to_verify = payload_dict
+                                    meta_for_schema = payload_dict
                                 else:
-                                    expected_model_sha = hashlib.sha256(cached_bytes).hexdigest()
-                                    claimed_model_sha = auth_data["model_sha256"]
+                                    meta_to_verify = {
+                                        k: v for k, v in auth_data.items() if k not in ("hmac", "signature", "cached_at")
+                                    }
+                                    meta_for_schema = auth_data
 
-                                    if not hmac.compare_digest(expected_model_sha, claimed_model_sha):
-                                        logger.warning("Redis model cache SHA-256 digest mismatch. Evicting.")
-                                        with contextlib.suppress(Exception):
-                                             redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
-                                    elif (
-                                        auth_data["serialization_version"] != 2
-                                        or auth_data["version"] != current_meta.get("version")
-                                        or auth_data["simulation_id"] != current_meta.get("simulation_id")
-                                        or not hmac.compare_digest(
-                                            auth_data["artifact_sha256"], current_meta.get("sha256", "")
-                                        )
-                                        or auth_data["input_dim"] != NUM_FEATURES
-                                        or auth_data["architecture"] != current_meta.get("architecture", "FraudDetectionModel-GroupNorm")
-                                        or (
-                                            settings.app_env.lower() == "production"
-                                            and str(auth_data.get("provenance_type", "UNVERIFIED")).strip().upper()
-                                            not in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED")
-                                        )
-                                    ):
-                                        logger.warning(
-                                            "Redis cache entry does not match current champion identity or contract. Evicting."
-                                        )
-                                        with contextlib.suppress(Exception):
+                                canonical_meta_str_compact = json.dumps(
+                                    meta_to_verify, sort_keys=True, separators=(",", ":")
+                                )
+                                canonical_meta_str_std = json.dumps(
+                                    meta_to_verify, sort_keys=True
+                                )
+                                domain_key = derive_domain_key(settings.payload_signing_secret, DOMAIN_MODEL_CACHE)
+                                expected_hmacs = [
+                                    hmac.new(domain_key, canonical_meta_str_compact.encode("utf-8") + b":" + cached_bytes, hashlib.sha256).hexdigest(),
+                                    hmac.new(domain_key, canonical_meta_str_std.encode("utf-8") + b":" + cached_bytes, hashlib.sha256).hexdigest(),
+                                ]
+                                if settings.app_env.lower() != "production":
+                                    expected_hmacs.extend([
+                                        hmac.new(settings.payload_signing_secret.encode("utf-8"), canonical_meta_str_compact.encode("utf-8") + b":" + cached_bytes, hashlib.sha256).hexdigest(),
+                                        hmac.new(settings.payload_signing_secret.encode("utf-8"), canonical_meta_str_std.encode("utf-8") + b":" + cached_bytes, hashlib.sha256).hexdigest(),
+                                    ])
+
+                                hmac_ok = any(hmac.compare_digest(exp, claimed_hmac) for exp in expected_hmacs if claimed_hmac)
+
+                                if not hmac_ok:
+                                    logger.warning("Redis model cache failed HMAC authenticity verification. Evicting.")
+                                    with contextlib.suppress(Exception):
+                                        redis_client.delete(scoped_model_key, scoped_auth_key)
+                                        if not sim_scope:
                                             redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
-                                    else:
-                                        # Authenticated, complete schema, and strictly matches current active champion!
-                                        buffer = io.BytesIO(cached_bytes)
-                                        loaded_jit = torch.jit.load(buffer, map_location="cpu")
-                                        loaded_jit.eval()
+                                else:
+                                    # MANDATORY FIELD VALIDATION:
+                                    # Every mandatory field must be present, non-empty, and correctly typed.
+                                    mandatory_fields = {
+                                        "serialization_version": int,
+                                        "version": int,
+                                        "generation": int,
+                                        "simulation_id": str,
+                                        "artifact_sha256": str,
+                                        "model_sha256": str,
+                                        "architecture": str,
+                                        "input_dim": int,
+                                    }
+                                    schema_valid = True
+                                    for f_name, exp_type in mandatory_fields.items():
+                                        val = meta_for_schema.get(f_name)
+                                        if val is None:
+                                            logger.warning(
+                                                "Redis cache envelope missing mandatory field '%s'. Evicting.", f_name
+                                            )
+                                            schema_valid = False
+                                            break
+                                        if not isinstance(val, exp_type):
+                                            logger.warning(
+                                                "Redis cache field '%s' type mismatch (expected %s, got %s). Evicting.",
+                                                f_name,
+                                                exp_type,
+                                                type(val),
+                                            )
+                                            schema_valid = False
+                                            break
+                                        if isinstance(val, str) and not val.strip():
+                                            logger.warning(
+                                                "Redis cache field '%s' is empty. Evicting.", f_name
+                                            )
+                                            schema_valid = False
+                                            break
 
-                                        dummy = torch.zeros(1, NUM_FEATURES)
-                                        with torch.no_grad():
-                                            test_val = loaded_jit(dummy)
-                                            if torch.isfinite(test_val).all():
-                                                _local_cache.set(
-                                                    model=loaded_jit,
-                                                    version=current_meta["version"],
-                                                    simulation_id=current_meta["simulation_id"],
-                                                    artifact_sha256=current_meta["sha256"],
-                                                    from_redis=True,
-                                                    generation=current_meta.get("generation", 1),
-                                                )
-                                                logger.info(
-                                                    "Loaded authenticated champion v%d TorchScript model from Redis cache.",
-                                                    current_meta["version"],
-                                                )
-                                                return loaded_jit, True
+                                    if not schema_valid:
+                                        with contextlib.suppress(Exception):
+                                            redis_client.delete(scoped_model_key, scoped_auth_key)
+                                            if not sim_scope:
+                                                redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
+                                    else:
+                                        expected_model_sha = hashlib.sha256(cached_bytes).hexdigest()
+                                        claimed_model_sha = meta_for_schema["model_sha256"]
+
+                                        if not hmac.compare_digest(expected_model_sha, claimed_model_sha):
+                                            logger.warning("Redis model cache SHA-256 digest mismatch. Evicting.")
+                                            with contextlib.suppress(Exception):
+                                                redis_client.delete(scoped_model_key, scoped_auth_key)
+                                                if not sim_scope:
+                                                    redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
+                                        elif (
+                                            meta_for_schema["serialization_version"] != 2
+                                            or meta_for_schema["version"] != current_meta.get("version")
+                                            or meta_for_schema["generation"] != current_meta.get("generation")
+                                            or meta_for_schema["simulation_id"] != current_meta.get("simulation_id")
+                                            or not hmac.compare_digest(
+                                                meta_for_schema["artifact_sha256"], current_meta.get("sha256", "")
+                                            )
+                                            or meta_for_schema["input_dim"] != NUM_FEATURES
+                                            or meta_for_schema["architecture"] != current_meta.get("architecture", "FraudDetectionModel-GroupNorm")
+                                            or (
+                                                settings.app_env.lower() == "production"
+                                                and str(meta_for_schema.get("provenance_type", "UNVERIFIED")).strip().upper()
+                                                not in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED")
+                                            )
+                                        ):
+                                            logger.warning(
+                                                "Redis cache entry does not match current champion identity or generation. Evicting."
+                                            )
+                                            with contextlib.suppress(Exception):
+                                                redis_client.delete(scoped_model_key, scoped_auth_key)
+                                                if not sim_scope:
+                                                    redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
+                                        else:
+                                            # Authenticated, complete schema, and strictly matches current active champion!
+                                            buffer = io.BytesIO(cached_bytes)
+                                            loaded_jit = torch.jit.load(buffer, map_location="cpu")
+                                            loaded_jit.eval()
+
+                                            dummy = torch.zeros(1, NUM_FEATURES)
+                                            with torch.no_grad():
+                                                test_val = loaded_jit(dummy)
+                                                if torch.isfinite(test_val).all():
+                                                    _local_cache.set(
+                                                        model=loaded_jit,
+                                                        version=current_meta["version"],
+                                                        simulation_id=current_meta["simulation_id"],
+                                                        artifact_sha256=current_meta["sha256"],
+                                                        from_redis=True,
+                                                        generation=current_meta.get("generation", 1),
+                                                    )
+                                                    logger.info(
+                                                        "Loaded authenticated champion v%d gen %d TorchScript model from Redis cache.",
+                                                        current_meta["version"],
+                                                        current_meta.get("generation", 1),
+                                                    )
+                                                    return loaded_jit, True
                         except Exception as err:
                             logger.warning(
                                 "Failed to validate/load Redis cache: %s; falling back to registry.", err
@@ -341,7 +431,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
 
             # 4. Load genuine champion model from ModelRegistry via ModelService
             svc = ModelService(settings)
-            champion_model = svc.get_champion(dp_compatible=True, registry=registry)
+            champion_model = svc.get_champion(simulation_id=simulation_id, dp_compatible=True, registry=registry)
             champion_model.eval()
 
             # 5. Compile TorchScript JIT model
@@ -356,20 +446,23 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                 scripted = champion_model
 
             # 6. Race check: Did a promotion happen during compilation?
-            latest_meta = registry.get_champion_metadata()
+            latest_meta = registry.get_champion_metadata(simulation_id=simulation_id)
             if (
                 latest_meta is None
                 or latest_meta.get("version") != current_meta.get("version")
+                or latest_meta.get("generation") != current_meta.get("generation")
                 or latest_meta.get("sha256") != current_meta.get("sha256")
                 or latest_meta.get("simulation_id") != current_meta.get("simulation_id")
             ):
                 logger.warning(
-                    "Champion metadata changed during model compilation (v%s -> v%s); discarding stale compilation.",
+                    "Champion metadata changed during model compilation (v%s gen %s -> v%s gen %s); discarding stale compilation.",
                     current_meta.get("version"),
+                    current_meta.get("generation"),
                     latest_meta.get("version") if latest_meta else "none",
+                    latest_meta.get("generation") if latest_meta else "none",
                 )
                 if latest_meta is None:
-                    _local_cache.clear()
+                    _local_cache.clear(simulation_id)
                     raise ModelNotAvailableError("Active champion model removed during compilation.")
                 continue
 
@@ -393,6 +486,10 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                     torch.jit.save(scripted, buffer)
                     model_bytes = buffer.getvalue()
                     model_sha256 = hashlib.sha256(model_bytes).hexdigest()
+
+                    sim_scope = current_meta["simulation_id"]
+                    scoped_model_key = f"cfi:champion_model:{sim_scope}"
+                    scoped_auth_key = f"cfi:champion_model:{sim_scope}:auth"
 
                     meta_to_sign = {
                         "version": current_meta["version"],
@@ -425,12 +522,15 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                     if hasattr(redis_client, "pipeline"):
                         try:
                             pipe = redis_client.pipeline(transaction=True)
+                            pipe.set(scoped_model_key, model_bytes, ex=3600)
+                            pipe.set(scoped_auth_key, auth_envelope_str, ex=3600)
                             pipe.set("cfi:champion_model", model_bytes, ex=3600)
                             pipe.set("cfi:champion_model:auth", auth_envelope_str, ex=3600)
                             pipe.execute()
                             logger.info(
-                                "Cached champion v%d in Redis atomically with version-bound HMAC envelope.",
+                                "Cached champion v%d gen %d in Redis atomically with version-bound HMAC envelope.",
                                 current_meta["version"],
+                                current_meta.get("generation", 1),
                             )
                         except Exception as pipe_err:
                             logger.warning(
@@ -570,7 +670,87 @@ def score_transaction_realtime(
             explanation=f"[Simulation Fallback] {explanation}",
         )
 
-    # 3. Retrieve verified champion model (fail-closed if unavailable or corrupt)
+    # 3. Construct and validate feature tensor (10 features)
+    from app.application.services.data_generator import preprocess_transaction
+
+    if is_production:
+        required_fields = {
+            "customer_history_score": payload.customer_history_score,
+            "chargeback_count": payload.chargeback_count,
+            "account_age_days": payload.account_age_days,
+            "country_code": payload.country_code,
+            "device_type": payload.device_type,
+            "merchant_risk_score": payload.merchant_risk_score,
+            "hour_of_day": payload.hour_of_day,
+        }
+        for field_name, field_val in required_fields.items():
+            if field_val is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "code": "MISSING_REQUIRED_FEATURES",
+                        "message": f"Required feature '{field_name}' is missing or None. Production scoring cannot fabricate feature inputs.",
+                    },
+                )
+
+    has_simulated_features = (
+        payload.customer_history_score is None
+        or payload.chargeback_count is None
+        or payload.account_age_days is None
+        or payload.country_code is None
+        or payload.device_type is None
+        or payload.merchant_risk_score is None
+        or payload.hour_of_day is None
+    )
+
+    cat_str = payload.merchant_category.lower() if payload.merchant_category else ""
+    merchant_risk = (
+        payload.merchant_risk_score
+        if payload.merchant_risk_score is not None
+        else (0.50 if cat_str in ("crypto_exchange", "crypto", "gambling") else 0.10)
+    )
+    hour_val = (
+        float(payload.hour_of_day)
+        if payload.hour_of_day is not None
+        else float(time.gmtime().tm_hour)
+    )
+
+    txn_dict = {
+        "transaction_amount": payload.amount,
+        "merchant_category": payload.merchant_category,
+        "country_code": payload.country_code or "US",
+        "device_type": payload.device_type or "mobile_app",
+        "velocity": float(payload.velocity_1h),
+        "hour_of_day": hour_val,
+        "merchant_risk_score": merchant_risk,
+        "customer_history_score": (
+            payload.customer_history_score
+            if payload.customer_history_score is not None
+            else 0.90
+        ),
+        "chargeback_count": (
+            float(payload.chargeback_count)
+            if payload.chargeback_count is not None
+            else 0.0
+        ),
+        "account_age_days": (
+            float(payload.account_age_days)
+            if payload.account_age_days is not None
+            else 365.0
+        ),
+    }
+    try:
+        input_tensor = preprocess_transaction(txn_dict, strict_categorical=is_production)
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "INVALID_FEATURE_INPUT",
+                "message": str(err),
+            },
+        ) from err
+
+    # 4. Retrieve verified champion model (fail-closed if unavailable or corrupt)
     try:
         scripted_model, from_redis = get_scripted_model(simulation_id=payload.simulation_id)
     except ModelNotAvailableError as exc:
@@ -622,75 +802,9 @@ def score_transaction_realtime(
             },
         ) from exc
 
-    # 4. Construct feature tensor (10 features)
+
+    # 5. Execute inference and validate model output contract
     try:
-        from app.application.services.data_generator import preprocess_transaction
-
-        if is_production:
-            required_fields = {
-                "customer_history_score": payload.customer_history_score,
-                "chargeback_count": payload.chargeback_count,
-                "account_age_days": payload.account_age_days,
-                "country_code": payload.country_code,
-                "device_type": payload.device_type,
-            }
-            for field_name, field_val in required_fields.items():
-                if field_val is None:
-                    raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                        detail={
-                            "code": "MISSING_REQUIRED_FEATURES",
-                            "message": f"Required feature '{field_name}' is missing or None. Production scoring cannot fabricate feature inputs.",
-                        },
-                    )
-
-        has_simulated_features = (
-            payload.customer_history_score is None
-            or payload.chargeback_count is None
-            or payload.account_age_days is None
-            or payload.country_code is None
-            or payload.device_type is None
-        )
-
-        cat_str = payload.merchant_category.lower()
-        merchant_risk = (
-            payload.merchant_risk_score
-            if payload.merchant_risk_score is not None
-            else (0.50 if cat_str in ("crypto_exchange", "crypto", "gambling") else 0.10)
-        )
-        hour_val = (
-            float(payload.hour_of_day)
-            if payload.hour_of_day is not None
-            else float(time.gmtime().tm_hour)
-        )
-
-        txn_dict = {
-            "transaction_amount": payload.amount,
-            "merchant_category": payload.merchant_category,
-            "country_code": payload.country_code or "US",
-            "device_type": payload.device_type or "mobile_app",
-            "velocity": float(payload.velocity_1h),
-            "hour_of_day": hour_val,
-            "merchant_risk_score": merchant_risk,
-            "customer_history_score": (
-                payload.customer_history_score
-                if payload.customer_history_score is not None
-                else 0.90
-            ),
-            "chargeback_count": (
-                float(payload.chargeback_count)
-                if payload.chargeback_count is not None
-                else 0.0
-            ),
-            "account_age_days": (
-                float(payload.account_age_days)
-                if payload.account_age_days is not None
-                else 365.0
-            ),
-        }
-        input_tensor = preprocess_transaction(txn_dict)
-
-        # 5. Execute inference and validate model output contract
         with torch.no_grad():
             output = scripted_model(input_tensor)
 

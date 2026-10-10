@@ -105,7 +105,7 @@ REFERENCE_BOUNDS: dict[str, tuple[float, float]] = {
 }
 
 
-def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
+def preprocess_transaction(txn: dict[str, Any], strict_categorical: bool = False) -> torch.Tensor:
     """Preprocess, ordinal-encode, and min-max scale a single transaction payload.
 
     Canonical authoritative reference preprocessor ensuring strict 100% feature
@@ -129,19 +129,40 @@ def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
             if val_str not in MERCHANT_CATEGORIES:
                 cat_aliases = {"retail": "grocery", "food": "dining", "online_retail": "online_marketplace"}
                 val_str = cat_aliases.get(val_str, val_str)
-            val = float(MERCHANT_CATEGORIES.index(val_str) if val_str in MERCHANT_CATEGORIES else 0)
+            if val_str in MERCHANT_CATEGORIES:
+                val = float(MERCHANT_CATEGORIES.index(val_str))
+            elif strict_categorical:
+                raise ValueError(
+                    f"Unknown merchant category '{val_str}': unmapped category cannot be silently encoded in production."
+                )
+            else:
+                val = 0.0
         elif name == "country_code":
             val_str = val if isinstance(val, str) else str(val)
             if val_str not in COUNTRIES:
                 country_aliases = {"GB": "UK"}
                 val_str = country_aliases.get(val_str, val_str)
-            val = float(COUNTRIES.index(val_str) if val_str in COUNTRIES else 0)
+            if val_str in COUNTRIES:
+                val = float(COUNTRIES.index(val_str))
+            elif strict_categorical:
+                raise ValueError(
+                    f"Unknown country code '{val_str}': unmapped country cannot be silently encoded in production."
+                )
+            else:
+                val = 0.0
         elif name == "device_type":
             val_str = val if isinstance(val, str) else str(val)
             if val_str not in DEVICES:
                 device_aliases = {"web": "web_browser", "mobile": "mobile_app", "mobile_web": "web_browser"}
                 val_str = device_aliases.get(val_str, val_str)
-            val = float(DEVICES.index(val_str) if val_str in DEVICES else 0)
+            if val_str in DEVICES:
+                val = float(DEVICES.index(val_str))
+            elif strict_categorical:
+                raise ValueError(
+                    f"Unknown device type '{val_str}': unmapped device cannot be silently encoded in production."
+                )
+            else:
+                val = 0.0
         else:
             try:
                 val = float(val)

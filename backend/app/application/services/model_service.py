@@ -909,6 +909,7 @@ class ModelService:
 
     def get_champion(
         self,
+        simulation_id: str | None = None,
         dp_compatible: bool | None = True,
         registry: Any | None = None,
     ) -> FraudDetectionModel:
@@ -923,7 +924,7 @@ class ModelService:
 
         reg = registry or ModelRegistry()
         if hasattr(reg, "resolve_and_verify_champion"):
-            resolved = reg.resolve_and_verify_champion()
+            resolved = reg.resolve_and_verify_champion(simulation_id=simulation_id)
         else:
             resolved = None
 

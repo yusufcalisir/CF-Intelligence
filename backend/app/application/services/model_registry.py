@@ -26,8 +26,8 @@ from filelock import FileLock
 from app.application.services.training_provenance_service import (
     DOMAIN_APPROVAL_SIGNOFF,
     TrainingExecutionReceipt,
-    TrainingReceiptAuthority,
     derive_domain_key,
+    get_default_training_verifier,
 )
 from app.domain.model_serving_errors import (
     ModelCompatibilityError,
@@ -142,10 +142,12 @@ def validate_production_admission(
 
     In production (app_env == 'production'), strictly enforces:
     - UNVERIFIED, STRUCTURAL_FIXTURE, and LEGACY_UNVERIFIED cannot become operational champions.
-    - Only models with verified/recorded training provenance are eligible.
+    - Only models with verified/recorded training provenance and verified cryptographic receipts are eligible.
     - Models with is_production_eligible == False are rejected.
     - Revoked models are strictly rejected.
     - Artifacts missing integrity digest (sha256) are rejected.
+    - Every production champion activation path requires two verified, distinct institutional sign-offs
+      (Four-Eyes Principle: ml_engineer and compliance) signed by non-development accounts.
     """
     from app.config import get_settings
 
@@ -174,7 +176,7 @@ def validate_production_admission(
             f"Structural test fixture cannot be promoted."
         )
 
-    if prov in ("UNVERIFIED", "LEGACY_UNVERIFIED"):
+    if prov in ("UNVERIFIED", "LEGACY_UNVERIFIED", "CALLER_REPORTED_UNVERIFIED"):
         raise ModelIntegrityError(
             f"Production admission rejected: model provenance '{prov}' is ineligible for "
             f"operational champion serving in production environment ({context})."
@@ -190,10 +192,77 @@ def validate_production_admission(
             f"Production admission rejected: model is explicitly marked as not production-eligible ({context})."
         )
 
-    if isinstance(entry_or_provenance, dict) and sha256_val is not None and not sha256_val.strip():
-        raise ModelIntegrityError(
-            f"Production admission rejected: model artifact digest is missing or empty ({context})."
+    if isinstance(entry_or_provenance, dict):
+        if sha256_val is not None and not sha256_val.strip():
+            raise ModelIntegrityError(
+                f"Production admission rejected: model artifact digest is missing or empty ({context})."
+            )
+
+        # Enforce verified cryptographic training receipt
+        if not entry_or_provenance.get("training_receipt"):
+            raise ModelIntegrityError(
+                f"Production admission rejected: model lacks verified cryptographic training execution receipt ({context})."
+            )
+
+        # Enforce dual-approval contract on champion activation and serving entry points
+        CHAMPION_CONTEXTS = (
+            "save_version",
+            "promote_version",
+            "rollback",
+            "resolve_and_verify_champion",
+            "get_active_champion_identity",
+            "champion_activation",
+            "ModelService.get_champion",
         )
+        if context in CHAMPION_CONTEXTS:
+            sign_offs = entry_or_provenance.get("sign_offs", [])
+            if not isinstance(sign_offs, list) or len(sign_offs) < 2:
+                raise ModelIntegrityError(
+                    f"Production promotion rejected: Missing required sign-offs: model requires two authorized institutional sign-offs ({context})."
+                )
+
+            ml_signs = [
+                s for s in sign_offs
+                if s.get("role") in ("ml_engineer", "ml_lead") and s.get("is_revoked") is not True
+            ]
+            comp_signs = [
+                s for s in sign_offs
+                if s.get("role") in ("compliance", "compliance_officer") and s.get("is_revoked") is not True
+            ]
+
+            if not ml_signs:
+                raise ModelIntegrityError(
+                    f"Production promotion rejected: Missing required sign-offs: missing verified ML engineer sign-off ({context})."
+                )
+            if not comp_signs:
+                raise ModelIntegrityError(
+                    f"Production promotion rejected: Missing required sign-offs: missing verified compliance sign-off ({context})."
+                )
+
+            ml_s = ml_signs[0]
+            comp_s = comp_signs[0]
+
+            # Four-Eyes Principle: distinct individuals
+            if ml_s.get("user") == comp_s.get("user"):
+                raise ModelIntegrityError(
+                    f"Production promotion rejected: Four-Eyes Principle violation, user '{ml_s.get('user')}' cannot approve both roles ({context})."
+                )
+
+            SEEDED_ACCOUNTS = {"admin", "analyst_a1", "analyst_b1", "analyst_c1", "auditor"}
+            for s in (ml_s, comp_s):
+                u = s.get("user", "")
+                if u in SEEDED_ACCOUNTS:
+                    raise ModelIntegrityError(
+                        f"Production promotion rejected: development seeded account '{u}' cannot authorize promotion ({context})."
+                    )
+                if not s.get("is_signature_valid"):
+                    raise ModelIntegrityError(
+                        f"Production promotion rejected: sign-offs lack valid cryptographic signatures ({context})."
+                    )
+                if not s.get("is_role_verified") or not s.get("is_identity_verified"):
+                    raise ModelIntegrityError(
+                        f"Production promotion rejected: sign-off missing verified role authority ({context})."
+                    )
 
 
 class ModelRegistry:
@@ -253,12 +322,24 @@ class ModelRegistry:
                 return []
             try:
                 with open(manifest_path, encoding="utf-8") as f:
-                    data = json.load(f)
+                    content = f.read()
+                    if not content.strip():
+                        raise ModelIntegrityError(
+                            f"Registry manifest for simulation '{simulation_id}' is empty (0 bytes)."
+                        )
+                    data = json.loads(content)
                     if isinstance(data, list):
                         return data
+                    raise ModelIntegrityError(
+                        f"Registry manifest for simulation '{simulation_id}' is corrupted: expected JSON list, got {type(data).__name__}."
+                    )
+            except ModelIntegrityError:
+                raise
             except Exception as e:
-                logger.warning("Failed to load registry manifest for %s: %s", simulation_id, e)
-            return []
+                logger.error("Failed to load registry manifest for %s: %s", simulation_id, e)
+                raise ModelIntegrityError(
+                    f"Registry manifest for simulation '{simulation_id}' is corrupted or unreadable: {e}"
+                ) from e
 
     def _save_manifest(self, simulation_id: str, manifest: list[dict[str, Any]]) -> None:
         sim_dir = self._get_sim_dir(simulation_id)
@@ -299,6 +380,7 @@ class ModelRegistry:
         training_evidence: dict[str, Any] | None = None,
         training_receipt: dict[str, Any] | TrainingExecutionReceipt | None = None,
         artifact_bytes: bytes | None = None,
+        provenance_receipt: dict[str, Any] | TrainingExecutionReceipt | None = None,
     ) -> dict[str, Any]:
         """Save a new version of the global model weights.
 
@@ -317,6 +399,8 @@ class ModelRegistry:
             dataset_manifest_id: Identifier of the training dataset manifest.
             training_evidence: Execution evidence produced during training.
             training_receipt: Cryptographically signed training execution receipt from trusted authority.
+            artifact_bytes: Raw bytes of the model artifact.
+            provenance_receipt: Alias for training_receipt.
 
         Returns:
             The created version entry metadata.
@@ -327,11 +411,12 @@ class ModelRegistry:
         # Parse training receipt if provided
         receipt_dict: dict[str, Any] | None = None
         has_valid_receipt = False
-        if training_receipt is not None:
-            if isinstance(training_receipt, TrainingExecutionReceipt):
-                receipt_dict = training_receipt.to_dict()
-            elif isinstance(training_receipt, dict):
-                receipt_dict = dict(training_receipt)
+        active_receipt = training_receipt or provenance_receipt
+        if active_receipt is not None:
+            if isinstance(active_receipt, TrainingExecutionReceipt):
+                receipt_dict = active_receipt.to_dict()
+            elif isinstance(active_receipt, dict):
+                receipt_dict = dict(active_receipt)
 
         clean_prov = provenance_type.strip() if provenance_type else "UNVERIFIED"
         clean_upper = clean_prov.upper()
@@ -340,8 +425,8 @@ class ModelRegistry:
 
         attestation_status = "NONE"
         if receipt_dict is not None:
-            auth = TrainingReceiptAuthority(settings.payload_signing_secret)
-            is_valid_rcpt, rcpt_reason = auth.verify_receipt(
+            verifier = get_default_training_verifier()
+            is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
                 receipt_dict,
                 candidate_artifact_sha256=None,
                 simulation_id=simulation_id,
@@ -350,20 +435,27 @@ class ModelRegistry:
                 has_valid_receipt = True
                 final_provenance = "TRAINING_RECORDED"
                 attestation_status = "RECEIPT_VERIFIED_TRAINING_AUTHORITY"
+                is_prod_eligible = True
             else:
                 final_provenance = "UNVERIFIED"
                 attestation_status = f"INVALID_RECEIPT: {rcpt_reason}"
-        elif clean_upper in ("TRAINED", "TRAINING_RECORDED"):
-            final_provenance = "TRAINING_RECORDED" if has_recorded_evidence else "UNVERIFIED"
-        elif clean_upper == "TRAINING_EVIDENCE_VERIFIED":
-            attestation_status = "INDEPENDENT_ATTESTATION_UNAVAILABLE"
-            final_provenance = "TRAINING_RECORDED" if has_recorded_evidence else "UNVERIFIED"
-        elif clean_upper in ("STRUCTURAL_FIXTURE", "LEGACY_UNVERIFIED", "UNVERIFIED"):
-            final_provenance = clean_prov
+                is_prod_eligible = False
         else:
-            final_provenance = "UNVERIFIED"
+            # Caller supplied metadata without a cryptographically verified receipt!
+            # Numeric evidence or caller-selected labels must NEVER establish trusted production provenance!
+            if clean_upper == "STRUCTURAL_FIXTURE":
+                final_provenance = "STRUCTURAL_FIXTURE"
+            elif clean_upper == "LEGACY_UNVERIFIED":
+                final_provenance = "LEGACY_UNVERIFIED"
+            else:
+                final_provenance = "UNVERIFIED"
 
-        is_prod_eligible = final_provenance in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED")
+            attestation_status = (
+                "CALLER_NUMERIC_EVIDENCE_UNAUTHENTICATED"
+                if has_recorded_evidence
+                else "NONE"
+            )
+            is_prod_eligible = False
 
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
@@ -391,9 +483,9 @@ class ModelRegistry:
             file_sha256 = compute_file_sha256(filepath)
 
             # If receipt provided, verify artifact SHA256 binding
-            if receipt_dict is not None:
-                auth = TrainingReceiptAuthority(settings.payload_signing_secret)
-                is_valid_binding, binding_reason = auth.verify_receipt(
+            if receipt_dict is not None and has_valid_receipt:
+                verifier = get_default_training_verifier()
+                is_valid_binding, binding_reason = verifier.verify_receipt(
                     receipt_dict,
                     candidate_artifact_sha256=file_sha256,
                     simulation_id=simulation_id,
@@ -910,14 +1002,16 @@ class ModelRegistry:
         role: str,
         user: str,
         signature: str,
+        auth_token: str | None = None,
         fairness_score: float = 1.0,
         bias_metric: float = 0.0,
         drift_divergence: float = 0.0,
     ) -> dict[str, Any]:
-        """Approve a model version by adding a sign-off.
+        """Approve a model version by adding an authenticated sign-off.
 
         Promotes version to challenger/champion if ML engineer and compliance officer have signed off.
-        Enforces Four-Eyes principle (distinct individuals) and binds cryptographic signature to canonical payload.
+        Enforces Four-Eyes principle (distinct individuals), authenticated principal validation,
+        and binds cryptographic signature to canonical payload.
         """
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
@@ -950,12 +1044,13 @@ class ModelRegistry:
             existing_roles = [
                 ("compliance" if s["role"] in ("compliance", "compliance_officer") else "ml_engineer")
                 for s in entry["sign_offs"]
+                if s.get("is_revoked") is not True
             ]
             if norm_role in existing_roles:
                 raise ValueError(f"Role '{role}' has already signed off on this version")
 
             # Four-Eyes Principle: Prevent same user from approving multiple roles on the same version
-            existing_users = [s["user"] for s in entry["sign_offs"]]
+            existing_users = [s["user"] for s in entry["sign_offs"] if s.get("is_revoked") is not True]
             if user in existing_users:
                 raise ValueError(
                     f"Four-Eyes Principle violation: user '{user}' cannot approve multiple roles on the same version"
@@ -963,17 +1058,42 @@ class ModelRegistry:
 
             # Verify identity and role membership against AuthenticationService
             from app.infrastructure.security.auth_service import AuthenticationService
+            auth_svc = AuthenticationService.get_instance()
 
-            user_rec = AuthenticationService.get_instance().get_user(user)
-            is_identity_verified = user_rec is not None
+            is_identity_verified = False
             is_role_verified = False
 
-            if user_rec is not None:
-                user_roles = [r.lower().strip() for r in user_rec.roles]
-                if norm_role == "compliance":
-                    is_role_verified = any(r in ("compliance", "compliance_officer", "admin") for r in user_roles)
-                elif norm_role == "ml_engineer":
-                    is_role_verified = any(r in ("ml_engineer", "ml_lead") for r in user_roles)
+            if auth_token:
+                is_valid_tok, tok_payload, tok_err = auth_svc.verify_access_token(auth_token)
+                if not is_valid_tok or not tok_payload:
+                    raise ModelIntegrityError(
+                        f"Production promotion rejected: sign-off authentication failed: {tok_err}"
+                    )
+                tok_user = tok_payload.get("username", "").lower()
+                if tok_user != user.lower() and tok_payload.get("sub") != user:
+                    raise ModelIntegrityError(
+                        f"Production promotion rejected: token user '{tok_user}' does not match sign-off user '{user}'."
+                    )
+                tok_roles = [r.lower().strip() for r in tok_payload.get("roles", [])]
+                if norm_role == "compliance" and not any(r in ("compliance", "compliance_officer", "admin") for r in tok_roles):
+                    raise ModelIntegrityError("Production promotion rejected: token claims lack compliance role authority.")
+                if norm_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in tok_roles):
+                    raise ModelIntegrityError("Production promotion rejected: token claims lack ml_engineer role authority.")
+                is_identity_verified = True
+                is_role_verified = True
+            elif settings.app_env.lower() == "production":
+                raise ModelIntegrityError(
+                    "Production promotion rejected: authenticated session token is required for institutional sign-off."
+                )
+            else:
+                user_rec = auth_svc.get_user(user)
+                is_identity_verified = user_rec is not None
+                if user_rec is not None:
+                    user_roles = [r.lower().strip() for r in user_rec.roles]
+                    if norm_role == "compliance":
+                        is_role_verified = any(r in ("compliance", "compliance_officer", "admin") for r in user_roles)
+                    elif norm_role == "ml_engineer":
+                        is_role_verified = any(r in ("ml_engineer", "ml_lead") for r in user_roles)
 
             # Cryptographic signature verification over canonical payload
             artifact_sha = entry.get("sha256") or compute_file_sha256(os.path.join(sim_dir, entry["filename"]))
@@ -1008,12 +1128,13 @@ class ModelRegistry:
                     "is_signature_valid": is_signature_valid,
                     "is_identity_verified": is_identity_verified,
                     "is_role_verified": is_role_verified,
-                    "is_independent_human_authorization": False,
+                    "is_independent_human_authorization": is_identity_verified and is_role_verified and user not in SEEDED_ACCOUNTS,
                     "payload_bound": canonical_payload,
                     "timestamp": datetime.now(UTC).isoformat(),
                     "fairness_score": fairness_score,
                     "bias_metric": bias_metric,
                     "drift_divergence": drift_divergence,
+                    "is_revoked": False,
                 }
             )
 
@@ -1072,6 +1193,101 @@ class ModelRegistry:
                     entry["is_active"] = False
 
             self._save_manifest(simulation_id, manifest)
+            return entry
+
+    def revoke_sign_off(
+        self,
+        simulation_id: str,
+        version: int,
+        role: str,
+        user: str = "",
+        reason: str = "Unspecified",
+        revoked_by: str | None = None,
+    ) -> dict[str, Any]:
+        """Revoke an approval on a model version, triggering automatic demotion if champion."""
+        sim_dir = self._get_sim_dir(simulation_id)
+        file_lock = _get_registry_file_lock(sim_dir)
+        with self._lock, file_lock:
+            manifest = self._load_manifest(simulation_id)
+            entry = next((e for e in manifest if e["version"] == version), None)
+            if not entry:
+                raise ValueError(f"Version {version} not found in registry for {simulation_id}")
+
+            norm_role = "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
+            effective_user = user or revoked_by or ""
+            found = False
+            for s in entry.get("sign_offs", []):
+                s_role = "compliance" if s["role"] in ("compliance", "compliance_officer") else "ml_engineer"
+                if s_role == norm_role and (not effective_user or s.get("user") == effective_user):
+                    s["is_revoked"] = True
+                    s["revocation_reason"] = reason
+                    s["revoked_at"] = datetime.now(UTC).isoformat()
+                    found = True
+
+            if not found:
+                raise ValueError(f"No sign-off found for role '{role}' on version {version}")
+
+            # Filter active sign-offs list so revoked sign-offs are removed from active governance
+            entry["sign_offs"] = [
+                s for s in entry.get("sign_offs", [])
+                if not (
+                    ("compliance" if s["role"] in ("compliance", "compliance_officer") else "ml_engineer") == norm_role
+                    and (not effective_user or s.get("user") == effective_user)
+                )
+            ]
+
+            # ALWAYS bump generation upon revocation to invalidate caches
+            max_gen = max((e.get("generation", 0) for e in manifest), default=0)
+            entry["generation"] = max_gen + 1
+
+            # If this version is champion or active, demote it
+            if entry.get("is_active") or entry.get("status") == "champion":
+                entry["is_active"] = False
+                entry["status"] = "inactive"
+
+            self._save_manifest(simulation_id, manifest)
+
+            # Invalidate caches
+            from app.config import get_settings
+            with contextlib.suppress(Exception):
+                from app.application.services.model_service import ModelService
+                ModelService(get_settings()).invalidate_model_cache()
+
+            return entry
+
+    def revoke_version(
+        self,
+        simulation_id: str,
+        version: int,
+        reason: str = "Unspecified",
+    ) -> dict[str, Any]:
+        """Revoke a model version completely, marking it permanently ineligible for production."""
+        sim_dir = self._get_sim_dir(simulation_id)
+        file_lock = _get_registry_file_lock(sim_dir)
+        with self._lock, file_lock:
+            manifest = self._load_manifest(simulation_id)
+            entry = next((e for e in manifest if e["version"] == version), None)
+            if not entry:
+                raise ValueError(f"Version {version} not found in registry for {simulation_id}")
+
+            entry["is_revoked"] = True
+            entry["revocation_reason"] = reason
+            entry["revoked_at"] = datetime.now(UTC).isoformat()
+            entry["is_production_eligible"] = False
+
+            if entry.get("is_active") or entry.get("status") == "champion":
+                entry["is_active"] = False
+                entry["status"] = "inactive"
+                max_gen = max((e.get("generation", 0) for e in manifest), default=0)
+                entry["generation"] = max_gen + 1
+
+            self._save_manifest(simulation_id, manifest)
+
+            from app.config import get_settings
+            with contextlib.suppress(Exception):
+                from app.application.services.model_service import ModelService
+                ModelService(get_settings()).invalidate_model_cache()
+
             return entry
 
 

@@ -2287,6 +2287,30 @@ class SimulationService:
                     "f1_score": global_f1 if global_f1 is not None else None,
                 }
 
+                import io
+                buf = io.BytesIO()
+                torch.save(global_model.state_dict(), buf)
+                model_bytes = buf.getvalue()
+
+                # Issue authentic TrainingExecutionReceipt from genuine FL execution boundary
+                from app.application.services.training_provenance_service import (
+                    get_default_training_issuer,
+                )
+                issuer = get_default_training_issuer()
+                fl_receipt = issuer.issue_receipt(
+                    training_run_id=f"fl_run_{simulation.id}",
+                    job_id=f"job_{simulation.id}",
+                    model_bytes=model_bytes,
+                    model_architecture="FraudDetectionNN",
+                    input_dim=10,
+                    feature_schema_version="v1",
+                    simulation_id=simulation.id,
+                    dataset_hash=dataset_hash,
+                    metrics=final_metrics,
+                    git_commit_hash=git_commit,
+                    dp_noise_profile=dp_noise_profile,
+                )
+
                 self.model_registry.save_version(
                     simulation_id=simulation.id,
                     state_dict=global_model.state_dict(),
@@ -2296,6 +2320,10 @@ class SimulationService:
                     dataset_hash=dataset_hash,
                     dp_noise_profile=dp_noise_profile,
                     status="champion",
+                    provenance_type="TRAINING_RECORDED",
+                    training_run_id=f"fl_run_{simulation.id}",
+                    training_receipt=fl_receipt,
+                    artifact_bytes=model_bytes,
                 )
                 logger.info("Saved and versioned global model in model registry.")
             except Exception as e:

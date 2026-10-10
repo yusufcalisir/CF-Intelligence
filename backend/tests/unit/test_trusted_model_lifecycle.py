@@ -131,11 +131,11 @@ def test_receipt_with_forged_signature_rejected_by_authority(temp_reg_dir: str):
         "schema_version": "1.0",
         "created_at": "2026-10-10T00:00:00Z",
         "signature": "bad_signature_hex",
-        "key_id": "cfi_training_auth_key_v1",
+        "key_id": auth._issuer.key_id,
     }
     is_valid, reason = auth.verify_receipt(fake_receipt, candidate_artifact_sha256="0" * 64, simulation_id="sim_forged_sig")
     assert not is_valid
-    assert "Cryptographic signature mismatch" in reason
+    assert "Cryptographic signature mismatch" in reason or "untrusted" in reason.lower()
 
 
 def test_modified_artifact_bytes_fails_receipt_digest_verification(temp_reg_dir: str):
@@ -194,7 +194,7 @@ def test_receipt_signed_by_untrusted_key_rejected(temp_reg_dir: str):
     prod_auth = TrainingReceiptAuthority("official_system_signing_key")
     is_valid, reason = prod_auth.verify_receipt(receipt, candidate_artifact_sha256=real_sha, simulation_id="sim_untrusted_key")
     assert not is_valid
-    assert "signature mismatch" in reason.lower()
+    assert "signature mismatch" in reason.lower() or "not present in trusted" in reason.lower()
 
 
 def test_receipt_with_tampered_metadata_rejected(temp_reg_dir: str):
@@ -231,7 +231,7 @@ def test_genuine_local_training_produces_verifiable_record(temp_reg_dir: str):
     torch.save(trained.state_dict(), buf)
     art_sha = hashlib.sha256(buf.getvalue()).hexdigest()
 
-    auth = TrainingReceiptAuthority(get_settings().payload_signing_secret)
+    auth = TrainingReceiptAuthority()
     rcpt = auth.issue_receipt(
         training_run_id="run_local_08",
         job_id="job_local_08",
@@ -259,11 +259,32 @@ def test_genuine_local_training_produces_verifiable_record(temp_reg_dir: str):
 
 
 def test_federated_training_registers_through_trusted_path(temp_reg_dir: str):
-    """Verifies that federated aggregation output binds execution metadata in a signed receipt."""
-    auth = TrainingReceiptAuthority(get_settings().payload_signing_secret)
-    model_bytes = b"federated_aggregated_global_model_weights_tensor"
+    """Verifies that genuine federated aggregation output binds execution metadata in a signed receipt."""
+    svc = ModelService(get_settings())
+    m1 = svc.create_model(dp_compatible=True)
+    m2 = svc.create_model(dp_compatible=True)
+
+    X1 = np.random.randn(64, NUM_FEATURES).astype(np.float32)
+    y1 = np.random.randint(0, 2, size=(64,)).astype(np.float32)
+    X2 = np.random.randn(64, NUM_FEATURES).astype(np.float32)
+    y2 = np.random.randint(0, 2, size=(64,)).astype(np.float32)
+
+    trained1, losses1, _ = svc.train_local(m1, X1, y1, epochs=1, batch_size=32)
+    trained2, losses2, _ = svc.train_local(m2, X2, y2, epochs=1, batch_size=32)
+
+    # Genuine federated aggregation (FedAvg)
+    sd1 = trained1.state_dict()
+    sd2 = trained2.state_dict()
+    agg_sd = {}
+    for k in sd1:
+        agg_sd[k] = (sd1[k].float() + sd2[k].float()) / 2.0
+
+    buf = io.BytesIO()
+    torch.save(agg_sd, buf)
+    model_bytes = buf.getvalue()
     art_sha = hashlib.sha256(model_bytes).hexdigest()
 
+    auth = TrainingReceiptAuthority()
     rcpt = auth.issue_receipt(
         training_run_id="fl_sim_round_10",
         job_id="fl_agg_job_42",
@@ -283,7 +304,7 @@ def test_federated_training_registers_through_trusted_path(temp_reg_dir: str):
 
 
 def test_recorded_evidence_cannot_upgrade_to_hardware_verified(temp_reg_dir: str):
-    """Checks that software-recorded evidence cannot claim hardware attestation status."""
+    """Checks that caller-supplied numeric metadata cannot establish trusted provenance without a receipt."""
     reg = ModelRegistry(storage_dir=temp_reg_dir)
     svc = ModelService(get_settings())
     m = svc.create_model(dp_compatible=True)
@@ -293,13 +314,13 @@ def test_recorded_evidence_cannot_upgrade_to_hardware_verified(temp_reg_dir: str
         m.state_dict(),
         metrics={"auc": 0.85},
         is_promoted=False,
-        provenance_type="TRAINING_EVIDENCE_VERIFIED",
+        provenance_type="TRAINING_RECORDED",
         training_run_id="run_10",
         training_evidence={"loss": 0.2, "epochs": 1, "batch_size": 32},
     )
     assert entry["provenance_type"] != "TRAINING_EVIDENCE_VERIFIED"
-    assert entry["provenance_type"] == "TRAINING_RECORDED"
-    assert entry["attestation_status"] == "INDEPENDENT_ATTESTATION_UNAVAILABLE"
+    assert entry["provenance_type"] == "UNVERIFIED"
+    assert entry["is_production_eligible"] is False
 
 
 # ==============================================================================
@@ -371,7 +392,7 @@ def test_signoff_with_unregistered_username_marked_unverified(temp_reg_dir: str)
 
 
 def test_unauthenticated_signoff_caller_cannot_promote_in_production(temp_reg_dir: str):
-    """Checks that in production, sign-offs without verified identity and role cannot promote a model."""
+    """Checks that in production, sign-offs without verified authenticated token cannot promote a model."""
     reg = ModelRegistry(storage_dir=temp_reg_dir)
     svc = ModelService(get_settings())
     m = svc.create_model(dp_compatible=True)
@@ -386,21 +407,22 @@ def test_unauthenticated_signoff_caller_cannot_promote_in_production(temp_reg_di
         training_evidence={"loss": 0.1, "epochs": 1, "batch_size": 32},
     )
     sig_ml = generate_signoff_signature("sim_unauth_promote", 1, entry["sha256"], "ml_engineer", "fake_user_1")
-    sig_comp = generate_signoff_signature("sim_unauth_promote", 1, entry["sha256"], "compliance", "fake_user_2")
 
-    reg.sign_off("sim_unauth_promote", 1, "ml_engineer", user="fake_user_1", signature=sig_ml)
     with (
         patch.object(get_settings(), "app_env", "production"),
-        pytest.raises(ModelIntegrityError, match="Production promotion rejected: sign-off missing verified role authority"),
+        pytest.raises(ModelIntegrityError, match="authenticated session token is required for institutional sign-off"),
     ):
-        reg.sign_off("sim_unauth_promote", 1, "compliance", user="fake_user_2", signature=sig_comp)
+        reg.sign_off("sim_unauth_promote", 1, "ml_engineer", user="fake_user_1", signature=sig_ml)
 
 
 def test_user_lacking_required_role_rejected_from_signoff(temp_reg_dir: str):
     """Checks that a user lacking the compliance role cannot approve a compliance sign-off in production."""
     auth_svc = AuthenticationService.get_instance()
-    auth_svc.register_user("tech_analyst", "Secret123!", "bank_a", roles=["analyst"])
-    auth_svc.register_user("real_mle", "Secret123!", "bank_a", roles=["ml_engineer"])
+    u_ana = auth_svc.register_user("tech_analyst", "Secret123!", "bank_a", roles=["analyst"])
+    u_mle = auth_svc.register_user("real_mle", "Secret123!", "bank_a", roles=["ml_engineer"])
+
+    tok_mle = auth_svc.create_token_bundle(u_mle).access_token
+    tok_ana = auth_svc.create_token_bundle(u_ana).access_token
 
     reg = ModelRegistry(storage_dir=temp_reg_dir)
     svc = ModelService(get_settings())
@@ -418,12 +440,12 @@ def test_user_lacking_required_role_rejected_from_signoff(temp_reg_dir: str):
     sig_mle = generate_signoff_signature("sim_lacking_role", 1, entry["sha256"], "ml_engineer", "real_mle")
     sig_ana = generate_signoff_signature("sim_lacking_role", 1, entry["sha256"], "compliance", "tech_analyst")
 
-    reg.sign_off("sim_lacking_role", 1, "ml_engineer", user="real_mle", signature=sig_mle)
+    reg.sign_off("sim_lacking_role", 1, "ml_engineer", user="real_mle", signature=sig_mle, auth_token=tok_mle)
     with (
         patch.object(get_settings(), "app_env", "production"),
-        pytest.raises(ModelIntegrityError, match="sign-off missing verified role authority"),
+        pytest.raises(ModelIntegrityError, match="token claims lack compliance role authority"),
     ):
-        reg.sign_off("sim_lacking_role", 1, "compliance", user="tech_analyst", signature=sig_ana)
+        reg.sign_off("sim_lacking_role", 1, "compliance", user="tech_analyst", signature=sig_ana, auth_token=tok_ana)
 
 
 def test_single_principal_attempting_both_signoff_roles_rejected(temp_reg_dir: str):
@@ -664,47 +686,116 @@ def test_manifest_referencing_missing_artifact_fails_closed(temp_reg_dir: str):
 
 
 def test_cache_envelope_rejects_missing_mandatory_fields():
-    """Verifies that omitting any mandatory envelope field causes validation rejection."""
-    mandatory_fields = [
-        "serialization_version",
-        "version",
-        "simulation_id",
-        "artifact_sha256",
-        "model_sha256",
-        "architecture",
-        "input_dim",
-    ]
-    base_envelope = {
-        "serialization_version": 2,
+    """Verifies that omitting any mandatory envelope field causes validation rejection and cache eviction."""
+    from unittest.mock import MagicMock
+
+    from app.presentation.routers.realtime_inference import get_scripted_model
+
+    mock_redis = MagicMock()
+    bad_envelope = {
+        "signature": "bad",
+        "key_id": "cfi_model_cache_key_v1",
+        "payload": {"version": 1},
+    }
+    mock_redis.get.side_effect = lambda k: b"cached_model_bytes" if not k.endswith(":auth") else json.dumps(bad_envelope)
+
+    meta = {
         "version": 1,
         "generation": 1,
-        "simulation_id": "sim_cache_envelope",
-        "artifact_sha256": "a" * 64,
-        "model_sha256": "b" * 64,
-        "architecture": "FraudDetectionModel-GroupNorm",
-        "input_dim": 10,
-        "provenance_type": "TRAINING_RECORDED",
+        "simulation_id": "sim_test_missing_fields",
+        "sha256": "fake_sha",
+        "status": "champion",
+        "is_active": True,
     }
-    for field in mandatory_fields:
-        bad_envelope = dict(base_envelope)
-        del bad_envelope[field]
-        assert field not in bad_envelope
+    with patch("app.presentation.routers.realtime_inference._get_redis_client", return_value=mock_redis), \
+         patch("app.application.services.model_registry.ModelRegistry.get_champion_metadata", return_value=meta), \
+         patch("torch.jit.load") as mock_jit_load:
+        with pytest.raises((ModelIntegrityError, ModelNotAvailableError)):
+            get_scripted_model("sim_test_missing_fields")
+        mock_jit_load.assert_not_called()
+        assert mock_redis.delete.called
 
 
 def test_cached_envelope_with_tampered_artifact_identity_evicted():
-    """Verifies that a cached envelope with a mismatched artifact SHA-256 is rejected."""
+    """Verifies that a cached envelope with a mismatched artifact SHA-256 is rejected and evicted."""
+    from unittest.mock import MagicMock
+
+    from app.presentation.routers.realtime_inference import get_scripted_model
+
+    mock_redis = MagicMock()
     settings = get_settings()
     domain_key = derive_domain_key(settings.payload_signing_secret, DOMAIN_MODEL_CACHE)
-    payload_str = json.dumps({"test": 1})
-    sig = hmac.new(domain_key, payload_str.encode() + b":model_bytes", hashlib.sha256).hexdigest()
-    assert len(sig) == 64
-    assert not hmac.compare_digest("a" * 64, "b" * 64)
+
+    meta_payload = {
+        "version": 1,
+        "generation": 1,
+        "simulation_id": "sim_tampered_artifact",
+        "artifact_sha256": "expected_artifact_sha",
+        "model_sha256": "tampered_sha256",
+        "architecture": "FraudDetectionModel-GroupNorm",
+        "input_dim": 10,
+        "feature_schema_version": "v1.0",
+        "feature_names": FEATURE_NAMES,
+        "provenance_type": "TRAINING_RECORDED",
+        "created_at": "2026-10-10T00:00:00Z",
+    }
+    raw_bytes = b"real_model_bytes"
+    sig = hmac.new(domain_key, json.dumps(meta_payload, sort_keys=True).encode() + b":" + raw_bytes, hashlib.sha256).hexdigest()
+    envelope = {
+        "serialization_version": 2,
+        "key_id": "cfi_model_cache_key_v1",
+        "signature": sig,
+        "payload": meta_payload,
+    }
+    mock_redis.get.side_effect = lambda k: raw_bytes if not k.endswith(":auth") else json.dumps(envelope)
+
+    meta = {
+        "version": 1,
+        "generation": 1,
+        "simulation_id": "sim_tampered_artifact",
+        "sha256": "expected_artifact_sha",
+        "status": "champion",
+        "is_active": True,
+    }
+    with patch("app.presentation.routers.realtime_inference._get_redis_client", return_value=mock_redis), \
+         patch("app.application.services.model_registry.ModelRegistry.get_champion_metadata", return_value=meta), \
+         patch("torch.jit.load") as mock_jit_load:
+        with pytest.raises((ModelIntegrityError, ModelNotAvailableError)):
+            get_scripted_model("sim_tampered_artifact")
+        mock_jit_load.assert_not_called()
+        assert mock_redis.delete.called
 
 
 def test_cached_envelope_with_untrusted_key_id_rejected():
-    """Verifies that an envelope signed with an untrusted key identifier is rejected."""
-    auth_data = {"key_id": "untrusted_compromised_key_v99"}
-    assert auth_data["key_id"].startswith("untrusted")
+    """Verifies that an envelope signed with an untrusted key identifier is rejected and evicted."""
+    from unittest.mock import MagicMock
+
+    from app.presentation.routers.realtime_inference import get_scripted_model
+
+    mock_redis = MagicMock()
+    bad_envelope = {
+        "serialization_version": 2,
+        "key_id": "untrusted_compromised_key_v99",
+        "signature": "bad",
+        "payload": {},
+    }
+    mock_redis.get.side_effect = lambda k: b"bytes" if not k.endswith(":auth") else json.dumps(bad_envelope)
+
+    meta = {
+        "version": 1,
+        "generation": 1,
+        "simulation_id": "sim_untrusted_key",
+        "sha256": "fake_sha",
+        "status": "champion",
+        "is_active": True,
+    }
+    with patch("app.presentation.routers.realtime_inference._get_redis_client", return_value=mock_redis), \
+         patch("app.application.services.model_registry.ModelRegistry.get_champion_metadata", return_value=meta), \
+         patch("torch.jit.load") as mock_jit_load:
+        with pytest.raises((ModelIntegrityError, ModelNotAvailableError)):
+            get_scripted_model("sim_untrusted_key")
+        mock_jit_load.assert_not_called()
+        assert mock_redis.delete.called
 
 
 def test_local_model_cache_evicted_on_generation_bump():
@@ -729,9 +820,43 @@ def test_warm_cache_avoids_heavy_file_hashing():
 
 def test_torchscript_loading_requires_prior_authentication():
     """Verifies that model deserialization is executed only after successful cryptographic authentication."""
-    invalid_hmac = "bad_hmac"
-    expected_hmac = "valid_hmac"
-    assert not hmac.compare_digest(invalid_hmac, expected_hmac)
+    from unittest.mock import MagicMock
+
+    from app.presentation.routers.realtime_inference import get_scripted_model
+
+    mock_redis = MagicMock()
+    envelope = {
+        "serialization_version": 2,
+        "key_id": "cfi_model_cache_key_v1",
+        "signature": "invalid_forged_hmac_hex",
+        "payload": {
+            "version": 1,
+            "generation": 1,
+            "simulation_id": "sim_auth_test",
+            "artifact_sha256": "sha",
+            "model_sha256": hashlib.sha256(b"fake").hexdigest(),
+            "architecture": "FraudDetectionModel-GroupNorm",
+            "input_dim": 10,
+        },
+    }
+    mock_redis.get.side_effect = lambda k: b"fake" if not k.endswith(":auth") else json.dumps(envelope)
+
+    meta = {
+        "version": 1,
+        "generation": 1,
+        "simulation_id": "sim_auth_test",
+        "sha256": "sha",
+        "status": "champion",
+        "is_active": True,
+    }
+    with patch("app.presentation.routers.realtime_inference._get_redis_client", return_value=mock_redis), \
+         patch("app.application.services.model_registry.ModelRegistry.get_champion_metadata", return_value=meta), \
+         patch("torch.jit.load") as mock_jit_load:
+        with pytest.raises((ModelIntegrityError, ModelNotAvailableError)):
+            get_scripted_model("sim_auth_test")
+        mock_jit_load.assert_not_called()
+        assert mock_redis.delete.called
+
 
 
 # ==============================================================================
@@ -863,8 +988,11 @@ def test_development_partial_features_labeled_as_simulated():
         assert "[Simulated Features]" in resp.json()["explanation"]
 
 
-def test_complete_production_features_scored_as_authoritative_ml_model():
-    """Verifies that complete feature vectors in production return ML_MODEL without simulated labels."""
+def test_complete_production_features_scored_as_authoritative_ml_model(temp_reg_dir: str):
+    """Verifies that complete feature vectors in production return ML_MODEL when champion is active."""
+    svc = ModelService(get_settings())
+    m = svc.create_model(dp_compatible=True)
+
     client = TestClient(app)
     req = {
         "transaction_id": "tx_prod_authoritative",
@@ -879,7 +1007,8 @@ def test_complete_production_features_scored_as_authoritative_ml_model():
         "merchant_risk_score": 0.10,
         "hour_of_day": 19.0,
     }
-    with patch.object(get_settings(), "app_env", "production"):
+    with patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(m, False)), \
+         patch.object(get_settings(), "app_env", "production"):
         resp = client.post("/v1/inference/score", json=req)
         assert resp.status_code == 200
         data = resp.json()
@@ -906,7 +1035,7 @@ def test_end_to_end_trusted_champion_lifecycle(temp_reg_dir: str):
     torch.save(trained.state_dict(), buf)
     art_sha = hashlib.sha256(buf.getvalue()).hexdigest()
 
-    auth = TrainingReceiptAuthority(get_settings().payload_signing_secret)
+    auth = TrainingReceiptAuthority()
     rcpt = auth.issue_receipt(
         training_run_id="run_lifecycle_full",
         job_id="job_lifecycle_full",
@@ -932,14 +1061,16 @@ def test_end_to_end_trusted_champion_lifecycle(temp_reg_dir: str):
     assert candidate["provenance_type"] == "TRAINING_RECORDED"
 
     auth_svc = AuthenticationService.get_instance()
-    auth_svc.register_user("mle_governance", "Secret123!", "bank_a", roles=["ml_engineer"])
-    auth_svc.register_user("comp_governance", "Secret123!", "bank_a", roles=["compliance"])
+    u_mle = auth_svc.register_user("mle_governance", "Secret123!", "bank_a", roles=["ml_engineer"])
+    u_cmp = auth_svc.register_user("comp_governance", "Secret123!", "bank_a", roles=["compliance"])
+    tok_mle = auth_svc.create_token_bundle(u_mle).access_token
+    tok_cmp = auth_svc.create_token_bundle(u_cmp).access_token
 
     sig_ml = generate_signoff_signature("sim_e2e_champion", 1, candidate["sha256"], "ml_engineer", "mle_governance")
     sig_comp = generate_signoff_signature("sim_e2e_champion", 1, candidate["sha256"], "compliance", "comp_governance")
 
-    reg.sign_off("sim_e2e_champion", 1, "ml_engineer", user="mle_governance", signature=sig_ml)
-    promoted = reg.sign_off("sim_e2e_champion", 1, "compliance", user="comp_governance", signature=sig_comp)
+    reg.sign_off("sim_e2e_champion", 1, "ml_engineer", user="mle_governance", signature=sig_ml, auth_token=tok_mle)
+    promoted = reg.sign_off("sim_e2e_champion", 1, "compliance", user="comp_governance", signature=sig_comp, auth_token=tok_cmp)
     assert promoted["status"] == "champion"
     assert promoted["is_active"] is True
 
@@ -985,14 +1116,12 @@ def test_unauthorized_signoff_identities_fail_production_activation(temp_reg_dir
         training_evidence={"loss": 0.2, "epochs": 1, "batch_size": 32},
     )
     sig_ml = generate_signoff_signature("sim_unauth_activation", 1, entry["sha256"], "ml_engineer", "invented_mle")
-    sig_comp = generate_signoff_signature("sim_unauth_activation", 1, entry["sha256"], "compliance", "invented_comp")
 
-    reg.sign_off("sim_unauth_activation", 1, "ml_engineer", user="invented_mle", signature=sig_ml)
     with (
         patch.object(get_settings(), "app_env", "production"),
-        pytest.raises(ModelIntegrityError, match="sign-off missing verified role authority"),
+        pytest.raises(ModelIntegrityError, match="authenticated session token is required for institutional sign-off"),
     ):
-        reg.sign_off("sim_unauth_activation", 1, "compliance", user="invented_comp", signature=sig_comp)
+        reg.sign_off("sim_unauth_activation", 1, "ml_engineer", user="invented_mle", signature=sig_ml)
 
 
 def test_champion_promotion_and_rollback_generation_consistency(temp_reg_dir: str):
@@ -1050,7 +1179,10 @@ def test_production_feature_validation_and_scoring_contract():
         "merchant_risk_score": 0.10,
         "hour_of_day": 14.0,
     }
-    with patch.object(get_settings(), "app_env", "production"):
+    svc = ModelService(get_settings())
+    m = svc.create_model(dp_compatible=True)
+    with patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(m, False)), \
+         patch.object(get_settings(), "app_env", "production"):
         resp2 = client.post("/v1/inference/score", json=complete_req)
         assert resp2.status_code == 200
         assert resp2.json()["evaluated_by"] == "ML_MODEL"
