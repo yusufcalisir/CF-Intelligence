@@ -123,6 +123,24 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("payload_signing_secret", "cfi_payload_signing_secret"),
     )
 
+    # ── Training Provenance & Verification ───
+    training_receipt_public_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "training_receipt_public_key",
+            "cfi_training_receipt_public_key",
+        ),
+        description="Authorized Ed25519 public key (hex or PEM) for training receipt provenance verification.",
+    )
+    training_receipt_key_id: str = Field(
+        default="cfi_training_ed25519_v1",
+        validation_alias=AliasChoices(
+            "training_receipt_key_id",
+            "cfi_training_receipt_key_id",
+        ),
+        description="Expected key ID for authorized training receipt issuer.",
+    )
+
     # ── Enterprise Security Suite ─────────────
     mtls_enabled: bool = True
     mtls_ca_cn: str = "CFI-Root-CA"

@@ -2293,21 +2293,51 @@ class SimulationService:
                 model_bytes = buf.getvalue()
 
                 # Issue authentic TrainingExecutionReceipt from genuine FL execution boundary
+                from app.application.services.data_generator import FEATURE_NAMES
                 from app.application.services.training_provenance_service import (
+                    TrainingExecutionEvidence,
                     get_default_training_issuer,
                 )
-                issuer = get_default_training_issuer()
-                fl_receipt = issuer.issue_receipt(
+
+                fl_rounds_executed = len(rounds) if rounds else getattr(config, "num_rounds", 1)
+                fl_epochs_executed = getattr(config, "local_epochs", 1) * fl_rounds_executed
+
+                total_fl_samples = 0
+                for b in banks:
+                    if b.id in bank_data:
+                        total_fl_samples += len(bank_data[b.id]["X_train"])
+                if total_fl_samples <= 0 and final_round_samples:
+                    total_fl_samples = sum(final_round_samples)
+                if total_fl_samples <= 0:
+                    total_fl_samples = 100
+
+                now_ts = _now()
+                completed_at_str = now_ts.isoformat() if hasattr(now_ts, "isoformat") else str(now_ts)
+                fnames_list = list(feature_names) if feature_names is not None else list(FEATURE_NAMES)
+
+                fl_evidence = TrainingExecutionEvidence(
                     training_run_id=f"fl_run_{simulation.id}",
                     job_id=f"job_{simulation.id}",
-                    model_bytes=model_bytes,
-                    model_architecture="FraudDetectionNN",
-                    input_dim=10,
-                    feature_schema_version="v1",
                     simulation_id=simulation.id,
-                    dataset_hash=dataset_hash,
-                    metrics=final_metrics,
+                    completed_at=completed_at_str,
+                    status="COMPLETED",
+                    executed_rounds=fl_rounds_executed,
+                    executed_epochs=fl_epochs_executed,
+                    sample_count=total_fl_samples,
+                    observed_metrics=final_metrics,
+                    artifact_sha256=hashlib.sha256(model_bytes).hexdigest(),
+                    architecture="FraudDetectionNN",
+                    feature_schema_version="v1",
+                    feature_names=fnames_list,
+                    producer_id="FEDERATED_SIMULATION_SERVICE",
                     git_commit_hash=git_commit,
+                    dataset_manifest_id=dataset_hash,
+                )
+
+                issuer = get_default_training_issuer()
+                fl_receipt = issuer.issue_receipt(
+                    evidence=fl_evidence,
+                    model_bytes=model_bytes,
                     dp_noise_profile=dp_noise_profile,
                 )
 

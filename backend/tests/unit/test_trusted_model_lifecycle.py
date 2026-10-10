@@ -131,7 +131,7 @@ def test_receipt_with_forged_signature_rejected_by_authority(temp_reg_dir: str):
         "schema_version": "1.0",
         "created_at": "2026-10-10T00:00:00Z",
         "signature": "bad_signature_hex",
-        "key_id": auth._issuer.key_id,
+        "key_id": auth.key_id,
     }
     is_valid, reason = auth.verify_receipt(fake_receipt, candidate_artifact_sha256="0" * 64, simulation_id="sim_forged_sig")
     assert not is_valid
