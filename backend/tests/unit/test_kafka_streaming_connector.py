@@ -504,3 +504,51 @@ class TestHealthAndTelemetryMetrics:
         batch3 = await connector.consume_batch(topic, max_messages=5)
         assert len(batch3) == 1
         assert batch3[0].id == "replay-01"
+
+
+# ── 9. Production Reality & Zero-Mock Invariant Tests ─────────────────────────
+
+class TestKafkaStreamingZeroMockInvariants:
+    """Verifies fail-closed production semantics, truthful receipts, and strict parsing."""
+
+    def test_production_mode_refuses_in_memory_kafka(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Production environment strictly refuses in-memory loopback without real cluster."""
+        monkeypatch.setenv("APP_ENV", "production")
+        with pytest.raises(RuntimeError, match="Production KafkaStreamingConnector requires an external Apache Kafka cluster"):
+            KafkaStreamingConnector()
+
+    @pytest.mark.asyncio
+    async def test_publish_receipt_contains_truthful_durability(self) -> None:
+        """PublishReceipt must truthfully declare IN_MEMORY_LOOPBACK and VOLATILE_PROCESS_MEMORY."""
+        broker = InMemoryKafkaBroker()
+        connector = KafkaStreamingConnector(in_memory_broker=broker)
+        ev = CloudEvent(
+            id="truth-evt-01",
+            source="urn:cfi:bank:ALPHA",
+            type=EVENT_TYPE_TRANSACTION,
+            data={"amount": 100.0, "currency": "EUR"},
+        )
+        receipt = await connector.publish(ev)
+        assert receipt.status == "COMMITTED"
+        assert receipt.delivery_mode == "IN_MEMORY_LOOPBACK"
+        assert receipt.durability == "VOLATILE_PROCESS_MEMORY"
+
+    def test_parse_batch_rejects_missing_fields_without_fake_defaults(self) -> None:
+        """Batch parsing strictly rejects missing account_id or amount without substituting fake 1.0."""
+        connector = KafkaStreamingConnector()
+
+        # Missing account_id
+        with pytest.raises(ValueError, match="missing mandatory account_id"):
+            connector.parse_batch([{"counterparty_account_id": "cpty1", "amount": 500.0}])
+
+        # Missing counterparty_account_id
+        with pytest.raises(ValueError, match="missing mandatory counterparty_account_id"):
+            connector.parse_batch([{"account_id": "acc1", "amount": 500.0}])
+
+        # Missing amount
+        with pytest.raises(ValueError, match="missing mandatory amount"):
+            connector.parse_batch([{"account_id": "acc1", "counterparty_account_id": "cpty1"}])
+
+        # Non-positive amount
+        with pytest.raises(ValueError, match="amount must be positive and finite"):
+            connector.parse_batch([{"account_id": "acc1", "counterparty_account_id": "cpty1", "amount": -10.0}])

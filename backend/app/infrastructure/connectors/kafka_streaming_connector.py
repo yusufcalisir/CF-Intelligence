@@ -5,8 +5,8 @@ Provides:
 - Asynchronous producer & consumer streaming workers with at-least-once delivery guarantees
 - Distributed idempotency and deduplication engine (Redis / thread-safe local cache)
 - Dead Letter Queue (DLQ) error isolation for poisoned or unparseable payloads
-- High-performance In-Memory Broker loopback engine for self-contained, zero-mock testing
-- Real aiokafka client support with SASL_SSL authentication when external broker is available
+- High-performance In-Memory Broker loopback engine for self-contained, isolated development and testing
+- Fails closed in production if external Kafka broker cluster is missing or unconfigured
 """
 
 from __future__ import annotations
@@ -15,6 +15,8 @@ import asyncio
 import contextlib
 import json
 import logging
+import math
+import os
 import threading
 import time
 from collections import defaultdict
@@ -281,6 +283,17 @@ class KafkaStreamingConnector(BaseBankConnector):
         self.sasl_password = sasl_password
         self.enable_idempotency = enable_idempotency
 
+        # Check environment: in production, an explicit connected Kafka cluster is required.
+        # Silent loopback to InMemoryKafkaBroker in production is strictly forbidden (Rule 1, 5, 12).
+        from app.config import get_settings
+        _cfg = get_settings()
+        app_env = os.getenv("APP_ENV", _cfg.app_env).lower()
+        if app_env == "production" and in_memory_broker is None:
+            raise RuntimeError(
+                "Production KafkaStreamingConnector requires an external Apache Kafka cluster. "
+                "In-memory loopback broker is strictly forbidden in production (APP_ENV=production)."
+            )
+
         self._idempotency = IdempotencyEngine(ttl_seconds=idempotency_ttl)
         self._broker = in_memory_broker or _GLOBAL_IN_MEMORY_BROKER
         self._buffered_transactions: list[NormalizedTransaction] = []
@@ -306,6 +319,9 @@ class KafkaStreamingConnector(BaseBankConnector):
         and assigns partition offsets.
         """
         start = time.perf_counter()
+        is_in_mem = isinstance(self._broker, InMemoryKafkaBroker)
+        delivery_mode = "IN_MEMORY_LOOPBACK" if is_in_mem else "KAFKA_CLUSTER"
+        durability = "VOLATILE_PROCESS_MEMORY" if is_in_mem else "DURABLE_BROKER_ACK"
 
         # 1. Parse into validated CloudEvent instance
         if isinstance(event, dict):
@@ -343,6 +359,8 @@ class KafkaStreamingConnector(BaseBankConnector):
                     status="DUPLICATE_IGNORED",
                     idempotent_duplicate=True,
                     latency_ms=round(latency, 3),
+                    delivery_mode=delivery_mode,
+                    durability=durability,
                 )
 
         # 3. Publish to Broker
@@ -368,6 +386,8 @@ class KafkaStreamingConnector(BaseBankConnector):
             status="COMMITTED",
             idempotent_duplicate=False,
             latency_ms=round(latency, 3),
+            delivery_mode=delivery_mode,
+            durability=durability,
         )
 
     async def publish_batch(
@@ -509,6 +529,10 @@ class KafkaStreamingConnector(BaseBankConnector):
             error,
         )
 
+        is_in_mem = isinstance(self._broker, InMemoryKafkaBroker)
+        delivery_mode = "IN_MEMORY_LOOPBACK" if is_in_mem else "KAFKA_CLUSTER"
+        durability = "VOLATILE_PROCESS_MEMORY" if is_in_mem else "DURABLE_BROKER_ACK"
+
         return PublishReceipt(
             event_id=envelope.dead_letter_id,
             topic=self.dlq_topic,
@@ -517,14 +541,28 @@ class KafkaStreamingConnector(BaseBankConnector):
             status="DLQ_ROUTED",
             idempotent_duplicate=False,
             latency_ms=0.0,
+            delivery_mode=delivery_mode,
+            durability=durability,
         )
 
     # ── Health & Diagnostics ──────────────────────────────────────────────────
 
     def health_check(self) -> dict[str, Any]:
         """Return connectivity status and streaming telemetry."""
+        is_in_memory = isinstance(self._broker, InMemoryKafkaBroker)
+        from app.config import get_settings
+        _cfg = get_settings()
+        app_env = os.getenv("APP_ENV", _cfg.app_env).lower()
+        is_prod = app_env == "production"
+
+        health_status = "HEALTHY" if self._is_running else "UNHEALTHY"
+        if is_prod and is_in_memory:
+            health_status = "DEGRADED"
+
         return {
-            "status": "HEALTHY" if self._is_running else "UNHEALTHY",
+            "status": health_status,
+            "broker_backend": "IN_MEMORY_LOOPBACK" if is_in_memory else "KAFKA_CLUSTER",
+            "durability": "VOLATILE_IN_MEMORY" if is_in_memory else "DURABLE_PARTITIONED",
             "bootstrap_servers": self.bootstrap_servers,
             "client_id": self.client_id,
             "group_id": self.group_id,
@@ -566,44 +604,60 @@ class KafkaStreamingConnector(BaseBankConnector):
                 results.append(item)
             elif isinstance(item, CloudEvent):
                 ce_data: dict[str, Any] = item.data if isinstance(item.data, dict) else {}
-                with contextlib.suppress(Exception):
-                    results.append(
-                        NormalizedTransaction(
-                            transaction_id=str(
-                                ce_data.get("transaction_id") or ce_data.get("id") or item.id or "tx_unknown"
-                            ),
-                            account_id=str(
-                                ce_data.get("account_id") or ce_data.get("debtor_account") or "acc_unknown"
-                            ),
-                            counterparty_account_id=str(
-                                ce_data.get("counterparty_account_id")
-                                or ce_data.get("creditor_account")
-                                or "acc_counterparty"
-                            ),
-                            amount=float(ce_data.get("amount", 1.0)),
-                            currency=str(ce_data.get("currency", "EUR")),
-                        )
+                acc_id = ce_data.get("account_id") or ce_data.get("debtor_account")
+                if not acc_id or str(acc_id).strip() in ("", "UNKNOWN", "UNKNOWN_DEBTOR"):
+                    raise ValueError(f"CloudEvent {item.id} missing mandatory account_id")
+                cpty_id = ce_data.get("counterparty_account_id") or ce_data.get("creditor_account")
+                if not cpty_id or str(cpty_id).strip() in ("", "UNKNOWN", "UNKNOWN_CREDITOR"):
+                    raise ValueError(f"CloudEvent {item.id} missing mandatory counterparty_account_id")
+                amt_val = ce_data.get("amount")
+                if amt_val is None:
+                    raise ValueError(f"CloudEvent {item.id} missing mandatory amount")
+                try:
+                    amt = float(amt_val)
+                except (ValueError, TypeError) as exc:
+                    raise ValueError(f"CloudEvent {item.id} invalid amount: {amt_val}") from exc
+                if amt <= 0 or not math.isfinite(amt):
+                    raise ValueError(f"CloudEvent {item.id} amount must be positive and finite: {amt_val}")
+                tx_id = str(ce_data.get("transaction_id") or ce_data.get("id") or item.id).strip()
+                results.append(
+                    NormalizedTransaction(
+                        transaction_id=tx_id,
+                        account_id=str(acc_id).strip(),
+                        counterparty_account_id=str(cpty_id).strip(),
+                        amount=amt,
+                        currency=str(ce_data.get("currency", "EUR")),
+                        channel_type="KAFKA_STREAMING",
                     )
+                )
             elif isinstance(item, dict):
                 inner = item.get("data")
                 dict_data: dict[str, Any] = inner if isinstance(inner, dict) else item
-                with contextlib.suppress(Exception):
-                    results.append(
-                        NormalizedTransaction(
-                            transaction_id=str(
-                                dict_data.get("transaction_id") or dict_data.get("id") or "tx_unknown"
-                            ),
-                            account_id=str(
-                                dict_data.get("account_id") or dict_data.get("debtor_account") or "acc_unknown"
-                            ),
-                            counterparty_account_id=str(
-                                dict_data.get("counterparty_account_id")
-                                or dict_data.get("creditor_account")
-                                or "acc_counterparty"
-                            ),
-                            amount=float(dict_data.get("amount", 1.0)),
-                            currency=str(dict_data.get("currency", "EUR")),
-                        )
+                acc_id = dict_data.get("account_id") or dict_data.get("debtor_account")
+                if not acc_id or str(acc_id).strip() in ("", "UNKNOWN", "UNKNOWN_DEBTOR"):
+                    raise ValueError("Transaction item missing mandatory account_id")
+                cpty_id = dict_data.get("counterparty_account_id") or dict_data.get("creditor_account")
+                if not cpty_id or str(cpty_id).strip() in ("", "UNKNOWN", "UNKNOWN_CREDITOR"):
+                    raise ValueError("Transaction item missing mandatory counterparty_account_id")
+                amt_val = dict_data.get("amount")
+                if amt_val is None:
+                    raise ValueError("Transaction item missing mandatory amount")
+                try:
+                    amt = float(amt_val)
+                except (ValueError, TypeError) as exc:
+                    raise ValueError(f"Transaction item invalid amount: {amt_val}") from exc
+                if amt <= 0 or not math.isfinite(amt):
+                    raise ValueError(f"Transaction item amount must be positive and finite: {amt_val}")
+                tx_id = str(dict_data.get("transaction_id") or dict_data.get("id") or f"tx_{len(results)}").strip()
+                results.append(
+                    NormalizedTransaction(
+                        transaction_id=tx_id,
+                        account_id=str(acc_id).strip(),
+                        counterparty_account_id=str(cpty_id).strip(),
+                        amount=amt,
+                        currency=str(dict_data.get("currency", "EUR")),
+                        channel_type="KAFKA_STREAMING",
                     )
+                )
         self._buffered_transactions.extend(results)
         return results

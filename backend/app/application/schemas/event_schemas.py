@@ -258,3 +258,11 @@ class PublishReceipt(BaseModel):
     )
     idempotent_duplicate: bool = Field(default=False, description="True if skipped due to distributed deduplication")
     latency_ms: float = Field(default=0.0, description="Publish latency in milliseconds", ge=0.0)
+    delivery_mode: str = Field(
+        default="IN_MEMORY_LOOPBACK",
+        description="Delivery transport mode: IN_MEMORY_LOOPBACK or KAFKA_CLUSTER",
+    )
+    durability: str = Field(
+        default="VOLATILE_PROCESS_MEMORY",
+        description="Durability guarantee: VOLATILE_PROCESS_MEMORY or DURABLE_BROKER_ACK",
+    )
