@@ -1214,7 +1214,15 @@ class SimulationService:
                                 )
                                 actual_eps = None
                             local_w = self.model_service.get_parameters(loc_model)
-                            local_loss = loss_hist[-1] if loss_hist else 0.1
+                            if loss_hist:
+                                local_loss = loss_hist[-1]
+                            elif len(bank_partition["X_train"]) > 0:
+                                eval_res = self.model_service.evaluate(
+                                    loc_model, bank_partition["X_train"], bank_partition["y_train"]
+                                )
+                                local_loss = eval_res.get("loss")
+                            else:
+                                local_loss = None
                             local_samples = len(bank_partition["X_train"])
                             train_res: dict[str, Any] = {
                                 "bank_id": bank.id,
@@ -1314,11 +1322,18 @@ class SimulationService:
                             train_res.get("num_samples")
                             or train_res.get("num_examples")
                             or train_res.get("sample_count")
-                            or 1000
                         )
-                        num_samples = (
-                            int(raw_samples) if isinstance(raw_samples, (int, float, str)) else 1000
-                        )
+                        if raw_samples is not None and isinstance(raw_samples, (int, float, str)):
+                            num_samples = max(0, int(raw_samples))
+                        elif bank_partition is not None and "X_train" in bank_partition:
+                            num_samples = len(bank_partition["X_train"])
+                        else:
+                            logger.warning(
+                                "Bank %s did not provide sample count for round %d; using 0 (unweighted) without fabricating arbitrary sample sizes",
+                                bank.id,
+                                round_num,
+                            )
+                            num_samples = 0
                         raw_loss = train_res.get("loss", 0.0)
                         loss_val = (
                             float(raw_loss) if isinstance(raw_loss, (int, float, str)) else 0.0
@@ -1651,6 +1666,7 @@ class SimulationService:
                     client_gnn_samples: list[int] = []
 
                     per_bank_gnn_loss = {}
+                    per_bank_gnn_test_loss = {}
 
                     for bank in banks:
                         local_weights, local_metrics = gnn_service.train_local_gnn(
@@ -1678,6 +1694,9 @@ class SimulationService:
                         client_gnn_samples.append(int(local_metrics["num_nodes"]))
 
                         per_bank_gnn_loss[bank.id] = local_metrics["loss"]
+                        per_bank_gnn_test_loss[bank.id] = local_metrics.get(
+                            "test_loss", local_metrics["loss"]
+                        )
 
                     if enable_dp and budget is not None:
                         budget.spend(config.dp_epsilon, limit=config.dp_epsilon_limit)
@@ -1721,9 +1740,9 @@ class SimulationService:
                         lra_results.get("risk_tier"),
                     )
 
-                    # 2. Audit Membership Inference Attack
+                    # 2. Audit Membership Inference Attack with genuine empirical holdout test losses
                     train_losses = list(per_bank_gnn_loss.values())
-                    test_losses = [loss_val * 1.15 for loss_val in train_losses]
+                    test_losses = list(per_bank_gnn_test_loss.values())
                     mia_results = audit_service.audit_membership_inference(
                         train_losses=train_losses,
                         test_losses=test_losses,

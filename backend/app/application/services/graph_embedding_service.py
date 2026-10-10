@@ -221,7 +221,11 @@ class GraphEmbeddingService:
 
         if features.size(0) == 0:
             logger.warning("Empty graph for bank %s, skipping training", bank_id)
-            return model.to_model_weights(), {"loss": 0.0, "num_nodes": 0}
+            return model.to_model_weights(include_classifier=False), {
+                "loss": 0.0,
+                "test_loss": 0.0,
+                "num_nodes": 0,
+            }
 
         label_tensor = torch.tensor(labels, dtype=torch.float32)
 
@@ -229,21 +233,19 @@ class GraphEmbeddingService:
         self._node_id_to_index = node_id_to_index
         self._index_to_node_id = {v: k for k, v in node_id_to_index.items()}
 
+        # Partition labeled nodes into train and holdout validation/test masks (80% train, 20% test if count >= 5)
+        labeled_indices = [i for i, label in enumerate(labels) if label in (0.0, 1.0)]
+        if len(labeled_indices) >= 5:
+            test_count = max(1, int(len(labeled_indices) * 0.2))
+            test_set = set(labeled_indices[-test_count:])
+            train_mask = torch.tensor([i not in test_set for i in range(len(labels))], dtype=torch.bool)
+            test_mask = torch.tensor([i in test_set for i in range(len(labels))], dtype=torch.bool)
+        else:
+            train_mask = torch.ones(len(labels), dtype=torch.bool)
+            test_mask = torch.ones(len(labels), dtype=torch.bool)
+
         # Training loop
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
-        # Use class-weighted BCE to handle fraud/legitimate imbalance
-        fraud_count = sum(labels)
-        legit_count = len(labels) - fraud_count
-        criterion: nn.Module
-        if fraud_count > 0 and legit_count > 0:
-            # Since our model already applies sigmoid, we use BCELoss with manual weight
-            criterion = nn.BCELoss(
-                weight=None,
-                reduction="none",
-            )
-        else:
-            criterion = nn.BCELoss()
 
         model.train()
         total_loss = 0.0
@@ -255,27 +257,22 @@ class GraphEmbeddingService:
                 features, adjacency, num_sample=self.neighbor_sample_size
             )
 
-            # Compute weighted loss
-            if fraud_count > 0 and legit_count > 0:
-                sample_weights = torch.where(
-                    label_tensor == 1.0,
-                    torch.tensor(legit_count / fraud_count),
-                    torch.tensor(1.0),
-                )
-                per_sample_loss = criterion(predictions, label_tensor)
-                loss = (per_sample_loss * sample_weights).mean()
-            else:
-                loss = nn.functional.binary_cross_entropy(predictions, label_tensor)
-
+            loss = model.compute_loss(predictions, label_tensor, mask=train_mask)
             loss.backward()
             optimizer.step()
             total_loss = loss.item()
 
         avg_loss = total_loss  # Last epoch loss
 
-        # Compute final embeddings and cache them
+        # Compute final embeddings and evaluate empirical holdout test loss
         model.eval()
         with torch.no_grad():
+            _, eval_preds = model(
+                features, adjacency, num_sample=self.neighbor_sample_size
+            )
+            eval_test_loss = model.compute_loss(eval_preds, label_tensor, mask=test_mask)
+            empirical_test_loss = float(eval_test_loss.item())
+
             final_embeddings = model.get_embeddings(
                 features, adjacency, num_sample=self.neighbor_sample_size
             )
@@ -287,9 +284,10 @@ class GraphEmbeddingService:
 
         metrics = {
             "loss": round(avg_loss, 6),
+            "test_loss": round(empirical_test_loss, 6),
             "num_nodes": len(labels),
             "num_edges": sum(len(adj) for adj in adjacency) // 2,
-            "fraud_nodes": int(fraud_count),
+            "fraud_nodes": int(sum(labels)),
             "embedding_dim": self.embedding_dim,
         }
 

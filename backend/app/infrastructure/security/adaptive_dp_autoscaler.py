@@ -138,17 +138,11 @@ class AdaptiveDPAutoScaler:
     def compute_rdp_gaussian(self, sigma: float, q: float, alpha: float) -> float:
         """Computes analytical Rényi Differential Privacy bound for subsampled Gaussian mechanism.
 
-        For subsampled Gaussian mechanism with sampling ratio q and noise sigma:
-            eps_RDP(alpha) <= (alpha * q^2) / (2 * sigma^2) + O(q^3)
+        Delegates to PrivacyService authoritative Mironov (2019) exact analytical implementation.
         """
-        if sigma <= 0.0:
-            return float("inf")
-        if q <= 0.0:
-            return 0.0
-        if alpha <= 1.0:
-            raise ValueError(f"RDP order alpha must be > 1.0, got {alpha}")
+        from app.application.services.privacy_service import PrivacyService
 
-        return (alpha * (q**2)) / (2.0 * (sigma**2))
+        return PrivacyService().compute_rdp_gaussian(sigma=sigma, q=q, alpha=alpha)
 
     def convert_rdp_to_approx_dp(
         self, rdp_map: dict[float, float], delta: float
