@@ -176,6 +176,7 @@ class TrainingJobAuthorityDatabase:
         app_env: str | None = None,
         db_url: str | None = None,
         is_prod: bool | None = None,
+        completion_db_url: str | None = None,
     ) -> None:
         effective_target = db_target if db_target is not None else (db_url or "")
         self._db_target = effective_target
@@ -199,7 +200,7 @@ class TrainingJobAuthorityDatabase:
                 db_target=":memory:", in_memory=True
             )
         elif clean.startswith("postgresql://") or clean.startswith("postgres://"):
-            self._backend = PostgresTrainingJobAuthority(db_url=clean)
+            self._backend = PostgresTrainingJobAuthority(db_url=clean, completion_db_url=completion_db_url)
         elif clean.startswith("sqlite://") or "://" not in clean:
             self._backend = SQLiteTrainingJobAuthority(db_target=clean, in_memory=False)
         else:
@@ -341,12 +342,14 @@ class TrustedTrainingJobRecordSource:
         coordinator_token: str | None = None,
         db_url: str | None = None,
         bank_tokens: dict[str, str] | None = None,
+        completion_db_url: str | None = None,
     ) -> None:
         self._lock = threading.RLock()
         self._worker_token = configured_token if configured_token is not None else worker_token
         self._coordinator_token = coordinator_token
         self._enforce_lifecycle = enforce_lifecycle
         self._app_env = app_env
+        self._completion_db_url = completion_db_url
 
         settings = get_settings()
         self._bank_tokens = dict(bank_tokens) if bank_tokens is not None else dict(getattr(settings, "training_bank_tokens", {}))
@@ -437,10 +440,16 @@ class TrustedTrainingJobRecordSource:
                 self._store_file_path = ""
                 self._in_memory = True
 
+        configured_completion = (
+            self._completion_db_url
+            or os.environ.get("CFI_TRAINING_JOB_COMPLETION_DB_URL")
+            or getattr(settings, "training_job_completion_db_url", None)
+        )
         self._db = TrainingJobAuthorityDatabase(
             db_target=self._store_file_path,
             in_memory=self._in_memory,
             app_env=active_env,
+            completion_db_url=configured_completion,
         )
 
     @property
@@ -1108,7 +1117,7 @@ class TrustedTrainingJobRecordSource:
         return self._db.get_completed_job_by_run_id(run_id)
 
     def get_round_observations(self, job_id: str) -> list[RoundObservation]:
-        return self._db.get_observations(job_id)
+        return self._db.get_round_observations(job_id)
 
     def has_completed_job(self, identifier: str) -> bool:
         return self.get_completed_job(identifier) is not None
@@ -1953,6 +1962,39 @@ class TrainingReceiptIssuer:
                 raise TrainingProvenanceSecurityError(
                     f"Git commit hash mismatch: caller claimed '{target_git}', but trusted record observed '{rec.git_commit_hash}'."
                 )
+
+            # Finding SIGN-TRUST-01: Issuer independently reconciles underlying evidence chain
+            is_durable_source = getattr(self._job_record_source, "is_durable", False)
+            source_enforces_lifecycle = getattr(self._job_record_source, "_enforce_lifecycle", False)
+            if (is_prod or source_enforces_lifecycle) and rec.executed_rounds > 0 and is_durable_source:
+                if hasattr(self._job_record_source, "get_round_observations"):
+                    obs_list = self._job_record_source.get_round_observations(target_job)
+                    if not obs_list:
+                        raise TrainingProvenanceSecurityError(
+                            f"Production receipt issuance rejected: job '{target_job}' has no observed round events in authority. "
+                            "Direct SQL insertion or completed row forgery detected."
+                        )
+                if hasattr(self._job_record_source, "get_global_aggregations"):
+                    aggs = self._job_record_source.get_global_aggregations(target_job)
+                    if not aggs:
+                        raise TrainingProvenanceSecurityError(
+                            f"Production receipt issuance rejected: job '{target_job}' has no recorded global aggregation evidence. "
+                            "Direct SQL insertion or completed row forgery detected."
+                        )
+                if hasattr(self._job_record_source, "get_model_evaluations"):
+                    evals = self._job_record_source.get_model_evaluations(target_job)
+                    if evals:
+                        eval_metrics = {ev.metric_name: ev.metric_value for ev in evals}
+                        for m_name in ("val_auc", "auc_roc", "val_loss"):
+                            if (
+                                m_name in eval_metrics
+                                and m_name in rec.observed_metrics
+                                and not math.isclose(eval_metrics[m_name], rec.observed_metrics[m_name], rel_tol=1e-5, abs_tol=1e-5)
+                            ):
+                                raise TrainingProvenanceSecurityError(
+                                    f"Production receipt issuance rejected: metric '{m_name}' in completion record ({rec.observed_metrics[m_name]}) "
+                                    f"does not match authoritative evaluation event ({eval_metrics[m_name]})."
+                                )
 
         receipt_id = f"rcpt_{uuid.uuid4().hex}"
         created_at = datetime.now(UTC).isoformat()
