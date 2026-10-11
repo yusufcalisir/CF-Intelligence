@@ -908,7 +908,7 @@ def provision_runtime_service_roles(
 class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
     """PostgreSQL-backed ACID relational authority enforcing multi-host concurrency and row-level locking."""
 
-    def __init__(self, db_url: str) -> None:
+    def __init__(self, db_url: str, app_env: str = "development") -> None:
         if psycopg is None:
             raise TrainingProvenanceConfigurationError(
                 "psycopg (v3) driver is not installed. PostgreSQL training authority cannot operate without psycopg."
@@ -922,6 +922,8 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             )
 
         self._db_url = clean_url
+        self.app_env = app_env
+        self._is_prod = app_env.lower() == "production"
         self._lock = threading.RLock()
         self._test_connection()
         self.init_schema()
@@ -1642,6 +1644,10 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                         )
 
                     if pause_checkpoint_marker_file:
+                        if self._is_prod:
+                            raise TrainingProvenanceSecurityError(
+                                f"Arbitrary filesystem checkpoint files are strictly forbidden in production authority for job '{clean_job_id}' (ISO-07)."
+                            )
                         with open(pause_checkpoint_marker_file, "w", encoding="utf-8") as f:
                             f.write("IN_TRANSACTION_CHECKPOINT")
                         release_file = pause_checkpoint_marker_file + ".release"

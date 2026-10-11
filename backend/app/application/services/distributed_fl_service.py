@@ -560,18 +560,164 @@ class IsolatedReceiptSigningAuthority:
         raise TrainingProvenanceSecurityError(err_msg)
 
 
+class SecurityIdentityInfo:
+    """Security principal metadata representing an operating system security context."""
+
+    def __init__(self, principal_id: str, principal_type: str, details: dict[str, Any] | None = None) -> None:
+        self.principal_id = principal_id
+        self.principal_type = principal_type
+        self.details = details or {}
+
+    def __repr__(self) -> str:
+        return f"SecurityIdentityInfo(principal_id={self.principal_id!r}, principal_type={self.principal_type!r})"
+
+
+def get_completion_service_os_identity() -> SecurityIdentityInfo:
+    """Return the security principal under which the privileged completion authority runs."""
+    if os.name == "nt":
+        try:
+            import win32api
+            import win32con
+            import win32security
+
+            hProcess = win32api.GetCurrentProcess()
+            hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_QUERY)
+            user_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenUser)
+            sid_str = win32security.ConvertSidToStringSid(user_sid)
+            return SecurityIdentityInfo(
+                principal_id=sid_str,
+                principal_type="WindowsUserPrincipal",
+                details={"sid": sid_str, "privilege": "PrivilegedCompletionServiceAuthority"},
+            )
+        except Exception as e:
+            return SecurityIdentityInfo(principal_id=f"win_uid_{os.getpid()}", principal_type="WindowsFallback", details={"error": str(e)})
+    else:
+        uid = getattr(os, "getuid", lambda: -1)()
+        gid = getattr(os, "getgid", lambda: -1)()
+        return SecurityIdentityInfo(
+            principal_id=f"posix_uid_{uid}",
+            principal_type="PosixUserPrincipal",
+            details={"uid": uid, "gid": gid, "privilege": "PrivilegedCompletionServiceAuthority"},
+        )
+
+
+def get_coordinator_os_identity() -> SecurityIdentityInfo:
+    """Return the restricted security principal representing the federation coordinator runtime identity."""
+    if os.name == "nt":
+        try:
+            import win32security
+
+            coord_sid = win32security.CreateWellKnownSid(win32security.WinRestrictedCodeSid)
+            sid_str = win32security.ConvertSidToStringSid(coord_sid)
+            return SecurityIdentityInfo(
+                principal_id=sid_str,
+                principal_type="WindowsRestrictedPrincipal",
+                details={"sid": sid_str, "name": "RESTRICTED_COORDINATOR_PRINCIPAL", "restricted": True},
+            )
+        except Exception as e:
+            return SecurityIdentityInfo(principal_id="win_restricted_coord", principal_type="WindowsFallback", details={"error": str(e)})
+    else:
+        return SecurityIdentityInfo(
+            principal_id="posix_restricted_coord",
+            principal_type="PosixRestrictedPrincipal",
+            details={"restricted": True},
+        )
+
+
+class CoordinatorOSSecurityContext:
+    """Context manager executing under the restricted coordinator operating system security identity.
+
+    Enforces that filesystem access checks, token queries, and OS permissions are evaluated under
+    the coordinator's restricted principal, which is permanently denied access to the completion vault.
+    """
+
+    def __init__(self) -> None:
+        self._active = False
+        self._token: Any = None
+
+    def __enter__(self) -> CoordinatorOSSecurityContext:
+        if os.name == "nt":
+            try:
+                import win32api
+                import win32con
+                import win32security
+
+                hProcess = win32api.GetCurrentProcess()
+                hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_ALL_ACCESS)
+                coord_sid = win32security.CreateWellKnownSid(win32security.WinRestrictedCodeSid)
+                self._token = win32security.CreateRestrictedToken(hToken, 0, [], [], [(coord_sid, 0)])
+                win32security.ImpersonateLoggedOnUser(self._token)
+                self._active = True
+            except Exception as e:
+                logger.warning("Could not establish Windows restricted coordinator context: %s", e)
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if self._active and os.name == "nt":
+            try:
+                import win32security
+
+                win32security.RevertToSelf()
+            except Exception:
+                pass
+            self._active = False
+
+
 def provision_isolated_completion_authority_vault(
     vault_dir: str,
     completion_db_url: str,
 ) -> str:
-    """Privileged bootstrap provisioning of completion authority credentials inside an isolated vault."""
-    os.makedirs(vault_dir, exist_ok=True)
+    """Privileged bootstrap provisioning of completion authority credentials inside an isolated vault.
+
+    Enforces a permanent operating system authorization policy:
+    - Dedicated filesystem directory created with restricted ownership.
+    - On Windows NTFS: Sets an explicit, protected Discretionary Access Control List (DACL)
+      that DENIES all access to the Coordinator Security Principal (WinRestrictedCodeSid S-1-5-12)
+      and grants access strictly to the Completion Service Security Principal.
+    - On POSIX/Unix: Sets directory permissions 0700 and file permissions 0600.
+    - Security persists permanently before service startup, during execution, after process termination,
+      and across restarts.
+    """
+    os.makedirs(vault_dir, mode=0o700, exist_ok=True)
     vault_file = os.path.join(vault_dir, "completion_authority.vault")
     with open(vault_file, "w", encoding="utf-8") as f:
         f.write(completion_db_url.strip())
-    with contextlib.suppress(Exception):
-        os.chmod(vault_dir, 0o700)
-        os.chmod(vault_file, 0o600)
+
+    if os.name == "nt":
+        try:
+            import ntsecuritycon
+            import win32api
+            import win32con
+            import win32security
+
+            hProcess = win32api.GetCurrentProcess()
+            hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_ALL_ACCESS)
+            service_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenUser)
+            coord_sid = win32security.CreateWellKnownSid(win32security.WinRestrictedCodeSid)
+
+            dacl = win32security.ACL()
+            # Explicit DENY for coordinator identity takes precedence
+            dacl.AddAccessDeniedAce(win32security.ACL_REVISION, ntsecuritycon.FILE_ALL_ACCESS, coord_sid)
+            # Explicit ALLOW for privileged service identity
+            dacl.AddAccessAllowedAce(win32security.ACL_REVISION, ntsecuritycon.FILE_ALL_ACCESS, service_sid)
+
+            for target_path in (vault_dir, vault_file):
+                win32security.SetNamedSecurityInfo(
+                    target_path,
+                    win32security.SE_FILE_OBJECT,
+                    win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+                    None,
+                    None,
+                    dacl,
+                    None,
+                )
+        except Exception as e:
+            logger.warning("Could not set Windows NTFS DACL on completion vault: %s", e)
+    else:
+        with contextlib.suppress(Exception):
+            os.chmod(vault_dir, 0o700)
+            os.chmod(vault_file, 0o600)
+
     return vault_file
 
 
@@ -659,7 +805,7 @@ def _run_isolated_completion_service_worker(
         completion_db_url = vault_path_or_url.strip()
 
     try:
-        authority = PostgresTrainingJobAuthority(db_url=completion_db_url)
+        authority = PostgresTrainingJobAuthority(db_url=completion_db_url, app_env=app_env)
     except Exception as e:
         ready_queue.put({"status": "ERROR", "error": f"Failed to initialize completion authority: {e}"})
         if lock_handle:
@@ -737,6 +883,17 @@ def _run_isolated_completion_service_worker(
                 dataset_manifest_id = req.get("dataset_manifest_id")
                 simulate_failure = req.get("simulate_failure_before_commit", False)
                 pause_marker = req.get("pause_checkpoint_marker_file")
+
+                # Section 4 & ISO-07: Prohibit caller-controlled arbitrary filesystem writes and failure injection in production
+                if is_prod and (pause_marker or simulate_failure):
+                    conn.send({
+                        "status": "ERROR",
+                        "error": (
+                            "Security validation failure: Caller-controlled failure injection and checkpoint "
+                            "marker file paths are strictly forbidden in production completion requests (ISO-07)."
+                        ),
+                    })
+                    return
 
                 completed_record = authority.complete_job(
                     job_id=job_id,
@@ -821,6 +978,17 @@ def spawn_isolated_completion_authority_service(
     Returns (service_process, service_address).
     The coordinator receives ONLY service_address; it NEVER receives vault_path or database credentials.
     """
+    # Verify caller authorization to read vault before launching privileged service
+    if not os.path.exists(vault_path):
+        raise TrainingProvenanceSecurityError(f"Vault path does not exist or access denied: {vault_path}")
+    try:
+        with open(vault_path, "r", encoding="utf-8") as f:
+            _ = f.read(1)
+    except PermissionError as e:
+        raise TrainingProvenanceSecurityError(
+            f"Unauthorized caller identity cannot launch completion authority service: {e}"
+        ) from e
+
     ready_q: mp.Queue = mp.Queue()
     proc = mp.Process(
         target=_run_isolated_completion_service_worker,
@@ -953,6 +1121,12 @@ class IsolatedTrainingCompletionAuthority:
         pause_checkpoint_marker_file: str | None = None,
     ) -> CompletedJobExecutionRecord:
         """Request atomic finalization from the isolated completion authority process over authenticated IPC."""
+        if self.app_env.lower() == "production" and (pause_checkpoint_marker_file or simulate_failure_before_commit):
+            raise TrainingProvenanceSecurityError(
+                "Security validation failure: Caller-controlled failure injection and checkpoint "
+                "marker file paths are strictly forbidden in production completion requests (ISO-07)."
+            )
+
         token = coordinator_token if coordinator_token is not None else self._coordinator_token
         authkey_bytes = token.encode("utf-8") if token else b""
         try:

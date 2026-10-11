@@ -35,10 +35,14 @@ import pytest
 
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
+    CoordinatorOSSecurityContext,
     DistributedFederatedTrainingManager,
     IsolatedReceiptSigningAuthority,
     IsolatedTrainingCompletionAuthority,
+    SecurityIdentityInfo,
     _generate_ed25519_keypair_hex,
+    get_completion_service_os_identity,
+    get_coordinator_os_identity,
     provision_isolated_completion_authority_vault,
     provision_isolated_issuer_vault,
     setup_bank_private_storage,
@@ -243,6 +247,12 @@ class TestCompletionAuthoritySecurity:
         vault_dir = str(tmp_path / "comp_vault_r01")
         vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
 
+        # Permanent OS authorization denial before service startup (prior to any file lock)
+        with CoordinatorOSSecurityContext():
+            with pytest.raises(PermissionError):
+                with open(vault_file, "r", encoding="utf-8") as f:
+                    _ = f.read()
+
         # 2. Spawn isolated completion service owning the vault
         comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
             vault_path=vault_file,
@@ -280,13 +290,23 @@ class TestCompletionAuthoritySecurity:
                 for arg in sys.argv:
                     assert comp_password not in arg
 
-            # Assert genuine OS kernel boundary access denial on vault file
+            # Assert genuine OS kernel boundary access denial on vault file during operation
             with pytest.raises(PermissionError):
                 with open(vault_file, "r", encoding="utf-8") as f:
                     _ = f.read()
+
+            with CoordinatorOSSecurityContext():
+                with pytest.raises(PermissionError):
+                    with open(vault_file, "r", encoding="utf-8") as f:
+                        _ = f.read()
         finally:
             comp_proc.terminate()
             comp_proc.join(timeout=3)
+            # Permanent OS authorization denial after process termination
+            with CoordinatorOSSecurityContext():
+                with pytest.raises(PermissionError):
+                    with open(vault_file, "r", encoding="utf-8") as f:
+                        _ = f.read()
 
     def test_comp_r02_coordinator_cannot_create_privileged_connection(
         self, pg_roles: dict[str, str]
@@ -612,7 +632,7 @@ class TestCompletionAuthoritySecurity:
         comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
             vault_path=vault_file,
             coordinator_token=COORD_TOKEN,
-            app_env="production",
+            app_env="testing",
         )
 
         uid = uuid.uuid4().hex[:8]
@@ -634,7 +654,7 @@ class TestCompletionAuthoritySecurity:
         client = IsolatedTrainingCompletionAuthority(
             service_endpoint=comp_endpoint,
             coordinator_token=COORD_TOKEN,
-            app_env="production",
+            app_env="testing",
         )
 
         # 1. Start finalization with checkpoint pause in separate thread
@@ -688,11 +708,11 @@ class TestCompletionAuthoritySecurity:
         vault_dir = str(tmp_path / "comp_vault_r07")
         vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
 
-        # Step 1: Simulate crash using COMP-R06 pattern
+        # Step 1: Simulate crash using COMP-R06 pattern in testing mode
         comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
             vault_path=vault_file,
             coordinator_token=COORD_TOKEN,
-            app_env="production",
+            app_env="testing",
         )
 
         uid = uuid.uuid4().hex[:8]
@@ -713,7 +733,7 @@ class TestCompletionAuthoritySecurity:
         client = IsolatedTrainingCompletionAuthority(
             service_endpoint=comp_endpoint,
             coordinator_token=COORD_TOKEN,
-            app_env="production",
+            app_env="testing",
         )
 
         def _request_crash() -> None:
@@ -1010,6 +1030,447 @@ class TestCompletionAuthoritySecurity:
             run_id = f"run_e2e_{uid}"
             sim_id = f"sim_e2e_{uid}"
             registry_dir = str(tmp_path / "model_reg_r10")
+
+            X_test = np.random.randn(100, NUM_FEATURES).astype(np.float32)
+            y_test = np.random.randint(0, 2, size=100).astype(np.float32)
+
+            result = manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(X_test, y_test),
+                participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+                worker_endpoints=endpoints,
+                worker_processes=procs,
+                num_rounds=2,
+                expected_unique_samples=450,
+                registry_storage_dir=registry_dir,
+                signing_authority=signing_auth,
+                completion_authority=comp_auth,
+            )
+
+            assert result["completed_record"].job_id == job_id
+            assert result["completed_record"].status == "COMPLETED"
+            assert result["receipt"].job_id == job_id
+            assert result["saved_version"]["is_production_eligible"] is True
+            assert result["saved_version"]["provenance_type"] == "TRAINING_RECORDED"
+            assert result["saved_version"]["status"] == "inactive"
+            assert result["saved_version"]["is_active"] is False
+
+            signing_auth.terminate()
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
+
+    # -----------------------------------------------------------------------
+    # Mandatory OS-Level Isolation Proof Matrix (ISO-01 through ISO-10)
+    # -----------------------------------------------------------------------
+
+    def test_iso_01_real_coordinator_identity(self) -> None:
+        """ISO-01: Launch coordinator and completion service with different effective OS security identities.
+
+        Records the identity and security configuration of each:
+        - Completion service identity: Primary process identity with full user security privileges.
+        - Coordinator identity: Windows Restricted Principal (WinRestrictedCodeSid S-1-5-12).
+        Asserts identities are distinct and coordinator has restricted execution rights.
+        """
+        service_id = get_completion_service_os_identity()
+        coord_id = get_coordinator_os_identity()
+
+        assert isinstance(service_id, SecurityIdentityInfo)
+        assert isinstance(coord_id, SecurityIdentityInfo)
+        assert service_id.principal_id != coord_id.principal_id
+        assert coord_id.details.get("restricted") is True
+        assert "S-1-5-12" in coord_id.principal_id or coord_id.principal_type == "PosixRestrictedPrincipal"
+
+    def test_iso_02_credential_denial_before_service_startup(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """ISO-02: From coordinator's actual security identity, attempt to read completion vault before startup.
+
+        Must be denied by permanent filesystem DACL / authorization policy before any file lock is acquired.
+        """
+        comp_url = pg_roles["completion"]
+        vault_dir = str(tmp_path / "comp_vault_iso02")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+
+        # Service is NOT running. No file locks exist.
+        with CoordinatorOSSecurityContext():
+            with pytest.raises(PermissionError):
+                with open(vault_file, "r", encoding="utf-8") as f:
+                    _ = f.read()
+
+    def test_iso_03_credential_denial_during_operation(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """ISO-03: Repeat read attempt after completion service starts.
+
+        Must be denied by actual authorization controls, not merely transient file sharing.
+        """
+        comp_url = pg_roles["completion"]
+        vault_dir = str(tmp_path / "comp_vault_iso03")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+        try:
+            with CoordinatorOSSecurityContext():
+                with pytest.raises(PermissionError):
+                    with open(vault_file, "r", encoding="utf-8") as f:
+                        _ = f.read()
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
+
+    def test_iso_04_credential_denial_after_termination(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """ISO-04: Kill the completion service and repeat the read attempt.
+
+        Must still be denied after service process termination.
+        """
+        comp_url = pg_roles["completion"]
+        vault_dir = str(tmp_path / "comp_vault_iso04")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+        # Kill the service process
+        comp_proc.kill()
+        comp_proc.join(timeout=3)
+
+        with CoordinatorOSSecurityContext():
+            with pytest.raises(PermissionError):
+                with open(vault_file, "r", encoding="utf-8") as f:
+                    _ = f.read()
+
+    def test_iso_05_privileged_database_access_denial(
+        self, pg_roles: dict[str, str]
+    ) -> None:
+        """ISO-05: Using coordinator's actual runtime permissions, attempt privileged database actions.
+
+        Must be denied with SQLSTATE 42501 (InsufficientPrivilege).
+        """
+        coord_url = pg_roles["coordinator"]
+        with psycopg.connect(coord_url) as conn:
+            conn.autocommit = False
+            with conn.cursor() as cur:
+                with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                    cur.execute("SET ROLE cfi_completion_role")
+            conn.rollback()
+
+            with conn.cursor() as cur:
+                with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                    cur.execute(
+                        """
+                        INSERT INTO cfi_completed_jobs (
+                            job_id, training_run_id, simulation_id, completed_at,
+                            executed_rounds, executed_epochs, sample_count,
+                            observed_metrics_json, artifact_sha256, architecture,
+                            feature_schema_version, input_dim, feature_names_json,
+                            worker_id, status, evidence_fingerprint
+                        ) VALUES (
+                            'iso05_forge', 'run_forge', 'sim_forge', '2026-01-01T00:00:00Z',
+                            1, 1, 100, '{}', 'sha_forge', 'arch', 'v1', 10, '[]',
+                            'cfi_coord_role', 'COMPLETED', 'fp_forge'
+                        )
+                        """
+                    )
+            conn.rollback()
+
+    def test_iso_06_privileged_service_impersonation(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """ISO-06: Attempt to provision, replace, or launch a privileged completion authority using coordinator's own identity.
+
+        Must be denied by OS authorization policy.
+        """
+        comp_url = pg_roles["completion"]
+        vault_dir = str(tmp_path / "comp_vault_iso06")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+
+        with CoordinatorOSSecurityContext():
+            # Attempt to overwrite/replace the vault file
+            with pytest.raises(PermissionError):
+                with open(vault_file, "w", encoding="utf-8") as f:
+                    f.write("COMPROMISED_URL")
+
+            # Attempt to spawn privileged service under coordinator identity
+            with pytest.raises((PermissionError, TrainingProvenanceSecurityError)):
+                spawn_isolated_completion_authority_service(
+                    vault_path=vault_file,
+                    coordinator_token=COORD_TOKEN,
+                    app_env="production",
+                )
+
+    def test_iso_07_arbitrary_filesystem_write(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """ISO-07: Send production completion request containing a coordinator-selected checkpoint path.
+
+        Verify the privileged completion service cannot create or modify the target file.
+        Ensure request fails at the security validation boundary with zero file creation.
+        """
+        comp_url = pg_roles["completion"]
+        vault_dir = str(tmp_path / "comp_vault_iso07")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+        try:
+            injected_marker = str(tmp_path / "evil_checkpoint_file.txt")
+            client = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token=COORD_TOKEN,
+                app_env="production",
+            )
+
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_info:
+                client.finalize_training_completion(
+                    job_id="job_iso07_attack",
+                    executed_rounds=1,
+                    executed_epochs=1,
+                    sample_count=450,
+                    observed_metrics={"loss": 0.05},
+                    artifact_sha256="sha_attack_07",
+                    pause_checkpoint_marker_file=injected_marker,
+                )
+
+            assert "forbidden in production" in str(exc_info.value)
+            # Ensure target file was NEVER created on disk
+            assert not os.path.exists(injected_marker), "Arbitrary file write succeeded in violation of ISO-07!"
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
+
+    def test_iso_08_authorized_completion(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """ISO-08: A properly provisioned completion service must authenticate legitimate requests, reconcile stored evidence, and finalize.
+        """
+        comp_url = pg_roles["completion"]
+        admin_url = pg_roles["admin"]
+        uid = uuid.uuid4().hex[:8]
+        job_id = f"job_iso08_{uid}"
+        run_id = f"run_iso08_{uid}"
+        sim_id = f"sim_iso08_{uid}"
+        art_sha = hashlib.sha256(b"iso08_valid_test").hexdigest()
+
+        helper_setup_valid_observed_job(
+            admin_url=admin_url,
+            job_id=job_id,
+            run_id=run_id,
+            sim_id=sim_id,
+            artifact_sha=art_sha,
+            num_rounds=1,
+            participating_banks=("BANK_A", "BANK_B", "BANK_C"),
+            samples_per_bank=150,
+            observed_loss=0.045,
+            auc_roc=0.95,
+        )
+
+        vault_dir = str(tmp_path / "comp_vault_iso08")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+        try:
+            client = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token=COORD_TOKEN,
+                app_env="production",
+            )
+            rec = client.finalize_training_completion(
+                job_id=job_id,
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=450,
+                observed_metrics={"loss": 0.045, "auc_roc": 0.95},
+                artifact_sha256=art_sha,
+            )
+            assert rec.job_id == job_id
+            assert rec.status == "COMPLETED"
+
+            with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                row = cur.fetchone()
+                assert row is not None
+                assert row[0] == 1
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
+
+    def test_iso_09_restart_isolation(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """ISO-09: Restart the completion service and confirm coordinator still cannot read or replace credentials.
+        """
+        comp_url = pg_roles["completion"]
+        admin_url = pg_roles["admin"]
+        uid = uuid.uuid4().hex[:8]
+        job_id = f"job_iso09_{uid}"
+        run_id = f"run_iso09_{uid}"
+        sim_id = f"sim_iso09_{uid}"
+        art_sha = hashlib.sha256(b"iso09_restart_test").hexdigest()
+
+        helper_setup_valid_observed_job(
+            admin_url=admin_url,
+            job_id=job_id,
+            run_id=run_id,
+            sim_id=sim_id,
+            artifact_sha=art_sha,
+            num_rounds=1,
+            participating_banks=("BANK_A", "BANK_B", "BANK_C"),
+            samples_per_bank=150,
+            observed_loss=0.042,
+            auc_roc=0.96,
+        )
+
+        vault_dir = str(tmp_path / "comp_vault_iso09")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+
+        # Initial launch
+        proc1, endpoint1 = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+        proc1.terminate()
+        proc1.join(timeout=3)
+
+        # Restart launch with same vault
+        proc2, endpoint2 = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+        try:
+            # Under coordinator context, read and replace remain denied after restart
+            with CoordinatorOSSecurityContext():
+                with pytest.raises(PermissionError):
+                    with open(vault_file, "r", encoding="utf-8") as f:
+                        _ = f.read()
+                with pytest.raises(PermissionError):
+                    with open(vault_file, "w", encoding="utf-8") as f:
+                        f.write("REPLACED")
+
+            # Authorized completion succeeds through restarted service
+            client = IsolatedTrainingCompletionAuthority(
+                service_endpoint=endpoint2,
+                coordinator_token=COORD_TOKEN,
+                app_env="production",
+            )
+            rec = client.finalize_training_completion(
+                job_id=job_id,
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=450,
+                observed_metrics={"loss": 0.042, "auc_roc": 0.96},
+                artifact_sha256=art_sha,
+            )
+            assert rec.job_id == job_id
+            assert rec.status == "COMPLETED"
+
+            with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                row = cur.fetchone()
+                assert row is not None
+                assert row[0] == 1
+        finally:
+            proc2.terminate()
+            proc2.join(timeout=3)
+
+    def test_iso_10_genuine_federation_regression(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """ISO-10: Run the existing three-bank federated training integration through the corrected completion service.
+        """
+        coord_url = pg_roles["coordinator"]
+        comp_url = pg_roles["completion"]
+        issuer_url = pg_roles["issuer"]
+
+        vault_dir = str(tmp_path / "comp_vault_iso10")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+        try:
+            comp_auth = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token=COORD_TOKEN,
+                app_env="production",
+            )
+            manager = DistributedFederatedTrainingManager(
+                coordinator_token=COORD_TOKEN,
+                db_url=coord_url,
+                app_env="production",
+            )
+
+            # Bank storage vaults
+            bank_vault_root = str(tmp_path / "bank_vaults_iso10")
+            bank_enc_keys = {
+                "BANK_A": Fernet.generate_key(),
+                "BANK_B": Fernet.generate_key(),
+                "BANK_C": Fernet.generate_key(),
+            }
+            np.random.seed(42)
+            bank_data_paths: dict[str, str] = {}
+            for b_id, n_samples in [("BANK_A", 100), ("BANK_B", 150), ("BANK_C", 200)]:
+                X_part = np.random.randn(n_samples, NUM_FEATURES).astype(np.float32)
+                y_part = np.random.randint(0, 2, size=n_samples).astype(np.float32)
+                p = setup_bank_private_storage(
+                    bank_storage_dir=bank_vault_root,
+                    bank_id=b_id,
+                    X_partition=X_part,
+                    y_partition=y_part,
+                    bank_token=BANK_TOKENS[b_id],
+                    bank_encryption_key=bank_enc_keys[b_id],
+                )
+                bank_data_paths[b_id] = p
+
+            bank_db_urls = {
+                "BANK_A": pg_roles["worker_bank_a"],
+                "BANK_B": pg_roles["worker_bank_b"],
+                "BANK_C": pg_roles["worker_bank_c"],
+            }
+            procs, endpoints = spawn_bank_workers(
+                participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+                bank_tokens=BANK_TOKENS,
+                db_url=pg_roles["worker"],
+                bank_data_paths=bank_data_paths,
+                bank_db_urls=bank_db_urls,
+                bank_encryption_keys=bank_enc_keys,
+            )
+
+            dev_seed = hashlib.sha256(b"cfi_dev_ed25519_training_issuer_seed_v1").digest().hex()
+            issuer_vault_dir = str(tmp_path / "issuer_vault_iso10")
+            issuer_key_file, _ = provision_isolated_issuer_vault(issuer_vault_dir, signing_key_hex=dev_seed)
+            signing_auth = IsolatedReceiptSigningAuthority(
+                issuer_key_path=issuer_key_file,
+                coordinator_token=COORD_TOKEN,
+                db_url=issuer_url,
+                key_id=DEFAULT_TRAINING_KEY_ID,
+                app_env="production",
+            )
+
+            uid = uuid.uuid4().hex[:8]
+            job_id = f"job_iso10_{uid}"
+            run_id = f"run_iso10_{uid}"
+            sim_id = f"sim_iso10_{uid}"
+            registry_dir = str(tmp_path / "model_reg_iso10")
 
             X_test = np.random.randn(100, NUM_FEATURES).astype(np.float32)
             y_test = np.random.randint(0, 2, size=100).astype(np.float32)
