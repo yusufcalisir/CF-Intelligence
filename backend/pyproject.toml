@@ -69,6 +69,8 @@ module = [
     "zstandard.*",
     "pyarrow",
     "pyarrow.*",
+    "experiments",
+    "experiments.*",
 ]
 ignore_missing_imports = true
 disable_error_code = ["import-untyped"]

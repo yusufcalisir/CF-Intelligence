@@ -714,9 +714,85 @@ def reconcile_job_completion_evidence(
                 )
 
 
-# ---------------------------------------------------------------------------
-# PostgreSQL Training Job Authority Backend
-# ---------------------------------------------------------------------------
+def provision_runtime_service_roles(admin_db_url: str) -> dict[str, str]:
+    """Provision strictly isolated PostgreSQL service roles for coordinator, worker, issuer, and serving.
+
+    Enforces Module 01-A.1 Role Separation:
+    - cfi_coordinator_role: Can schedule, record aggregations & evaluations, and complete jobs.
+      Forbidden from directly inserting or modifying bank round observations (SQLSTATE 42501).
+    - cfi_worker_role: Can start jobs and record bank round observations.
+      Forbidden from scheduling, completing, or modifying global aggregations/evaluations (SQLSTATE 42501).
+    - cfi_issuer_role: Strictly READ-ONLY access to scheduled, started, and completed records.
+      Forbidden from inserting or updating any training authority table (SQLSTATE 42501).
+    - cfi_serving_role: Strictly READ-ONLY access to completed candidate models.
+      Forbidden from mutating or deleting authoritative evidence (SQLSTATE 42501).
+    - Immutability: UPDATE and DELETE are REVOKED on completed jobs across all non-admin runtime roles.
+    """
+    if not psycopg:
+        raise TrainingProvenanceConfigurationError("PostgreSQL driver (psycopg) is required to provision service roles.")
+
+    parsed = urllib.parse.urlsplit(admin_db_url)
+    roles = {
+        "coordinator": ("cfi_coord_role", "cfi_coord_pass_2026"),
+        "worker": ("cfi_worker_role", "cfi_worker_pass_2026"),
+        "issuer": ("cfi_issuer_role", "cfi_issuer_pass_2026"),
+        "serving": ("cfi_serving_role", "cfi_serving_pass_2026"),
+    }
+
+    role_urls: dict[str, str] = {"admin": admin_db_url}
+
+    with psycopg.connect(admin_db_url) as conn:
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            for rname in ["cfi_coord_role", "cfi_worker_role", "cfi_issuer_role", "cfi_serving_role"]:
+                cur.execute(f"""
+                    DO $$
+                    BEGIN
+                        IF EXISTS (SELECT FROM pg_roles WHERE rolname = '{rname}') THEN
+                            EXECUTE 'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM {rname}';
+                            EXECUTE 'REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM {rname}';
+                            EXECUTE 'REVOKE ALL ON SCHEMA public FROM {rname}';
+                            EXECUTE 'DROP OWNED BY {rname} CASCADE';
+                            EXECUTE 'DROP ROLE {rname}';
+                        END IF;
+                    END $$;
+                """)
+
+            # 1. Coordinator Role
+            cur.execute("CREATE ROLE cfi_coord_role WITH LOGIN PASSWORD 'cfi_coord_pass_2026'")
+            cur.execute("GRANT USAGE ON SCHEMA public TO cfi_coord_role")
+            cur.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO cfi_coord_role")
+            cur.execute("GRANT INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs TO cfi_coord_role")
+            cur.execute("REVOKE INSERT ON cfi_started_jobs, cfi_round_observations FROM cfi_coord_role")
+            cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_coord_role")
+
+            # 2. Worker Role
+            cur.execute("CREATE ROLE cfi_worker_role WITH LOGIN PASSWORD 'cfi_worker_pass_2026'")
+            cur.execute("GRANT USAGE ON SCHEMA public TO cfi_worker_role")
+            cur.execute("GRANT SELECT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations TO cfi_worker_role")
+            cur.execute("GRANT INSERT ON cfi_started_jobs, cfi_round_observations TO cfi_worker_role")
+            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs FROM cfi_worker_role")
+            cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_worker_role")
+
+            # 3. Issuer Role
+            cur.execute("CREATE ROLE cfi_issuer_role WITH LOGIN PASSWORD 'cfi_issuer_pass_2026'")
+            cur.execute("GRANT USAGE ON SCHEMA public TO cfi_issuer_role")
+            cur.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO cfi_issuer_role")
+            cur.execute("REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_issuer_role")
+
+            # 4. Serving Role
+            cur.execute("CREATE ROLE cfi_serving_role WITH LOGIN PASSWORD 'cfi_serving_pass_2026'")
+            cur.execute("GRANT USAGE ON SCHEMA public TO cfi_serving_role")
+            cur.execute("GRANT SELECT ON cfi_completed_jobs TO cfi_serving_role")
+            cur.execute("REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_serving_role")
+
+    for role_key, (rname, rpass) in roles.items():
+        netloc = f"{rname}:{rpass}@{parsed.hostname}:{parsed.port}"
+        role_urls[role_key] = urllib.parse.urlunsplit(
+            (parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment)
+        )
+
+    return role_urls
 
 
 class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
