@@ -16,6 +16,7 @@ import json
 import logging
 import math
 import os
+import secrets
 import sqlite3
 import threading
 import types
@@ -28,10 +29,12 @@ from typing import Any
 try:
     import psycopg
     from psycopg import errors as pg_errors
+    from psycopg import sql as pg_sql
     from psycopg.rows import dict_row as pg_dict_row
 except ImportError:
     psycopg = None  # type: ignore[assignment]
     pg_errors = None  # type: ignore[assignment]
+    pg_sql = None  # type: ignore[assignment]
     pg_dict_row = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
@@ -714,82 +717,181 @@ def reconcile_job_completion_evidence(
                 )
 
 
-def provision_runtime_service_roles(admin_db_url: str) -> dict[str, str]:
-    """Provision strictly isolated PostgreSQL service roles for coordinator, worker, issuer, and serving.
+FORBIDDEN_DATABASE_PASSWORDS = {
+    "cfi_coord_pass_2026",
+    "cfi_worker_pass_2026",
+    "cfi_issuer_pass_2026",
+    "cfi_serving_pass_2026",
+    "cfi_completion_pass_2026",
+    "password",
+    "admin",
+    "123456",
+    "postgres",
+}
+
+
+def provision_runtime_service_roles(
+    admin_db_url: str,
+    custom_passwords: dict[str, str] | None = None,
+    app_env: str = "production",
+) -> dict[str, str]:
+    """Provision strictly isolated PostgreSQL service roles for coordinator, workers, completion, issuer, and serving.
 
     Enforces Module 01-A.1 Role Separation:
-    - cfi_coordinator_role: Can schedule, record aggregations & evaluations, and complete jobs.
-      Forbidden from directly inserting or modifying bank round observations (SQLSTATE 42501).
-    - cfi_worker_role: Can start jobs and record bank round observations.
+    - cfi_coord_role: Can schedule, record aggregations & evaluations.
+      Forbidden from directly inserting completed evidence (SQLSTATE 42501).
+      Forbidden from inserting bank round observations (SQLSTATE 42501).
+    - cfi_completion_role: Dedicated completion authority possessing exclusive INSERT on cfi_completed_jobs.
+    - cfi_worker_role & per-bank roles (cfi_bank_a_role, cfi_bank_b_role, cfi_bank_c_role):
+      Can start jobs and record bank round observations with Row-Level Security isolation.
       Forbidden from scheduling, completing, or modifying global aggregations/evaluations (SQLSTATE 42501).
     - cfi_issuer_role: Strictly READ-ONLY access to scheduled, started, and completed records.
       Forbidden from inserting or updating any training authority table (SQLSTATE 42501).
     - cfi_serving_role: Strictly READ-ONLY access to completed candidate models.
       Forbidden from mutating or deleting authoritative evidence (SQLSTATE 42501).
-    - Immutability: UPDATE and DELETE are REVOKED on completed jobs across all non-admin runtime roles.
+    - Immutability: UPDATE and DELETE are REVOKED on all tables across all non-admin runtime roles.
+    - Migration safety: Idempotently creates or alters roles without dropping owned tables or cascading objects.
+    - Dynamic secrets: High-entropy random passwords by default, rejecting known compromised passwords in production.
     """
-    if not psycopg:
+    if not psycopg or pg_sql is None:
         raise TrainingProvenanceConfigurationError("PostgreSQL driver (psycopg) is required to provision service roles.")
 
     parsed = urllib.parse.urlsplit(admin_db_url)
-    roles = {
-        "coordinator": ("cfi_coord_role", "cfi_coord_pass_2026"),
-        "worker": ("cfi_worker_role", "cfi_worker_pass_2026"),
-        "issuer": ("cfi_issuer_role", "cfi_issuer_pass_2026"),
-        "serving": ("cfi_serving_role", "cfi_serving_pass_2026"),
+    is_prod = app_env.lower() == "production"
+
+    role_mapping = {
+        "coordinator": "cfi_coord_role",
+        "completion": "cfi_completion_role",
+        "worker": "cfi_worker_role",
+        "worker_bank_a": "cfi_bank_a_role",
+        "worker_bank_b": "cfi_bank_b_role",
+        "worker_bank_c": "cfi_bank_c_role",
+        "issuer": "cfi_issuer_role",
+        "serving": "cfi_serving_role",
     }
 
+    passwords: dict[str, str] = {}
+    for role_key in role_mapping:
+        provided = (custom_passwords or {}).get(role_key)
+        if provided:
+            cleaned = provided.strip()
+            if is_prod:
+                if cleaned in FORBIDDEN_DATABASE_PASSWORDS:
+                    raise TrainingProvenanceConfigurationError(
+                        f"Insecure or known compromised password rejected for role '{role_key}' in production."
+                    )
+                if len(cleaned) < 16:
+                    raise TrainingProvenanceConfigurationError(
+                        f"Database password for role '{role_key}' must have at least 16 characters in production."
+                    )
+            passwords[role_key] = cleaned
+        else:
+            if is_prod and custom_passwords is not None and role_key in custom_passwords and not custom_passwords[role_key]:
+                raise TrainingProvenanceConfigurationError(f"Missing production database credential for role '{role_key}'.")
+            passwords[role_key] = secrets.token_urlsafe(32)
+
     role_urls: dict[str, str] = {"admin": admin_db_url}
+
+    # 0. Ensure schema tables are initialized under admin authority before applying grants
+    PostgresTrainingJobAuthority(db_url=admin_db_url).init_schema()
 
     with psycopg.connect(admin_db_url) as conn:
         conn.autocommit = True
         with conn.cursor() as cur:
-            cur.execute("""
-                DO $$
-                DECLARE
-                    rname text;
-                BEGIN
-                    FOR rname IN SELECT unnest(ARRAY['cfi_coord_role', 'cfi_worker_role', 'cfi_issuer_role', 'cfi_serving_role']) LOOP
-                        IF EXISTS (SELECT FROM pg_roles WHERE rolname = rname) THEN
-                            EXECUTE format('REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM %I', rname);
-                            EXECUTE format('REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM %I', rname);
-                            EXECUTE format('REVOKE ALL ON SCHEMA public FROM %I', rname);
-                            EXECUTE format('DROP OWNED BY %I CASCADE', rname);
-                            EXECUTE format('DROP ROLE %I', rname);
-                        END IF;
-                    END LOOP;
-                END $$;
-            """)
+            # 1. Idempotently create or alter roles without dropping owned tables or cascading objects
+            for role_key, rname in role_mapping.items():
+                rpass = passwords[role_key]
+                cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (rname,))
+                if cur.fetchone():
+                    cur.execute(
+                        pg_sql.SQL("ALTER ROLE {role} WITH LOGIN PASSWORD {pwd}").format(
+                            role=pg_sql.Identifier(rname),
+                            pwd=pg_sql.Literal(rpass),
+                        )
+                    )
+                else:
+                    cur.execute(
+                        pg_sql.SQL("CREATE ROLE {role} WITH LOGIN PASSWORD {pwd}").format(
+                            role=pg_sql.Identifier(rname),
+                            pwd=pg_sql.Literal(rpass),
+                        )
+                    )
 
-            # 1. Coordinator Role
-            cur.execute("CREATE ROLE cfi_coord_role WITH LOGIN PASSWORD 'cfi_coord_pass_2026'")
-            cur.execute("GRANT USAGE ON SCHEMA public TO cfi_coord_role")
+            # 2. Grant schema usage
+            for rname in role_mapping.values():
+                cur.execute(pg_sql.SQL("GRANT USAGE ON SCHEMA public TO {role}").format(role=pg_sql.Identifier(rname)))
+
+            # 3. Coordinator Role (cfi_coord_role)
+            # Can schedule jobs, record global aggregations and evaluations.
+            # Strictly CANNOT insert into completed_jobs or round observations!
             cur.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO cfi_coord_role")
-            cur.execute("GRANT INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs TO cfi_coord_role")
-            cur.execute("REVOKE INSERT ON cfi_started_jobs, cfi_round_observations FROM cfi_coord_role")
+            cur.execute("GRANT INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations TO cfi_coord_role")
+            cur.execute("REVOKE INSERT ON cfi_completed_jobs, cfi_started_jobs, cfi_round_observations FROM cfi_coord_role")
             cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_coord_role")
 
-            # 2. Worker Role
-            cur.execute("CREATE ROLE cfi_worker_role WITH LOGIN PASSWORD 'cfi_worker_pass_2026'")
-            cur.execute("GRANT USAGE ON SCHEMA public TO cfi_worker_role")
-            cur.execute("GRANT SELECT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations TO cfi_worker_role")
-            cur.execute("GRANT INSERT ON cfi_started_jobs, cfi_round_observations TO cfi_worker_role")
-            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs FROM cfi_worker_role")
-            cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_worker_role")
+            # 4. Completion Authority Role (cfi_completion_role)
+            # Dedicated role with exclusive authorization to write reconciled completion records to cfi_completed_jobs.
+            cur.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO cfi_completion_role")
+            cur.execute("GRANT INSERT ON cfi_completed_jobs TO cfi_completion_role")
+            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_global_aggregations, cfi_model_evaluations FROM cfi_completion_role")
+            cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_completion_role")
 
-            # 3. Issuer Role
-            cur.execute("CREATE ROLE cfi_issuer_role WITH LOGIN PASSWORD 'cfi_issuer_pass_2026'")
-            cur.execute("GRANT USAGE ON SCHEMA public TO cfi_issuer_role")
+            # 5. Worker Roles (cfi_worker_role, cfi_bank_a_role, cfi_bank_b_role, cfi_bank_c_role)
+            worker_roles = ["cfi_worker_role", "cfi_bank_a_role", "cfi_bank_b_role", "cfi_bank_c_role"]
+            for wr in worker_roles:
+                cur.execute(pg_sql.SQL("GRANT SELECT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_completed_jobs TO {role}").format(role=pg_sql.Identifier(wr)))
+                cur.execute(pg_sql.SQL("GRANT INSERT ON cfi_started_jobs, cfi_round_observations TO {role}").format(role=pg_sql.Identifier(wr)))
+                cur.execute(pg_sql.SQL("REVOKE INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs FROM {role}").format(role=pg_sql.Identifier(wr)))
+                cur.execute(pg_sql.SQL("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM {role}").format(role=pg_sql.Identifier(wr)))
+
+            # 6. Row-Level Security on cfi_round_observations for bank isolation
+            cur.execute("ALTER TABLE cfi_round_observations ENABLE ROW LEVEL SECURITY")
+            cur.execute("DROP POLICY IF EXISTS cfi_bank_a_policy ON cfi_round_observations")
+            cur.execute("DROP POLICY IF EXISTS cfi_bank_b_policy ON cfi_round_observations")
+            cur.execute("DROP POLICY IF EXISTS cfi_bank_c_policy ON cfi_round_observations")
+            cur.execute("DROP POLICY IF EXISTS cfi_general_worker_policy ON cfi_round_observations")
+            cur.execute("DROP POLICY IF EXISTS cfi_readers_obs_policy ON cfi_round_observations")
+
+            cur.execute("""
+                CREATE POLICY cfi_bank_a_policy ON cfi_round_observations
+                FOR ALL TO cfi_bank_a_role
+                USING (bank_id = 'BANK_A')
+                WITH CHECK (bank_id = 'BANK_A')
+            """)
+            cur.execute("""
+                CREATE POLICY cfi_bank_b_policy ON cfi_round_observations
+                FOR ALL TO cfi_bank_b_role
+                USING (bank_id = 'BANK_B')
+                WITH CHECK (bank_id = 'BANK_B')
+            """)
+            cur.execute("""
+                CREATE POLICY cfi_bank_c_policy ON cfi_round_observations
+                FOR ALL TO cfi_bank_c_role
+                USING (bank_id = 'BANK_C')
+                WITH CHECK (bank_id = 'BANK_C')
+            """)
+            cur.execute("""
+                CREATE POLICY cfi_general_worker_policy ON cfi_round_observations
+                FOR ALL TO cfi_worker_role
+                USING (true)
+                WITH CHECK (true)
+            """)
+            cur.execute("""
+                CREATE POLICY cfi_readers_obs_policy ON cfi_round_observations
+                FOR SELECT TO cfi_coord_role, cfi_completion_role, cfi_issuer_role
+                USING (true)
+            """)
+
+            # 7. Issuer Role (cfi_issuer_role)
             cur.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO cfi_issuer_role")
             cur.execute("REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_issuer_role")
 
-            # 4. Serving Role
-            cur.execute("CREATE ROLE cfi_serving_role WITH LOGIN PASSWORD 'cfi_serving_pass_2026'")
-            cur.execute("GRANT USAGE ON SCHEMA public TO cfi_serving_role")
+            # 8. Serving Role (cfi_serving_role)
             cur.execute("GRANT SELECT ON cfi_completed_jobs TO cfi_serving_role")
             cur.execute("REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_serving_role")
 
-    for role_key, (rname, rpass) in roles.items():
+    for role_key, rname in role_mapping.items():
+        rpass = passwords[role_key]
         netloc = f"{rname}:{rpass}@{parsed.hostname}:{parsed.port}"
         role_urls[role_key] = urllib.parse.urlunsplit(
             (parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment)
@@ -801,7 +903,7 @@ def provision_runtime_service_roles(admin_db_url: str) -> dict[str, str]:
 class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
     """PostgreSQL-backed ACID relational authority enforcing multi-host concurrency and row-level locking."""
 
-    def __init__(self, db_url: str) -> None:
+    def __init__(self, db_url: str, completion_db_url: str | None = None) -> None:
         if psycopg is None:
             raise TrainingProvenanceConfigurationError(
                 "psycopg (v3) driver is not installed. PostgreSQL training authority cannot operate without psycopg."
@@ -815,6 +917,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             )
 
         self._db_url = clean_url
+        self._completion_db_url = completion_db_url.strip() if completion_db_url else None
         self._lock = threading.RLock()
         self._test_connection()
         self.init_schema()
@@ -861,123 +964,149 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             conn.close()
 
     def init_schema(self) -> None:
-        with self._connect() as conn:
-            with conn.transaction():
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS cfi_scheduled_jobs (
-                            job_id VARCHAR(128) PRIMARY KEY,
-                            training_run_id VARCHAR(128) UNIQUE NOT NULL,
-                            simulation_id VARCHAR(128) NOT NULL,
-                            coordinator_id VARCHAR(128) NOT NULL,
-                            architecture VARCHAR(128) NOT NULL,
-                            feature_schema_version VARCHAR(64) NOT NULL,
-                            expected_rounds INT NOT NULL,
-                            expected_epochs INT NOT NULL,
-                            input_dim INT NOT NULL,
-                            feature_names_json TEXT NOT NULL,
-                            permitted_workers_json TEXT,
-                            config_fingerprint VARCHAR(64) NOT NULL,
-                            scheduled_at VARCHAR(64) NOT NULL,
-                            status VARCHAR(32) NOT NULL DEFAULT 'SCHEDULED'
-                        );
-                        """
-                    )
-                    cur.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS cfi_started_jobs (
-                            job_id VARCHAR(128) PRIMARY KEY REFERENCES cfi_scheduled_jobs(job_id),
-                            training_run_id VARCHAR(128) NOT NULL,
-                            simulation_id VARCHAR(128) NOT NULL,
-                            worker_id VARCHAR(128) NOT NULL,
-                            started_at VARCHAR(64) NOT NULL,
-                            status VARCHAR(32) NOT NULL DEFAULT 'STARTED'
-                        );
-                        """
-                    )
-                    cur.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS cfi_round_observations (
-                            event_id VARCHAR(128) PRIMARY KEY,
-                            job_id VARCHAR(128) NOT NULL REFERENCES cfi_scheduled_jobs(job_id),
-                            training_run_id VARCHAR(128) NOT NULL,
-                            simulation_id VARCHAR(128) NOT NULL,
-                            worker_id VARCHAR(128) NOT NULL,
-                            bank_id VARCHAR(128) NOT NULL,
-                            round_number INT NOT NULL,
-                            attempt_number INT NOT NULL DEFAULT 1,
-                            actual_sample_count INT NOT NULL,
-                            actual_executed_epochs INT NOT NULL DEFAULT 0,
-                            observed_loss DOUBLE PRECISION NOT NULL,
-                            metrics_json TEXT NOT NULL,
-                            model_update_digest VARCHAR(64),
-                            execution_timestamp VARCHAR(64) NOT NULL,
-                            execution_status VARCHAR(32) NOT NULL DEFAULT 'COMPLETED',
-                            payload_digest VARCHAR(64) NOT NULL,
-                            CONSTRAINT uq_cfi_round_obs UNIQUE(job_id, bank_id, round_number, attempt_number)
-                        );
-                        """
-                    )
-                    cur.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS cfi_global_aggregations (
-                            event_id VARCHAR(128) PRIMARY KEY,
-                            job_id VARCHAR(128) NOT NULL REFERENCES cfi_scheduled_jobs(job_id),
-                            round_number INT NOT NULL,
-                            aggregation_algorithm VARCHAR(64) NOT NULL,
-                            accepted_participants_json TEXT NOT NULL,
-                            accepted_digests_json TEXT NOT NULL,
-                            aggregation_config_json TEXT NOT NULL,
-                            aggregated_model_digest VARCHAR(64) NOT NULL,
-                            timestamp VARCHAR(64) NOT NULL,
-                            aggregation_status VARCHAR(32) NOT NULL DEFAULT 'COMPLETED',
-                            payload_digest VARCHAR(64) NOT NULL,
-                            CONSTRAINT uq_cfi_global_agg UNIQUE(job_id, round_number)
-                        );
-                        """
-                    )
-                    cur.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS cfi_model_evaluations (
-                            event_id VARCHAR(128) PRIMARY KEY,
-                            job_id VARCHAR(128) NOT NULL REFERENCES cfi_scheduled_jobs(job_id),
-                            evaluation_run_id VARCHAR(128) NOT NULL,
-                            metric_name VARCHAR(64) NOT NULL,
-                            metric_value DOUBLE PRECISION NOT NULL,
-                            evaluated_artifact_digest VARCHAR(64) NOT NULL,
-                            evaluator_identity VARCHAR(128) NOT NULL,
-                            evaluation_timestamp VARCHAR(64) NOT NULL,
-                            dataset_manifest_id TEXT,
-                            payload_digest VARCHAR(64) NOT NULL,
-                            CONSTRAINT uq_cfi_model_eval UNIQUE(job_id, metric_name, evaluated_artifact_digest)
-                        );
-                        """
-                    )
-                    cur.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS cfi_completed_jobs (
-                            job_id VARCHAR(128) PRIMARY KEY REFERENCES cfi_scheduled_jobs(job_id),
-                            training_run_id VARCHAR(128) UNIQUE NOT NULL,
-                            simulation_id VARCHAR(128) NOT NULL,
-                            completed_at VARCHAR(64) NOT NULL,
-                            executed_rounds INT NOT NULL,
-                            executed_epochs INT NOT NULL,
-                            sample_count INT NOT NULL,
-                            observed_metrics_json TEXT NOT NULL,
-                            artifact_sha256 VARCHAR(64) NOT NULL,
-                            architecture VARCHAR(128) NOT NULL,
-                            feature_schema_version VARCHAR(64) NOT NULL,
-                            input_dim INT NOT NULL,
-                            feature_names_json TEXT NOT NULL,
-                            worker_id VARCHAR(128) NOT NULL,
-                            status VARCHAR(32) NOT NULL DEFAULT 'COMPLETED',
-                            git_commit_hash VARCHAR(128),
-                            dataset_manifest_id TEXT,
-                            evidence_fingerprint VARCHAR(64) NOT NULL
-                        );
-                        """
-                    )
+        try:
+            with self._connect() as conn:
+                with conn.transaction():
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            """
+                            CREATE TABLE IF NOT EXISTS cfi_scheduled_jobs (
+                                job_id VARCHAR(128) PRIMARY KEY,
+                                training_run_id VARCHAR(128) UNIQUE NOT NULL,
+                                simulation_id VARCHAR(128) NOT NULL,
+                                coordinator_id VARCHAR(128) NOT NULL,
+                                architecture VARCHAR(128) NOT NULL,
+                                feature_schema_version VARCHAR(64) NOT NULL,
+                                expected_rounds INT NOT NULL,
+                                expected_epochs INT NOT NULL,
+                                input_dim INT NOT NULL,
+                                feature_names_json TEXT NOT NULL,
+                                permitted_workers_json TEXT,
+                                config_fingerprint VARCHAR(64) NOT NULL,
+                                scheduled_at VARCHAR(64) NOT NULL,
+                                status VARCHAR(32) NOT NULL DEFAULT 'SCHEDULED'
+                            );
+                            """
+                        )
+                        cur.execute(
+                            """
+                            CREATE TABLE IF NOT EXISTS cfi_started_jobs (
+                                job_id VARCHAR(128) PRIMARY KEY REFERENCES cfi_scheduled_jobs(job_id),
+                                training_run_id VARCHAR(128) NOT NULL,
+                                simulation_id VARCHAR(128) NOT NULL,
+                                worker_id VARCHAR(128) NOT NULL,
+                                started_at VARCHAR(64) NOT NULL,
+                                status VARCHAR(32) NOT NULL DEFAULT 'STARTED'
+                            );
+                            """
+                        )
+                        cur.execute(
+                            """
+                            CREATE TABLE IF NOT EXISTS cfi_round_observations (
+                                event_id VARCHAR(128) PRIMARY KEY,
+                                job_id VARCHAR(128) NOT NULL REFERENCES cfi_scheduled_jobs(job_id),
+                                training_run_id VARCHAR(128) NOT NULL,
+                                simulation_id VARCHAR(128) NOT NULL,
+                                worker_id VARCHAR(128) NOT NULL,
+                                bank_id VARCHAR(128) NOT NULL,
+                                round_number INT NOT NULL,
+                                attempt_number INT NOT NULL DEFAULT 1,
+                                actual_sample_count INT NOT NULL,
+                                actual_executed_epochs INT NOT NULL DEFAULT 0,
+                                observed_loss DOUBLE PRECISION NOT NULL,
+                                metrics_json TEXT NOT NULL,
+                                model_update_digest VARCHAR(64),
+                                execution_timestamp VARCHAR(64) NOT NULL,
+                                execution_status VARCHAR(32) NOT NULL DEFAULT 'COMPLETED',
+                                payload_digest VARCHAR(64) NOT NULL,
+                                CONSTRAINT uq_cfi_round_obs UNIQUE(job_id, bank_id, round_number, attempt_number)
+                            );
+                            """
+                        )
+                        cur.execute(
+                            """
+                            CREATE TABLE IF NOT EXISTS cfi_global_aggregations (
+                                event_id VARCHAR(128) PRIMARY KEY,
+                                job_id VARCHAR(128) NOT NULL REFERENCES cfi_scheduled_jobs(job_id),
+                                round_number INT NOT NULL,
+                                aggregation_algorithm VARCHAR(64) NOT NULL,
+                                accepted_participants_json TEXT NOT NULL,
+                                accepted_digests_json TEXT NOT NULL,
+                                aggregation_config_json TEXT NOT NULL,
+                                aggregated_model_digest VARCHAR(64) NOT NULL,
+                                timestamp VARCHAR(64) NOT NULL,
+                                aggregation_status VARCHAR(32) NOT NULL DEFAULT 'COMPLETED',
+                                payload_digest VARCHAR(64) NOT NULL,
+                                CONSTRAINT uq_cfi_global_agg UNIQUE(job_id, round_number)
+                            );
+                            """
+                        )
+                        cur.execute(
+                            """
+                            CREATE TABLE IF NOT EXISTS cfi_model_evaluations (
+                                event_id VARCHAR(128) PRIMARY KEY,
+                                job_id VARCHAR(128) NOT NULL REFERENCES cfi_scheduled_jobs(job_id),
+                                evaluation_run_id VARCHAR(128) NOT NULL,
+                                metric_name VARCHAR(64) NOT NULL,
+                                metric_value DOUBLE PRECISION NOT NULL,
+                                evaluated_artifact_digest VARCHAR(64) NOT NULL,
+                                evaluator_identity VARCHAR(128) NOT NULL,
+                                evaluation_timestamp VARCHAR(64) NOT NULL,
+                                dataset_manifest_id TEXT,
+                                payload_digest VARCHAR(64) NOT NULL,
+                                CONSTRAINT uq_cfi_model_eval UNIQUE(job_id, metric_name, evaluated_artifact_digest)
+                            );
+                            """
+                        )
+                        cur.execute(
+                            """
+                            CREATE TABLE IF NOT EXISTS cfi_completed_jobs (
+                                job_id VARCHAR(128) PRIMARY KEY REFERENCES cfi_scheduled_jobs(job_id),
+                                training_run_id VARCHAR(128) UNIQUE NOT NULL,
+                                simulation_id VARCHAR(128) NOT NULL,
+                                completed_at VARCHAR(64) NOT NULL,
+                                executed_rounds INT NOT NULL,
+                                executed_epochs INT NOT NULL,
+                                sample_count INT NOT NULL,
+                                observed_metrics_json TEXT NOT NULL,
+                                artifact_sha256 VARCHAR(64) NOT NULL,
+                                architecture VARCHAR(128) NOT NULL,
+                                feature_schema_version VARCHAR(64) NOT NULL,
+                                input_dim INT NOT NULL,
+                                feature_names_json TEXT NOT NULL,
+                                worker_id VARCHAR(128) NOT NULL,
+                                status VARCHAR(32) NOT NULL DEFAULT 'COMPLETED',
+                                git_commit_hash VARCHAR(128),
+                                dataset_manifest_id TEXT,
+                                evidence_fingerprint VARCHAR(64) NOT NULL
+                            );
+                            """
+                        )
+        except Exception as e:
+            sanitized = str(e)
+            if "permission denied" in sanitized.lower() or "42501" in sanitized:
+                try:
+                    with self._connect() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("SELECT current_user")
+                            c_user_row = cur.fetchone()
+                            c_user = c_user_row["current_user"] if isinstance(c_user_row, dict) else (c_user_row[0] if c_user_row else "")
+                            authorized_service_roles = {
+                                "cfi_coord_role",
+                                "cfi_completion_role",
+                                "cfi_worker_role",
+                                "cfi_bank_a_role",
+                                "cfi_bank_b_role",
+                                "cfi_bank_c_role",
+                                "cfi_issuer_role",
+                                "cfi_serving_role",
+                            }
+                            if c_user in authorized_service_roles:
+                                cur.execute("SELECT 1 FROM cfi_scheduled_jobs LIMIT 1")
+                                return
+                except Exception:
+                    pass
+            raise
 
     def schedule_job(
         self,
@@ -1017,7 +1146,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         with self._connect() as conn:
             with conn.transaction():
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = %s FOR UPDATE", (clean_job_id,))
+                    cur.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = %s", (clean_job_id,))
                     existing = cur.fetchone()
                     if existing:
                         if existing["config_fingerprint"] == cfg_fingerprint:
@@ -1103,7 +1232,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         with self._connect() as conn:
             with conn.transaction():
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = %s FOR UPDATE", (clean_job_id,))
+                    cur.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = %s", (clean_job_id,))
                     sched = cur.fetchone()
                     if not sched:
                         raise TrainingProvenanceSecurityError(
@@ -1122,7 +1251,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             f"Worker '{worker_id}' is not authorized to start job '{clean_job_id}' (permitted: {perm_workers})."
                         )
 
-                    cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s FOR UPDATE", (clean_job_id,))
+                    cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
                     existing = cur.fetchone()
                     if existing:
                         return StartedTrainingJob(
@@ -1166,7 +1295,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         with self._connect() as conn:
             with conn.transaction():
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s FOR UPDATE", (clean_job_id,))
+                    cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
                     started = cur.fetchone()
                     if not started:
                         raise TrainingProvenanceSecurityError(
@@ -1275,7 +1404,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         with self._connect() as conn:
             with conn.transaction():
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s FOR UPDATE", (clean_job_id,))
+                    cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
                     if not cur.fetchone():
                         raise TrainingProvenanceSecurityError(
                             f"Cannot record global aggregation for job '{clean_job_id}': job is not in STARTED state."
@@ -1369,7 +1498,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         with self._connect() as conn:
             with conn.transaction():
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s FOR UPDATE", (clean_job_id,))
+                    cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
                     if not cur.fetchone():
                         raise TrainingProvenanceSecurityError(
                             f"Cannot record model evaluation for job '{clean_job_id}': job is not in STARTED state."
@@ -1487,14 +1616,14 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         with self._connect() as conn:
             with conn.transaction():
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = %s FOR UPDATE", (clean_job_id,))
+                    cur.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = %s", (clean_job_id,))
                     sched_row = cur.fetchone()
 
                     if not sched_row:
                         raise TrainingProvenanceSecurityError(
                             f"Cannot record completion for job '{clean_job_id}': job has not been scheduled through authorized training coordinator."
                         )
-                    cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s FOR UPDATE", (clean_job_id,))
+                    cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
                     started_row = cur.fetchone()
                     if not started_row:
                         raise TrainingProvenanceSecurityError(
@@ -1553,7 +1682,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                     )
 
                     # Check existing completion for idempotency vs conflict
-                    cur.execute("SELECT * FROM cfi_completed_jobs WHERE job_id = %s FOR UPDATE", (clean_job_id,))
+                    cur.execute("SELECT * FROM cfi_completed_jobs WHERE job_id = %s", (clean_job_id,))
                     existing_comp = cur.fetchone()
                     if existing_comp:
                         if existing_comp["evidence_fingerprint"] == evidence_fp:
@@ -1684,38 +1813,105 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                     )
                     record.validate()
 
-                    cur.execute(
-                        """
-                        INSERT INTO cfi_completed_jobs (
-                            job_id, training_run_id, simulation_id, completed_at,
-                            executed_rounds, executed_epochs, sample_count,
-                            observed_metrics_json, artifact_sha256, architecture,
-                            feature_schema_version, input_dim, feature_names_json,
-                            worker_id, status, git_commit_hash, dataset_manifest_id,
-                            evidence_fingerprint
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        """,
-                        (
-                            clean_job_id,
-                            sched_run_id,
-                            sched_sim_id,
-                            now_str,
-                            executed_rounds,
-                            executed_epochs,
-                            sample_count,
-                            json.dumps(target_metrics),
-                            clean_sha,
-                            sched_arch,
-                            sched_schema_ver,
-                            sched_input_dim,
-                            json.dumps(list(target_fnames)),
-                            worker_id,
-                            "COMPLETED",
-                            git_commit_hash,
-                            dataset_manifest_id,
-                            evidence_fp,
-                        ),
-                    )
+                    try:
+                        if self._completion_db_url:
+                            with psycopg.connect(self._completion_db_url, autocommit=True) as comp_conn:
+                                with comp_conn.cursor() as comp_cur:
+                                    comp_cur.execute(
+                                        """
+                                        INSERT INTO cfi_completed_jobs (
+                                            job_id, training_run_id, simulation_id, completed_at,
+                                            executed_rounds, executed_epochs, sample_count,
+                                            observed_metrics_json, artifact_sha256, architecture,
+                                            feature_schema_version, input_dim, feature_names_json,
+                                            worker_id, status, git_commit_hash, dataset_manifest_id,
+                                            evidence_fingerprint
+                                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                        """,
+                                        (
+                                            clean_job_id,
+                                            sched_run_id,
+                                            sched_sim_id,
+                                            now_str,
+                                            executed_rounds,
+                                            executed_epochs,
+                                            sample_count,
+                                            json.dumps(target_metrics),
+                                            clean_sha,
+                                            sched_arch,
+                                            sched_schema_ver,
+                                            sched_input_dim,
+                                            json.dumps(list(target_fnames)),
+                                            worker_id,
+                                            "COMPLETED",
+                                            git_commit_hash,
+                                            dataset_manifest_id,
+                                            evidence_fp,
+                                        ),
+                                    )
+                        else:
+                            with conn.transaction():
+                                cur.execute(
+                                    """
+                                    INSERT INTO cfi_completed_jobs (
+                                        job_id, training_run_id, simulation_id, completed_at,
+                                        executed_rounds, executed_epochs, sample_count,
+                                        observed_metrics_json, artifact_sha256, architecture,
+                                        feature_schema_version, input_dim, feature_names_json,
+                                        worker_id, status, git_commit_hash, dataset_manifest_id,
+                                        evidence_fingerprint
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    """,
+                                    (
+                                        clean_job_id,
+                                        sched_run_id,
+                                        sched_sim_id,
+                                        now_str,
+                                        executed_rounds,
+                                        executed_epochs,
+                                        sample_count,
+                                        json.dumps(target_metrics),
+                                        clean_sha,
+                                        sched_arch,
+                                        sched_schema_ver,
+                                        sched_input_dim,
+                                        json.dumps(list(target_fnames)),
+                                        worker_id,
+                                        "COMPLETED",
+                                        git_commit_hash,
+                                        dataset_manifest_id,
+                                        evidence_fp,
+                                    ),
+                                )
+                    except Exception as insert_err:
+                        sanitized_insert_err = str(insert_err)
+                        if "unique constraint" in sanitized_insert_err.lower() or "23505" in sanitized_insert_err:
+                            cur.execute("SELECT * FROM cfi_completed_jobs WHERE job_id = %s", (clean_job_id,))
+                            concurrent_comp = cur.fetchone()
+                            if concurrent_comp and concurrent_comp["evidence_fingerprint"] == evidence_fp:
+                                return CompletedJobExecutionRecord(
+                                    job_id=concurrent_comp["job_id"],
+                                    training_run_id=concurrent_comp["training_run_id"],
+                                    simulation_id=concurrent_comp["simulation_id"],
+                                    completed_at=concurrent_comp["completed_at"],
+                                    executed_rounds=concurrent_comp["executed_rounds"],
+                                    executed_epochs=concurrent_comp["executed_epochs"],
+                                    sample_count=concurrent_comp["sample_count"],
+                                    observed_metrics=json.loads(concurrent_comp["observed_metrics_json"]),
+                                    artifact_sha256=concurrent_comp["artifact_sha256"],
+                                    architecture=concurrent_comp["architecture"],
+                                    feature_schema_version=concurrent_comp["feature_schema_version"],
+                                    input_dim=concurrent_comp["input_dim"],
+                                    feature_names=tuple(json.loads(concurrent_comp["feature_names_json"])),
+                                    worker_id=concurrent_comp["worker_id"],
+                                    status=concurrent_comp["status"],
+                                    git_commit_hash=concurrent_comp["git_commit_hash"],
+                                    dataset_manifest_id=concurrent_comp["dataset_manifest_id"],
+                                )
+                            raise TrainingProvenanceSecurityError(
+                                f"Conflicting completion record for job '{clean_job_id}': cannot overwrite existing completed execution record with conflicting evidence."
+                            ) from None
+                        raise
 
         return record
 
