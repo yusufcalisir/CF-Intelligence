@@ -24,6 +24,7 @@ from typing import Any
 import uuid
 
 import psycopg
+import psycopg.conninfo
 import pytest
 
 from app.application.services.data_generator import FEATURE_NAMES
@@ -250,7 +251,8 @@ class TestCompletionAuthoritySecurity:
 
         # 5. Deep scan of coordinator instance dict: verify no completion URL or password leaked
         comp_parsed = psycopg.conninfo.conninfo_to_dict(comp_url)
-        comp_password = comp_parsed.get("password", "")
+        raw_password = comp_parsed.get("password")
+        comp_password: str = str(raw_password) if raw_password is not None else ""
 
         def _scan_for_leak(obj: Any, depth: int = 0) -> None:
             if depth > 4 or obj is None:
@@ -327,7 +329,9 @@ class TestCompletionAuthoritySecurity:
         # 3. Verify under admin authority that NO completed record was persisted
         with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            assert cur.fetchone()[0] == 0
+            row = cur.fetchone()
+            assert row is not None
+            assert row[0] == 0
 
     def test_comp_03_privileged_connection_bypass(self, pg_roles: dict[str, str]) -> None:
         """COMP-03: Prove coordinator cannot obtain or invoke privileged completion connection.
@@ -427,7 +431,9 @@ class TestCompletionAuthoritySecurity:
         # Verify no row was inserted
         with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            assert cur.fetchone()[0] == 0
+            row = cur.fetchone()
+            assert row is not None
+            assert row[0] == 0
 
     def test_comp_05_genuine_finalization(self, pg_roles: dict[str, str]) -> None:
         """COMP-05: Execute valid observed training lifecycle and demonstrate successful completion.
@@ -527,7 +533,9 @@ class TestCompletionAuthoritySecurity:
         # Verify transaction was completely aborted; zero completed rows exist
         with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            assert cur.fetchone()[0] == 0
+            row = cur.fetchone()
+            assert row is not None
+            assert row[0] == 0
 
     def test_comp_07_concurrent_equivalent_completion(self, pg_roles: dict[str, str]) -> None:
         """COMP-07: Submit concurrent equivalent completion requests from independent callers.
@@ -582,7 +590,9 @@ class TestCompletionAuthoritySecurity:
         # Exactly 1 row in PostgreSQL
         with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            assert cur.fetchone()[0] == 1
+            row = cur.fetchone()
+            assert row is not None
+            assert row[0] == 1
 
     def test_comp_08_conflicting_completion(self, pg_roles: dict[str, str]) -> None:
         """COMP-08: Attempt incompatible completion after a valid finalization.
@@ -641,7 +651,9 @@ class TestCompletionAuthoritySecurity:
         # 3. Persisted row remains unchanged with original artifact sha
         with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
             cur.execute("SELECT artifact_sha256 FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            persisted_sha = cur.fetchone()[0]
+            row = cur.fetchone()
+            assert row is not None
+            persisted_sha = row[0]
             assert persisted_sha == art_sha_1
 
     def test_comp_09_process_database_failure(self, pg_roles: dict[str, str]) -> None:
@@ -689,7 +701,9 @@ class TestCompletionAuthoritySecurity:
             # Verify no row was inserted into PostgreSQL
             with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-                assert cur.fetchone()[0] == 0
+                row = cur.fetchone()
+                assert row is not None
+                assert row[0] == 0
 
             # 2. Terminate completion worker process and verify fail-closed behavior
             comp_auth.terminate()
