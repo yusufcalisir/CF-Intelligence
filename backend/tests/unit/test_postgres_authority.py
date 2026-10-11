@@ -21,6 +21,7 @@ import os
 import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime
+from typing import Any
 
 import psycopg
 import pytest
@@ -46,7 +47,7 @@ def real_pg_instance() -> Generator[str, None, None]:
     pg.start()
     try:
         assert pg.uri is not None
-        yield str(pg.uri)
+        yield pg.uri
     finally:
         pg.stop()
 
@@ -66,10 +67,11 @@ class TestPostgresTrainingJobAuthority:
         assert initial_files == after_files
 
         # Ensure sqlite query fails on Postgres authority connection
+        conn: Any
         with psycopg.connect(real_pg_instance, row_factory=pg_dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT version();")
-                row = cur.fetchone()
+                row: Any = cur.fetchone()
                 assert row is not None
                 assert "PostgreSQL" in row["version"]
 
@@ -406,6 +408,7 @@ class TestPostgresTrainingJobAuthority:
             "cfi_model_evaluations",
             "cfi_completed_jobs",
         }
+        conn: Any
         with psycopg.connect(real_pg_instance, row_factory=pg_dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -414,7 +417,8 @@ class TestPostgresTrainingJobAuthority:
                     WHERE table_schema = 'public' AND table_name LIKE 'cfi_%';
                     """
                 )
-                tables = {r["table_name"] for r in cur.fetchall()}
+                rows: list[Any] = cur.fetchall()
+                tables = {r["table_name"] for r in rows}
                 assert expected_tables.issubset(tables)
 
     def test_pg_10_application_restart_preserves_state(self, real_pg_instance: str) -> None:

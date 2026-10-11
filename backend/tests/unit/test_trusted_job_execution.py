@@ -973,9 +973,13 @@ class TestTrustedJobExecutionBoundary:
         run_id = "run_durable_12"
         sim_id = "sim_durable_12"
 
+        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
         # Worker 1 runs in independent OS process A
         worker1_code = f"""
 import os, sys, json
+if {backend_dir!r} not in sys.path:
+    sys.path.insert(0, {backend_dir!r})
 from app.application.services.training_provenance_service import TrustedTrainingJobRecordSource
 from app.application.services.data_generator import FEATURE_NAMES
 
@@ -1022,6 +1026,8 @@ print(json.dumps({{"pid": os.getpid(), "status": rec.status, "rounds": rec.execu
         # Worker 2 runs in independent OS process B (restarts / opens existing store)
         worker2_code = f"""
 import os, sys, json
+if {backend_dir!r} not in sys.path:
+    sys.path.insert(0, {backend_dir!r})
 from app.application.services.training_provenance_service import (
     TrustedTrainingJobRecordSource,
     TrainingProvenanceSecurityError,

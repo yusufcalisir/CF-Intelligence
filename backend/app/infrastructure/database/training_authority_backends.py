@@ -20,7 +20,7 @@ import sqlite3
 import threading
 import types
 import uuid
-from collections.abc import Sequence
+from collections.abc import Generator, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -71,11 +71,17 @@ class ScheduledTrainingJob:
     expected_rounds: int
     expected_epochs: int
     input_dim: int
-    feature_names: tuple[str, ...]
-    permitted_workers: tuple[str, ...]
-    config_fingerprint: str
-    scheduled_at: str
+    feature_names: Sequence[str] = ()
+    permitted_workers: Sequence[str] = ()
+    config_fingerprint: str = ""
+    scheduled_at: str = ""
     status: str = "SCHEDULED"
+
+    def __post_init__(self) -> None:
+        if isinstance(self.feature_names, (list, tuple)):
+            object.__setattr__(self, "feature_names", tuple(self.feature_names))
+        if isinstance(self.permitted_workers, (list, tuple)):
+            object.__setattr__(self, "permitted_workers", tuple(self.permitted_workers))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -267,7 +273,7 @@ class CompletedJobExecutionRecord:
     architecture: str = "FraudDetectionNN"
     feature_schema_version: str = "v1.0"
     input_dim: int = 10
-    feature_names: tuple[str, ...] = ()
+    feature_names: Sequence[str] = ()
     worker_id: str = "TRAINING_EXECUTOR"
     status: str = "COMPLETED"
     git_commit_hash: str | None = None
@@ -463,7 +469,7 @@ class TrainingJobAuthorityBackend(abc.ABC):
 
 def reconcile_job_completion_evidence(
     clean_job_id: str,
-    sched_row: dict[str, Any],
+    sched_row: Mapping[str, Any],
     executed_rounds: int,
     executed_epochs: int,
     sample_count: int,
@@ -643,13 +649,13 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             ) from e
 
     @contextlib.contextmanager
-    def _connect(self):
+    def _connect(self) -> Generator[Any, None, None]:
         if psycopg is None or pg_dict_row is None:
             raise TrainingProvenanceConfigurationError(
                 "psycopg (v3) driver is not installed. PostgreSQL training authority cannot operate without psycopg."
             )
         try:
-            conn = psycopg.connect(self._db_url, row_factory=pg_dict_row, autocommit=False)
+            conn: Any = psycopg.connect(self._db_url, row_factory=pg_dict_row, autocommit=False)
         except TrainingProvenanceConfigurationError:
             raise
         except Exception as e:
@@ -1324,6 +1330,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             cur.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = %s", (clean_job_id,))
                             sched_row = cur.fetchone()
 
+                        assert sched_row is not None
                         cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
                         started_row = cur.fetchone()
                         if not started_row:

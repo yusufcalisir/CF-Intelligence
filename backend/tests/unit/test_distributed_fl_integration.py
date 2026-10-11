@@ -46,7 +46,7 @@ def real_pg_instance() -> Generator[str, None, None]:
     pg.start()
     try:
         assert pg.uri is not None
-        yield str(pg.uri)
+        yield pg.uri
     finally:
         pg.stop()
 
