@@ -48,9 +48,16 @@ BANK_TOKENS = {
 @pytest.fixture(scope="module")
 def real_pg_instance() -> Generator[str, None, None]:
     """Start embedded real PostgreSQL 18.1 instance and yield connection URI."""
-    from pg0 import Pg0
+    try:
+        import pg0
+    except ImportError:
+        pytest.skip("pg0 is not installed (PostgreSQL 18.1 embedded authority unavailable)")
+    try:
+        import psycopg  # noqa: F401
+    except ImportError:
+        pytest.skip("psycopg is not installed (PostgreSQL driver unavailable)")
 
-    pg = Pg0()
+    pg = pg0.Pg0()
     pg.start()
     try:
         assert pg.uri is not None

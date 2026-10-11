@@ -23,9 +23,14 @@ from collections.abc import Generator
 from datetime import UTC, datetime
 from typing import Any
 
-import psycopg
 import pytest
-from psycopg.rows import dict_row as pg_dict_row
+
+try:
+    import psycopg
+    from psycopg.rows import dict_row as pg_dict_row
+except ImportError:
+    psycopg = None  # type: ignore[assignment]
+    pg_dict_row = None  # type: ignore[assignment]
 
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.training_provenance_service import (
@@ -37,13 +42,25 @@ from app.application.services.training_provenance_service import (
     TrainingProvenanceSecurityError,
 )
 
+# Deterministic test parameters
+TEST_SECRET_COORDINATOR = "coord_secret_999999999999999999999999"
+TEST_SECRET_WORKER_A = "worker_a_secret_111111111111111111111"
+TEST_SECRET_WORKER_B = "worker_b_secret_222222222222222222222"
+TEST_SECRET_WORKER_C = "worker_c_secret_333333333333333333333"
+
 
 @pytest.fixture(scope="module")
 def real_pg_instance() -> Generator[str, None, None]:
     """Start an embedded real PostgreSQL 18.1 server instance and yield its connection URI."""
-    from pg0 import Pg0
+    try:
+        import pg0
+    except ImportError:
+        pytest.skip("pg0 is not installed (PostgreSQL 18.1 embedded authority unavailable)")
 
-    pg = Pg0()
+    if psycopg is None:
+        pytest.skip("psycopg is not installed (PostgreSQL driver unavailable)")
+
+    pg = pg0.Pg0()
     pg.start()
     try:
         assert pg.uri is not None
