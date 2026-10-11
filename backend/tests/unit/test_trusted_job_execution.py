@@ -27,7 +27,7 @@ import math
 import os
 import tempfile
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Generator
 
 import pytest
 import torch
@@ -76,6 +76,27 @@ def _serialize_model(model: nn.Module) -> bytes:
     buf = io.BytesIO()
     torch.save(model.state_dict(), buf)
     return buf.getvalue()
+
+
+@pytest.fixture(scope="module")
+def real_pg_instance() -> Generator[str, None, None]:
+    """Provide embedded real PostgreSQL 18.1 instance."""
+    try:
+        import pg0
+    except ImportError:
+        pytest.skip("pg0 is not installed (PostgreSQL 18.1 embedded authority unavailable)")
+    try:
+        import psycopg  # noqa: F401
+    except ImportError:
+        pytest.skip("psycopg is not installed (PostgreSQL driver unavailable)")
+
+    pg = pg0.Pg0()
+    pg.start()
+    try:
+        assert pg.uri is not None
+        yield pg.uri
+    finally:
+        pg.stop()
 
 
 class TestTrustedJobExecutionBoundary:
@@ -153,15 +174,14 @@ class TestTrustedJobExecutionBoundary:
     # =========================================================================
     # JOB-02: Unauthorized completion
     # =========================================================================
-    def test_job_02_unauthorized_completion_rejected(self, tmp_path: Any) -> None:
+    def test_job_02_unauthorized_completion_rejected(self, real_pg_instance: str) -> None:
         """JOB-02: Attempt to register a completed job using an untrusted caller. Verify rejection."""
         authorized_worker_token = "high_entropy_authorized_worker_token_38294719283"
         authorized_coordinator_token = "high_entropy_authorized_coordinator_token_98374928"
-        db_path = str(tmp_path / "job_sec_02.db")
         source = TrustedTrainingJobRecordSource(
             configured_token=authorized_worker_token,
             coordinator_token=authorized_coordinator_token,
-            store_path=db_path,
+            db_url=real_pg_instance,
             app_env="production",
         )
 
@@ -228,15 +248,14 @@ class TestTrustedJobExecutionBoundary:
     # =========================================================================
     # JOB-03: Authorized token, nonexistent execution
     # =========================================================================
-    def test_job_03_authorized_token_nonexistent_execution_rejected(self, tmp_path: Any) -> None:
+    def test_job_03_authorized_token_nonexistent_execution_rejected(self, real_pg_instance: str) -> None:
         """JOB-03: Present a valid worker credential but no genuine scheduled/started training job. Verify rejection."""
         authorized_worker_token = "high_entropy_authorized_worker_token_38294719283"
         authorized_coordinator_token = "high_entropy_authorized_coordinator_token_98374928"
-        db_path = str(tmp_path / "job_sec_03.db")
         source = TrustedTrainingJobRecordSource(
             configured_token=authorized_worker_token,
             coordinator_token=authorized_coordinator_token,
-            store_path=db_path,
+            db_url=real_pg_instance,
             app_env="production",
         )
 
@@ -851,7 +870,7 @@ class TestTrustedJobExecutionBoundary:
         completed_rec = source.complete_training_job(
             job_id=job_id,
             executed_rounds=executed_rounds,
-            executed_epochs=1,
+            executed_epochs=executed_rounds,
             sample_count=total_unique_samples,
             observed_metrics=observed_metrics,
             artifact_sha256=model_sha,
@@ -873,7 +892,7 @@ class TestTrustedJobExecutionBoundary:
             completed_at=completed_rec.completed_at,
             status="COMPLETED",
             executed_rounds=executed_rounds,
-            executed_epochs=1,
+            executed_epochs=executed_rounds,
             sample_count=total_unique_samples,
             observed_metrics=observed_metrics,
             artifact_sha256=model_sha,
@@ -1036,7 +1055,7 @@ for r in range(1, 4):
 rec = source.complete_training_job(
     job_id={job_id!r},
     executed_rounds=3,
-    executed_epochs=1,
+    executed_epochs=3,
     sample_count=400,
     observed_metrics={{"loss": 0.28}},
     artifact_sha256="e" * 64,
@@ -1084,7 +1103,7 @@ try:
     source.complete_training_job(
         job_id={job_id!r},
         executed_rounds=3,
-        executed_epochs=1,
+        executed_epochs=3,
         sample_count=9999,
         observed_metrics={{"loss": 0.28}},
         artifact_sha256="e" * 64,

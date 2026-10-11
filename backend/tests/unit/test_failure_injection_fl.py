@@ -25,6 +25,7 @@ from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
     DistributedFederatedTrainingManager,
     _serialize_model_state_dict,
+    spawn_bank_workers,
 )
 from app.application.services.model_service import NUM_FEATURES, ModelService
 from app.application.services.training_provenance_service import (
@@ -87,9 +88,16 @@ class TestFederatedLearningFailureInjection:
         }
         holdout_val = (np.random.randn(50, NUM_FEATURES).astype(np.float32), np.random.randint(0, 2, 50).astype(np.float32))
 
+        procs, endpoints = spawn_bank_workers(
+            participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+            bank_tokens=BANK_TOKENS,
+            db_url=real_pg_instance,
+            bank_partitions=bank_partitions,
+            fail_bank_b_observation=True,
+        )
+
         manager = DistributedFederatedTrainingManager(
             coordinator_token=COORD_SECRET,
-            bank_tokens=BANK_TOKENS,
             db_url=real_pg_instance,
             app_env="production",
         )
@@ -101,8 +109,10 @@ class TestFederatedLearningFailureInjection:
                 job_id=job_id,
                 training_run_id=run_id,
                 simulation_id=sim_id,
-                bank_partitions=bank_partitions,
                 holdout_val_data=holdout_val,
+                participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+                worker_endpoints=endpoints,
+                worker_processes=procs,
                 num_rounds=1,
                 fail_bank_b_observation=True,
                 registry_storage_dir=str(tmp_path / "registry"),
@@ -127,9 +137,15 @@ class TestFederatedLearningFailureInjection:
         }
         holdout_val = (np.random.randn(50, NUM_FEATURES).astype(np.float32), np.random.randint(0, 2, 50).astype(np.float32))
 
+        procs, endpoints = spawn_bank_workers(
+            participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+            bank_tokens=BANK_TOKENS,
+            db_url=real_pg_instance,
+            bank_partitions=bank_partitions,
+        )
+
         manager = DistributedFederatedTrainingManager(
             coordinator_token=COORD_SECRET,
-            bank_tokens=BANK_TOKENS,
             db_url=real_pg_instance,
             app_env="production",
         )
@@ -141,8 +157,10 @@ class TestFederatedLearningFailureInjection:
                 job_id=job_id,
                 training_run_id=run_id,
                 simulation_id=sim_id,
-                bank_partitions=bank_partitions,
                 holdout_val_data=holdout_val,
+                participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+                worker_endpoints=endpoints,
+                worker_processes=procs,
                 num_rounds=2,
                 crash_bank_b=True,
                 registry_storage_dir=str(tmp_path / "registry"),
@@ -233,6 +251,13 @@ class TestFederatedLearningFailureInjection:
             aggregated_global_model_digest=real_sha,
             coordinator_token=COORD_SECRET,
         )
+        authority.record_evaluation_observation(
+            job_id=job_id,
+            metric_name="loss",
+            metric_value=0.45,
+            evaluated_artifact_digest=real_sha,
+            coordinator_token=COORD_SECRET,
+        )
         rec = authority.complete_training_job(
             job_id=job_id,
             executed_rounds=1,
@@ -242,7 +267,7 @@ class TestFederatedLearningFailureInjection:
             artifact_sha256=real_sha,
             worker_id="FEDERATED_COORDINATOR",
             coordinator_token=COORD_SECRET,
-            enforce_lifecycle=False,
+            enforce_lifecycle=True,
         )
 
         # Attacker substitutes bytes
