@@ -267,10 +267,11 @@ def test_t06_valid_cache_hit(temp_registry_dir: str) -> None:
 
     meta_to_sign = {
         "version": meta["version"],
+        "generation": meta.get("generation", 1),
         "simulation_id": meta["simulation_id"],
         "artifact_sha256": meta["sha256"],
         "model_sha256": hashlib.sha256(valid_bytes).hexdigest(),
-        "architecture": meta.get("architecture", "FraudDetectionModel-GroupNorm"),
+        "architecture": meta.get("architecture") or "FraudDetectionModel-GroupNorm",
         "input_dim": NUM_FEATURES,
         "serialization_version": 2,
     }
@@ -287,9 +288,10 @@ def test_t06_valid_cache_hit(temp_registry_dir: str) -> None:
     valid_auth = json.dumps(auth_payload).encode("utf-8")
 
     mock_redis = MagicMock()
+    sim_id = meta.get("simulation_id", "")
     mock_redis.get.side_effect = lambda k: (
-        valid_bytes if k == "cfi:champion_model"
-        else valid_auth if k == "cfi:champion_model:auth"
+        valid_bytes if k in ("cfi:champion_model", f"cfi:champion_model:{sim_id}")
+        else valid_auth if k in ("cfi:champion_model:auth", f"cfi:champion_model:{sim_id}:auth")
         else None
     )
 

@@ -22,9 +22,12 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import io
+import json
+import math
 import os
 import tempfile
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 import torch
@@ -150,26 +153,48 @@ class TestTrustedJobExecutionBoundary:
     # =========================================================================
     # JOB-02: Unauthorized completion
     # =========================================================================
-    def test_job_02_unauthorized_completion_rejected(self) -> None:
+    def test_job_02_unauthorized_completion_rejected(self, tmp_path: Any) -> None:
         """JOB-02: Attempt to register a completed job using an untrusted caller. Verify rejection."""
-        authorized_token = "high_entropy_authorized_worker_token_38294719283"
+        authorized_worker_token = "high_entropy_authorized_worker_token_38294719283"
+        authorized_coordinator_token = "high_entropy_authorized_coordinator_token_98374928"
+        db_path = str(tmp_path / "job_sec_02.db")
         source = TrustedTrainingJobRecordSource(
-            configured_token=authorized_token,
+            configured_token=authorized_worker_token,
+            coordinator_token=authorized_coordinator_token,
+            store_path=db_path,
             app_env="production",
         )
 
-        # First, schedule and start a valid job
         job_id = "job_sec_02"
         run_id = "run_sec_02"
         sim_id = "sim_sec_02"
+
+        # Worker credential cannot authorize job scheduling; coordinator role required
+        with pytest.raises(TrainingProvenanceSecurityError, match="Worker credential cannot authorize job scheduling"):
+            source.schedule_training_job(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                coordinator_token=authorized_worker_token,
+            )
+
         source.schedule_training_job(
             job_id=job_id,
             training_run_id=run_id,
             simulation_id=sim_id,
+            coordinator_token=authorized_coordinator_token,
         )
+
+        # Coordinator token cannot authorize worker execution
+        with pytest.raises(TrainingProvenanceSecurityError, match="Coordinator credential cannot authorize worker"):
+            source.start_training_job(
+                job_id=job_id,
+                worker_token=authorized_coordinator_token,
+            )
+
         source.start_training_job(
             job_id=job_id,
-            worker_token=authorized_token,
+            worker_token=authorized_worker_token,
         )
 
         # 1. Caller provides no token
@@ -203,11 +228,15 @@ class TestTrustedJobExecutionBoundary:
     # =========================================================================
     # JOB-03: Authorized token, nonexistent execution
     # =========================================================================
-    def test_job_03_authorized_token_nonexistent_execution_rejected(self) -> None:
+    def test_job_03_authorized_token_nonexistent_execution_rejected(self, tmp_path: Any) -> None:
         """JOB-03: Present a valid worker credential but no genuine scheduled/started training job. Verify rejection."""
-        authorized_token = "high_entropy_authorized_worker_token_38294719283"
+        authorized_worker_token = "high_entropy_authorized_worker_token_38294719283"
+        authorized_coordinator_token = "high_entropy_authorized_coordinator_token_98374928"
+        db_path = str(tmp_path / "job_sec_03.db")
         source = TrustedTrainingJobRecordSource(
-            configured_token=authorized_token,
+            configured_token=authorized_worker_token,
+            coordinator_token=authorized_coordinator_token,
+            store_path=db_path,
             app_env="production",
         )
 
@@ -222,7 +251,7 @@ class TestTrustedJobExecutionBoundary:
                 architecture="FraudDetectionNN",
                 feature_schema_version="v1.0",
                 feature_names=list(FEATURE_NAMES),
-                worker_token=authorized_token,
+                worker_token=authorized_worker_token,
                 enforce_lifecycle=True,
             )
 
@@ -231,6 +260,7 @@ class TestTrustedJobExecutionBoundary:
             job_id="job_scheduled_only",
             training_run_id="run_scheduled_only",
             simulation_id="sim_scheduled_only",
+            coordinator_token=authorized_coordinator_token,
         )
         with pytest.raises(TrainingProvenanceSecurityError, match="has not been started"):
             source.complete_training_job(
@@ -242,7 +272,7 @@ class TestTrustedJobExecutionBoundary:
                 architecture="FraudDetectionNN",
                 feature_schema_version="v1.0",
                 feature_names=list(FEATURE_NAMES),
-                worker_token=authorized_token,
+                worker_token=authorized_worker_token,
                 enforce_lifecycle=True,
             )
 
@@ -655,7 +685,9 @@ class TestTrustedJobExecutionBoundary:
     # JOB-10: Genuine training lifecycle
     # =========================================================================
     def test_job_10_genuine_training_lifecycle_produces_valid_receipt(self) -> None:
-        """JOB-10: Run genuine training through actual authorized path. Verify record, receipt, and digest match."""
+        """JOB-10: Genuine 3-node federated training orchestration, real PyTorch optimization, measured AUC, receipt, and registry."""
+        from sklearn.metrics import roc_auc_score
+
         priv_hex, pub_hex = _generate_ed25519_keypair_hex()
         trust_store = DurableTrustStore({DEFAULT_TRAINING_KEY_ID: pub_hex})
         source = TrustedTrainingJobRecordSource()
@@ -675,7 +707,8 @@ class TestTrustedJobExecutionBoundary:
         run_id = "run_genuine_10"
         sim_id = "sim_genuine_10"
 
-        # 1. Schedule job
+        # 1. Schedule federated training job with 3 participating banks and 2 expected global rounds
+        participating_banks = ["BANK_A", "BANK_B", "BANK_C"]
         scheduled = source.schedule_training_job(
             job_id=job_id,
             training_run_id=run_id,
@@ -685,64 +718,128 @@ class TestTrustedJobExecutionBoundary:
             expected_rounds=2,
             input_dim=NUM_FEATURES,
             feature_names=list(FEATURE_NAMES),
+            permitted_workers=participating_banks,
         )
         assert scheduled.job_id == job_id
 
-        # 2. Worker starts job
-        started = source.start_training_job(job_id=job_id, worker_id="GENUINE_WORKER")
+        # 2. Worker pool starts job
+        started = source.start_training_job(job_id=job_id, worker_id="BANK_A")
         assert started.job_id == job_id
 
-        # 3. Perform genuine PyTorch training optimization steps
-        model = FraudDetectionModel(input_dim=NUM_FEATURES)
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+        # 3. Create isolated local datasets for 3 independent bank nodes (zero pooled raw data)
+        torch.manual_seed(42)
+        # Bank A: 120 samples
+        X_bank_a = torch.randn(120, NUM_FEATURES)
+        y_bank_a = torch.randint(0, 2, (120,)).float()
+        # Bank B: 150 samples
+        X_bank_b = torch.randn(150, NUM_FEATURES)
+        y_bank_b = torch.randint(0, 2, (150,)).float()
+        # Bank C: 180 samples
+        X_bank_c = torch.randn(180, NUM_FEATURES)
+        y_bank_c = torch.randint(0, 2, (180,)).float()
+
+        # Holdout validation/test set: 100 samples
+        X_test = torch.randn(100, NUM_FEATURES)
+        y_test = torch.randint(0, 2, (100,)).float()
+
+        client_data = {
+            "BANK_A": (X_bank_a, y_bank_a),
+            "BANK_B": (X_bank_b, y_bank_b),
+            "BANK_C": (X_bank_c, y_bank_c),
+        }
+
+        # Initialize global model
+        global_model = FraudDetectionModel(input_dim=NUM_FEATURES)
+        executed_rounds = 2
+        total_unique_samples = sum(len(x) for x, _ in client_data.values())  # 450 unique samples
         criterion = nn.BCELoss()
 
-        # Synthesize real training tensors
-        X_train = torch.randn(100, NUM_FEATURES)
-        y_train = torch.randint(0, 2, (100,)).float()
-
-        total_samples = 100
-        executed_rounds = 2
-        last_loss = 0.0
-
+        # 4. Execute 2 global federated rounds with local PyTorch training and FedAvg aggregation
+        last_round_local_losses: dict[str, float] = {}
         for r in range(1, executed_rounds + 1):
-            model.train()
-            optimizer.zero_grad()
-            preds = model(X_train)
-            loss = criterion(preds, y_train)
-            loss.backward()
-            optimizer.step()
-            last_loss = float(loss.item())
+            local_weights = {}
+            local_sample_counts = {}
 
-            # Worker records round observation
-            source.record_round_observation(
-                job_id=job_id,
-                round_num=r,
-                observed_loss=last_loss,
-                sample_count=total_samples,
-            )
+            # Each bank trains locally on its private partition
+            for bank_id, (X_local, y_local) in client_data.items():
+                local_model = FraudDetectionModel(input_dim=NUM_FEATURES)
+                local_model.load_state_dict(global_model.state_dict())
+                local_model.train()
+                optimizer = torch.optim.Adam(local_model.parameters(), lr=0.01)
 
-        model_bytes = _serialize_model(model)
+                # Local optimization step
+                optimizer.zero_grad()
+                preds = local_model(X_local)
+                loss = criterion(preds, y_local)
+                loss.backward()
+                optimizer.step()
+                local_loss = float(loss.item())
+                last_round_local_losses[bank_id] = local_loss
+
+                local_weights[bank_id] = {k: v.clone() for k, v in local_model.state_dict().items()}
+                local_sample_counts[bank_id] = len(X_local)
+
+                # Record authoritative round observation for this bank
+                source.record_round_observation(
+                    job_id=job_id,
+                    round_number=r,
+                    bank_id=bank_id,
+                    sample_count=len(X_local),
+                    observed_loss=local_loss,
+                    metrics={"loss": local_loss, "round": float(r)},
+                )
+
+            # Coordinator aggregates model updates via FedAvg (weighted average)
+            # Coordinator verifies zero leakage: it receives only state dicts, not raw data
+            new_global_state = {}
+            for param_key in global_model.state_dict():
+                weighted_sum = sum(
+                    local_weights[b][param_key].float() * local_sample_counts[b]
+                    for b in participating_banks
+                )
+                new_global_state[param_key] = weighted_sum / total_unique_samples
+            global_model.load_state_dict(new_global_state)
+
+        # 5. Measure test evaluation metrics on global holdout set (actual measured loss and AUC)
+        global_model.eval()
+        with torch.no_grad():
+            test_preds = global_model(X_test)
+            test_loss = float(criterion(test_preds, y_test).item())
+            measured_auc = float(roc_auc_score(y_test.numpy(), test_preds.numpy()))
+
+        assert math.isfinite(test_loss)
+        assert 0.0 <= measured_auc <= 1.0
+
+        model_bytes = _serialize_model(global_model)
         model_sha = hashlib.sha256(model_bytes).hexdigest()
-        observed_metrics = {"loss": last_loss, "auc_roc": 0.75}
+        weighted_final_training_loss = sum(
+            last_round_local_losses[b] * len(client_data[b][0]) for b in participating_banks
+        ) / total_unique_samples
+        observed_metrics = {
+            "loss": weighted_final_training_loss,
+            "val_loss": test_loss,
+            "auc_roc": measured_auc,
+        }
 
-        # 4. Worker completes training job
+        # 6. Worker completes training job reconciled against observations
         completed_rec = source.complete_training_job(
             job_id=job_id,
             executed_rounds=executed_rounds,
             executed_epochs=1,
-            sample_count=total_samples,
+            sample_count=total_unique_samples,
             observed_metrics=observed_metrics,
             artifact_sha256=model_sha,
             architecture="FraudDetectionNN",
             feature_schema_version="v1.0",
             feature_names=list(FEATURE_NAMES),
-            worker_id="GENUINE_WORKER",
+            worker_id="BANK_A",
         )
         assert completed_rec.status == "COMPLETED"
         assert completed_rec.artifact_sha256 == model_sha
+        assert completed_rec.sample_count == 450
+        assert completed_rec.executed_rounds == 2
 
-        # 5. Issue authentic receipt
+        # 7. Issue authentic Ed25519 receipt
         evidence = TrainingExecutionEvidence(
             training_run_id=run_id,
             job_id=job_id,
@@ -751,20 +848,19 @@ class TestTrustedJobExecutionBoundary:
             status="COMPLETED",
             executed_rounds=executed_rounds,
             executed_epochs=1,
-            sample_count=total_samples,
+            sample_count=total_unique_samples,
             observed_metrics=observed_metrics,
             artifact_sha256=model_sha,
             architecture="FraudDetectionNN",
             feature_schema_version="v1.0",
             feature_names=list(FEATURE_NAMES),
-            producer_id="GENUINE_WORKER",
+            producer_id="BANK_A",
         )
-
         receipt = issuer.issue_receipt(evidence=evidence, model_bytes=model_bytes)
         assert receipt.model_artifact_sha256 == model_sha
         assert receipt.signature is not None
 
-        # 6. Verify receipt independently
+        # 8. Verify receipt independently with public key only
         is_verified, reason = verifier.verify_receipt(
             receipt=receipt,
             expected_simulation_id=sim_id,
@@ -777,7 +873,7 @@ class TestTrustedJobExecutionBoundary:
         )
         assert is_verified is True, f"Receipt verification failed: {reason}"
 
-        # 7. ModelRegistry admission succeeds and verifies provenance
+        # 9. ModelRegistry admission succeeds and verifies provenance
         reset_default_training_verifier()
         with pytest.MonkeyPatch.context() as mp:
             mp.setenv("CFI_TRAINING_RECEIPT_PUBLIC_KEY", pub_hex)
@@ -786,9 +882,9 @@ class TestTrustedJobExecutionBoundary:
                 registry = ModelRegistry(storage_dir=tmp_dir)
                 registry.save_version(
                     simulation_id=sim_id,
-                    state_dict=model.state_dict(),
+                    state_dict=global_model.state_dict(),
                     metrics=observed_metrics,
-                    is_promoted=True,
+                    is_promoted=False,
                     status="candidate",
                     provenance_type="TRAINING_RECORDED",
                     training_run_id=run_id,
@@ -803,6 +899,7 @@ class TestTrustedJobExecutionBoundary:
                 assert version is not None
                 assert version["provenance_type"] == "TRAINING_RECORDED"
                 assert version["is_production_eligible"] is True
+                assert version["status"] == "candidate"
             finally:
                 reset_default_training_verifier()
 
@@ -861,70 +958,122 @@ class TestTrustedJobExecutionBoundary:
     # =========================================================================
     # JOB-12: Restart and multi-worker behavior
     # =========================================================================
-    def test_job_12_restart_and_multi_worker_durability(self) -> None:
-        """JOB-12: Verify the job-record authority provides documented persistence and multi-worker reload."""
+    def test_job_12_restart_and_multi_worker_durability(self, tmp_path: Any) -> None:
+        """JOB-12: Verify multi-process persistence, independent PIDs, durable restart, and conflict rejection."""
+        import subprocess
+        import sys
+
         # 1. When store_path is empty, is_durable is truthfully False
         in_memory_source = TrustedTrainingJobRecordSource(store_path="")
         assert in_memory_source.is_durable is False
 
-        # 2. Test durable file persistence and cross-worker reload
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tf:
-            store_file = tf.name
+        # 2. Test durable SQLite persistence across independent OS processes with distinct PIDs
+        db_file = str(tmp_path / "job_durability_12.db")
+        job_id = "job_durable_12"
+        run_id = "run_durable_12"
+        sim_id = "sim_durable_12"
 
-        try:
-            # Worker 1 creates record source with durable store path
-            worker1_source = TrustedTrainingJobRecordSource(store_path=store_file)
-            assert worker1_source.is_durable is True
+        # Worker 1 runs in independent OS process A
+        worker1_code = f"""
+import os, sys, json
+from app.application.services.training_provenance_service import TrustedTrainingJobRecordSource
+from app.application.services.data_generator import FEATURE_NAMES
 
-            job_id = "job_durable_12"
-            run_id = "run_durable_12"
-            sim_id = "sim_durable_12"
+source = TrustedTrainingJobRecordSource(store_path={db_file!r})
+source.schedule_training_job(
+    job_id={job_id!r},
+    training_run_id={run_id!r},
+    simulation_id={sim_id!r},
+    expected_rounds=3,
+)
+source.start_training_job(job_id={job_id!r})
+for r in range(1, 4):
+    source.record_round_observation(
+        job_id={job_id!r},
+        round_number=r,
+        sample_count=400,
+        observed_loss=0.28,
+    )
+rec = source.complete_training_job(
+    job_id={job_id!r},
+    executed_rounds=3,
+    sample_count=1200,
+    observed_metrics={{"loss": 0.28}},
+    artifact_sha256="e" * 64,
+    architecture="FraudDetectionNN",
+    feature_schema_version="v1.0",
+    feature_names=list(FEATURE_NAMES),
+)
+print(json.dumps({{"pid": os.getpid(), "status": rec.status, "rounds": rec.executed_rounds}}))
+"""
+        res1 = subprocess.run(
+            [sys.executable, "-c", worker1_code],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=os.getcwd(),
+        )
+        out1 = json.loads(res1.stdout.strip().splitlines()[-1])
+        pid1 = out1["pid"]
+        assert out1["status"] == "COMPLETED"
+        assert out1["rounds"] == 3
+        assert pid1 != os.getpid()
 
-            worker1_source.schedule_training_job(
-                job_id=job_id,
-                training_run_id=run_id,
-                simulation_id=sim_id,
-            )
-            worker1_source.start_training_job(job_id=job_id)
-            rec1 = worker1_source.complete_training_job(
-                job_id=job_id,
-                executed_rounds=3,
-                sample_count=1200,
-                observed_metrics={"loss": 0.28},
-                artifact_sha256="e" * 64,
-                architecture="FraudDetectionNN",
-                feature_schema_version="v1.0",
-                feature_names=list(FEATURE_NAMES),
-            )
-            assert rec1.status == "COMPLETED"
+        # Worker 2 runs in independent OS process B (restarts / opens existing store)
+        worker2_code = f"""
+import os, sys, json
+from app.application.services.training_provenance_service import (
+    TrustedTrainingJobRecordSource,
+    TrainingProvenanceSecurityError,
+)
+from app.application.services.data_generator import FEATURE_NAMES
 
-            # Worker 2 (separate process / instance) opens the same store
-            worker2_source = TrustedTrainingJobRecordSource(store_path=store_file)
-            assert worker2_source.is_durable is True
+source = TrustedTrainingJobRecordSource(store_path={db_file!r})
+rec = source.get_completed_job_by_id({job_id!r})
+assert rec is not None
+assert rec.job_id == {job_id!r}
+assert rec.sample_count == 1200
+assert rec.executed_rounds == 3
+assert rec.artifact_sha256 == "e" * 64
 
-            # Worker 2 reloads and sees the completed job
-            rec2 = worker2_source.get_completed_job_by_id(job_id)
-            assert rec2 is not None
-            assert rec2.job_id == job_id
-            assert rec2.executed_rounds == 3
-            assert rec2.sample_count == 1200
-            assert rec2.artifact_sha256 == "e" * 64
+# Attempt conflicting completion
+conflict_failed = False
+try:
+    source.complete_training_job(
+        job_id={job_id!r},
+        executed_rounds=3,
+        sample_count=9999,
+        observed_metrics={{"loss": 0.28}},
+        artifact_sha256="e" * 64,
+        architecture="FraudDetectionNN",
+        feature_schema_version="v1.0",
+        feature_names=list(FEATURE_NAMES),
+    )
+except TrainingProvenanceSecurityError:
+    conflict_failed = True
 
-            # Worker 2 attempts conflicting completion on the same job -> fails closed
-            with pytest.raises(TrainingProvenanceSecurityError, match="Conflicting completion record"):
-                worker2_source.complete_training_job(
-                    job_id=job_id,
-                    executed_rounds=3,
-                    sample_count=9999,  # conflict
-                    observed_metrics={"loss": 0.28},
-                    artifact_sha256="e" * 64,
-                    architecture="FraudDetectionNN",
-                    feature_schema_version="v1.0",
-                    feature_names=list(FEATURE_NAMES),
-                )
-        finally:
-            if os.path.exists(store_file):
-                os.remove(store_file)
+print(json.dumps({{"pid": os.getpid(), "reloaded_id": rec.job_id, "conflict_rejected": conflict_failed}}))
+"""
+        res2 = subprocess.run(
+            [sys.executable, "-c", worker2_code],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=os.getcwd(),
+        )
+        out2 = json.loads(res2.stdout.strip().splitlines()[-1])
+        pid2 = out2["pid"]
+        assert out2["reloaded_id"] == job_id
+        assert out2["conflict_rejected"] is True
+        assert pid2 != pid1
+        assert pid2 != os.getpid()
+
+        # 3. Parent process also validates persisted database state
+        parent_source = TrustedTrainingJobRecordSource(store_path=db_file)
+        rec_parent = parent_source.get_completed_job_by_id(job_id)
+        assert rec_parent is not None
+        assert rec_parent.job_id == job_id
+        assert rec_parent.sample_count == 1200
 
     # =========================================================================
     # JOB-13: Duplicate submission

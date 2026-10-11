@@ -20,6 +20,7 @@ import json
 import logging
 import math
 import os
+import sqlite3
 import threading
 import types
 import uuid
@@ -31,6 +32,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
+from app.application.services.data_generator import FEATURE_NAMES as CANONICAL_FEATURE_NAMES
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -200,6 +202,20 @@ FORBIDDEN_WORKER_TOKENS = frozenset(
     }
 )
 
+FORBIDDEN_COORDINATOR_TOKENS = frozenset(
+    {
+        "",
+        "cfi_authorized_training_coordinator_secret_v1",
+        "secret",
+        "changeme",
+        "admin",
+        "password",
+        "token",
+        "default",
+        "change_me",
+    }
+)
+
 
 @dataclasses.dataclass(frozen=True)
 class ScheduledTrainingJob:
@@ -215,6 +231,9 @@ class ScheduledTrainingJob:
     input_dim: int
     feature_names: tuple[str, ...]
     scheduled_at: str
+    coordinator_id: str = "COORDINATOR"
+    permitted_workers: tuple[str, ...] = ()
+    config_fingerprint: str = ""
     status: str = "SCHEDULED"
 
 
@@ -230,19 +249,1006 @@ class StartedTrainingJob:
     status: str = "STARTED"
 
 
+@dataclasses.dataclass(frozen=True)
+class RoundObservation:
+    """Immutable record of an authorized training round observation."""
+
+    event_id: str
+    job_id: str
+    training_run_id: str
+    simulation_id: str
+    worker_id: str
+    bank_id: str
+    round_number: int
+    attempt_number: int
+    actual_sample_count: int
+    actual_executed_epochs: int
+    observed_loss: float
+    metrics: dict[str, float]
+    execution_timestamp: str
+    model_update_digest: str | None = None
+    execution_status: str = "COMPLETED"
+
+    def __post_init__(self) -> None:
+        if isinstance(self.metrics, dict):
+            object.__setattr__(
+                self,
+                "metrics",
+                types.MappingProxyType(dict(self.metrics)),
+            )
+
+    def validate(self) -> None:
+        if not self.event_id or not self.event_id.strip():
+            raise ValueError("event_id must be non-empty.")
+        if not self.job_id or not self.job_id.strip():
+            raise ValueError("job_id must be non-empty.")
+        if not self.worker_id or not self.worker_id.strip():
+            raise ValueError("worker_id must be non-empty.")
+        if self.round_number < 1:
+            raise ValueError(f"round_number must be >= 1, got {self.round_number}.")
+        if self.attempt_number < 1:
+            raise ValueError(f"attempt_number must be >= 1, got {self.attempt_number}.")
+        if self.actual_sample_count <= 0:
+            raise ValueError(f"actual_sample_count must be positive, got {self.actual_sample_count}.")
+        if not isinstance(self.observed_loss, (int, float)) or not math.isfinite(self.observed_loss):
+            raise ValueError(f"observed_loss must be a finite float, got {self.observed_loss!r}.")
+        if self.execution_status not in ("COMPLETED", "FAILED"):
+            raise ValueError(f"Invalid execution_status: {self.execution_status!r}.")
+
+    @property
+    def payload_digest(self) -> str:
+        """Deterministic digest of observation content for idempotency and conflict detection."""
+        h = hashlib.sha256()
+        h.update(str(self.round_number).encode())
+        h.update(str(self.attempt_number).encode())
+        h.update(str(self.actual_sample_count).encode())
+        h.update(str(self.actual_executed_epochs).encode())
+        h.update(f"{float(self.observed_loss):.8f}".encode())
+        for k in sorted(self.metrics.keys()):
+            h.update(f"{k}:{float(self.metrics[k]):.8f}".encode())
+        if self.model_update_digest:
+            h.update(self.model_update_digest.encode())
+        h.update(self.execution_status.encode())
+        return h.hexdigest()
+
+
+def _compute_config_fingerprint(
+    job_id: str,
+    training_run_id: str,
+    simulation_id: str,
+    architecture: str,
+    feature_schema_version: str,
+    expected_rounds: int,
+    expected_epochs: int,
+    input_dim: int,
+    feature_names: Sequence[str],
+) -> str:
+    h = hashlib.sha256()
+    h.update(job_id.strip().encode())
+    h.update(training_run_id.strip().encode())
+    h.update(simulation_id.strip().encode())
+    h.update(architecture.strip().encode())
+    h.update(feature_schema_version.strip().encode())
+    h.update(str(expected_rounds).encode())
+    h.update(str(expected_epochs).encode())
+    h.update(str(input_dim).encode())
+    for fn in feature_names:
+        h.update(fn.strip().encode())
+    return h.hexdigest()
+
+
+def _compute_evidence_fingerprint(
+    training_run_id: str,
+    simulation_id: str,
+    executed_rounds: int,
+    executed_epochs: int,
+    sample_count: int,
+    artifact_sha256: str,
+    architecture: str,
+    feature_schema_version: str,
+    input_dim: int,
+    feature_names: Sequence[str],
+    observed_metrics: dict[str, float],
+) -> str:
+    h = hashlib.sha256()
+    h.update(training_run_id.strip().encode())
+    h.update(simulation_id.strip().encode())
+    h.update(str(executed_rounds).encode())
+    h.update(str(executed_epochs).encode())
+    h.update(str(sample_count).encode())
+    h.update(artifact_sha256.strip().encode())
+    h.update(architecture.strip().encode())
+    h.update(feature_schema_version.strip().encode())
+    h.update(str(input_dim).encode())
+    for fn in feature_names:
+        h.update(fn.strip().encode())
+    for k in sorted(observed_metrics.keys()):
+        h.update(f"{k}:{float(observed_metrics[k]):.8f}".encode())
+    return h.hexdigest()
+
+
+class TrainingJobAuthorityDatabase:
+    """ACID transactional database authority for training job lifecycle and execution observations."""
+
+    def __init__(self, db_target: str, in_memory: bool = False) -> None:
+        self._lock = threading.RLock()
+        self._in_memory = in_memory
+        self._db_target = db_target
+        self._mem_conn: sqlite3.Connection | None = None
+
+        if self._in_memory or db_target in (":memory:", ""):
+            self._is_memory = True
+            self._file_path = ""
+            self._mem_conn = sqlite3.connect(
+                f"file:cfi_mem_jobs_{uuid.uuid4().hex}?mode=memory&cache=shared",
+                uri=True,
+                check_same_thread=False,
+                timeout=15.0,
+                isolation_level=None,
+            )
+            self._mem_conn.row_factory = sqlite3.Row
+            self._init_schema(self._mem_conn)
+        else:
+            self._is_memory = False
+            clean_path = db_target
+            if clean_path.startswith("sqlite:///"):
+                clean_path = clean_path[len("sqlite:///") :]
+            elif clean_path.startswith("sqlite://"):
+                clean_path = clean_path[len("sqlite://") :]
+            self._file_path = os.path.abspath(clean_path)
+            parent = os.path.dirname(self._file_path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with self._connect() as conn:
+                self._init_schema(conn)
+
+    @contextlib.contextmanager
+    def _connect(self):
+        if self._is_memory:
+            assert self._mem_conn is not None
+            with self._lock:
+                yield self._mem_conn
+        else:
+            conn = sqlite3.connect(
+                self._file_path,
+                timeout=15.0,
+                check_same_thread=False,
+                isolation_level=None,
+            )
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            conn.execute("PRAGMA busy_timeout = 15000")
+            conn.execute("PRAGMA journal_mode = WAL")
+            conn.execute("PRAGMA synchronous = NORMAL")
+            try:
+                yield conn
+            finally:
+                conn.close()
+
+    def _init_schema(self, conn: sqlite3.Connection) -> None:
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA busy_timeout = 15000")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cfi_scheduled_jobs (
+                job_id TEXT PRIMARY KEY,
+                training_run_id TEXT UNIQUE NOT NULL,
+                simulation_id TEXT NOT NULL,
+                coordinator_id TEXT NOT NULL,
+                architecture TEXT NOT NULL,
+                feature_schema_version TEXT NOT NULL,
+                expected_rounds INTEGER NOT NULL,
+                expected_epochs INTEGER NOT NULL,
+                input_dim INTEGER NOT NULL,
+                feature_names_json TEXT NOT NULL,
+                permitted_workers_json TEXT,
+                config_fingerprint TEXT NOT NULL,
+                scheduled_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'SCHEDULED'
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cfi_started_jobs (
+                job_id TEXT PRIMARY KEY REFERENCES cfi_scheduled_jobs(job_id),
+                training_run_id TEXT NOT NULL,
+                simulation_id TEXT NOT NULL,
+                worker_id TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'STARTED'
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cfi_round_observations (
+                event_id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL REFERENCES cfi_scheduled_jobs(job_id),
+                training_run_id TEXT NOT NULL,
+                simulation_id TEXT NOT NULL,
+                worker_id TEXT NOT NULL,
+                bank_id TEXT NOT NULL,
+                round_number INTEGER NOT NULL,
+                attempt_number INTEGER NOT NULL DEFAULT 1,
+                actual_sample_count INTEGER NOT NULL,
+                actual_executed_epochs INTEGER NOT NULL DEFAULT 0,
+                observed_loss REAL NOT NULL,
+                metrics_json TEXT NOT NULL,
+                model_update_digest TEXT,
+                execution_timestamp TEXT NOT NULL,
+                execution_status TEXT NOT NULL DEFAULT 'COMPLETED',
+                payload_digest TEXT NOT NULL,
+                UNIQUE(job_id, bank_id, round_number, attempt_number)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cfi_completed_jobs (
+                job_id TEXT PRIMARY KEY REFERENCES cfi_scheduled_jobs(job_id),
+                training_run_id TEXT UNIQUE NOT NULL,
+                simulation_id TEXT NOT NULL,
+                completed_at TEXT NOT NULL,
+                executed_rounds INTEGER NOT NULL,
+                executed_epochs INTEGER NOT NULL,
+                sample_count INTEGER NOT NULL,
+                observed_metrics_json TEXT NOT NULL,
+                artifact_sha256 TEXT NOT NULL,
+                architecture TEXT NOT NULL,
+                feature_schema_version TEXT NOT NULL,
+                input_dim INTEGER NOT NULL,
+                feature_names_json TEXT NOT NULL,
+                worker_id TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'COMPLETED',
+                git_commit_hash TEXT,
+                dataset_manifest_id TEXT,
+                evidence_fingerprint TEXT NOT NULL
+            )
+            """
+        )
+
+    def schedule_job(
+        self,
+        job_id: str,
+        training_run_id: str,
+        simulation_id: str,
+        architecture: str,
+        feature_schema_version: str,
+        expected_rounds: int,
+        expected_epochs: int,
+        input_dim: int,
+        feature_names: Sequence[str],
+        coordinator_id: str = "COORDINATOR",
+        permitted_workers: Sequence[str] = (),
+    ) -> ScheduledTrainingJob:
+        clean_job_id = job_id.strip()
+        clean_run_id = training_run_id.strip()
+        clean_sim_id = simulation_id.strip()
+        fnames_tuple = tuple(feature_names)
+        perm_workers_tuple = tuple(permitted_workers)
+        now_str = datetime.now(UTC).isoformat()
+
+        cfg_fingerprint = _compute_config_fingerprint(
+            clean_job_id,
+            clean_run_id,
+            clean_sim_id,
+            architecture,
+            feature_schema_version,
+            expected_rounds,
+            expected_epochs,
+            input_dim,
+            fnames_tuple,
+        )
+
+        with self._connect() as conn:  # noqa: SIM117
+            with self._lock:
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    # 1. Check permanent 1-to-1 training_run_id binding
+                    cur = conn.execute(
+                        "SELECT job_id FROM cfi_scheduled_jobs WHERE training_run_id = ?",
+                        (clean_run_id,),
+                    )
+                    bound_row = cur.fetchone()
+                    if bound_row and bound_row["job_id"] != clean_job_id:
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot schedule job '{clean_job_id}': training_run_id '{clean_run_id}' is already permanently bound to job '{bound_row['job_id']}'."
+                        )
+
+                    # 2. Check if job_id already scheduled
+                    cur = conn.execute(
+                        "SELECT * FROM cfi_scheduled_jobs WHERE job_id = ?",
+                        (clean_job_id,),
+                    )
+                    existing = cur.fetchone()
+                    if existing:
+                        if existing["config_fingerprint"] == cfg_fingerprint:
+                            conn.execute("COMMIT")
+                            return ScheduledTrainingJob(
+                                job_id=existing["job_id"],
+                                training_run_id=existing["training_run_id"],
+                                simulation_id=existing["simulation_id"],
+                                architecture=existing["architecture"],
+                                feature_schema_version=existing["feature_schema_version"],
+                                expected_rounds=existing["expected_rounds"],
+                                expected_epochs=existing["expected_epochs"],
+                                input_dim=existing["input_dim"],
+                                feature_names=tuple(json.loads(existing["feature_names_json"])),
+                                scheduled_at=existing["scheduled_at"],
+                                coordinator_id=existing["coordinator_id"],
+                                permitted_workers=tuple(json.loads(existing["permitted_workers_json"] or "[]")),
+                                config_fingerprint=existing["config_fingerprint"],
+                                status=existing["status"],
+                            )
+                        else:
+                            raise TrainingProvenanceSecurityError(
+                                f"Cannot reschedule job '{clean_job_id}' with conflicting parameters."
+                            )
+
+                    # 3. Insert newly scheduled job
+                    conn.execute(
+                        """
+                        INSERT INTO cfi_scheduled_jobs (
+                            job_id, training_run_id, simulation_id, coordinator_id,
+                            architecture, feature_schema_version, expected_rounds, expected_epochs,
+                            input_dim, feature_names_json, permitted_workers_json, config_fingerprint,
+                            scheduled_at, status
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            clean_job_id,
+                            clean_run_id,
+                            clean_sim_id,
+                            coordinator_id,
+                            architecture,
+                            feature_schema_version,
+                            expected_rounds,
+                            expected_epochs,
+                            input_dim,
+                            json.dumps(list(fnames_tuple)),
+                            json.dumps(list(perm_workers_tuple)),
+                            cfg_fingerprint,
+                            now_str,
+                            "SCHEDULED",
+                        ),
+                    )
+                    conn.execute("COMMIT")
+                    return ScheduledTrainingJob(
+                        job_id=clean_job_id,
+                        training_run_id=clean_run_id,
+                        simulation_id=clean_sim_id,
+                        architecture=architecture,
+                        feature_schema_version=feature_schema_version,
+                        expected_rounds=expected_rounds,
+                        expected_epochs=expected_epochs,
+                        input_dim=input_dim,
+                        feature_names=fnames_tuple,
+                        scheduled_at=now_str,
+                        coordinator_id=coordinator_id,
+                        permitted_workers=perm_workers_tuple,
+                        config_fingerprint=cfg_fingerprint,
+                        status="SCHEDULED",
+                    )
+                except Exception:
+                    conn.execute("ROLLBACK")
+                    raise
+
+    def start_job(
+        self,
+        job_id: str,
+        worker_id: str = "TRAINING_EXECUTOR",
+    ) -> StartedTrainingJob:
+        clean_job_id = job_id.strip()
+        now_str = datetime.now(UTC).isoformat()
+
+        with self._connect() as conn:  # noqa: SIM117
+            with self._lock:
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    cur = conn.execute(
+                        "SELECT * FROM cfi_scheduled_jobs WHERE job_id = ?",
+                        (clean_job_id,),
+                    )
+                    sched = cur.fetchone()
+                    if not sched:
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot start job '{clean_job_id}': job was not scheduled by the training coordinator."
+                        )
+
+                    cur = conn.execute(
+                        "SELECT job_id FROM cfi_completed_jobs WHERE job_id = ?",
+                        (clean_job_id,),
+                    )
+                    if cur.fetchone():
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot start job '{clean_job_id}': job has already completed."
+                        )
+
+                    # Permitted workers policy check
+                    perm_workers = json.loads(sched["permitted_workers_json"] or "[]")
+                    if perm_workers and worker_id not in perm_workers:
+                        raise TrainingProvenanceSecurityError(
+                            f"Worker '{worker_id}' is not authorized to start job '{clean_job_id}' (permitted: {perm_workers})."
+                        )
+
+                    cur = conn.execute(
+                        "SELECT * FROM cfi_started_jobs WHERE job_id = ?",
+                        (clean_job_id,),
+                    )
+                    existing = cur.fetchone()
+                    if existing:
+                        conn.execute("COMMIT")
+                        return StartedTrainingJob(
+                            job_id=existing["job_id"],
+                            training_run_id=existing["training_run_id"],
+                            simulation_id=existing["simulation_id"],
+                            worker_id=existing["worker_id"],
+                            started_at=existing["started_at"],
+                            status=existing["status"],
+                        )
+
+                    conn.execute(
+                        """
+                        INSERT INTO cfi_started_jobs (
+                            job_id, training_run_id, simulation_id, worker_id, started_at, status
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            clean_job_id,
+                            sched["training_run_id"],
+                            sched["simulation_id"],
+                            worker_id,
+                            now_str,
+                            "STARTED",
+                        ),
+                    )
+                    conn.execute("COMMIT")
+                    return StartedTrainingJob(
+                        job_id=clean_job_id,
+                        training_run_id=sched["training_run_id"],
+                        simulation_id=sched["simulation_id"],
+                        worker_id=worker_id,
+                        started_at=now_str,
+                        status="STARTED",
+                    )
+                except Exception:
+                    conn.execute("ROLLBACK")
+                    raise
+
+    def record_observation(self, obs: RoundObservation) -> RoundObservation:
+        obs.validate()
+        clean_job_id = obs.job_id.strip()
+
+        with self._connect() as conn:  # noqa: SIM117
+            with self._lock:
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    # 1. Verify job is STARTED and not COMPLETED
+                    cur = conn.execute(
+                        "SELECT * FROM cfi_started_jobs WHERE job_id = ?",
+                        (clean_job_id,),
+                    )
+                    started = cur.fetchone()
+                    if not started:
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot record observations for job '{clean_job_id}': job is not in STARTED state."
+                        )
+
+                    cur = conn.execute(
+                        "SELECT job_id FROM cfi_completed_jobs WHERE job_id = ?",
+                        (clean_job_id,),
+                    )
+                    if cur.fetchone():
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot add round observation to finalized completed job '{clean_job_id}'."
+                        )
+
+                    # 2. Check duplicate event_id
+                    cur = conn.execute(
+                        "SELECT * FROM cfi_round_observations WHERE event_id = ?",
+                        (obs.event_id,),
+                    )
+                    existing_evt = cur.fetchone()
+                    if existing_evt:
+                        if existing_evt["payload_digest"] == obs.payload_digest:
+                            conn.execute("COMMIT")
+                            return obs
+                        else:
+                            raise TrainingProvenanceSecurityError(
+                                f"Duplicate event ID '{obs.event_id}' with conflicting content rejected."
+                            )
+
+                    # 3. Check duplicate (job_id, bank_id, round_number, attempt_number)
+                    cur = conn.execute(
+                        """
+                        SELECT * FROM cfi_round_observations
+                        WHERE job_id = ? AND bank_id = ? AND round_number = ? AND attempt_number = ?
+                        """,
+                        (clean_job_id, obs.bank_id, obs.round_number, obs.attempt_number),
+                    )
+                    existing_round = cur.fetchone()
+                    if existing_round:
+                        if existing_round["payload_digest"] == obs.payload_digest:
+                            conn.execute("COMMIT")
+                            return obs
+                        else:
+                            raise TrainingProvenanceSecurityError(
+                                f"Duplicate observation for job '{clean_job_id}' bank '{obs.bank_id}' round {obs.round_number} attempt {obs.attempt_number} with conflicting content rejected."
+                            )
+
+                    run_id = started["training_run_id"]
+                    sim_id = started["simulation_id"]
+
+                    conn.execute(
+                        """
+                        INSERT INTO cfi_round_observations (
+                            event_id, job_id, training_run_id, simulation_id,
+                            worker_id, bank_id, round_number, attempt_number,
+                            actual_sample_count, actual_executed_epochs, observed_loss,
+                            metrics_json, model_update_digest, execution_timestamp,
+                            execution_status, payload_digest
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            obs.event_id,
+                            clean_job_id,
+                            run_id,
+                            sim_id,
+                            obs.worker_id,
+                            obs.bank_id,
+                            obs.round_number,
+                            obs.attempt_number,
+                            obs.actual_sample_count,
+                            obs.actual_executed_epochs,
+                            float(obs.observed_loss),
+                            json.dumps(dict(obs.metrics)),
+                            obs.model_update_digest,
+                            obs.execution_timestamp,
+                            obs.execution_status,
+                            obs.payload_digest,
+                        ),
+                    )
+                    conn.execute("COMMIT")
+                    return obs
+                except Exception:
+                    conn.execute("ROLLBACK")
+                    raise
+
+    def get_observations(self, job_id: str) -> list[RoundObservation]:
+        clean_job_id = job_id.strip()
+        with self._connect() as conn:
+            cur = conn.execute(
+                """
+                SELECT * FROM cfi_round_observations
+                WHERE job_id = ?
+                ORDER BY round_number ASC, attempt_number ASC
+                """,
+                (clean_job_id,),
+            )
+            rows = cur.fetchall()
+            return [
+                RoundObservation(
+                    event_id=r["event_id"],
+                    job_id=r["job_id"],
+                    training_run_id=r["training_run_id"],
+                    simulation_id=r["simulation_id"],
+                    worker_id=r["worker_id"],
+                    bank_id=r["bank_id"],
+                    round_number=r["round_number"],
+                    attempt_number=r["attempt_number"],
+                    actual_sample_count=r["actual_sample_count"],
+                    actual_executed_epochs=r["actual_executed_epochs"],
+                    observed_loss=r["observed_loss"],
+                    metrics=json.loads(r["metrics_json"] or "{}"),
+                    execution_timestamp=r["execution_timestamp"],
+                    model_update_digest=r["model_update_digest"],
+                    execution_status=r["execution_status"],
+                )
+                for r in rows
+            ]
+
+    def complete_job(
+        self,
+        job_id: str,
+        executed_rounds: int,
+        executed_epochs: int,
+        sample_count: int,
+        observed_metrics: dict[str, float],
+        artifact_sha256: str,
+        worker_id: str = "TRAINING_EXECUTOR",
+        git_commit_hash: str | None = None,
+        dataset_manifest_id: str | None = None,
+        simulation_id: str | None = None,
+        training_run_id: str | None = None,
+        architecture: str | None = None,
+        feature_schema_version: str | None = None,
+        input_dim: int | None = None,
+        feature_names: Sequence[str] | list[str] | tuple[str, ...] | None = None,
+        enforce_lifecycle: bool = True,
+    ) -> CompletedJobExecutionRecord:
+        clean_job_id = job_id.strip()
+        clean_sha = artifact_sha256.strip()
+        target_metrics = dict(observed_metrics) if observed_metrics is not None else {}
+        now_str = datetime.now(UTC).isoformat()
+
+        with self._connect() as conn:  # noqa: SIM117
+            with self._lock:
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    # 1. Fetch scheduled job
+                    cur = conn.execute(
+                        "SELECT * FROM cfi_scheduled_jobs WHERE job_id = ?",
+                        (clean_job_id,),
+                    )
+                    sched_row = cur.fetchone()
+
+                    if enforce_lifecycle:
+                        if not sched_row:
+                            raise TrainingProvenanceSecurityError(
+                                f"Cannot record completion for job '{clean_job_id}': job has not been scheduled through authorized training coordinator. Arbitrary completion claims are rejected."
+                            )
+                        cur = conn.execute(
+                            "SELECT * FROM cfi_started_jobs WHERE job_id = ?",
+                            (clean_job_id,),
+                        )
+                        started_row = cur.fetchone()
+                        if not started_row:
+                            raise TrainingProvenanceSecurityError(
+                                f"Cannot record completion for job '{clean_job_id}': job has not been started by an authorized worker."
+                            )
+                    else:
+                        # Auto-schedule and start in permissive development mode if absent
+                        if not sched_row:
+                            s_sim = simulation_id.strip() if simulation_id else "sim_default"
+                            s_run = training_run_id.strip() if training_run_id else f"run_{clean_job_id}"
+                            s_arch = architecture or "FraudDetectionNN"
+                            s_ver = feature_schema_version or "v1.0"
+                            s_fnames = tuple(feature_names) if feature_names else ()
+                            s_dim = input_dim or len(s_fnames) or 10
+                            cfg_fp = _compute_config_fingerprint(
+                                clean_job_id, s_run, s_sim, s_arch, s_ver, executed_rounds, executed_epochs, s_dim, s_fnames
+                            )
+                            conn.execute(
+                                """
+                                INSERT INTO cfi_scheduled_jobs (
+                                    job_id, training_run_id, simulation_id, coordinator_id,
+                                    architecture, feature_schema_version, expected_rounds, expected_epochs,
+                                    input_dim, feature_names_json, permitted_workers_json, config_fingerprint,
+                                    scheduled_at, status
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                """,
+                                (
+                                    clean_job_id, s_run, s_sim, "COORDINATOR", s_arch, s_ver,
+                                    executed_rounds, executed_epochs, s_dim, json.dumps(list(s_fnames)),
+                                    "[]", cfg_fp, now_str, "SCHEDULED"
+                                ),
+                            )
+                            cur = conn.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = ?", (clean_job_id,))
+                            sched_row = cur.fetchone()
+
+                        cur = conn.execute("SELECT * FROM cfi_started_jobs WHERE job_id = ?", (clean_job_id,))
+                        started_row = cur.fetchone()
+                        if not started_row:
+                            conn.execute(
+                                """
+                                INSERT INTO cfi_started_jobs (
+                                    job_id, training_run_id, simulation_id, worker_id, started_at, status
+                                ) VALUES (?, ?, ?, ?, ?, ?)
+                                """,
+                                (
+                                    clean_job_id, sched_row["training_run_id"], sched_row["simulation_id"],
+                                    worker_id, now_str, "STARTED"
+                                ),
+                            )
+                            cur = conn.execute("SELECT * FROM cfi_started_jobs WHERE job_id = ?", (clean_job_id,))
+                            started_row = cur.fetchone()
+
+                    assert sched_row is not None
+                    assert started_row is not None
+
+                    sched_run_id = sched_row["training_run_id"]
+                    sched_sim_id = sched_row["simulation_id"]
+                    sched_arch = sched_row["architecture"]
+                    sched_schema_ver = sched_row["feature_schema_version"]
+                    sched_input_dim = sched_row["input_dim"]
+                    sched_feature_names = tuple(json.loads(sched_row["feature_names_json"]))
+                    sched_expected_rounds = sched_row["expected_rounds"]
+
+                    # 2. Strict feature contract and metadata immutability enforcement
+                    if simulation_id and simulation_id.strip() != sched_sim_id:
+                        raise TrainingProvenanceSecurityError(
+                            f"Simulation ID mismatch for job '{clean_job_id}': scheduled '{sched_sim_id}', got '{simulation_id}'."
+                        )
+                    if training_run_id and training_run_id.strip() != sched_run_id:
+                        raise TrainingProvenanceSecurityError(
+                            f"Training run ID mismatch for job '{clean_job_id}': scheduled '{sched_run_id}', got '{training_run_id}'."
+                        )
+                    if architecture and architecture.strip() != sched_arch:
+                        raise TrainingProvenanceSecurityError(
+                            f"Architecture mismatch for job '{clean_job_id}': scheduled '{sched_arch}', got '{architecture}'."
+                        )
+                    if feature_schema_version and feature_schema_version.strip() != sched_schema_ver:
+                        raise TrainingProvenanceSecurityError(
+                            f"Feature schema version mismatch for job '{clean_job_id}': scheduled '{sched_schema_ver}', got '{feature_schema_version}'."
+                        )
+                    if input_dim is not None and input_dim != sched_input_dim:
+                        raise TrainingProvenanceSecurityError(
+                            f"Input dimension mismatch for job '{clean_job_id}': scheduled {sched_input_dim}, got {input_dim}."
+                        )
+                    if feature_names is not None:
+                        if sched_feature_names and tuple(feature_names) != sched_feature_names:
+                            raise TrainingProvenanceSecurityError(
+                                f"Feature names mismatch for job '{clean_job_id}': scheduled {sched_feature_names}, got {tuple(feature_names)}."
+                            )
+                        target_fnames = sched_feature_names or tuple(feature_names)
+                    else:
+                        target_fnames = sched_feature_names
+
+                    target_arch = sched_arch
+                    target_schema_ver = sched_schema_ver
+                    target_input_dim = sched_input_dim
+
+                    evidence_fp = _compute_evidence_fingerprint(
+                        sched_run_id,
+                        sched_sim_id,
+                        executed_rounds,
+                        executed_epochs,
+                        sample_count,
+                        clean_sha,
+                        target_arch,
+                        target_schema_ver,
+                        target_input_dim,
+                        target_fnames,
+                        target_metrics,
+                    )
+
+                    # 3. Check existing completed record (idempotency vs conflict)
+                    cur = conn.execute(
+                        "SELECT * FROM cfi_completed_jobs WHERE job_id = ?",
+                        (clean_job_id,),
+                    )
+                    existing_comp = cur.fetchone()
+                    if existing_comp:
+                        if existing_comp["evidence_fingerprint"] == evidence_fp:
+                            conn.execute("COMMIT")
+                            return CompletedJobExecutionRecord(
+                                job_id=existing_comp["job_id"],
+                                training_run_id=existing_comp["training_run_id"],
+                                simulation_id=existing_comp["simulation_id"],
+                                completed_at=existing_comp["completed_at"],
+                                executed_rounds=existing_comp["executed_rounds"],
+                                executed_epochs=existing_comp["executed_epochs"],
+                                sample_count=existing_comp["sample_count"],
+                                observed_metrics=json.loads(existing_comp["observed_metrics_json"]),
+                                artifact_sha256=existing_comp["artifact_sha256"],
+                                architecture=existing_comp["architecture"],
+                                feature_schema_version=existing_comp["feature_schema_version"],
+                                input_dim=existing_comp["input_dim"],
+                                feature_names=tuple(json.loads(existing_comp["feature_names_json"])),
+                                worker_id=existing_comp["worker_id"],
+                                status=existing_comp["status"],
+                                git_commit_hash=existing_comp["git_commit_hash"],
+                                dataset_manifest_id=existing_comp["dataset_manifest_id"],
+                            )
+                        else:
+                            raise TrainingProvenanceSecurityError(
+                                f"Conflicting completion record for job '{clean_job_id}': cannot overwrite existing completed execution record with conflicting evidence."
+                            )
+
+                    # 4. Observation reconciliation
+                    cur = conn.execute(
+                        """
+                        SELECT * FROM cfi_round_observations
+                        WHERE job_id = ?
+                        ORDER BY round_number ASC, attempt_number ASC
+                        """,
+                        (clean_job_id,),
+                    )
+                    obs_rows = cur.fetchall()
+
+                    if enforce_lifecycle or obs_rows:
+                        if not obs_rows:
+                            raise TrainingProvenanceSecurityError(
+                                f"Cannot complete job '{clean_job_id}': no verified execution observations recorded. Fabricated completion is rejected."
+                            )
+
+                        completed_obs = [r for r in obs_rows if r["execution_status"] == "COMPLETED"]
+                        if not completed_obs:
+                            raise TrainingProvenanceSecurityError(
+                                f"Cannot complete job '{clean_job_id}': no successfully completed execution observations recorded."
+                            )
+
+                        observed_round_nums = sorted({r["round_number"] for r in completed_obs})
+
+                        # Verify executed rounds count against distinct observed rounds
+                        if executed_rounds != len(observed_round_nums):
+                            raise TrainingProvenanceSecurityError(
+                                f"Executed rounds mismatch for job '{clean_job_id}': claimed {executed_rounds}, but {len(observed_round_nums)} rounds observed."
+                            )
+                        if sched_expected_rounds > 0 and executed_rounds < sched_expected_rounds:
+                            raise TrainingProvenanceSecurityError(
+                                f"Job '{clean_job_id}' completed fewer rounds than scheduled contract: expected {sched_expected_rounds}, got {executed_rounds}."
+                            )
+
+                        # Verify sample accounting against observations
+                        # Calculate total samples observed across rounds and unique bank participants
+                        total_observed_samples = sum(r["actual_sample_count"] for r in completed_obs)
+                        # Latest round samples (for multi-round iterative FL)
+                        latest_round = max(observed_round_nums)
+                        latest_round_samples = sum(r["actual_sample_count"] for r in completed_obs if r["round_number"] == latest_round)
+                        unique_bank_samples = sum(
+                            {r["bank_id"]: r["actual_sample_count"] for r in completed_obs if r["round_number"] == latest_round}.values()
+                        )
+
+                        sample_matches = sample_count in (
+                            total_observed_samples,
+                            latest_round_samples,
+                            unique_bank_samples,
+                        )
+                        if not sample_matches:
+                            raise TrainingProvenanceSecurityError(
+                                f"Sample count mismatch for job '{clean_job_id}': claimed {sample_count}, but reconciled observed count is {total_observed_samples} (or {latest_round_samples} per-round)."
+                            )
+
+                        # Verify metrics & loss against observations
+                        if "loss" in target_metrics:
+                            claimed_loss = float(target_metrics["loss"])
+                            final_round_obs = [r for r in completed_obs if r["round_number"] == latest_round]
+                            final_losses = [float(r["observed_loss"]) for r in final_round_obs]
+                            tot_s = sum(r["actual_sample_count"] for r in final_round_obs) or 1
+                            weighted_final_loss = (
+                                sum(float(r["observed_loss"]) * r["actual_sample_count"] for r in final_round_obs)
+                                / tot_s
+                            )
+                            valid_losses = [*final_losses, weighted_final_loss]
+                            if not any(math.isclose(claimed_loss, loss_val, rel_tol=1e-3, abs_tol=1e-3) for loss_val in valid_losses):
+                                raise TrainingProvenanceSecurityError(
+                                    f"Observed loss mismatch for job '{clean_job_id}': claimed {claimed_loss}, but observed final loss is {final_losses[-1]}."
+                                )
+
+                    record = CompletedJobExecutionRecord(
+                        job_id=clean_job_id,
+                        training_run_id=sched_run_id,
+                        simulation_id=sched_sim_id,
+                        completed_at=now_str,
+                        executed_rounds=executed_rounds,
+                        executed_epochs=executed_epochs,
+                        sample_count=sample_count,
+                        observed_metrics=target_metrics,
+                        artifact_sha256=clean_sha,
+                        architecture=target_arch,
+                        feature_schema_version=target_schema_ver,
+                        input_dim=target_input_dim,
+                        feature_names=target_fnames,
+                        worker_id=worker_id,
+                        status="COMPLETED",
+                        git_commit_hash=git_commit_hash,
+                        dataset_manifest_id=dataset_manifest_id,
+                    )
+                    record.validate()
+
+                    conn.execute(
+                        """
+                        INSERT INTO cfi_completed_jobs (
+                            job_id, training_run_id, simulation_id, completed_at,
+                            executed_rounds, executed_epochs, sample_count,
+                            observed_metrics_json, artifact_sha256, architecture,
+                            feature_schema_version, input_dim, feature_names_json,
+                            worker_id, status, git_commit_hash, dataset_manifest_id,
+                            evidence_fingerprint
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            clean_job_id,
+                            sched_run_id,
+                            sched_sim_id,
+                            now_str,
+                            executed_rounds,
+                            executed_epochs,
+                            sample_count,
+                            json.dumps(target_metrics),
+                            clean_sha,
+                            target_arch,
+                            target_schema_ver,
+                            target_input_dim,
+                            json.dumps(list(target_fnames)),
+                            worker_id,
+                            "COMPLETED",
+                            git_commit_hash,
+                            dataset_manifest_id,
+                            evidence_fp,
+                        ),
+                    )
+                    conn.execute("COMMIT")
+                    return record
+                except Exception:
+                    conn.execute("ROLLBACK")
+                    raise
+
+    def get_completed_job_by_id(self, job_id: str) -> CompletedJobExecutionRecord | None:
+        clean_job_id = job_id.strip()
+        with self._connect() as conn:
+            cur = conn.execute(
+                "SELECT * FROM cfi_completed_jobs WHERE job_id = ?",
+                (clean_job_id,),
+            )
+            r = cur.fetchone()
+            if not r:
+                return None
+            return CompletedJobExecutionRecord(
+                job_id=r["job_id"],
+                training_run_id=r["training_run_id"],
+                simulation_id=r["simulation_id"],
+                completed_at=r["completed_at"],
+                executed_rounds=r["executed_rounds"],
+                executed_epochs=r["executed_epochs"],
+                sample_count=r["sample_count"],
+                observed_metrics=json.loads(r["observed_metrics_json"]),
+                artifact_sha256=r["artifact_sha256"],
+                architecture=r["architecture"],
+                feature_schema_version=r["feature_schema_version"],
+                input_dim=r["input_dim"],
+                feature_names=tuple(json.loads(r["feature_names_json"])),
+                worker_id=r["worker_id"],
+                status=r["status"],
+                git_commit_hash=r["git_commit_hash"],
+                dataset_manifest_id=r["dataset_manifest_id"],
+            )
+
+    def get_completed_job_by_run_id(self, run_id: str) -> CompletedJobExecutionRecord | None:
+        clean_run_id = run_id.strip()
+        with self._connect() as conn:
+            cur = conn.execute(
+                "SELECT * FROM cfi_completed_jobs WHERE training_run_id = ?",
+                (clean_run_id,),
+            )
+            r = cur.fetchone()
+            if not r:
+                return None
+            return CompletedJobExecutionRecord(
+                job_id=r["job_id"],
+                training_run_id=r["training_run_id"],
+                simulation_id=r["simulation_id"],
+                completed_at=r["completed_at"],
+                executed_rounds=r["executed_rounds"],
+                executed_epochs=r["executed_epochs"],
+                sample_count=r["sample_count"],
+                observed_metrics=json.loads(r["observed_metrics_json"]),
+                artifact_sha256=r["artifact_sha256"],
+                architecture=r["architecture"],
+                feature_schema_version=r["feature_schema_version"],
+                input_dim=r["input_dim"],
+                feature_names=tuple(json.loads(r["feature_names_json"])),
+                worker_id=r["worker_id"],
+                status=r["status"],
+                git_commit_hash=r["git_commit_hash"],
+                dataset_manifest_id=r["dataset_manifest_id"],
+            )
+
+    def clear(self) -> None:
+        with self._connect() as conn, self._lock:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                conn.execute("DELETE FROM cfi_completed_jobs")
+                conn.execute("DELETE FROM cfi_round_observations")
+                conn.execute("DELETE FROM cfi_started_jobs")
+                conn.execute("DELETE FROM cfi_scheduled_jobs")
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+
+
 class TrustedTrainingJobRecordSource:
     """Protected source of completed training execution records enforcing the complete job lifecycle.
 
-    Lifecycle state progression:
-        SCHEDULED (by coordinator) -> STARTED (by authorized worker) -> COMPLETED (with observations)
-
     Guarantees:
-    - Mandatory, strong, independently configured worker credential in production; default placeholders rejected.
-    - An arbitrary caller cannot create a COMPLETED record without prior scheduling and starting through authorized infrastructure.
-    - Existing completed jobs cannot be overwritten with conflicting evidence (fails closed).
-    - Repeated identical completion events are idempotent.
-    - Permanent 1-to-1 binding between job_id and training_run_id prevents cross-job ID collisions.
-    - Supports atomic file-backed durable persistence with mtime reload for cross-worker consistency.
+    - ACID transactional SQLite persistence with WAL mode preventing lost updates across processes.
+    - Workload authorization strictly separating coordinator scheduling from worker execution.
+    - Full round observation recording and derivation/reconciliation of completion claims.
+    - Feature contract immutability from scheduling through completion.
+    - Fail-closed behavior in production: missing database or credentials raises TrainingProvenanceConfigurationError.
     """
 
     def __init__(
@@ -254,52 +1260,74 @@ class TrustedTrainingJobRecordSource:
         configured_token: str | None = None,
         store_path: str | None = None,
         app_env: str | None = None,
+        coordinator_token: str | None = None,
+        db_url: str | None = None,
     ) -> None:
         self._lock = threading.RLock()
         self._worker_token = configured_token if configured_token is not None else worker_token
-        self._in_memory = in_memory
+        self._coordinator_token = coordinator_token
         self._enforce_lifecycle = enforce_lifecycle
         self._app_env = app_env
-        self._last_mtime: float = 0.0
 
-        target_store = store_path if store_path is not None else store_file_path
-        if self._in_memory or target_store == "":
-            self._store_file_path = ""
-            self._in_memory = True
-        else:
-            settings = get_settings()
-            configured = (
-                target_store
-                or os.environ.get("CFI_TRAINING_JOB_STORE_PATH")
-                or getattr(settings, "training_job_store_path", None)
-            )
-            if configured:
-                self._store_file_path = configured
-            else:
-                self._store_file_path = ""
-                self._in_memory = True
+        target_store = store_path if store_path is not None else (store_file_path or db_url)
+        settings = get_settings()
+        active_env = self._app_env or settings.app_env
+        is_prod = active_env.lower() == "production"
 
-        self._scheduled_jobs: dict[str, ScheduledTrainingJob] = {}
-        self._started_jobs: dict[str, StartedTrainingJob] = {}
-        self._completed_jobs_by_id: dict[str, CompletedJobExecutionRecord] = {}
-        self._completed_jobs_by_run_id: dict[str, CompletedJobExecutionRecord] = {}
-        self._run_to_job_id: dict[str, str] = {}
-
-        if not self._in_memory and self._store_file_path:
-            self.reload()
-
-        active_env = self._app_env or get_settings().app_env
-        if active_env.lower() == "production":
-            expected = self._resolve_expected_worker_token()
-            if not expected or expected in FORBIDDEN_WORKER_TOKENS or "change_me" in expected:
+        if is_prod:
+            expected_worker = self._resolve_expected_worker_token()
+            if not expected_worker or expected_worker in FORBIDDEN_WORKER_TOKENS or "change_me" in expected_worker:
                 raise TrainingProvenanceConfigurationError(
                     "Production training worker credential is not configured or uses a forbidden default/placeholder. "
                     "Production execution recording fails closed."
                 )
+            expected_coord = self._resolve_expected_coordinator_token()
+            if expected_coord in FORBIDDEN_COORDINATOR_TOKENS or "change_me" in expected_coord:
+                raise TrainingProvenanceConfigurationError(
+                    "Production training coordinator credential is not configured or uses a forbidden default/placeholder. "
+                    "Production execution recording fails closed."
+                )
+            if expected_coord and hmac.compare_digest(expected_worker, expected_coord):
+                raise TrainingProvenanceConfigurationError(
+                    "Production training coordinator and worker credentials cannot be identical (privilege separation required)."
+                )
+
+        if in_memory or target_store == "":
+            if is_prod:
+                raise TrainingProvenanceConfigurationError(
+                    "Production training job authority database/store is not configured. "
+                    "In-memory fallback is strictly forbidden in production."
+                )
+            self._store_file_path = ""
+            self._in_memory = True
+        else:
+            configured = (
+                target_store
+                or os.environ.get("CFI_TRAINING_JOB_DB_URL")
+                or os.environ.get("CFI_TRAINING_JOB_STORE_PATH")
+                or getattr(settings, "training_job_db_url", None)
+                or getattr(settings, "training_job_store_path", None)
+            )
+            if configured:
+                self._store_file_path = configured
+                self._in_memory = False
+            elif is_prod:
+                raise TrainingProvenanceConfigurationError(
+                    "Production training job authority database/store is not configured. "
+                    "In-memory fallback is strictly forbidden in production."
+                )
+            else:
+                self._store_file_path = ""
+                self._in_memory = True
+
+        self._db = TrainingJobAuthorityDatabase(
+            db_target=self._store_file_path,
+            in_memory=self._in_memory,
+        )
 
     @property
     def is_durable(self) -> bool:
-        """Truthfully report whether this record source is backed by durable file storage."""
+        """Truthfully report whether this record source is backed by durable database storage."""
         return not self._in_memory and bool(self._store_file_path)
 
     def _resolve_expected_worker_token(self) -> str:
@@ -311,10 +1339,54 @@ class TrustedTrainingJobRecordSource:
             or ""
         )
 
+    def _resolve_expected_coordinator_token(self) -> str:
+        settings = get_settings()
+        return (
+            self._coordinator_token
+            or os.environ.get("CFI_TRAINING_COORDINATOR_TOKEN")
+            or getattr(settings, "training_coordinator_token", None)
+            or ""
+        )
+
+    def _validate_coordinator_token(self, provided_token: str | None) -> None:
+        active_env = self._app_env or get_settings().app_env
+        is_prod = active_env.lower() == "production"
+        expected = self._resolve_expected_coordinator_token()
+        expected_worker = self._resolve_expected_worker_token()
+
+        if is_prod:
+            if not expected or expected in FORBIDDEN_COORDINATOR_TOKENS or "change_me" in expected:
+                raise TrainingProvenanceConfigurationError(
+                    "Production training coordinator credential is not configured or uses an insecure placeholder. "
+                    "Production execution recording fails closed."
+                )
+            if not provided_token:
+                raise TrainingProvenanceSecurityError(
+                    "Unauthorized training coordinator: missing training coordinator authorization token."
+                )
+            if expected_worker and hmac.compare_digest(provided_token, expected_worker):
+                raise TrainingProvenanceSecurityError(
+                    "Worker credential cannot authorize job scheduling; coordinator role required."
+                )
+            if not hmac.compare_digest(provided_token, expected):
+                raise TrainingProvenanceSecurityError(
+                    "Unauthorized training coordinator: Invalid training coordinator authorization token."
+                )
+        else:
+            if expected_worker and provided_token and hmac.compare_digest(provided_token, expected_worker):
+                raise TrainingProvenanceSecurityError(
+                    "Worker credential cannot authorize job scheduling; coordinator role required."
+                )
+            if expected and (provided_token is None or not hmac.compare_digest(provided_token, expected)):
+                raise TrainingProvenanceSecurityError(
+                    "Unauthorized training coordinator: invalid coordinator token."
+                )
+
     def _validate_worker_token(self, provided_token: str | None) -> None:
         active_env = self._app_env or get_settings().app_env
         is_prod = active_env.lower() == "production"
         expected = self._resolve_expected_worker_token()
+        expected_coord = self._resolve_expected_coordinator_token()
 
         if is_prod:
             if not expected or expected in FORBIDDEN_WORKER_TOKENS or "change_me" in expected:
@@ -326,14 +1398,23 @@ class TrustedTrainingJobRecordSource:
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized training worker: missing training worker authorization token."
                 )
+            if expected_coord and hmac.compare_digest(provided_token, expected_coord):
+                raise TrainingProvenanceSecurityError(
+                    "Coordinator credential cannot authorize worker execution events."
+                )
             if not hmac.compare_digest(provided_token, expected):
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized training worker: Invalid training worker authorization token."
                 )
-        elif expected and (provided_token is None or not hmac.compare_digest(provided_token, expected)):
-            raise TrainingProvenanceSecurityError(
-                "Unauthorized training worker: invalid worker token."
-            )
+        else:
+            if expected_coord and provided_token and hmac.compare_digest(provided_token, expected_coord):
+                raise TrainingProvenanceSecurityError(
+                    "Coordinator credential cannot authorize worker execution events."
+                )
+            if expected and (provided_token is None or not hmac.compare_digest(provided_token, expected)):
+                raise TrainingProvenanceSecurityError(
+                    "Unauthorized training worker: invalid worker token."
+                )
 
     def schedule_training_job(
         self,
@@ -346,8 +1427,13 @@ class TrustedTrainingJobRecordSource:
         expected_epochs: int = 0,
         input_dim: int = 10,
         feature_names: Sequence[str] | list[str] | tuple[str, ...] = (),
+        coordinator_token: str | None = None,
+        coordinator_id: str = "COORDINATOR",
+        permitted_workers: Sequence[str] = (),
     ) -> ScheduledTrainingJob:
         """Schedule a training job through the authorized training coordinator."""
+        self._validate_coordinator_token(coordinator_token)
+
         if not job_id or not job_id.strip():
             raise ValueError("job_id must be non-empty.")
         if not training_run_id or not training_run_id.strip():
@@ -355,42 +1441,22 @@ class TrustedTrainingJobRecordSource:
         if not simulation_id or not simulation_id.strip():
             raise ValueError("simulation_id must be non-empty.")
 
-        clean_job_id = job_id.strip()
-        clean_run_id = training_run_id.strip()
+        fnames = tuple(feature_names) if feature_names else tuple(CANONICAL_FEATURE_NAMES)
+        dim = input_dim or len(fnames) or 10
 
-        with self._lock:
-            self._reload_if_modified()
-            # Enforce 1-to-1 job_id and training_run_id mapping
-            if clean_run_id in self._run_to_job_id:
-                bound_job = self._run_to_job_id[clean_run_id]
-                if bound_job != clean_job_id:
-                    raise TrainingProvenanceSecurityError(
-                        f"Cannot schedule job '{clean_job_id}': training_run_id '{clean_run_id}' is already permanently bound to job '{bound_job}'."
-                    )
-            if clean_job_id in self._scheduled_jobs:
-                existing = self._scheduled_jobs[clean_job_id]
-                if existing.training_run_id != clean_run_id or existing.simulation_id != simulation_id.strip():
-                    raise TrainingProvenanceSecurityError(
-                        f"Cannot reschedule job '{clean_job_id}' with conflicting parameters."
-                    )
-                return existing
-
-            scheduled = ScheduledTrainingJob(
-                job_id=clean_job_id,
-                training_run_id=clean_run_id,
-                simulation_id=simulation_id.strip(),
-                architecture=architecture,
-                feature_schema_version=feature_schema_version,
-                expected_rounds=expected_rounds,
-                expected_epochs=expected_epochs,
-                input_dim=input_dim,
-                feature_names=tuple(feature_names),
-                scheduled_at=datetime.now(UTC).isoformat(),
-            )
-            self._scheduled_jobs[clean_job_id] = scheduled
-            self._run_to_job_id[clean_run_id] = clean_job_id
-            self._persist()
-            return scheduled
+        return self._db.schedule_job(
+            job_id=job_id,
+            training_run_id=training_run_id,
+            simulation_id=simulation_id,
+            architecture=architecture,
+            feature_schema_version=feature_schema_version,
+            expected_rounds=expected_rounds,
+            expected_epochs=expected_epochs,
+            input_dim=dim,
+            feature_names=fnames,
+            coordinator_id=coordinator_id,
+            permitted_workers=permitted_workers,
+        )
 
     def start_training_job(
         self,
@@ -400,52 +1466,63 @@ class TrustedTrainingJobRecordSource:
     ) -> StartedTrainingJob:
         """Signal that authorized training worker has initiated execution for a scheduled job."""
         self._validate_worker_token(worker_token)
-
-        clean_job_id = job_id.strip()
-        with self._lock:
-            self._reload_if_modified()
-            if clean_job_id not in self._scheduled_jobs:
-                raise TrainingProvenanceSecurityError(
-                    f"Cannot start job '{clean_job_id}': job was not scheduled by the training coordinator."
-                )
-            if clean_job_id in self._completed_jobs_by_id:
-                raise TrainingProvenanceSecurityError(
-                    f"Cannot start job '{clean_job_id}': job has already completed."
-                )
-            if clean_job_id in self._started_jobs:
-                return self._started_jobs[clean_job_id]
-
-            sched = self._scheduled_jobs[clean_job_id]
-            started = StartedTrainingJob(
-                job_id=clean_job_id,
-                training_run_id=sched.training_run_id,
-                simulation_id=sched.simulation_id,
-                worker_id=worker_id,
-                started_at=datetime.now(UTC).isoformat(),
-            )
-            self._started_jobs[clean_job_id] = started
-            self._persist()
-            return started
+        if not job_id or not job_id.strip():
+            raise ValueError("job_id must be non-empty.")
+        return self._db.start_job(job_id=job_id, worker_id=worker_id)
 
     def record_round_observation(
         self,
         job_id: str,
-        round_idx: int | None = None,
+        round_number: int | None = None,
         sample_count: int = 0,
         metrics: dict[str, float] | None = None,
         worker_token: str | None = None,
-        round_num: int | None = None,
+        worker_id: str = "TRAINING_EXECUTOR",
+        bank_id: str = "BANK_A",
+        attempt_number: int = 1,
+        actual_executed_epochs: int = 0,
         observed_loss: float | None = None,
-    ) -> None:
+        model_update_digest: str | None = None,
+        event_id: str | None = None,
+        execution_status: str = "COMPLETED",
+        round_num: int | None = None,
+        round_idx: int | None = None,
+    ) -> RoundObservation:
         """Record genuine round progress and observations during active execution."""
         self._validate_worker_token(worker_token)
         clean_job_id = job_id.strip()
-        with self._lock:
-            self._reload_if_modified()
-            if clean_job_id not in self._started_jobs:
-                raise TrainingProvenanceSecurityError(
-                    f"Cannot record observations for job '{clean_job_id}': job is not in STARTED state."
-                )
+        r_num = round_number if round_number is not None else (round_num if round_num is not None else (round_idx if round_idx is not None else 1))
+
+        loss_val = observed_loss
+        target_metrics = dict(metrics) if metrics is not None else {}
+        if loss_val is None:
+            for k in ("loss", "final_loss", "train_loss", "val_loss"):
+                if k in target_metrics:
+                    loss_val = float(target_metrics[k])
+                    break
+        if loss_val is None:
+            loss_val = 0.0
+
+        eid = event_id or f"evt_{clean_job_id}_r{r_num}_{worker_id}_{attempt_number}_{uuid.uuid4().hex[:8]}"
+
+        obs = RoundObservation(
+            event_id=eid,
+            job_id=clean_job_id,
+            training_run_id="",
+            simulation_id="",
+            worker_id=worker_id,
+            bank_id=bank_id,
+            round_number=r_num,
+            attempt_number=attempt_number,
+            actual_sample_count=sample_count,
+            actual_executed_epochs=actual_executed_epochs,
+            observed_loss=loss_val,
+            metrics=target_metrics,
+            execution_timestamp=datetime.now(UTC).isoformat(),
+            model_update_digest=model_update_digest,
+            execution_status=execution_status,
+        )
+        return self._db.record_observation(obs)
 
     def complete_training_job(
         self,
@@ -467,16 +1544,9 @@ class TrustedTrainingJobRecordSource:
         training_run_id: str | None = None,
         enforce_lifecycle: bool | None = None,
     ) -> CompletedJobExecutionRecord:
-        """Register completion of an authorized training job with observed execution evidence.
-
-        Enforces strict lifecycle progression:
-        - In production (or when enforce_lifecycle=True), job MUST have been scheduled and started.
-        - Existing completed jobs cannot be overwritten with conflicting evidence (fail closed).
-        - Repeated identical submissions are idempotent.
-        """
+        """Register completion of an authorized training job with observed execution evidence."""
         self._validate_worker_token(worker_token)
 
-        clean_job_id = job_id.strip()
         active_env = self._app_env or get_settings().app_env
         is_prod = active_env.lower() == "production"
         enforce = (
@@ -485,139 +1555,24 @@ class TrustedTrainingJobRecordSource:
             else (self._enforce_lifecycle if self._enforce_lifecycle is not None else is_prod)
         )
 
-        with self._lock:
-            self._reload_if_modified()
-
-            # Lifecycle enforcement check
-            if enforce:
-                if clean_job_id not in self._scheduled_jobs:
-                    raise TrainingProvenanceSecurityError(
-                        f"Cannot record completion for job '{clean_job_id}': job has not been scheduled through authorized training coordinator. Arbitrary completion claims are rejected."
-                    )
-                if clean_job_id not in self._started_jobs:
-                    raise TrainingProvenanceSecurityError(
-                        f"Cannot record completion for job '{clean_job_id}': job has not been started by an authorized worker."
-                    )
-                sched = self._scheduled_jobs[clean_job_id]
-                started = self._started_jobs[clean_job_id]
-                sched_sim = sched.simulation_id
-                sched_run = sched.training_run_id
-                sched_arch = sched.architecture
-                sched_schema = sched.feature_schema_version
-                sched_worker = started.worker_id
-
-                if simulation_id and simulation_id.strip() != sched_sim:
-                    raise TrainingProvenanceSecurityError(
-                        f"Simulation ID mismatch for job '{clean_job_id}': scheduled '{sched_sim}', got '{simulation_id}'."
-                    )
-                if training_run_id and training_run_id.strip() != sched_run:
-                    raise TrainingProvenanceSecurityError(
-                        f"Training run ID mismatch for job '{clean_job_id}': scheduled '{sched_run}', got '{training_run_id}'."
-                    )
-                if architecture and architecture.strip() != sched_arch:
-                    raise TrainingProvenanceSecurityError(
-                        f"Architecture mismatch for job '{clean_job_id}': scheduled '{sched_arch}', got '{architecture}'."
-                    )
-                if feature_schema_version and feature_schema_version.strip() != sched_schema:
-                    raise TrainingProvenanceSecurityError(
-                        f"Feature schema version mismatch for job '{clean_job_id}': scheduled '{sched_schema}', got '{feature_schema_version}'."
-                    )
-            else:
-                # In non-enforced development/test mode, auto-schedule and start if missing
-                if clean_job_id not in self._scheduled_jobs:
-                    sched_sim = simulation_id.strip() if simulation_id else "sim_default"
-                    sched_run = training_run_id.strip() if training_run_id else f"run_{clean_job_id}"
-                    sched_arch = architecture or "FraudDetectionNN"
-                    sched_schema = feature_schema_version or "v1.0"
-                    sched_fnames = tuple(feature_names) if feature_names else ()
-                    sched_dim = input_dim or len(sched_fnames) or 10
-                    self._scheduled_jobs[clean_job_id] = ScheduledTrainingJob(
-                        job_id=clean_job_id,
-                        training_run_id=sched_run,
-                        simulation_id=sched_sim,
-                        architecture=sched_arch,
-                        feature_schema_version=sched_schema,
-                        expected_rounds=executed_rounds,
-                        expected_epochs=executed_epochs,
-                        input_dim=sched_dim,
-                        feature_names=sched_fnames,
-                        scheduled_at=datetime.now(UTC).isoformat(),
-                    )
-                    self._run_to_job_id[sched_run] = clean_job_id
-                else:
-                    sched = self._scheduled_jobs[clean_job_id]
-                    sched_sim = sched.simulation_id
-                    sched_run = sched.training_run_id
-                    sched_arch = architecture or sched.architecture
-                    sched_schema = feature_schema_version or sched.feature_schema_version
-
-                if clean_job_id not in self._started_jobs:
-                    self._started_jobs[clean_job_id] = StartedTrainingJob(
-                        job_id=clean_job_id,
-                        training_run_id=sched_run,
-                        simulation_id=sched_sim,
-                        worker_id=worker_id,
-                        started_at=datetime.now(UTC).isoformat(),
-                    )
-                sched_worker = worker_id
-
-            # Idempotency and Conflict / Overwrite Prevention (Defect 4, Gate J05, J13)
-            target_metrics: dict[str, float] = dict(observed_metrics) if observed_metrics is not None else {}
-            if clean_job_id in self._completed_jobs_by_id:
-                existing = self._completed_jobs_by_id[clean_job_id]
-                # Compare all security-relevant fields
-                is_identical = (
-                    hmac.compare_digest(existing.artifact_sha256, artifact_sha256)
-                    and existing.executed_rounds == executed_rounds
-                    and existing.executed_epochs == executed_epochs
-                    and existing.sample_count == sample_count
-                    and existing.simulation_id == sched_sim
-                    and existing.training_run_id == sched_run
-                    and len(existing.observed_metrics) == len(target_metrics)
-                    and all(
-                        k in existing.observed_metrics
-                        and math.isclose(existing.observed_metrics[k], v, rel_tol=1e-7, abs_tol=1e-7)
-                        for k, v in target_metrics.items()
-                    )
-                )
-                if is_identical:
-                    # Idempotent re-submission
-                    return existing
-                else:
-                    # Conflicting overwrite attempt
-                    raise TrainingProvenanceSecurityError(
-                        f"Conflicting completion record for job '{clean_job_id}': cannot overwrite existing completed execution record with conflicting evidence."
-                    )
-
-            target_fnames = tuple(feature_names) if feature_names is not None else ()
-            target_dim = input_dim if input_dim is not None else (len(target_fnames) or 10)
-
-            rec = CompletedJobExecutionRecord(
-                job_id=clean_job_id,
-                training_run_id=sched_run,
-                simulation_id=sched_sim,
-                completed_at=datetime.now(UTC).isoformat(),
-                executed_rounds=executed_rounds,
-                executed_epochs=executed_epochs,
-                sample_count=sample_count,
-                observed_metrics=target_metrics,
-                artifact_sha256=artifact_sha256,
-                architecture=sched_arch,
-                feature_schema_version=sched_schema,
-                input_dim=target_dim,
-                feature_names=target_fnames,
-                worker_id=sched_worker,
-                status="COMPLETED",
-                git_commit_hash=git_commit_hash,
-                dataset_manifest_id=dataset_manifest_id,
-            )
-            rec.validate()
-
-            self._completed_jobs_by_id[clean_job_id] = rec
-            self._completed_jobs_by_run_id[sched_run] = rec
-            self._run_to_job_id[sched_run] = clean_job_id
-            self._persist()
-            return rec
+        return self._db.complete_job(
+            job_id=job_id,
+            executed_rounds=executed_rounds,
+            executed_epochs=executed_epochs,
+            sample_count=sample_count,
+            observed_metrics=observed_metrics or {},
+            artifact_sha256=artifact_sha256,
+            worker_id=worker_id,
+            git_commit_hash=git_commit_hash,
+            dataset_manifest_id=dataset_manifest_id,
+            simulation_id=simulation_id,
+            training_run_id=training_run_id,
+            architecture=architecture,
+            feature_schema_version=feature_schema_version,
+            input_dim=input_dim,
+            feature_names=feature_names,
+            enforce_lifecycle=enforce,
+        )
 
     def record_job_completion(
         self,
@@ -684,119 +1639,28 @@ class TrustedTrainingJobRecordSource:
 
     def get_completed_job(self, identifier: str) -> CompletedJobExecutionRecord | None:
         """Retrieve completed execution record by job_id or training_run_id."""
-        with self._lock:
-            self._reload_if_modified()
-            if identifier in self._completed_jobs_by_id:
-                return self._completed_jobs_by_id[identifier]
-            if identifier in self._completed_jobs_by_run_id:
-                return self._completed_jobs_by_run_id[identifier]
-            return None
+        rec = self._db.get_completed_job_by_id(identifier)
+        if rec is not None:
+            return rec
+        return self._db.get_completed_job_by_run_id(identifier)
 
     def get_completed_job_by_id(self, job_id: str) -> CompletedJobExecutionRecord | None:
-        with self._lock:
-            self._reload_if_modified()
-            return self._completed_jobs_by_id.get(job_id)
+        return self._db.get_completed_job_by_id(job_id)
 
     def get_completed_job_by_run_id(self, run_id: str) -> CompletedJobExecutionRecord | None:
-        with self._lock:
-            self._reload_if_modified()
-            return self._completed_jobs_by_run_id.get(run_id)
+        return self._db.get_completed_job_by_run_id(run_id)
+
+    def get_round_observations(self, job_id: str) -> list[RoundObservation]:
+        return self._db.get_observations(job_id)
 
     def has_completed_job(self, identifier: str) -> bool:
-        with self._lock:
-            self._reload_if_modified()
-            return identifier in self._completed_jobs_by_id or identifier in self._completed_jobs_by_run_id
+        return self.get_completed_job(identifier) is not None
 
     def clear(self) -> None:
-        with self._lock:
-            self._scheduled_jobs.clear()
-            self._started_jobs.clear()
-            self._completed_jobs_by_id.clear()
-            self._completed_jobs_by_run_id.clear()
-            self._run_to_job_id.clear()
-            if not self._in_memory and self._store_file_path and os.path.exists(self._store_file_path):
-                with contextlib.suppress(OSError):
-                    os.remove(self._store_file_path)
-            self._last_mtime = 0.0
-
-    def _persist(self) -> None:
-        if self._in_memory or not self._store_file_path:
-            return
-        data = {
-            "scheduled": {k: dataclasses.asdict(v) for k, v in self._scheduled_jobs.items()},
-            "started": {k: dataclasses.asdict(v) for k, v in self._started_jobs.items()},
-            "completed": {
-                k: {
-                    "job_id": v.job_id,
-                    "training_run_id": v.training_run_id,
-                    "simulation_id": v.simulation_id,
-                    "completed_at": v.completed_at,
-                    "executed_rounds": v.executed_rounds,
-                    "executed_epochs": v.executed_epochs,
-                    "sample_count": v.sample_count,
-                    "observed_metrics": dict(v.observed_metrics),
-                    "artifact_sha256": v.artifact_sha256,
-                    "architecture": v.architecture,
-                    "feature_schema_version": v.feature_schema_version,
-                    "input_dim": v.input_dim,
-                    "feature_names": list(v.feature_names),
-                    "worker_id": v.worker_id,
-                    "status": v.status,
-                    "git_commit_hash": v.git_commit_hash,
-                    "dataset_manifest_id": v.dataset_manifest_id,
-                }
-                for k, v in self._completed_jobs_by_id.items()
-            },
-            "run_to_job": self._run_to_job_id,
-            "updated_at": datetime.now(UTC).isoformat(),
-        }
-        parent_dir = os.path.dirname(os.path.abspath(self._store_file_path))
-        os.makedirs(parent_dir, exist_ok=True)
-        tmp_path = f"{self._store_file_path}.{os.getpid()}.{threading.get_ident()}.tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp_path, self._store_file_path)
-        with contextlib.suppress(OSError):
-            self._last_mtime = os.path.getmtime(self._store_file_path)
+        self._db.clear()
 
     def reload(self) -> None:
-        if self._in_memory or not self._store_file_path:
-            return
-        with self._lock:
-            if os.path.exists(self._store_file_path):
-                try:
-                    mtime = os.path.getmtime(self._store_file_path)
-                    with open(self._store_file_path, encoding="utf-8") as f:
-                        data = json.load(f)
-                    self._scheduled_jobs = {
-                        k: ScheduledTrainingJob(**v)
-                        for k, v in data.get("scheduled", {}).items()
-                    }
-                    self._started_jobs = {
-                        k: StartedTrainingJob(**v)
-                        for k, v in data.get("started", {}).items()
-                    }
-                    self._completed_jobs_by_id = {
-                        k: CompletedJobExecutionRecord(**v)
-                        for k, v in data.get("completed", {}).items()
-                    }
-                    self._completed_jobs_by_run_id = {
-                        v.training_run_id: v
-                        for v in self._completed_jobs_by_id.values()
-                    }
-                    self._run_to_job_id = data.get("run_to_job", {})
-                    self._last_mtime = mtime
-                except Exception as exc:
-                    logger.warning("Failed to reload training job store from %s: %s", self._store_file_path, exc)
-
-    def _reload_if_modified(self) -> None:
-        if self._in_memory or not self._store_file_path:
-            return
-        if os.path.exists(self._store_file_path):
-            with contextlib.suppress(OSError):
-                mtime = os.path.getmtime(self._store_file_path)
-                if mtime > self._last_mtime:
-                    self.reload()
+        pass
 
 
 class DurableTrustStore:
@@ -1031,6 +1895,9 @@ def schedule_training_job(
     expected_epochs: int = 0,
     input_dim: int = 10,
     feature_names: Sequence[str] | list[str] | tuple[str, ...] = (),
+    coordinator_token: str | None = None,
+    coordinator_id: str = "COORDINATOR",
+    permitted_workers: Sequence[str] = (),
 ) -> ScheduledTrainingJob:
     """Convenience helper to schedule a training job with the default record source."""
     return get_default_training_job_record_source().schedule_training_job(
@@ -1043,6 +1910,9 @@ def schedule_training_job(
         expected_epochs=expected_epochs,
         input_dim=input_dim,
         feature_names=feature_names,
+        coordinator_token=coordinator_token,
+        coordinator_id=coordinator_id,
+        permitted_workers=permitted_workers,
     )
 
 
@@ -1056,6 +1926,43 @@ def start_training_job(
         job_id=job_id,
         worker_id=worker_id,
         worker_token=worker_token,
+    )
+
+
+def record_round_observation(
+    job_id: str,
+    round_number: int | None = None,
+    sample_count: int = 0,
+    metrics: dict[str, float] | None = None,
+    worker_token: str | None = None,
+    worker_id: str = "TRAINING_EXECUTOR",
+    bank_id: str = "BANK_A",
+    attempt_number: int = 1,
+    actual_executed_epochs: int = 0,
+    observed_loss: float | None = None,
+    model_update_digest: str | None = None,
+    event_id: str | None = None,
+    execution_status: str = "COMPLETED",
+    round_num: int | None = None,
+    round_idx: int | None = None,
+) -> RoundObservation:
+    """Convenience helper to record genuine round execution observations with the default record source."""
+    return get_default_training_job_record_source().record_round_observation(
+        job_id=job_id,
+        round_number=round_number,
+        sample_count=sample_count,
+        metrics=metrics,
+        worker_token=worker_token,
+        worker_id=worker_id,
+        bank_id=bank_id,
+        attempt_number=attempt_number,
+        actual_executed_epochs=actual_executed_epochs,
+        observed_loss=observed_loss,
+        model_update_digest=model_update_digest,
+        event_id=event_id,
+        execution_status=execution_status,
+        round_num=round_num,
+        round_idx=round_idx,
     )
 
 

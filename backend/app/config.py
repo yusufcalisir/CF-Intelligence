@@ -140,6 +140,14 @@ class Settings(BaseSettings):
         ),
         description="Expected key ID for authorized training receipt issuer.",
     )
+    training_coordinator_token: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "training_coordinator_token",
+            "cfi_training_coordinator_token",
+        ),
+        description="Authorization secret for training coordinators to schedule jobs.",
+    )
     training_worker_token: str = Field(
         default="",
         validation_alias=AliasChoices(
@@ -148,13 +156,21 @@ class Settings(BaseSettings):
         ),
         description="Authorization secret for training workers to register completed job executions.",
     )
+    training_job_db_url: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "training_job_db_url",
+            "cfi_training_job_db_url",
+        ),
+        description="Durable SQLite or PostgreSQL connection URL for training job authority records.",
+    )
     training_job_store_path: str = Field(
         default="",
         validation_alias=AliasChoices(
             "training_job_store_path",
             "cfi_training_job_store_path",
         ),
-        description="Path to durable training job execution records file.",
+        description="Path to durable training job execution records file or sqlite database.",
     )
     training_receipt_trust_store_path: str = Field(
         default="",
@@ -334,9 +350,10 @@ class Settings(BaseSettings):
         if "*" in self.cors_allowed_origins.split(","):
             violations.append("cors_allowed_origins cannot contain wildcard '*' in production.")
 
-        forbidden_worker_tokens = {
+        forbidden_tokens = {
             "",
             "cfi_authorized_training_worker_secret_v1",
+            "cfi_authorized_training_coordinator_secret_v1",
             "secret",
             "changeme",
             "admin",
@@ -346,11 +363,34 @@ class Settings(BaseSettings):
         }
         if (
             not self.training_worker_token
-            or self.training_worker_token in forbidden_worker_tokens
+            or self.training_worker_token in forbidden_tokens
             or "change_me" in self.training_worker_token
         ):
             violations.append(
                 "training_worker_token must be set to an independently configured high-entropy secret in production (cannot be empty or default placeholder)."
+            )
+
+        if (
+            not self.training_coordinator_token
+            or self.training_coordinator_token in forbidden_tokens
+            or "change_me" in self.training_coordinator_token
+        ):
+            violations.append(
+                "training_coordinator_token must be set to an independently configured high-entropy secret in production (cannot be empty or default placeholder)."
+            )
+
+        if (
+            self.training_worker_token
+            and self.training_coordinator_token
+            and self.training_worker_token == self.training_coordinator_token
+        ):
+            violations.append(
+                "training_worker_token and training_coordinator_token must be distinct credentials in production (privilege separation violation)."
+            )
+
+        if not self.training_job_db_url and not self.training_job_store_path:
+            violations.append(
+                "training_job_db_url (or training_job_store_path) must be explicitly configured in production. In-memory fallback is strictly forbidden."
             )
 
         if violations:

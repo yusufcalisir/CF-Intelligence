@@ -944,10 +944,14 @@ class SimulationService:
             job_id = f"job_{simulation.id}"
             training_run_id = f"fl_run_{simulation.id}"
             fnames_list = list(FEATURE_NAMES)
+            coordinator_token = os.environ.get("CFI_TRAINING_COORDINATOR_TOKEN") or getattr(
+                self.settings, "training_coordinator_token", None
+            )
             worker_token = os.environ.get("CFI_TRAINING_WORKER_TOKEN") or getattr(
                 self.settings, "training_worker_token", None
             )
             job_source = get_default_training_job_record_source()
+            provenance_recording_failed = False
             try:
                 job_source.schedule_training_job(
                     job_id=job_id,
@@ -959,6 +963,9 @@ class SimulationService:
                     expected_epochs=0,
                     input_dim=len(fnames_list),
                     feature_names=fnames_list,
+                    coordinator_token=coordinator_token,
+                    coordinator_id="FEDERATED_COORDINATOR",
+                    permitted_workers=("FEDERATED_SIMULATION_SERVICE",),
                 )
                 job_source.start_training_job(
                     job_id=job_id,
@@ -967,6 +974,7 @@ class SimulationService:
                 )
             except Exception as exc:
                 logger.warning("Failed to schedule/start trusted training job %s: %s", job_id, exc)
+                provenance_recording_failed = True
 
             if fl_engine_type == "flower":
                 # â”€â”€ Flower Framework Branch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1657,15 +1665,27 @@ class SimulationService:
 
                     # Record round execution observation in trusted job lifecycle
                     round_samples_sum = sum(client_samples) if client_samples else 0
-                    with contextlib.suppress(Exception):
-                        job_source.record_round_observation(
-                            job_id=job_id,
-                            round_num=round_num,
-                            observed_loss=round_loss
-                            if isinstance(round_loss, (int, float)) and math.isfinite(round_loss)
-                            else None,
-                            sample_count=round_samples_sum,
-                        )
+                    if not provenance_recording_failed:
+                        try:
+                            job_source.record_round_observation(
+                                job_id=job_id,
+                                round_number=round_num,
+                                observed_loss=round_loss
+                                if isinstance(round_loss, (int, float)) and math.isfinite(round_loss)
+                                else 0.0,
+                                sample_count=round_samples_sum,
+                                worker_token=worker_token,
+                                worker_id="FEDERATED_SIMULATION_SERVICE",
+                                bank_id="CONSORTIUM_ROUND",
+                            )
+                        except Exception as obs_err:
+                            logger.error(
+                                "Failed to record round observation for job %s round %d: %s",
+                                job_id,
+                                round_num,
+                                obs_err,
+                            )
+                            provenance_recording_failed = True
 
                     _cleanup_pytorch_memory()
 
@@ -2379,7 +2399,7 @@ class SimulationService:
                 artifact_sha = hashlib.sha256(model_bytes).hexdigest()
 
                 fl_receipt = None
-                if has_valid_observations:
+                if has_valid_observations and not provenance_recording_failed:
                     from app.application.services.training_provenance_service import (
                         record_training_job_completion,
                     )
@@ -2441,12 +2461,13 @@ class SimulationService:
                 else:
                     logger.warning(
                         "Simulation %s completed ML run but lacked necessary training observations "
-                        "(rounds=%d, samples=%d, finite_loss=%s) to issue a trusted execution receipt. "
+                        "(rounds=%d, samples=%d, finite_loss=%s, provenance_failed=%s) to issue a trusted execution receipt. "
                         "Registering model truthfully as unverified without fabricated receipt.",
                         simulation.id,
                         fl_rounds_executed,
                         total_fl_samples,
                         has_finite_loss,
+                        provenance_recording_failed,
                     )
 
                 self.model_registry.save_version(

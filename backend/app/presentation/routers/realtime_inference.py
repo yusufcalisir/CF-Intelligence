@@ -320,7 +320,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                     logger.warning("Redis model cache failed HMAC authenticity verification. Evicting.")
                                     with contextlib.suppress(Exception):
                                         redis_client.delete(scoped_model_key, scoped_auth_key)
-                                        if not sim_scope:
+                                        if scoped_model_key != "cfi:champion_model":
                                             redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                 else:
                                     # MANDATORY FIELD VALIDATION:
@@ -363,7 +363,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                     if not schema_valid:
                                         with contextlib.suppress(Exception):
                                             redis_client.delete(scoped_model_key, scoped_auth_key)
-                                            if not sim_scope:
+                                            if scoped_model_key != "cfi:champion_model":
                                                 redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                     else:
                                         expected_model_sha = hashlib.sha256(cached_bytes).hexdigest()
@@ -373,18 +373,18 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                             logger.warning("Redis model cache SHA-256 digest mismatch. Evicting.")
                                             with contextlib.suppress(Exception):
                                                 redis_client.delete(scoped_model_key, scoped_auth_key)
-                                                if not sim_scope:
+                                                if scoped_model_key != "cfi:champion_model":
                                                     redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                         elif (
-                                            meta_for_schema["serialization_version"] != 2
-                                            or meta_for_schema["version"] != current_meta.get("version")
-                                            or meta_for_schema["generation"] != current_meta.get("generation")
-                                            or meta_for_schema["simulation_id"] != current_meta.get("simulation_id")
+                                            meta_for_schema.get("serialization_version") != 2
+                                            or meta_for_schema.get("version") != current_meta.get("version")
+                                            or meta_for_schema.get("generation", 1) != current_meta.get("generation", 1)
+                                            or meta_for_schema.get("simulation_id") != current_meta.get("simulation_id")
                                             or not hmac.compare_digest(
-                                                meta_for_schema["artifact_sha256"], current_meta.get("sha256", "")
+                                                meta_for_schema.get("artifact_sha256", ""), current_meta.get("sha256", "")
                                             )
-                                            or meta_for_schema["input_dim"] != NUM_FEATURES
-                                            or meta_for_schema["architecture"] != current_meta.get("architecture", "FraudDetectionModel-GroupNorm")
+                                            or meta_for_schema.get("input_dim") != NUM_FEATURES
+                                            or meta_for_schema.get("architecture") != (current_meta.get("architecture") or "FraudDetectionModel-GroupNorm")
                                             or (
                                                 settings.app_env.lower() == "production"
                                                 and str(meta_for_schema.get("provenance_type", "UNVERIFIED")).strip().upper()
@@ -396,7 +396,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                             )
                                             with contextlib.suppress(Exception):
                                                 redis_client.delete(scoped_model_key, scoped_auth_key)
-                                                if not sim_scope:
+                                                if scoped_model_key != "cfi:champion_model":
                                                     redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                         else:
                                             # Authenticated, complete schema, and strictly matches current active champion!

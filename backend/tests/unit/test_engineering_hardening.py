@@ -60,6 +60,9 @@ def test_production_invariants_pass_when_hardened() -> None:
         payload_signing_secret="super_secure_random_production_secret_key_2026_hex64",
         postgres_password="strong_hardened_db_password_2026",
         cors_allowed_origins="https://cfi-platform.internal,https://cf-intelligence.vercel.app",
+        training_worker_token="super_secret_training_worker_token_2026_enterprise",
+        training_coordinator_token="super_secret_training_coordinator_token_2026_enterprise",
+        training_job_store_path="cfi_jobs.sqlite",
     )
     # Should not raise
     hardened_prod.validate_production_invariants()
@@ -141,6 +144,9 @@ async def test_production_lifespan_proceeds_with_valid_configuration(
             app_debug=False,
             payload_signing_secret="high_entropy_ephemeral_test_secret_2026_64hex",
             cors_allowed_origins="https://cfi-platform.internal,https://cf-intelligence.vercel.app",
+            training_worker_token="super_secret_training_worker_token_2026_enterprise",
+            training_coordinator_token="super_secret_training_coordinator_token_2026_enterprise",
+            training_job_store_path="cfi_jobs.sqlite",
         ),
     )
     # Mock network/db calls during lifespan probe to keep test hermetic
