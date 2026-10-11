@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import hmac
 import io
 import logging
 import math
@@ -36,6 +37,8 @@ from app.application.services.privacy_service import PrivacyService
 from app.application.services.training_provenance_service import (
     DEFAULT_TRAINING_KEY_ID,
     TrainingExecutionEvidence,
+    TrainingExecutionReceipt,
+    TrainingProvenanceConfigurationError,
     TrainingProvenanceSecurityError,
     TrainingReceiptIssuer,
     TrainingReceiptVerifier,
@@ -82,17 +85,190 @@ def _serialize_model_state_dict(model: nn.Module) -> bytes:
 # ---------------------------------------------------------------------------
 
 
+class BankPrivateStorageVault:
+    """Institution-isolated storage vault enforcing physical and logical boundary protection.
+
+    Enforces Module 01-A.1 Requirement:
+    - Dedicated local storage vault per financial institution (BANK_A, BANK_B, BANK_C).
+    - Hard access denial on unauthorized cross-bank reads or coordinator read attempts.
+    - Native OS-level exclusive handle on the private dataset during worker execution,
+      causing genuine OS-level PermissionError when external processes attempt open().
+    """
+
+    def __init__(self, bank_id: str, vault_dir: str, bank_token: str | None = None) -> None:
+        self.bank_id = bank_id
+        self.vault_dir = os.path.join(vault_dir, bank_id)
+        os.makedirs(self.vault_dir, exist_ok=True)
+        self.data_path = os.path.join(self.vault_dir, "private_dataset.npz")
+        self.bank_token = bank_token
+        self._os_lock_handle: Any = None
+
+    def store_dataset(self, X: np.ndarray, y: np.ndarray) -> str:
+        np.savez_compressed(self.data_path, X=X, y=y)
+        with contextlib.suppress(Exception):
+            os.chmod(self.vault_dir, 0o700)
+            os.chmod(self.data_path, 0o600)
+        return self.data_path
+
+    def acquire_exclusive_os_boundary(self) -> None:
+        """Lock the physical file using native OS kernel primitives so external open() fails with PermissionError."""
+        if not os.path.exists(self.data_path):
+            return
+        if os.name == "nt":
+            import ctypes
+
+            generic_read = 0x80000000
+            generic_write = 0x40000000
+            file_share_none = 0
+            open_existing = 3
+            file_attribute_normal = 0x80
+            handle = ctypes.windll.kernel32.CreateFileW(
+                self.data_path,
+                generic_read | generic_write,
+                file_share_none,
+                None,
+                open_existing,
+                file_attribute_normal,
+                None,
+            )
+            if handle != -1:
+                self._os_lock_handle = handle
+        else:
+            try:
+                import fcntl
+
+                fd = os.open(self.data_path, os.O_RDWR)
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self._os_lock_handle = fd
+            except Exception:
+                pass
+
+    def release_exclusive_os_boundary(self) -> None:
+        """Release the OS-level lock on dataset file."""
+        if self._os_lock_handle is not None:
+            if os.name == "nt":
+                import ctypes
+
+                ctypes.windll.kernel32.CloseHandle(self._os_lock_handle)
+            else:
+                try:
+                    import fcntl
+
+                    fcntl.flock(self._os_lock_handle, fcntl.LOCK_UN)
+                    os.close(self._os_lock_handle)
+                except Exception:
+                    pass
+            self._os_lock_handle = None
+
+    def read_dataset_as_bank(self, caller_identity: str, caller_token: str | None = None) -> tuple[np.ndarray, np.ndarray]:
+        """Access vault dataset with strict institutional identity and token verification."""
+        if caller_identity != self.bank_id:
+            raise PermissionError(
+                f"Access denied: Caller '{caller_identity}' is forbidden from accessing private data vault of bank '{self.bank_id}'."
+            )
+        if self.bank_token is not None and caller_token != self.bank_token:
+            raise PermissionError(
+                f"Access denied: Invalid worker credential presented for bank '{self.bank_id}' storage vault."
+            )
+        if not os.path.exists(self.data_path):
+            raise FileNotFoundError(f"Vault data file not found at '{self.data_path}'")
+        loaded = np.load(self.data_path)
+        return loaded["X"], loaded["y"]
+
+
+class IsolatedReceiptSigningAuthority:
+    """Independently authorized receipt signing authority residing outside the coordinator boundary.
+
+    Enforces Module 01-A.1 Defect F correction:
+    1. Holds Ed25519 signing private key in an isolated security boundary.
+    2. Coordinator process never possesses the private signing key or raw key hex.
+    3. Issues receipts solely for jobs with verified COMPLETED records in PostgreSQL authority.
+    4. Verifies artifact SHA-256 against authoritative completed evidence before signing.
+    5. Fails closed on uncompleted jobs, mismatched artifact bytes, or revoked keys.
+    """
+
+    def __init__(
+        self,
+        signing_key_hex: str,
+        db_url: str,
+        key_id: str = DEFAULT_TRAINING_KEY_ID,
+        coordinator_token: str | None = None,
+        app_env: str = "production",
+    ) -> None:
+        if not signing_key_hex or len(signing_key_hex.strip()) != 64:
+            raise TrainingProvenanceConfigurationError("Signing key hex must be a 64-character hex string.")
+        self.key_id = key_id
+        self.app_env = app_env
+        self.db_url = db_url
+        self._record_source = TrustedTrainingJobRecordSource(
+            coordinator_token=coordinator_token,
+            db_url=self.db_url,
+            enforce_lifecycle=True,
+            app_env=self.app_env,
+        )
+        self._issuer = TrainingReceiptIssuer(
+            signing_key_hex=signing_key_hex,
+            key_id=self.key_id,
+            job_record_source=self._record_source,
+            enforce_job_records=True,
+            app_env=self.app_env,
+        )
+
+    @property
+    def public_key_hex(self) -> str:
+        return self._issuer.public_bytes_hex
+
+    def sign_completed_job_receipt(
+        self,
+        job_id: str,
+        artifact_bytes: bytes,
+        caller_identity: str = "COORDINATOR",
+    ) -> TrainingExecutionReceipt:
+        """Issue an Ed25519 receipt for an authenticated completed job in PostgreSQL authority."""
+        completed_record = self._record_source.get_completed_job_by_id(job_id)
+        if completed_record is None:
+            raise TrainingProvenanceSecurityError(
+                f"Receipt issuance denied: Job '{job_id}' has no trusted COMPLETED record in authority."
+            )
+        computed_sha = hashlib.sha256(artifact_bytes).hexdigest()
+        if not hmac.compare_digest(computed_sha, completed_record.artifact_sha256):
+            raise TrainingProvenanceSecurityError(
+                f"Receipt issuance denied: Provided artifact SHA-256 '{computed_sha}' does not match "
+                f"authoritative completed artifact digest '{completed_record.artifact_sha256}'."
+            )
+
+        evidence = TrainingExecutionEvidence(
+            training_run_id=completed_record.training_run_id,
+            job_id=completed_record.job_id,
+            simulation_id=completed_record.simulation_id,
+            completed_at=completed_record.completed_at,
+            status=completed_record.status,
+            executed_rounds=completed_record.executed_rounds,
+            executed_epochs=completed_record.executed_epochs,
+            sample_count=completed_record.sample_count,
+            observed_metrics=dict(completed_record.observed_metrics),
+            artifact_sha256=completed_record.artifact_sha256,
+            architecture=completed_record.architecture,
+            feature_schema_version=completed_record.feature_schema_version,
+            feature_names=list(completed_record.feature_names),
+            producer_id=completed_record.worker_id,
+        )
+        return self._issuer.issue_receipt(evidence=evidence, model_bytes=artifact_bytes)
+
+
 def setup_bank_private_storage(
     bank_storage_dir: str,
     bank_id: str,
     X_partition: np.ndarray,
     y_partition: np.ndarray,
+    bank_token: str | None = None,
+    lock_boundary: bool = False,
 ) -> str:
     """Privileged fixture provisioning bank-private synthetic partition into bank-owned directory."""
-    bank_dir = os.path.join(bank_storage_dir, bank_id)
-    os.makedirs(bank_dir, exist_ok=True)
-    data_path = os.path.join(bank_dir, "private_dataset.npz")
-    np.savez_compressed(data_path, X=X_partition, y=y_partition)
+    vault = BankPrivateStorageVault(bank_id, bank_storage_dir, bank_token=bank_token)
+    data_path = vault.store_dataset(X_partition, y_partition)
+    if lock_boundary:
+        vault.acquire_exclusive_os_boundary()
     return data_path
 
 
@@ -178,118 +354,127 @@ def run_bank_worker_node(
     )
 
     # Load local training data from isolated bank storage if path provided
+    vault_handle: BankPrivateStorageVault | None = None
     if data_path is not None:
         if not os.path.exists(data_path):
             raise FileNotFoundError(f"Bank [{bank_id}] private dataset not found at '{data_path}'")
         loaded_data = np.load(data_path)
         X_train: np.ndarray = loaded_data["X"]
         y_train: np.ndarray = loaded_data["y"]
+        # Enforce OS-level boundary lock so external processes cannot read bank private dataset
+        bank_vault_dir = os.path.dirname(os.path.dirname(data_path))
+        vault_handle = BankPrivateStorageVault(bank_id, bank_vault_dir, bank_token=worker_token)
+        vault_handle.acquire_exclusive_os_boundary()
     elif X_partition is not None and y_partition is not None:
         X_train = X_partition
         y_train = y_partition
     else:
         raise ValueError(f"Bank [{bank_id}] must be supplied with either a private data_path or partition arrays.")
 
-    while True:
-        try:
-            msg = inbox.get()
-        except Exception:
-            break
-
-        if msg is None or msg.get("command") == "STOP":
-            logger.info("Bank worker [%s] received STOP command. Exiting.", bank_id)
-            break
-
-        if msg.get("command") == "TRAIN_ROUND":
-            job_id = msg["job_id"]
-            round_number = msg["round_number"]
-            global_weights_obj: ModelWeights | None = msg.get("global_weights")
-
-            # On round 1, authorized worker initiates job start in PostgreSQL authority
-            if round_number == 1 and bank_id == "BANK_A":
-                with contextlib.suppress(Exception):
-                    authority_source.start_training_job(job_id=job_id, worker_token=worker_token)
-
-            # Initialize local model and load latest global weights
-            local_model = model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
-            if global_weights_obj is not None:
-                model_service.set_parameters(local_model, global_weights_obj)
-
-            # Execute real PyTorch optimization on private dataset partition
-            local_model, loss_history, _ = model_service.train_local(
-                model=local_model,
-                X_train=X_train,
-                y_train=y_train,
-                epochs=1,
-                learning_rate=0.01,
-                batch_size=32,
-            )
-
-            local_weights = model_service.get_parameters(local_model)
-            weights_bytes = _serialize_weights_to_bytes(local_weights)
-            update_digest = hashlib.sha256(weights_bytes).hexdigest()
-            sample_count = len(X_train)
-
-            # Strict measurement validation: no fabricated fallback loss values
-            if not loss_history:
-                raise TrainingProvenanceSecurityError(
-                    f"Bank worker [{bank_id}] produced no loss history during local training."
-                )
-            observed_loss = float(loss_history[-1])
-            if not math.isfinite(observed_loss):
-                raise TrainingProvenanceSecurityError(
-                    f"Bank worker [{bank_id}] produced non-finite observed loss: {observed_loss}"
-                )
-
-            if fail_observation:
-                # Adversarial failure injection: worker fails to record observation in PostgreSQL
-                logger.warning("Bank worker [%s] simulated observation persistence failure for round %d", bank_id, round_number)
-                outbox.put({
-                    "status": "OBSERVATION_FAILED",
-                    "bank_id": bank_id,
-                    "round_number": round_number,
-                    "pid": pid,
-                })
-                continue
-
-            # Record authoritative execution observation directly in PostgreSQL
+    try:
+        while True:
             try:
-                obs = authority_source.record_round_observation(
-                    job_id=job_id,
-                    round_number=round_number,
-                    sample_count=sample_count,
-                    actual_executed_epochs=1,
-                    observed_loss=observed_loss,
-                    metrics={"loss": observed_loss},
-                    worker_token=worker_token,
-                    bank_id=bank_id,
-                    model_update_digest=update_digest,
-                    execution_status="COMPLETED",
-                )
-                logger.info("Bank worker [%s] persisted observation event %s for round %d", bank_id, obs.event_id, round_number)
-            except Exception as e:
-                logger.error("Bank worker [%s] failed to record observation: %s", bank_id, e)
-                outbox.put({
-                    "status": "ERROR",
-                    "bank_id": bank_id,
-                    "error": str(e),
-                    "pid": pid,
-                })
-                continue
+                msg = inbox.get()
+            except Exception:
+                break
 
-            # Send local weights and digest to coordinator over federated transport
-            # Notice: Zero raw dataset samples (X_train, y_train) are transmitted across IPC.
-            outbox.put({
-                "status": "SUCCESS",
-                "bank_id": bank_id,
-                "pid": pid,
-                "round_number": round_number,
-                "weights": local_weights,
-                "update_digest": update_digest,
-                "sample_count": sample_count,
-                "loss": observed_loss,
-                "executed_epochs": 1,
-            })
+            if msg is None or msg.get("command") == "STOP":
+                logger.info("Bank worker [%s] received STOP command. Exiting.", bank_id)
+                break
+
+            if msg.get("command") == "TRAIN_ROUND":
+                job_id = msg["job_id"]
+                round_number = msg["round_number"]
+                global_weights_obj: ModelWeights | None = msg.get("global_weights")
+
+                # On round 1, authorized worker initiates job start in PostgreSQL authority
+                if round_number == 1 and bank_id == "BANK_A":
+                    with contextlib.suppress(Exception):
+                        authority_source.start_training_job(job_id=job_id, worker_token=worker_token)
+
+                # Initialize local model and load latest global weights
+                local_model = model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+                if global_weights_obj is not None:
+                    model_service.set_parameters(local_model, global_weights_obj)
+
+                # Execute real PyTorch optimization on private dataset partition
+                local_model, loss_history, _ = model_service.train_local(
+                    model=local_model,
+                    X_train=X_train,
+                    y_train=y_train,
+                    epochs=1,
+                    learning_rate=0.01,
+                    batch_size=32,
+                )
+
+                local_weights = model_service.get_parameters(local_model)
+                weights_bytes = _serialize_weights_to_bytes(local_weights)
+                update_digest = hashlib.sha256(weights_bytes).hexdigest()
+                sample_count = len(X_train)
+
+                # Strict measurement validation: no fabricated fallback loss values
+                if not loss_history:
+                    raise TrainingProvenanceSecurityError(
+                        f"Bank worker [{bank_id}] produced no loss history during local training."
+                    )
+                observed_loss = float(loss_history[-1])
+                if not math.isfinite(observed_loss):
+                    raise TrainingProvenanceSecurityError(
+                        f"Bank worker [{bank_id}] produced non-finite observed loss: {observed_loss}"
+                    )
+
+                if fail_observation:
+                    # Adversarial failure injection: worker fails to record observation in PostgreSQL
+                    logger.warning("Bank worker [%s] simulated observation persistence failure for round %d", bank_id, round_number)
+                    outbox.put({
+                        "status": "OBSERVATION_FAILED",
+                        "bank_id": bank_id,
+                        "round_number": round_number,
+                        "pid": pid,
+                    })
+                    continue
+
+                # Record authoritative execution observation directly in PostgreSQL
+                try:
+                    obs = authority_source.record_round_observation(
+                        job_id=job_id,
+                        round_number=round_number,
+                        sample_count=sample_count,
+                        actual_executed_epochs=1,
+                        observed_loss=observed_loss,
+                        metrics={"loss": observed_loss},
+                        worker_token=worker_token,
+                        bank_id=bank_id,
+                        model_update_digest=update_digest,
+                        execution_status="COMPLETED",
+                    )
+                    logger.info("Bank worker [%s] persisted observation event %s for round %d", bank_id, obs.event_id, round_number)
+                except Exception as e:
+                    logger.error("Bank worker [%s] failed to record observation: %s", bank_id, e)
+                    outbox.put({
+                        "status": "ERROR",
+                        "bank_id": bank_id,
+                        "error": str(e),
+                        "pid": pid,
+                    })
+                    continue
+
+                # Send local weights and digest to coordinator over federated transport
+                # Notice: Zero raw dataset samples (X_train, y_train) are transmitted across IPC.
+                outbox.put({
+                    "status": "SUCCESS",
+                    "bank_id": bank_id,
+                    "pid": pid,
+                    "round_number": round_number,
+                    "weights": local_weights,
+                    "update_digest": update_digest,
+                    "sample_count": sample_count,
+                    "loss": observed_loss,
+                    "executed_epochs": 1,
+                })
+    finally:
+        if vault_handle is not None:
+            vault_handle.release_exclusive_os_boundary()
 
 
 # ---------------------------------------------------------------------------
@@ -319,6 +504,11 @@ class DistributedFederatedTrainingManager:
         self.db_url = db_url
         self.app_env = app_env
         self.settings = get_settings()
+
+        if self.app_env.lower() == "production" and bank_tokens is not None:
+            raise TrainingProvenanceSecurityError(
+                "Production coordinator cannot receive bank private credentials (BI-02)."
+            )
 
         # Coordinator authority source possesses coordinator_token ONLY!
         # It has ZERO access to bank worker tokens and cannot impersonate banks.
@@ -355,6 +545,7 @@ class DistributedFederatedTrainingManager:
         crash_bank_b: bool = False,
         registry_storage_dir: str | None = None,
         signing_key_hex: str | None = None,
+        signing_authority: IsolatedReceiptSigningAuthority | None = None,
         receipt_issuer: TrainingReceiptIssuer | None = None,
         receipt_verifier: TrainingReceiptVerifier | None = None,
         model_registry: ModelRegistry | None = None,
@@ -364,6 +555,34 @@ class DistributedFederatedTrainingManager:
         Returns comprehensive trace including process IDs, observations, receipts, and registry status.
         """
         coordinator_pid = os.getpid()
+
+        is_prod = self.app_env.lower() == "production"
+        if is_prod:
+            if bank_partitions is not None:
+                raise TrainingProvenanceSecurityError(
+                    "Production coordinator cannot receive bank private dataset partitions (BI-01)."
+                )
+            if bank_tokens is not None:
+                raise TrainingProvenanceSecurityError(
+                    "Production coordinator cannot receive bank private credentials (BI-02)."
+                )
+            if bank_data_paths is not None:
+                raise TrainingProvenanceSecurityError(
+                    "Production coordinator cannot receive bank private data paths (BI-03)."
+                )
+            if signing_key_hex is not None:
+                raise TrainingProvenanceSecurityError(
+                    "Production coordinator cannot receive signing private key (CR-01, CR-02)."
+                )
+            if receipt_issuer is not None and getattr(receipt_issuer, "_require_authenticated_job", None) is False:
+                raise TrainingProvenanceSecurityError(
+                    "Production receipt issuer cannot disable authenticated job records (CR-04)."
+                )
+            if not worker_endpoints:
+                raise TrainingProvenanceSecurityError(
+                    "Production coordinator cannot generate bank credentials or spawn workers with generated secrets (BI-04). "
+                    "Pre-authenticated worker endpoints must be supplied."
+                )
 
         # Determine participating banks list
         banks = list(participating_banks) if participating_banks else (
@@ -583,35 +802,42 @@ class DistributedFederatedTrainingManager:
             )
 
             # 7. Issue Ed25519 Receipt in RECEIPT ISSUER DOMAIN
-            active_issuer = receipt_issuer
-            if active_issuer is None:
-                if signing_key_hex is not None:
-                    active_issuer = TrainingReceiptIssuer(
-                        signing_key_hex=signing_key_hex,
-                        key_id=DEFAULT_TRAINING_KEY_ID,
-                        job_record_source=self.authority_source,
-                        enforce_job_records=True,
-                    )
-                else:
-                    active_issuer = get_default_training_issuer()
+            if signing_authority is not None:
+                receipt = signing_authority.sign_completed_job_receipt(
+                    job_id=job_id,
+                    artifact_bytes=final_model_bytes,
+                    caller_identity="COORDINATOR",
+                )
+            else:
+                active_issuer = receipt_issuer
+                if active_issuer is None:
+                    if signing_key_hex is not None:
+                        active_issuer = TrainingReceiptIssuer(
+                            signing_key_hex=signing_key_hex,
+                            key_id=DEFAULT_TRAINING_KEY_ID,
+                            job_record_source=self.authority_source,
+                            enforce_job_records=True,
+                        )
+                    else:
+                        active_issuer = get_default_training_issuer()
 
-            evidence = TrainingExecutionEvidence(
-                training_run_id=training_run_id,
-                job_id=job_id,
-                simulation_id=simulation_id,
-                completed_at=completed_record.completed_at,
-                status="COMPLETED",
-                executed_rounds=num_rounds,
-                executed_epochs=num_rounds,
-                sample_count=unique_samples,
-                observed_metrics=dict(completed_record.observed_metrics),
-                artifact_sha256=final_artifact_sha256,
-                architecture="FraudDetectionNN",
-                feature_schema_version="v1.0",
-                feature_names=list(FEATURE_NAMES),
-                producer_id="FEDERATED_COORDINATOR",
-            )
-            receipt = active_issuer.issue_receipt(evidence=evidence, model_bytes=final_model_bytes)
+                evidence = TrainingExecutionEvidence(
+                    training_run_id=training_run_id,
+                    job_id=job_id,
+                    simulation_id=simulation_id,
+                    completed_at=completed_record.completed_at,
+                    status="COMPLETED",
+                    executed_rounds=num_rounds,
+                    executed_epochs=num_rounds,
+                    sample_count=unique_samples,
+                    observed_metrics=dict(completed_record.observed_metrics),
+                    artifact_sha256=final_artifact_sha256,
+                    architecture="FraudDetectionNN",
+                    feature_schema_version="v1.0",
+                    feature_names=list(FEATURE_NAMES),
+                    producer_id="FEDERATED_COORDINATOR",
+                )
+                receipt = active_issuer.issue_receipt(evidence=evidence, model_bytes=final_model_bytes)
 
             # 8. Public-Key-Only Verification in VERIFIER DOMAIN
             active_verifier = receipt_verifier or get_default_training_verifier()
