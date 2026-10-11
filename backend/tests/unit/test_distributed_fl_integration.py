@@ -30,6 +30,7 @@ from app.application.services.distributed_fl_service import (
     DistributedFederatedTrainingManager,
     IsolatedReceiptSigningAuthority,
     _generate_ed25519_keypair_hex,
+    provision_isolated_issuer_vault,
     setup_bank_private_storage,
     spawn_bank_workers,
 )
@@ -96,9 +97,9 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
     X_c = np.random.randn(180, NUM_FEATURES).astype(np.float32)
     y_c = np.random.randint(0, 2, size=180).astype(np.float32)
 
-    data_path_a = setup_bank_private_storage(vaults_dir, "BANK_A", X_a, y_a)
-    data_path_b = setup_bank_private_storage(vaults_dir, "BANK_B", X_b, y_b)
-    data_path_c = setup_bank_private_storage(vaults_dir, "BANK_C", X_c, y_c)
+    data_path_a = setup_bank_private_storage(vaults_dir, "BANK_A", X_a, y_a, bank_token=BANK_TOKENS["BANK_A"])
+    data_path_b = setup_bank_private_storage(vaults_dir, "BANK_B", X_b, y_b, bank_token=BANK_TOKENS["BANK_B"])
+    data_path_c = setup_bank_private_storage(vaults_dir, "BANK_C", X_c, y_c, bank_token=BANK_TOKENS["BANK_C"])
 
     bank_data_paths = {
         "BANK_A": data_path_a,
@@ -131,8 +132,10 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
 
     registry_dir = str(tmp_path / "registry")
     dev_seed = hashlib.sha256(b"cfi_dev_ed25519_training_issuer_seed_v1").digest().hex()
+    issuer_vault_dir = str(tmp_path / "issuer_vault")
+    issuer_key_file, _ = provision_isolated_issuer_vault(issuer_vault_dir, signing_key_hex=dev_seed)
     signing_auth = IsolatedReceiptSigningAuthority(
-        signing_key_hex=dev_seed,
+        issuer_key_path=issuer_key_file,
         coordinator_token=COORD_SECRET,
         db_url=real_pg_instance,
         key_id=DEFAULT_TRAINING_KEY_ID,

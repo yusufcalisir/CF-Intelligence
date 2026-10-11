@@ -28,6 +28,7 @@ from app.application.services.distributed_fl_service import (
     DistributedFederatedTrainingManager,
     IsolatedReceiptSigningAuthority,
     _generate_ed25519_keypair_hex,
+    provision_isolated_issuer_vault,
 )
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES, ModelService
@@ -542,6 +543,7 @@ class TestCryptographicReceiptIsolation:
             job_id=job_id,
             artifact_bytes=model_bytes,
             caller_identity="COORDINATOR",
+            caller_token=COORD_SECRET,
         )
         assert bool(receipt.signature)
         assert receipt.signature_scheme == "Ed25519"
@@ -572,3 +574,82 @@ class TestCryptographicReceiptIsolation:
         assert candidate["status"] == "inactive"
         assert candidate["provenance_type"] == "TRAINING_RECORDED"
         assert registry.get_active_champion_identity(simulation_id=sim_id) is None
+        signing_auth.terminate()
+
+    def test_cr_11_coordinator_cannot_read_isolated_issuer_vault_key(self, tmp_path, real_pg_instance: str) -> None:
+        """CR-11: Issuer private key is provisioned in isolated vault; coordinator has no access."""
+        vault_dir = str(tmp_path / "issuer_vault_cr11")
+        key_file, pub_hex = provision_isolated_issuer_vault(vault_dir)
+        signing_auth = IsolatedReceiptSigningAuthority(
+            issuer_key_path=key_file,
+            coordinator_token=COORD_SECRET,
+            db_url=real_pg_instance,
+            app_env="production",
+        )
+        assert signing_auth.public_key_hex == pub_hex
+        assert not hasattr(signing_auth, "signing_key_hex")
+        assert not hasattr(signing_auth, "_private_key")
+        signing_auth.terminate()
+
+    def test_cr_12_issuer_rejects_missing_or_invalid_coordinator_token(self, real_pg_instance: str, tmp_path) -> None:
+        """CR-12: Production issuer strictly rejects signing request if coordinator token is missing or invalid."""
+        vault_dir = str(tmp_path / "issuer_vault_cr12")
+        key_file, _ = provision_isolated_issuer_vault(vault_dir)
+        signing_auth = IsolatedReceiptSigningAuthority(
+            issuer_key_path=key_file,
+            coordinator_token=COORD_SECRET,
+            db_url=real_pg_instance,
+            app_env="production",
+        )
+        with pytest.raises(TrainingProvenanceSecurityError, match="Unauthorized receipt signing request|invalid or missing coordinator token|missing coordinator token|Receipt signing rejected"):
+            signing_auth.sign_completed_job_receipt(
+                job_id="job_cr12",
+                artifact_bytes=b"bytes",
+                caller_identity="COORDINATOR",
+                caller_token=None,
+            )
+        with pytest.raises(TrainingProvenanceSecurityError, match="Unauthorized receipt signing request|invalid or missing coordinator token|Receipt signing rejected"):
+            signing_auth.sign_completed_job_receipt(
+                job_id="job_cr12",
+                artifact_bytes=b"bytes",
+                caller_identity="COORDINATOR",
+                caller_token="wrong_token_cr12",
+            )
+        signing_auth.terminate()
+
+    def test_cr_13_replay_request_for_already_signed_job_rejected(self, real_pg_instance: str, tmp_path) -> None:
+        """CR-13: Replaying receipt signing request for an already-signed job is rejected by issuer."""
+        source = TrustedTrainingJobRecordSource(
+            coordinator_token=COORD_SECRET,
+            bank_tokens={"BANK_A": BANK_A_SECRET},
+            db_url=real_pg_instance,
+            enforce_lifecycle=True,
+            app_env="production",
+        )
+        job_id = f"job_cr13_{uuid.uuid4().hex[:8]}"
+        run_id = f"run_cr13_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_cr13_{uuid.uuid4().hex[:8]}"
+        model_bytes = b"model_bytes_cr13"
+        model_sha = hashlib.sha256(model_bytes).hexdigest()
+
+        source.schedule_training_job(job_id=job_id, training_run_id=run_id, simulation_id=sim_id, coordinator_token=COORD_SECRET, permitted_workers=["BANK_A"])
+        source.start_training_job(job_id=job_id, worker_token=BANK_A_SECRET)
+        source.record_round_observation(job_id=job_id, round_number=1, sample_count=100, actual_executed_epochs=1, observed_loss=0.2, worker_token=BANK_A_SECRET, bank_id="BANK_A", model_update_digest="d13")
+        source.record_global_aggregation(job_id=job_id, round_number=1, aggregation_algorithm="fed_avg_weighted", accepted_participant_ids=["BANK_A"], accepted_local_update_digests=["d13"], aggregated_global_model_digest=model_sha, coordinator_token=COORD_SECRET)
+        source.record_evaluation_observation(job_id=job_id, metric_name="loss", metric_value=0.2, evaluated_artifact_digest=model_sha, coordinator_token=COORD_SECRET)
+        source.complete_training_job(job_id=job_id, executed_rounds=1, executed_epochs=1, sample_count=100, observed_metrics={"loss": 0.2}, artifact_sha256=model_sha, worker_id="FEDERATED_COORDINATOR", coordinator_token=COORD_SECRET, enforce_lifecycle=True)
+
+        vault_dir = str(tmp_path / "issuer_vault_cr13")
+        key_file, _ = provision_isolated_issuer_vault(vault_dir)
+        signing_auth = IsolatedReceiptSigningAuthority(
+            issuer_key_path=key_file,
+            coordinator_token=COORD_SECRET,
+            db_url=real_pg_instance,
+            app_env="production",
+        )
+        r1 = signing_auth.sign_completed_job_receipt(job_id=job_id, artifact_bytes=model_bytes, caller_identity="COORDINATOR", caller_token=COORD_SECRET)
+        assert bool(r1.signature)
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="Duplicate signing request|already-signed|already been signed|Replay detected"):
+            signing_auth.sign_completed_job_receipt(job_id=job_id, artifact_bytes=model_bytes, caller_identity="COORDINATOR", caller_token=COORD_SECRET)
+        signing_auth.terminate()

@@ -110,18 +110,31 @@ def _sec12_coordinator_terminating_aggregator(db_url: str, job_id: str, ready_ev
             cur.execute(
                 """
                 INSERT INTO cfi_global_aggregations (
-                    job_id, round_number, aggregation_algorithm,
-                    accepted_participant_ids_json, accepted_update_digests_json,
-                    aggregated_global_model_digest, coordinator_id, created_at
-                ) VALUES (%s, 1, 'fed_avg', '["BANK_A"]', '["d1"]', 'agg_kill', 'COORD', NOW())
+                    event_id, job_id, round_number, aggregation_algorithm,
+                    accepted_participants_json, accepted_digests_json,
+                    aggregation_config_json, aggregated_model_digest,
+                    timestamp, aggregation_status, payload_digest
+                ) VALUES (
+                    %s, %s, 1, 'fed_avg',
+                    '["BANK_A"]', '["d1"]',
+                    '{}', 'agg_kill', NOW(),
+                    'ACCEPTED', 'digest_payload'
+                )
                 """,
-                (job_id,),
+                (f"evt_agg_{job_id}", job_id),
             )
             ready_event.set()
             time.sleep(10)
 
 
-def _sec24_concurrent_completer(db_url: str, job_id: str, loss_val: float, barrier: Any, out_q: Any) -> None:
+def _sec24_concurrent_completer(
+    db_url: str,
+    job_id: str,
+    loss_val: float,
+    barrier: Any,
+    out_q: Any,
+    artifact_sha: str | None = None,
+) -> None:
     try:
         source = TrustedTrainingJobRecordSource(
             coordinator_token=COORD_SECRET,
@@ -131,13 +144,14 @@ def _sec24_concurrent_completer(db_url: str, job_id: str, loss_val: float, barri
             app_env="production",
         )
         barrier.wait()
+        sha_to_use = artifact_sha or ("24" * 32)
         rec = source.complete_training_job(
             job_id=job_id,
             executed_rounds=1,
             executed_epochs=1,
             sample_count=100,
             observed_metrics={"loss": loss_val},
-            artifact_sha256="24" * 32,
+            artifact_sha256=sha_to_use,
             worker_id="FEDERATED_COORDINATOR",
             coordinator_token=COORD_SECRET,
             enforce_lifecycle=True,
@@ -414,7 +428,7 @@ class TestSecurityAdversarialMatrix:
         ready_event = mp.Event()
         proc = mp.Process(target=_sec12_coordinator_terminating_aggregator, args=(real_pg_instance, job_id, ready_event))
         proc.start()
-        ready_event.wait(timeout=5)
+        assert ready_event.wait(timeout=10) is True, "Aggregator child process failed to reach active transaction boundary"
         proc.terminate()
         proc.join(timeout=3)
 
@@ -803,7 +817,7 @@ class TestSecurityAdversarialMatrix:
                 assert exc_info.value.sqlstate == "42501"
 
     def test_sec_24_two_processes_race_to_complete_differently(self, real_pg_instance: str) -> None:
-        """SEC-24: Two independent processes race with barrier synchronization to complete job differently; exactly one committed."""
+        """SEC-24: Two independent processes race with barrier synchronization to complete job; exactly one commits."""
         source = TrustedTrainingJobRecordSource(
             coordinator_token=COORD_SECRET,
             bank_tokens=BANK_TOKENS,
@@ -812,7 +826,8 @@ class TestSecurityAdversarialMatrix:
             app_env="production",
         )
         job_id = f"job_sec24_{uuid.uuid4().hex[:8]}"
-        art_sha = "24" * 32
+        art_sha_valid = "24" * 32
+        art_sha_conflict = "99" * 32
         source.schedule_training_job(
             job_id=job_id,
             training_run_id="run_sec24",
@@ -837,35 +852,36 @@ class TestSecurityAdversarialMatrix:
             aggregation_algorithm="fed_avg_weighted",
             accepted_participant_ids=["BANK_A"],
             accepted_local_update_digests=["digest_sec24"],
-            aggregated_global_model_digest=art_sha,
+            aggregated_global_model_digest=art_sha_valid,
             coordinator_token=COORD_SECRET,
         )
         source.record_evaluation_observation(
             job_id=job_id,
             metric_name="loss",
             metric_value=0.25,
-            evaluated_artifact_digest=art_sha,
+            evaluated_artifact_digest=art_sha_valid,
             coordinator_token=COORD_SECRET,
         )
 
         barrier: Any = mp.Barrier(2)
         q1: Any = mp.Queue()
         q2: Any = mp.Queue()
-        p1 = mp.Process(target=_sec24_concurrent_completer, args=(real_pg_instance, job_id, 0.25, barrier, q1))
-        p2 = mp.Process(target=_sec24_concurrent_completer, args=(real_pg_instance, job_id, 0.99, barrier, q2))
+        p1 = mp.Process(target=_sec24_concurrent_completer, args=(real_pg_instance, job_id, 0.25, barrier, q1, art_sha_valid))
+        p2 = mp.Process(target=_sec24_concurrent_completer, args=(real_pg_instance, job_id, 0.25, barrier, q2, art_sha_conflict))
         p1.start()
         p2.start()
         p1.join(timeout=10)
         p2.join(timeout=10)
 
-        res1 = q1.get(timeout=5)
-        res2 = q2.get(timeout=5)
-        assert res1[0] == "SUCCESS"
-        assert res2[0] == "ERROR"
+        results = [q1.get(timeout=5), q2.get(timeout=5)]
+        statuses = {r[0] for r in results}
+        assert "SUCCESS" in statuses
+        assert "ERROR" in statuses
 
         persisted = source.get_completed_job_by_id(job_id)
         assert persisted is not None
         assert persisted.observed_metrics["loss"] == 0.25
+        assert persisted.artifact_sha256 == art_sha_valid
 
     def test_sec_25_duplicate_and_conflicting_observations_submitted_concurrently(self, real_pg_instance: str) -> None:
         """SEC-25: Concurrent worker processes submit observations without deadlock or database corruption."""

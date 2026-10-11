@@ -15,6 +15,7 @@ Verifies the physical and cryptographic boundaries separating financial institut
 
 from __future__ import annotations
 
+import io
 import uuid
 from collections.abc import Generator
 from typing import Any
@@ -29,6 +30,7 @@ from app.application.services.distributed_fl_service import (
 )
 from app.application.services.model_service import NUM_FEATURES
 from app.application.services.training_provenance_service import (
+    TrainingProvenanceConfigurationError,
     TrainingProvenanceSecurityError,
     TrustedTrainingJobRecordSource,
 )
@@ -306,3 +308,108 @@ class TestBankIsolationEnforcement:
                 bank_id="BANK_C",
                 model_update_digest="digest_forged_c",
             )
+
+    def test_bi_11_vault_production_missing_encryption_key_rejected(self, tmp_path) -> None:
+        """BI-11: Instantiating production bank vault without encryption key or token is rejected."""
+        vault_dir = str(tmp_path / "vault_bi11")
+        with pytest.raises(TrainingProvenanceConfigurationError, match="requires mandatory encryption key configuration"):
+            BankPrivateStorageVault("BANK_A", vault_dir, bank_token=None, bank_encryption_key=None, app_env="production")
+
+    def test_bi_12_vault_production_plaintext_npz_rejected(self, tmp_path) -> None:
+        """BI-12: Reader presented with unencrypted plaintext NPZ fixture in production fails closed."""
+        vault_dir = str(tmp_path / "vault_bi12")
+        bank_dir = tmp_path / "vault_bi12" / "BANK_A"
+        bank_dir.mkdir(parents=True)
+        raw_file = bank_dir / "private_dataset.npz"
+        buf = io.BytesIO()
+        np.savez_compressed(buf, X=np.zeros((5, NUM_FEATURES)), y=np.zeros(5))
+        raw_file.write_bytes(buf.getvalue())
+
+        vault = BankPrivateStorageVault("BANK_A", vault_dir, bank_token=BANK_A_SECRET, app_env="production")
+        with pytest.raises(TrainingProvenanceSecurityError, match="Plaintext dataset rejected|forbids unencrypted"):
+            vault.read_dataset_as_bank("BANK_A", caller_token=BANK_A_SECRET)
+
+    def test_bi_13_vault_wrong_bank_key_decryption_fails(self, tmp_path) -> None:
+        """BI-13: Decrypting vault with wrong bank key fails authentication."""
+        vault_dir = str(tmp_path / "vault_bi13")
+        X_mock = np.ones((5, NUM_FEATURES), dtype=np.float32)
+        y_mock = np.ones(5, dtype=np.float32)
+        setup_bank_private_storage(vault_dir, "BANK_A", X_mock, y_mock, bank_token=BANK_A_SECRET, app_env="production")
+
+        vault_wrong = BankPrivateStorageVault("BANK_A", vault_dir, bank_token="wrong_token_for_bank_a_999", app_env="production")
+        with pytest.raises((TrainingProvenanceSecurityError, PermissionError), match="Decryption authentication failed|Access denied"):
+            vault_wrong.read_dataset_as_bank("BANK_A", caller_token="wrong_token_for_bank_a_999")
+
+    def test_bi_14_vault_tampered_ciphertext_fails_auth(self, tmp_path) -> None:
+        """BI-14: Tampered encrypted bytes in vault fail authenticated decryption."""
+        vault_dir = str(tmp_path / "vault_bi14")
+        X_mock = np.ones((5, NUM_FEATURES), dtype=np.float32)
+        y_mock = np.ones(5, dtype=np.float32)
+        data_path = setup_bank_private_storage(vault_dir, "BANK_A", X_mock, y_mock, bank_token=BANK_A_SECRET, app_env="production")
+
+        with open(data_path, "r+b") as f:
+            data = bytearray(f.read())
+            data[len(BankPrivateStorageVault.VAULT_MAGIC_V1) + 10] ^= 0xFF
+            f.seek(0)
+            f.write(data)
+
+        vault = BankPrivateStorageVault("BANK_A", vault_dir, bank_token=BANK_A_SECRET, app_env="production")
+        with pytest.raises(TrainingProvenanceSecurityError, match="Decryption authentication failed"):
+            vault.read_dataset_as_bank("BANK_A", caller_token=BANK_A_SECRET)
+
+    def test_bi_15_vault_truncated_ciphertext_fails_auth(self, tmp_path) -> None:
+        """BI-15: Truncated ciphertext in vault fails authenticated decryption."""
+        vault_dir = str(tmp_path / "vault_bi15")
+        X_mock = np.ones((5, NUM_FEATURES), dtype=np.float32)
+        y_mock = np.ones(5, dtype=np.float32)
+        data_path = setup_bank_private_storage(vault_dir, "BANK_A", X_mock, y_mock, bank_token=BANK_A_SECRET, app_env="production")
+
+        with open(data_path, "r+b") as f:
+            data = f.read()
+            f.seek(0)
+            f.truncate(len(data) - 20)
+
+        vault = BankPrivateStorageVault("BANK_A", vault_dir, bank_token=BANK_A_SECRET, app_env="production")
+        with pytest.raises(TrainingProvenanceSecurityError, match="Decryption authentication failed"):
+            vault.read_dataset_as_bank("BANK_A", caller_token=BANK_A_SECRET)
+
+    def test_bi_16_vault_corrupted_header_version_fails(self, tmp_path) -> None:
+        """BI-16: Corrupted vault header magic or unexpected version fails closed."""
+        vault_dir = str(tmp_path / "vault_bi16")
+        X_mock = np.ones((5, NUM_FEATURES), dtype=np.float32)
+        y_mock = np.ones(5, dtype=np.float32)
+        data_path = setup_bank_private_storage(vault_dir, "BANK_A", X_mock, y_mock, bank_token=BANK_A_SECRET, app_env="production")
+
+        with open(data_path, "r+b") as f:
+            f.write(b"BAD_MAGIC_99\x00")
+
+        vault = BankPrivateStorageVault("BANK_A", vault_dir, bank_token=BANK_A_SECRET, app_env="production")
+        with pytest.raises(TrainingProvenanceSecurityError, match="Unsupported or corrupted vault format"):
+            vault.read_dataset_as_bank("BANK_A", caller_token=BANK_A_SECRET)
+
+    def test_bi_17_vault_stored_artifact_not_raw_npz_plaintext(self, tmp_path) -> None:
+        """BI-17: Verifies stored vault payload does not contain raw unencrypted ZIP/NPZ markers."""
+        vault_dir = str(tmp_path / "vault_bi17")
+        X_mock = np.random.randn(10, NUM_FEATURES).astype(np.float32)
+        y_mock = np.random.randint(0, 2, 10).astype(np.float32)
+        data_path = setup_bank_private_storage(vault_dir, "BANK_A", X_mock, y_mock, bank_token=BANK_A_SECRET, app_env="production")
+
+        with open(data_path, "rb") as f:
+            stored_bytes = f.read()
+
+        assert stored_bytes.startswith(BankPrivateStorageVault.VAULT_MAGIC_V1)
+        assert b"PK\x03\x04" not in stored_bytes
+        with pytest.raises((ValueError, OSError)):
+            np.load(io.BytesIO(stored_bytes))
+
+    def test_bi_18_vault_authorized_decryption_succeeds(self, tmp_path) -> None:
+        """BI-18: Authorized bank worker with valid key decrypts exact original array data."""
+        vault_dir = str(tmp_path / "vault_bi18")
+        X_mock = np.random.randn(10, NUM_FEATURES).astype(np.float32)
+        y_mock = np.random.randint(0, 2, 10).astype(np.float32)
+        setup_bank_private_storage(vault_dir, "BANK_A", X_mock, y_mock, bank_token=BANK_A_SECRET, app_env="production")
+
+        vault = BankPrivateStorageVault("BANK_A", vault_dir, bank_token=BANK_A_SECRET, app_env="production")
+        X_loaded, y_loaded = vault.read_dataset_as_bank("BANK_A", caller_token=BANK_A_SECRET)
+        np.testing.assert_allclose(X_loaded, X_mock)
+        np.testing.assert_allclose(y_loaded, y_mock)

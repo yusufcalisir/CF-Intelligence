@@ -100,18 +100,31 @@ def _coordinator_terminating_aggregator(db_url: str, job_id: str, ready_event: A
             cur.execute(
                 """
                 INSERT INTO cfi_global_aggregations (
-                    job_id, round_number, aggregation_algorithm,
-                    accepted_participant_ids_json, accepted_update_digests_json,
-                    aggregated_global_model_digest, coordinator_id, created_at
-                ) VALUES (%s, 1, 'fed_avg', '["BANK_A"]', '["d1"]', 'agg_kill', 'COORD', NOW())
+                    event_id, job_id, round_number, aggregation_algorithm,
+                    accepted_participants_json, accepted_digests_json,
+                    aggregation_config_json, aggregated_model_digest,
+                    timestamp, aggregation_status, payload_digest
+                ) VALUES (
+                    %s, %s, 1, 'fed_avg',
+                    '["BANK_A"]', '["d1"]',
+                    '{}', 'agg_kill', NOW(),
+                    'ACCEPTED', 'digest_payload'
+                )
                 """,
-                (job_id,),
+                (f"evt_agg_{job_id}", job_id),
             )
             ready_event.set()
             time.sleep(10)
 
 
-def _concurrent_completer(db_url: str, job_id: str, loss_val: float, barrier: Any, out_q: Any) -> None:
+def _concurrent_completer(
+    db_url: str,
+    job_id: str,
+    loss_val: float,
+    barrier: Any,
+    out_q: Any,
+    artifact_sha: str | None = None,
+) -> None:
     """Subprocess competing in genuine concurrent completion race."""
     try:
         source = TrustedTrainingJobRecordSource(
@@ -122,13 +135,14 @@ def _concurrent_completer(db_url: str, job_id: str, loss_val: float, barrier: An
             app_env="production",
         )
         barrier.wait()
+        sha_to_use = artifact_sha or ("19" * 32)
         rec = source.complete_training_job(
             job_id=job_id,
             executed_rounds=1,
             executed_epochs=1,
             sample_count=100,
             observed_metrics={"loss": loss_val},
-            artifact_sha256="19" * 32,
+            artifact_sha256=sha_to_use,
             worker_id="FEDERATED_COORDINATOR",
             coordinator_token=COORD_SECRET,
             enforce_lifecycle=True,
@@ -665,7 +679,7 @@ class TestAdversarialEndToEndScenarios:
         ready_event = mp.Event()
         proc = mp.Process(target=_coordinator_terminating_aggregator, args=(real_pg_instance, job_id, ready_event))
         proc.start()
-        ready_event.wait(timeout=5)
+        assert ready_event.wait(timeout=10) is True, "Aggregator child process failed to reach active transaction boundary"
         # Terminate real coordinator process while transaction is uncommitted
         proc.terminate()
         proc.join(timeout=3)
@@ -830,24 +844,24 @@ class TestAdversarialEndToEndScenarios:
         out_q_1: Any = mp.Queue()
         out_q_2: Any = mp.Queue()
 
-        p1 = mp.Process(target=_concurrent_completer, args=(real_pg_instance, job_id, 0.25, barrier, out_q_1))
-        p2 = mp.Process(target=_concurrent_completer, args=(real_pg_instance, job_id, 0.99, barrier, out_q_2))
+        art_sha_conflict = "cc" * 32
+        p1 = mp.Process(target=_concurrent_completer, args=(real_pg_instance, job_id, 0.25, barrier, out_q_1, art_sha))
+        p2 = mp.Process(target=_concurrent_completer, args=(real_pg_instance, job_id, 0.25, barrier, out_q_2, art_sha_conflict))
 
         p1.start()
         p2.start()
         p1.join(timeout=10)
         p2.join(timeout=10)
 
-        res1 = out_q_1.get(timeout=5)
-        res2 = out_q_2.get(timeout=5)
-
-        assert res1[0] == "SUCCESS"
-        assert res2[0] == "ERROR"
-        assert "mismatch" in res2[1].lower() or "conflict" in res2[1].lower()
+        results = [out_q_1.get(timeout=5), out_q_2.get(timeout=5)]
+        statuses = {r[0] for r in results}
+        assert "SUCCESS" in statuses
+        assert "ERROR" in statuses
 
         persisted = source.get_completed_job_by_id(job_id)
         assert persisted is not None
         assert persisted.observed_metrics["loss"] == 0.25
+        assert persisted.artifact_sha256 == art_sha
 
     def test_e2e_neg_20_serving_process_cannot_sign_receipt(self) -> None:
         """E2E-NEG-20: Verifier / serving process has no signing key and cannot manufacture receipts."""

@@ -36,6 +36,7 @@ from app.application.services.training_provenance_service import (
 )
 from app.infrastructure.database.training_authority_backends import (
     PostgresTrainingJobAuthority,
+    provision_runtime_service_roles,
     redact_database_url,
     sanitize_database_error_message,
 )
@@ -540,3 +541,80 @@ class TestPostgresAuthorityPolicy:
         obs = source.get_round_observations(job_id)
         assert len(obs) == 3
         assert {o.bank_id for o in obs} == {"BANK_A", "BANK_B", "BANK_C"}
+
+    def test_db_15_runtime_service_roles_enforce_least_privilege(self, real_pg_instance: str) -> None:
+        """DB-15: Verifies the 4 real runtime service roles (coordinator, worker, issuer, serving) enforce least privilege with SQLSTATE 42501."""
+        role_urls = provision_runtime_service_roles(real_pg_instance)
+        assert {"coordinator", "worker", "issuer", "serving"}.issubset(role_urls.keys())
+
+        coord_url = role_urls["coordinator"]
+        worker_url = role_urls["worker"]
+        issuer_url = role_urls["issuer"]
+        serving_url = role_urls["serving"]
+
+        # 1. Worker role CANNOT insert or update cfi_completed_jobs (SQLSTATE 42501)
+        with psycopg.connect(worker_url) as conn:
+            with conn.cursor() as cur:
+                with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc:
+                    cur.execute(
+                        """
+                        INSERT INTO cfi_completed_jobs (
+                            job_id, training_run_id, simulation_id, completed_at, status,
+                            executed_rounds, executed_epochs, sample_count, observed_metrics_json,
+                            artifact_sha256, architecture, feature_schema_version, input_dim,
+                            feature_names_json, worker_id, evidence_fingerprint
+                        ) VALUES ('j_worker_unauth', 'r', 's', NOW(), 'COMPLETED', 1, 1, 100, '{}', 'sha', 'arch', 'v1', 1, '[]', 'HAX', 'fp')
+                        """
+                    )
+                assert exc.value.sqlstate == "42501"
+                conn.rollback()
+
+                # Worker role CANNOT insert into cfi_scheduled_jobs
+                with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc:
+                    cur.execute(
+                        """
+                        INSERT INTO cfi_scheduled_jobs (
+                            job_id, training_run_id, simulation_id, coordinator_id,
+                            architecture, feature_schema_version, expected_rounds,
+                            expected_epochs, input_dim, feature_names_json, config_fingerprint, scheduled_at
+                        ) VALUES ('j_sched_unauth', 'r', 's', 'c', 'a', 'v', 1, 1, 1, '[]', 'fp', NOW())
+                        """
+                    )
+                assert exc.value.sqlstate == "42501"
+                conn.rollback()
+
+        # 2. Coordinator role CANNOT directly insert into cfi_round_observations (SQLSTATE 42501)
+        with psycopg.connect(coord_url) as conn:
+            with conn.cursor() as cur:
+                with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc:
+                    cur.execute(
+                        """
+                        INSERT INTO cfi_round_observations (
+                            event_id, job_id, training_run_id, simulation_id, worker_id,
+                            bank_id, round_number, attempt_number, actual_sample_count,
+                            actual_executed_epochs, observed_loss, metrics_json, model_update_digest,
+                            execution_timestamp, execution_status, payload_digest
+                        ) VALUES ('evt_coord_unauth', 'j', 'r', 's', 'w', 'BANK_A', 1, 1, 100, 1, 0.5, '{}', 'd', '2026-10-11T12:00:00Z', 'COMPLETED', 'pd')
+                        """
+                    )
+                assert exc.value.sqlstate == "42501"
+                conn.rollback()
+
+        # 3. Issuer role CANNOT mutate any tables (SQLSTATE 42501)
+        with psycopg.connect(issuer_url) as conn:
+            with conn.cursor() as cur:
+                with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc:
+                    cur.execute("DELETE FROM cfi_completed_jobs")
+                assert exc.value.sqlstate == "42501"
+                conn.rollback()
+
+        # 4. Serving role CANNOT mutate any tables (SQLSTATE 42501)
+        with psycopg.connect(serving_url) as conn:
+            with conn.cursor() as cur:
+                with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc:
+                    cur.execute("UPDATE cfi_completed_jobs SET status = 'TAMPERED'")
+                assert exc.value.sqlstate == "42501"
+                conn.rollback()
+                # But serving role CAN select completed jobs
+                cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs")
+                assert cur.fetchone() is not None
