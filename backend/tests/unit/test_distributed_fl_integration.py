@@ -32,9 +32,11 @@ from app.application.services.distributed_fl_service import (
     IsolatedReceiptSigningAuthority,
     IsolatedTrainingCompletionAuthority,
     _generate_ed25519_keypair_hex,
+    provision_isolated_completion_authority_vault,
     provision_isolated_issuer_vault,
     setup_bank_private_storage,
     spawn_bank_workers,
+    spawn_isolated_completion_authority_service,
 )
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES
@@ -144,9 +146,20 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
     X_test = np.random.randn(100, NUM_FEATURES).astype(np.float32)
     y_test = np.random.randint(0, 2, size=100).astype(np.float32)
 
-    # 4. Independent completion authority initialized outside coordinator boundary
+    # 4. Privileged bootstrap provisions completion credentials into isolated vault
+    comp_vault_dir = str(tmp_path / "completion_vault")
+    comp_vault_file = provision_isolated_completion_authority_vault(
+        comp_vault_dir,
+        role_urls["completion"],
+    )
+    comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+        vault_path=comp_vault_file,
+        coordinator_token=COORD_SECRET,
+        app_env="production",
+    )
+    # Coordinator client receives ONLY service_endpoint (zero database credentials, zero vault path)
     completion_auth = IsolatedTrainingCompletionAuthority(
-        completion_db_url=role_urls["completion"],
+        service_endpoint=comp_endpoint,
         coordinator_token=COORD_SECRET,
         app_env="production",
     )
@@ -185,6 +198,8 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
         completion_authority=completion_auth,
     )
     result["completion_auth"] = completion_auth
+    result["comp_proc"] = comp_proc
+    result["comp_vault_file"] = comp_vault_file
     result["job_id"] = job_id
     result["run_id"] = run_id
     result["sim_id"] = sim_id

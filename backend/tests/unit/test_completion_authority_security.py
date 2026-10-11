@@ -1,16 +1,16 @@
-"""Executable Security Test Suite for Independent, Atomic Training Completion Authority (COMP-01 through COMP-10).
+"""Executable Security Verification Suite for Independent, Atomic Training Completion Authority.
 
-Verifies the following security invariants against a real PostgreSQL 18.1 instance:
-- COMP-01: Coordinator credential isolation (coordinator never holds completion credentials, URLs, or authority).
-- COMP-02: Direct SQL completion forgery (cfi_coord_role denied direct INSERT on cfi_completed_jobs with SQLSTATE 42501).
-- COMP-03: Privileged connection bypass (cannot SET ROLE or invoke privileged completion under coordinator security context).
-- COMP-04: Forged finalization request (independent authority rejects finalization without required observations/aggregations).
-- COMP-05: Genuine finalization (valid observed training lifecycle finalizes through independent authority without coordinator credentials).
-- COMP-06: Atomic validation/finalization (mismatched/tampered evidence rolls back completely; zero partial state).
-- COMP-07: Concurrent equivalent completion (serialized via PostgreSQL advisory xact lock; exactly 1 authoritative completed row).
-- COMP-08: Conflicting completion (incompatible completion rejected after finalization; persisted evidence unchanged).
-- COMP-09: Process/database failure (failure at execution checkpoint rolls back cleanly; terminated worker fails closed).
-- COMP-10: Downstream provenance (uncompleted/forged job cannot be signed or admitted; genuine job signs and admits as inactive candidate).
+Verifies the mandatory proof matrix against a real PostgreSQL 18.1 instance:
+- COMP-R01: Coordinator process cannot read completion credentials (memory, env, argv, and OS-exclusive vault boundary denial).
+- COMP-R02: Coordinator cannot create a privileged completion connection (SET ROLE and direct INSERT denied with SQLSTATE 42501).
+- COMP-R03: Unauthorized completion IPC/service request is rejected (handshake and token verification fail closed).
+- COMP-R04: Authorized completion request succeeds (independent service reconciles evidence and atomically inserts completed record).
+- COMP-R05: Real concurrent evidence mutation cannot invalidate finalization (advisory xact lock serializes; post-finalization write rejected).
+- COMP-R06: Worker is terminated inside an open transaction (in-transaction checkpoint reached; killed process rolls back cleanly; 0 partial rows).
+- COMP-R07: Post-crash retry preserves correct completion state (restarted service safely completes job; exactly 1 completed row).
+- COMP-R08: Concurrent independent clients resolve safely (independent connection channels serialized via PostgreSQL; no mismatched responses).
+- COMP-R09: Forged completion produces no trusted receipt or Registry candidate (uncompleted job rejected by issuer and Registry).
+- COMP-R10: Genuine three-bank training still completes through the independent boundary (end-to-end 3-bank federated execution).
 """
 
 from __future__ import annotations
@@ -20,9 +20,15 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import sys
+import tempfile
+import threading
+import time
 from typing import Any
 import uuid
 
+from cryptography.fernet import Fernet
+import numpy as np
 import psycopg
 import psycopg.conninfo
 import pytest
@@ -30,8 +36,14 @@ import pytest
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
     DistributedFederatedTrainingManager,
+    IsolatedReceiptSigningAuthority,
     IsolatedTrainingCompletionAuthority,
     _generate_ed25519_keypair_hex,
+    provision_isolated_completion_authority_vault,
+    provision_isolated_issuer_vault,
+    setup_bank_private_storage,
+    spawn_bank_workers,
+    spawn_isolated_completion_authority_service,
 )
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES
@@ -159,34 +171,44 @@ def helper_setup_valid_observed_job(
             )
 
         # 4. Record global aggregation
-        agg_digest = artifact_sha if r == num_rounds else hashlib.sha256(f"global_{job_id}_r{r}".encode()).hexdigest()
         admin_auth.record_global_aggregation(
             GlobalAggregationEvent(
                 event_id=f"agg_{job_id}_r{r}",
                 job_id=job_id,
                 round_number=r,
-                aggregation_algorithm="FedAvg",
-                accepted_participant_ids=tuple(participating_banks),
+                aggregation_algorithm="fed_avg_weighted",
+                accepted_participant_ids=participating_banks,
                 accepted_local_update_digests=tuple(digests),
-                aggregation_configuration={"algorithm": "FedAvg"},
-                aggregated_global_model_digest=agg_digest,
+                aggregation_configuration={"weighting": "sample_count"},
+                aggregated_global_model_digest=artifact_sha,
                 timestamp=now_str,
-                aggregation_status="ACCEPTED",
+                aggregation_status="COMPLETED",
             )
         )
 
-    # 5. Record model evaluation
+    # 5. Record model evaluation observations
     admin_auth.record_model_evaluation(
         ModelEvaluationEvent(
-            event_id=f"eval_{job_id}_auc",
+            event_id=f"eval_auc_{job_id}",
             job_id=job_id,
-            evaluation_run_id=f"eval_run_{job_id}",
+            evaluation_run_id=run_id,
             metric_name="auc_roc",
             metric_value=auc_roc,
             evaluated_artifact_digest=artifact_sha,
-            evaluator_identity="EVALUATOR",
+            evaluator_identity="cfi_coord_role",
             evaluation_timestamp=now_str,
-            evaluation_dataset_manifest=f"manifest_{job_id}",
+        )
+    )
+    admin_auth.record_model_evaluation(
+        ModelEvaluationEvent(
+            event_id=f"eval_loss_{job_id}",
+            job_id=job_id,
+            evaluation_run_id=run_id,
+            metric_name="loss",
+            metric_value=observed_loss,
+            evaluated_artifact_digest=artifact_sha,
+            evaluator_identity="cfi_coord_role",
+            evaluation_timestamp=now_str,
         )
     )
 
@@ -194,550 +216,644 @@ def helper_setup_valid_observed_job(
         "job_id": job_id,
         "run_id": run_id,
         "sim_id": sim_id,
-        "num_rounds": num_rounds,
-        "total_samples": total_samples,
-        "observed_loss": observed_loss,
-        "auc_roc": auc_roc,
         "artifact_sha": artifact_sha,
-        "fnames": fnames,
+        "total_samples": total_samples,
     }
 
 
 class TestCompletionAuthoritySecurity:
-    """Mandatory executable security test suite COMP-01 through COMP-10."""
+    """Security verification test suite enforcing genuinely independent, atomic training completion authority."""
 
-    def test_comp_01_coordinator_credential_isolation(self, pg_roles: dict[str, str]) -> None:
-        """COMP-01: Prove coordinator has zero access to completion-authority credentials.
+    def test_comp_r01_coordinator_cannot_read_completion_credentials(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """COMP-R01: Prove coordinator runtime cannot obtain completion database credentials.
 
         Verifies:
-        - Passing completion_db_url to coordinator raises TrainingProvenanceSecurityError.
-        - Coordinator holds only coordinator role URL (cfi_coord_role).
-        - Coordinator internal authority source points to cfi_coord_role.
+        - Coordinator object graph has zero attributes holding completion credentials or URLs.
         - Process environment has no CFI_TRAINING_JOB_COMPLETION_DB_URL.
-        - Neither coordinator attributes nor service objects hold completion credentials.
+        - Process arguments (sys.argv) contain no completion credentials.
+        - Genuine OS-level access denial: Attempting to read the completion authority vault
+          fails with PermissionError due to the kernel-level exclusive file lock.
         """
-        coord_url = pg_roles["coordinator"]
         comp_url = pg_roles["completion"]
+        coord_url = pg_roles["coordinator"]
 
-        # 1. Constructor rejection when caller attempts to supply completion credentials
-        with pytest.raises(TrainingProvenanceSecurityError, match="Coordinator process cannot receive or hold completion-authority credentials"):
-            DistributedFederatedTrainingManager(
+        # 1. Privileged bootstrap provisions vault
+        vault_dir = str(tmp_path / "comp_vault_r01")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+
+        # 2. Spawn isolated completion service owning the vault
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+        try:
+            # 3. Coordinator is initialized with service_endpoint only
+            comp_auth = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token=COORD_TOKEN,
+                app_env="production",
+            )
+            coordinator = DistributedFederatedTrainingManager(
                 coordinator_token=COORD_TOKEN,
                 db_url=coord_url,
                 app_env="production",
-                completion_db_url=comp_url,
             )
 
-        # 2. Coordinator instantiated legitimately with its own role only
-        coordinator = DistributedFederatedTrainingManager(
-            coordinator_token=COORD_TOKEN,
-            db_url=coord_url,
-            app_env="production",
-        )
+            # Assert coordinator object graph contains NO completion URL
+            assert not hasattr(coordinator, "completion_db_url")
+            assert not hasattr(coordinator.authority_source, "_completion_db_url")
+            backend = coordinator.authority_source._db._backend
+            assert isinstance(backend, PostgresTrainingJobAuthority)
+            assert not hasattr(backend, "_completion_db_url")
 
-        assert coordinator.db_url == coord_url
-        assert "cfi_coord_role" in coordinator.db_url
-        assert "cfi_completion_role" not in coordinator.db_url
+            # Assert process environment contains no completion database URL
+            assert "CFI_TRAINING_JOB_COMPLETION_DB_URL" not in os.environ
 
-        # 3. Underlying TrustedTrainingJobRecordSource and authority backend
-        authority_source = coordinator.authority_source
-        backend = authority_source._db._backend
-        assert isinstance(backend, PostgresTrainingJobAuthority)
-        assert backend._db_url == coord_url
-        assert not hasattr(backend, "_completion_db_url")
+            # Assert sys.argv contains no completion password or role
+            comp_parsed = psycopg.conninfo.conninfo_to_dict(comp_url)
+            raw_password = comp_parsed.get("password")
+            comp_password: str = str(raw_password) if raw_password is not None else ""
+            if comp_password:
+                for arg in sys.argv:
+                    assert comp_password not in arg
 
-        # 4. Process environment check
-        assert "CFI_TRAINING_JOB_COMPLETION_DB_URL" not in os.environ
+            # Assert genuine OS kernel boundary access denial on vault file
+            with pytest.raises(PermissionError):
+                with open(vault_file, "r", encoding="utf-8") as f:
+                    _ = f.read()
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
 
-        # 5. Deep scan of coordinator instance dict: verify no completion URL or password leaked
-        comp_parsed = psycopg.conninfo.conninfo_to_dict(comp_url)
-        raw_password = comp_parsed.get("password")
-        comp_password: str = str(raw_password) if raw_password is not None else ""
+    def test_comp_r02_coordinator_cannot_create_privileged_connection(
+        self, pg_roles: dict[str, str]
+    ) -> None:
+        """COMP-R02: Prove coordinator principal cannot create or bypass to privileged completion connection.
 
-        def _scan_for_leak(obj: Any, depth: int = 0) -> None:
-            if depth > 4 or obj is None:
-                return
-            if isinstance(obj, str):
-                if comp_password and comp_password in obj:
-                    raise AssertionError("Completion password leaked in coordinator object graph!")
-                if "cfi_completion_role" in obj:
-                    raise AssertionError("Completion role name found in coordinator object graph!")
-            elif isinstance(obj, dict):
-                for k, v in obj.items():
-                    assert k != "completion_db_url"
-                    _scan_for_leak(v, depth + 1)
-            elif hasattr(obj, "__dict__"):
-                for k, v in vars(obj).items():
-                    assert k != "completion_db_url"
-                    _scan_for_leak(v, depth + 1)
-
-        _scan_for_leak(coordinator)
-
-    def test_comp_02_direct_sql_completion_forgery(self, pg_roles: dict[str, str]) -> None:
-        """COMP-02: Prove coordinator PostgreSQL role cannot directly forge completed-job records.
-
-        Under cfi_coord_role:
-        - Schedule a legitimate job.
-        - Do not perform genuine training.
-        - Attempt direct SQL INSERT into cfi_completed_jobs with syntactically valid data.
-        - Verify authorization rejection with SQLSTATE 42501 (InsufficientPrivilege).
-        - Verify 0 rows exist in cfi_completed_jobs.
+        Attempts:
+        - Connecting as cfi_completion_role with coordinator credentials fails.
+        - SET ROLE cfi_completion_role under coordinator session fails with SQLSTATE 42501.
+        - Direct INSERT on cfi_completed_jobs under coordinator session fails with SQLSTATE 42501.
         """
         coord_url = pg_roles["coordinator"]
         admin_url = pg_roles["admin"]
-        uid = uuid.uuid4().hex[:8]
-        job_id = f"job_forge_{uid}"
-        run_id = f"run_forge_{uid}"
-        sim_id = f"sim_forge_{uid}"
-        art_sha = hashlib.sha256(b"forged_model").hexdigest()
 
+        uid = uuid.uuid4().hex[:8]
+        job_id = f"job_coord_bypass_{uid}"
+
+        # 1. Attempt SET ROLE cfi_completion_role under coordinator session
         with psycopg.connect(coord_url) as conn:
             conn.autocommit = False
             with conn.cursor() as cur:
-                # 1. Schedule legitimate job under cfi_coord_role (authorized)
-                cur.execute(
-                    """
-                    INSERT INTO cfi_scheduled_jobs (
-                        job_id, training_run_id, simulation_id, coordinator_id,
-                        architecture, feature_schema_version, expected_rounds,
-                        expected_epochs, input_dim, feature_names_json, permitted_workers_json,
-                        config_fingerprint, scheduled_at, status
-                    ) VALUES (%s, %s, %s, 'cfi_coord_role', 'FraudDetectionNN', 'v1.0', 1, 1, 10, '[]', '[]', 'fp', NOW(), 'SCHEDULED')
-                    """,
-                    (job_id, run_id, sim_id),
-                )
-                conn.commit()
-
-                # 2. Attempt direct SQL INSERT into cfi_completed_jobs under cfi_coord_role
-                fnames_json = json.dumps(list(FEATURE_NAMES))
-                with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc:
-                    cur.execute(
-                        """
-                        INSERT INTO cfi_completed_jobs (
-                            job_id, training_run_id, simulation_id, completed_at, status,
-                            executed_rounds, executed_epochs, sample_count, observed_metrics_json,
-                            artifact_sha256, architecture, feature_schema_version, input_dim,
-                            feature_names_json, worker_id, evidence_fingerprint
-                        ) VALUES (%s, %s, %s, NOW(), 'COMPLETED', 1, 1, 100, '{"loss": 0.05}',
-                                  %s, 'FraudDetectionNN', 'v1.0', 10, %s, 'FEDERATED_COORDINATOR', 'fake_fp')
-                        """,
-                        (job_id, run_id, sim_id, art_sha, fnames_json),
-                    )
-                assert exc.value.sqlstate == "42501"
-                conn.rollback()
-
-        # 3. Verify under admin authority that NO completed record was persisted
-        with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            row = cur.fetchone()
-            assert row is not None
-            assert row[0] == 0
-
-    def test_comp_03_privileged_connection_bypass(self, pg_roles: dict[str, str]) -> None:
-        """COMP-03: Prove coordinator cannot obtain or invoke privileged completion connection.
-
-        Attempts:
-        - SET ROLE cfi_completion_role under coordinator session fails with SQLSTATE 42501.
-        - Invoking complete_job via coordinator PostgresTrainingJobAuthority fails with SQLSTATE 42501.
-        """
-        coord_url = pg_roles["coordinator"]
-        admin_url = pg_roles["admin"]
-        uid = uuid.uuid4().hex[:8]
-        job_id = f"job_bypass_{uid}"
-        run_id = f"run_bypass_{uid}"
-        sim_id = f"sim_bypass_{uid}"
-        art_sha = hashlib.sha256(b"bypass_model").hexdigest()
-
-        # 1. Attempt SET ROLE cfi_completion_role under cfi_coord_role
-        with psycopg.connect(coord_url) as conn:
-            with conn.cursor() as cur:
-                with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc:
+                with pytest.raises(psycopg.Error) as exc:
                     cur.execute("SET ROLE cfi_completion_role;")
                 assert exc.value.sqlstate == "42501"
                 conn.rollback()
 
-        # 2. Setup job in DB and try to call complete_job using coordinator connection
-        helper_setup_valid_observed_job(
-            admin_url=admin_url,
-            job_id=job_id,
-            run_id=run_id,
-            sim_id=sim_id,
-            artifact_sha=art_sha,
-        )
+        # 2. Attempt direct SQL INSERT into cfi_completed_jobs under coordinator session
+        with psycopg.connect(coord_url) as conn:
+            conn.autocommit = False
+            with conn.cursor() as cur:
+                with pytest.raises(psycopg.Error) as exc:
+                    cur.execute(
+                        """
+                        INSERT INTO cfi_completed_jobs (
+                            job_id, training_run_id, simulation_id, completed_at,
+                            executed_rounds, executed_epochs, sample_count,
+                            observed_metrics_json, artifact_sha256, architecture,
+                            feature_schema_version, input_dim, feature_names_json,
+                            worker_id, status, git_commit_hash, dataset_manifest_id,
+                            evidence_fingerprint
+                        ) VALUES (
+                            %s, 'run_bypass', 'sim_bypass', NOW(), 1, 1, 100, '{}',
+                            'fake_sha', 'FraudDetectionNN', 'v1.0', 10, '[]',
+                            'FEDERATED_COORDINATOR', 'COMPLETED', NULL, NULL, 'fake_fp'
+                        )
+                        """,
+                        (job_id,),
+                    )
+                assert exc.value.sqlstate == "42501"
+                conn.rollback()
 
-        coord_auth = PostgresTrainingJobAuthority(db_url=coord_url)
-        with pytest.raises(Exception) as exc_info:
-            coord_auth.complete_job(
-                job_id=job_id,
-                executed_rounds=1,
-                executed_epochs=1,
-                sample_count=450,
-                observed_metrics={"loss": 0.05, "auc_roc": 0.94},
-                artifact_sha256=art_sha,
-                enforce_lifecycle=True,
-            )
-        # Must fail due to PostgreSQL permission rejection (SQLSTATE 42501)
-        assert "42501" in str(exc_info.value) or "permission denied" in str(exc_info.value).lower()
-
-    def test_comp_04_forged_finalization_request(self, pg_roles: dict[str, str]) -> None:
-        """COMP-04: Prove independent completion authority rejects forged finalization requests.
-
-        Coordinator requests finalization for a scheduled job with NO observations, aggregations, or evaluations.
-        Independent completion authority independently reconciles PostgreSQL evidence and rejects it.
-        """
-        comp_url = pg_roles["completion"]
-        admin_url = pg_roles["admin"]
-        admin_auth = PostgresTrainingJobAuthority(db_url=admin_url)
-
-        uid = uuid.uuid4().hex[:8]
-        job_id = f"job_forged_req_{uid}"
-        run_id = f"run_forged_req_{uid}"
-        sim_id = f"sim_forged_req_{uid}"
-        art_sha = hashlib.sha256(b"forged_req").hexdigest()
-
-        # Schedule and start job ONLY (no observations or aggregations)
-        admin_auth.schedule_job(
-            job_id=job_id,
-            training_run_id=run_id,
-            simulation_id=sim_id,
-            coordinator_id="cfi_coord_role",
-            architecture="FraudDetectionNN",
-            feature_schema_version="v1.0",
-            expected_rounds=1,
-            expected_epochs=1,
-            input_dim=10,
-            feature_names=list(FEATURE_NAMES),
-            permitted_workers=["BANK_A", "BANK_B", "BANK_C"],
-        )
-        admin_auth.start_job(job_id=job_id, worker_id="BANK_A")
-
-        # Request finalization from isolated completion authority
-        with IsolatedTrainingCompletionAuthority(
-            completion_db_url=comp_url,
-            coordinator_token=COORD_TOKEN,
-            app_env="production",
-        ) as comp_auth:
-            with pytest.raises(TrainingProvenanceSecurityError, match="no verified execution observations recorded"):
-                comp_auth.finalize_training_completion(
-                    job_id=job_id,
-                    executed_rounds=1,
-                    executed_epochs=1,
-                    sample_count=450,
-                    observed_metrics={"loss": 0.05},
-                    artifact_sha256=art_sha,
-                    coordinator_token=COORD_TOKEN,
-                )
-
-        # Verify no row was inserted
+        # 3. Verify under admin authority that 0 rows were persisted
         with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
             row = cur.fetchone()
             assert row is not None
             assert row[0] == 0
 
-    def test_comp_05_genuine_finalization(self, pg_roles: dict[str, str]) -> None:
-        """COMP-05: Execute valid observed training lifecycle and demonstrate successful completion.
+    def test_comp_r03_unauthorized_completion_request_rejected(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """COMP-R03: Prove unauthorized completion service requests fail closed.
 
         Verifies:
-        - Independent completion authority reconciles real PostgreSQL events.
-        - Atomically writes completed record to cfi_completed_jobs under cfi_completion_role.
-        - Coordinator never possessed completion credentials.
+        - Request with invalid coordinator token is rejected during IPC authentication.
+        - No completed job record is written to PostgreSQL.
         """
         comp_url = pg_roles["completion"]
         admin_url = pg_roles["admin"]
 
-        uid = uuid.uuid4().hex[:8]
-        job_id = f"job_genuine_{uid}"
-        run_id = f"run_genuine_{uid}"
-        sim_id = f"sim_genuine_{uid}"
-        art_sha = hashlib.sha256(f"genuine_model_{uid}".encode()).hexdigest()
-
-        helper_setup_valid_observed_job(
-            admin_url=admin_url,
-            job_id=job_id,
-            run_id=run_id,
-            sim_id=sim_id,
-            artifact_sha=art_sha,
-        )
-
-        with IsolatedTrainingCompletionAuthority(
-            completion_db_url=comp_url,
+        vault_dir = str(tmp_path / "comp_vault_r03")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
             coordinator_token=COORD_TOKEN,
             app_env="production",
-        ) as comp_auth:
-            record = comp_auth.finalize_training_completion(
+        )
+        try:
+            uid = uuid.uuid4().hex[:8]
+            job_id = f"job_unauth_{uid}"
+            run_id = f"run_unauth_{uid}"
+            sim_id = f"sim_unauth_{uid}"
+            art_sha = hashlib.sha256(b"unauth_test").hexdigest()
+
+            helper_setup_valid_observed_job(
+                admin_url=admin_url,
                 job_id=job_id,
-                executed_rounds=1,
-                executed_epochs=1,
-                sample_count=450,
-                observed_metrics={"loss": 0.05, "auc_roc": 0.94},
-                artifact_sha256=art_sha,
-                coordinator_token=COORD_TOKEN,
+                run_id=run_id,
+                sim_id=sim_id,
+                artifact_sha=art_sha,
             )
 
-            assert record.job_id == job_id
-            assert record.status == "COMPLETED"
-            assert record.artifact_sha256 == art_sha
-            assert record.sample_count == 450
-            assert record.executed_rounds == 1
-            assert record.executed_epochs == 1
-
-        # Verify PostgreSQL durable state
-        with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
-            cur.execute("SELECT * FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            row = cur.fetchone()
-            assert row is not None
-            assert row[0] == job_id
-            assert row[8] == art_sha
-
-    def test_comp_06_atomic_validation_finalization(self, pg_roles: dict[str, str]) -> None:
-        """COMP-06: Attempt to tamper with evidence during completion.
-
-        Verify the transaction either produces one fully consistent completed record
-        or rolls back without leaving partial or corrupted records.
-        """
-        comp_url = pg_roles["completion"]
-        admin_url = pg_roles["admin"]
-
-        uid = uuid.uuid4().hex[:8]
-        job_id = f"job_atomic_{uid}"
-        run_id = f"run_atomic_{uid}"
-        sim_id = f"sim_atomic_{uid}"
-        art_sha = hashlib.sha256(f"atomic_model_{uid}".encode()).hexdigest()
-
-        helper_setup_valid_observed_job(
-            admin_url=admin_url,
-            job_id=job_id,
-            run_id=run_id,
-            sim_id=sim_id,
-            artifact_sha=art_sha,
-        )
-
-        with IsolatedTrainingCompletionAuthority(
-            completion_db_url=comp_url,
-            coordinator_token=COORD_TOKEN,
-            app_env="production",
-        ) as comp_auth:
-            # Adversarial claim: tampered sample count (claimed 9999 vs observed 450)
-            with pytest.raises(TrainingProvenanceSecurityError, match="Sample count mismatch"):
-                comp_auth.finalize_training_completion(
-                    job_id=job_id,
-                    executed_rounds=1,
-                    executed_epochs=1,
-                    sample_count=9999,  # Inconsistent
-                    observed_metrics={"loss": 0.05, "auc_roc": 0.94},
-                    artifact_sha256=art_sha,
-                    coordinator_token=COORD_TOKEN,
-                )
-
-        # Verify transaction was completely aborted; zero completed rows exist
-        with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            row = cur.fetchone()
-            assert row is not None
-            assert row[0] == 0
-
-    def test_comp_07_concurrent_equivalent_completion(self, pg_roles: dict[str, str]) -> None:
-        """COMP-07: Submit concurrent equivalent completion requests from independent callers.
-
-        Verifies:
-        - Handled safely via PostgreSQL advisory transaction locking.
-        - Documented idempotency returns identical completed record.
-        - Exactly one authoritative completed row is persisted in cfi_completed_jobs.
-        """
-        comp_url = pg_roles["completion"]
-        admin_url = pg_roles["admin"]
-
-        uid = uuid.uuid4().hex[:8]
-        job_id = f"job_concurrent_{uid}"
-        run_id = f"run_concurrent_{uid}"
-        sim_id = f"sim_concurrent_{uid}"
-        art_sha = hashlib.sha256(f"concurrent_model_{uid}".encode()).hexdigest()
-
-        helper_setup_valid_observed_job(
-            admin_url=admin_url,
-            job_id=job_id,
-            run_id=run_id,
-            sim_id=sim_id,
-            artifact_sha=art_sha,
-        )
-
-        with IsolatedTrainingCompletionAuthority(
-            completion_db_url=comp_url,
-            coordinator_token=COORD_TOKEN,
-            app_env="production",
-        ) as comp_auth:
-            def _request_completion() -> Any:
-                return comp_auth.finalize_training_completion(
-                    job_id=job_id,
-                    executed_rounds=1,
-                    executed_epochs=1,
-                    sample_count=450,
-                    observed_metrics={"loss": 0.05, "auc_roc": 0.94},
-                    artifact_sha256=art_sha,
-                    coordinator_token=COORD_TOKEN,
-                )
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-                f1 = executor.submit(_request_completion)
-                f2 = executor.submit(_request_completion)
-                r1 = f1.result(timeout=15)
-                r2 = f2.result(timeout=15)
-
-            assert r1.job_id == r2.job_id == job_id
-            assert r1.artifact_sha256 == r2.artifact_sha256 == art_sha
-
-        # Exactly 1 row in PostgreSQL
-        with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            row = cur.fetchone()
-            assert row is not None
-            assert row[0] == 1
-
-    def test_comp_08_conflicting_completion(self, pg_roles: dict[str, str]) -> None:
-        """COMP-08: Attempt incompatible completion after a valid finalization.
-
-        Verifies:
-        - Rejection of conflicting completion request.
-        - Persisted evidence in cfi_completed_jobs remains unchanged.
-        """
-        comp_url = pg_roles["completion"]
-        admin_url = pg_roles["admin"]
-
-        uid = uuid.uuid4().hex[:8]
-        job_id = f"job_conflict_{uid}"
-        run_id = f"run_conflict_{uid}"
-        sim_id = f"sim_conflict_{uid}"
-        art_sha_1 = hashlib.sha256(f"initial_model_{uid}".encode()).hexdigest()
-        art_sha_2 = hashlib.sha256(f"conflicting_model_{uid}".encode()).hexdigest()
-
-        helper_setup_valid_observed_job(
-            admin_url=admin_url,
-            job_id=job_id,
-            run_id=run_id,
-            sim_id=sim_id,
-            artifact_sha=art_sha_1,
-        )
-
-        with IsolatedTrainingCompletionAuthority(
-            completion_db_url=comp_url,
-            coordinator_token=COORD_TOKEN,
-            app_env="production",
-        ) as comp_auth:
-            # 1. First valid finalization
-            r1 = comp_auth.finalize_training_completion(
-                job_id=job_id,
-                executed_rounds=1,
-                executed_epochs=1,
-                sample_count=450,
-                observed_metrics={"loss": 0.05, "auc_roc": 0.94},
-                artifact_sha256=art_sha_1,
-                coordinator_token=COORD_TOKEN,
+            # Connect with wrong authentication token
+            client_unauth = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token="FORGED_COORDINATOR_TOKEN_INVALID",
+                app_env="production",
             )
-            assert r1.artifact_sha256 == art_sha_1
 
-            # 2. Conflicting completion request with different artifact hash
-            with pytest.raises(TrainingProvenanceSecurityError, match="Conflicting completion record"):
-                comp_auth.finalize_training_completion(
-                    job_id=job_id,
-                    executed_rounds=1,
-                    executed_epochs=1,
-                    sample_count=450,
-                    observed_metrics={"loss": 0.05, "auc_roc": 0.94},
-                    artifact_sha256=art_sha_2,
-                    coordinator_token=COORD_TOKEN,
-                )
-
-        # 3. Persisted row remains unchanged with original artifact sha
-        with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
-            cur.execute("SELECT artifact_sha256 FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            row = cur.fetchone()
-            assert row is not None
-            persisted_sha = row[0]
-            assert persisted_sha == art_sha_1
-
-    def test_comp_09_process_database_failure(self, pg_roles: dict[str, str]) -> None:
-        """COMP-09: Terminate or interrupt finalization boundary at confirmed checkpoint.
-
-        Verifies:
-        - Checkpoint failure before commit rolls back cleanly; no partial completion trusted.
-        - Process crash fails closed with TrainingProvenanceSecurityError.
-        """
-        comp_url = pg_roles["completion"]
-        admin_url = pg_roles["admin"]
-
-        uid = uuid.uuid4().hex[:8]
-        job_id = f"job_fail_{uid}"
-        run_id = f"run_fail_{uid}"
-        sim_id = f"sim_fail_{uid}"
-        art_sha = hashlib.sha256(f"fail_model_{uid}".encode()).hexdigest()
-
-        helper_setup_valid_observed_job(
-            admin_url=admin_url,
-            job_id=job_id,
-            run_id=run_id,
-            sim_id=sim_id,
-            artifact_sha=art_sha,
-        )
-
-        with IsolatedTrainingCompletionAuthority(
-            completion_db_url=comp_url,
-            coordinator_token=COORD_TOKEN,
-            app_env="production",
-        ) as comp_auth:
-            # 1. Simulate failure before commit at confirmed execution checkpoint
-            with pytest.raises(TrainingProvenanceSecurityError, match="Simulated execution checkpoint failure before commit"):
-                comp_auth.finalize_training_completion(
+            with pytest.raises(TrainingProvenanceSecurityError):
+                client_unauth.finalize_training_completion(
                     job_id=job_id,
                     executed_rounds=1,
                     executed_epochs=1,
                     sample_count=450,
                     observed_metrics={"loss": 0.05, "auc_roc": 0.94},
                     artifact_sha256=art_sha,
-                    coordinator_token=COORD_TOKEN,
-                    simulate_failure_before_commit=True,
                 )
 
-            # Verify no row was inserted into PostgreSQL
+            # Verify no completed job was persisted in PostgreSQL
             with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
                 row = cur.fetchone()
                 assert row is not None
                 assert row[0] == 0
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
 
-            # 2. Terminate completion worker process and verify fail-closed behavior
-            comp_auth.terminate()
-            with pytest.raises(TrainingProvenanceSecurityError, match="worker process terminated"):
-                comp_auth.finalize_training_completion(
+    def test_comp_r04_authorized_completion_request_succeeds(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """COMP-R04: Prove authorized completion request succeeds through independent boundary.
+
+        Verifies:
+        - Request with valid coordinator token succeeds.
+        - Atomic validation and write under cfi_completion_role succeeds.
+        - Exactly 1 authoritative row is written to PostgreSQL.
+        """
+        comp_url = pg_roles["completion"]
+        admin_url = pg_roles["admin"]
+
+        vault_dir = str(tmp_path / "comp_vault_r04")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+        try:
+            uid = uuid.uuid4().hex[:8]
+            job_id = f"job_auth_{uid}"
+            run_id = f"run_auth_{uid}"
+            sim_id = f"sim_auth_{uid}"
+            art_sha = hashlib.sha256(b"auth_test").hexdigest()
+
+            helper_setup_valid_observed_job(
+                admin_url=admin_url,
+                job_id=job_id,
+                run_id=run_id,
+                sim_id=sim_id,
+                artifact_sha=art_sha,
+            )
+
+            client_auth = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token=COORD_TOKEN,
+                app_env="production",
+            )
+
+            record = client_auth.finalize_training_completion(
+                job_id=job_id,
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=450,
+                observed_metrics={"loss": 0.05, "auc_roc": 0.94},
+                artifact_sha256=art_sha,
+            )
+
+            assert record.job_id == job_id
+            assert record.artifact_sha256 == art_sha
+            assert record.status == "COMPLETED"
+
+            # Verify persisted row in PostgreSQL
+            with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                row = cur.fetchone()
+                assert row is not None
+                assert row[0] == 1
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
+
+    def test_comp_r05_concurrent_evidence_mutation_serialized_or_rejected(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """COMP-R05: Prove real concurrent evidence mutation cannot invalidate finalization.
+
+        Verifies:
+        - PostgreSQL transaction-level advisory locks serialize evidence writes and completion.
+        - A concurrent evidence write attempting to add an observation while completion is reconciling
+          is serialized until completion commits, and then rejected because the job is finalized.
+        """
+        comp_url = pg_roles["completion"]
+        admin_url = pg_roles["admin"]
+        worker_url = pg_roles["worker_bank_a"]
+
+        uid = uuid.uuid4().hex[:8]
+        job_id = f"job_concur_write_{uid}"
+        run_id = f"run_concur_write_{uid}"
+        sim_id = f"sim_concur_write_{uid}"
+        art_sha = hashlib.sha256(b"concur_write_test").hexdigest()
+
+        helper_setup_valid_observed_job(
+            admin_url=admin_url,
+            job_id=job_id,
+            run_id=run_id,
+            sim_id=sim_id,
+            artifact_sha=art_sha,
+            num_rounds=1,
+        )
+
+        authority_comp = PostgresTrainingJobAuthority(db_url=comp_url)
+        authority_worker = PostgresTrainingJobAuthority(db_url=worker_url)
+
+        obs_rejected = False
+        obs_started_event = threading.Event()
+
+        def _concurrent_observation_writer() -> None:
+            nonlocal obs_rejected
+            obs_started_event.wait(timeout=5)
+            # Try to add a late observation for round 2
+            late_obs = RoundObservation(
+                event_id=f"obs_late_{uid}",
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                worker_id="BANK_A",
+                bank_id="BANK_A",
+                round_number=2,
+                attempt_number=1,
+                actual_sample_count=50,
+                actual_executed_epochs=1,
+                observed_loss=0.08,
+                metrics={"loss": 0.08},
+                execution_timestamp=datetime.now(timezone.utc).isoformat(),
+                model_update_digest=hashlib.sha256(b"late").hexdigest(),
+                execution_status="COMPLETED",
+            )
+            try:
+                authority_worker.record_observation(late_obs)
+            except TrainingProvenanceSecurityError as e:
+                if "finalized completed job" in str(e):
+                    obs_rejected = True
+
+        obs_thread = threading.Thread(target=_concurrent_observation_writer)
+        obs_thread.start()
+
+        # Signal thread right before executing completion
+        obs_started_event.set()
+
+        completed_record = authority_comp.complete_job(
+            job_id=job_id,
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=450,
+            observed_metrics={"loss": 0.05, "auc_roc": 0.94},
+            artifact_sha256=art_sha,
+            worker_id="FEDERATED_COORDINATOR",
+        )
+        obs_thread.join(timeout=10)
+
+        assert completed_record.status == "COMPLETED"
+        assert obs_rejected is True
+
+        # Verify PostgreSQL state: completed record reflects exactly round 1
+        with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+            cur.execute("SELECT sample_count, executed_rounds FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+            row = cur.fetchone()
+            assert row is not None
+            assert row[0] == 450
+            assert row[1] == 1
+
+            # Late observation was never committed
+            cur.execute("SELECT COUNT(*) FROM cfi_round_observations WHERE event_id = %s", (f"obs_late_{uid}",))
+            row_obs = cur.fetchone()
+            assert row_obs is not None
+            assert row_obs[0] == 0
+
+    def test_comp_r06_worker_terminated_inside_open_transaction(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """COMP-R06: Prove terminating the completion worker process inside an open transaction rolls back cleanly.
+
+        Required sequence:
+        1. Begin valid finalization with in-transaction pause checkpoint.
+        2. Confirm worker process has entered the transaction and written the checkpoint marker.
+        3. Abruptly kill the worker process before commit.
+        4. Inspect PostgreSQL state: zero completed rows persisted.
+        """
+        comp_url = pg_roles["completion"]
+        admin_url = pg_roles["admin"]
+
+        vault_dir = str(tmp_path / "comp_vault_r06")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+
+        uid = uuid.uuid4().hex[:8]
+        job_id = f"job_crash_{uid}"
+        run_id = f"run_crash_{uid}"
+        sim_id = f"sim_crash_{uid}"
+        art_sha = hashlib.sha256(b"crash_test").hexdigest()
+
+        helper_setup_valid_observed_job(
+            admin_url=admin_url,
+            job_id=job_id,
+            run_id=run_id,
+            sim_id=sim_id,
+            artifact_sha=art_sha,
+        )
+
+        marker_file = str(tmp_path / f"checkpoint_marker_{uid}.txt")
+
+        client = IsolatedTrainingCompletionAuthority(
+            service_endpoint=comp_endpoint,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+
+        # 1. Start finalization with checkpoint pause in separate thread
+        def _request_with_checkpoint() -> None:
+            with pytest.raises(TrainingProvenanceSecurityError):
+                client.finalize_training_completion(
                     job_id=job_id,
                     executed_rounds=1,
                     executed_epochs=1,
                     sample_count=450,
                     observed_metrics={"loss": 0.05, "auc_roc": 0.94},
                     artifact_sha256=art_sha,
-                    coordinator_token=COORD_TOKEN,
+                    pause_checkpoint_marker_file=marker_file,
                 )
 
-    def test_comp_10_downstream_provenance(self, pg_roles: dict[str, str], tmp_path) -> None:
-        """COMP-10: Downstream provenance verification for rejected and legitimate completions.
+        t = threading.Thread(target=_request_with_checkpoint)
+        t.start()
+
+        # 2. Confirm worker reached in-transaction checkpoint
+        for _ in range(50):
+            if os.path.exists(marker_file):
+                break
+            time.sleep(0.1)
+        assert os.path.exists(marker_file), "Worker did not reach in-transaction checkpoint!"
+
+        # 3. Abruptly terminate worker process while transaction is OPEN
+        comp_proc.kill()
+        comp_proc.join(timeout=5)
+        t.join(timeout=5)
+
+        # 4. Inspect PostgreSQL: transaction rolled back cleanly, 0 rows in cfi_completed_jobs
+        with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+            row = cur.fetchone()
+            assert row is not None
+            assert row[0] == 0
+
+    def test_comp_r07_post_crash_retry_preserves_correct_state(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """COMP-R07: Prove post-crash retry preserves correct completion state without partial corruption.
 
         Verifies:
-        - Rejected/forged completion cannot receive an Ed25519 receipt or ModelRegistry admission.
-        - Genuine completed job retains working receipt issuance, public verification, and Registry admission.
+        - Restarting the service after a process crash.
+        - Retrying the completion request succeeds cleanly.
+        - Exactly 1 authoritative completed record is persisted in PostgreSQL.
         """
         comp_url = pg_roles["completion"]
         admin_url = pg_roles["admin"]
-        issuer_url = pg_roles["issuer"]
 
-        # Setup issuer key corresponding to DEFAULT_TRAINING_KEY_ID in trust store
+        vault_dir = str(tmp_path / "comp_vault_r07")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+
+        # Step 1: Simulate crash using COMP-R06 pattern
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+
+        uid = uuid.uuid4().hex[:8]
+        job_id = f"job_retry_{uid}"
+        run_id = f"run_retry_{uid}"
+        sim_id = f"sim_retry_{uid}"
+        art_sha = hashlib.sha256(b"retry_test").hexdigest()
+
+        helper_setup_valid_observed_job(
+            admin_url=admin_url,
+            job_id=job_id,
+            run_id=run_id,
+            sim_id=sim_id,
+            artifact_sha=art_sha,
+        )
+
+        marker_file = str(tmp_path / f"checkpoint_marker_{uid}.txt")
+        client = IsolatedTrainingCompletionAuthority(
+            service_endpoint=comp_endpoint,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+
+        def _request_crash() -> None:
+            with pytest.raises(TrainingProvenanceSecurityError):
+                client.finalize_training_completion(
+                    job_id=job_id,
+                    executed_rounds=1,
+                    executed_epochs=1,
+                    sample_count=450,
+                    observed_metrics={"loss": 0.05, "auc_roc": 0.94},
+                    artifact_sha256=art_sha,
+                    pause_checkpoint_marker_file=marker_file,
+                )
+
+        t = threading.Thread(target=_request_crash)
+        t.start()
+
+        for _ in range(50):
+            if os.path.exists(marker_file):
+                break
+            time.sleep(0.1)
+        assert os.path.exists(marker_file)
+
+        comp_proc.kill()
+        comp_proc.join(timeout=5)
+        t.join(timeout=5)
+
+        # Step 2: Restart service with provisioned vault
+        restarted_proc, new_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+        try:
+            restarted_client = IsolatedTrainingCompletionAuthority(
+                service_endpoint=new_endpoint,
+                coordinator_token=COORD_TOKEN,
+                app_env="production",
+            )
+
+            # Step 3: Retry completion without pause
+            record = restarted_client.finalize_training_completion(
+                job_id=job_id,
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=450,
+                observed_metrics={"loss": 0.05, "auc_roc": 0.94},
+                artifact_sha256=art_sha,
+            )
+
+            assert record.job_id == job_id
+            assert record.status == "COMPLETED"
+
+            # Exactly 1 row in PostgreSQL
+            with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                row = cur.fetchone()
+                assert row is not None
+                assert row[0] == 1
+        finally:
+            restarted_proc.terminate()
+            restarted_proc.join(timeout=3)
+
+    def test_comp_r08_concurrent_independent_clients_resolve_safely(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """COMP-R08: Prove concurrent independent clients resolve safely without queue sharing or mismatched responses.
+
+        Verifies:
+        - Two distinct clients each connect via separate IPC sockets.
+        - Concurrently submit completion requests for the same job.
+        - Neither client receives a mismatched or corrupted response.
+        - PostgreSQL contains exactly 1 authoritative completed record.
+        """
+        comp_url = pg_roles["completion"]
+        admin_url = pg_roles["admin"]
+
+        vault_dir = str(tmp_path / "comp_vault_r08")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+        try:
+            uid = uuid.uuid4().hex[:8]
+            job_id = f"job_concurrent_{uid}"
+            run_id = f"run_concurrent_{uid}"
+            sim_id = f"sim_concurrent_{uid}"
+            art_sha = hashlib.sha256(b"concurrent_test").hexdigest()
+
+            helper_setup_valid_observed_job(
+                admin_url=admin_url,
+                job_id=job_id,
+                run_id=run_id,
+                sim_id=sim_id,
+                artifact_sha=art_sha,
+            )
+
+            client_1 = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token=COORD_TOKEN,
+                app_env="production",
+            )
+            client_2 = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token=COORD_TOKEN,
+                app_env="production",
+            )
+
+            def _req_1():
+                return client_1.finalize_training_completion(
+                    job_id=job_id,
+                    executed_rounds=1,
+                    executed_epochs=1,
+                    sample_count=450,
+                    observed_metrics={"loss": 0.05, "auc_roc": 0.94},
+                    artifact_sha256=art_sha,
+                )
+
+            def _req_2():
+                return client_2.finalize_training_completion(
+                    job_id=job_id,
+                    executed_rounds=1,
+                    executed_epochs=1,
+                    sample_count=450,
+                    observed_metrics={"loss": 0.05, "auc_roc": 0.94},
+                    artifact_sha256=art_sha,
+                )
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                f1 = executor.submit(_req_1)
+                f2 = executor.submit(_req_2)
+                r1 = f1.result(timeout=15)
+                r2 = f2.result(timeout=15)
+
+            assert r1.job_id == r2.job_id == job_id
+            assert r1.artifact_sha256 == r2.artifact_sha256 == art_sha
+            assert r1.status == r2.status == "COMPLETED"
+
+            # Exactly 1 row persisted in PostgreSQL
+            with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                row = cur.fetchone()
+                assert row is not None
+                assert row[0] == 1
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
+
+    def test_comp_r09_forged_completion_produces_no_trusted_receipt_or_registry_candidate(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """COMP-R09: Prove uncompleted/forged jobs produce no trusted Ed25519 receipt or Registry candidate.
+
+        Verifies:
+        - Signing authority rejects issuance for uncompleted job.
+        - ModelRegistry rejects admission without verified receipt (UNVERIFIED, ineligible).
+        """
+        issuer_url = pg_roles["issuer"]
         issuer_priv_hex = hashlib.sha256(b"cfi_dev_ed25519_training_issuer_seed_v1").digest().hex()
 
-        # Job Record Source under read-only cfi_issuer_role
         issuer_source = TrustedTrainingJobRecordSource(
             db_url=issuer_url,
             enforce_lifecycle=True,
             app_env="production",
-            worker_token="tok_issuer",
+            worker_token="tok_issuer_r09",
         )
         issuer = TrainingReceiptIssuer(
             signing_key_hex=issuer_priv_hex,
@@ -748,14 +864,13 @@ class TestCompletionAuthoritySecurity:
         )
         verifier = get_default_training_verifier()
         registry = ModelRegistry(
-            storage_dir=str(tmp_path / "model_reg"),
+            storage_dir=str(tmp_path / "model_reg_r09"),
             verifier=verifier,
         )
 
-        # -------------------------------------------------------------
-        # Part A: Attempt receipt and admission for uncompleted/forged job
-        # -------------------------------------------------------------
         uncompleted_job_id = f"job_uncomp_{uuid.uuid4().hex[:8]}"
+
+        # Receipt signing fails closed
         with pytest.raises(TrainingProvenanceSecurityError, match="has no authenticated execution record"):
             issuer.issue_receipt(
                 job_id=uncompleted_job_id,
@@ -768,91 +883,134 @@ class TestCompletionAuthoritySecurity:
                 metrics={"loss": 0.05},
             )
 
-        # ModelRegistry without valid receipt marks candidate UNVERIFIED and ineligible
-        unverified_version = registry.save_version(
+        # ModelRegistry marks candidate UNVERIFIED and ineligible
+        version_entry = registry.save_version(
             simulation_id="sim_uncomp",
             state_dict={},
             metrics={"loss": 0.05},
             is_promoted=False,
             training_receipt=None,
         )
-        assert unverified_version["is_production_eligible"] is False
-        assert unverified_version["provenance_type"] == "UNVERIFIED"
+        assert version_entry["is_production_eligible"] is False
+        assert version_entry["provenance_type"] == "UNVERIFIED"
 
-        # -------------------------------------------------------------
-        # Part B: Legitimate completion workflow
-        # -------------------------------------------------------------
-        uid = uuid.uuid4().hex[:8]
-        legit_job_id = f"job_legit_{uid}"
-        legit_run_id = f"run_legit_{uid}"
-        legit_sim_id = f"sim_legit_{uid}"
-        model_bytes = f"legit_model_{uid}".encode()
-        legit_art_sha = hashlib.sha256(model_bytes).hexdigest()
+    def test_comp_r10_genuine_three_bank_training_completes_through_independent_boundary(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """COMP-R10: Prove genuine three-bank federated training completes through independent completion authority.
 
-        helper_setup_valid_observed_job(
-            admin_url=admin_url,
-            job_id=legit_job_id,
-            run_id=legit_run_id,
-            sim_id=legit_sim_id,
-            artifact_sha=legit_art_sha,
-        )
+        Verifies:
+        - Full multi-process distributed training executes across BANK_A, BANK_B, BANK_C.
+        - Coordinator holds coordinator credentials ONLY (zero completion DB credentials).
+        - Completion finalized through independent service boundary over authenticated IPC.
+        - Ed25519 receipt issued by isolated signing authority and admitted to ModelRegistry.
+        """
+        comp_url = pg_roles["completion"]
+        coord_url = pg_roles["coordinator"]
+        issuer_url = pg_roles["issuer"]
 
-        with IsolatedTrainingCompletionAuthority(
-            completion_db_url=comp_url,
+        # 1. Privileged bootstrap provisions completion vault & spawns independent completion service
+        comp_vault_dir = str(tmp_path / "comp_vault_r10")
+        comp_vault_file = provision_isolated_completion_authority_vault(comp_vault_dir, comp_url)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=comp_vault_file,
             coordinator_token=COORD_TOKEN,
             app_env="production",
-        ) as comp_auth:
-            comp_auth.finalize_training_completion(
-                job_id=legit_job_id,
-                executed_rounds=1,
-                executed_epochs=1,
-                sample_count=450,
-                observed_metrics={"loss": 0.05, "auc_roc": 0.94},
-                artifact_sha256=legit_art_sha,
+        )
+        try:
+            # 2. Coordinator receives client with service_endpoint ONLY
+            comp_auth = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
                 coordinator_token=COORD_TOKEN,
+                app_env="production",
+            )
+            manager = DistributedFederatedTrainingManager(
+                coordinator_token=COORD_TOKEN,
+                db_url=coord_url,
+                app_env="production",
             )
 
-        # Issue receipt reading from PostgreSQL under cfi_issuer_role
-        legit_receipt = issuer.issue_receipt(
-            job_id=legit_job_id,
-            training_run_id=legit_run_id,
-            simulation_id=legit_sim_id,
-            model_artifact_sha256=legit_art_sha,
-            architecture="FraudDetectionNN",
-            executed_rounds=1,
-            executed_epochs=1,
-            sample_count=450,
-            metrics={"loss": 0.05, "auc_roc": 0.94},
-            producer_id="FEDERATED_COORDINATOR",
-        )
-        assert legit_receipt.job_id == legit_job_id
-        assert legit_receipt.model_artifact_sha256 == legit_art_sha
+            # 3. Provision bank partitions and spawn bank worker processes
+            bank_enc_keys = {
+                "BANK_A": Fernet.generate_key(),
+                "BANK_B": Fernet.generate_key(),
+                "BANK_C": Fernet.generate_key(),
+            }
+            vaults_dir = str(tmp_path / "bank_vaults")
+            np.random.seed(42)
+            bank_data_paths = {}
+            for b_id, n_samples in [("BANK_A", 100), ("BANK_B", 150), ("BANK_C", 200)]:
+                X_part = np.random.randn(n_samples, NUM_FEATURES).astype(np.float32)
+                y_part = np.random.randint(0, 2, size=n_samples).astype(np.float32)
+                p = setup_bank_private_storage(
+                    bank_storage_dir=vaults_dir,
+                    bank_id=b_id,
+                    X_partition=X_part,
+                    y_partition=y_part,
+                    bank_token=BANK_TOKENS[b_id],
+                    bank_encryption_key=bank_enc_keys[b_id],
+                )
+                bank_data_paths[b_id] = p
 
-        # Verify receipt with public-key-only verifier
-        is_valid, _ = verifier.verify_receipt(
-            receipt=legit_receipt,
-            expected_simulation_id=legit_sim_id,
-            expected_architecture="FraudDetectionNN",
-            expected_feature_schema_version="v1.0",
-            expected_input_dim=NUM_FEATURES,
-            expected_feature_names=list(FEATURE_NAMES),
-        )
-        assert is_valid is True
+            bank_db_urls = {
+                "BANK_A": pg_roles["worker_bank_a"],
+                "BANK_B": pg_roles["worker_bank_b"],
+                "BANK_C": pg_roles["worker_bank_c"],
+            }
+            procs, endpoints = spawn_bank_workers(
+                participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+                bank_tokens=BANK_TOKENS,
+                db_url=pg_roles["worker"],
+                bank_data_paths=bank_data_paths,
+                bank_db_urls=bank_db_urls,
+                bank_encryption_keys=bank_enc_keys,
+            )
 
-        # ModelRegistry admits verified inactive candidate
-        admitted_version = registry.save_version(
-            simulation_id=legit_sim_id,
-            state_dict={},
-            artifact_bytes=model_bytes,
-            metrics={"loss": 0.05, "auc_roc": 0.94},
-            is_promoted=False,
-            training_receipt=legit_receipt,
-        )
-        assert admitted_version["is_production_eligible"] is True
-        assert admitted_version["provenance_type"] == "TRAINING_RECORDED"
-        assert admitted_version["status"] == "inactive"
-        assert admitted_version["is_active"] is False
+            # 4. Provision signing authority
+            dev_seed = hashlib.sha256(b"cfi_dev_ed25519_training_issuer_seed_v1").digest().hex()
+            issuer_vault_dir = str(tmp_path / "issuer_vault")
+            issuer_key_file, _ = provision_isolated_issuer_vault(issuer_vault_dir, signing_key_hex=dev_seed)
+            signing_auth = IsolatedReceiptSigningAuthority(
+                issuer_key_path=issuer_key_file,
+                coordinator_token=COORD_TOKEN,
+                db_url=issuer_url,
+                key_id=DEFAULT_TRAINING_KEY_ID,
+                app_env="production",
+            )
 
-        # Verify active champion remains unaltered
-        active_champ = registry.get_active_champion_identity(legit_sim_id)
-        assert active_champ is None
+            uid = uuid.uuid4().hex[:8]
+            job_id = f"job_e2e_{uid}"
+            run_id = f"run_e2e_{uid}"
+            sim_id = f"sim_e2e_{uid}"
+            registry_dir = str(tmp_path / "model_reg_r10")
+
+            X_test = np.random.randn(100, NUM_FEATURES).astype(np.float32)
+            y_test = np.random.randint(0, 2, size=100).astype(np.float32)
+
+            result = manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(X_test, y_test),
+                participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+                worker_endpoints=endpoints,
+                worker_processes=procs,
+                num_rounds=2,
+                expected_unique_samples=450,
+                registry_storage_dir=registry_dir,
+                signing_authority=signing_auth,
+                completion_authority=comp_auth,
+            )
+
+            assert result["completed_record"].job_id == job_id
+            assert result["completed_record"].status == "COMPLETED"
+            assert result["receipt"].job_id == job_id
+            assert result["saved_version"]["is_production_eligible"] is True
+            assert result["saved_version"]["provenance_type"] == "TRAINING_RECORDED"
+            assert result["saved_version"]["status"] == "inactive"
+            assert result["saved_version"]["is_active"] is False
+
+            signing_auth.terminate()
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)

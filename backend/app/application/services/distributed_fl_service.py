@@ -14,6 +14,7 @@ Implements Module 01-A.1 Requirement P6:
 from __future__ import annotations
 
 import base64
+import concurrent.futures
 import contextlib
 import hashlib
 import hmac
@@ -21,8 +22,11 @@ import io
 import logging
 import math
 import multiprocessing as mp
+from multiprocessing.connection import Client, Listener
 import os
 import tempfile
+import threading
+import time
 from collections.abc import Mapping
 from typing import Any
 
@@ -496,7 +500,7 @@ class IsolatedReceiptSigningAuthority:
         self._process.start()
 
         try:
-            init_msg = self._outbox.get(timeout=10)
+            init_msg = self._outbox.get(timeout=25)
             if isinstance(init_msg, dict) and init_msg.get("status") == "READY":
                 self._public_key_hex = init_msg["public_key_hex"]
             else:
@@ -545,6 +549,8 @@ class IsolatedReceiptSigningAuthority:
         })
         try:
             res = self._outbox.get(timeout=30)
+            if isinstance(res, dict) and res.get("status") == "READY":
+                res = self._outbox.get(timeout=30)
         except Exception as e:
             raise TrainingProvenanceSecurityError(f"Receipt signing service timeout or communication failure: {e}") from e
 
@@ -554,68 +560,171 @@ class IsolatedReceiptSigningAuthority:
         raise TrainingProvenanceSecurityError(err_msg)
 
 
-def _run_isolated_completion_worker(
+def provision_isolated_completion_authority_vault(
+    vault_dir: str,
     completion_db_url: str,
+) -> str:
+    """Privileged bootstrap provisioning of completion authority credentials inside an isolated vault."""
+    os.makedirs(vault_dir, exist_ok=True)
+    vault_file = os.path.join(vault_dir, "completion_authority.vault")
+    with open(vault_file, "w", encoding="utf-8") as f:
+        f.write(completion_db_url.strip())
+    with contextlib.suppress(Exception):
+        os.chmod(vault_dir, 0o700)
+        os.chmod(vault_file, 0o600)
+    return vault_file
+
+
+def _acquire_vault_exclusive_os_boundary(path: str) -> Any:
+    """Lock the physical vault file using native OS kernel primitives so external open() fails with PermissionError."""
+    if not os.path.exists(path):
+        return None
+    if os.name == "nt":
+        import ctypes
+
+        generic_read = 0x80000000
+        generic_write = 0x40000000
+        file_share_none = 0
+        open_existing = 3
+        file_attribute_normal = 0x80
+        handle = ctypes.windll.kernel32.CreateFileW(  # type: ignore[attr-defined]
+            path,
+            generic_read | generic_write,
+            file_share_none,
+            None,
+            open_existing,
+            file_attribute_normal,
+            None,
+        )
+        if handle != -1:
+            return handle
+        return None
+    else:
+        try:
+            import fcntl
+
+            fd = os.open(path, os.O_RDWR)
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore[attr-defined]
+            return fd
+        except Exception:
+            return None
+
+
+def _release_vault_exclusive_os_boundary(handle: Any) -> None:
+    if handle is not None:
+        if os.name == "nt":
+            import ctypes
+
+            ctypes.windll.kernel32.CloseHandle(handle)  # type: ignore[attr-defined]
+        else:
+            try:
+                import fcntl
+
+                fcntl.flock(handle, fcntl.LOCK_UN)  # type: ignore[attr-defined]
+                os.close(handle)
+            except Exception:
+                pass
+
+
+def _run_isolated_completion_service_worker(
+    vault_path_or_url: str,
     coordinator_token: str | None,
-    inbox: mp.Queue,
-    outbox: mp.Queue,
-    app_env: str,
+    ready_queue: mp.Queue,
+    app_env: str = "production",
 ) -> None:
-    """Isolated OS process executing authoritative PostgreSQL completion reconciliation and writes.
+    """Dedicated Operating System Process running the Completion Authority Service.
 
     Resides strictly outside the coordinator security context:
-    - Holds exclusive cfi_completion_role credentials in this child process memory space.
+    - Holds exclusive cfi_completion_role credentials in this independent process address space.
+    - Locks the vault file with native OS kernel exclusive boundary.
     - Connects directly to PostgreSQL under cfi_completion_role.
-    - Executes atomic, single-transaction validation and finalization with advisory locking.
-    - Coordinator process never possesses, stores, or derives these completion credentials.
+    - Serves authenticated IPC connections via multiprocessing.connection.Listener.
+    - Coordinator never possesses, stores, or derives these completion credentials.
     """
     worker_pid = os.getpid()
+    logger.info("Isolated Training Completion Authority Service running with PID %d", worker_pid)
+
+    lock_handle = None
+    if os.path.exists(vault_path_or_url):
+        with open(vault_path_or_url, encoding="utf-8") as f:
+            completion_db_url = f.read().strip()
+        lock_handle = _acquire_vault_exclusive_os_boundary(vault_path_or_url)
+    else:
+        if app_env.lower() == "production":
+            ready_queue.put({
+                "status": "ERROR",
+                "error": "Production isolated completion authority requires a provisioned vault file.",
+            })
+            return
+        completion_db_url = vault_path_or_url.strip()
+
     try:
         authority = PostgresTrainingJobAuthority(db_url=completion_db_url)
     except Exception as e:
-        outbox.put({"status": "ERROR", "error": f"Failed to initialize completion authority in worker process: {e}"})
+        ready_queue.put({"status": "ERROR", "error": f"Failed to initialize completion authority: {e}"})
+        if lock_handle:
+            _release_vault_exclusive_os_boundary(lock_handle)
         return
 
-    outbox.put({"status": "READY", "worker_pid": worker_pid})
+    # Scrub raw completion_db_url from local variables
+    del completion_db_url
 
-    while True:
+    authkey_bytes = coordinator_token.encode("utf-8") if coordinator_token else b""
+    try:
+        listener = Listener(("127.0.0.1", 0), authkey=authkey_bytes)
+        service_address = listener.address
+    except Exception as e:
+        ready_queue.put({"status": "ERROR", "error": f"Failed to bind service listener: {e}"})
+        if lock_handle:
+            _release_vault_exclusive_os_boundary(lock_handle)
+        return
+
+    ready_queue.put({
+        "status": "READY",
+        "worker_pid": worker_pid,
+        "service_address": service_address,
+    })
+
+    stop_requested = threading.Event()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=8)
+
+    def _handle_connection(conn: Any) -> None:
         try:
-            req = inbox.get()
-        except Exception:
-            break
+            req = conn.recv()
+            if not isinstance(req, dict):
+                conn.send({"status": "ERROR", "error": "Invalid request payload."})
+                return
 
-        if not isinstance(req, dict):
-            continue
+            cmd = req.get("command")
+            if cmd == "SHUTDOWN":
+                stop_requested.set()
+                conn.send({"status": "SUCCESS", "message": "SHUTDOWN_ACK"})
+                return
 
-        cmd = req.get("command")
-        if cmd == "SHUTDOWN":
-            break
-
-        if cmd == "FINALIZE_COMPLETION":
-            try:
-                auth_token = req.get("coordinator_token")
+            if cmd == "FINALIZE_COMPLETION":
+                auth_tok = req.get("coordinator_token")
                 is_prod = app_env.lower() == "production"
 
                 if is_prod and not coordinator_token:
-                    outbox.put({
+                    conn.send({
                         "status": "ERROR",
                         "error": "Unauthorized completion request: coordinator token configuration is required in production.",
                     })
-                    continue
+                    return
 
                 if coordinator_token is not None:
-                    if not auth_token or not hmac.compare_digest(auth_token, coordinator_token):
-                        outbox.put({
+                    if not auth_tok or not hmac.compare_digest(auth_tok, coordinator_token):
+                        conn.send({
                             "status": "ERROR",
                             "error": "Unauthorized completion request: invalid or missing coordinator token.",
                         })
-                        continue
+                        return
                 elif req.get("caller_identity") != "COORDINATOR":
-                    outbox.put({
+                    conn.send({
                         "status": "ERROR",
                         "error": f"Unauthorized completion caller identity: '{req.get('caller_identity')}'.",
                     })
-                    continue
+                    return
 
                 job_id = req["job_id"]
                 executed_rounds = req["executed_rounds"]
@@ -627,6 +736,7 @@ def _run_isolated_completion_worker(
                 git_commit_hash = req.get("git_commit_hash")
                 dataset_manifest_id = req.get("dataset_manifest_id")
                 simulate_failure = req.get("simulate_failure_before_commit", False)
+                pause_marker = req.get("pause_checkpoint_marker_file")
 
                 completed_record = authority.complete_job(
                     job_id=job_id,
@@ -640,6 +750,7 @@ def _run_isolated_completion_worker(
                     dataset_manifest_id=dataset_manifest_id,
                     enforce_lifecycle=True,
                     simulate_failure_before_commit=simulate_failure,
+                    pause_checkpoint_marker_file=pause_marker,
                 )
 
                 record_dict = {
@@ -661,79 +772,164 @@ def _run_isolated_completion_worker(
                     "git_commit_hash": completed_record.git_commit_hash,
                     "dataset_manifest_id": completed_record.dataset_manifest_id,
                 }
-
-                outbox.put({
+                conn.send({
                     "status": "SUCCESS",
                     "record_dict": record_dict,
                     "worker_pid": worker_pid,
                 })
-            except Exception as e:
-                outbox.put({
-                    "status": "ERROR",
-                    "error": str(e),
-                })
+            else:
+                conn.send({"status": "ERROR", "error": f"Unknown command: '{cmd}'"})
+        except Exception as e:
+            with contextlib.suppress(Exception):
+                conn.send({"status": "ERROR", "error": str(e)})
+        finally:
+            with contextlib.suppress(Exception):
+                conn.close()
+
+    with contextlib.suppress(Exception):
+        raw_listener = getattr(listener, "_listener", None)
+        if raw_listener is not None:
+            sock = getattr(raw_listener, "_socket", None)
+            if sock is not None:
+                sock.settimeout(0.5)
+
+    while not stop_requested.is_set():
+        try:
+            conn = listener.accept()
+            executor.submit(_handle_connection, conn)
+        except mp.AuthenticationError:
+            continue
+        except (TimeoutError, OSError):
+            continue
+        except Exception:
+            break
+
+    executor.shutdown(wait=True)
+    with contextlib.suppress(Exception):
+        listener.close()
+    if lock_handle:
+        _release_vault_exclusive_os_boundary(lock_handle)
+
+
+def spawn_isolated_completion_authority_service(
+    vault_path: str,
+    coordinator_token: str | None = None,
+    app_env: str = "production",
+) -> tuple[mp.Process, tuple[str, int]]:
+    """Spawn dedicated OS process running the Completion Authority Service.
+
+    Returns (service_process, service_address).
+    The coordinator receives ONLY service_address; it NEVER receives vault_path or database credentials.
+    """
+    ready_q: mp.Queue = mp.Queue()
+    proc = mp.Process(
+        target=_run_isolated_completion_service_worker,
+        args=(vault_path, coordinator_token, ready_q, app_env),
+    )
+    proc.daemon = True
+    proc.start()
+
+    init_msg = ready_q.get(timeout=15)
+    if not isinstance(init_msg, dict) or init_msg.get("status") != "READY":
+        err = init_msg.get("error") if isinstance(init_msg, dict) else str(init_msg)
+        proc.terminate()
+        proc.join(timeout=3)
+        raise TrainingProvenanceConfigurationError(f"Failed to start completion authority service: {err}")
+
+    service_addr = init_msg["service_address"]
+    return proc, service_addr
 
 
 class IsolatedTrainingCompletionAuthority:
     """Independently authorized completion authority residing outside the coordinator boundary.
 
     Enforces Architecture & Security Invariants:
-    1. Holds completion database credentials (cfi_completion_role) in an independent OS process memory space.
-    2. Coordinator process never possesses, derives, stores, or forwards the completion database URL or credentials.
-    3. Finalizes completion records exclusively through atomic PostgreSQL transactions with advisory row locks.
-    4. Independently verifies required PostgreSQL observations, accepted aggregation evidence, evaluation records,
-       identity binding, immutable training configuration, execution accounting, and final artifact identity.
-    5. Fails closed on missing/forged evidence, inconsistent sample/epoch accounting, conflicting completions,
-       unauthenticated callers, or process/database failure.
+    1. Independent Credential Ownership: Holds cfi_completion_role credentials in an isolated OS process.
+       Coordinator process possesses ZERO completion credentials and communicates strictly via authenticated IPC.
+    2. Vault OS Boundary: Credential file is protected via kernel-level exclusive file lock.
+    3. Atomic Reconciliation: Reconciliation of observations, aggregations, and evaluations and final insertion
+       execute within a single PostgreSQL transaction with exclusive advisory transaction locking.
+    4. Concurrency Safety: Multi-threaded connection listener handles independent client requests safely.
+    5. Fails closed on unauthenticated requests, missing evidence, process termination, or database failure.
     """
 
     def __init__(
         self,
-        completion_db_url: str,
+        service_endpoint: tuple[str, int] | None = None,
+        vault_path: str | None = None,
+        completion_db_url: str | None = None,
         coordinator_token: str | None = None,
         app_env: str = "production",
     ) -> None:
         self.app_env = app_env
-        self._inbox: mp.Queue = mp.Queue()
-        self._outbox: mp.Queue = mp.Queue()
-        self._process = mp.Process(
-            target=_run_isolated_completion_worker,
-            args=(
-                completion_db_url,
-                coordinator_token,
-                self._inbox,
-                self._outbox,
-                self.app_env,
-            ),
-        )
-        self._process.daemon = True
-        self._process.start()
+        self._coordinator_token = coordinator_token
+        self._process: mp.Process | None = None
+        self._temp_vault: tempfile.TemporaryDirectory | None = None
 
-        try:
-            init_msg = self._outbox.get(timeout=15)
-            if isinstance(init_msg, dict) and init_msg.get("status") == "READY":
-                self._worker_pid = init_msg.get("worker_pid")
-            else:
-                err = init_msg.get("error") if isinstance(init_msg, dict) else str(init_msg)
-                raise TrainingProvenanceConfigurationError(f"Failed to initialize completion authority worker: {err}")
-        except Exception as e:
-            if not isinstance(e, TrainingProvenanceConfigurationError):
-                raise TrainingProvenanceConfigurationError(f"Completion authority worker failed to initialize: {e}") from e
-            raise
+        if service_endpoint is not None:
+            # Client mode: Used by Coordinator. Possesses zero database credentials or vault paths.
+            self.service_endpoint: tuple[str, int] = service_endpoint
+            self._worker_pid = None
+        elif vault_path is not None:
+            # Service Launcher mode: Spawns independent completion service worker.
+            self._process, self.service_endpoint = spawn_isolated_completion_authority_service(
+                vault_path=vault_path,
+                coordinator_token=coordinator_token,
+                app_env=app_env,
+            )
+            self._worker_pid = self._process.pid
+        elif completion_db_url is not None:
+            if self.app_env.lower() == "production":
+                raise TrainingProvenanceSecurityError(
+                    "Production isolated completion authority requires provisioned vault_path or service_endpoint; "
+                    "passing raw completion_db_url is strictly forbidden (COMP-01)."
+                )
+            self._temp_vault = tempfile.TemporaryDirectory(prefix="cfi_comp_vault_")
+            temp_vault_file = provision_isolated_completion_authority_vault(
+                self._temp_vault.name,
+                completion_db_url,
+            )
+            self._process, self.service_endpoint = spawn_isolated_completion_authority_service(
+                vault_path=temp_vault_file,
+                coordinator_token=coordinator_token,
+                app_env=app_env,
+            )
+            self._worker_pid = self._process.pid
+        else:
+            raise TrainingProvenanceConfigurationError(
+                "Either service_endpoint or vault_path must be provided to IsolatedTrainingCompletionAuthority."
+            )
 
     @property
     def pid(self) -> int | None:
+        if self._process is not None:
+            return self._process.pid
         return self._worker_pid
 
     def is_alive(self) -> bool:
-        return self._process.is_alive()
+        if self._process is not None:
+            return self._process.is_alive()
+        try:
+            authkey = self._coordinator_token.encode("utf-8") if self._coordinator_token else b""
+            c = Client(self.service_endpoint, authkey=authkey)
+            c.close()
+            return True
+        except Exception:
+            return False
 
     def terminate(self) -> None:
-        if self._process.is_alive():
+        if self._process is not None and self._process.is_alive():
             with contextlib.suppress(Exception):
-                self._inbox.put({"command": "SHUTDOWN"})
+                authkey = self._coordinator_token.encode("utf-8") if self._coordinator_token else b""
+                c = Client(self.service_endpoint, authkey=authkey)
+                c.send({"command": "SHUTDOWN"})
+                c.close()
             self._process.terminate()
             self._process.join(timeout=3)
+        if self._temp_vault is not None:
+            with contextlib.suppress(Exception):
+                self._temp_vault.cleanup()
+            self._temp_vault = None
 
     def __enter__(self) -> IsolatedTrainingCompletionAuthority:
         return self
@@ -754,30 +950,43 @@ class IsolatedTrainingCompletionAuthority:
         git_commit_hash: str | None = None,
         dataset_manifest_id: str | None = None,
         simulate_failure_before_commit: bool = False,
+        pause_checkpoint_marker_file: str | None = None,
     ) -> CompletedJobExecutionRecord:
         """Request atomic finalization from the isolated completion authority process over authenticated IPC."""
-        if not self._process.is_alive():
-            raise TrainingProvenanceSecurityError("Completion authority service unavailable: worker process terminated.")
-
-        self._inbox.put({
-            "command": "FINALIZE_COMPLETION",
-            "job_id": job_id,
-            "executed_rounds": executed_rounds,
-            "executed_epochs": executed_epochs,
-            "sample_count": sample_count,
-            "observed_metrics": observed_metrics or {},
-            "artifact_sha256": artifact_sha256,
-            "worker_id": worker_id,
-            "coordinator_token": coordinator_token,
-            "git_commit_hash": git_commit_hash,
-            "dataset_manifest_id": dataset_manifest_id,
-            "simulate_failure_before_commit": simulate_failure_before_commit,
-            "caller_identity": "COORDINATOR",
-        })
+        token = coordinator_token if coordinator_token is not None else self._coordinator_token
+        authkey_bytes = token.encode("utf-8") if token else b""
         try:
-            res = self._outbox.get(timeout=30)
+            conn = Client(self.service_endpoint, authkey=authkey_bytes)
         except Exception as e:
-            raise TrainingProvenanceSecurityError(f"Completion authority service timeout or communication failure: {e}") from e
+            raise TrainingProvenanceSecurityError(
+                f"Completion authority service unavailable or connection failed: {e}"
+            ) from e
+
+        try:
+            conn.send({
+                "command": "FINALIZE_COMPLETION",
+                "job_id": job_id,
+                "executed_rounds": executed_rounds,
+                "executed_epochs": executed_epochs,
+                "sample_count": sample_count,
+                "observed_metrics": observed_metrics or {},
+                "artifact_sha256": artifact_sha256,
+                "worker_id": worker_id,
+                "coordinator_token": token,
+                "git_commit_hash": git_commit_hash,
+                "dataset_manifest_id": dataset_manifest_id,
+                "simulate_failure_before_commit": simulate_failure_before_commit,
+                "pause_checkpoint_marker_file": pause_checkpoint_marker_file,
+                "caller_identity": "COORDINATOR",
+            })
+            res = conn.recv()
+        except Exception as e:
+            raise TrainingProvenanceSecurityError(
+                f"Completion authority service communication failure: {e}"
+            ) from e
+        finally:
+            with contextlib.suppress(Exception):
+                conn.close()
 
         if res.get("status") == "SUCCESS":
             return CompletedJobExecutionRecord(**res["record_dict"])

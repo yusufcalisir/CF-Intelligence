@@ -19,6 +19,7 @@ import os
 import secrets
 import sqlite3
 import threading
+import time
 import types
 import urllib.parse
 import uuid
@@ -494,6 +495,7 @@ class TrainingJobAuthorityBackend(abc.ABC):
         feature_names: Sequence[str] | list[str] | tuple[str, ...] | None = None,
         enforce_lifecycle: bool = True,
         simulate_failure_before_commit: bool = False,
+        pause_checkpoint_marker_file: str | None = None,
     ) -> CompletedJobExecutionRecord: ...
 
     @abc.abstractmethod
@@ -1297,6 +1299,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         with self._connect() as conn:
             with conn.transaction():
                 with conn.cursor() as cur:
+                    cur.execute("SELECT pg_advisory_xact_lock_shared(hashtext(%s))", (clean_job_id,))
                     cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
                     started = cur.fetchone()
                     if not started:
@@ -1406,6 +1409,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         with self._connect() as conn:
             with conn.transaction():
                 with conn.cursor() as cur:
+                    cur.execute("SELECT pg_advisory_xact_lock_shared(hashtext(%s))", (clean_job_id,))
                     cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
                     if not cur.fetchone():
                         raise TrainingProvenanceSecurityError(
@@ -1500,6 +1504,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         with self._connect() as conn:
             with conn.transaction():
                 with conn.cursor() as cur:
+                    cur.execute("SELECT pg_advisory_xact_lock_shared(hashtext(%s))", (clean_job_id,))
                     cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
                     if not cur.fetchone():
                         raise TrainingProvenanceSecurityError(
@@ -1606,6 +1611,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         feature_names: Sequence[str] | list[str] | tuple[str, ...] | None = None,
         enforce_lifecycle: bool = True,
         simulate_failure_before_commit: bool = False,
+        pause_checkpoint_marker_file: str | None = None,
     ) -> CompletedJobExecutionRecord:
         clean_job_id = job_id.strip()
         if not enforce_lifecycle:
@@ -1634,6 +1640,15 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                         raise TrainingProvenanceSecurityError(
                             f"Cannot record completion for job '{clean_job_id}': job has not been started by an authorized worker."
                         )
+
+                    if pause_checkpoint_marker_file:
+                        with open(pause_checkpoint_marker_file, "w", encoding="utf-8") as f:
+                            f.write("IN_TRANSACTION_CHECKPOINT")
+                        release_file = pause_checkpoint_marker_file + ".release"
+                        for _ in range(30):
+                            if os.path.exists(release_file):
+                                break
+                            time.sleep(0.1)
 
                     sched_run_id = sched_row["training_run_id"]
                     sched_sim_id = sched_row["simulation_id"]
@@ -2721,6 +2736,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         feature_names: Sequence[str] | list[str] | tuple[str, ...] | None = None,
         enforce_lifecycle: bool = True,
         simulate_failure_before_commit: bool = False,
+        pause_checkpoint_marker_file: str | None = None,
     ) -> CompletedJobExecutionRecord:
         clean_job_id = job_id.strip()
         if self._is_prod and not enforce_lifecycle:
