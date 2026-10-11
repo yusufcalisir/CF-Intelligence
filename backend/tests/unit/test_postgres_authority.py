@@ -21,16 +21,20 @@ import os
 import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
-try:
+if TYPE_CHECKING:
     import psycopg
     from psycopg.rows import dict_row as pg_dict_row
-except ImportError:
-    psycopg = None  # type: ignore[assignment]
-    pg_dict_row = None  # type: ignore[assignment]
+else:
+    try:
+        import psycopg
+        from psycopg.rows import dict_row as pg_dict_row
+    except ImportError:
+        psycopg = None
+        pg_dict_row = None
 
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.training_provenance_service import (
@@ -84,6 +88,8 @@ class TestPostgresTrainingJobAuthority:
         assert initial_files == after_files
 
         # Ensure sqlite query fails on Postgres authority connection
+        assert psycopg is not None
+        assert pg_dict_row is not None
         conn: Any
         with psycopg.connect(real_pg_instance, row_factory=pg_dict_row) as conn:
             with conn.cursor() as cur:
@@ -425,6 +431,8 @@ class TestPostgresTrainingJobAuthority:
             "cfi_model_evaluations",
             "cfi_completed_jobs",
         }
+        assert psycopg is not None
+        assert pg_dict_row is not None
         conn: Any
         with psycopg.connect(real_pg_instance, row_factory=pg_dict_row) as conn:
             with conn.cursor() as cur:
