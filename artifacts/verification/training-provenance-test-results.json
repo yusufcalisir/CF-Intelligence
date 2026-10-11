@@ -1,0 +1,298 @@
+{
+  "metadata": {
+    "project": "CF-Intelligence",
+    "document": "Production Training Provenance and Federated Trust Boundary Hardening Verification",
+    "baseline_commit": "c5c4b1555a3cc80fc7ffcf59ecbb1eb307cc4f4b",
+    "head_commit": "7899e5352b893632dbd1212a38b0955209eb4241",
+    "commits": [
+      {
+        "sha": "14c5d3c8",
+        "message": "fix(security): enforce non-bypassable training lifecycle and canonical accounting in authority"
+      },
+      {
+        "sha": "c2b8bb2d",
+        "message": "feat(federation): isolate bank storage vaults and decouple receipt signing authority"
+      },
+      {
+        "sha": "7899e535",
+        "message": "test(security): add adversarial suites for lifecycle, isolation, and aggregation provenance"
+      },
+      {
+        "sha": "HEAD",
+        "message": "docs(verification): add production training provenance security verification report and test results"
+      }
+    ],
+    "runtime_environment": {
+      "python": "3.12.10",
+      "pytorch": "2.12.1+cpu",
+      "psycopg": "3.3.6",
+      "postgresql": "PostgreSQL 18.1 (pg0 embedded)",
+      "os": "Windows-11-10.0.26300-SP0",
+      "isolation_mode": "multiprocessing.Process OS spawn with Win32 exclusive file lock dwShareMode=0"
+    },
+    "verified_at": "2026-10-11T12:55:34.002399+00:00"
+  },
+  "summary": {
+    "total_tests_collected": 134,
+    "total_tests_passed": 134,
+    "total_tests_failed": 0,
+    "total_tests_skipped": 0,
+    "pass_rate_percentage": 100.0,
+    "verdict": "TRAINING PROVENANCE SECURITY HARDENING COMPLETE \u2014 ALL J01\u2013J14 GUARANTEES VERIFIED"
+  },
+  "acceptance_gates_j01_j14": {
+    "J01": {
+      "name": "Authenticated training worker workload identity",
+      "status": "PASS",
+      "tests": [
+        "JOB-01",
+        "JOB-02",
+        "ADV-06",
+        "BI-02",
+        "BI-05",
+        "BI-06"
+      ]
+    },
+    "J02": {
+      "name": "Genuine training execution requirement",
+      "status": "PASS",
+      "tests": [
+        "JOB-03",
+        "JOB-04",
+        "LC-01",
+        "LC-02",
+        "LC-04",
+        "E2E-NEG-01"
+      ]
+    },
+    "J03": {
+      "name": "Tamper-evident model weight binding",
+      "status": "PASS",
+      "tests": [
+        "JOB-05",
+        "ADV-15",
+        "FI-04",
+        "AG-09",
+        "E2E-NEG-10"
+      ]
+    },
+    "J04": {
+      "name": "Training metric authenticity and reconciliation",
+      "status": "PASS",
+      "tests": [
+        "JOB-09",
+        "ADV-04",
+        "FI-08",
+        "AG-11",
+        "E2E-NEG-11"
+      ]
+    },
+    "J05": {
+      "name": "Model architecture and schema binding",
+      "status": "PASS",
+      "tests": [
+        "JOB-08",
+        "ADV-05"
+      ]
+    },
+    "J06": {
+      "name": "Execution accounting integrity",
+      "status": "PASS",
+      "tests": [
+        "ADV-02",
+        "ADV-03",
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "E2E-NEG-12"
+      ]
+    },
+    "J07": {
+      "name": "Replay protection across jobs and simulations",
+      "status": "PASS",
+      "tests": [
+        "JOB-06",
+        "JOB-07",
+        "FI-07",
+        "AG-07",
+        "AG-08"
+      ]
+    },
+    "J08": {
+      "name": "Concurrency control and race safety",
+      "status": "PASS",
+      "tests": [
+        "ADV-08",
+        "ADV-09",
+        "ADV-10",
+        "PG-03",
+        "PG-04",
+        "PG-12",
+        "DB-08",
+        "DB-09",
+        "DB-14",
+        "E2E-NEG-19"
+      ]
+    },
+    "J09": {
+      "name": "Idempotent completion vs conflict rejection",
+      "status": "PASS",
+      "tests": [
+        "JOB-05",
+        "JOB-13",
+        "ADV-08",
+        "PG-03",
+        "DB-09",
+        "E2E-NEG-19"
+      ]
+    },
+    "J10": {
+      "name": "Durable persistence without memory fallback",
+      "status": "PASS",
+      "tests": [
+        "ADV-11",
+        "ADV-14",
+        "PG-10",
+        "DB-01",
+        "DB-02",
+        "DB-03",
+        "DB-04",
+        "DB-13"
+      ]
+    },
+    "J11": {
+      "name": "Database outage fail-closed semantics",
+      "status": "PASS",
+      "tests": [
+        "ADV-12",
+        "ADV-13",
+        "FI-01",
+        "FI-06",
+        "PG-07",
+        "DB-11",
+        "CR-07",
+        "E2E-NEG-13"
+      ]
+    },
+    "J12": {
+      "name": "Process and service trust isolation",
+      "status": "PASS",
+      "tests": [
+        "BI-01",
+        "BI-03",
+        "BI-04",
+        "BI-07",
+        "BI-08",
+        "BI-09",
+        "BI-10",
+        "CR-01",
+        "CR-02",
+        "CR-09",
+        "E2E-NEG-06",
+        "E2E-NEG-07",
+        "E2E-NEG-20"
+      ]
+    },
+    "J13": {
+      "name": "Cryptographic receipt issuance and verifier separation",
+      "status": "PASS",
+      "tests": [
+        "JOB-10",
+        "JOB-14",
+        "CR-01",
+        "CR-03",
+        "CR-04",
+        "CR-06",
+        "CR-08",
+        "CR-10",
+        "E2E-NEG-16",
+        "E2E-NEG-17"
+      ]
+    },
+    "J14": {
+      "name": "End-to-end model registration authorization",
+      "status": "PASS",
+      "tests": [
+        "JOB-10",
+        "ADV-15",
+        "CR-03",
+        "CR-10",
+        "AG-12"
+      ]
+    }
+  },
+  "suites": {
+    "test_trusted_job_execution.py": {
+      "total": 14,
+      "passed": 14,
+      "failed": 0
+    },
+    "test_training_execution_observations.py": {
+      "total": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    "test_training_job_concurrency.py": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "test_federated_training_provenance_integration.py": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0
+    },
+    "test_failure_injection_fl.py": {
+      "total": 8,
+      "passed": 8,
+      "failed": 0
+    },
+    "test_postgres_authority.py": {
+      "total": 13,
+      "passed": 13,
+      "failed": 0
+    },
+    "test_lifecycle_enforcement_attacks.py": {
+      "total": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    "test_bank_isolation_enforcement.py": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0
+    },
+    "test_execution_accounting_canonical.py": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0
+    },
+    "test_aggregation_provenance_hardened.py": {
+      "total": 12,
+      "passed": 12,
+      "failed": 0
+    },
+    "test_cryptographic_receipt_isolation.py": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0
+    },
+    "test_postgres_authority_policy.py": {
+      "total": 14,
+      "passed": 14,
+      "failed": 0
+    },
+    "test_adversarial_e2e_scenarios.py": {
+      "total": 20,
+      "passed": 20,
+      "failed": 0
+    }
+  }
+}
