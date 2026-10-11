@@ -502,12 +502,12 @@ class TestCompletionAuthoritySecurity:
         authority_comp = PostgresTrainingJobAuthority(db_url=comp_url)
         authority_worker = PostgresTrainingJobAuthority(db_url=worker_url)
 
-        obs_rejected = False
-        obs_started_event = threading.Event()
+        marker_file = str(tmp_path / f"checkpoint_marker_r05_{uid}.txt")
+        obs_outcome: dict[str, bool] = {"rejected": False}
+        completed_record = None
+        complete_err = None
 
         def _concurrent_observation_writer() -> None:
-            nonlocal obs_rejected
-            obs_started_event.wait(timeout=5)
             # Try to add a late observation for round 2
             late_obs = RoundObservation(
                 event_id=f"obs_late_{uid}",
@@ -530,27 +530,54 @@ class TestCompletionAuthoritySecurity:
                 authority_worker.record_observation(late_obs)
             except TrainingProvenanceSecurityError as e:
                 if "finalized completed job" in str(e):
-                    obs_rejected = True
+                    obs_outcome["rejected"] = True
 
+        def _completion_runner() -> None:
+            nonlocal completed_record, complete_err
+            try:
+                completed_record = authority_comp.complete_job(
+                    job_id=job_id,
+                    executed_rounds=1,
+                    executed_epochs=1,
+                    sample_count=450,
+                    observed_metrics={"loss": 0.05, "auc_roc": 0.94},
+                    artifact_sha256=art_sha,
+                    worker_id="FEDERATED_COORDINATOR",
+                    pause_checkpoint_marker_file=marker_file,
+                )
+            except Exception as e:
+                complete_err = e
+
+        comp_thread = threading.Thread(target=_completion_runner)
+        comp_thread.start()
+
+        # 1. Wait until completion transaction is active and holding exclusive advisory lock
+        for _ in range(50):
+            if os.path.exists(marker_file):
+                break
+            time.sleep(0.1)
+        assert os.path.exists(marker_file), "Completion did not reach in-transaction checkpoint!"
+
+        # 2. Start concurrent worker observation write
         obs_thread = threading.Thread(target=_concurrent_observation_writer)
         obs_thread.start()
 
-        # Signal thread right before executing completion
-        obs_started_event.set()
+        # 3. Verify obs_thread is running and blocked waiting for shared advisory lock
+        time.sleep(0.3)
+        assert obs_thread.is_alive(), "Observation thread did not block on transaction advisory lock!"
 
-        completed_record = authority_comp.complete_job(
-            job_id=job_id,
-            executed_rounds=1,
-            executed_epochs=1,
-            sample_count=450,
-            observed_metrics={"loss": 0.05, "auc_roc": 0.94},
-            artifact_sha256=art_sha,
-            worker_id="FEDERATED_COORDINATOR",
-        )
-        obs_thread.join(timeout=10)
+        # 4. Release completion checkpoint to commit transaction
+        release_file = marker_file + ".release"
+        with open(release_file, "w", encoding="utf-8") as f:
+            f.write("RELEASE")
 
+        comp_thread.join(timeout=5)
+        obs_thread.join(timeout=5)
+
+        assert complete_err is None
+        assert completed_record is not None
         assert completed_record.status == "COMPLETED"
-        assert obs_rejected is True
+        assert obs_outcome["rejected"] is True
 
         # Verify PostgreSQL state: completed record reflects exactly round 1
         with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
