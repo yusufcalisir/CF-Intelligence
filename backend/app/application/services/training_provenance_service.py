@@ -188,12 +188,11 @@ class TrainingJobAuthorityDatabase:
             active_env = (app_env or get_settings().app_env).lower()
             is_production = active_env == "production"
 
-        if is_production:
-            if in_memory or not (clean.startswith("postgresql://") or clean.startswith("postgres://")):
-                raise TrainingProvenanceConfigurationError(
-                    "Production training job authority database must be a PostgreSQL connection URL (e.g. postgresql://...). "
-                    "Plain filesystem paths, SQLite URLs, and in-memory storage are strictly forbidden in production."
-                )
+        if is_production and (in_memory or not (clean.startswith("postgresql://") or clean.startswith("postgres://"))):
+            raise TrainingProvenanceConfigurationError(
+                "Production training job authority database must be a PostgreSQL connection URL (e.g. postgresql://...). "
+                "Plain filesystem paths, SQLite URLs, and in-memory storage are strictly forbidden in production."
+            )
 
         if in_memory or clean in (":memory:", ""):
             self._backend: TrainingJobAuthorityBackend = SQLiteTrainingJobAuthority(
@@ -879,6 +878,7 @@ class TrustedTrainingJobRecordSource:
                 )
 
         # Quorum policy
+        min_quorum: int = 1
         if aggregation_configuration and any(k in aggregation_configuration for k in ("min_quorum", "min_participants", "quorum")):
             for q_key in ("min_quorum", "min_participants", "quorum"):
                 if q_key in aggregation_configuration:

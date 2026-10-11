@@ -32,7 +32,6 @@ from app.application.services.distributed_fl_service import (
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES, ModelService
 from app.application.services.training_provenance_service import (
-    DEFAULT_TRAINING_KEY_ID,
     DurableTrustStore,
     TrainingExecutionEvidence,
     TrainingProvenanceConfigurationError,

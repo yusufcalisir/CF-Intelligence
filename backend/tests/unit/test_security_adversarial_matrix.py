@@ -38,11 +38,11 @@ from __future__ import annotations
 
 import hashlib
 import multiprocessing as mp
-import os
 import time
 import urllib.parse
 import uuid
 from collections.abc import Generator
+from typing import Any
 
 import numpy as np
 import psycopg
@@ -59,7 +59,6 @@ from app.application.services.distributed_fl_service import (
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES
 from app.application.services.training_provenance_service import (
-    DEFAULT_TRAINING_KEY_ID,
     DurableTrustStore,
     TrainingExecutionEvidence,
     TrainingProvenanceConfigurationError,
@@ -104,7 +103,7 @@ def real_pg_instance() -> Generator[str, None, None]:
         pg.stop()
 
 
-def _sec12_coordinator_terminating_aggregator(db_url: str, job_id: str, ready_event: mp.Event) -> None:
+def _sec12_coordinator_terminating_aggregator(db_url: str, job_id: str, ready_event: Any) -> None:
     authority = PostgresTrainingJobAuthority(db_url=db_url)
     with authority._connect() as conn:
         with conn.cursor() as cur:
@@ -122,7 +121,7 @@ def _sec12_coordinator_terminating_aggregator(db_url: str, job_id: str, ready_ev
             time.sleep(10)
 
 
-def _sec24_concurrent_completer(db_url: str, job_id: str, loss_val: float, barrier: mp.Barrier, out_q: mp.Queue) -> None:
+def _sec24_concurrent_completer(db_url: str, job_id: str, loss_val: float, barrier: Any, out_q: Any) -> None:
     try:
         source = TrustedTrainingJobRecordSource(
             coordinator_token=COORD_SECRET,
@@ -148,7 +147,7 @@ def _sec24_concurrent_completer(db_url: str, job_id: str, loss_val: float, barri
         out_q.put(("ERROR", str(e), loss_val))
 
 
-def _sec25_concurrent_observer(db_url: str, job_id: str, loss_val: float, barrier: mp.Barrier, out_q: mp.Queue) -> None:
+def _sec25_concurrent_observer(db_url: str, job_id: str, loss_val: float, barrier: Any, out_q: Any) -> None:
     try:
         source = TrustedTrainingJobRecordSource(
             worker_token=BANK_A_SECRET,
@@ -294,7 +293,7 @@ class TestSecurityAdversarialMatrix:
     def test_sec_06_coordinator_attempts_direct_bank_a_dataset_access(self, tmp_path) -> None:
         """SEC-06: Direct access attempt to Bank A private vault from coordinator context is denied."""
         vaults_dir = str(tmp_path / "vaults_sec06")
-        data_path = setup_bank_private_storage(
+        setup_bank_private_storage(
             bank_storage_dir=vaults_dir,
             bank_id="BANK_A",
             X_partition=np.zeros((10, NUM_FEATURES), dtype=np.float32),
@@ -424,7 +423,7 @@ class TestSecurityAdversarialMatrix:
 
     def test_sec_13_postgresql_unavailability_during_observation_fails_closed(self) -> None:
         """SEC-13: Database unavailability during observation persistence fails closed without fallback."""
-        with pytest.raises(Exception):
+        with pytest.raises(TrainingProvenanceConfigurationError):
             source = TrustedTrainingJobRecordSource(
                 worker_token=BANK_A_SECRET,
                 bank_tokens={"BANK_A": BANK_A_SECRET},
@@ -707,7 +706,6 @@ class TestSecurityAdversarialMatrix:
 
     def test_sec_21_final_artifact_bytes_replaced(self, real_pg_instance: str) -> None:
         """SEC-21: Replaced model artifact bytes differing from receipt SHA-256 fails verification."""
-        verifier = get_default_training_verifier()
         priv_hex, pub_hex = _generate_ed25519_keypair_hex()
         trust_store = DurableTrustStore({"key_sec21": pub_hex})
         custom_verifier = TrainingReceiptVerifier(trust_store=trust_store)
@@ -850,8 +848,9 @@ class TestSecurityAdversarialMatrix:
             coordinator_token=COORD_SECRET,
         )
 
-        barrier = mp.Barrier(2)
-        q1, q2 = mp.Queue(), mp.Queue()
+        barrier: Any = mp.Barrier(2)
+        q1: Any = mp.Queue()
+        q2: Any = mp.Queue()
         p1 = mp.Process(target=_sec24_concurrent_completer, args=(real_pg_instance, job_id, 0.25, barrier, q1))
         p2 = mp.Process(target=_sec24_concurrent_completer, args=(real_pg_instance, job_id, 0.99, barrier, q2))
         p1.start()
@@ -865,6 +864,7 @@ class TestSecurityAdversarialMatrix:
         assert res2[0] == "ERROR"
 
         persisted = source.get_completed_job_by_id(job_id)
+        assert persisted is not None
         assert persisted.observed_metrics["loss"] == 0.25
 
     def test_sec_25_duplicate_and_conflicting_observations_submitted_concurrently(self, real_pg_instance: str) -> None:
@@ -886,8 +886,9 @@ class TestSecurityAdversarialMatrix:
         )
         source.start_training_job(job_id=job_id, worker_token=BANK_A_SECRET)
 
-        barrier = mp.Barrier(2)
-        q1, q2 = mp.Queue(), mp.Queue()
+        barrier: Any = mp.Barrier(2)
+        q1: Any = mp.Queue()
+        q2: Any = mp.Queue()
         p1 = mp.Process(target=_sec25_concurrent_observer, args=(real_pg_instance, job_id, 0.3, barrier, q1))
         p2 = mp.Process(target=_sec25_concurrent_observer, args=(real_pg_instance, job_id, 0.4, barrier, q2))
         p1.start()

@@ -20,10 +20,10 @@ Verifies the production database authority security invariants:
 from __future__ import annotations
 
 import multiprocessing as mp
-import os
 import urllib.parse
 import uuid
 from collections.abc import Generator
+from typing import Any
 
 import psycopg
 import pytest
@@ -158,7 +158,7 @@ class TestPostgresAuthorityPolicy:
         # Attempting to insert a fake completed job directly without schedule/start
         with authority._connect() as conn:
             with conn.cursor() as cur:
-                with pytest.raises(Exception):
+                with pytest.raises(psycopg.Error):
                     # Foreign key violation since job_id is not in cfi_scheduled_jobs
                     cur.execute(
                         """
@@ -274,8 +274,8 @@ class TestPostgresAuthorityPolicy:
         )
         source.start_training_job(job_id=job_id, worker_token=BANK_A_SECRET)
 
-        out_q_a = mp.Queue()
-        out_q_b = mp.Queue()
+        out_q_a: Any = mp.Queue()
+        out_q_b: Any = mp.Queue()
 
         p_a = mp.Process(target=_worker_concurrent_writer, args=(real_pg_instance, job_id, "BANK_A", BANK_A_SECRET, out_q_a))
         p_b = mp.Process(target=_worker_concurrent_writer, args=(real_pg_instance, job_id, "BANK_B", "bank_b_token_sec", out_q_b))
@@ -343,7 +343,7 @@ class TestPostgresAuthorityPolicy:
             evaluated_artifact_digest=art_sha,
             coordinator_token=COORD_SECRET,
         )
-        rec1 = source.complete_training_job(
+        source.complete_training_job(
             job_id=job_id,
             executed_rounds=1,
             executed_epochs=1,
@@ -431,7 +431,6 @@ class TestPostgresAuthorityPolicy:
         self, real_pg_instance: str
     ) -> None:
         """DB-13: Completed training records remain queryable across new connections."""
-        authority = PostgresTrainingJobAuthority(db_url=real_pg_instance)
         job_id = f"job_db13_{uuid.uuid4().hex[:8]}"
         run_id = f"run_db13_{uuid.uuid4().hex[:8]}"
         art_sha = "sha_db13_" + "3" * 55
@@ -520,7 +519,7 @@ class TestPostgresAuthorityPolicy:
         )
         source.start_training_job(job_id=job_id, worker_token=BANK_A_SECRET)
 
-        queues = {b: mp.Queue() for b in ("BANK_A", "BANK_B", "BANK_C")}
+        queues: dict[str, Any] = {b: mp.Queue() for b in ("BANK_A", "BANK_B", "BANK_C")}
         tokens = {"BANK_A": BANK_A_SECRET, "BANK_B": "token_b_db14", "BANK_C": "token_c_db14"}
         procs = [
             mp.Process(target=_worker_concurrent_writer, args=(real_pg_instance, job_id, b, tokens[b], queues[b]))

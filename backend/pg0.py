@@ -13,7 +13,7 @@ import tempfile
 import time
 from typing import Any
 
-import pgserver
+import pgserver  # type: ignore[import-not-found,import-untyped]
 
 logger = logging.getLogger(__name__)
 

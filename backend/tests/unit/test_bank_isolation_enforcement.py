@@ -15,19 +15,17 @@ Verifies the physical and cryptographic boundaries separating financial institut
 
 from __future__ import annotations
 
-import os
 import uuid
 from collections.abc import Generator
+from typing import Any
 
 import numpy as np
 import pytest
 
-from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
     BankPrivateStorageVault,
     DistributedFederatedTrainingManager,
     setup_bank_private_storage,
-    spawn_bank_workers,
 )
 from app.application.services.model_service import NUM_FEATURES
 from app.application.services.training_provenance_service import (
@@ -80,7 +78,7 @@ class TestBankIsolationEnforcement:
             db_url=real_pg_instance,
             app_env="production",
         )
-        fake_partitions = {
+        fake_partitions: dict[str, Any] = {
             "BANK_A": (np.zeros((10, NUM_FEATURES), dtype=np.float32), np.zeros(10, dtype=np.float32))
         }
 

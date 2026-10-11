@@ -16,12 +16,12 @@ Verifies Module 01-A.1 Requirement P6:
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import os
 import uuid
 from collections.abc import Generator
 from typing import Any
 
-import hashlib
 import numpy as np
 import pytest
 

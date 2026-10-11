@@ -26,8 +26,9 @@ import json
 import math
 import os
 import tempfile
+from collections.abc import Generator
 from datetime import UTC, datetime
-from typing import Any, Generator
+from typing import Any
 
 import pytest
 import torch

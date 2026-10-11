@@ -154,7 +154,7 @@ class BankPrivateStorageVault:
                 import fcntl
 
                 fd = os.open(self.data_path, os.O_RDWR)
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore[attr-defined]
                 self._os_lock_handle = fd
             except Exception:
                 pass
@@ -170,7 +170,7 @@ class BankPrivateStorageVault:
                 try:
                     import fcntl
 
-                    fcntl.flock(self._os_lock_handle, fcntl.LOCK_UN)
+                    fcntl.flock(self._os_lock_handle, fcntl.LOCK_UN)  # type: ignore[attr-defined]
                     os.close(self._os_lock_handle)
                 except Exception:
                     pass
@@ -336,7 +336,7 @@ class IsolatedReceiptSigningAuthority:
         self.coordinator_token = coordinator_token
 
         # Eagerly probe database connectivity to fail closed immediately on unreachable DB
-        test_source = TrustedTrainingJobRecordSource(
+        TrustedTrainingJobRecordSource(
             coordinator_token=coordinator_token,
             db_url=self.db_url,
             enforce_lifecycle=True,

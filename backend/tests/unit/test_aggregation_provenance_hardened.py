@@ -23,7 +23,6 @@ from collections.abc import Generator
 
 import pytest
 
-from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.training_provenance_service import (
     TrainingProvenanceSecurityError,
     TrustedTrainingJobRecordSource,

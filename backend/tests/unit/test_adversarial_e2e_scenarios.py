@@ -27,10 +27,10 @@ from __future__ import annotations
 
 import hashlib
 import multiprocessing as mp
-import os
 import time
 import uuid
 from collections.abc import Generator
+from typing import Any
 
 import numpy as np
 import pytest
@@ -45,7 +45,7 @@ from app.application.services.distributed_fl_service import (
     spawn_bank_workers,
 )
 from app.application.services.model_registry import ModelRegistry
-from app.application.services.model_service import NUM_FEATURES, ModelService
+from app.application.services.model_service import NUM_FEATURES
 from app.application.services.training_provenance_service import (
     DEFAULT_TRAINING_KEY_ID,
     DurableTrustStore,
@@ -57,7 +57,6 @@ from app.application.services.training_provenance_service import (
     TrustedTrainingJobRecordSource,
     get_default_training_verifier,
 )
-from app.config import get_settings
 from app.infrastructure.database.training_authority_backends import PostgresTrainingJobAuthority
 
 COORD_SECRET = "coord_secret_e2e_neg_production_991"
@@ -93,7 +92,7 @@ def real_pg_instance() -> Generator[str, None, None]:
         pg.stop()
 
 
-def _coordinator_terminating_aggregator(db_url: str, job_id: str, ready_event: mp.Event) -> None:
+def _coordinator_terminating_aggregator(db_url: str, job_id: str, ready_event: Any) -> None:
     """Subprocess simulating coordinator terminated during aggregation transaction."""
     authority = PostgresTrainingJobAuthority(db_url=db_url)
     with authority._connect() as conn:
@@ -112,7 +111,7 @@ def _coordinator_terminating_aggregator(db_url: str, job_id: str, ready_event: m
             time.sleep(10)
 
 
-def _concurrent_completer(db_url: str, job_id: str, loss_val: float, barrier: mp.Barrier, out_q: mp.Queue) -> None:
+def _concurrent_completer(db_url: str, job_id: str, loss_val: float, barrier: Any, out_q: Any) -> None:
     """Subprocess competing in genuine concurrent completion race."""
     try:
         source = TrustedTrainingJobRecordSource(
@@ -592,7 +591,7 @@ class TestAdversarialEndToEndScenarios:
 
     def test_e2e_neg_13_postgresql_unavailability_during_observation(self) -> None:
         """E2E-NEG-13: When PostgreSQL becomes unavailable during observation, system fails closed without fallback."""
-        with pytest.raises(Exception):
+        with pytest.raises(TrainingProvenanceConfigurationError):
             source = TrustedTrainingJobRecordSource(
                 worker_token=BANK_A_SECRET,
                 bank_tokens={"BANK_A": BANK_A_SECRET},
@@ -827,9 +826,9 @@ class TestAdversarialEndToEndScenarios:
             coordinator_token=COORD_SECRET,
         )
 
-        barrier = mp.Barrier(2)
-        out_q_1 = mp.Queue()
-        out_q_2 = mp.Queue()
+        barrier: Any = mp.Barrier(2)
+        out_q_1: Any = mp.Queue()
+        out_q_2: Any = mp.Queue()
 
         p1 = mp.Process(target=_concurrent_completer, args=(real_pg_instance, job_id, 0.25, barrier, out_q_1))
         p2 = mp.Process(target=_concurrent_completer, args=(real_pg_instance, job_id, 0.99, barrier, out_q_2))

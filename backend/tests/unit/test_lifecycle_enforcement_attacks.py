@@ -20,7 +20,6 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.training_provenance_service import (
-    DEFAULT_TRAINING_KEY_ID,
     TrainingExecutionEvidence,
     TrainingProvenanceConfigurationError,
     TrainingProvenanceSecurityError,

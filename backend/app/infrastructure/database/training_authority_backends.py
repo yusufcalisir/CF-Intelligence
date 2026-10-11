@@ -371,12 +371,12 @@ def compute_config_fingerprint(
         "coordinator_id": coordinator_id.strip(),
         "architecture": architecture.strip(),
         "feature_schema_version": feature_schema_version.strip(),
-        "expected_rounds": int(expected_rounds),
-        "expected_epochs": int(expected_epochs),
-        "input_dim": int(input_dim),
-        "feature_names": [str(fn).strip() for fn in feature_names],
-        "permitted_workers": sorted([str(pw).strip() for pw in permitted_workers]),
-        "min_quorum": int(min_quorum) if min_quorum is not None else len(permitted_workers),
+        "expected_rounds": expected_rounds,
+        "expected_epochs": expected_epochs,
+        "input_dim": input_dim,
+        "feature_names": [fn.strip() for fn in feature_names],
+        "permitted_workers": sorted(pw.strip() for pw in permitted_workers),
+        "min_quorum": min_quorum if min_quorum is not None else len(permitted_workers),
         "training_configuration": training_configuration or {},
     }
     canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
