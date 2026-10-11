@@ -26,16 +26,14 @@ from collections.abc import Generator, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-psycopg: Any = None
-pg_sql: Any = None
-pg_dict_row: Any = None
-
 try:
     import psycopg
     from psycopg import sql as pg_sql
     from psycopg.rows import dict_row as pg_dict_row
 except ImportError:
-    pass
+    psycopg = None  # type: ignore[assignment]
+    pg_sql = None  # type: ignore[assignment]
+    pg_dict_row = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 

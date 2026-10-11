@@ -180,7 +180,7 @@ class BankPrivateStorageVault:
             file_share_none = 0
             open_existing = 3
             file_attribute_normal = 0x80
-            handle = ctypes.windll.kernel32.CreateFileW(
+            handle = ctypes.windll.kernel32.CreateFileW(  # type: ignore[attr-defined]
                 self.data_path,
                 generic_read | generic_write,
                 file_share_none,
@@ -207,7 +207,7 @@ class BankPrivateStorageVault:
             if os.name == "nt":
                 import ctypes
 
-                ctypes.windll.kernel32.CloseHandle(self._os_lock_handle)
+                ctypes.windll.kernel32.CloseHandle(self._os_lock_handle)  # type: ignore[attr-defined]
             else:
                 try:
                     import fcntl
