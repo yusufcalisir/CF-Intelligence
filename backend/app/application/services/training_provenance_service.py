@@ -20,7 +20,6 @@ import json
 import logging
 import math
 import os
-import sqlite3
 import threading
 import types
 import uuid
@@ -28,12 +27,32 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
+try:
+    import psycopg
+    from psycopg.rows import dict_row as pg_dict_row
+except ImportError:
+    psycopg = None  # type: ignore[assignment]
+    pg_dict_row = None  # type: ignore[assignment]
+
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from app.application.services.data_generator import FEATURE_NAMES as CANONICAL_FEATURE_NAMES
 from app.config import get_settings
+from app.infrastructure.database.training_authority_backends import (
+    CompletedJobExecutionRecord,
+    GlobalAggregationEvent,
+    ModelEvaluationEvent,
+    PostgresTrainingJobAuthority,
+    RoundObservation,
+    ScheduledTrainingJob,
+    SQLiteTrainingJobAuthority,
+    StartedTrainingJob,
+    TrainingJobAuthorityBackend,
+    TrainingProvenanceConfigurationError,
+    TrainingProvenanceSecurityError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,18 +61,6 @@ DOMAIN_MODEL_CACHE = "cfi:model_cache_auth:v1"
 DOMAIN_APPROVAL_SIGNOFF = "cfi:model_approval_signoff:v1"
 
 DEFAULT_TRAINING_KEY_ID = "cfi_training_ed25519_v1"
-
-
-class TrainingProvenanceConfigurationError(Exception):
-    """Raised when training provenance trust configuration is missing or invalid."""
-
-    pass
-
-
-class TrainingProvenanceSecurityError(ValueError, PermissionError):
-    """Raised when an unauthenticated or unauthorized party attempts to issue or forge a receipt."""
-
-    pass
 
 
 def derive_domain_key(secret: str, domain: str) -> bytes:
@@ -128,65 +135,6 @@ class TrainingExecutionEvidence:
             raise ValueError("Training metrics must contain a finite numeric loss.")
 
 
-@dataclasses.dataclass(frozen=True)
-class CompletedJobExecutionRecord:
-    """Authoritative execution record registered directly by an authorized training worker runtime."""
-
-    job_id: str
-    training_run_id: str
-    simulation_id: str
-    completed_at: str
-    executed_rounds: int
-    executed_epochs: int
-    sample_count: int
-    observed_metrics: dict[str, float]
-    artifact_sha256: str
-    architecture: str = "FraudDetectionNN"
-    feature_schema_version: str = "v1.0"
-    input_dim: int | None = None
-    feature_names: Sequence[str] | list[str] | tuple[str, ...] = ()
-    worker_id: str = "TRAINING_EXECUTOR"
-    status: str = "COMPLETED"
-    git_commit_hash: str | None = None
-    dataset_manifest_id: str | None = None
-
-    def __post_init__(self) -> None:
-        if isinstance(self.feature_names, (list, tuple)):
-            object.__setattr__(self, "feature_names", tuple(self.feature_names))
-        if self.input_dim is None and self.feature_names:
-            object.__setattr__(self, "input_dim", len(self.feature_names))
-        if isinstance(self.observed_metrics, dict):
-            object.__setattr__(
-                self,
-                "observed_metrics",
-                types.MappingProxyType(dict(self.observed_metrics)),
-            )
-
-    def validate(self) -> None:
-        if not self.job_id or not self.job_id.strip():
-            raise ValueError("job_id must be non-empty.")
-        if not self.training_run_id or not self.training_run_id.strip():
-            raise ValueError("training_run_id must be non-empty.")
-        if len(self.artifact_sha256.strip()) != 64:
-            raise ValueError(
-                f"artifact_sha256 must be a 64-char hex SHA-256 digest, got: {self.artifact_sha256!r}"
-            )
-        if self.status != "COMPLETED":
-            raise ValueError(f"Job execution status must be 'COMPLETED', got: {self.status!r}")
-        if self.executed_rounds < 1 and self.executed_epochs < 1:
-            raise ValueError("Executed rounds or epochs must be at least 1.")
-        if self.sample_count <= 0:
-            raise ValueError(f"Training sample count must be positive, got: {self.sample_count}")
-        if not self.observed_metrics:
-            raise ValueError("observed_metrics must be non-empty.")
-        loss_val = None
-        for k in ("loss", "final_loss", "train_loss", "val_loss"):
-            if k in self.observed_metrics:
-                loss_val = self.observed_metrics[k]
-                break
-        if loss_val is None or not isinstance(loss_val, (int, float)) or not math.isfinite(loss_val):
-            raise ValueError("Training metrics must contain a finite numeric loss.")
-
 
 FORBIDDEN_WORKER_TOKENS = frozenset(
     {
@@ -217,296 +165,31 @@ FORBIDDEN_COORDINATOR_TOKENS = frozenset(
 )
 
 
-@dataclasses.dataclass(frozen=True)
-class ScheduledTrainingJob:
-    """Represents a training job scheduled by the authorized training coordinator."""
-
-    job_id: str
-    training_run_id: str
-    simulation_id: str
-    architecture: str
-    feature_schema_version: str
-    expected_rounds: int
-    expected_epochs: int
-    input_dim: int
-    feature_names: tuple[str, ...]
-    scheduled_at: str
-    coordinator_id: str = "COORDINATOR"
-    permitted_workers: tuple[str, ...] = ()
-    config_fingerprint: str = ""
-    status: str = "SCHEDULED"
-
-
-@dataclasses.dataclass(frozen=True)
-class StartedTrainingJob:
-    """Represents an active training job started by an authorized training worker."""
-
-    job_id: str
-    training_run_id: str
-    simulation_id: str
-    worker_id: str
-    started_at: str
-    status: str = "STARTED"
-
-
-@dataclasses.dataclass(frozen=True)
-class RoundObservation:
-    """Immutable record of an authorized training round observation."""
-
-    event_id: str
-    job_id: str
-    training_run_id: str
-    simulation_id: str
-    worker_id: str
-    bank_id: str
-    round_number: int
-    attempt_number: int
-    actual_sample_count: int
-    actual_executed_epochs: int
-    observed_loss: float
-    metrics: dict[str, float]
-    execution_timestamp: str
-    model_update_digest: str | None = None
-    execution_status: str = "COMPLETED"
-
-    def __post_init__(self) -> None:
-        if isinstance(self.metrics, dict):
-            object.__setattr__(
-                self,
-                "metrics",
-                types.MappingProxyType(dict(self.metrics)),
-            )
-
-    def validate(self) -> None:
-        if not self.event_id or not self.event_id.strip():
-            raise ValueError("event_id must be non-empty.")
-        if not self.job_id or not self.job_id.strip():
-            raise ValueError("job_id must be non-empty.")
-        if not self.worker_id or not self.worker_id.strip():
-            raise ValueError("worker_id must be non-empty.")
-        if self.round_number < 1:
-            raise ValueError(f"round_number must be >= 1, got {self.round_number}.")
-        if self.attempt_number < 1:
-            raise ValueError(f"attempt_number must be >= 1, got {self.attempt_number}.")
-        if self.actual_sample_count <= 0:
-            raise ValueError(f"actual_sample_count must be positive, got {self.actual_sample_count}.")
-        if not isinstance(self.observed_loss, (int, float)) or not math.isfinite(self.observed_loss):
-            raise ValueError(f"observed_loss must be a finite float, got {self.observed_loss!r}.")
-        if self.execution_status not in ("COMPLETED", "FAILED"):
-            raise ValueError(f"Invalid execution_status: {self.execution_status!r}.")
-
-    @property
-    def payload_digest(self) -> str:
-        """Deterministic digest of observation content for idempotency and conflict detection."""
-        h = hashlib.sha256()
-        h.update(str(self.round_number).encode())
-        h.update(str(self.attempt_number).encode())
-        h.update(str(self.actual_sample_count).encode())
-        h.update(str(self.actual_executed_epochs).encode())
-        h.update(f"{float(self.observed_loss):.8f}".encode())
-        for k in sorted(self.metrics.keys()):
-            h.update(f"{k}:{float(self.metrics[k]):.8f}".encode())
-        if self.model_update_digest:
-            h.update(self.model_update_digest.encode())
-        h.update(self.execution_status.encode())
-        return h.hexdigest()
-
-
-def _compute_config_fingerprint(
-    job_id: str,
-    training_run_id: str,
-    simulation_id: str,
-    architecture: str,
-    feature_schema_version: str,
-    expected_rounds: int,
-    expected_epochs: int,
-    input_dim: int,
-    feature_names: Sequence[str],
-) -> str:
-    h = hashlib.sha256()
-    h.update(job_id.strip().encode())
-    h.update(training_run_id.strip().encode())
-    h.update(simulation_id.strip().encode())
-    h.update(architecture.strip().encode())
-    h.update(feature_schema_version.strip().encode())
-    h.update(str(expected_rounds).encode())
-    h.update(str(expected_epochs).encode())
-    h.update(str(input_dim).encode())
-    for fn in feature_names:
-        h.update(fn.strip().encode())
-    return h.hexdigest()
-
-
-def _compute_evidence_fingerprint(
-    training_run_id: str,
-    simulation_id: str,
-    executed_rounds: int,
-    executed_epochs: int,
-    sample_count: int,
-    artifact_sha256: str,
-    architecture: str,
-    feature_schema_version: str,
-    input_dim: int,
-    feature_names: Sequence[str],
-    observed_metrics: dict[str, float],
-) -> str:
-    h = hashlib.sha256()
-    h.update(training_run_id.strip().encode())
-    h.update(simulation_id.strip().encode())
-    h.update(str(executed_rounds).encode())
-    h.update(str(executed_epochs).encode())
-    h.update(str(sample_count).encode())
-    h.update(artifact_sha256.strip().encode())
-    h.update(architecture.strip().encode())
-    h.update(feature_schema_version.strip().encode())
-    h.update(str(input_dim).encode())
-    for fn in feature_names:
-        h.update(fn.strip().encode())
-    for k in sorted(observed_metrics.keys()):
-        h.update(f"{k}:{float(observed_metrics[k]):.8f}".encode())
-    return h.hexdigest()
-
 
 class TrainingJobAuthorityDatabase:
-    """ACID transactional database authority for training job lifecycle and execution observations."""
+    """ACID transactional database authority dispatching to PostgreSQL or SQLite backend."""
 
     def __init__(self, db_target: str, in_memory: bool = False) -> None:
-        self._lock = threading.RLock()
-        self._in_memory = in_memory
         self._db_target = db_target
-        self._mem_conn: sqlite3.Connection | None = None
+        self._in_memory = in_memory
+        clean = (db_target or "").strip()
 
-        if self._in_memory or db_target in (":memory:", ""):
-            self._is_memory = True
-            self._file_path = ""
-            self._mem_conn = sqlite3.connect(
-                f"file:cfi_mem_jobs_{uuid.uuid4().hex}?mode=memory&cache=shared",
-                uri=True,
-                check_same_thread=False,
-                timeout=15.0,
-                isolation_level=None,
+        if in_memory or clean in (":memory:", ""):
+            self._backend: TrainingJobAuthorityBackend = SQLiteTrainingJobAuthority(
+                db_target=":memory:", in_memory=True
             )
-            self._mem_conn.row_factory = sqlite3.Row
-            self._init_schema(self._mem_conn)
+        elif clean.startswith("postgresql://") or clean.startswith("postgres://"):
+            self._backend = PostgresTrainingJobAuthority(db_url=clean)
+        elif clean.startswith("sqlite://") or "://" not in clean:
+            self._backend = SQLiteTrainingJobAuthority(db_target=clean, in_memory=False)
         else:
-            self._is_memory = False
-            clean_path = db_target
-            if clean_path.startswith("sqlite:///"):
-                clean_path = clean_path[len("sqlite:///") :]
-            elif clean_path.startswith("sqlite://"):
-                clean_path = clean_path[len("sqlite://") :]
-            self._file_path = os.path.abspath(clean_path)
-            parent = os.path.dirname(self._file_path)
-            if parent:
-                os.makedirs(parent, exist_ok=True)
-            with self._connect() as conn:
-                self._init_schema(conn)
+            raise TrainingProvenanceConfigurationError(
+                f"Unsupported database URL scheme: '{clean}'. Only PostgreSQL ('postgresql://...') and SQLite ('sqlite://...') backends are supported."
+            )
 
-    @contextlib.contextmanager
-    def _connect(self):
-        if self._is_memory:
-            assert self._mem_conn is not None
-            with self._lock:
-                yield self._mem_conn
-        else:
-            conn = sqlite3.connect(
-                self._file_path,
-                timeout=15.0,
-                check_same_thread=False,
-                isolation_level=None,
-            )
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA foreign_keys = ON")
-            conn.execute("PRAGMA busy_timeout = 15000")
-            conn.execute("PRAGMA journal_mode = WAL")
-            conn.execute("PRAGMA synchronous = NORMAL")
-            try:
-                yield conn
-            finally:
-                conn.close()
-
-    def _init_schema(self, conn: sqlite3.Connection) -> None:
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute("PRAGMA busy_timeout = 15000")
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cfi_scheduled_jobs (
-                job_id TEXT PRIMARY KEY,
-                training_run_id TEXT UNIQUE NOT NULL,
-                simulation_id TEXT NOT NULL,
-                coordinator_id TEXT NOT NULL,
-                architecture TEXT NOT NULL,
-                feature_schema_version TEXT NOT NULL,
-                expected_rounds INTEGER NOT NULL,
-                expected_epochs INTEGER NOT NULL,
-                input_dim INTEGER NOT NULL,
-                feature_names_json TEXT NOT NULL,
-                permitted_workers_json TEXT,
-                config_fingerprint TEXT NOT NULL,
-                scheduled_at TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'SCHEDULED'
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cfi_started_jobs (
-                job_id TEXT PRIMARY KEY REFERENCES cfi_scheduled_jobs(job_id),
-                training_run_id TEXT NOT NULL,
-                simulation_id TEXT NOT NULL,
-                worker_id TEXT NOT NULL,
-                started_at TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'STARTED'
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cfi_round_observations (
-                event_id TEXT PRIMARY KEY,
-                job_id TEXT NOT NULL REFERENCES cfi_scheduled_jobs(job_id),
-                training_run_id TEXT NOT NULL,
-                simulation_id TEXT NOT NULL,
-                worker_id TEXT NOT NULL,
-                bank_id TEXT NOT NULL,
-                round_number INTEGER NOT NULL,
-                attempt_number INTEGER NOT NULL DEFAULT 1,
-                actual_sample_count INTEGER NOT NULL,
-                actual_executed_epochs INTEGER NOT NULL DEFAULT 0,
-                observed_loss REAL NOT NULL,
-                metrics_json TEXT NOT NULL,
-                model_update_digest TEXT,
-                execution_timestamp TEXT NOT NULL,
-                execution_status TEXT NOT NULL DEFAULT 'COMPLETED',
-                payload_digest TEXT NOT NULL,
-                UNIQUE(job_id, bank_id, round_number, attempt_number)
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cfi_completed_jobs (
-                job_id TEXT PRIMARY KEY REFERENCES cfi_scheduled_jobs(job_id),
-                training_run_id TEXT UNIQUE NOT NULL,
-                simulation_id TEXT NOT NULL,
-                completed_at TEXT NOT NULL,
-                executed_rounds INTEGER NOT NULL,
-                executed_epochs INTEGER NOT NULL,
-                sample_count INTEGER NOT NULL,
-                observed_metrics_json TEXT NOT NULL,
-                artifact_sha256 TEXT NOT NULL,
-                architecture TEXT NOT NULL,
-                feature_schema_version TEXT NOT NULL,
-                input_dim INTEGER NOT NULL,
-                feature_names_json TEXT NOT NULL,
-                worker_id TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'COMPLETED',
-                git_commit_hash TEXT,
-                dataset_manifest_id TEXT,
-                evidence_fingerprint TEXT NOT NULL
-            )
-            """
-        )
+    @property
+    def backend_type(self) -> str:
+        return self._backend.backend_type
 
     def schedule_job(
         self,
@@ -522,331 +205,40 @@ class TrainingJobAuthorityDatabase:
         coordinator_id: str = "COORDINATOR",
         permitted_workers: Sequence[str] = (),
     ) -> ScheduledTrainingJob:
-        clean_job_id = job_id.strip()
-        clean_run_id = training_run_id.strip()
-        clean_sim_id = simulation_id.strip()
-        fnames_tuple = tuple(feature_names)
-        perm_workers_tuple = tuple(permitted_workers)
-        now_str = datetime.now(UTC).isoformat()
-
-        cfg_fingerprint = _compute_config_fingerprint(
-            clean_job_id,
-            clean_run_id,
-            clean_sim_id,
-            architecture,
-            feature_schema_version,
-            expected_rounds,
-            expected_epochs,
-            input_dim,
-            fnames_tuple,
+        return self._backend.schedule_job(
+            job_id=job_id,
+            training_run_id=training_run_id,
+            simulation_id=simulation_id,
+            architecture=architecture,
+            feature_schema_version=feature_schema_version,
+            expected_rounds=expected_rounds,
+            expected_epochs=expected_epochs,
+            input_dim=input_dim,
+            feature_names=feature_names,
+            coordinator_id=coordinator_id,
+            permitted_workers=permitted_workers,
         )
 
-        with self._connect() as conn:  # noqa: SIM117
-            with self._lock:
-                conn.execute("BEGIN IMMEDIATE")
-                try:
-                    # 1. Check permanent 1-to-1 training_run_id binding
-                    cur = conn.execute(
-                        "SELECT job_id FROM cfi_scheduled_jobs WHERE training_run_id = ?",
-                        (clean_run_id,),
-                    )
-                    bound_row = cur.fetchone()
-                    if bound_row and bound_row["job_id"] != clean_job_id:
-                        raise TrainingProvenanceSecurityError(
-                            f"Cannot schedule job '{clean_job_id}': training_run_id '{clean_run_id}' is already permanently bound to job '{bound_row['job_id']}'."
-                        )
-
-                    # 2. Check if job_id already scheduled
-                    cur = conn.execute(
-                        "SELECT * FROM cfi_scheduled_jobs WHERE job_id = ?",
-                        (clean_job_id,),
-                    )
-                    existing = cur.fetchone()
-                    if existing:
-                        if existing["config_fingerprint"] == cfg_fingerprint:
-                            conn.execute("COMMIT")
-                            return ScheduledTrainingJob(
-                                job_id=existing["job_id"],
-                                training_run_id=existing["training_run_id"],
-                                simulation_id=existing["simulation_id"],
-                                architecture=existing["architecture"],
-                                feature_schema_version=existing["feature_schema_version"],
-                                expected_rounds=existing["expected_rounds"],
-                                expected_epochs=existing["expected_epochs"],
-                                input_dim=existing["input_dim"],
-                                feature_names=tuple(json.loads(existing["feature_names_json"])),
-                                scheduled_at=existing["scheduled_at"],
-                                coordinator_id=existing["coordinator_id"],
-                                permitted_workers=tuple(json.loads(existing["permitted_workers_json"] or "[]")),
-                                config_fingerprint=existing["config_fingerprint"],
-                                status=existing["status"],
-                            )
-                        else:
-                            raise TrainingProvenanceSecurityError(
-                                f"Cannot reschedule job '{clean_job_id}' with conflicting parameters."
-                            )
-
-                    # 3. Insert newly scheduled job
-                    conn.execute(
-                        """
-                        INSERT INTO cfi_scheduled_jobs (
-                            job_id, training_run_id, simulation_id, coordinator_id,
-                            architecture, feature_schema_version, expected_rounds, expected_epochs,
-                            input_dim, feature_names_json, permitted_workers_json, config_fingerprint,
-                            scheduled_at, status
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            clean_job_id,
-                            clean_run_id,
-                            clean_sim_id,
-                            coordinator_id,
-                            architecture,
-                            feature_schema_version,
-                            expected_rounds,
-                            expected_epochs,
-                            input_dim,
-                            json.dumps(list(fnames_tuple)),
-                            json.dumps(list(perm_workers_tuple)),
-                            cfg_fingerprint,
-                            now_str,
-                            "SCHEDULED",
-                        ),
-                    )
-                    conn.execute("COMMIT")
-                    return ScheduledTrainingJob(
-                        job_id=clean_job_id,
-                        training_run_id=clean_run_id,
-                        simulation_id=clean_sim_id,
-                        architecture=architecture,
-                        feature_schema_version=feature_schema_version,
-                        expected_rounds=expected_rounds,
-                        expected_epochs=expected_epochs,
-                        input_dim=input_dim,
-                        feature_names=fnames_tuple,
-                        scheduled_at=now_str,
-                        coordinator_id=coordinator_id,
-                        permitted_workers=perm_workers_tuple,
-                        config_fingerprint=cfg_fingerprint,
-                        status="SCHEDULED",
-                    )
-                except Exception:
-                    conn.execute("ROLLBACK")
-                    raise
-
-    def start_job(
-        self,
-        job_id: str,
-        worker_id: str = "TRAINING_EXECUTOR",
-    ) -> StartedTrainingJob:
-        clean_job_id = job_id.strip()
-        now_str = datetime.now(UTC).isoformat()
-
-        with self._connect() as conn:  # noqa: SIM117
-            with self._lock:
-                conn.execute("BEGIN IMMEDIATE")
-                try:
-                    cur = conn.execute(
-                        "SELECT * FROM cfi_scheduled_jobs WHERE job_id = ?",
-                        (clean_job_id,),
-                    )
-                    sched = cur.fetchone()
-                    if not sched:
-                        raise TrainingProvenanceSecurityError(
-                            f"Cannot start job '{clean_job_id}': job was not scheduled by the training coordinator."
-                        )
-
-                    cur = conn.execute(
-                        "SELECT job_id FROM cfi_completed_jobs WHERE job_id = ?",
-                        (clean_job_id,),
-                    )
-                    if cur.fetchone():
-                        raise TrainingProvenanceSecurityError(
-                            f"Cannot start job '{clean_job_id}': job has already completed."
-                        )
-
-                    # Permitted workers policy check
-                    perm_workers = json.loads(sched["permitted_workers_json"] or "[]")
-                    if perm_workers and worker_id not in perm_workers:
-                        raise TrainingProvenanceSecurityError(
-                            f"Worker '{worker_id}' is not authorized to start job '{clean_job_id}' (permitted: {perm_workers})."
-                        )
-
-                    cur = conn.execute(
-                        "SELECT * FROM cfi_started_jobs WHERE job_id = ?",
-                        (clean_job_id,),
-                    )
-                    existing = cur.fetchone()
-                    if existing:
-                        conn.execute("COMMIT")
-                        return StartedTrainingJob(
-                            job_id=existing["job_id"],
-                            training_run_id=existing["training_run_id"],
-                            simulation_id=existing["simulation_id"],
-                            worker_id=existing["worker_id"],
-                            started_at=existing["started_at"],
-                            status=existing["status"],
-                        )
-
-                    conn.execute(
-                        """
-                        INSERT INTO cfi_started_jobs (
-                            job_id, training_run_id, simulation_id, worker_id, started_at, status
-                        ) VALUES (?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            clean_job_id,
-                            sched["training_run_id"],
-                            sched["simulation_id"],
-                            worker_id,
-                            now_str,
-                            "STARTED",
-                        ),
-                    )
-                    conn.execute("COMMIT")
-                    return StartedTrainingJob(
-                        job_id=clean_job_id,
-                        training_run_id=sched["training_run_id"],
-                        simulation_id=sched["simulation_id"],
-                        worker_id=worker_id,
-                        started_at=now_str,
-                        status="STARTED",
-                    )
-                except Exception:
-                    conn.execute("ROLLBACK")
-                    raise
+    def start_job(self, job_id: str, worker_id: str = "TRAINING_EXECUTOR") -> StartedTrainingJob:
+        return self._backend.start_job(job_id=job_id, worker_id=worker_id)
 
     def record_observation(self, obs: RoundObservation) -> RoundObservation:
-        obs.validate()
-        clean_job_id = obs.job_id.strip()
-
-        with self._connect() as conn:  # noqa: SIM117
-            with self._lock:
-                conn.execute("BEGIN IMMEDIATE")
-                try:
-                    # 1. Verify job is STARTED and not COMPLETED
-                    cur = conn.execute(
-                        "SELECT * FROM cfi_started_jobs WHERE job_id = ?",
-                        (clean_job_id,),
-                    )
-                    started = cur.fetchone()
-                    if not started:
-                        raise TrainingProvenanceSecurityError(
-                            f"Cannot record observations for job '{clean_job_id}': job is not in STARTED state."
-                        )
-
-                    cur = conn.execute(
-                        "SELECT job_id FROM cfi_completed_jobs WHERE job_id = ?",
-                        (clean_job_id,),
-                    )
-                    if cur.fetchone():
-                        raise TrainingProvenanceSecurityError(
-                            f"Cannot add round observation to finalized completed job '{clean_job_id}'."
-                        )
-
-                    # 2. Check duplicate event_id
-                    cur = conn.execute(
-                        "SELECT * FROM cfi_round_observations WHERE event_id = ?",
-                        (obs.event_id,),
-                    )
-                    existing_evt = cur.fetchone()
-                    if existing_evt:
-                        if existing_evt["payload_digest"] == obs.payload_digest:
-                            conn.execute("COMMIT")
-                            return obs
-                        else:
-                            raise TrainingProvenanceSecurityError(
-                                f"Duplicate event ID '{obs.event_id}' with conflicting content rejected."
-                            )
-
-                    # 3. Check duplicate (job_id, bank_id, round_number, attempt_number)
-                    cur = conn.execute(
-                        """
-                        SELECT * FROM cfi_round_observations
-                        WHERE job_id = ? AND bank_id = ? AND round_number = ? AND attempt_number = ?
-                        """,
-                        (clean_job_id, obs.bank_id, obs.round_number, obs.attempt_number),
-                    )
-                    existing_round = cur.fetchone()
-                    if existing_round:
-                        if existing_round["payload_digest"] == obs.payload_digest:
-                            conn.execute("COMMIT")
-                            return obs
-                        else:
-                            raise TrainingProvenanceSecurityError(
-                                f"Duplicate observation for job '{clean_job_id}' bank '{obs.bank_id}' round {obs.round_number} attempt {obs.attempt_number} with conflicting content rejected."
-                            )
-
-                    run_id = started["training_run_id"]
-                    sim_id = started["simulation_id"]
-
-                    conn.execute(
-                        """
-                        INSERT INTO cfi_round_observations (
-                            event_id, job_id, training_run_id, simulation_id,
-                            worker_id, bank_id, round_number, attempt_number,
-                            actual_sample_count, actual_executed_epochs, observed_loss,
-                            metrics_json, model_update_digest, execution_timestamp,
-                            execution_status, payload_digest
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            obs.event_id,
-                            clean_job_id,
-                            run_id,
-                            sim_id,
-                            obs.worker_id,
-                            obs.bank_id,
-                            obs.round_number,
-                            obs.attempt_number,
-                            obs.actual_sample_count,
-                            obs.actual_executed_epochs,
-                            float(obs.observed_loss),
-                            json.dumps(dict(obs.metrics)),
-                            obs.model_update_digest,
-                            obs.execution_timestamp,
-                            obs.execution_status,
-                            obs.payload_digest,
-                        ),
-                    )
-                    conn.execute("COMMIT")
-                    return obs
-                except Exception:
-                    conn.execute("ROLLBACK")
-                    raise
+        return self._backend.record_observation(obs)
 
     def get_observations(self, job_id: str) -> list[RoundObservation]:
-        clean_job_id = job_id.strip()
-        with self._connect() as conn:
-            cur = conn.execute(
-                """
-                SELECT * FROM cfi_round_observations
-                WHERE job_id = ?
-                ORDER BY round_number ASC, attempt_number ASC
-                """,
-                (clean_job_id,),
-            )
-            rows = cur.fetchall()
-            return [
-                RoundObservation(
-                    event_id=r["event_id"],
-                    job_id=r["job_id"],
-                    training_run_id=r["training_run_id"],
-                    simulation_id=r["simulation_id"],
-                    worker_id=r["worker_id"],
-                    bank_id=r["bank_id"],
-                    round_number=r["round_number"],
-                    attempt_number=r["attempt_number"],
-                    actual_sample_count=r["actual_sample_count"],
-                    actual_executed_epochs=r["actual_executed_epochs"],
-                    observed_loss=r["observed_loss"],
-                    metrics=json.loads(r["metrics_json"] or "{}"),
-                    execution_timestamp=r["execution_timestamp"],
-                    model_update_digest=r["model_update_digest"],
-                    execution_status=r["execution_status"],
-                )
-                for r in rows
-            ]
+        return self._backend.get_observations(job_id)
+
+    def record_global_aggregation(self, event: GlobalAggregationEvent) -> GlobalAggregationEvent:
+        return self._backend.record_global_aggregation(event)
+
+    def get_global_aggregations(self, job_id: str) -> list[GlobalAggregationEvent]:
+        return self._backend.get_global_aggregations(job_id)
+
+    def record_model_evaluation(self, event: ModelEvaluationEvent) -> ModelEvaluationEvent:
+        return self._backend.record_model_evaluation(event)
+
+    def get_model_evaluations(self, job_id: str) -> list[ModelEvaluationEvent]:
+        return self._backend.get_model_evaluations(job_id)
 
     def complete_job(
         self,
@@ -867,385 +259,51 @@ class TrainingJobAuthorityDatabase:
         feature_names: Sequence[str] | list[str] | tuple[str, ...] | None = None,
         enforce_lifecycle: bool = True,
     ) -> CompletedJobExecutionRecord:
-        clean_job_id = job_id.strip()
-        clean_sha = artifact_sha256.strip()
-        target_metrics = dict(observed_metrics) if observed_metrics is not None else {}
-        now_str = datetime.now(UTC).isoformat()
-
-        with self._connect() as conn:  # noqa: SIM117
-            with self._lock:
-                conn.execute("BEGIN IMMEDIATE")
-                try:
-                    # 1. Fetch scheduled job
-                    cur = conn.execute(
-                        "SELECT * FROM cfi_scheduled_jobs WHERE job_id = ?",
-                        (clean_job_id,),
-                    )
-                    sched_row = cur.fetchone()
-
-                    if enforce_lifecycle:
-                        if not sched_row:
-                            raise TrainingProvenanceSecurityError(
-                                f"Cannot record completion for job '{clean_job_id}': job has not been scheduled through authorized training coordinator. Arbitrary completion claims are rejected."
-                            )
-                        cur = conn.execute(
-                            "SELECT * FROM cfi_started_jobs WHERE job_id = ?",
-                            (clean_job_id,),
-                        )
-                        started_row = cur.fetchone()
-                        if not started_row:
-                            raise TrainingProvenanceSecurityError(
-                                f"Cannot record completion for job '{clean_job_id}': job has not been started by an authorized worker."
-                            )
-                    else:
-                        # Auto-schedule and start in permissive development mode if absent
-                        if not sched_row:
-                            s_sim = simulation_id.strip() if simulation_id else "sim_default"
-                            s_run = training_run_id.strip() if training_run_id else f"run_{clean_job_id}"
-                            s_arch = architecture or "FraudDetectionNN"
-                            s_ver = feature_schema_version or "v1.0"
-                            s_fnames = tuple(feature_names) if feature_names else ()
-                            s_dim = input_dim or len(s_fnames) or 10
-                            cfg_fp = _compute_config_fingerprint(
-                                clean_job_id, s_run, s_sim, s_arch, s_ver, executed_rounds, executed_epochs, s_dim, s_fnames
-                            )
-                            conn.execute(
-                                """
-                                INSERT INTO cfi_scheduled_jobs (
-                                    job_id, training_run_id, simulation_id, coordinator_id,
-                                    architecture, feature_schema_version, expected_rounds, expected_epochs,
-                                    input_dim, feature_names_json, permitted_workers_json, config_fingerprint,
-                                    scheduled_at, status
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                """,
-                                (
-                                    clean_job_id, s_run, s_sim, "COORDINATOR", s_arch, s_ver,
-                                    executed_rounds, executed_epochs, s_dim, json.dumps(list(s_fnames)),
-                                    "[]", cfg_fp, now_str, "SCHEDULED"
-                                ),
-                            )
-                            cur = conn.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = ?", (clean_job_id,))
-                            sched_row = cur.fetchone()
-
-                        cur = conn.execute("SELECT * FROM cfi_started_jobs WHERE job_id = ?", (clean_job_id,))
-                        started_row = cur.fetchone()
-                        if not started_row:
-                            conn.execute(
-                                """
-                                INSERT INTO cfi_started_jobs (
-                                    job_id, training_run_id, simulation_id, worker_id, started_at, status
-                                ) VALUES (?, ?, ?, ?, ?, ?)
-                                """,
-                                (
-                                    clean_job_id, sched_row["training_run_id"], sched_row["simulation_id"],
-                                    worker_id, now_str, "STARTED"
-                                ),
-                            )
-                            cur = conn.execute("SELECT * FROM cfi_started_jobs WHERE job_id = ?", (clean_job_id,))
-                            started_row = cur.fetchone()
-
-                    assert sched_row is not None
-                    assert started_row is not None
-
-                    sched_run_id = sched_row["training_run_id"]
-                    sched_sim_id = sched_row["simulation_id"]
-                    sched_arch = sched_row["architecture"]
-                    sched_schema_ver = sched_row["feature_schema_version"]
-                    sched_input_dim = sched_row["input_dim"]
-                    sched_feature_names = tuple(json.loads(sched_row["feature_names_json"]))
-                    sched_expected_rounds = sched_row["expected_rounds"]
-
-                    # 2. Strict feature contract and metadata immutability enforcement
-                    if simulation_id and simulation_id.strip() != sched_sim_id:
-                        raise TrainingProvenanceSecurityError(
-                            f"Simulation ID mismatch for job '{clean_job_id}': scheduled '{sched_sim_id}', got '{simulation_id}'."
-                        )
-                    if training_run_id and training_run_id.strip() != sched_run_id:
-                        raise TrainingProvenanceSecurityError(
-                            f"Training run ID mismatch for job '{clean_job_id}': scheduled '{sched_run_id}', got '{training_run_id}'."
-                        )
-                    if architecture and architecture.strip() != sched_arch:
-                        raise TrainingProvenanceSecurityError(
-                            f"Architecture mismatch for job '{clean_job_id}': scheduled '{sched_arch}', got '{architecture}'."
-                        )
-                    if feature_schema_version and feature_schema_version.strip() != sched_schema_ver:
-                        raise TrainingProvenanceSecurityError(
-                            f"Feature schema version mismatch for job '{clean_job_id}': scheduled '{sched_schema_ver}', got '{feature_schema_version}'."
-                        )
-                    if input_dim is not None and input_dim != sched_input_dim:
-                        raise TrainingProvenanceSecurityError(
-                            f"Input dimension mismatch for job '{clean_job_id}': scheduled {sched_input_dim}, got {input_dim}."
-                        )
-                    if feature_names is not None:
-                        if sched_feature_names and tuple(feature_names) != sched_feature_names:
-                            raise TrainingProvenanceSecurityError(
-                                f"Feature names mismatch for job '{clean_job_id}': scheduled {sched_feature_names}, got {tuple(feature_names)}."
-                            )
-                        target_fnames = sched_feature_names or tuple(feature_names)
-                    else:
-                        target_fnames = sched_feature_names
-
-                    target_arch = sched_arch
-                    target_schema_ver = sched_schema_ver
-                    target_input_dim = sched_input_dim
-
-                    evidence_fp = _compute_evidence_fingerprint(
-                        sched_run_id,
-                        sched_sim_id,
-                        executed_rounds,
-                        executed_epochs,
-                        sample_count,
-                        clean_sha,
-                        target_arch,
-                        target_schema_ver,
-                        target_input_dim,
-                        target_fnames,
-                        target_metrics,
-                    )
-
-                    # 3. Check existing completed record (idempotency vs conflict)
-                    cur = conn.execute(
-                        "SELECT * FROM cfi_completed_jobs WHERE job_id = ?",
-                        (clean_job_id,),
-                    )
-                    existing_comp = cur.fetchone()
-                    if existing_comp:
-                        if existing_comp["evidence_fingerprint"] == evidence_fp:
-                            conn.execute("COMMIT")
-                            return CompletedJobExecutionRecord(
-                                job_id=existing_comp["job_id"],
-                                training_run_id=existing_comp["training_run_id"],
-                                simulation_id=existing_comp["simulation_id"],
-                                completed_at=existing_comp["completed_at"],
-                                executed_rounds=existing_comp["executed_rounds"],
-                                executed_epochs=existing_comp["executed_epochs"],
-                                sample_count=existing_comp["sample_count"],
-                                observed_metrics=json.loads(existing_comp["observed_metrics_json"]),
-                                artifact_sha256=existing_comp["artifact_sha256"],
-                                architecture=existing_comp["architecture"],
-                                feature_schema_version=existing_comp["feature_schema_version"],
-                                input_dim=existing_comp["input_dim"],
-                                feature_names=tuple(json.loads(existing_comp["feature_names_json"])),
-                                worker_id=existing_comp["worker_id"],
-                                status=existing_comp["status"],
-                                git_commit_hash=existing_comp["git_commit_hash"],
-                                dataset_manifest_id=existing_comp["dataset_manifest_id"],
-                            )
-                        else:
-                            raise TrainingProvenanceSecurityError(
-                                f"Conflicting completion record for job '{clean_job_id}': cannot overwrite existing completed execution record with conflicting evidence."
-                            )
-
-                    # 4. Observation reconciliation
-                    cur = conn.execute(
-                        """
-                        SELECT * FROM cfi_round_observations
-                        WHERE job_id = ?
-                        ORDER BY round_number ASC, attempt_number ASC
-                        """,
-                        (clean_job_id,),
-                    )
-                    obs_rows = cur.fetchall()
-
-                    if enforce_lifecycle or obs_rows:
-                        if not obs_rows:
-                            raise TrainingProvenanceSecurityError(
-                                f"Cannot complete job '{clean_job_id}': no verified execution observations recorded. Fabricated completion is rejected."
-                            )
-
-                        completed_obs = [r for r in obs_rows if r["execution_status"] == "COMPLETED"]
-                        if not completed_obs:
-                            raise TrainingProvenanceSecurityError(
-                                f"Cannot complete job '{clean_job_id}': no successfully completed execution observations recorded."
-                            )
-
-                        observed_round_nums = sorted({r["round_number"] for r in completed_obs})
-
-                        # Verify executed rounds count against distinct observed rounds
-                        if executed_rounds != len(observed_round_nums):
-                            raise TrainingProvenanceSecurityError(
-                                f"Executed rounds mismatch for job '{clean_job_id}': claimed {executed_rounds}, but {len(observed_round_nums)} rounds observed."
-                            )
-                        if sched_expected_rounds > 0 and executed_rounds < sched_expected_rounds:
-                            raise TrainingProvenanceSecurityError(
-                                f"Job '{clean_job_id}' completed fewer rounds than scheduled contract: expected {sched_expected_rounds}, got {executed_rounds}."
-                            )
-
-                        # Verify sample accounting against observations
-                        # Calculate total samples observed across rounds and unique bank participants
-                        total_observed_samples = sum(r["actual_sample_count"] for r in completed_obs)
-                        # Latest round samples (for multi-round iterative FL)
-                        latest_round = max(observed_round_nums)
-                        latest_round_samples = sum(r["actual_sample_count"] for r in completed_obs if r["round_number"] == latest_round)
-                        unique_bank_samples = sum(
-                            {r["bank_id"]: r["actual_sample_count"] for r in completed_obs if r["round_number"] == latest_round}.values()
-                        )
-
-                        sample_matches = sample_count in (
-                            total_observed_samples,
-                            latest_round_samples,
-                            unique_bank_samples,
-                        )
-                        if not sample_matches:
-                            raise TrainingProvenanceSecurityError(
-                                f"Sample count mismatch for job '{clean_job_id}': claimed {sample_count}, but reconciled observed count is {total_observed_samples} (or {latest_round_samples} per-round)."
-                            )
-
-                        # Verify metrics & loss against observations
-                        if "loss" in target_metrics:
-                            claimed_loss = float(target_metrics["loss"])
-                            final_round_obs = [r for r in completed_obs if r["round_number"] == latest_round]
-                            final_losses = [float(r["observed_loss"]) for r in final_round_obs]
-                            tot_s = sum(r["actual_sample_count"] for r in final_round_obs) or 1
-                            weighted_final_loss = (
-                                sum(float(r["observed_loss"]) * r["actual_sample_count"] for r in final_round_obs)
-                                / tot_s
-                            )
-                            valid_losses = [*final_losses, weighted_final_loss]
-                            if not any(math.isclose(claimed_loss, loss_val, rel_tol=1e-3, abs_tol=1e-3) for loss_val in valid_losses):
-                                raise TrainingProvenanceSecurityError(
-                                    f"Observed loss mismatch for job '{clean_job_id}': claimed {claimed_loss}, but observed final loss is {final_losses[-1]}."
-                                )
-
-                    record = CompletedJobExecutionRecord(
-                        job_id=clean_job_id,
-                        training_run_id=sched_run_id,
-                        simulation_id=sched_sim_id,
-                        completed_at=now_str,
-                        executed_rounds=executed_rounds,
-                        executed_epochs=executed_epochs,
-                        sample_count=sample_count,
-                        observed_metrics=target_metrics,
-                        artifact_sha256=clean_sha,
-                        architecture=target_arch,
-                        feature_schema_version=target_schema_ver,
-                        input_dim=target_input_dim,
-                        feature_names=target_fnames,
-                        worker_id=worker_id,
-                        status="COMPLETED",
-                        git_commit_hash=git_commit_hash,
-                        dataset_manifest_id=dataset_manifest_id,
-                    )
-                    record.validate()
-
-                    conn.execute(
-                        """
-                        INSERT INTO cfi_completed_jobs (
-                            job_id, training_run_id, simulation_id, completed_at,
-                            executed_rounds, executed_epochs, sample_count,
-                            observed_metrics_json, artifact_sha256, architecture,
-                            feature_schema_version, input_dim, feature_names_json,
-                            worker_id, status, git_commit_hash, dataset_manifest_id,
-                            evidence_fingerprint
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            clean_job_id,
-                            sched_run_id,
-                            sched_sim_id,
-                            now_str,
-                            executed_rounds,
-                            executed_epochs,
-                            sample_count,
-                            json.dumps(target_metrics),
-                            clean_sha,
-                            target_arch,
-                            target_schema_ver,
-                            target_input_dim,
-                            json.dumps(list(target_fnames)),
-                            worker_id,
-                            "COMPLETED",
-                            git_commit_hash,
-                            dataset_manifest_id,
-                            evidence_fp,
-                        ),
-                    )
-                    conn.execute("COMMIT")
-                    return record
-                except Exception:
-                    conn.execute("ROLLBACK")
-                    raise
+        return self._backend.complete_job(
+            job_id=job_id,
+            executed_rounds=executed_rounds,
+            executed_epochs=executed_epochs,
+            sample_count=sample_count,
+            observed_metrics=observed_metrics,
+            artifact_sha256=artifact_sha256,
+            worker_id=worker_id,
+            git_commit_hash=git_commit_hash,
+            dataset_manifest_id=dataset_manifest_id,
+            simulation_id=simulation_id,
+            training_run_id=training_run_id,
+            architecture=architecture,
+            feature_schema_version=feature_schema_version,
+            input_dim=input_dim,
+            feature_names=feature_names,
+            enforce_lifecycle=enforce_lifecycle,
+        )
 
     def get_completed_job_by_id(self, job_id: str) -> CompletedJobExecutionRecord | None:
-        clean_job_id = job_id.strip()
-        with self._connect() as conn:
-            cur = conn.execute(
-                "SELECT * FROM cfi_completed_jobs WHERE job_id = ?",
-                (clean_job_id,),
-            )
-            r = cur.fetchone()
-            if not r:
-                return None
-            return CompletedJobExecutionRecord(
-                job_id=r["job_id"],
-                training_run_id=r["training_run_id"],
-                simulation_id=r["simulation_id"],
-                completed_at=r["completed_at"],
-                executed_rounds=r["executed_rounds"],
-                executed_epochs=r["executed_epochs"],
-                sample_count=r["sample_count"],
-                observed_metrics=json.loads(r["observed_metrics_json"]),
-                artifact_sha256=r["artifact_sha256"],
-                architecture=r["architecture"],
-                feature_schema_version=r["feature_schema_version"],
-                input_dim=r["input_dim"],
-                feature_names=tuple(json.loads(r["feature_names_json"])),
-                worker_id=r["worker_id"],
-                status=r["status"],
-                git_commit_hash=r["git_commit_hash"],
-                dataset_manifest_id=r["dataset_manifest_id"],
-            )
+        return self._backend.get_completed_job_by_id(job_id)
 
     def get_completed_job_by_run_id(self, run_id: str) -> CompletedJobExecutionRecord | None:
-        clean_run_id = run_id.strip()
-        with self._connect() as conn:
-            cur = conn.execute(
-                "SELECT * FROM cfi_completed_jobs WHERE training_run_id = ?",
-                (clean_run_id,),
-            )
-            r = cur.fetchone()
-            if not r:
-                return None
-            return CompletedJobExecutionRecord(
-                job_id=r["job_id"],
-                training_run_id=r["training_run_id"],
-                simulation_id=r["simulation_id"],
-                completed_at=r["completed_at"],
-                executed_rounds=r["executed_rounds"],
-                executed_epochs=r["executed_epochs"],
-                sample_count=r["sample_count"],
-                observed_metrics=json.loads(r["observed_metrics_json"]),
-                artifact_sha256=r["artifact_sha256"],
-                architecture=r["architecture"],
-                feature_schema_version=r["feature_schema_version"],
-                input_dim=r["input_dim"],
-                feature_names=tuple(json.loads(r["feature_names_json"])),
-                worker_id=r["worker_id"],
-                status=r["status"],
-                git_commit_hash=r["git_commit_hash"],
-                dataset_manifest_id=r["dataset_manifest_id"],
-            )
+        return self._backend.get_completed_job_by_run_id(run_id)
+
+    def get_scheduled_job(self, job_id: str) -> ScheduledTrainingJob | None:
+        return self._backend.get_scheduled_job(job_id)
+
+    def get_started_job(self, job_id: str) -> StartedTrainingJob | None:
+        return self._backend.get_started_job(job_id)
 
     def clear(self) -> None:
-        with self._connect() as conn, self._lock:
-            conn.execute("BEGIN IMMEDIATE")
-            try:
-                conn.execute("DELETE FROM cfi_completed_jobs")
-                conn.execute("DELETE FROM cfi_round_observations")
-                conn.execute("DELETE FROM cfi_started_jobs")
-                conn.execute("DELETE FROM cfi_scheduled_jobs")
-                conn.execute("COMMIT")
-            except Exception:
-                conn.execute("ROLLBACK")
-                raise
+        self._backend.clear()
+
+    def close(self) -> None:
+        self._backend.close()
 
 
 class TrustedTrainingJobRecordSource:
     """Protected source of completed training execution records enforcing the complete job lifecycle.
 
     Guarantees:
-    - ACID transactional SQLite persistence with WAL mode preventing lost updates across processes.
-    - Workload authorization strictly separating coordinator scheduling from worker execution.
+    - ACID transactional persistence via PostgreSQL (production) or SQLite WAL mode (development).
+    - Workload authorization strictly separating coordinator scheduling from authenticated per-bank worker execution.
+    - Prevents identity impersonation across banking institutions.
     - Full round observation recording and derivation/reconciliation of completion claims.
     - Feature contract immutability from scheduling through completion.
     - Fail-closed behavior in production: missing database or credentials raises TrainingProvenanceConfigurationError.
@@ -1262,6 +320,7 @@ class TrustedTrainingJobRecordSource:
         app_env: str | None = None,
         coordinator_token: str | None = None,
         db_url: str | None = None,
+        bank_tokens: dict[str, str] | None = None,
     ) -> None:
         self._lock = threading.RLock()
         self._worker_token = configured_token if configured_token is not None else worker_token
@@ -1269,28 +328,60 @@ class TrustedTrainingJobRecordSource:
         self._enforce_lifecycle = enforce_lifecycle
         self._app_env = app_env
 
-        target_store = store_path if store_path is not None else (store_file_path or db_url)
         settings = get_settings()
+        self._bank_tokens = dict(bank_tokens) if bank_tokens is not None else dict(getattr(settings, "training_bank_tokens", {}))
+        env_bank_tokens = os.environ.get("CFI_TRAINING_BANK_TOKENS")
+        if env_bank_tokens:
+            try:
+                parsed = json.loads(env_bank_tokens)
+                if isinstance(parsed, dict):
+                    self._bank_tokens.update(parsed)
+            except Exception:
+                pass
+
+        target_store = store_path if store_path is not None else (store_file_path or db_url)
         active_env = self._app_env or settings.app_env
         is_prod = active_env.lower() == "production"
 
         if is_prod:
-            expected_worker = self._resolve_expected_worker_token()
-            if not expected_worker or expected_worker in FORBIDDEN_WORKER_TOKENS or "change_me" in expected_worker:
-                raise TrainingProvenanceConfigurationError(
-                    "Production training worker credential is not configured or uses a forbidden default/placeholder. "
-                    "Production execution recording fails closed."
-                )
             expected_coord = self._resolve_expected_coordinator_token()
-            if expected_coord in FORBIDDEN_COORDINATOR_TOKENS or "change_me" in expected_coord:
+            has_worker_creds = bool(self._bank_tokens or self._resolve_expected_worker_token())
+
+            if (expected_coord or not has_worker_creds) and (
+                not expected_coord or expected_coord in FORBIDDEN_COORDINATOR_TOKENS or "change_me" in expected_coord
+            ):
                 raise TrainingProvenanceConfigurationError(
                     "Production training coordinator credential is not configured or uses a forbidden default/placeholder. "
                     "Production execution recording fails closed."
                 )
-            if expected_coord and hmac.compare_digest(expected_worker, expected_coord):
-                raise TrainingProvenanceConfigurationError(
-                    "Production training coordinator and worker credentials cannot be identical (privilege separation required)."
-                )
+
+            if self._bank_tokens:
+                seen_tokens: set[str] = set()
+                for b_id, b_tok in self._bank_tokens.items():
+                    if not b_tok or b_tok in FORBIDDEN_WORKER_TOKENS or "change_me" in b_tok:
+                        raise TrainingProvenanceConfigurationError(
+                            f"Production training bank token for '{b_id}' is empty or uses a forbidden placeholder."
+                        )
+                    if expected_coord and hmac.compare_digest(b_tok, expected_coord):
+                        raise TrainingProvenanceConfigurationError(
+                            f"Production training bank token for '{b_id}' and coordinator token cannot be identical (privilege separation required)."
+                        )
+                    if b_tok in seen_tokens:
+                        raise TrainingProvenanceConfigurationError(
+                            f"Production training bank token for '{b_id}' reuses another bank's credential."
+                        )
+                    seen_tokens.add(b_tok)
+            else:
+                expected_worker = self._resolve_expected_worker_token()
+                if not expected_worker or expected_worker in FORBIDDEN_WORKER_TOKENS or "change_me" in expected_worker:
+                    raise TrainingProvenanceConfigurationError(
+                        "Production training worker credential is not configured or uses a forbidden default/placeholder. "
+                        "Production execution recording fails closed."
+                    )
+                if expected_coord and hmac.compare_digest(expected_worker, expected_coord):
+                    raise TrainingProvenanceConfigurationError(
+                        "Production training coordinator and worker credentials cannot be identical (privilege separation required)."
+                    )
 
         if in_memory or target_store == "":
             if is_prod:
@@ -1309,6 +400,13 @@ class TrustedTrainingJobRecordSource:
                 or getattr(settings, "training_job_store_path", None)
             )
             if configured:
+                if is_prod and "://" in configured and not (
+                    configured.startswith("postgresql://") or configured.startswith("postgres://")
+                ):
+                    raise TrainingProvenanceConfigurationError(
+                        "Production training job authority database must be a PostgreSQL connection URL (e.g. postgresql://...). "
+                        "SQLite URLs and in-memory storage are strictly forbidden in production."
+                    )
                 self._store_file_path = configured
                 self._in_memory = False
             elif is_prod:
@@ -1329,6 +427,11 @@ class TrustedTrainingJobRecordSource:
     def is_durable(self) -> bool:
         """Truthfully report whether this record source is backed by durable database storage."""
         return not self._in_memory and bool(self._store_file_path)
+
+    @property
+    def backend_type(self) -> str:
+        """Report whether the underlying authority backend is 'postgres' or 'sqlite'."""
+        return self._db.backend_type
 
     def _resolve_expected_worker_token(self) -> str:
         settings = get_settings()
@@ -1368,6 +471,11 @@ class TrustedTrainingJobRecordSource:
                 raise TrainingProvenanceSecurityError(
                     "Worker credential cannot authorize job scheduling; coordinator role required."
                 )
+            for b_tok in self._bank_tokens.values():
+                if b_tok and hmac.compare_digest(provided_token, b_tok):
+                    raise TrainingProvenanceSecurityError(
+                        "Bank worker credential cannot authorize coordinator actions; coordinator role required."
+                    )
             if not hmac.compare_digest(provided_token, expected):
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized training coordinator: Invalid training coordinator authorization token."
@@ -1377,6 +485,11 @@ class TrustedTrainingJobRecordSource:
                 raise TrainingProvenanceSecurityError(
                     "Worker credential cannot authorize job scheduling; coordinator role required."
                 )
+            for b_tok in self._bank_tokens.values():
+                if b_tok and provided_token and hmac.compare_digest(provided_token, b_tok):
+                    raise TrainingProvenanceSecurityError(
+                        "Bank worker credential cannot authorize coordinator actions; coordinator role required."
+                    )
             if expected and (provided_token is None or not hmac.compare_digest(provided_token, expected)):
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized training coordinator: invalid coordinator token."
@@ -1389,11 +502,6 @@ class TrustedTrainingJobRecordSource:
         expected_coord = self._resolve_expected_coordinator_token()
 
         if is_prod:
-            if not expected or expected in FORBIDDEN_WORKER_TOKENS or "change_me" in expected:
-                raise TrainingProvenanceConfigurationError(
-                    "Production training worker credential is not configured or uses an insecure placeholder. "
-                    "Production execution recording fails closed."
-                )
             if not provided_token:
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized training worker: missing training worker authorization token."
@@ -1402,19 +510,105 @@ class TrustedTrainingJobRecordSource:
                 raise TrainingProvenanceSecurityError(
                     "Coordinator credential cannot authorize worker execution events."
                 )
-            if not hmac.compare_digest(provided_token, expected):
-                raise TrainingProvenanceSecurityError(
-                    "Unauthorized training worker: Invalid training worker authorization token."
-                )
+            if self._bank_tokens:
+                if not any(hmac.compare_digest(provided_token, bt) for bt in self._bank_tokens.values() if bt):
+                    raise TrainingProvenanceSecurityError(
+                        "Unauthorized training worker: Invalid training worker authorization token."
+                    )
+            else:
+                if not expected or expected in FORBIDDEN_WORKER_TOKENS or "change_me" in expected:
+                    raise TrainingProvenanceConfigurationError(
+                        "Production training worker credential is not configured or uses an insecure placeholder. "
+                        "Production execution recording fails closed."
+                    )
+                if not hmac.compare_digest(provided_token, expected):
+                    raise TrainingProvenanceSecurityError(
+                        "Unauthorized training worker: Invalid training worker authorization token."
+                    )
         else:
             if expected_coord and provided_token and hmac.compare_digest(provided_token, expected_coord):
                 raise TrainingProvenanceSecurityError(
                     "Coordinator credential cannot authorize worker execution events."
                 )
+            if (
+                self._bank_tokens
+                and provided_token
+                and any(hmac.compare_digest(provided_token, bt) for bt in self._bank_tokens.values() if bt)
+            ):
+                return
             if expected and (provided_token is None or not hmac.compare_digest(provided_token, expected)):
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized training worker: invalid worker token."
                 )
+
+    def authenticate_bank_worker(
+        self,
+        provided_token: str | None,
+        claimed_bank_id: str | None = None,
+    ) -> str:
+        """Authenticate bank worker credential and return authoritative bank identity.
+
+        Strictly prevents identity spoofing:
+        - Rejects missing or empty credentials.
+        - Rejects coordinator credentials attempting worker actions.
+        - Matches token to configured bank identity (BANK_A, BANK_B, BANK_C).
+        - If claimed_bank_id is passed, rejects if it differs from authenticated identity.
+        """
+        active_env = self._app_env or get_settings().app_env
+        is_prod = active_env.lower() == "production"
+        expected_coord = self._resolve_expected_coordinator_token()
+        expected_worker = self._resolve_expected_worker_token()
+
+        if not provided_token:
+            if is_prod or self._bank_tokens or expected_worker:
+                raise TrainingProvenanceSecurityError(
+                    "Unauthorized training worker: missing training worker authorization token."
+                )
+            return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
+
+        if expected_coord and hmac.compare_digest(provided_token, expected_coord):
+            raise TrainingProvenanceSecurityError(
+                "Coordinator credential cannot authorize worker execution events."
+            )
+
+        matched_bank: str | None = None
+        for b_id, b_tok in self._bank_tokens.items():
+            if b_tok and hmac.compare_digest(provided_token, b_tok):
+                matched_bank = b_id
+                break
+
+        if matched_bank is not None:
+            if claimed_bank_id and claimed_bank_id.strip() != matched_bank:
+                raise TrainingProvenanceSecurityError(
+                    f"Identity spoofing rejected: credential authenticated as '{matched_bank}', "
+                    f"but caller requested bank_id='{claimed_bank_id}'."
+                )
+            return matched_bank
+
+        if self._bank_tokens:
+            raise TrainingProvenanceSecurityError(
+                "Unauthorized bank worker: credential does not match any recognized bank workload identity."
+            )
+
+        expected_worker = self._resolve_expected_worker_token()
+        if is_prod:
+            if not expected_worker or expected_worker in FORBIDDEN_WORKER_TOKENS or "change_me" in expected_worker:
+                raise TrainingProvenanceConfigurationError(
+                    "Production training worker credential is not configured or uses an insecure placeholder."
+                )
+            if not hmac.compare_digest(provided_token, expected_worker):
+                raise TrainingProvenanceSecurityError(
+                    "Unauthorized training worker: Invalid training worker authorization token."
+                )
+            return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
+        else:
+            if expected_worker and hmac.compare_digest(provided_token, expected_worker):
+                return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
+            if not expected_worker:
+                return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
+            raise TrainingProvenanceSecurityError(
+                "Unauthorized training worker: invalid worker token."
+            )
 
     def schedule_training_job(
         self,
@@ -1461,14 +655,32 @@ class TrustedTrainingJobRecordSource:
     def start_training_job(
         self,
         job_id: str,
-        worker_id: str = "TRAINING_EXECUTOR",
+        worker_id: str | None = None,
         worker_token: str | None = None,
     ) -> StartedTrainingJob:
         """Signal that authorized training worker has initiated execution for a scheduled job."""
-        self._validate_worker_token(worker_token)
-        if not job_id or not job_id.strip():
+        clean_job_id = job_id.strip()
+        if not clean_job_id:
             raise ValueError("job_id must be non-empty.")
-        return self._db.start_job(job_id=job_id, worker_id=worker_id)
+
+        auth_bank = self.authenticate_bank_worker(
+            worker_token,
+            claimed_bank_id=worker_id if (worker_id and worker_id in self._bank_tokens) else None,
+        )
+        resolved_worker_id = auth_bank or worker_id or "TRAINING_EXECUTOR"
+
+        sched = self._db.get_scheduled_job(clean_job_id)
+        if (
+            sched
+            and sched.permitted_workers
+            and auth_bank not in sched.permitted_workers
+            and resolved_worker_id not in sched.permitted_workers
+        ):
+            raise TrainingProvenanceSecurityError(
+                f"Bank '{auth_bank or resolved_worker_id}' is not authorized to start job '{clean_job_id}' (permitted: {sched.permitted_workers})."
+            )
+
+        return self._db.start_job(job_id=clean_job_id, worker_id=resolved_worker_id)
 
     def record_round_observation(
         self,
@@ -1489,8 +701,15 @@ class TrustedTrainingJobRecordSource:
         round_idx: int | None = None,
     ) -> RoundObservation:
         """Record genuine round progress and observations during active execution."""
-        self._validate_worker_token(worker_token)
+        auth_bank = self.authenticate_bank_worker(worker_token, claimed_bank_id=bank_id)
         clean_job_id = job_id.strip()
+
+        sched = self._db.get_scheduled_job(clean_job_id)
+        if sched and sched.permitted_workers and auth_bank not in sched.permitted_workers:
+            raise TrainingProvenanceSecurityError(
+                f"Bank '{auth_bank}' is not authorized to record observations for job '{clean_job_id}' (permitted: {sched.permitted_workers})."
+            )
+
         r_num = round_number if round_number is not None else (round_num if round_num is not None else (round_idx if round_idx is not None else 1))
 
         loss_val = observed_loss
@@ -1503,15 +722,15 @@ class TrustedTrainingJobRecordSource:
         if loss_val is None:
             loss_val = 0.0
 
-        eid = event_id or f"evt_{clean_job_id}_r{r_num}_{worker_id}_{attempt_number}_{uuid.uuid4().hex[:8]}"
+        eid = event_id or f"evt_{clean_job_id}_r{r_num}_{auth_bank}_{attempt_number}_{uuid.uuid4().hex[:8]}"
 
         obs = RoundObservation(
             event_id=eid,
             job_id=clean_job_id,
             training_run_id="",
             simulation_id="",
-            worker_id=worker_id,
-            bank_id=bank_id,
+            worker_id=worker_id or auth_bank,
+            bank_id=auth_bank,
             round_number=r_num,
             attempt_number=attempt_number,
             actual_sample_count=sample_count,
@@ -1524,6 +743,148 @@ class TrustedTrainingJobRecordSource:
         )
         return self._db.record_observation(obs)
 
+    def record_global_aggregation(
+        self,
+        job_id: str,
+        round_number: int,
+        aggregation_algorithm: str,
+        accepted_participant_ids: Sequence[str],
+        accepted_local_update_digests: Sequence[str],
+        aggregated_global_model_digest: str,
+        aggregation_configuration: dict[str, Any] | None = None,
+        coordinator_token: str | None = None,
+        event_id: str | None = None,
+        timestamp: str | None = None,
+    ) -> GlobalAggregationEvent:
+        """Record global federated aggregation evidence performed by the authorized coordinator."""
+        self._validate_coordinator_token(coordinator_token)
+        clean_job_id = job_id.strip()
+
+        if not accepted_participant_ids:
+            raise TrainingProvenanceSecurityError(
+                f"Global aggregation in round {round_number} requires at least one accepted participant (quorum check failed)."
+            )
+
+        if len(accepted_participant_ids) != len(accepted_local_update_digests):
+            raise TrainingProvenanceSecurityError(
+                f"Aggregation participants count ({len(accepted_participant_ids)}) does not match update digests count ({len(accepted_local_update_digests)})."
+            )
+
+        if len(set(accepted_participant_ids)) != len(accepted_participant_ids):
+            raise TrainingProvenanceSecurityError(
+                f"Duplicate participant ID in accepted aggregation for round {round_number}: {accepted_participant_ids}."
+            )
+
+        if len(set(accepted_local_update_digests)) != len(accepted_local_update_digests):
+            raise TrainingProvenanceSecurityError(
+                f"Duplicate update digest in accepted aggregation for round {round_number}: {accepted_local_update_digests}."
+            )
+
+        sched = self._db.get_scheduled_job(clean_job_id)
+        if sched and sched.permitted_workers:
+            for p_id in accepted_participant_ids:
+                if p_id not in sched.permitted_workers:
+                    raise TrainingProvenanceSecurityError(
+                        f"Participant '{p_id}' is not in permitted workers for job '{clean_job_id}': permitted={sched.permitted_workers}."
+                    )
+
+        min_quorum = 1
+        if aggregation_configuration:
+            if "min_quorum" in aggregation_configuration:
+                min_quorum = int(aggregation_configuration["min_quorum"])
+            elif "min_participants" in aggregation_configuration:
+                min_quorum = int(aggregation_configuration["min_participants"])
+            elif "quorum" in aggregation_configuration:
+                min_quorum = int(aggregation_configuration["quorum"])
+
+        if len(accepted_participant_ids) < min_quorum:
+            raise TrainingProvenanceSecurityError(
+                f"Quorum failure for job '{clean_job_id}' round {round_number}: requires at least {min_quorum} participants, but only {len(accepted_participant_ids)} accepted ({accepted_participant_ids})."
+            )
+
+        obs_list = self._db.get_observations(clean_job_id)
+        existing_aggs = self._db.get_global_aggregations(clean_job_id)
+
+        earlier_digests: set[str] = set()
+        for agg in existing_aggs:
+            if agg.round_number < round_number:
+                earlier_digests.update(agg.accepted_local_update_digests)
+
+        for d in accepted_local_update_digests:
+            if d in earlier_digests:
+                raise TrainingProvenanceSecurityError(
+                    f"Replay of earlier round update digest '{d}' rejected in round {round_number}."
+                )
+
+        round_obs = [o for o in obs_list if o.round_number == round_number and o.execution_status == "COMPLETED"]
+        obs_by_bank = {o.bank_id: o for o in round_obs}
+
+        for p_id, p_digest in zip(accepted_participant_ids, accepted_local_update_digests, strict=False):
+            if p_id not in obs_by_bank:
+                raise TrainingProvenanceSecurityError(
+                    f"Accepted participant '{p_id}' has no verified completed round observation in round {round_number}."
+                )
+            actual_digest = obs_by_bank[p_id].model_update_digest
+            if actual_digest and actual_digest != p_digest:
+                raise TrainingProvenanceSecurityError(
+                    f"Accepted local update digest for participant '{p_id}' ({p_digest}) does not match observed digest ({actual_digest})."
+                )
+
+        eid = event_id or f"agg_{clean_job_id}_r{round_number}_{uuid.uuid4().hex[:8]}"
+        now_str = timestamp or datetime.now(UTC).isoformat()
+
+        event = GlobalAggregationEvent(
+            event_id=eid,
+            job_id=clean_job_id,
+            round_number=round_number,
+            aggregation_algorithm=aggregation_algorithm,
+            accepted_participant_ids=tuple(accepted_participant_ids),
+            accepted_local_update_digests=tuple(accepted_local_update_digests),
+            aggregation_configuration=aggregation_configuration or {},
+            aggregated_global_model_digest=aggregated_global_model_digest,
+            timestamp=now_str,
+            aggregation_status="COMPLETED",
+        )
+        return self._db.record_global_aggregation(event)
+
+    def record_evaluation_observation(
+        self,
+        job_id: str,
+        metric_name: str,
+        metric_value: float,
+        evaluated_artifact_digest: str,
+        evaluator_identity: str = "COORDINATOR",
+        evaluation_run_id: str | None = None,
+        evaluation_dataset_manifest: str | None = None,
+        coordinator_token: str | None = None,
+        event_id: str | None = None,
+    ) -> ModelEvaluationEvent:
+        """Record model evaluation evidence bound to the exact evaluated artifact digest."""
+        self._validate_coordinator_token(coordinator_token)
+        clean_job_id = job_id.strip()
+        clean_sha = evaluated_artifact_digest.strip()
+        run_id = evaluation_run_id or f"eval_{clean_job_id}_{metric_name}"
+        eid = event_id or f"evt_eval_{clean_job_id}_{metric_name}_{uuid.uuid4().hex[:8]}"
+
+        event = ModelEvaluationEvent(
+            event_id=eid,
+            job_id=clean_job_id,
+            evaluation_run_id=run_id,
+            metric_name=metric_name,
+            metric_value=float(metric_value),
+            evaluated_artifact_digest=clean_sha,
+            evaluator_identity=evaluator_identity,
+            evaluation_timestamp=datetime.now(UTC).isoformat(),
+            evaluation_dataset_manifest=evaluation_dataset_manifest,
+        )
+        return self._db.record_model_evaluation(event)
+
+    def get_global_aggregations(self, job_id: str) -> list[GlobalAggregationEvent]:
+        return self._db.get_global_aggregations(job_id)
+
+    def get_model_evaluations(self, job_id: str) -> list[ModelEvaluationEvent]:
+        return self._db.get_model_evaluations(job_id)
+
     def complete_training_job(
         self,
         job_id: str,
@@ -1533,6 +894,7 @@ class TrustedTrainingJobRecordSource:
         observed_metrics: dict[str, float] | None = None,
         artifact_sha256: str = "",
         worker_token: str | None = None,
+        coordinator_token: str | None = None,
         worker_id: str = "TRAINING_EXECUTOR",
         architecture: str | None = None,
         feature_schema_version: str | None = None,
@@ -1545,7 +907,10 @@ class TrustedTrainingJobRecordSource:
         enforce_lifecycle: bool | None = None,
     ) -> CompletedJobExecutionRecord:
         """Register completion of an authorized training job with observed execution evidence."""
-        self._validate_worker_token(worker_token)
+        if coordinator_token is not None:
+            self._validate_coordinator_token(coordinator_token)
+        else:
+            self._validate_worker_token(worker_token)
 
         active_env = self._app_env or get_settings().app_env
         is_prod = active_env.lower() == "production"
@@ -1578,6 +943,7 @@ class TrustedTrainingJobRecordSource:
         self,
         record: CompletedJobExecutionRecord | None = None,
         worker_token: str | None = None,
+        coordinator_token: str | None = None,
         *,
         job_id: str | None = None,
         training_run_id: str | None = None,
@@ -1605,6 +971,7 @@ class TrustedTrainingJobRecordSource:
                 observed_metrics=dict(record.observed_metrics),
                 artifact_sha256=record.artifact_sha256,
                 worker_token=worker_token,
+                coordinator_token=coordinator_token,
                 worker_id=record.worker_id,
                 architecture=record.architecture,
                 feature_schema_version=record.feature_schema_version,
@@ -1626,6 +993,7 @@ class TrustedTrainingJobRecordSource:
             observed_metrics=metrics or {},
             artifact_sha256=model_artifact_sha256,
             worker_token=worker_token,
+            coordinator_token=coordinator_token,
             worker_id=worker_id,
             architecture=architecture,
             feature_schema_version=feature_schema_version,
@@ -1655,6 +1023,24 @@ class TrustedTrainingJobRecordSource:
 
     def has_completed_job(self, identifier: str) -> bool:
         return self.get_completed_job(identifier) is not None
+
+    def get_scheduled_job(self, job_id: str) -> ScheduledTrainingJob | None:
+        return self._db.get_scheduled_job(job_id)
+
+    def get_started_job(self, job_id: str) -> StartedTrainingJob | None:
+        return self._db.get_started_job(job_id)
+
+    def get_training_job(
+        self, job_id: str
+    ) -> ScheduledTrainingJob | StartedTrainingJob | CompletedJobExecutionRecord | None:
+        """Retrieve job state across completed, started, or scheduled lifecycle stages."""
+        completed = self._db.get_completed_job_by_id(job_id)
+        if completed is not None:
+            return completed
+        started = self._db.get_started_job(job_id)
+        if started is not None:
+            return started
+        return self._db.get_scheduled_job(job_id)
 
     def clear(self) -> None:
         self._db.clear()

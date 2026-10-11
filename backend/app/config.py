@@ -156,6 +156,14 @@ class Settings(BaseSettings):
         ),
         description="Authorization secret for training workers to register completed job executions.",
     )
+    training_bank_tokens: dict[str, str] = Field(
+        default_factory=dict,
+        validation_alias=AliasChoices(
+            "training_bank_tokens",
+            "cfi_training_bank_tokens",
+        ),
+        description="Per-bank workload credentials mapping bank IDs (e.g., BANK_A, BANK_B, BANK_C) to their independent high-entropy secrets.",
+    )
     training_job_db_url: str = Field(
         default="",
         validation_alias=AliasChoices(
@@ -388,9 +396,33 @@ class Settings(BaseSettings):
                 "training_worker_token and training_coordinator_token must be distinct credentials in production (privilege separation violation)."
             )
 
+        if self.training_bank_tokens:
+            seen_tokens: set[str] = set()
+            for b_id, b_tok in self.training_bank_tokens.items():
+                if not b_tok or b_tok in forbidden_tokens or "change_me" in b_tok:
+                    violations.append(
+                        f"training_bank_tokens['{b_id}'] must be set to an independently configured high-entropy secret in production (cannot be empty or placeholder)."
+                    )
+                if b_tok == self.training_coordinator_token:
+                    violations.append(
+                        f"training_bank_tokens['{b_id}'] and training_coordinator_token must be distinct credentials in production (privilege separation violation)."
+                    )
+                if b_tok in seen_tokens:
+                    violations.append(
+                        f"training_bank_tokens['{b_id}'] reuses a credential from another bank in production (bank isolation violation)."
+                    )
+                seen_tokens.add(b_tok)
+
         if not self.training_job_db_url and not self.training_job_store_path:
             violations.append(
                 "training_job_db_url (or training_job_store_path) must be explicitly configured in production. In-memory fallback is strictly forbidden."
+            )
+        elif self.training_job_db_url and not (
+            self.training_job_db_url.startswith("postgresql://")
+            or self.training_job_db_url.startswith("postgres://")
+        ):
+            violations.append(
+                "training_job_db_url in production must be a PostgreSQL connection URL (e.g. postgresql://...). SQLite URLs are forbidden in production."
             )
 
         if violations:

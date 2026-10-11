@@ -14,7 +14,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "TCH"]
-ignore = ["E501", "N803", "N806", "B905", "B007", "B904", "B008", "TC001", "TC002", "TC003", "N815"]
+ignore = ["E501", "N803", "N806", "B905", "B007", "B904", "B008", "TC001", "TC002", "TC003", "N815", "SIM117"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
@@ -35,6 +35,7 @@ strict = false
 warn_return_any = false
 warn_unused_configs = false
 disallow_untyped_defs = false
+disable_error_code = ["import-untyped"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
@@ -66,8 +67,11 @@ module = [
     "prometheus_fastapi_instrumentator.*",
     "zstandard",
     "zstandard.*",
+    "pyarrow",
+    "pyarrow.*",
 ]
 ignore_missing_imports = true
+disable_error_code = ["import-untyped"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
