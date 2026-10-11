@@ -197,7 +197,7 @@ class ModelGovernanceService:
     def audit_canonical_fairness_baseline(self) -> dict[str, Any]:
         """Audits model fairness against canonical cross-bank transaction evaluation baseline."""
         try:
-            from experiments.fairness.demographic_audit import FairnessAuditor
+            from experiments.fairness.demographic_audit import FairnessAuditor  # type: ignore[import-not-found]
 
             y_true, y_pred, channel, _, _ = FairnessAuditor.generate_calibrated_proxy_population(
                 sample_size=1000, seed=42

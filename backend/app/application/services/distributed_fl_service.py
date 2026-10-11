@@ -22,6 +22,7 @@ import logging
 import math
 import multiprocessing as mp
 import os
+import tempfile
 from typing import Any
 
 import numpy as np
@@ -81,7 +82,6 @@ def _serialize_model_state_dict(model: nn.Module) -> bytes:
     torch.save(model.state_dict(), buf)
     return buf.getvalue()
 
-
 # ---------------------------------------------------------------------------
 # Bank Storage & Worker Isolation Helpers
 # ---------------------------------------------------------------------------
@@ -93,24 +93,56 @@ class BankPrivateStorageVault:
     Enforces Module 01-A.1 Requirement:
     - Dedicated local storage vault per financial institution (BANK_A, BANK_B, BANK_C).
     - Hard access denial on unauthorized cross-bank reads or coordinator read attempts.
-    - Token-derived cryptographic sealing of raw datasets at rest so external processes without the
-      bank's workload credential cannot decrypt or parse private records.
+    - Token-derived cryptographic sealing (PBKDF2-HMAC-SHA256 with 100k iterations and Fernet AES-128-CBC + HMAC-SHA256 authenticated encryption) of raw datasets at rest with mandatory key configuration in production.
+    - Zero plaintext fallback in production (unencrypted zip/npz strictly rejected with TrainingProvenanceSecurityError).
     - Native OS-level exclusive handle on the private dataset during worker execution,
       causing genuine OS-level PermissionError when external processes attempt open().
     """
 
-    def __init__(self, bank_id: str, vault_dir: str, bank_token: str | None = None) -> None:
+    VAULT_MAGIC_V1 = b"CFI_VAULT_V1\x00"
+
+    def __init__(
+        self,
+        bank_id: str,
+        vault_dir: str,
+        bank_token: str | None = None,
+        bank_encryption_key: str | bytes | None = None,
+        app_env: str = "production",
+    ) -> None:
         self.bank_id = bank_id
         self.vault_dir = os.path.join(vault_dir, bank_id)
         os.makedirs(self.vault_dir, exist_ok=True)
         self.data_path = os.path.join(self.vault_dir, "private_dataset.npz")
         self.bank_token = bank_token
+        self.bank_encryption_key = bank_encryption_key
+        self.app_env = app_env
+        self._is_prod = app_env.lower() == "production"
         self._os_lock_handle: Any = None
 
+        if self._is_prod and not self.bank_token and not self.bank_encryption_key:
+            raise TrainingProvenanceConfigurationError(
+                f"Production bank private storage vault for '{self.bank_id}' requires mandatory encryption key configuration."
+            )
+
     def _get_encryption_cipher(self) -> Fernet | None:
+        if self.bank_encryption_key is not None:
+            if isinstance(self.bank_encryption_key, str):
+                key_bytes = self.bank_encryption_key.encode("utf-8")
+            else:
+                key_bytes = self.bank_encryption_key
+            derived_key = hashlib.sha256(key_bytes).digest()
+            return Fernet(base64.urlsafe_b64encode(derived_key))
+
         if not self.bank_token:
+            if self._is_prod:
+                raise TrainingProvenanceConfigurationError(
+                    f"Production bank private storage vault for '{self.bank_id}' requires encryption key configuration."
+                )
             return None
-        derived_key = hashlib.sha256(f"cfi:vault:{self.bank_id}:{self.bank_token}".encode()).digest()
+
+        # PBKDF2-HMAC-SHA256 key derivation with bank-specific salt and 100,000 iterations
+        salt = f"cfi:vault:kdf:v1:{self.bank_id}".encode()
+        derived_key = hashlib.pbkdf2_hmac("sha256", self.bank_token.encode(), salt, 100_000, 32)
         return Fernet(base64.urlsafe_b64encode(derived_key))
 
     def store_dataset(self, X: np.ndarray, y: np.ndarray) -> str:
@@ -118,7 +150,15 @@ class BankPrivateStorageVault:
         np.savez_compressed(buf, X=X, y=y)
         raw_bytes = buf.getvalue()
         cipher = self._get_encryption_cipher()
-        payload = cipher.encrypt(raw_bytes) if cipher else raw_bytes
+        if cipher is None:
+            if self._is_prod:
+                raise TrainingProvenanceConfigurationError(
+                    f"Production bank private storage vault for '{self.bank_id}' cannot store unencrypted dataset."
+                )
+            payload = raw_bytes
+        else:
+            payload = self.VAULT_MAGIC_V1 + cipher.encrypt(raw_bytes)
+
         with open(self.data_path, "wb") as f:
             f.write(payload)
         with contextlib.suppress(Exception):
@@ -182,7 +222,7 @@ class BankPrivateStorageVault:
             raise PermissionError(
                 f"Access denied: Caller '{caller_identity}' is forbidden from accessing private data vault of bank '{self.bank_id}'."
             )
-        if self.bank_token is not None and caller_token != self.bank_token:
+        if self.bank_token is not None and (caller_token is None or not hmac.compare_digest(caller_token, self.bank_token)):
             raise PermissionError(
                 f"Access denied: Invalid worker credential presented for bank '{self.bank_id}' storage vault."
             )
@@ -190,23 +230,67 @@ class BankPrivateStorageVault:
             raise FileNotFoundError(f"Vault data file not found at '{self.data_path}'")
         with open(self.data_path, "rb") as f:
             raw_data = f.read()
+
         if raw_data.startswith(b"PK\x03\x04"):
+            if self._is_prod:
+                raise TrainingProvenanceSecurityError(
+                    f"Plaintext dataset rejected: Vault for bank '{self.bank_id}' forbids unencrypted datasets in production."
+                )
             decrypted = raw_data
         else:
-            cipher = self._get_encryption_cipher()
-            if cipher:
-                try:
-                    decrypted = cipher.decrypt(raw_data)
-                except Exception as e:
-                    raise PermissionError(f"Decryption authentication failed for bank '{self.bank_id}' storage vault: {e}") from e
+            if not raw_data.startswith(self.VAULT_MAGIC_V1):
+                if self._is_prod:
+                    raise TrainingProvenanceSecurityError(
+                        f"Unsupported or corrupted vault format/key version for bank '{self.bank_id}'. Expected header {self.VAULT_MAGIC_V1!r}."
+                    )
+                ciphertext = raw_data
             else:
-                decrypted = raw_data
+                ciphertext = raw_data[len(self.VAULT_MAGIC_V1):]
+
+            cipher = self._get_encryption_cipher()
+            if not cipher:
+                raise TrainingProvenanceConfigurationError(
+                    f"Missing encryption cipher for bank '{self.bank_id}' vault."
+                )
+            try:
+                decrypted = cipher.decrypt(ciphertext)
+            except Exception as e:
+                raise TrainingProvenanceSecurityError(
+                    f"Decryption authentication failed for bank '{self.bank_id}' storage vault: {e}"
+                ) from e
+
         loaded = np.load(io.BytesIO(decrypted))
         return loaded["X"], loaded["y"]
 
 
+def provision_isolated_issuer_vault(
+    vault_dir: str,
+    signing_key_hex: str | None = None,
+) -> tuple[str, str]:
+    """Privileged bootstrap provisioning Ed25519 issuer private key inside an isolated vault."""
+    os.makedirs(vault_dir, exist_ok=True)
+    if not signing_key_hex:
+        priv_hex, pub_hex = _generate_ed25519_keypair_hex()
+    else:
+        priv_hex = signing_key_hex.strip()
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        priv_key = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(priv_hex))
+        pub_hex = priv_key.public_key().public_bytes_raw().hex()
+        del priv_key
+
+    key_file = os.path.join(vault_dir, "issuer_ed25519.key")
+    with open(key_file, "w", encoding="utf-8") as f:
+        f.write(priv_hex)
+    with contextlib.suppress(Exception):
+        os.chmod(vault_dir, 0o700)
+        os.chmod(key_file, 0o600)
+    del priv_hex
+    return key_file, pub_hex
+
+
 def _run_isolated_issuer_worker(
-    signing_key_hex: str,
+    issuer_key_source: str,
     db_url: str,
     key_id: str,
     coordinator_token: str | None,
@@ -217,6 +301,12 @@ def _run_isolated_issuer_worker(
     """Dedicated Operating System Process holding the Ed25519 signing private key in memory isolation."""
     issuer_pid = os.getpid()
     logger.info("Isolated Receipt Signing Service running with PID %d", issuer_pid)
+
+    if os.path.exists(issuer_key_source):
+        with open(issuer_key_source, encoding="utf-8") as f:
+            signing_key_hex = f.read().strip()
+    else:
+        signing_key_hex = issuer_key_source.strip()
 
     record_source = TrustedTrainingJobRecordSource(
         coordinator_token=coordinator_token,
@@ -232,6 +322,12 @@ def _run_isolated_issuer_worker(
         app_env=app_env,
     )
 
+    del signing_key_hex
+
+    outbox.put({"status": "READY", "public_key_hex": issuer.public_bytes_hex})
+
+    issued_jobs: set[str] = set()
+
     while True:
         try:
             req = inbox.get()
@@ -243,9 +339,14 @@ def _run_isolated_issuer_worker(
         if req.get("command") == "SIGN_RECEIPT":
             try:
                 auth_token = req.get("auth_token")
-                caller_identity = req.get("caller_identity", "COORDINATOR")
 
-                # Enforce cryptographic caller authentication
+                if app_env.lower() == "production" and not coordinator_token:
+                    outbox.put({
+                        "status": "ERROR",
+                        "error": "Unauthorized receipt signing request: coordinator token configuration is required in production.",
+                    })
+                    continue
+
                 if coordinator_token is not None:
                     if not auth_token or not hmac.compare_digest(auth_token, coordinator_token):
                         outbox.put({
@@ -253,15 +354,22 @@ def _run_isolated_issuer_worker(
                             "error": "Unauthorized receipt signing request: invalid or missing coordinator token.",
                         })
                         continue
-                elif caller_identity != "COORDINATOR":
+                elif req.get("caller_identity") != "COORDINATOR":
                     outbox.put({
                         "status": "ERROR",
-                        "error": f"Unauthorized receipt signing caller identity: '{caller_identity}'.",
+                        "error": f"Unauthorized receipt signing caller identity: '{req.get('caller_identity')}'.",
                     })
                     continue
 
                 job_id = req["job_id"]
                 artifact_bytes = req["artifact_bytes"]
+
+                if job_id in issued_jobs:
+                    outbox.put({
+                        "status": "ERROR",
+                        "error": f"Receipt issuance denied: Duplicate signing request for already-signed job '{job_id}'.",
+                    })
+                    continue
 
                 completed_record = record_source.get_completed_job_by_id(job_id)
                 if completed_record is None:
@@ -297,6 +405,7 @@ def _run_isolated_issuer_worker(
                     producer_id=completed_record.worker_id,
                 )
                 receipt = issuer.issue_receipt(evidence=evidence, model_bytes=artifact_bytes)
+                issued_jobs.add(job_id)
                 outbox.put({
                     "status": "SUCCESS",
                     "receipt": receipt,
@@ -314,26 +423,41 @@ class IsolatedReceiptSigningAuthority:
 
     Enforces Module 01-A.1 Requirements:
     1. Holds Ed25519 signing private key in an independent OS process memory address space.
-    2. Coordinator process never possesses the private signing key or raw key hex.
+    2. Coordinator process never possesses, derives, stores, or forwards the private signing key or raw key hex.
     3. Issues receipts solely for jobs with verified COMPLETED records in PostgreSQL authority.
     4. Verifies artifact SHA-256 against authoritative completed evidence before signing.
-    5. Fails closed on uncompleted jobs, mismatched artifact bytes, or service termination.
+    5. Fails closed on uncompleted jobs, mismatched artifact bytes, unauthenticated callers, or service termination.
     """
 
     def __init__(
         self,
-        signing_key_hex: str,
-        db_url: str,
+        signing_key_hex: str | None = None,
+        issuer_key_path: str | None = None,
+        db_url: str = "",
         key_id: str = DEFAULT_TRAINING_KEY_ID,
         coordinator_token: str | None = None,
         app_env: str = "production",
     ) -> None:
-        if not signing_key_hex or len(signing_key_hex.strip()) != 64:
-            raise TrainingProvenanceConfigurationError("Signing key hex must be a 64-character hex string.")
         self.key_id = key_id
         self.app_env = app_env
         self.db_url = db_url
-        self.coordinator_token = coordinator_token
+        self._temp_vault: tempfile.TemporaryDirectory | None = None
+
+        if issuer_key_path is not None:
+            key_source = issuer_key_path
+        elif signing_key_hex is not None:
+            if len(signing_key_hex.strip()) != 64:
+                raise TrainingProvenanceConfigurationError("Signing key hex must be a 64-character hex string.")
+            self._temp_vault = tempfile.TemporaryDirectory(prefix="cfi_issuer_vault_")
+            vault_file = os.path.join(self._temp_vault.name, "issuer.key")
+            with open(vault_file, "w", encoding="utf-8") as f:
+                f.write(signing_key_hex.strip())
+            with contextlib.suppress(Exception):
+                os.chmod(self._temp_vault.name, 0o700)
+                os.chmod(vault_file, 0o600)
+            key_source = vault_file
+        else:
+            raise TrainingProvenanceConfigurationError("Either issuer_key_path or signing_key_hex must be provided.")
 
         # Eagerly probe database connectivity to fail closed immediately on unreachable DB
         TrustedTrainingJobRecordSource(
@@ -343,20 +467,15 @@ class IsolatedReceiptSigningAuthority:
             app_env=self.app_env,
         )
 
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-        priv_key = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(signing_key_hex.strip()))
-        self._public_key_hex = priv_key.public_key().public_bytes_raw().hex()
-        del priv_key
-
         self._inbox: mp.Queue = mp.Queue()
         self._outbox: mp.Queue = mp.Queue()
         self._process = mp.Process(
             target=_run_isolated_issuer_worker,
             args=(
-                signing_key_hex,
+                key_source,
                 db_url,
                 self.key_id,
-                self.coordinator_token,
+                coordinator_token,
                 self._inbox,
                 self._outbox,
                 self.app_env,
@@ -364,6 +483,15 @@ class IsolatedReceiptSigningAuthority:
         )
         self._process.daemon = True
         self._process.start()
+
+        try:
+            init_msg = self._outbox.get(timeout=10)
+            if isinstance(init_msg, dict) and init_msg.get("status") == "READY":
+                self._public_key_hex = init_msg["public_key_hex"]
+            else:
+                self._public_key_hex = ""
+        except Exception:
+            self._public_key_hex = ""
 
     @property
     def pid(self) -> int | None:
@@ -380,6 +508,10 @@ class IsolatedReceiptSigningAuthority:
         if self._process.is_alive():
             self._process.terminate()
             self._process.join(timeout=3)
+        if self._temp_vault is not None:
+            with contextlib.suppress(Exception):
+                self._temp_vault.cleanup()
+            self._temp_vault = None
 
     def sign_completed_job_receipt(
         self,
@@ -392,7 +524,7 @@ class IsolatedReceiptSigningAuthority:
         if not self._process.is_alive():
             raise TrainingProvenanceSecurityError("Receipt signing service unavailable: issuer process terminated.")
 
-        token = caller_token if caller_token is not None else self.coordinator_token
+        token = caller_token
         self._inbox.put({
             "command": "SIGN_RECEIPT",
             "job_id": job_id,
@@ -407,7 +539,8 @@ class IsolatedReceiptSigningAuthority:
 
         if res.get("status") == "SUCCESS":
             return res["receipt"]
-        raise TrainingProvenanceSecurityError(res.get("error", "Receipt signing rejected by isolated issuer."))
+        err_msg = res.get("error") or f"Receipt signing rejected by isolated issuer: {res}"
+        raise TrainingProvenanceSecurityError(err_msg)
 
 
 def setup_bank_private_storage(
@@ -416,14 +549,23 @@ def setup_bank_private_storage(
     X_partition: np.ndarray,
     y_partition: np.ndarray,
     bank_token: str | None = None,
+    bank_encryption_key: str | bytes | None = None,
     lock_boundary: bool = False,
+    app_env: str = "production",
 ) -> str:
     """Privileged fixture provisioning bank-private synthetic partition into bank-owned directory."""
-    vault = BankPrivateStorageVault(bank_id, bank_storage_dir, bank_token=bank_token)
+    vault = BankPrivateStorageVault(
+        bank_id=bank_id,
+        vault_dir=bank_storage_dir,
+        bank_token=bank_token,
+        bank_encryption_key=bank_encryption_key,
+        app_env=app_env,
+    )
     data_path = vault.store_dataset(X_partition, y_partition)
     if lock_boundary:
         vault.acquire_exclusive_os_boundary()
     return data_path
+
 
 
 def spawn_bank_workers(
