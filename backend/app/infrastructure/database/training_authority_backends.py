@@ -70,6 +70,21 @@ def redact_database_url(url: str) -> str:
         return re.sub(r":([^@/:]+)@", ":***@", url)
 
 
+def sanitize_database_error_message(msg: str) -> str:
+    """Scrub database URLs, passwords, and sensitive connection credentials from error messages and logs."""
+    if not msg:
+        return ""
+    import re
+
+    # Scrub standard URI pattern: postgresql://user:password@host
+    scrubbed = re.sub(r"://([^:@/\s]+):([^@/\s]+)@", r"://\1:***@", msg)
+    # Scrub password=xyz, password='xyz', password="xyz" parameters
+    scrubbed = re.sub(r"""(password|pwd)\s*=\s*(?:'[^']*'|"[^"]*"|[^\s;,]+)""", r"\1=***", scrubbed, flags=re.IGNORECASE)
+    # Scrub standalone password credentials in connection strings
+    scrubbed = re.sub(r":([^@/:\s]{3,})@", r":***@", scrubbed)
+    return scrubbed
+
+
 # ---------------------------------------------------------------------------
 # Evidence & Observation Dataclasses
 # ---------------------------------------------------------------------------
@@ -495,7 +510,7 @@ def reconcile_job_completion_evidence(
     obs_rows: list[RoundObservation],
     agg_rows: list[GlobalAggregationEvent],
     eval_rows: list[ModelEvaluationEvent],
-    enforce_lifecycle: bool,
+    enforce_lifecycle: bool = True,
 ) -> None:
     """Enforces strict, unambiguous reconciliation across rounds, samples, epochs, metrics, and aggregation provenance."""
     sched_expected_rounds = sched_row["expected_rounds"]
@@ -529,72 +544,99 @@ def reconcile_job_completion_evidence(
                 f"Job '{clean_job_id}' completed fewer rounds than scheduled contract: expected {sched_expected_rounds}, got {executed_rounds}."
             )
 
-        # 2. Strict, Unambiguous Accounting Contract
+        # 2. Strict, Unambiguous Sample Accounting Contract
         latest_round = max(observed_round_nums)
         accepted_global_round_count = len(observed_round_nums)
         accepted_bank_contribution_count = len(completed_obs)
-        observed_local_epoch_count = sum(r.actual_executed_epochs for r in completed_obs)
         processed_sample_exposures = sum(r.actual_sample_count * max(1, r.actual_executed_epochs) for r in completed_obs)
-        reported_unique_dataset_samples = sum(
-            {r.bank_id: r.actual_sample_count for r in completed_obs if r.round_number == latest_round}.values()
-        )
+
+        # Dataset sample consistency across rounds (AC-07)
+        bank_sample_counts: dict[str, int] = {}
+        for obs in completed_obs:
+            if obs.bank_id in bank_sample_counts:
+                if obs.actual_sample_count != bank_sample_counts[obs.bank_id]:
+                    raise TrainingProvenanceSecurityError(
+                        f"Inconsistent sample count observed for bank '{obs.bank_id}' across rounds for job '{clean_job_id}': "
+                        f"round {obs.round_number} reported {obs.actual_sample_count}, but earlier round reported {bank_sample_counts[obs.bank_id]}."
+                    )
+            else:
+                bank_sample_counts[obs.bank_id] = obs.actual_sample_count
+
+        canonical_unique_samples = sum(bank_sample_counts.values())
 
         logger.debug(
-            "Reconciliation accounting for %s: rounds=%d, contributions=%d, local_epochs=%d, exposures=%d, unique_samples=%d",
+            "Reconciliation accounting for %s: rounds=%d, contributions=%d, exposures=%d, canonical_unique_samples=%d",
             clean_job_id,
             accepted_global_round_count,
             accepted_bank_contribution_count,
-            observed_local_epoch_count,
             processed_sample_exposures,
-            reported_unique_dataset_samples,
+            canonical_unique_samples,
         )
 
         # Canonical receipt contract: sample_count MUST represent the unique dataset samples across participating banks.
-        # Repeated sample exposures cannot be substituted for unique dataset samples.
-        if sample_count != reported_unique_dataset_samples:
+        # Repeated sample exposures cannot be substituted for unique dataset samples (AC-06).
+        if sample_count != canonical_unique_samples:
+            if sample_count == processed_sample_exposures and processed_sample_exposures != canonical_unique_samples:
+                raise TrainingProvenanceSecurityError(
+                    f"Sample count mismatch for job '{clean_job_id}': claimed sample exposures ({sample_count}) "
+                    f"instead of canonical unique dataset samples ({canonical_unique_samples}). "
+                    f"Repeated sample exposures cannot substitute for unique dataset samples."
+                )
             raise TrainingProvenanceSecurityError(
-                f"Sample count mismatch for job '{clean_job_id}': claimed {sample_count}, but canonical unique dataset samples across participating banks is {reported_unique_dataset_samples} (processed_sample_exposures={processed_sample_exposures}). Repeated sample exposures cannot substitute for unique dataset samples."
+                f"Sample count mismatch for job '{clean_job_id}': claimed {sample_count}, "
+                f"but canonical unique dataset samples across participating banks is {canonical_unique_samples} "
+                f"(processed_sample_exposures={processed_sample_exposures})."
             )
 
-        # 3. Executed epochs reconciliation
-        # Executed epochs must be derived directly from actual accepted execution events.
-        # Planned configuration epochs cannot substitute for unexecuted epochs.
-        if executed_epochs > 0:
-            observed_epochs_sum = sum(r.actual_executed_epochs for r in completed_obs if r.round_number == latest_round)
-            total_epochs_sum = sum(r.actual_executed_epochs for r in completed_obs)
-            sequential_global_epochs = sum(
-                max(r.actual_executed_epochs for r in completed_obs if r.round_number == rnd)
-                for rnd in observed_round_nums
-            )
-            per_round_epochs = max(r.actual_executed_epochs for r in completed_obs if r.round_number == latest_round)
-            valid_observed_epochs = {sequential_global_epochs, total_epochs_sum, per_round_epochs, observed_epochs_sum}
-            if not any(v > 0 for v in valid_observed_epochs):
+        # 3. Canonical Executed Epochs Reconciliation (AC-01 through AC-05)
+        canonical_executed_epochs = sum(
+            max(r.actual_executed_epochs for r in completed_obs if r.round_number == rnd)
+            for rnd in observed_round_nums
+        )
+        total_worker_epochs = sum(r.actual_executed_epochs for r in completed_obs)
+        last_round_epochs = max(r.actual_executed_epochs for r in completed_obs if r.round_number == latest_round)
+
+        if executed_epochs != canonical_executed_epochs:
+            if executed_epochs == 0 and canonical_executed_epochs > 0:
+                raise TrainingProvenanceSecurityError(
+                    f"Executed epochs mismatch for job '{clean_job_id}': claimed 0 executed epochs despite {canonical_executed_epochs} observed executed epochs."
+                )
+            if canonical_executed_epochs == 0 and executed_epochs > 0:
                 raise TrainingProvenanceSecurityError(
                     f"Executed epochs mismatch for job '{clean_job_id}': claimed {executed_epochs}, but zero executed epochs were observed."
                 )
-            if executed_epochs not in valid_observed_epochs:
+            if executed_epochs == total_worker_epochs and total_worker_epochs != canonical_executed_epochs:
                 raise TrainingProvenanceSecurityError(
-                    f"Executed epochs mismatch for job '{clean_job_id}': claimed {executed_epochs}, but reconciled observed epochs are {sorted(valid_observed_epochs)}. Planned configuration epochs cannot substitute for observed epochs."
+                    f"Executed epochs mismatch for job '{clean_job_id}': claimed total worker-epochs ({executed_epochs}) "
+                    f"instead of canonical sequential global epochs ({canonical_executed_epochs}). "
+                    f"Sum of worker epochs cannot substitute for canonical sequential epochs."
                 )
+            if executed_epochs == last_round_epochs and last_round_epochs != canonical_executed_epochs:
+                raise TrainingProvenanceSecurityError(
+                    f"Executed epochs mismatch for job '{clean_job_id}': claimed last-round epochs ({executed_epochs}) "
+                    f"instead of full-run canonical sequential epochs ({canonical_executed_epochs})."
+                )
+            raise TrainingProvenanceSecurityError(
+                f"Executed epochs mismatch for job '{clean_job_id}': claimed {executed_epochs}, "
+                f"but canonical observed executed epochs is {canonical_executed_epochs}. Planned configuration epochs cannot substitute for observed epochs."
+            )
 
         # 4. Global aggregation provenance chain reconciliation
-        # For a federated job requiring aggregation (executed_rounds > 0 or enforce_lifecycle or agg_rows),
-        # missing aggregation evidence must be rejected, not silently skipped.
-        if executed_rounds > 0 or enforce_lifecycle or agg_rows:
-            if not agg_rows:
-                raise TrainingProvenanceSecurityError(
-                    f"Cannot complete federated training job '{clean_job_id}': missing global aggregation records. All federated rounds require authoritative aggregation evidence."
-                )
-            agg_round_nums = sorted({a.round_number for a in agg_rows})
-            if len(agg_round_nums) != executed_rounds or agg_round_nums != expected_seq:
-                raise TrainingProvenanceSecurityError(
-                    f"Global aggregation round continuity mismatch for job '{clean_job_id}': expected rounds {expected_seq}, but got aggregated rounds {agg_round_nums}."
-                )
-            latest_agg = max(agg_rows, key=lambda a: a.round_number)
-            if latest_agg.aggregated_global_model_digest != clean_sha:
-                raise TrainingProvenanceSecurityError(
-                    f"Artifact SHA-256 does not match final accepted aggregation digest for job '{clean_job_id}': expected {latest_agg.aggregated_global_model_digest}, got {clean_sha}."
-                )
+        if not agg_rows:
+            raise TrainingProvenanceSecurityError(
+                f"Cannot complete federated training job '{clean_job_id}': missing global aggregation records. "
+                "All federated rounds require authoritative aggregation evidence."
+            )
+        agg_round_nums = sorted({a.round_number for a in agg_rows})
+        if len(agg_round_nums) != executed_rounds or agg_round_nums != expected_seq:
+            raise TrainingProvenanceSecurityError(
+                f"Global aggregation round continuity mismatch for job '{clean_job_id}': expected rounds {expected_seq}, but got aggregated rounds {agg_round_nums}."
+            )
+        latest_agg = max(agg_rows, key=lambda a: a.round_number)
+        if latest_agg.aggregated_global_model_digest != clean_sha:
+            raise TrainingProvenanceSecurityError(
+                f"Artifact SHA-256 does not match final accepted aggregation digest for job '{clean_job_id}': expected {latest_agg.aggregated_global_model_digest}, got {clean_sha}."
+            )
 
         # 5. Training Loss Verification
         if "loss" in target_metrics:
@@ -623,7 +665,7 @@ def reconcile_job_completion_evidence(
             if k not in ("loss", "train_loss", "training_loss")
         }
         if eval_metrics:
-            if not eval_rows and enforce_lifecycle:
+            if not eval_rows:
                 raise TrainingProvenanceSecurityError(
                     f"Evaluation metrics {list(eval_metrics.keys())} claimed for job '{clean_job_id}' without verified model evaluation observations."
                 )
@@ -632,16 +674,15 @@ def reconcile_job_completion_evidence(
                     e for e in eval_rows
                     if e.metric_name == m_name and e.evaluated_artifact_digest == clean_sha
                 ]
-                if not matching_evals and enforce_lifecycle:
+                if not matching_evals:
                     raise TrainingProvenanceSecurityError(
                         f"Evaluation metric '{m_name}' claimed for job '{clean_job_id}' has no matching trusted evaluation event bound to artifact {clean_sha}."
                     )
-                if matching_evals:
-                    trusted_val = matching_evals[-1].metric_value
-                    if not math.isclose(float(m_val), float(trusted_val), rel_tol=1e-3, abs_tol=1e-3):
-                        raise TrainingProvenanceSecurityError(
-                            f"Evaluation metric '{m_name}' value mismatch for job '{clean_job_id}': claimed {m_val}, but trusted evaluation recorded {trusted_val}."
-                        )
+                trusted_val = matching_evals[-1].metric_value
+                if not math.isclose(float(m_val), float(trusted_val), rel_tol=1e-3, abs_tol=1e-3):
+                    raise TrainingProvenanceSecurityError(
+                        f"Evaluation metric '{m_name}' value mismatch for job '{clean_job_id}': claimed {m_val}, but trusted evaluation recorded {trusted_val}."
+                    )
 
 
 # ---------------------------------------------------------------------------
@@ -685,10 +726,11 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                     cur.execute("SELECT 1")
         except Exception as e:
             redacted_url = redact_database_url(self._db_url)
-            logger.error("PostgreSQL connection test failed on URL %s: %s", redacted_url, e)
+            sanitized_err = sanitize_database_error_message(str(e))
+            logger.error("PostgreSQL connection test failed on URL %s: %s", redacted_url, sanitized_err)
             raise TrainingProvenanceConfigurationError(
-                f"Failed to connect to PostgreSQL authority at '{redacted_url}': {e}"
-            ) from e
+                f"Failed to connect to PostgreSQL authority at '{redacted_url}': {sanitized_err}"
+            ) from None
 
     @contextlib.contextmanager
     def _connect(self) -> Generator[Any, None, None]:
@@ -702,7 +744,8 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             raise
         except Exception as e:
             redacted_url = redact_database_url(self._db_url)
-            raise sqlite3.DatabaseError(f"PostgreSQL connection failure to {redacted_url}: {e}") from e
+            sanitized_err = sanitize_database_error_message(str(e))
+            raise TrainingProvenanceConfigurationError(f"PostgreSQL connection failure to {redacted_url}: {sanitized_err}") from None
 
         try:
             yield conn
@@ -1333,66 +1376,16 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                     cur.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = %s FOR UPDATE", (clean_job_id,))
                     sched_row = cur.fetchone()
 
-                    if enforce_lifecycle:
-                        if not sched_row:
-                            raise TrainingProvenanceSecurityError(
-                                f"Cannot record completion for job '{clean_job_id}': job has not been scheduled through authorized training coordinator."
-                            )
-                        cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s FOR UPDATE", (clean_job_id,))
-                        started_row = cur.fetchone()
-                        if not started_row:
-                            raise TrainingProvenanceSecurityError(
-                                f"Cannot record completion for job '{clean_job_id}': job has not been started by an authorized worker."
-                            )
-                    else:
-                        if not sched_row:
-                            s_sim = simulation_id.strip() if simulation_id else "sim_default"
-                            s_run = training_run_id.strip() if training_run_id else f"run_{clean_job_id}"
-                            s_arch = architecture or "FraudDetectionNN"
-                            s_ver = feature_schema_version or "v1.0"
-                            s_fnames = tuple(feature_names) if feature_names else ()
-                            s_dim = input_dim or len(s_fnames) or 10
-                            cfg_fp = compute_config_fingerprint(
-                                clean_job_id, s_run, s_sim, s_arch, s_ver, executed_rounds, executed_epochs, s_dim, s_fnames
-                            )
-                            cur.execute(
-                                """
-                                INSERT INTO cfi_scheduled_jobs (
-                                    job_id, training_run_id, simulation_id, coordinator_id,
-                                    architecture, feature_schema_version, expected_rounds, expected_epochs,
-                                    input_dim, feature_names_json, permitted_workers_json, config_fingerprint,
-                                    scheduled_at, status
-                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                """,
-                                (
-                                    clean_job_id, s_run, s_sim, "COORDINATOR", s_arch, s_ver,
-                                    executed_rounds, executed_epochs, s_dim, json.dumps(list(s_fnames)),
-                                    "[]", cfg_fp, now_str, "SCHEDULED"
-                                ),
-                            )
-                            cur.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = %s", (clean_job_id,))
-                            sched_row = cur.fetchone()
-
-                        assert sched_row is not None
-                        cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
-                        started_row = cur.fetchone()
-                        if not started_row:
-                            cur.execute(
-                                """
-                                INSERT INTO cfi_started_jobs (
-                                    job_id, training_run_id, simulation_id, worker_id, started_at, status
-                                ) VALUES (%s, %s, %s, %s, %s, %s)
-                                """,
-                                (
-                                    clean_job_id, sched_row["training_run_id"], sched_row["simulation_id"],
-                                    worker_id, now_str, "STARTED"
-                                ),
-                            )
-                            cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
-                            started_row = cur.fetchone()
-
-                    assert sched_row is not None
-                    assert started_row is not None
+                    if not sched_row:
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot record completion for job '{clean_job_id}': job has not been scheduled through authorized training coordinator."
+                        )
+                    cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s FOR UPDATE", (clean_job_id,))
+                    started_row = cur.fetchone()
+                    if not started_row:
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot record completion for job '{clean_job_id}': job has not been started by an authorized worker."
+                        )
 
                     sched_run_id = sched_row["training_run_id"]
                     sched_sim_id = sched_row["simulation_id"]
@@ -2450,65 +2443,16 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                     cur = conn.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = ?", (clean_job_id,))
                     sched_row = cur.fetchone()
 
-                    if enforce_lifecycle:
-                        if not sched_row:
-                            raise TrainingProvenanceSecurityError(
-                                f"Cannot record completion for job '{clean_job_id}': job has not been scheduled through authorized training coordinator."
-                            )
-                        cur = conn.execute("SELECT * FROM cfi_started_jobs WHERE job_id = ?", (clean_job_id,))
-                        started_row = cur.fetchone()
-                        if not started_row:
-                            raise TrainingProvenanceSecurityError(
-                                f"Cannot record completion for job '{clean_job_id}': job has not been started by an authorized worker."
-                            )
-                    else:
-                        if not sched_row:
-                            s_sim = simulation_id.strip() if simulation_id else "sim_default"
-                            s_run = training_run_id.strip() if training_run_id else f"run_{clean_job_id}"
-                            s_arch = architecture or "FraudDetectionNN"
-                            s_ver = feature_schema_version or "v1.0"
-                            s_fnames = tuple(feature_names) if feature_names else ()
-                            s_dim = input_dim or len(s_fnames) or 10
-                            cfg_fp = compute_config_fingerprint(
-                                clean_job_id, s_run, s_sim, s_arch, s_ver, executed_rounds, executed_epochs, s_dim, s_fnames
-                            )
-                            conn.execute(
-                                """
-                                INSERT INTO cfi_scheduled_jobs (
-                                    job_id, training_run_id, simulation_id, coordinator_id,
-                                    architecture, feature_schema_version, expected_rounds, expected_epochs,
-                                    input_dim, feature_names_json, permitted_workers_json, config_fingerprint,
-                                    scheduled_at, status
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                """,
-                                (
-                                    clean_job_id, s_run, s_sim, "COORDINATOR", s_arch, s_ver,
-                                    executed_rounds, executed_epochs, s_dim, json.dumps(list(s_fnames)),
-                                    "[]", cfg_fp, now_str, "SCHEDULED"
-                                ),
-                            )
-                            cur = conn.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = ?", (clean_job_id,))
-                            sched_row = cur.fetchone()
-
-                        cur = conn.execute("SELECT * FROM cfi_started_jobs WHERE job_id = ?", (clean_job_id,))
-                        started_row = cur.fetchone()
-                        if not started_row:
-                            conn.execute(
-                                """
-                                INSERT INTO cfi_started_jobs (
-                                    job_id, training_run_id, simulation_id, worker_id, started_at, status
-                                ) VALUES (?, ?, ?, ?, ?, ?)
-                                """,
-                                (
-                                    clean_job_id, sched_row["training_run_id"], sched_row["simulation_id"],
-                                    worker_id, now_str, "STARTED"
-                                ),
-                            )
-                            cur = conn.execute("SELECT * FROM cfi_started_jobs WHERE job_id = ?", (clean_job_id,))
-                            started_row = cur.fetchone()
-
-                    assert sched_row is not None
-                    assert started_row is not None
+                    if not sched_row:
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot record completion for job '{clean_job_id}': job has not been scheduled through authorized training coordinator."
+                        )
+                    cur = conn.execute("SELECT * FROM cfi_started_jobs WHERE job_id = ?", (clean_job_id,))
+                    started_row = cur.fetchone()
+                    if not started_row:
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot record completion for job '{clean_job_id}': job has not been started by an authorized worker."
+                        )
 
                     sched_run_id = sched_row["training_run_id"]
                     sched_sim_id = sched_row["simulation_id"]

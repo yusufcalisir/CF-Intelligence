@@ -169,10 +169,31 @@ FORBIDDEN_COORDINATOR_TOKENS = frozenset(
 class TrainingJobAuthorityDatabase:
     """ACID transactional database authority dispatching to PostgreSQL or SQLite backend."""
 
-    def __init__(self, db_target: str, in_memory: bool = False) -> None:
-        self._db_target = db_target
+    def __init__(
+        self,
+        db_target: str | None = None,
+        in_memory: bool = False,
+        app_env: str | None = None,
+        db_url: str | None = None,
+        is_prod: bool | None = None,
+    ) -> None:
+        effective_target = db_target if db_target is not None else (db_url or "")
+        self._db_target = effective_target
         self._in_memory = in_memory
-        clean = (db_target or "").strip()
+        clean = (effective_target or "").strip()
+
+        if is_prod is not None:
+            is_production = is_prod
+        else:
+            active_env = (app_env or get_settings().app_env).lower()
+            is_production = active_env == "production"
+
+        if is_production:
+            if in_memory or not (clean.startswith("postgresql://") or clean.startswith("postgres://")):
+                raise TrainingProvenanceConfigurationError(
+                    "Production training job authority database must be a PostgreSQL connection URL (e.g. postgresql://...). "
+                    "Plain filesystem paths, SQLite URLs, and in-memory storage are strictly forbidden in production."
+                )
 
         if in_memory or clean in (":memory:", ""):
             self._backend: TrainingJobAuthorityBackend = SQLiteTrainingJobAuthority(
@@ -400,14 +421,13 @@ class TrustedTrainingJobRecordSource:
                 or getattr(settings, "training_job_store_path", None)
             )
             if configured:
-                if is_prod and "://" in configured and not (
-                    configured.startswith("postgresql://") or configured.startswith("postgres://")
-                ):
+                clean_target = configured.strip()
+                if is_prod and not (clean_target.startswith("postgresql://") or clean_target.startswith("postgres://")):
                     raise TrainingProvenanceConfigurationError(
                         "Production training job authority database must be a PostgreSQL connection URL (e.g. postgresql://...). "
-                        "SQLite URLs and in-memory storage are strictly forbidden in production."
+                        "Plain filesystem paths, SQLite URLs, and in-memory storage are strictly forbidden in production."
                     )
-                self._store_file_path = configured
+                self._store_file_path = clean_target
                 self._in_memory = False
             elif is_prod:
                 raise TrainingProvenanceConfigurationError(
@@ -421,6 +441,7 @@ class TrustedTrainingJobRecordSource:
         self._db = TrainingJobAuthorityDatabase(
             db_target=self._store_file_path,
             in_memory=self._in_memory,
+            app_env=active_env,
         )
 
     @property
@@ -432,6 +453,12 @@ class TrustedTrainingJobRecordSource:
     def backend_type(self) -> str:
         """Report whether the underlying authority backend is 'postgres' or 'sqlite'."""
         return self._db.backend_type
+
+    @property
+    def _is_prod(self) -> bool:
+        """Whether this record source is running in production mode."""
+        active_env = self._app_env or get_settings().app_env
+        return active_env.lower() == "production"
 
     def _resolve_expected_worker_token(self) -> str:
         settings = get_settings()
@@ -722,6 +749,13 @@ class TrustedTrainingJobRecordSource:
         if loss_val is None:
             loss_val = 0.0
 
+        if model_update_digest is not None and not model_update_digest.strip():
+            raise TrainingProvenanceSecurityError("model_update_digest cannot be empty.")
+
+        digest_val = model_update_digest
+        if not digest_val and self._is_prod:
+            raise TrainingProvenanceSecurityError("model_update_digest is mandatory for recorded round observation.")
+
         eid = event_id or f"evt_{clean_job_id}_r{r_num}_{auth_bank}_{attempt_number}_{uuid.uuid4().hex[:8]}"
 
         obs = RoundObservation(
@@ -738,7 +772,7 @@ class TrustedTrainingJobRecordSource:
             observed_loss=loss_val,
             metrics=target_metrics,
             execution_timestamp=datetime.now(UTC).isoformat(),
-            model_update_digest=model_update_digest,
+            model_update_digest=digest_val,
             execution_status=execution_status,
         )
         return self._db.record_observation(obs)
@@ -788,22 +822,42 @@ class TrustedTrainingJobRecordSource:
                         f"Participant '{p_id}' is not in permitted workers for job '{clean_job_id}': permitted={sched.permitted_workers}."
                     )
 
-        min_quorum = 1
+        # Quorum policy: coordinator cannot downgrade quorum below scheduled contract
+        scheduled_min_quorum = len(sched.permitted_workers) if sched and sched.permitted_workers else 1
+        min_quorum = scheduled_min_quorum
         if aggregation_configuration:
-            if "min_quorum" in aggregation_configuration:
-                min_quorum = int(aggregation_configuration["min_quorum"])
-            elif "min_participants" in aggregation_configuration:
-                min_quorum = int(aggregation_configuration["min_participants"])
-            elif "quorum" in aggregation_configuration:
-                min_quorum = int(aggregation_configuration["quorum"])
+            for q_key in ("min_quorum", "min_participants", "quorum"):
+                if q_key in aggregation_configuration:
+                    req_quorum = int(aggregation_configuration[q_key])
+                    if req_quorum < scheduled_min_quorum:
+                        raise TrainingProvenanceSecurityError(
+                            f"Coordinator cannot lower quorum below scheduled contract ({req_quorum} < {scheduled_min_quorum}) for job '{clean_job_id}'."
+                        )
+                    min_quorum = max(req_quorum, scheduled_min_quorum)
+                    break
 
         if len(accepted_participant_ids) < min_quorum:
             raise TrainingProvenanceSecurityError(
                 f"Quorum failure for job '{clean_job_id}' round {round_number}: requires at least {min_quorum} participants, but only {len(accepted_participant_ids)} accepted ({accepted_participant_ids})."
             )
 
+        if sched and sched.permitted_workers and min_quorum >= len(sched.permitted_workers):
+            missing_req = set(sched.permitted_workers) - set(accepted_participant_ids)
+            if missing_req:
+                raise TrainingProvenanceSecurityError(
+                    f"Required participant(s) {sorted(missing_req)} omitted from aggregation for job '{clean_job_id}' round {round_number}."
+                )
+
         obs_list = self._db.get_observations(clean_job_id)
         existing_aggs = self._db.get_global_aggregations(clean_job_id)
+
+        # Previous round aggregation continuity
+        if round_number > 1:
+            earlier_rounds = {agg.round_number for agg in existing_aggs}
+            if (round_number - 1) not in earlier_rounds:
+                raise TrainingProvenanceSecurityError(
+                    f"Aggregation round continuity violation for job '{clean_job_id}': round {round_number} cannot be recorded without round {round_number - 1} aggregation."
+                )
 
         earlier_digests: set[str] = set()
         for agg in existing_aggs:
@@ -819,15 +873,29 @@ class TrustedTrainingJobRecordSource:
         round_obs = [o for o in obs_list if o.round_number == round_number and o.execution_status == "COMPLETED"]
         obs_by_bank = {o.bank_id: o for o in round_obs}
 
-        for p_id, p_digest in zip(accepted_participant_ids, accepted_local_update_digests, strict=False):
+        for p_id, p_digest in zip(accepted_participant_ids, accepted_local_update_digests, strict=True):
             if p_id not in obs_by_bank:
                 raise TrainingProvenanceSecurityError(
                     f"Accepted participant '{p_id}' has no verified completed round observation in round {round_number}."
                 )
-            actual_digest = obs_by_bank[p_id].model_update_digest
-            if actual_digest and actual_digest != p_digest:
+            obs = obs_by_bank[p_id]
+            if obs.job_id != clean_job_id:
                 raise TrainingProvenanceSecurityError(
-                    f"Accepted local update digest for participant '{p_id}' ({p_digest}) does not match observed digest ({actual_digest})."
+                    f"Observation for participant '{p_id}' belongs to job '{obs.job_id}', not '{clean_job_id}'."
+                )
+            actual_digest = (obs.model_update_digest or "").strip()
+            p_digest_clean = (p_digest or "").strip()
+            if self._is_prod and not actual_digest:
+                raise TrainingProvenanceSecurityError(
+                    f"Participant '{p_id}' observation in round {round_number} contains missing or empty model update digest."
+                )
+            if not p_digest_clean:
+                raise TrainingProvenanceSecurityError(
+                    f"Accepted local update digest for participant '{p_id}' is missing or empty."
+                )
+            if actual_digest and p_digest_clean and not hmac.compare_digest(actual_digest, p_digest_clean):
+                raise TrainingProvenanceSecurityError(
+                    f"Accepted local update digest for participant '{p_id}' ({p_digest_clean}) does not match observed digest ({actual_digest})."
                 )
 
         eid = event_id or f"agg_{clean_job_id}_r{round_number}_{uuid.uuid4().hex[:8]}"
@@ -914,10 +982,18 @@ class TrustedTrainingJobRecordSource:
 
         active_env = self._app_env or get_settings().app_env
         is_prod = active_env.lower() == "production"
+        if is_prod and enforce_lifecycle is False:
+            raise TrainingProvenanceSecurityError(
+                "Production lifecycle enforcement cannot be disabled (enforce_lifecycle=False is forbidden in production)."
+            )
+        if is_prod and self._enforce_lifecycle is False:
+            raise TrainingProvenanceSecurityError(
+                "Production lifecycle enforcement cannot be disabled."
+            )
         enforce = (
-            enforce_lifecycle
-            if enforce_lifecycle is not None
-            else (self._enforce_lifecycle if self._enforce_lifecycle is not None else is_prod)
+            True
+            if is_prod
+            else (enforce_lifecycle if enforce_lifecycle is not None else (self._enforce_lifecycle if self._enforce_lifecycle is not None else is_prod))
         )
 
         return self._db.complete_job(
@@ -1541,6 +1617,7 @@ class TrainingReceiptIssuer:
         trust_store: DurableTrustStore | None = None,
         signing_key_hex: str | None = None,
         enforce_job_records: bool | None = None,
+        app_env: str | None = None,
     ) -> None:
         if signing_key_hex is not None:
             if signing_key_hex == "":
@@ -1551,10 +1628,15 @@ class TrainingReceiptIssuer:
 
         self.key_id = key_id
         self._job_record_source = job_record_source or get_default_training_job_record_source()
-        self._require_authenticated_job = require_authenticated_job
         self._trust_store = trust_store or get_default_trust_store()
         settings = get_settings()
-        is_prod = settings.app_env.lower() == "production"
+        is_prod = (app_env.lower() == "production") if app_env is not None else (settings.app_env.lower() == "production")
+
+        if is_prod and require_authenticated_job is False:
+            raise TrainingProvenanceConfigurationError(
+                "Production receipt issuance requires authenticated job record verification (require_authenticated_job=False is forbidden in production)."
+            )
+        self._require_authenticated_job = True if is_prod else require_authenticated_job
 
         if self._trust_store.is_key_revoked(self.key_id):
             raise ValueError(
@@ -1755,9 +1837,9 @@ class TrainingReceiptIssuer:
 
         # Enforce authenticated execution record from trusted job completion source
         enforce_record = (
-            self._require_authenticated_job
-            if self._require_authenticated_job is not None
-            else is_prod
+            True
+            if is_prod
+            else (self._require_authenticated_job if self._require_authenticated_job is not None else False)
         )
         if enforce_record:
             target_job = target_job_id or f"job_{target_run_id}"
@@ -1780,75 +1862,75 @@ class TrainingReceiptIssuer:
                 )
 
             if rec.status != "COMPLETED":
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Job '{target_job}' in trusted completion source is not in 'COMPLETED' status (got '{rec.status}')."
                 )
 
             # Strict complete identity and field binding (Section 5)
             if rec.job_id != target_job:
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Job ID mismatch: caller requested '{target_job}', but trusted record is for '{rec.job_id}'."
                 )
             if rec.training_run_id != target_run_id:
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Training run ID mismatch: caller claimed '{target_run_id}', but trusted record is for '{rec.training_run_id}'."
                 )
             if rec.simulation_id != target_sim_id:
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Simulation ID mismatch: caller claimed '{target_sim_id}', but trusted record is for '{rec.simulation_id}'."
                 )
             if rec.worker_id != target_producer:
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Producer identity mismatch: caller claimed '{target_producer}', but trusted record observed '{rec.worker_id}'."
                 )
             if target_rounds != rec.executed_rounds:
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Executed rounds mismatch: caller claimed {target_rounds}, but trusted record observed {rec.executed_rounds}."
                 )
             if target_epochs != rec.executed_epochs:
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Executed epochs mismatch: caller claimed {target_epochs}, but trusted record observed {rec.executed_epochs}."
                 )
             if target_samples != rec.sample_count:
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Sample count mismatch: caller claimed {target_samples}, but trusted record observed {rec.sample_count}."
                 )
             if not hmac.compare_digest(target_sha, rec.artifact_sha256):
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Artifact digest mismatch: caller provided {target_sha}, but trusted record observed {rec.artifact_sha256}."
                 )
             if target_arch != rec.architecture:
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Model architecture mismatch: caller claimed '{target_arch}', but trusted record observed '{rec.architecture}'."
                 )
             if target_schema_ver != rec.feature_schema_version:
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Feature schema version mismatch: caller claimed '{target_schema_ver}', but trusted record observed '{rec.feature_schema_version}'."
                 )
             if target_input_dim != rec.input_dim:
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Input dimension mismatch: caller claimed {target_input_dim}, but trusted record observed {rec.input_dim}."
                 )
             if tuple(fnames) != tuple(rec.feature_names):
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     "Feature names or ordering mismatch: caller provided feature list does not match trusted execution record."
                 )
 
             # Match observed metrics
             for k, expected_v in rec.observed_metrics.items():
                 if k not in target_metrics:
-                    raise ValueError(f"Observed metric '{k}' missing from receipt request.")
+                    raise TrainingProvenanceSecurityError(f"Observed metric '{k}' missing from receipt request.")
                 actual_v = target_metrics[k]
                 if not (isinstance(actual_v, (int, float)) and math.isclose(actual_v, expected_v, rel_tol=1e-7, abs_tol=1e-7)):
-                    raise ValueError(
+                    raise TrainingProvenanceSecurityError(
                         f"Metric '{k}' mismatch: caller claimed {actual_v}, but trusted record observed {expected_v}."
                     )
             if rec.dataset_manifest_id and target_manifest and target_manifest != rec.dataset_manifest_id:
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Dataset manifest mismatch: caller claimed '{target_manifest}', but trusted record observed '{rec.dataset_manifest_id}'."
                 )
             if rec.git_commit_hash and target_git and target_git != rec.git_commit_hash:
-                raise ValueError(
+                raise TrainingProvenanceSecurityError(
                     f"Git commit hash mismatch: caller claimed '{target_git}', but trusted record observed '{rec.git_commit_hash}'."
                 )
 
