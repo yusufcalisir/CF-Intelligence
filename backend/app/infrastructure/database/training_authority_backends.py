@@ -744,19 +744,22 @@ def provision_runtime_service_roles(admin_db_url: str) -> dict[str, str]:
     with psycopg.connect(admin_db_url) as conn:
         conn.autocommit = True
         with conn.cursor() as cur:
-            for rname in ["cfi_coord_role", "cfi_worker_role", "cfi_issuer_role", "cfi_serving_role"]:
-                cur.execute(f"""
-                    DO $$
-                    BEGIN
-                        IF EXISTS (SELECT FROM pg_roles WHERE rolname = '{rname}') THEN
-                            EXECUTE 'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM {rname}';
-                            EXECUTE 'REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM {rname}';
-                            EXECUTE 'REVOKE ALL ON SCHEMA public FROM {rname}';
-                            EXECUTE 'DROP OWNED BY {rname} CASCADE';
-                            EXECUTE 'DROP ROLE {rname}';
+            cur.execute("""
+                DO $$
+                DECLARE
+                    rname text;
+                BEGIN
+                    FOR rname IN SELECT unnest(ARRAY['cfi_coord_role', 'cfi_worker_role', 'cfi_issuer_role', 'cfi_serving_role']) LOOP
+                        IF EXISTS (SELECT FROM pg_roles WHERE rolname = rname) THEN
+                            EXECUTE format('REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM %I', rname);
+                            EXECUTE format('REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM %I', rname);
+                            EXECUTE format('REVOKE ALL ON SCHEMA public FROM %I', rname);
+                            EXECUTE format('DROP OWNED BY %I CASCADE', rname);
+                            EXECUTE format('DROP ROLE %I', rname);
                         END IF;
-                    END $$;
-                """)
+                    END LOOP;
+                END $$;
+            """)
 
             # 1. Coordinator Role
             cur.execute("CREATE ROLE cfi_coord_role WITH LOGIN PASSWORD 'cfi_coord_pass_2026'")
