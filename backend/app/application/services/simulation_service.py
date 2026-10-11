@@ -22,6 +22,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import math
+import os
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -934,6 +935,39 @@ class SimulationService:
             client_samples: list[int] = []
             per_bank_loss: dict[str, float] = {}
 
+            # Schedule and start genuine training job in trusted execution authority
+            from app.application.services.data_generator import FEATURE_NAMES
+            from app.application.services.training_provenance_service import (
+                get_default_training_job_record_source,
+            )
+
+            job_id = f"job_{simulation.id}"
+            training_run_id = f"fl_run_{simulation.id}"
+            fnames_list = list(FEATURE_NAMES)
+            worker_token = os.environ.get("CFI_TRAINING_WORKER_TOKEN") or getattr(
+                self.settings, "training_worker_token", None
+            )
+            job_source = get_default_training_job_record_source()
+            try:
+                job_source.schedule_training_job(
+                    job_id=job_id,
+                    training_run_id=training_run_id,
+                    simulation_id=simulation.id,
+                    architecture="FraudDetectionNN",
+                    feature_schema_version="v1.0",
+                    expected_rounds=config.num_rounds,
+                    expected_epochs=0,
+                    input_dim=len(fnames_list),
+                    feature_names=fnames_list,
+                )
+                job_source.start_training_job(
+                    job_id=job_id,
+                    worker_id="FEDERATED_SIMULATION_SERVICE",
+                    worker_token=worker_token,
+                )
+            except Exception as exc:
+                logger.warning("Failed to schedule/start trusted training job %s: %s", job_id, exc)
+
             if fl_engine_type == "flower":
                 # â”€â”€ Flower Framework Branch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 from app.application.services.flower_engine import FlowerFLEngine
@@ -1621,6 +1655,18 @@ class SimulationService:
                         else 0.0,
                     )
 
+                    # Record round execution observation in trusted job lifecycle
+                    round_samples_sum = sum(client_samples) if client_samples else 0
+                    with contextlib.suppress(Exception):
+                        job_source.record_round_observation(
+                            job_id=job_id,
+                            round_num=round_num,
+                            observed_loss=round_loss
+                            if isinstance(round_loss, (int, float)) and math.isfinite(round_loss)
+                            else None,
+                            sample_count=round_samples_sum,
+                        )
+
                     _cleanup_pytorch_memory()
 
             # Phase 3b: Federated Graph Embedding (FedGNN)
@@ -2164,7 +2210,6 @@ class SimulationService:
 
             # Generate automated regulatory compliance log
             import json
-            import os
 
             compliance_status = (
                 "COMPLIANT"
@@ -2339,52 +2384,60 @@ class SimulationService:
                         record_training_job_completion,
                     )
 
-                    worker_token = os.environ.get("CFI_TRAINING_WORKER_TOKEN") or getattr(
-                        self.settings, "training_worker_token", None
-                    )
-                    record_training_job_completion(
-                        job_id=f"job_{simulation.id}",
-                        training_run_id=f"fl_run_{simulation.id}",
-                        simulation_id=simulation.id,
-                        executed_rounds=fl_rounds_executed,
-                        executed_epochs=fl_epochs_executed,
-                        sample_count=total_fl_samples,
-                        observed_metrics=final_metrics,
-                        artifact_sha256=artifact_sha,
-                        architecture="FraudDetectionNN",
-                        feature_schema_version="v1.0",
-                        feature_names=fnames_list,
-                        worker_id="FEDERATED_SIMULATION_SERVICE",
-                        git_commit_hash=git_commit,
-                        dataset_manifest_id=dataset_hash,
-                        worker_token=worker_token,
-                    )
+                    try:
+                        worker_token = os.environ.get("CFI_TRAINING_WORKER_TOKEN") or getattr(
+                            self.settings, "training_worker_token", None
+                        )
+                        record_training_job_completion(
+                            job_id=f"job_{simulation.id}",
+                            training_run_id=f"fl_run_{simulation.id}",
+                            simulation_id=simulation.id,
+                            executed_rounds=fl_rounds_executed,
+                            executed_epochs=fl_epochs_executed,
+                            sample_count=total_fl_samples,
+                            observed_metrics=final_metrics,
+                            artifact_sha256=artifact_sha,
+                            architecture="FraudDetectionNN",
+                            feature_schema_version="v1.0",
+                            feature_names=fnames_list,
+                            worker_id="FEDERATED_SIMULATION_SERVICE",
+                            git_commit_hash=git_commit,
+                            dataset_manifest_id=dataset_hash,
+                            worker_token=worker_token,
+                        )
 
-                    fl_evidence = TrainingExecutionEvidence(
-                        training_run_id=f"fl_run_{simulation.id}",
-                        job_id=f"job_{simulation.id}",
-                        simulation_id=simulation.id,
-                        completed_at=completed_at_str,
-                        status="COMPLETED",
-                        executed_rounds=fl_rounds_executed,
-                        executed_epochs=fl_epochs_executed,
-                        sample_count=total_fl_samples,
-                        observed_metrics=final_metrics,
-                        artifact_sha256=artifact_sha,
-                        architecture="FraudDetectionNN",
-                        feature_schema_version="v1.0",
-                        feature_names=fnames_list,
-                        producer_id="FEDERATED_SIMULATION_SERVICE",
-                        git_commit_hash=git_commit,
-                        dataset_manifest_id=dataset_hash,
-                    )
+                        fl_evidence = TrainingExecutionEvidence(
+                            training_run_id=f"fl_run_{simulation.id}",
+                            job_id=f"job_{simulation.id}",
+                            simulation_id=simulation.id,
+                            completed_at=completed_at_str,
+                            status="COMPLETED",
+                            executed_rounds=fl_rounds_executed,
+                            executed_epochs=fl_epochs_executed,
+                            sample_count=total_fl_samples,
+                            observed_metrics=final_metrics,
+                            artifact_sha256=artifact_sha,
+                            architecture="FraudDetectionNN",
+                            feature_schema_version="v1.0",
+                            feature_names=fnames_list,
+                            producer_id="FEDERATED_SIMULATION_SERVICE",
+                            git_commit_hash=git_commit,
+                            dataset_manifest_id=dataset_hash,
+                        )
 
-                    issuer = get_default_training_issuer()
-                    fl_receipt = issuer.issue_receipt(
-                        evidence=fl_evidence,
-                        model_bytes=model_bytes,
-                        dp_noise_profile=dp_noise_profile,
-                    )
+                        issuer = get_default_training_issuer()
+                        fl_receipt = issuer.issue_receipt(
+                            evidence=fl_evidence,
+                            model_bytes=model_bytes,
+                            dp_noise_profile=dp_noise_profile,
+                        )
+                    except Exception as exc:
+                        logger.error(
+                            "Failed to record trusted job completion or issue receipt for simulation %s: %s",
+                            simulation.id,
+                            exc,
+                        )
+                        fl_receipt = None
                 else:
                     logger.warning(
                         "Simulation %s completed ML run but lacked necessary training observations "

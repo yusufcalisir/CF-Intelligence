@@ -141,12 +141,20 @@ class Settings(BaseSettings):
         description="Expected key ID for authorized training receipt issuer.",
     )
     training_worker_token: str = Field(
-        default="cfi_authorized_training_worker_secret_v1",
+        default="",
         validation_alias=AliasChoices(
             "training_worker_token",
             "cfi_training_worker_token",
         ),
         description="Authorization secret for training workers to register completed job executions.",
+    )
+    training_job_store_path: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "training_job_store_path",
+            "cfi_training_job_store_path",
+        ),
+        description="Path to durable training job execution records file.",
     )
     training_receipt_trust_store_path: str = Field(
         default="",
@@ -325,6 +333,25 @@ class Settings(BaseSettings):
 
         if "*" in self.cors_allowed_origins.split(","):
             violations.append("cors_allowed_origins cannot contain wildcard '*' in production.")
+
+        forbidden_worker_tokens = {
+            "",
+            "cfi_authorized_training_worker_secret_v1",
+            "secret",
+            "changeme",
+            "admin",
+            "password",
+            "token",
+            "default",
+        }
+        if (
+            not self.training_worker_token
+            or self.training_worker_token in forbidden_worker_tokens
+            or "change_me" in self.training_worker_token
+        ):
+            violations.append(
+                "training_worker_token must be set to an independently configured high-entropy secret in production (cannot be empty or default placeholder)."
+            )
 
         if violations:
             msg = "Production Security Configuration Violations:\n - " + "\n - ".join(violations)

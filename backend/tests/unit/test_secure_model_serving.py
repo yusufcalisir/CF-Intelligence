@@ -30,7 +30,7 @@ import shutil
 import tempfile
 import threading
 import time
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -1908,7 +1908,7 @@ def test_p10_legitimate_training_compatibility(temp_registry_dir: str) -> None:
 
         champ = svc.get_champion(dp_compatible=True, registry=reg)
         assert champ is not None
-        champ_meta = getattr(champ, "champion_metadata")
+        champ_meta = cast("dict[str, Any]", champ.champion_metadata)
         assert champ_meta["provenance_type"] == "TRAINING_RECORDED"
 
 
