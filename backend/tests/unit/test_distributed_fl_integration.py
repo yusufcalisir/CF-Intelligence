@@ -104,7 +104,7 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
     X_c = np.random.randn(180, NUM_FEATURES).astype(np.float32)
     y_c = np.random.randint(0, 2, size=180).astype(np.float32)
 
-    bank_enc_keys = {
+    bank_enc_keys: dict[str, str | bytes] = {
         "BANK_A": Fernet.generate_key(),
         "BANK_B": Fernet.generate_key(),
         "BANK_C": Fernet.generate_key(),

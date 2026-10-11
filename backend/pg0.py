@@ -11,13 +11,24 @@ import os
 import sys
 
 # Locate the installed pg0-embedded package in site-packages to avoid self-shadowing
-_site_pg0_path = os.path.join(sys.prefix, "Lib", "site-packages", "pg0", "__init__.py")
-if not os.path.exists(_site_pg0_path):
+_site_pg0_path: str | None = None
+_prefix_path = os.path.join(sys.prefix, "Lib", "site-packages", "pg0", "__init__.py")
+if os.path.exists(_prefix_path):
+    _site_pg0_path = _prefix_path
+else:
     for p in sys.path:
         candidate = os.path.join(p, "pg0", "__init__.py")
         if os.path.exists(candidate) and os.path.abspath(candidate) != os.path.abspath(__file__):
             _site_pg0_path = candidate
             break
+
+if not _site_pg0_path:
+    _venv_cand = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".venv", "Lib", "site-packages", "pg0", "__init__.py")
+    if os.path.exists(_venv_cand):
+        _site_pg0_path = _venv_cand
+
+if not _site_pg0_path or not os.path.exists(_site_pg0_path):
+    raise ImportError("pg0 package is not installed in the active environment or project virtualenv")
 
 _spec = importlib.util.spec_from_file_location("pg0_real", _site_pg0_path)
 if _spec is not None and _spec.loader is not None:

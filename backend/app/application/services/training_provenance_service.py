@@ -249,6 +249,9 @@ class TrainingJobAuthorityDatabase:
     def get_observations(self, job_id: str) -> list[RoundObservation]:
         return self._backend.get_observations(job_id)
 
+    def get_round_observations(self, job_id: str) -> list[RoundObservation]:
+        return self._backend.get_observations(job_id)
+
     def record_global_aggregation(self, event: GlobalAggregationEvent) -> GlobalAggregationEvent:
         return self._backend.record_global_aggregation(event)
 

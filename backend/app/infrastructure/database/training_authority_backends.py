@@ -26,16 +26,16 @@ from collections.abc import Generator, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
+psycopg: Any = None
+pg_sql: Any = None
+pg_dict_row: Any = None
+
 try:
     import psycopg
-    from psycopg import errors as pg_errors
     from psycopg import sql as pg_sql
     from psycopg.rows import dict_row as pg_dict_row
 except ImportError:
-    psycopg = None  # type: ignore[assignment]
-    pg_errors = None  # type: ignore[assignment]
-    pg_sql = None  # type: ignore[assignment]
-    pg_dict_row = None  # type: ignore[assignment]
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -459,6 +459,10 @@ class TrainingJobAuthorityBackend(abc.ABC):
 
     @abc.abstractmethod
     def get_observations(self, job_id: str) -> list[RoundObservation]: ...
+
+    def get_round_observations(self, job_id: str) -> list[RoundObservation]:
+        """Alias for get_observations for provenance record source compatibility."""
+        return self.get_observations(job_id)
 
     @abc.abstractmethod
     def record_global_aggregation(self, event: GlobalAggregationEvent) -> GlobalAggregationEvent: ...
@@ -1815,7 +1819,10 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
 
                     try:
                         if self._completion_db_url:
-                            with psycopg.connect(self._completion_db_url, autocommit=True) as comp_conn:
+                            if psycopg is None:
+                                raise TrainingProvenanceConfigurationError("psycopg (v3) driver is not installed.")
+                            driver: Any = psycopg
+                            with driver.connect(self._completion_db_url, autocommit=True) as comp_conn:
                                 with comp_conn.cursor() as comp_cur:
                                     comp_cur.execute(
                                         """

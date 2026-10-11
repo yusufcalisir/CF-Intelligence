@@ -23,6 +23,7 @@ import math
 import multiprocessing as mp
 import os
 import tempfile
+from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
@@ -582,7 +583,7 @@ def spawn_bank_workers(
     bank_partitions: dict[str, tuple[np.ndarray, np.ndarray]] | None = None,
     fail_bank_b_observation: bool = False,
     bank_db_urls: dict[str, str] | None = None,
-    bank_encryption_keys: dict[str, str | bytes] | None = None,
+    bank_encryption_keys: Mapping[str, str | bytes] | None = None,
 ) -> tuple[dict[str, mp.Process], dict[str, dict[str, mp.Queue]]]:
     """Spawn dedicated OS worker processes with their private credentials and data paths.
 
