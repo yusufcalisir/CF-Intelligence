@@ -247,7 +247,9 @@ class TestPostgresAuthorityPolicy:
 
                 # 4. SELECT permitted for read-only inspection
                 rcur.execute("SELECT COUNT(*) FROM cfi_scheduled_jobs")
-                count = rcur.fetchone()[0]
+                row = rcur.fetchone()
+                assert row is not None
+                count = row[0]
                 assert count >= 0
 
 
