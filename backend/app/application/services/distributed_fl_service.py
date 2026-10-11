@@ -119,9 +119,10 @@ class BankPrivateStorageVault:
         self._is_prod = app_env.lower() == "production"
         self._os_lock_handle: Any = None
 
-        if self._is_prod and not self.bank_token and not self.bank_encryption_key:
+        if self._is_prod and self.bank_encryption_key is None:
             raise TrainingProvenanceConfigurationError(
-                f"Production bank private storage vault for '{self.bank_id}' requires mandatory encryption key configuration."
+                f"Production bank private storage vault for '{self.bank_id}' requires dedicated data-at-rest "
+                "encryption key (bank_encryption_key). Deriving data encryption keys from authentication credentials is forbidden in production."
             )
 
     def _get_encryption_cipher(self) -> Fernet | None:
@@ -136,11 +137,11 @@ class BankPrivateStorageVault:
         if not self.bank_token:
             if self._is_prod:
                 raise TrainingProvenanceConfigurationError(
-                    f"Production bank private storage vault for '{self.bank_id}' requires encryption key configuration."
+                    f"Production bank private storage vault for '{self.bank_id}' requires dedicated encryption key."
                 )
             return None
 
-        # PBKDF2-HMAC-SHA256 key derivation with bank-specific salt and 100,000 iterations
+        # PBKDF2-HMAC-SHA256 key derivation with bank-specific salt and 100,000 iterations (development fallback)
         salt = f"cfi:vault:kdf:v1:{self.bank_id}".encode()
         derived_key = hashlib.pbkdf2_hmac("sha256", self.bank_token.encode(), salt, 100_000, 32)
         return Fernet(base64.urlsafe_b64encode(derived_key))
@@ -446,6 +447,11 @@ class IsolatedReceiptSigningAuthority:
         if issuer_key_path is not None:
             key_source = issuer_key_path
         elif signing_key_hex is not None:
+            if self.app_env.lower() == "production":
+                raise TrainingProvenanceSecurityError(
+                    "Production isolated receipt signing authority requires provisioned issuer_key_path; "
+                    "passing raw signing_key_hex to service launcher is strictly forbidden."
+                )
             if len(signing_key_hex.strip()) != 64:
                 raise TrainingProvenanceConfigurationError("Signing key hex must be a 64-character hex string.")
             self._temp_vault = tempfile.TemporaryDirectory(prefix="cfi_issuer_vault_")
@@ -575,6 +581,8 @@ def spawn_bank_workers(
     bank_data_paths: dict[str, str] | None = None,
     bank_partitions: dict[str, tuple[np.ndarray, np.ndarray]] | None = None,
     fail_bank_b_observation: bool = False,
+    bank_db_urls: dict[str, str] | None = None,
+    bank_encryption_keys: dict[str, str | bytes] | None = None,
 ) -> tuple[dict[str, mp.Process], dict[str, dict[str, mp.Queue]]]:
     """Spawn dedicated OS worker processes with their private credentials and data paths.
 
@@ -589,18 +597,21 @@ def spawn_bank_workers(
         data_path = bank_data_paths.get(b_id) if bank_data_paths else None
         X_b, y_b = bank_partitions.get(b_id, (None, None)) if bank_partitions else (None, None)
         should_fail_obs = (b_id == "BANK_B" and fail_bank_b_observation)
+        worker_db_url = bank_db_urls[b_id] if bank_db_urls and b_id in bank_db_urls else db_url
+        enc_key = bank_encryption_keys.get(b_id) if bank_encryption_keys else None
         proc = mp.Process(
             target=run_bank_worker_node,
             args=(
                 b_id,
                 bank_tokens[b_id],
-                db_url,
+                worker_db_url,
                 in_q,
                 out_q,
                 data_path,
                 X_b,
                 y_b,
                 should_fail_obs,
+                enc_key,
             ),
         )
         proc.daemon = True
@@ -625,6 +636,7 @@ def run_bank_worker_node(
     X_partition: np.ndarray | None = None,
     y_partition: np.ndarray | None = None,
     fail_observation: bool = False,
+    bank_encryption_key: str | bytes | None = None,
 ) -> None:
     """Dedicated Operating System Process for a Participating Bank Worker.
 
@@ -655,7 +667,12 @@ def run_bank_worker_node(
         if not os.path.exists(data_path):
             raise FileNotFoundError(f"Bank [{bank_id}] private dataset not found at '{data_path}'")
         bank_vault_dir = os.path.dirname(os.path.dirname(data_path))
-        vault_handle = BankPrivateStorageVault(bank_id, bank_vault_dir, bank_token=worker_token)
+        vault_handle = BankPrivateStorageVault(
+            bank_id,
+            bank_vault_dir,
+            bank_token=worker_token,
+            bank_encryption_key=bank_encryption_key,
+        )
         X_train, y_train = vault_handle.read_dataset_as_bank(bank_id, caller_token=worker_token)
         vault_handle.acquire_exclusive_os_boundary()
     elif X_partition is not None and y_partition is not None:
@@ -799,9 +816,11 @@ class DistributedFederatedTrainingManager:
         db_url: str,
         app_env: str = "production",
         bank_tokens: dict[str, str] | None = None,
+        completion_db_url: str | None = None,
     ) -> None:
         self.coordinator_token = coordinator_token
         self.db_url = db_url
+        self.completion_db_url = completion_db_url
         self.app_env = app_env
         self.settings = get_settings()
 
@@ -815,6 +834,7 @@ class DistributedFederatedTrainingManager:
         self.authority_source = TrustedTrainingJobRecordSource(
             coordinator_token=self.coordinator_token,
             db_url=self.db_url,
+            completion_db_url=self.completion_db_url,
             enforce_lifecycle=True,
             app_env=self.app_env,
         )
