@@ -645,7 +645,7 @@ class CoordinatorOSSecurityContext:
                 hProcess = win32api.GetCurrentProcess()
                 hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_ALL_ACCESS)
                 coord_sid = win32security.CreateWellKnownSid(win32security.WinRestrictedCodeSid)
-                self._token = win32security.CreateRestrictedToken(hToken, 0, [], [], [(coord_sid, 0)])
+                self._token = win32security.CreateRestrictedToken(hToken, 0, (), (), ((coord_sid, 0),))
                 win32security.ImpersonateLoggedOnUser(self._token)
                 self._active = True
             except Exception as e:
