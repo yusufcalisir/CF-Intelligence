@@ -353,19 +353,34 @@ def compute_config_fingerprint(
     expected_epochs: int,
     input_dim: int,
     feature_names: Sequence[str],
+    coordinator_id: str = "COORDINATOR",
+    permitted_workers: Sequence[str] = (),
+    min_quorum: int | None = None,
+    training_configuration: dict[str, Any] | None = None,
 ) -> str:
-    h = hashlib.sha256()
-    h.update(job_id.strip().encode())
-    h.update(training_run_id.strip().encode())
-    h.update(simulation_id.strip().encode())
-    h.update(architecture.strip().encode())
-    h.update(feature_schema_version.strip().encode())
-    h.update(str(expected_rounds).encode())
-    h.update(str(expected_epochs).encode())
-    h.update(str(input_dim).encode())
-    for fn in feature_names:
-        h.update(fn.strip().encode())
-    return h.hexdigest()
+    """Computes deterministic canonical SHA-256 fingerprint binding all security-critical scheduled parameters.
+
+    Includes job identity, training run, simulation, coordinator, architecture, feature schema,
+    expected rounds/epochs, input dimension, feature names, authorized participants, and quorum policy.
+    """
+    payload = {
+        "schema_version": "cfi_cfg_v2",
+        "job_id": job_id.strip(),
+        "training_run_id": training_run_id.strip(),
+        "simulation_id": simulation_id.strip(),
+        "coordinator_id": coordinator_id.strip(),
+        "architecture": architecture.strip(),
+        "feature_schema_version": feature_schema_version.strip(),
+        "expected_rounds": int(expected_rounds),
+        "expected_epochs": int(expected_epochs),
+        "input_dim": int(input_dim),
+        "feature_names": [str(fn).strip() for fn in feature_names],
+        "permitted_workers": sorted([str(pw).strip() for pw in permitted_workers]),
+        "min_quorum": int(min_quorum) if min_quorum is not None else len(permitted_workers),
+        "training_configuration": training_configuration or {},
+    }
+    canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
 
 def compute_evidence_fingerprint(
@@ -511,178 +526,192 @@ def reconcile_job_completion_evidence(
     agg_rows: list[GlobalAggregationEvent],
     eval_rows: list[ModelEvaluationEvent],
     enforce_lifecycle: bool = True,
+    is_production_authority: bool = False,
 ) -> None:
     """Enforces strict, unambiguous reconciliation across rounds, samples, epochs, metrics, and aggregation provenance."""
-    sched_expected_rounds = sched_row["expected_rounds"]
-
-    if enforce_lifecycle or obs_rows:
+    if is_production_authority:
+        if not enforce_lifecycle:
+            raise TrainingProvenanceSecurityError(
+                f"Cannot complete job '{clean_job_id}': enforce_lifecycle=False is forbidden. Execution observations and aggregation evidence are mandatory."
+            )
+        if not obs_rows:
+            raise TrainingProvenanceSecurityError(
+                f"Cannot complete job '{clean_job_id}': no verified execution observations recorded. Fabricated completion is rejected."
+            )
+    else:
+        # Development authority (SQLite):
+        if not enforce_lifecycle and not obs_rows:
+            # Development-only unverified path for low-level table conflict tests
+            return
         if not obs_rows:
             raise TrainingProvenanceSecurityError(
                 f"Cannot complete job '{clean_job_id}': no verified execution observations recorded. Fabricated completion is rejected."
             )
 
-        completed_obs = [r for r in obs_rows if r.execution_status == "COMPLETED"]
-        if not completed_obs:
-            raise TrainingProvenanceSecurityError(
-                f"Cannot complete job '{clean_job_id}': no successfully completed execution observations recorded."
-            )
+    sched_expected_rounds = sched_row["expected_rounds"]
 
-        observed_round_nums = sorted({r.round_number for r in completed_obs})
-
-        # 1. Round count and continuity
-        if executed_rounds != len(observed_round_nums):
-            raise TrainingProvenanceSecurityError(
-                f"Executed rounds mismatch for job '{clean_job_id}': claimed {executed_rounds}, but {len(observed_round_nums)} rounds observed."
-            )
-        expected_seq = list(range(1, executed_rounds + 1))
-        if observed_round_nums != expected_seq:
-            raise TrainingProvenanceSecurityError(
-                f"Executed rounds non-continuous for job '{clean_job_id}': expected rounds {expected_seq}, got {observed_round_nums}."
-            )
-        if sched_expected_rounds > 0 and executed_rounds < sched_expected_rounds:
-            raise TrainingProvenanceSecurityError(
-                f"Job '{clean_job_id}' completed fewer rounds than scheduled contract: expected {sched_expected_rounds}, got {executed_rounds}."
-            )
-
-        # 2. Strict, Unambiguous Sample Accounting Contract
-        latest_round = max(observed_round_nums)
-        accepted_global_round_count = len(observed_round_nums)
-        accepted_bank_contribution_count = len(completed_obs)
-        processed_sample_exposures = sum(r.actual_sample_count * max(1, r.actual_executed_epochs) for r in completed_obs)
-
-        # Dataset sample consistency across rounds (AC-07)
-        bank_sample_counts: dict[str, int] = {}
-        for obs in completed_obs:
-            if obs.bank_id in bank_sample_counts:
-                if obs.actual_sample_count != bank_sample_counts[obs.bank_id]:
-                    raise TrainingProvenanceSecurityError(
-                        f"Inconsistent sample count observed for bank '{obs.bank_id}' across rounds for job '{clean_job_id}': "
-                        f"round {obs.round_number} reported {obs.actual_sample_count}, but earlier round reported {bank_sample_counts[obs.bank_id]}."
-                    )
-            else:
-                bank_sample_counts[obs.bank_id] = obs.actual_sample_count
-
-        canonical_unique_samples = sum(bank_sample_counts.values())
-
-        logger.debug(
-            "Reconciliation accounting for %s: rounds=%d, contributions=%d, exposures=%d, canonical_unique_samples=%d",
-            clean_job_id,
-            accepted_global_round_count,
-            accepted_bank_contribution_count,
-            processed_sample_exposures,
-            canonical_unique_samples,
+    completed_obs = [r for r in obs_rows if r.execution_status == "COMPLETED"]
+    if not completed_obs:
+        raise TrainingProvenanceSecurityError(
+            f"Cannot complete job '{clean_job_id}': no successfully completed execution observations recorded."
         )
 
-        # Canonical receipt contract: sample_count MUST represent the unique dataset samples across participating banks.
-        # Repeated sample exposures cannot be substituted for unique dataset samples (AC-06).
-        if sample_count != canonical_unique_samples:
-            if sample_count == processed_sample_exposures and processed_sample_exposures != canonical_unique_samples:
-                raise TrainingProvenanceSecurityError(
-                    f"Sample count mismatch for job '{clean_job_id}': claimed sample exposures ({sample_count}) "
-                    f"instead of canonical unique dataset samples ({canonical_unique_samples}). "
-                    f"Repeated sample exposures cannot substitute for unique dataset samples."
-                )
-            raise TrainingProvenanceSecurityError(
-                f"Sample count mismatch for job '{clean_job_id}': claimed {sample_count}, "
-                f"but canonical unique dataset samples across participating banks is {canonical_unique_samples} "
-                f"(processed_sample_exposures={processed_sample_exposures})."
-            )
+    observed_round_nums = sorted({r.round_number for r in completed_obs})
 
-        # 3. Canonical Executed Epochs Reconciliation (AC-01 through AC-05)
-        canonical_executed_epochs = sum(
-            max(r.actual_executed_epochs for r in completed_obs if r.round_number == rnd)
-            for rnd in observed_round_nums
+    # 1. Round count and continuity
+    if executed_rounds != len(observed_round_nums):
+        raise TrainingProvenanceSecurityError(
+            f"Executed rounds mismatch for job '{clean_job_id}': claimed {executed_rounds}, but {len(observed_round_nums)} rounds observed."
         )
-        total_worker_epochs = sum(r.actual_executed_epochs for r in completed_obs)
-        last_round_epochs = max(r.actual_executed_epochs for r in completed_obs if r.round_number == latest_round)
+    expected_seq = list(range(1, executed_rounds + 1))
+    if observed_round_nums != expected_seq:
+        raise TrainingProvenanceSecurityError(
+            f"Executed rounds non-continuous for job '{clean_job_id}': expected rounds {expected_seq}, got {observed_round_nums}."
+        )
+    if sched_expected_rounds > 0 and executed_rounds < sched_expected_rounds:
+        raise TrainingProvenanceSecurityError(
+            f"Job '{clean_job_id}' completed fewer rounds than scheduled contract: expected {sched_expected_rounds}, got {executed_rounds}."
+        )
 
-        if executed_epochs != canonical_executed_epochs:
-            if executed_epochs == 0 and canonical_executed_epochs > 0:
+    # 2. Strict, Unambiguous Sample Accounting Contract
+    latest_round = max(observed_round_nums)
+    accepted_global_round_count = len(observed_round_nums)
+    accepted_bank_contribution_count = len(completed_obs)
+    processed_sample_exposures = sum(r.actual_sample_count * max(1, r.actual_executed_epochs) for r in completed_obs)
+
+    # Dataset sample consistency across rounds (AC-07)
+    bank_sample_counts: dict[str, int] = {}
+    for obs in completed_obs:
+        if obs.bank_id in bank_sample_counts:
+            if obs.actual_sample_count != bank_sample_counts[obs.bank_id]:
                 raise TrainingProvenanceSecurityError(
-                    f"Executed epochs mismatch for job '{clean_job_id}': claimed 0 executed epochs despite {canonical_executed_epochs} observed executed epochs."
+                    f"Inconsistent sample count observed for bank '{obs.bank_id}' across rounds for job '{clean_job_id}': "
+                    f"round {obs.round_number} reported {obs.actual_sample_count}, but earlier round reported {bank_sample_counts[obs.bank_id]}."
                 )
-            if canonical_executed_epochs == 0 and executed_epochs > 0:
-                raise TrainingProvenanceSecurityError(
-                    f"Executed epochs mismatch for job '{clean_job_id}': claimed {executed_epochs}, but zero executed epochs were observed."
-                )
-            if executed_epochs == total_worker_epochs and total_worker_epochs != canonical_executed_epochs:
-                raise TrainingProvenanceSecurityError(
-                    f"Executed epochs mismatch for job '{clean_job_id}': claimed total worker-epochs ({executed_epochs}) "
-                    f"instead of canonical sequential global epochs ({canonical_executed_epochs}). "
-                    f"Sum of worker epochs cannot substitute for canonical sequential epochs."
-                )
-            if executed_epochs == last_round_epochs and last_round_epochs != canonical_executed_epochs:
-                raise TrainingProvenanceSecurityError(
-                    f"Executed epochs mismatch for job '{clean_job_id}': claimed last-round epochs ({executed_epochs}) "
-                    f"instead of full-run canonical sequential epochs ({canonical_executed_epochs})."
-                )
+        else:
+            bank_sample_counts[obs.bank_id] = obs.actual_sample_count
+
+    canonical_unique_samples = sum(bank_sample_counts.values())
+
+    logger.debug(
+        "Reconciliation accounting for %s: rounds=%d, contributions=%d, exposures=%d, canonical_unique_samples=%d",
+        clean_job_id,
+        accepted_global_round_count,
+        accepted_bank_contribution_count,
+        processed_sample_exposures,
+        canonical_unique_samples,
+    )
+
+    # Canonical receipt contract: sample_count MUST represent the unique dataset samples across participating banks.
+    # Repeated sample exposures cannot be substituted for unique dataset samples (AC-06).
+    if sample_count != canonical_unique_samples:
+        if sample_count == processed_sample_exposures and processed_sample_exposures != canonical_unique_samples:
             raise TrainingProvenanceSecurityError(
-                f"Executed epochs mismatch for job '{clean_job_id}': claimed {executed_epochs}, "
-                f"but canonical observed executed epochs is {canonical_executed_epochs}. Planned configuration epochs cannot substitute for observed epochs."
+                f"Sample count mismatch for job '{clean_job_id}': claimed sample exposures ({sample_count}) "
+                f"instead of canonical unique dataset samples ({canonical_unique_samples}). "
+                f"Repeated sample exposures cannot substitute for unique dataset samples."
+            )
+        raise TrainingProvenanceSecurityError(
+            f"Sample count mismatch for job '{clean_job_id}': claimed {sample_count}, "
+            f"but canonical unique dataset samples across participating banks is {canonical_unique_samples} "
+            f"(processed_sample_exposures={processed_sample_exposures})."
+        )
+
+    # 3. Canonical Executed Epochs Reconciliation (AC-01 through AC-05)
+    canonical_executed_epochs = sum(
+        max(r.actual_executed_epochs for r in completed_obs if r.round_number == rnd)
+        for rnd in observed_round_nums
+    )
+    total_worker_epochs = sum(r.actual_executed_epochs for r in completed_obs)
+    last_round_epochs = max(r.actual_executed_epochs for r in completed_obs if r.round_number == latest_round)
+
+    if executed_epochs != canonical_executed_epochs:
+        if executed_epochs == 0 and canonical_executed_epochs > 0:
+            raise TrainingProvenanceSecurityError(
+                f"Executed epochs mismatch for job '{clean_job_id}': claimed 0 executed epochs despite {canonical_executed_epochs} observed executed epochs."
+            )
+        if canonical_executed_epochs == 0 and executed_epochs > 0:
+            raise TrainingProvenanceSecurityError(
+                f"Executed epochs mismatch for job '{clean_job_id}': claimed {executed_epochs}, but zero executed epochs were observed."
+            )
+        if executed_epochs == total_worker_epochs and total_worker_epochs != canonical_executed_epochs:
+            raise TrainingProvenanceSecurityError(
+                f"Executed epochs mismatch for job '{clean_job_id}': claimed total worker-epochs ({executed_epochs}) "
+                f"instead of canonical sequential global epochs ({canonical_executed_epochs}). "
+                f"Sum of worker epochs cannot substitute for canonical sequential epochs."
+            )
+        if executed_epochs == last_round_epochs and last_round_epochs != canonical_executed_epochs:
+            raise TrainingProvenanceSecurityError(
+                f"Executed epochs mismatch for job '{clean_job_id}': claimed last-round epochs ({executed_epochs}) "
+                f"instead of full-run canonical sequential epochs ({canonical_executed_epochs})."
+            )
+        raise TrainingProvenanceSecurityError(
+            f"Executed epochs mismatch for job '{clean_job_id}': claimed {executed_epochs}, "
+            f"but canonical observed executed epochs is {canonical_executed_epochs}. Planned configuration epochs cannot substitute for observed epochs."
+        )
+
+    # 4. Global aggregation provenance chain reconciliation
+    if not agg_rows:
+        raise TrainingProvenanceSecurityError(
+            f"Cannot complete federated training job '{clean_job_id}': missing global aggregation records. "
+            "All federated rounds require authoritative aggregation evidence."
+        )
+    agg_round_nums = sorted({a.round_number for a in agg_rows})
+    if len(agg_round_nums) != executed_rounds or agg_round_nums != expected_seq:
+        raise TrainingProvenanceSecurityError(
+            f"Global aggregation round continuity mismatch for job '{clean_job_id}': expected rounds {expected_seq}, but got aggregated rounds {agg_round_nums}."
+        )
+    latest_agg = max(agg_rows, key=lambda a: a.round_number)
+    if latest_agg.aggregated_global_model_digest != clean_sha:
+        raise TrainingProvenanceSecurityError(
+            f"Artifact SHA-256 does not match final accepted aggregation digest for job '{clean_job_id}': expected {latest_agg.aggregated_global_model_digest}, got {clean_sha}."
+        )
+
+    # 5. Training Loss Verification
+    if "loss" in target_metrics:
+        claimed_loss = float(target_metrics["loss"])
+        final_round_obs = [r for r in completed_obs if r.round_number == latest_round]
+        final_losses = [float(r.observed_loss) for r in final_round_obs]
+        tot_s = sum(r.actual_sample_count for r in final_round_obs) or 1
+        weighted_final_loss = (
+            sum(float(r.observed_loss) * r.actual_sample_count for r in final_round_obs)
+            / tot_s
+        )
+        unweighted_final_loss = (
+            sum(final_losses) / len(final_losses)
+            if final_losses
+            else 0.0
+        )
+        valid_losses = [*final_losses, weighted_final_loss, unweighted_final_loss]
+        if not any(math.isclose(claimed_loss, loss_val, rel_tol=1e-3, abs_tol=1e-3) for loss_val in valid_losses):
+            raise TrainingProvenanceSecurityError(
+                f"Observed loss mismatch for job '{clean_job_id}': claimed {claimed_loss}, but observed final loss is {final_losses[-1]}."
             )
 
-        # 4. Global aggregation provenance chain reconciliation
-        if not agg_rows:
+    # 6. Evaluation Metrics Provenance Verification (ROC-AUC, validation loss, etc.)
+    eval_metrics = {
+        k: v for k, v in target_metrics.items()
+        if k not in ("loss", "train_loss", "training_loss")
+    }
+    if eval_metrics:
+        if not eval_rows:
             raise TrainingProvenanceSecurityError(
-                f"Cannot complete federated training job '{clean_job_id}': missing global aggregation records. "
-                "All federated rounds require authoritative aggregation evidence."
+                f"Evaluation metrics {list(eval_metrics.keys())} claimed for job '{clean_job_id}' without verified model evaluation observations."
             )
-        agg_round_nums = sorted({a.round_number for a in agg_rows})
-        if len(agg_round_nums) != executed_rounds or agg_round_nums != expected_seq:
-            raise TrainingProvenanceSecurityError(
-                f"Global aggregation round continuity mismatch for job '{clean_job_id}': expected rounds {expected_seq}, but got aggregated rounds {agg_round_nums}."
-            )
-        latest_agg = max(agg_rows, key=lambda a: a.round_number)
-        if latest_agg.aggregated_global_model_digest != clean_sha:
-            raise TrainingProvenanceSecurityError(
-                f"Artifact SHA-256 does not match final accepted aggregation digest for job '{clean_job_id}': expected {latest_agg.aggregated_global_model_digest}, got {clean_sha}."
-            )
-
-        # 5. Training Loss Verification
-        if "loss" in target_metrics:
-            claimed_loss = float(target_metrics["loss"])
-            final_round_obs = [r for r in completed_obs if r.round_number == latest_round]
-            final_losses = [float(r.observed_loss) for r in final_round_obs]
-            tot_s = sum(r.actual_sample_count for r in final_round_obs) or 1
-            weighted_final_loss = (
-                sum(float(r.observed_loss) * r.actual_sample_count for r in final_round_obs)
-                / tot_s
-            )
-            unweighted_final_loss = (
-                sum(final_losses) / len(final_losses)
-                if final_losses
-                else 0.0
-            )
-            valid_losses = [*final_losses, weighted_final_loss, unweighted_final_loss]
-            if not any(math.isclose(claimed_loss, loss_val, rel_tol=1e-3, abs_tol=1e-3) for loss_val in valid_losses):
+        for m_name, m_val in eval_metrics.items():
+            matching_evals = [
+                e for e in eval_rows
+                if e.metric_name == m_name and e.evaluated_artifact_digest == clean_sha
+            ]
+            if not matching_evals:
                 raise TrainingProvenanceSecurityError(
-                    f"Observed loss mismatch for job '{clean_job_id}': claimed {claimed_loss}, but observed final loss is {final_losses[-1]}."
+                    f"Evaluation metric '{m_name}' claimed for job '{clean_job_id}' has no matching trusted evaluation event bound to artifact {clean_sha}."
                 )
-
-        # 6. Evaluation Metrics Provenance Verification (ROC-AUC, validation loss, etc.)
-        eval_metrics = {
-            k: v for k, v in target_metrics.items()
-            if k not in ("loss", "train_loss", "training_loss")
-        }
-        if eval_metrics:
-            if not eval_rows:
+            trusted_val = matching_evals[-1].metric_value
+            if not math.isclose(float(m_val), float(trusted_val), rel_tol=1e-3, abs_tol=1e-3):
                 raise TrainingProvenanceSecurityError(
-                    f"Evaluation metrics {list(eval_metrics.keys())} claimed for job '{clean_job_id}' without verified model evaluation observations."
+                    f"Evaluation metric '{m_name}' value mismatch for job '{clean_job_id}': claimed {m_val}, but trusted evaluation recorded {trusted_val}."
                 )
-            for m_name, m_val in eval_metrics.items():
-                matching_evals = [
-                    e for e in eval_rows
-                    if e.metric_name == m_name and e.evaluated_artifact_digest == clean_sha
-                ]
-                if not matching_evals:
-                    raise TrainingProvenanceSecurityError(
-                        f"Evaluation metric '{m_name}' claimed for job '{clean_job_id}' has no matching trusted evaluation event bound to artifact {clean_sha}."
-                    )
-                trusted_val = matching_evals[-1].metric_value
-                if not math.isclose(float(m_val), float(trusted_val), rel_tol=1e-3, abs_tol=1e-3):
-                    raise TrainingProvenanceSecurityError(
-                        f"Evaluation metric '{m_name}' value mismatch for job '{clean_job_id}': claimed {m_val}, but trusted evaluation recorded {trusted_val}."
-                    )
 
 
 # ---------------------------------------------------------------------------
@@ -902,6 +931,8 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             expected_epochs,
             input_dim,
             fnames_tuple,
+            coordinator_id=coordinator_id,
+            permitted_workers=perm_workers_tuple,
         )
 
         with self._connect() as conn:
@@ -1366,6 +1397,10 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         enforce_lifecycle: bool = True,
     ) -> CompletedJobExecutionRecord:
         clean_job_id = job_id.strip()
+        if not enforce_lifecycle:
+            raise TrainingProvenanceSecurityError(
+                f"Cannot complete job '{clean_job_id}': enforce_lifecycle=False is forbidden. Execution observations and aggregation evidence are mandatory."
+            )
         clean_sha = artifact_sha256.strip()
         target_metrics = dict(observed_metrics) if observed_metrics is not None else {}
         now_str = datetime.now(UTC).isoformat()
@@ -1546,6 +1581,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                         agg_rows=agg_objects,
                         eval_rows=eval_objects,
                         enforce_lifecycle=enforce_lifecycle,
+                        is_production_authority=True,
                     )
 
                     record = CompletedJobExecutionRecord(
@@ -1756,6 +1792,10 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
     def backend_type(self) -> str:
         return "sqlite"
 
+    @property
+    def _is_prod(self) -> bool:
+        return False
+
     @contextlib.contextmanager
     def _connect(self):
         if self._is_memory:
@@ -1932,6 +1972,8 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
             expected_epochs,
             input_dim,
             fnames_tuple,
+            coordinator_id=coordinator_id,
+            permitted_workers=perm_workers_tuple,
         )
 
         with self._connect() as conn:
@@ -2432,6 +2474,10 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         enforce_lifecycle: bool = True,
     ) -> CompletedJobExecutionRecord:
         clean_job_id = job_id.strip()
+        if self._is_prod and not enforce_lifecycle:
+            raise TrainingProvenanceSecurityError(
+                f"Cannot complete job '{clean_job_id}': enforce_lifecycle=False is forbidden. Execution observations and aggregation evidence are mandatory."
+            )
         clean_sha = artifact_sha256.strip()
         target_metrics = dict(observed_metrics) if observed_metrics is not None else {}
         now_str = datetime.now(UTC).isoformat()
@@ -2611,6 +2657,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                         agg_rows=agg_objects,
                         eval_rows=eval_objects,
                         enforce_lifecycle=enforce_lifecycle,
+                        is_production_authority=self._is_prod,
                     )
 
                     record = CompletedJobExecutionRecord(

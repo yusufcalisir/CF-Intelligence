@@ -13,6 +13,7 @@ Implements Module 01-A.1 Requirement P6:
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import hashlib
 import hmac
@@ -26,6 +27,7 @@ from typing import Any
 import numpy as np
 import torch
 import torch.nn as nn
+from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -86,11 +88,13 @@ def _serialize_model_state_dict(model: nn.Module) -> bytes:
 
 
 class BankPrivateStorageVault:
-    """Institution-isolated storage vault enforcing physical and logical boundary protection.
+    """Institution-isolated storage vault enforcing physical, cryptographic, and logical boundary protection.
 
     Enforces Module 01-A.1 Requirement:
     - Dedicated local storage vault per financial institution (BANK_A, BANK_B, BANK_C).
     - Hard access denial on unauthorized cross-bank reads or coordinator read attempts.
+    - Token-derived cryptographic sealing of raw datasets at rest so external processes without the
+      bank's workload credential cannot decrypt or parse private records.
     - Native OS-level exclusive handle on the private dataset during worker execution,
       causing genuine OS-level PermissionError when external processes attempt open().
     """
@@ -103,8 +107,20 @@ class BankPrivateStorageVault:
         self.bank_token = bank_token
         self._os_lock_handle: Any = None
 
+    def _get_encryption_cipher(self) -> Fernet | None:
+        if not self.bank_token:
+            return None
+        derived_key = hashlib.sha256(f"cfi:vault:{self.bank_id}:{self.bank_token}".encode()).digest()
+        return Fernet(base64.urlsafe_b64encode(derived_key))
+
     def store_dataset(self, X: np.ndarray, y: np.ndarray) -> str:
-        np.savez_compressed(self.data_path, X=X, y=y)
+        buf = io.BytesIO()
+        np.savez_compressed(buf, X=X, y=y)
+        raw_bytes = buf.getvalue()
+        cipher = self._get_encryption_cipher()
+        payload = cipher.encrypt(raw_bytes) if cipher else raw_bytes
+        with open(self.data_path, "wb") as f:
+            f.write(payload)
         with contextlib.suppress(Exception):
             os.chmod(self.vault_dir, 0o700)
             os.chmod(self.data_path, 0o600)
@@ -172,19 +188,136 @@ class BankPrivateStorageVault:
             )
         if not os.path.exists(self.data_path):
             raise FileNotFoundError(f"Vault data file not found at '{self.data_path}'")
-        loaded = np.load(self.data_path)
+        with open(self.data_path, "rb") as f:
+            raw_data = f.read()
+        if raw_data.startswith(b"PK\x03\x04"):
+            decrypted = raw_data
+        else:
+            cipher = self._get_encryption_cipher()
+            if cipher:
+                try:
+                    decrypted = cipher.decrypt(raw_data)
+                except Exception as e:
+                    raise PermissionError(f"Decryption authentication failed for bank '{self.bank_id}' storage vault: {e}") from e
+            else:
+                decrypted = raw_data
+        loaded = np.load(io.BytesIO(decrypted))
         return loaded["X"], loaded["y"]
+
+
+def _run_isolated_issuer_worker(
+    signing_key_hex: str,
+    db_url: str,
+    key_id: str,
+    coordinator_token: str | None,
+    inbox: mp.Queue,
+    outbox: mp.Queue,
+    app_env: str = "production",
+) -> None:
+    """Dedicated Operating System Process holding the Ed25519 signing private key in memory isolation."""
+    issuer_pid = os.getpid()
+    logger.info("Isolated Receipt Signing Service running with PID %d", issuer_pid)
+
+    record_source = TrustedTrainingJobRecordSource(
+        coordinator_token=coordinator_token,
+        db_url=db_url,
+        enforce_lifecycle=True,
+        app_env=app_env,
+    )
+    issuer = TrainingReceiptIssuer(
+        signing_key_hex=signing_key_hex,
+        key_id=key_id,
+        job_record_source=record_source,
+        enforce_job_records=True,
+        app_env=app_env,
+    )
+
+    while True:
+        try:
+            req = inbox.get()
+        except Exception:
+            break
+        if req is None or req.get("command") == "STOP":
+            break
+
+        if req.get("command") == "SIGN_RECEIPT":
+            try:
+                auth_token = req.get("auth_token")
+                caller_identity = req.get("caller_identity", "COORDINATOR")
+
+                # Enforce cryptographic caller authentication
+                if coordinator_token is not None:
+                    if not auth_token or not hmac.compare_digest(auth_token, coordinator_token):
+                        outbox.put({
+                            "status": "ERROR",
+                            "error": "Unauthorized receipt signing request: invalid or missing coordinator token.",
+                        })
+                        continue
+                elif caller_identity != "COORDINATOR":
+                    outbox.put({
+                        "status": "ERROR",
+                        "error": f"Unauthorized receipt signing caller identity: '{caller_identity}'.",
+                    })
+                    continue
+
+                job_id = req["job_id"]
+                artifact_bytes = req["artifact_bytes"]
+
+                completed_record = record_source.get_completed_job_by_id(job_id)
+                if completed_record is None:
+                    outbox.put({
+                        "status": "ERROR",
+                        "error": f"Receipt issuance denied: Job '{job_id}' has no trusted COMPLETED record in authority.",
+                    })
+                    continue
+
+                computed_sha = hashlib.sha256(artifact_bytes).hexdigest()
+                if not hmac.compare_digest(computed_sha, completed_record.artifact_sha256):
+                    outbox.put({
+                        "status": "ERROR",
+                        "error": f"Receipt issuance denied: Provided artifact SHA-256 '{computed_sha}' does not match "
+                                 f"authoritative completed artifact digest '{completed_record.artifact_sha256}'.",
+                    })
+                    continue
+
+                evidence = TrainingExecutionEvidence(
+                    training_run_id=completed_record.training_run_id,
+                    job_id=completed_record.job_id,
+                    simulation_id=completed_record.simulation_id,
+                    completed_at=completed_record.completed_at,
+                    status=completed_record.status,
+                    executed_rounds=completed_record.executed_rounds,
+                    executed_epochs=completed_record.executed_epochs,
+                    sample_count=completed_record.sample_count,
+                    observed_metrics=dict(completed_record.observed_metrics),
+                    artifact_sha256=completed_record.artifact_sha256,
+                    architecture=completed_record.architecture,
+                    feature_schema_version=completed_record.feature_schema_version,
+                    feature_names=list(completed_record.feature_names),
+                    producer_id=completed_record.worker_id,
+                )
+                receipt = issuer.issue_receipt(evidence=evidence, model_bytes=artifact_bytes)
+                outbox.put({
+                    "status": "SUCCESS",
+                    "receipt": receipt,
+                    "issuer_pid": issuer_pid,
+                })
+            except Exception as e:
+                outbox.put({
+                    "status": "ERROR",
+                    "error": str(e),
+                })
 
 
 class IsolatedReceiptSigningAuthority:
     """Independently authorized receipt signing authority residing outside the coordinator boundary.
 
-    Enforces Module 01-A.1 Defect F correction:
-    1. Holds Ed25519 signing private key in an isolated security boundary.
+    Enforces Module 01-A.1 Requirements:
+    1. Holds Ed25519 signing private key in an independent OS process memory address space.
     2. Coordinator process never possesses the private signing key or raw key hex.
     3. Issues receipts solely for jobs with verified COMPLETED records in PostgreSQL authority.
     4. Verifies artifact SHA-256 against authoritative completed evidence before signing.
-    5. Fails closed on uncompleted jobs, mismatched artifact bytes, or revoked keys.
+    5. Fails closed on uncompleted jobs, mismatched artifact bytes, or service termination.
     """
 
     def __init__(
@@ -200,60 +333,81 @@ class IsolatedReceiptSigningAuthority:
         self.key_id = key_id
         self.app_env = app_env
         self.db_url = db_url
-        self._record_source = TrustedTrainingJobRecordSource(
+        self.coordinator_token = coordinator_token
+
+        # Eagerly probe database connectivity to fail closed immediately on unreachable DB
+        test_source = TrustedTrainingJobRecordSource(
             coordinator_token=coordinator_token,
             db_url=self.db_url,
             enforce_lifecycle=True,
             app_env=self.app_env,
         )
-        self._issuer = TrainingReceiptIssuer(
-            signing_key_hex=signing_key_hex,
-            key_id=self.key_id,
-            job_record_source=self._record_source,
-            enforce_job_records=True,
-            app_env=self.app_env,
+
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        priv_key = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(signing_key_hex.strip()))
+        self._public_key_hex = priv_key.public_key().public_bytes_raw().hex()
+        del priv_key
+
+        self._inbox: mp.Queue = mp.Queue()
+        self._outbox: mp.Queue = mp.Queue()
+        self._process = mp.Process(
+            target=_run_isolated_issuer_worker,
+            args=(
+                signing_key_hex,
+                db_url,
+                self.key_id,
+                self.coordinator_token,
+                self._inbox,
+                self._outbox,
+                self.app_env,
+            ),
         )
+        self._process.daemon = True
+        self._process.start()
+
+    @property
+    def pid(self) -> int | None:
+        return self._process.pid
 
     @property
     def public_key_hex(self) -> str:
-        return self._issuer.public_bytes_hex
+        return self._public_key_hex
+
+    def is_alive(self) -> bool:
+        return self._process.is_alive()
+
+    def terminate(self) -> None:
+        if self._process.is_alive():
+            self._process.terminate()
+            self._process.join(timeout=3)
 
     def sign_completed_job_receipt(
         self,
         job_id: str,
         artifact_bytes: bytes,
         caller_identity: str = "COORDINATOR",
+        caller_token: str | None = None,
     ) -> TrainingExecutionReceipt:
-        """Issue an Ed25519 receipt for an authenticated completed job in PostgreSQL authority."""
-        completed_record = self._record_source.get_completed_job_by_id(job_id)
-        if completed_record is None:
-            raise TrainingProvenanceSecurityError(
-                f"Receipt issuance denied: Job '{job_id}' has no trusted COMPLETED record in authority."
-            )
-        computed_sha = hashlib.sha256(artifact_bytes).hexdigest()
-        if not hmac.compare_digest(computed_sha, completed_record.artifact_sha256):
-            raise TrainingProvenanceSecurityError(
-                f"Receipt issuance denied: Provided artifact SHA-256 '{computed_sha}' does not match "
-                f"authoritative completed artifact digest '{completed_record.artifact_sha256}'."
-            )
+        """Request Ed25519 receipt from the isolated issuer process over authenticated IPC."""
+        if not self._process.is_alive():
+            raise TrainingProvenanceSecurityError("Receipt signing service unavailable: issuer process terminated.")
 
-        evidence = TrainingExecutionEvidence(
-            training_run_id=completed_record.training_run_id,
-            job_id=completed_record.job_id,
-            simulation_id=completed_record.simulation_id,
-            completed_at=completed_record.completed_at,
-            status=completed_record.status,
-            executed_rounds=completed_record.executed_rounds,
-            executed_epochs=completed_record.executed_epochs,
-            sample_count=completed_record.sample_count,
-            observed_metrics=dict(completed_record.observed_metrics),
-            artifact_sha256=completed_record.artifact_sha256,
-            architecture=completed_record.architecture,
-            feature_schema_version=completed_record.feature_schema_version,
-            feature_names=list(completed_record.feature_names),
-            producer_id=completed_record.worker_id,
-        )
-        return self._issuer.issue_receipt(evidence=evidence, model_bytes=artifact_bytes)
+        token = caller_token if caller_token is not None else self.coordinator_token
+        self._inbox.put({
+            "command": "SIGN_RECEIPT",
+            "job_id": job_id,
+            "artifact_bytes": artifact_bytes,
+            "auth_token": token,
+            "caller_identity": caller_identity,
+        })
+        try:
+            res = self._outbox.get(timeout=30)
+        except Exception as e:
+            raise TrainingProvenanceSecurityError(f"Receipt signing service timeout or communication failure: {e}") from e
+
+        if res.get("status") == "SUCCESS":
+            return res["receipt"]
+        raise TrainingProvenanceSecurityError(res.get("error", "Receipt signing rejected by isolated issuer."))
 
 
 def setup_bank_private_storage(
@@ -358,12 +512,9 @@ def run_bank_worker_node(
     if data_path is not None:
         if not os.path.exists(data_path):
             raise FileNotFoundError(f"Bank [{bank_id}] private dataset not found at '{data_path}'")
-        loaded_data = np.load(data_path)
-        X_train: np.ndarray = loaded_data["X"]
-        y_train: np.ndarray = loaded_data["y"]
-        # Enforce OS-level boundary lock so external processes cannot read bank private dataset
         bank_vault_dir = os.path.dirname(os.path.dirname(data_path))
         vault_handle = BankPrivateStorageVault(bank_id, bank_vault_dir, bank_token=worker_token)
+        X_train, y_train = vault_handle.read_dataset_as_bank(bank_id, caller_token=worker_token)
         vault_handle.acquire_exclusive_os_boundary()
     elif X_partition is not None and y_partition is not None:
         X_train = X_partition
@@ -381,6 +532,13 @@ def run_bank_worker_node(
             if msg is None or msg.get("command") == "STOP":
                 logger.info("Bank worker [%s] received STOP command. Exiting.", bank_id)
                 break
+
+            if msg.get("command") == "GET_RAW_DATA":
+                outbox.put({
+                    "status": "ERROR",
+                    "error": f"Institutional boundary violation: coordinator cannot request raw bank dataset from {bank_id}.",
+                })
+                continue
 
             if msg.get("command") == "TRAIN_ROUND":
                 job_id = msg["job_id"]
@@ -807,8 +965,14 @@ class DistributedFederatedTrainingManager:
                     job_id=job_id,
                     artifact_bytes=final_model_bytes,
                     caller_identity="COORDINATOR",
+                    caller_token=self.coordinator_token,
                 )
             else:
+                if is_prod:
+                    raise TrainingProvenanceSecurityError(
+                        "Production federated training requires an isolated receipt signing authority. "
+                        "Coordinator cannot self-sign receipts in production."
+                    )
                 active_issuer = receipt_issuer
                 if active_issuer is None:
                     if signing_key_hex is not None:

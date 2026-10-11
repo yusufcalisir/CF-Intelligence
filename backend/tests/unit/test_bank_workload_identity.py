@@ -270,6 +270,7 @@ class TestBankWorkloadIdentity:
             worker_token=BANK_A_SECRET,
             bank_id="BANK_A",
             event_id=fixed_event_id,
+            model_update_digest=f"digest_id08_a_{uuid.uuid4().hex[:8]}",
         )
         assert obs_a.event_id == fixed_event_id
 
@@ -283,4 +284,5 @@ class TestBankWorkloadIdentity:
                 worker_token=BANK_B_SECRET,
                 bank_id="BANK_B",
                 event_id=fixed_event_id,
+                model_update_digest=f"digest_id08_b_{uuid.uuid4().hex[:8]}",
             )

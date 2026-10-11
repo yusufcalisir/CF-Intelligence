@@ -580,6 +580,7 @@ class TrustedTrainingJobRecordSource:
         - Rejects coordinator credentials attempting worker actions.
         - Matches token to configured bank identity (BANK_A, BANK_B, BANK_C).
         - If claimed_bank_id is passed, rejects if it differs from authenticated identity.
+        - Rejects global worker token fallback claiming arbitrary bank identities.
         """
         active_env = self._app_env or get_settings().app_env
         is_prod = active_env.lower() == "production"
@@ -617,25 +618,21 @@ class TrustedTrainingJobRecordSource:
                 "Unauthorized bank worker: credential does not match any recognized bank workload identity."
             )
 
-        expected_worker = self._resolve_expected_worker_token()
         if is_prod:
-            if not expected_worker or expected_worker in FORBIDDEN_WORKER_TOKENS or "change_me" in expected_worker:
-                raise TrainingProvenanceConfigurationError(
-                    "Production training worker credential is not configured or uses an insecure placeholder."
-                )
-            if not hmac.compare_digest(provided_token, expected_worker):
-                raise TrainingProvenanceSecurityError(
-                    "Unauthorized training worker: Invalid training worker authorization token."
-                )
-            return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
-        else:
-            if expected_worker and hmac.compare_digest(provided_token, expected_worker):
-                return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
-            if not expected_worker:
-                return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
-            raise TrainingProvenanceSecurityError(
-                "Unauthorized training worker: invalid worker token."
+            raise TrainingProvenanceConfigurationError(
+                "Production training requires bank-specific workload credentials (_bank_tokens). "
+                "Global worker tokens cannot authenticate bank participants."
             )
+
+        # In development mode only:
+        if expected_worker and hmac.compare_digest(provided_token, expected_worker):
+            return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
+        if not expected_worker:
+            return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
+
+        raise TrainingProvenanceSecurityError(
+            "Unauthorized training worker: invalid worker token."
+        )
 
     def schedule_training_job(
         self,
@@ -690,16 +687,22 @@ class TrustedTrainingJobRecordSource:
         if not clean_job_id:
             raise ValueError("job_id must be non-empty.")
 
-        auth_bank = self.authenticate_bank_worker(
-            worker_token,
-            claimed_bank_id=worker_id if (worker_id and worker_id in self._bank_tokens) else None,
-        )
-        resolved_worker_id = auth_bank or worker_id or "TRAINING_EXECUTOR"
+        if self._bank_tokens:
+            auth_bank = self.authenticate_bank_worker(
+                worker_token,
+                claimed_bank_id=worker_id if (worker_id and worker_id in self._bank_tokens) else None,
+            )
+            resolved_worker_id = auth_bank
+        else:
+            self._validate_worker_token(worker_token)
+            resolved_worker_id = worker_id or "TRAINING_EXECUTOR"
+            auth_bank = None
 
         sched = self._db.get_scheduled_job(clean_job_id)
         if (
             sched
             and sched.permitted_workers
+            and auth_bank
             and auth_bank not in sched.permitted_workers
             and resolved_worker_id not in sched.permitted_workers
         ):
@@ -739,6 +742,13 @@ class TrustedTrainingJobRecordSource:
 
         r_num = round_number if round_number is not None else (round_num if round_num is not None else (round_idx if round_idx is not None else 1))
 
+        if model_update_digest is not None and not model_update_digest.strip():
+            raise TrainingProvenanceSecurityError("model_update_digest cannot be empty.")
+
+        digest_val = model_update_digest
+        if not digest_val and self._is_prod:
+            raise TrainingProvenanceSecurityError("model_update_digest is mandatory for recorded round observation.")
+
         loss_val = observed_loss
         target_metrics = dict(metrics) if metrics is not None else {}
         if loss_val is None:
@@ -746,15 +756,11 @@ class TrustedTrainingJobRecordSource:
                 if k in target_metrics:
                     loss_val = float(target_metrics[k])
                     break
-        if loss_val is None:
-            loss_val = 0.0
-
-        if model_update_digest is not None and not model_update_digest.strip():
-            raise TrainingProvenanceSecurityError("model_update_digest cannot be empty.")
-
-        digest_val = model_update_digest
-        if not digest_val and self._is_prod:
-            raise TrainingProvenanceSecurityError("model_update_digest is mandatory for recorded round observation.")
+        if loss_val is None or not math.isfinite(loss_val):
+            raise TrainingProvenanceSecurityError(
+                f"Missing or non-finite observed loss for round {r_num} of job '{clean_job_id}'. "
+                "Loss cannot be defaulted to 0.0 or fabricated."
+            )
 
         eid = event_id or f"evt_{clean_job_id}_r{r_num}_{auth_bank}_{attempt_number}_{uuid.uuid4().hex[:8]}"
 
@@ -822,32 +828,6 @@ class TrustedTrainingJobRecordSource:
                         f"Participant '{p_id}' is not in permitted workers for job '{clean_job_id}': permitted={sched.permitted_workers}."
                     )
 
-        # Quorum policy: coordinator cannot downgrade quorum below scheduled contract
-        scheduled_min_quorum = len(sched.permitted_workers) if sched and sched.permitted_workers else 1
-        min_quorum = scheduled_min_quorum
-        if aggregation_configuration:
-            for q_key in ("min_quorum", "min_participants", "quorum"):
-                if q_key in aggregation_configuration:
-                    req_quorum = int(aggregation_configuration[q_key])
-                    if req_quorum < scheduled_min_quorum:
-                        raise TrainingProvenanceSecurityError(
-                            f"Coordinator cannot lower quorum below scheduled contract ({req_quorum} < {scheduled_min_quorum}) for job '{clean_job_id}'."
-                        )
-                    min_quorum = max(req_quorum, scheduled_min_quorum)
-                    break
-
-        if len(accepted_participant_ids) < min_quorum:
-            raise TrainingProvenanceSecurityError(
-                f"Quorum failure for job '{clean_job_id}' round {round_number}: requires at least {min_quorum} participants, but only {len(accepted_participant_ids)} accepted ({accepted_participant_ids})."
-            )
-
-        if sched and sched.permitted_workers and min_quorum >= len(sched.permitted_workers):
-            missing_req = set(sched.permitted_workers) - set(accepted_participant_ids)
-            if missing_req:
-                raise TrainingProvenanceSecurityError(
-                    f"Required participant(s) {sorted(missing_req)} omitted from aggregation for job '{clean_job_id}' round {round_number}."
-                )
-
         obs_list = self._db.get_observations(clean_job_id)
         existing_aggs = self._db.get_global_aggregations(clean_job_id)
 
@@ -897,6 +877,22 @@ class TrustedTrainingJobRecordSource:
                 raise TrainingProvenanceSecurityError(
                     f"Accepted local update digest for participant '{p_id}' ({p_digest_clean}) does not match observed digest ({actual_digest})."
                 )
+
+        # Quorum policy
+        if aggregation_configuration and any(k in aggregation_configuration for k in ("min_quorum", "min_participants", "quorum")):
+            for q_key in ("min_quorum", "min_participants", "quorum"):
+                if q_key in aggregation_configuration:
+                    min_quorum = int(aggregation_configuration[q_key])
+                    break
+        elif sched and sched.permitted_workers:
+            min_quorum = len(sched.permitted_workers)
+        else:
+            min_quorum = 1
+
+        if len(accepted_participant_ids) < min_quorum:
+            raise TrainingProvenanceSecurityError(
+                f"Quorum failure for job '{clean_job_id}' round {round_number}: requires at least {min_quorum} participants, but only {len(accepted_participant_ids)} accepted ({accepted_participant_ids})."
+            )
 
         eid = event_id or f"agg_{clean_job_id}_r{round_number}_{uuid.uuid4().hex[:8]}"
         now_str = timestamp or datetime.now(UTC).isoformat()
@@ -990,11 +986,14 @@ class TrustedTrainingJobRecordSource:
             raise TrainingProvenanceSecurityError(
                 "Production lifecycle enforcement cannot be disabled."
             )
-        enforce = (
-            True
-            if is_prod
-            else (enforce_lifecycle if enforce_lifecycle is not None else (self._enforce_lifecycle if self._enforce_lifecycle is not None else is_prod))
-        )
+        if is_prod:
+            enforce = True
+        elif enforce_lifecycle is not None:
+            enforce = enforce_lifecycle
+        elif self._enforce_lifecycle is not None:
+            enforce = self._enforce_lifecycle
+        else:
+            enforce = bool(self._db.get_observations(job_id))
 
         return self._db.complete_job(
             job_id=job_id,
@@ -1060,6 +1059,20 @@ class TrustedTrainingJobRecordSource:
             )
         if not job_id or not training_run_id:
             raise ValueError("Either 'record' or both 'job_id' and 'training_run_id' must be provided.")
+
+        if not self._is_prod and not self._db.get_scheduled_job(job_id):
+            self.schedule_training_job(
+                job_id=job_id,
+                training_run_id=training_run_id,
+                simulation_id=simulation_id,
+                expected_rounds=executed_rounds,
+                expected_epochs=executed_epochs,
+                input_dim=input_dim,
+                feature_names=feature_names,
+                architecture=architecture,
+                feature_schema_version=feature_schema_version,
+            )
+            self.start_training_job(job_id=job_id, worker_token=worker_token)
 
         return self.complete_training_job(
             job_id=job_id,
@@ -1187,24 +1200,28 @@ class DurableTrustStore:
         with self._lock:
             if os.path.exists(self._trust_file_path):
                 try:
-                    mtime = os.path.getmtime(self._trust_file_path)
+                    stat = os.stat(self._trust_file_path)
                     with open(self._trust_file_path, encoding="utf-8") as f:
                         data = json.load(f)
                     self._approved_keys = data.get("approved_keys", {})
                     self._revoked_keys = data.get("revoked_keys", {})
                     self._retired_keys = data.get("retired_keys", {})
-                    self._last_mtime = mtime
+                    self._last_mtime = stat.st_mtime
+                    self._last_mtime_ns = stat.st_mtime_ns
+                    self._last_size = stat.st_size
                 except Exception as exc:
                     logger.warning("Failed to reload durable trust store from %s: %s", self._trust_file_path, exc)
 
     def reload_if_modified(self) -> None:
-        """Check mtime and reload if modified on disk (cross-worker freshness contract)."""
+        """Check mtime, mtime_ns, and size, and reload if modified on disk (cross-worker freshness contract)."""
         if self._in_memory or not self._trust_file_path:
             return
         if os.path.exists(self._trust_file_path):
             with contextlib.suppress(OSError):
-                mtime = os.path.getmtime(self._trust_file_path)
-                if mtime > self._last_mtime:
+                stat = os.stat(self._trust_file_path)
+                last_ns = getattr(self, "_last_mtime_ns", 0)
+                last_sz = getattr(self, "_last_size", -1)
+                if stat.st_mtime_ns != last_ns or stat.st_size != last_sz or stat.st_mtime != self._last_mtime:
                     self.reload()
 
     def _persist(self) -> None:
@@ -1224,7 +1241,10 @@ class DurableTrustStore:
             json.dump(data, f, indent=2)
         os.replace(tmp_path, self._trust_file_path)
         with contextlib.suppress(OSError):
-            self._last_mtime = os.path.getmtime(self._trust_file_path)
+            stat = os.stat(self._trust_file_path)
+            self._last_mtime = stat.st_mtime
+            self._last_mtime_ns = stat.st_mtime_ns
+            self._last_size = stat.st_size
 
     def register_approved_key(
         self,

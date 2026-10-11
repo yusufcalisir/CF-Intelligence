@@ -90,13 +90,38 @@ class TestLifecycleEnforcementAttacks:
     def test_lc_02_direct_postgres_authority_complete_without_prior_lifecycle_fails(
         self, real_pg_instance: str
     ) -> None:
-        """LC-02: Direct call to PostgreSQL authority complete_job with enforce_lifecycle=False fails without auto-creation."""
+        """LC-02 (Defect A): Direct call to PostgreSQL authority complete_job with enforce_lifecycle=False is rejected even on scheduled/started job."""
         authority = PostgresTrainingJobAuthority(db_url=real_pg_instance)
-        fake_job_id = f"job_lc02_{uuid.uuid4().hex[:8]}"
+        job_id = f"job_lc02_{uuid.uuid4().hex[:8]}"
 
-        with pytest.raises(TrainingProvenanceSecurityError, match="has not been scheduled|was not scheduled"):
+        # 1. Schedule a legitimate job
+        authority.schedule_job(
+            job_id=job_id,
+            training_run_id=f"run_lc02_{uuid.uuid4().hex[:8]}",
+            simulation_id="sim_lc02",
+            coordinator_id="coord_lc02",
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=len(FEATURE_NAMES),
+            feature_names=list(FEATURE_NAMES),
+            permitted_workers=["BANK_A"],
+        )
+        # 2. Transition the job to STARTED
+        authority.start_job(job_id=job_id, worker_id="BANK_A")
+
+        # 3. Write ZERO execution observations
+        # 4. Write ZERO aggregation evidence
+        # 5. Write ZERO evaluation evidence
+
+        # Direct complete_job with enforce_lifecycle=False must be strictly REJECTED
+        with pytest.raises(
+            TrainingProvenanceSecurityError,
+            match="enforce_lifecycle=False is forbidden|All completed training records must be backed by genuine execution evidence",
+        ):
             authority.complete_job(
-                job_id=fake_job_id,
+                job_id=job_id,
                 executed_rounds=1,
                 executed_epochs=1,
                 sample_count=50,
@@ -106,8 +131,8 @@ class TestLifecycleEnforcementAttacks:
                 enforce_lifecycle=False,
             )
 
-        # Verify database has zero records for this job
-        assert authority.get_completed_job_by_id(fake_job_id) is None
+        # Verify database has zero completed records for this job
+        assert authority.get_completed_job_by_id(job_id) is None
 
     def test_lc_03_completion_with_zero_observed_rounds_rejected(
         self, real_pg_instance: str
@@ -157,7 +182,7 @@ class TestLifecycleEnforcementAttacks:
         ghost_job_id = f"job_lc04_{uuid.uuid4().hex[:8]}"
 
         # Attempting completion for ghost job
-        with pytest.raises(TrainingProvenanceSecurityError, match="has not been scheduled|was not scheduled"):
+        with pytest.raises(TrainingProvenanceSecurityError, match="enforce_lifecycle=False is forbidden|has not been scheduled|was not scheduled"):
             authority.complete_job(
                 job_id=ghost_job_id,
                 executed_rounds=1,

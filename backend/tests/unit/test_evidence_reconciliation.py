@@ -492,7 +492,7 @@ class TestEvidenceReconciliation:
         # Claiming an arbitrary number like 9999 fails
         with pytest.raises(TrainingProvenanceSecurityError, match="Sample count mismatch"):
             evidence_source.complete_training_job(
-                job_id=job_id, executed_rounds=2, executed_epochs=1,
+                job_id=job_id, executed_rounds=2, executed_epochs=2,
                 sample_count=9999, observed_metrics={"loss": 0.30},
                 artifact_sha256=g_d2, worker_token=BANK_A_SECRET,
             )
@@ -500,14 +500,14 @@ class TestEvidenceReconciliation:
         # Claiming repeated sample exposures (600) instead of unique samples (300) fails under strict accounting contract
         with pytest.raises(TrainingProvenanceSecurityError, match="Repeated sample exposures cannot substitute for unique dataset samples"):
             evidence_source.complete_training_job(
-                job_id=job_id, executed_rounds=2, executed_epochs=1,
+                job_id=job_id, executed_rounds=2, executed_epochs=2,
                 sample_count=600, observed_metrics={"loss": 0.30},
                 artifact_sha256=g_d2, worker_token=BANK_A_SECRET,
             )
 
         # Claiming canonical unique_bank_samples (300) succeeds
         rec = evidence_source.complete_training_job(
-            job_id=job_id, executed_rounds=2, executed_epochs=1,
+            job_id=job_id, executed_rounds=2, executed_epochs=2,
             sample_count=300, observed_metrics={"loss": 0.30},
             artifact_sha256=g_d2, worker_token=BANK_A_SECRET,
         )
@@ -804,7 +804,7 @@ class TestEvidenceReconciliation:
 
         with pytest.raises(TrainingProvenanceSecurityError, match="Global aggregation round continuity mismatch"):
             evidence_source.complete_training_job(
-                job_id=job_id, executed_rounds=2, executed_epochs=1, sample_count=100,
+                job_id=job_id, executed_rounds=2, executed_epochs=2, sample_count=100,
                 observed_metrics={"loss": 0.35}, artifact_sha256=g1,
                 worker_token=BANK_A_SECRET,
             )

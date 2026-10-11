@@ -146,6 +146,7 @@ agents.md
 .roo/
 .cline/
 scratch/
+artifacts/
 phases/
 audit_phases/
 FULL_PERSISTENT_AUDIT_REPORT.md

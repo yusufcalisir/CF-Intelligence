@@ -21,9 +21,11 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import os
+import urllib.parse
 import uuid
 from collections.abc import Generator
 
+import psycopg
 import pytest
 
 from app.application.services.training_provenance_service import (
@@ -189,6 +191,65 @@ class TestPostgresAuthorityPolicy:
                         ) VALUES ('j', 'r', 's', 'c', 'a', 'v', 1, 1, 1, '[]', 'f', 't')
                         """
                     )
+
+    def test_db_07b_real_restricted_role_privilege_enforcement(
+        self, real_pg_instance: str
+    ) -> None:
+        """DB-07b: Dedicated restricted role receives SQLSTATE 42501 (InsufficientPrivilege) on unauthorized writes."""
+        authority = PostgresTrainingJobAuthority(db_url=real_pg_instance)
+        role_name = f"cfi_reader_{uuid.uuid4().hex[:6]}"
+        role_pass = "restricted_secret_123"
+
+        # Setup restricted role using admin connection
+        with authority._connect() as conn:
+            conn.autocommit = True
+            with conn.cursor() as cur:
+                cur.execute(f"DROP ROLE IF EXISTS {role_name}")
+                cur.execute(f"CREATE ROLE {role_name} WITH LOGIN PASSWORD '{role_pass}'")
+                cur.execute(f"GRANT USAGE ON SCHEMA public TO {role_name}")
+                cur.execute(f"GRANT SELECT ON ALL TABLES IN SCHEMA public TO {role_name}")
+                cur.execute(f"REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM {role_name}")
+
+        parsed = urllib.parse.urlsplit(real_pg_instance)
+        restricted_netloc = f"{role_name}:{role_pass}@{parsed.hostname}:{parsed.port}"
+        restricted_url = urllib.parse.urlunsplit(
+            (parsed.scheme, restricted_netloc, parsed.path, parsed.query, parsed.fragment)
+        )
+
+        # Connect as restricted role and attempt unauthorized mutations
+        with psycopg.connect(restricted_url) as rconn:
+            with rconn.cursor() as rcur:
+                # 1. INSERT rejected with SQLSTATE 42501
+                with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc_insert:
+                    rcur.execute(
+                        """
+                        INSERT INTO cfi_scheduled_jobs (
+                            job_id, training_run_id, simulation_id, coordinator_id,
+                            architecture, feature_schema_version, expected_rounds,
+                            expected_epochs, input_dim, feature_names_json, config_fingerprint, scheduled_at
+                        ) VALUES ('unauth_j', 'unauth_r', 'unauth_s', 'c', 'a', 'v', 1, 1, 1, '[]', 'f', 't')
+                        """
+                    )
+                assert exc_insert.value.sqlstate == "42501"
+                rconn.rollback()
+
+                # 2. UPDATE rejected with SQLSTATE 42501
+                with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc_update:
+                    rcur.execute("UPDATE cfi_completed_jobs SET status = 'TAMPERED'")
+                assert exc_update.value.sqlstate == "42501"
+                rconn.rollback()
+
+                # 3. DELETE rejected with SQLSTATE 42501
+                with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc_delete:
+                    rcur.execute("DELETE FROM cfi_round_observations")
+                assert exc_delete.value.sqlstate == "42501"
+                rconn.rollback()
+
+                # 4. SELECT permitted for read-only inspection
+                rcur.execute("SELECT COUNT(*) FROM cfi_scheduled_jobs")
+                count = rcur.fetchone()[0]
+                assert count >= 0
+
 
     def test_db_08_separate_os_processes_execute_concurrent_postgres_writes(
         self, real_pg_instance: str

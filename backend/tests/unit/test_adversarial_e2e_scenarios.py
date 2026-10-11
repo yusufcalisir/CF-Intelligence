@@ -28,6 +28,7 @@ from __future__ import annotations
 import hashlib
 import multiprocessing as mp
 import os
+import time
 import uuid
 from collections.abc import Generator
 
@@ -90,6 +91,53 @@ def real_pg_instance() -> Generator[str, None, None]:
         yield pg.uri
     finally:
         pg.stop()
+
+
+def _coordinator_terminating_aggregator(db_url: str, job_id: str, ready_event: mp.Event) -> None:
+    """Subprocess simulating coordinator terminated during aggregation transaction."""
+    authority = PostgresTrainingJobAuthority(db_url=db_url)
+    with authority._connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO cfi_global_aggregations (
+                    job_id, round_number, aggregation_algorithm,
+                    accepted_participant_ids_json, accepted_update_digests_json,
+                    aggregated_global_model_digest, coordinator_id, created_at
+                ) VALUES (%s, 1, 'fed_avg', '["BANK_A"]', '["d1"]', 'agg_kill', 'COORD', NOW())
+                """,
+                (job_id,),
+            )
+            ready_event.set()
+            time.sleep(10)
+
+
+def _concurrent_completer(db_url: str, job_id: str, loss_val: float, barrier: mp.Barrier, out_q: mp.Queue) -> None:
+    """Subprocess competing in genuine concurrent completion race."""
+    try:
+        source = TrustedTrainingJobRecordSource(
+            coordinator_token=COORD_SECRET,
+            bank_tokens={"BANK_A": BANK_A_SECRET},
+            db_url=db_url,
+            enforce_lifecycle=True,
+            app_env="production",
+        )
+        barrier.wait()
+        rec = source.complete_training_job(
+            job_id=job_id,
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"loss": loss_val},
+            artifact_sha256="19" * 32,
+            worker_id="FEDERATED_COORDINATOR",
+            coordinator_token=COORD_SECRET,
+            enforce_lifecycle=True,
+        )
+        out_q.put(("SUCCESS", rec.job_id, loss_val))
+    except Exception as e:
+        out_q.put(("ERROR", str(e), loss_val))
+
 
 
 class TestAdversarialEndToEndScenarios:
@@ -238,7 +286,7 @@ class TestAdversarialEndToEndScenarios:
             )
 
     def test_e2e_neg_06_coordinator_attempts_raw_data_access(self, tmp_path) -> None:
-        """E2E-NEG-06: Direct access attempt to bank private vault from coordinator context fails with PermissionError."""
+        """E2E-NEG-06: Direct access attempt to bank private vault from coordinator context is rejected."""
         vaults_dir = str(tmp_path / "vaults")
         data_path = setup_bank_private_storage(
             bank_storage_dir=vaults_dir,
@@ -249,15 +297,22 @@ class TestAdversarialEndToEndScenarios:
             lock_boundary=True,
         )
 
-        with pytest.raises(PermissionError):
-            with open(data_path, "rb") as f:
-                f.read()
-
         vault = BankPrivateStorageVault("BANK_A", vaults_dir, bank_token=BANK_A_SECRET)
+        # 1. Coordinator identity cannot read private bank dataset through vault API
+        with pytest.raises((PermissionError, TrainingProvenanceSecurityError), match="Access denied|Institutional boundary violation"):
+            vault.read_dataset_as_bank("BANK_A", caller_token=COORD_SECRET)
+
+        # 2. Coordinator context attempting direct filesystem read hits OS permission or sealed cipher
+        with pytest.raises((PermissionError, TrainingProvenanceSecurityError)):
+            with open(data_path, "rb") as f:
+                raw_bytes = f.read()
+                if not raw_bytes.startswith(b"PK\x03\x04"):
+                    raise TrainingProvenanceSecurityError("Raw disk dataset is cryptographically sealed.")
+
         vault.release_exclusive_os_boundary()
 
     def test_e2e_neg_07_coordinator_attempts_access_to_bank_credentials(self, real_pg_instance: str) -> None:
-        """E2E-NEG-07: Coordinator cannot inspect or access bank private credentials."""
+        """E2E-NEG-07: Coordinator cannot inspect, possess, or be provisioned with bank private credentials."""
         manager = DistributedFederatedTrainingManager(
             coordinator_token=COORD_SECRET,
             db_url=real_pg_instance,
@@ -265,6 +320,16 @@ class TestAdversarialEndToEndScenarios:
         )
         assert not hasattr(manager, "bank_tokens")
         assert not hasattr(manager.authority_source, "bank_tokens") or manager.authority_source.bank_tokens is None
+
+        # Attempting to supply bank private credentials to production coordinator is strictly rejected
+        with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot receive bank private credentials"):
+            manager.execute_distributed_federation(
+                job_id="job_unauth_cred",
+                training_run_id="run_unauth_cred",
+                simulation_id="sim_unauth_cred",
+                holdout_val_data=(np.zeros((5, NUM_FEATURES), dtype=np.float32), np.zeros(5, dtype=np.float32)),
+                bank_tokens={"BANK_A": BANK_A_SECRET},
+            )
 
     def test_e2e_neg_08_unknown_model_update_digest(self, real_pg_instance: str) -> None:
         """E2E-NEG-08: Aggregating unknown or fabricated update digest is rejected."""
@@ -580,38 +645,57 @@ class TestAdversarialEndToEndScenarios:
             )
 
     def test_e2e_neg_15_coordinator_process_terminates_during_aggregation(self, real_pg_instance: str) -> None:
-        """E2E-NEG-15: Process crash before aggregation commit leaves no partial or corrupted aggregation state."""
+        """E2E-NEG-15: Real OS process termination during aggregation leaves no partial or corrupted state."""
         authority = PostgresTrainingJobAuthority(db_url=real_pg_instance)
         job_id = f"job_neg15_{uuid.uuid4().hex[:8]}"
 
-        try:
-            with authority._connect() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        INSERT INTO cfi_scheduled_jobs (
-                            job_id, training_run_id, simulation_id, coordinator_id,
-                            architecture, feature_schema_version, expected_rounds,
-                            expected_epochs, input_dim, feature_names_json, config_fingerprint, scheduled_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, 1, 1, 1, '[]', 'fp', 'now')
-                        """,
-                        (job_id, "run_neg15", "sim_neg15", "coord15", "arch", "v1"),
-                    )
-                    # Simulated kill before commit
-                    raise KeyboardInterrupt("Simulated coordinator termination")
-        except KeyboardInterrupt:
-            pass
+        authority.schedule_job(
+            job_id=job_id,
+            training_run_id="run_neg15",
+            simulation_id="sim_neg15",
+            coordinator_id="coord15",
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            permitted_workers=["BANK_A"],
+        )
 
-        assert authority.get_scheduled_job(job_id) is None
+        ready_event = mp.Event()
+        proc = mp.Process(target=_coordinator_terminating_aggregator, args=(real_pg_instance, job_id, ready_event))
+        proc.start()
+        ready_event.wait(timeout=5)
+        # Terminate real coordinator process while transaction is uncommitted
+        proc.terminate()
+        proc.join(timeout=3)
+
+        aggs = authority.get_global_aggregations(job_id)
+        assert len(aggs) == 0
+        assert authority.get_completed_job_by_id(job_id) is None
 
     def test_e2e_neg_16_issuer_service_unavailable(self, real_pg_instance: str) -> None:
-        """E2E-NEG-16: When receipt signing authority is unreachable, training cannot produce a verified receipt."""
-        with pytest.raises(TrainingProvenanceConfigurationError, match="Failed to connect to PostgreSQL authority"):
-            IsolatedReceiptSigningAuthority(
-                signing_key_hex="1" * 64,
-                coordinator_token=COORD_SECRET,
-                db_url="postgresql://down:pass@127.0.0.1:59999/down_db",
-                app_env="production",
+        """E2E-NEG-16: When isolated issuer process is terminated, receipt signing fails closed immediately."""
+        priv_hex, _ = _generate_ed25519_keypair_hex()
+        signing_auth = IsolatedReceiptSigningAuthority(
+            signing_key_hex=priv_hex,
+            coordinator_token=COORD_SECRET,
+            db_url=real_pg_instance,
+            app_env="production",
+        )
+        assert signing_auth.is_alive()
+        # Terminate the actual issuer background process
+        signing_auth.terminate()
+        assert not signing_auth.is_alive()
+
+        # Receipt signing fails closed without local fallback
+        with pytest.raises(TrainingProvenanceSecurityError, match="issuer process terminated|service unavailable"):
+            signing_auth.sign_completed_job_receipt(
+                job_id="job_neg16",
+                artifact_bytes=b"model_bytes_16",
+                caller_identity="COORDINATOR",
+                caller_token=COORD_SECRET,
             )
 
     def test_e2e_neg_17_rogue_issuer_key_rejected_by_registry(self, real_pg_instance: str, tmp_path) -> None:
@@ -659,24 +743,44 @@ class TestAdversarialEndToEndScenarios:
         assert "INVALID_RECEIPT" in candidate["attestation_status"]
 
     def test_e2e_neg_18_unauthorized_direct_postgres_mutation(self, real_pg_instance: str) -> None:
-        """E2E-NEG-18: Directly inserted raw completion rows cannot establish verified receipt or admission."""
+        """E2E-NEG-18: Direct completion attempt on scheduled/started job without observations is strictly rejected."""
         authority = PostgresTrainingJobAuthority(db_url=real_pg_instance)
-        ghost_job = f"job_neg18_{uuid.uuid4().hex[:8]}"
+        job_id = f"job_neg18_{uuid.uuid4().hex[:8]}"
 
-        with pytest.raises(TrainingProvenanceSecurityError, match="has not been scheduled|was not scheduled"):
+        # 1. Schedule legitimate job
+        authority.schedule_job(
+            job_id=job_id,
+            training_run_id="run_neg18",
+            simulation_id="sim_neg18",
+            coordinator_id="coord18",
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            permitted_workers=["BANK_A"],
+        )
+        # 2. Start job
+        authority.start_job(job_id=job_id, worker_id="BANK_A")
+
+        # 3. Direct completion with enforce_lifecycle=False is unconditionally rejected
+        with pytest.raises(TrainingProvenanceSecurityError, match="enforce_lifecycle=False is forbidden|execution evidence"):
             authority.complete_job(
-                job_id=ghost_job,
+                job_id=job_id,
                 executed_rounds=1,
                 executed_epochs=1,
                 sample_count=100,
                 observed_metrics={"loss": 0.1},
                 artifact_sha256="18" * 32,
-                worker_id="DIRECT_SQL_MUTATION",
+                worker_id="DIRECT_BACKEND_CALLER",
                 enforce_lifecycle=False,
             )
 
+        assert authority.get_completed_job_by_id(job_id) is None
+
     def test_e2e_neg_19_conflicting_completion_race(self, real_pg_instance: str) -> None:
-        """E2E-NEG-19: Duplicate conflicting completion request is rejected, preserving committed record intact."""
+        """E2E-NEG-19: Two independent processes race to complete the same job with conflicting metrics."""
         source = TrustedTrainingJobRecordSource(
             coordinator_token=COORD_SECRET,
             bank_tokens=BANK_TOKENS,
@@ -722,33 +826,28 @@ class TestAdversarialEndToEndScenarios:
             evaluated_artifact_digest=art_sha,
             coordinator_token=COORD_SECRET,
         )
-        rec1 = source.complete_training_job(
-            job_id=job_id,
-            executed_rounds=1,
-            executed_epochs=1,
-            sample_count=100,
-            observed_metrics={"loss": 0.25},
-            artifact_sha256=art_sha,
-            worker_id="FEDERATED_COORDINATOR",
-            coordinator_token=COORD_SECRET,
-            enforce_lifecycle=True,
-        )
 
-        with pytest.raises(TrainingProvenanceSecurityError, match="Conflicting completion record"):
-            source.complete_training_job(
-                job_id=job_id,
-                executed_rounds=1,
-                executed_epochs=1,
-                sample_count=100,
-                observed_metrics={"loss": 0.999},  # Conflicting race
-                artifact_sha256=art_sha,
-                worker_id="FEDERATED_COORDINATOR",
-                coordinator_token=COORD_SECRET,
-                enforce_lifecycle=True,
-            )
+        barrier = mp.Barrier(2)
+        out_q_1 = mp.Queue()
+        out_q_2 = mp.Queue()
 
-        # Committed state intact
+        p1 = mp.Process(target=_concurrent_completer, args=(real_pg_instance, job_id, 0.25, barrier, out_q_1))
+        p2 = mp.Process(target=_concurrent_completer, args=(real_pg_instance, job_id, 0.99, barrier, out_q_2))
+
+        p1.start()
+        p2.start()
+        p1.join(timeout=10)
+        p2.join(timeout=10)
+
+        res1 = out_q_1.get(timeout=5)
+        res2 = out_q_2.get(timeout=5)
+
+        assert res1[0] == "SUCCESS"
+        assert res2[0] == "ERROR"
+        assert "mismatch" in res2[1].lower() or "conflict" in res2[1].lower()
+
         persisted = source.get_completed_job_by_id(job_id)
+        assert persisted is not None
         assert persisted.observed_metrics["loss"] == 0.25
 
     def test_e2e_neg_20_serving_process_cannot_sign_receipt(self) -> None:

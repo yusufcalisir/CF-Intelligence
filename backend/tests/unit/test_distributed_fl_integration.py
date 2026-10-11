@@ -21,12 +21,14 @@ import uuid
 from collections.abc import Generator
 from typing import Any
 
+import hashlib
 import numpy as np
 import pytest
 
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
     DistributedFederatedTrainingManager,
+    IsolatedReceiptSigningAuthority,
     _generate_ed25519_keypair_hex,
     setup_bank_private_storage,
     spawn_bank_workers,
@@ -34,6 +36,7 @@ from app.application.services.distributed_fl_service import (
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES
 from app.application.services.training_provenance_service import (
+    DEFAULT_TRAINING_KEY_ID,
     TrainingProvenanceSecurityError,
     TrainingReceiptIssuer,
     TrustedTrainingJobRecordSource,
@@ -127,6 +130,15 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
     )
 
     registry_dir = str(tmp_path / "registry")
+    dev_seed = hashlib.sha256(b"cfi_dev_ed25519_training_issuer_seed_v1").digest().hex()
+    signing_auth = IsolatedReceiptSigningAuthority(
+        signing_key_hex=dev_seed,
+        coordinator_token=COORD_SECRET,
+        db_url=real_pg_instance,
+        key_id=DEFAULT_TRAINING_KEY_ID,
+        app_env="production",
+    )
+
     result = manager.execute_distributed_federation(
         job_id=job_id,
         training_run_id=run_id,
@@ -138,6 +150,7 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
         num_rounds=2,
         expected_unique_samples=450,
         registry_storage_dir=registry_dir,
+        signing_authority=signing_auth,
     )
     result["job_id"] = job_id
     result["run_id"] = run_id
