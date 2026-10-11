@@ -19,6 +19,7 @@ import os
 import sqlite3
 import threading
 import types
+import urllib.parse
 import uuid
 from collections.abc import Generator, Mapping, Sequence
 from datetime import UTC, datetime
@@ -51,6 +52,22 @@ class TrainingProvenanceSecurityError(ValueError, PermissionError):
     """Raised when an unauthorized, forged, conflicting, or mismatched training event is detected."""
 
     pass
+
+
+def redact_database_url(url: str) -> str:
+    """Redact sensitive password credentials from database URLs for safe logging and error reporting."""
+    if not url:
+        return ""
+    try:
+        clean = url.strip()
+        parsed = urllib.parse.urlsplit(clean)
+        if parsed.password:
+            netloc = parsed.netloc.replace(f":{parsed.password}@", ":***@")
+            return urllib.parse.urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+        return clean
+    except Exception:
+        import re
+        return re.sub(r":([^@/:]+)@", ":***@", url)
 
 
 # ---------------------------------------------------------------------------
@@ -512,39 +529,62 @@ def reconcile_job_completion_evidence(
                 f"Job '{clean_job_id}' completed fewer rounds than scheduled contract: expected {sched_expected_rounds}, got {executed_rounds}."
             )
 
-        # 2. Strict Sample Accounting
+        # 2. Strict, Unambiguous Accounting Contract
         latest_round = max(observed_round_nums)
-        # Unique bank partition samples (each bank contributes its local partition size per round)
-        unique_bank_samples = sum(
+        accepted_global_round_count = len(observed_round_nums)
+        accepted_bank_contribution_count = len(completed_obs)
+        observed_local_epoch_count = sum(r.actual_executed_epochs for r in completed_obs)
+        processed_sample_exposures = sum(r.actual_sample_count * max(1, r.actual_executed_epochs) for r in completed_obs)
+        reported_unique_dataset_samples = sum(
             {r.bank_id: r.actual_sample_count for r in completed_obs if r.round_number == latest_round}.values()
         )
-        # Total sample exposures across all local rounds and attempts
-        processed_sample_exposures = sum(r.actual_sample_count for r in completed_obs)
-        latest_round_samples = sum(r.actual_sample_count for r in completed_obs if r.round_number == latest_round)
 
-        sample_matches = sample_count in (
-            unique_bank_samples,
+        logger.debug(
+            "Reconciliation accounting for %s: rounds=%d, contributions=%d, local_epochs=%d, exposures=%d, unique_samples=%d",
+            clean_job_id,
+            accepted_global_round_count,
+            accepted_bank_contribution_count,
+            observed_local_epoch_count,
             processed_sample_exposures,
-            latest_round_samples,
+            reported_unique_dataset_samples,
         )
-        if not sample_matches:
+
+        # Canonical receipt contract: sample_count MUST represent the unique dataset samples across participating banks.
+        # Repeated sample exposures cannot be substituted for unique dataset samples.
+        if sample_count != reported_unique_dataset_samples:
             raise TrainingProvenanceSecurityError(
-                f"Sample count mismatch for job '{clean_job_id}': claimed {sample_count}, but reconciled observed count is unique={unique_bank_samples}, total_exposures={processed_sample_exposures}."
+                f"Sample count mismatch for job '{clean_job_id}': claimed {sample_count}, but canonical unique dataset samples across participating banks is {reported_unique_dataset_samples} (processed_sample_exposures={processed_sample_exposures}). Repeated sample exposures cannot substitute for unique dataset samples."
             )
 
         # 3. Executed epochs reconciliation
+        # Executed epochs must be derived directly from actual accepted execution events.
+        # Planned configuration epochs cannot substitute for unexecuted epochs.
         if executed_epochs > 0:
             observed_epochs_sum = sum(r.actual_executed_epochs for r in completed_obs if r.round_number == latest_round)
             total_epochs_sum = sum(r.actual_executed_epochs for r in completed_obs)
-            if observed_epochs_sum == 0 and total_epochs_sum == 0 and sched_row["expected_epochs"] == 0:
-                pass
-            elif executed_epochs not in (observed_epochs_sum, total_epochs_sum, sched_row["expected_epochs"]):
+            sequential_global_epochs = sum(
+                max(r.actual_executed_epochs for r in completed_obs if r.round_number == rnd)
+                for rnd in observed_round_nums
+            )
+            per_round_epochs = max(r.actual_executed_epochs for r in completed_obs if r.round_number == latest_round)
+            valid_observed_epochs = {sequential_global_epochs, total_epochs_sum, per_round_epochs, observed_epochs_sum}
+            if not any(v > 0 for v in valid_observed_epochs):
                 raise TrainingProvenanceSecurityError(
-                    f"Executed epochs mismatch for job '{clean_job_id}': claimed {executed_epochs}, but reconciled observed epochs is {observed_epochs_sum} (latest round) or {total_epochs_sum} (total)."
+                    f"Executed epochs mismatch for job '{clean_job_id}': claimed {executed_epochs}, but zero executed epochs were observed."
+                )
+            if executed_epochs not in valid_observed_epochs:
+                raise TrainingProvenanceSecurityError(
+                    f"Executed epochs mismatch for job '{clean_job_id}': claimed {executed_epochs}, but reconciled observed epochs are {sorted(valid_observed_epochs)}. Planned configuration epochs cannot substitute for observed epochs."
                 )
 
         # 4. Global aggregation provenance chain reconciliation
-        if agg_rows:
+        # For a federated job requiring aggregation (executed_rounds > 0 or enforce_lifecycle or agg_rows),
+        # missing aggregation evidence must be rejected, not silently skipped.
+        if executed_rounds > 0 or enforce_lifecycle or agg_rows:
+            if not agg_rows:
+                raise TrainingProvenanceSecurityError(
+                    f"Cannot complete federated training job '{clean_job_id}': missing global aggregation records. All federated rounds require authoritative aggregation evidence."
+                )
             agg_round_nums = sorted({a.round_number for a in agg_rows})
             if len(agg_round_nums) != executed_rounds or agg_round_nums != expected_seq:
                 raise TrainingProvenanceSecurityError(
@@ -620,8 +660,9 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
 
         clean_url = db_url.strip()
         if not (clean_url.startswith("postgresql://") or clean_url.startswith("postgres://")):
+            redacted_url = redact_database_url(clean_url)
             raise TrainingProvenanceConfigurationError(
-                f"Unsupported database URL scheme for PostgreSQL authority: '{clean_url}'."
+                f"Unsupported database URL scheme for PostgreSQL authority: '{redacted_url}'."
             )
 
         self._db_url = clean_url
@@ -643,9 +684,10 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                 with conn.cursor() as cur:
                     cur.execute("SELECT 1")
         except Exception as e:
-            logger.error("PostgreSQL connection test failed on URL %s: %s", self._db_url, e)
+            redacted_url = redact_database_url(self._db_url)
+            logger.error("PostgreSQL connection test failed on URL %s: %s", redacted_url, e)
             raise TrainingProvenanceConfigurationError(
-                f"Failed to connect to PostgreSQL authority at '{self._db_url}': {e}"
+                f"Failed to connect to PostgreSQL authority at '{redacted_url}': {e}"
             ) from e
 
     @contextlib.contextmanager
@@ -659,7 +701,8 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         except TrainingProvenanceConfigurationError:
             raise
         except Exception as e:
-            raise sqlite3.DatabaseError(f"PostgreSQL connection failure: {e}") from e
+            redacted_url = redact_database_url(self._db_url)
+            raise sqlite3.DatabaseError(f"PostgreSQL connection failure to {redacted_url}: {e}") from e
 
         try:
             yield conn

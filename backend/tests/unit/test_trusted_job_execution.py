@@ -785,6 +785,7 @@ class TestTrustedJobExecutionBoundary:
                     round_number=r,
                     bank_id=bank_id,
                     sample_count=len(X_local),
+                    actual_executed_epochs=1,
                     observed_loss=local_loss,
                     metrics={"loss": local_loss, "round": float(r)},
                 )
@@ -800,6 +801,17 @@ class TestTrustedJobExecutionBoundary:
                 new_global_state[param_key] = weighted_sum / total_unique_samples
             global_model.load_state_dict(new_global_state)
 
+            round_model_bytes = _serialize_model(global_model)
+            round_model_sha = hashlib.sha256(round_model_bytes).hexdigest()
+            source.record_global_aggregation(
+                job_id=job_id,
+                round_number=r,
+                aggregation_algorithm="fed_avg_weighted",
+                accepted_participant_ids=participating_banks,
+                accepted_local_update_digests=[hashlib.sha256(f"update_{b}_{r}".encode()).hexdigest() for b in participating_banks],
+                aggregated_global_model_digest=round_model_sha,
+            )
+
         # 5. Measure test evaluation metrics on global holdout set (actual measured loss and AUC)
         global_model.eval()
         with torch.no_grad():
@@ -812,6 +824,20 @@ class TestTrustedJobExecutionBoundary:
 
         model_bytes = _serialize_model(global_model)
         model_sha = hashlib.sha256(model_bytes).hexdigest()
+
+        source.record_evaluation_observation(
+            job_id=job_id,
+            metric_name="val_loss",
+            metric_value=test_loss,
+            evaluated_artifact_digest=model_sha,
+        )
+        source.record_evaluation_observation(
+            job_id=job_id,
+            metric_name="auc_roc",
+            metric_value=measured_auc,
+            evaluated_artifact_digest=model_sha,
+        )
+
         weighted_final_training_loss = sum(
             last_round_local_losses[b] * len(client_data[b][0]) for b in participating_banks
         ) / total_unique_samples
@@ -996,12 +1022,22 @@ for r in range(1, 4):
         job_id={job_id!r},
         round_number=r,
         sample_count=400,
+        actual_executed_epochs=1,
         observed_loss=0.28,
+    )
+    source.record_global_aggregation(
+        job_id={job_id!r},
+        round_number=r,
+        aggregation_algorithm="fed_avg_weighted",
+        accepted_participant_ids=["BANK_A"],
+        accepted_local_update_digests=[f"digest_{{r}}"],
+        aggregated_global_model_digest="e" * 64,
     )
 rec = source.complete_training_job(
     job_id={job_id!r},
     executed_rounds=3,
-    sample_count=1200,
+    executed_epochs=1,
+    sample_count=400,
     observed_metrics={{"loss": 0.28}},
     artifact_sha256="e" * 64,
     architecture="FraudDetectionNN",
@@ -1038,7 +1074,7 @@ source = TrustedTrainingJobRecordSource(store_path={db_file!r})
 rec = source.get_completed_job_by_id({job_id!r})
 assert rec is not None
 assert rec.job_id == {job_id!r}
-assert rec.sample_count == 1200
+assert rec.sample_count == 400
 assert rec.executed_rounds == 3
 assert rec.artifact_sha256 == "e" * 64
 
@@ -1048,6 +1084,7 @@ try:
     source.complete_training_job(
         job_id={job_id!r},
         executed_rounds=3,
+        executed_epochs=1,
         sample_count=9999,
         observed_metrics={{"loss": 0.28}},
         artifact_sha256="e" * 64,
@@ -1079,7 +1116,7 @@ print(json.dumps({{"pid": os.getpid(), "reloaded_id": rec.job_id, "conflict_reje
         rec_parent = parent_source.get_completed_job_by_id(job_id)
         assert rec_parent is not None
         assert rec_parent.job_id == job_id
-        assert rec_parent.sample_count == 1200
+        assert rec_parent.sample_count == 400
 
     # =========================================================================
     # JOB-13: Duplicate submission

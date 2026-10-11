@@ -18,6 +18,9 @@ from __future__ import annotations
 import concurrent.futures
 import hashlib
 import os
+import subprocess
+import sys
+import urllib.parse
 import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime
@@ -45,6 +48,7 @@ from app.application.services.training_provenance_service import (
     TrainingProvenanceConfigurationError,
     TrainingProvenanceSecurityError,
 )
+from app.infrastructure.database.training_authority_backends import redact_database_url
 
 # Deterministic test parameters
 TEST_SECRET_COORDINATOR = "coord_secret_999999999999999999999999"
@@ -220,6 +224,22 @@ class TestPostgresTrainingJobAuthority:
         )
         db.record_observation(obs)
 
+        sha1 = "1" * 64
+        sha2 = "2" * 64
+
+        agg_evt = GlobalAggregationEvent(
+            event_id=f"agg_{job_id}_r1",
+            job_id=job_id,
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=("BANK_A",),
+            accepted_local_update_digests=("a" * 64,),
+            aggregation_configuration={"weights": "proportional"},
+            aggregated_global_model_digest=sha1,
+            timestamp=datetime.now(UTC).isoformat(),
+        )
+        db.record_global_aggregation(agg_evt)
+
         # Spawn two concurrent threads with independent Postgres connections trying to complete with conflicting hashes
         def attempt_completion(sha_val: str) -> tuple[bool, str]:
             local_db = PostgresTrainingJobAuthority(db_url=real_pg_instance)
@@ -238,9 +258,6 @@ class TestPostgresTrainingJobAuthority:
             except Exception as e:
                 return False, str(e)
 
-        sha1 = "1" * 64
-        sha2 = "2" * 64
-
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             fut1 = executor.submit(attempt_completion, sha1)
             fut2 = executor.submit(attempt_completion, sha2)
@@ -253,7 +270,23 @@ class TestPostgresTrainingJobAuthority:
 
         assert len(successes) == 1, f"Expected exactly 1 success, got: {successes}"
         assert len(failures) == 1, f"Expected exactly 1 failure, got: {failures}"
-        assert "Conflicting completion record" in failures[0][1]
+        assert (
+            "Conflicting completion record" in failures[0][1]
+            or "does not match final accepted aggregation digest" in failures[0][1]
+        )
+
+        # Subsequent conflicting completion attempt against committed record must be rejected
+        with pytest.raises(TrainingProvenanceSecurityError, match="Conflicting completion record"):
+            db.complete_job(
+                job_id=job_id,
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=200,
+                observed_metrics={"loss": 0.25},
+                artifact_sha256=sha2,
+                worker_id="BANK_A",
+                enforce_lifecycle=True,
+            )
 
     def test_pg_04_concurrent_valid_observations_survive(self, real_pg_instance: str) -> None:
         """PG-04: Concurrent valid observations from different bank workers survive without dropped events."""
@@ -494,3 +527,175 @@ class TestPostgresTrainingJobAuthority:
         assert len(obs_list) == 1
         assert obs_list[0].actual_sample_count == 100
         assert obs_list[0].observed_loss == 0.35
+
+    def test_pg_11_role_permission_denial(self, real_pg_instance: str) -> None:
+        """PG-11: PostgreSQL role without write permissions is denied insert/mutation on cfi tables."""
+        assert psycopg is not None
+        # 1. Admin creates a read-only unprivileged role
+        with psycopg.connect(real_pg_instance, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DO $$
+                    DECLARE
+                        curr_db text;
+                    BEGIN
+                        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'cfi_unprivileged') THEN
+                            CREATE ROLE cfi_unprivileged LOGIN PASSWORD 'unpriv_secret_pass';
+                        END IF;
+                        SELECT current_database() INTO curr_db;
+                        EXECUTE format('GRANT CONNECT ON DATABASE %I TO cfi_unprivileged', curr_db);
+                    END
+                    $$;
+                    """
+                )
+                cur.execute("GRANT USAGE ON SCHEMA public TO cfi_unprivileged;")
+                cur.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO cfi_unprivileged;")
+                cur.execute("REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_unprivileged;")
+
+        # 2. Build unprivileged connection string
+        parsed = urllib.parse.urlsplit(real_pg_instance)
+        hostname = parsed.hostname or "127.0.0.1"
+        port = f":{parsed.port}" if parsed.port else ""
+        unpriv_netloc = f"cfi_unprivileged:unpriv_secret_pass@{hostname}{port}"
+        unpriv_url = urllib.parse.urlunsplit((parsed.scheme, unpriv_netloc, parsed.path, parsed.query, parsed.fragment))
+
+        # 3. Direct SQL insert by unauthorized role fails with permission denied
+        with psycopg.connect(unpriv_url) as unpriv_conn:
+            with pytest.raises(Exception, match="permission denied"):
+                with unpriv_conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO cfi_completed_jobs (
+                            job_id, training_run_id, simulation_id, completed_at,
+                            executed_rounds, executed_epochs, sample_count,
+                            observed_metrics_json, artifact_sha256, architecture,
+                            feature_schema_version, input_dim, feature_names_json,
+                            worker_id, evidence_fingerprint, status
+                        ) VALUES (
+                            'forged_job', 'forged_run', 'forged_sim', 'now',
+                            1, 1, 100, '{}', 'sha', 'arch', 'v1', 1, '[]',
+                            'worker', 'fp', 'COMPLETED'
+                        );
+                        """
+                    )
+
+        # 4. Authority instantiated with unprivileged role fails closed with permission denied
+        with pytest.raises(Exception, match="permission denied"):
+            PostgresTrainingJobAuthority(db_url=unpriv_url)
+
+    def test_pg_12_multiprocess_concurrency(self, real_pg_instance: str) -> None:
+        """PG-12: Multi-process concurrency across distinct OS processes persists all valid observations without data loss."""
+        db = TrainingJobAuthorityDatabase(db_target=real_pg_instance)
+        job_id = f"job_pg12_{uuid.uuid4().hex[:8]}"
+        run_id = f"run_pg12_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_pg12_{uuid.uuid4().hex[:8]}"
+
+        db.schedule_job(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=len(FEATURE_NAMES),
+            feature_names=list(FEATURE_NAMES),
+            permitted_workers=["BANK_A", "BANK_B"],
+        )
+        db.start_job(job_id=job_id, worker_id="BANK_A")
+
+        worker_code_template = """
+import os, sys, hashlib
+from datetime import datetime, UTC
+from app.application.services.training_provenance_service import PostgresTrainingJobAuthority, RoundObservation
+
+db_url = {db_url!r}
+job_id = {job_id!r}
+run_id = {run_id!r}
+sim_id = {sim_id!r}
+bank_id = {bank_id!r}
+sample_count = {sample_count}
+
+auth = PostgresTrainingJobAuthority(db_url=db_url)
+obs = RoundObservation(
+    event_id=f"evt_mp_{{job_id}}_{{bank_id}}",
+    job_id=job_id,
+    training_run_id=run_id,
+    simulation_id=sim_id,
+    worker_id=bank_id,
+    bank_id=bank_id,
+    round_number=1,
+    attempt_number=1,
+    actual_sample_count=sample_count,
+    actual_executed_epochs=1,
+    observed_loss=0.30,
+    metrics={{"loss": 0.30}},
+    execution_timestamp=datetime.now(UTC).isoformat(),
+    model_update_digest=hashlib.sha256(bank_id.encode()).hexdigest(),
+)
+auth.record_observation(obs)
+print(f"PID:{{os.getpid()}}")
+"""
+        code_a = worker_code_template.format(
+            db_url=real_pg_instance, job_id=job_id, run_id=run_id, sim_id=sim_id, bank_id="BANK_A", sample_count=150
+        )
+        code_b = worker_code_template.format(
+            db_url=real_pg_instance, job_id=job_id, run_id=run_id, sim_id=sim_id, bank_id="BANK_B", sample_count=250
+        )
+
+        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+        p1 = subprocess.Popen(
+            [sys.executable, "-c", code_a],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=backend_dir,
+        )
+        p2 = subprocess.Popen(
+            [sys.executable, "-c", code_b],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=backend_dir,
+        )
+
+        out1, err1 = p1.communicate(timeout=20)
+        out2, err2 = p2.communicate(timeout=20)
+
+        assert p1.returncode == 0, f"Process 1 failed with {err1}"
+        assert p2.returncode == 0, f"Process 2 failed with {err2}"
+
+        # Distinct OS PIDs
+        assert p1.pid != p2.pid
+        assert p1.pid != os.getpid()
+        assert p2.pid != os.getpid()
+
+        # Re-query PostgreSQL authority from parent process
+        obs_list = db.get_observations(job_id)
+        assert len(obs_list) == 2
+        bank_obs = {o.bank_id: o.actual_sample_count for o in obs_list}
+        assert bank_obs == {"BANK_A": 150, "BANK_B": 250}
+
+    def test_pg_13_connection_password_redaction(self, caplog: pytest.LogCaptureFixture) -> None:
+        """PG-13: Database passwords in PostgreSQL connection URLs are redacted in all logs and exception messages."""
+        fake_secret = "super_secret_pg_pass_998877"
+        sensitive_url = f"postgresql://cfi_admin:{fake_secret}@127.0.0.1:59997/cfi_test_db"
+
+        # 1. Direct redaction helper
+        redacted = redact_database_url(sensitive_url)
+        assert fake_secret not in redacted
+        assert ":***@" in redacted
+        assert "cfi_admin:***@127.0.0.1:59997/cfi_test_db" in redacted
+
+        # 2. Connection failure exception message does not leak secret
+        with pytest.raises(TrainingProvenanceConfigurationError) as exc_info:
+            PostgresTrainingJobAuthority(db_url=sensitive_url)
+
+        exc_str = str(exc_info.value)
+        assert fake_secret not in exc_str
+        assert ":***@" in exc_str
+
+        # 3. Log records do not leak secret
+        assert fake_secret not in caplog.text

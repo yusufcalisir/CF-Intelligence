@@ -497,7 +497,15 @@ class TestEvidenceReconciliation:
                 artifact_sha256=g_d2, worker_token=BANK_A_SECRET,
             )
 
-        # Claiming unique_bank_samples (300) or total exposures (600) succeeds
+        # Claiming repeated sample exposures (600) instead of unique samples (300) fails under strict accounting contract
+        with pytest.raises(TrainingProvenanceSecurityError, match="Repeated sample exposures cannot substitute for unique dataset samples"):
+            evidence_source.complete_training_job(
+                job_id=job_id, executed_rounds=2, executed_epochs=1,
+                sample_count=600, observed_metrics={"loss": 0.30},
+                artifact_sha256=g_d2, worker_token=BANK_A_SECRET,
+            )
+
+        # Claiming canonical unique_bank_samples (300) succeeds
         rec = evidence_source.complete_training_job(
             job_id=job_id, executed_rounds=2, executed_epochs=1,
             sample_count=300, observed_metrics={"loss": 0.30},
@@ -798,5 +806,40 @@ class TestEvidenceReconciliation:
             evidence_source.complete_training_job(
                 job_id=job_id, executed_rounds=2, executed_epochs=1, sample_count=100,
                 observed_metrics={"loss": 0.35}, artifact_sha256=g1,
+                worker_token=BANK_A_SECRET,
+            )
+
+    def test_ev_15_missing_aggregation_records_completely_rejected(
+        self, evidence_source: TrustedTrainingJobRecordSource
+    ) -> None:
+        """EV-15: Completely missing global aggregation records fail closed for federated jobs requiring aggregation."""
+        job_id = f"job_ev15_{uuid.uuid4().hex[:8]}"
+        run_id = f"run_ev15_{uuid.uuid4().hex[:8]}"
+
+        evidence_source.schedule_training_job(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id="sim_01",
+            coordinator_token=COORD_SECRET,
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=len(FEATURE_NAMES),
+            feature_names=list(FEATURE_NAMES),
+            permitted_workers=("BANK_A",),
+        )
+        evidence_source.start_training_job(job_id=job_id, worker_token=BANK_A_SECRET)
+
+        d1 = hashlib.sha256(b"r1_ev15").hexdigest()
+        evidence_source.record_round_observation(
+            job_id=job_id, round_number=1, sample_count=100, actual_executed_epochs=1,
+            observed_loss=0.35, metrics={"loss": 0.35}, worker_token=BANK_A_SECRET,
+            bank_id="BANK_A", model_update_digest=d1,
+        )
+
+        # Zero global aggregation records are recorded
+        with pytest.raises(TrainingProvenanceSecurityError, match="missing global aggregation records"):
+            evidence_source.complete_training_job(
+                job_id=job_id, executed_rounds=1, executed_epochs=1, sample_count=100,
+                observed_metrics={"loss": 0.35}, artifact_sha256="a" * 64,
                 worker_token=BANK_A_SECRET,
             )

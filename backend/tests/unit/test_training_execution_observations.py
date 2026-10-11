@@ -187,6 +187,15 @@ class TestTrainingExecutionObservationsAdversarial:
             observed_loss=0.45,
             worker_token="worker_secret_12345678901234567890",
         )
+        source.record_global_aggregation(
+            job_id=job_id,
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=["d" * 64],
+            aggregated_global_model_digest="d" * 64,
+            coordinator_token="coordinator_secret_12345678901234567890",
+        )
 
         # Attacker claims fabricated loss of 0.05
         with pytest.raises(TrainingProvenanceSecurityError, match="Observed loss mismatch"):

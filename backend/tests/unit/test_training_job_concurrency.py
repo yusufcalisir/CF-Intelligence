@@ -47,17 +47,31 @@ class TestTrainingJobConcurrencyAdversarial:
             simulation_id="sim_adv_08",
             expected_rounds=1,
         )
+        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        sha_a = "a" * 64
+        sha_b = "b" * 64
+
         source.start_training_job(job_id=job_id)
         source.record_round_observation(
             job_id=job_id,
             round_number=1,
             sample_count=500,
+            actual_executed_epochs=1,
             observed_loss=0.30,
         )
+        source.record_global_aggregation(
+            job_id=job_id,
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=["digest_1"],
+            aggregated_global_model_digest=sha_a,
+        )
 
-        script_template = """
+        script_template = f"""
 import os, sys, json, time
-sys.path.insert(0, os.getcwd())
+if {backend_dir!r} not in sys.path:
+    sys.path.insert(0, {backend_dir!r})
 from app.application.services.training_provenance_service import (
     TrustedTrainingJobRecordSource,
     TrainingProvenanceSecurityError,
@@ -79,8 +93,9 @@ try:
     rec = source.complete_training_job(
         job_id=job_id,
         executed_rounds=1,
+        executed_epochs=1,
         sample_count=500,
-        observed_metrics={"loss": 0.30},
+        observed_metrics={{"loss": 0.30}},
         artifact_sha256=artifact_sha,
         architecture="FraudDetectionNN",
         feature_schema_version="v1.0",
@@ -94,14 +109,11 @@ except Exception as e:
     status = "ERROR"
     err_msg = str(e)
 
-print(json.dumps({"pid": pid, "status": status, "err": err_msg, "artifact": artifact_sha}))
+print(json.dumps({{"pid": pid, "status": status, "err": err_msg, "artifact": artifact_sha}}))
 """
         script_file = str(tmp_path / "worker_complete_race.py")
         with open(script_file, "w", encoding="utf-8") as f:
             f.write(script_template)
-
-        sha_a = "a" * 64
-        sha_b = "b" * 64
 
         proc_env = dict(os.environ, PYTHONPATH=os.getcwd())
 
@@ -166,9 +178,11 @@ print(json.dumps({"pid": pid, "status": status, "err": err_msg, "artifact": arti
         )
         source.start_training_job(job_id=job_id, worker_id="BANK_A")
 
-        script_template = """
+        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        script_template = f"""
 import os, sys, json
-sys.path.insert(0, os.getcwd())
+if {backend_dir!r} not in sys.path:
+    sys.path.insert(0, {backend_dir!r})
 from app.application.services.training_provenance_service import TrustedTrainingJobRecordSource
 
 db_path = sys.argv[1]
@@ -183,11 +197,12 @@ event = source.record_round_observation(
     round_number=1,
     bank_id=bank_id,
     sample_count=sample_count,
+    actual_executed_epochs=1,
     observed_loss=observed_loss,
     worker_id=bank_id,
 )
 
-print(json.dumps({"pid": os.getpid(), "event_id": event.event_id, "bank_id": bank_id}))
+print(json.dumps({{"pid": os.getpid(), "event_id": event.event_id, "bank_id": bank_id}}))
 """
         script_file = str(tmp_path / "worker_record_obs.py")
         with open(script_file, "w", encoding="utf-8") as f:
@@ -329,14 +344,25 @@ time.sleep(30)
             job_id=job_id,
             round_number=1,
             sample_count=400,
+            actual_executed_epochs=1,
             observed_loss=0.22,
         )
         assert obs.actual_sample_count == 400
+
+        recovered_source.record_global_aggregation(
+            job_id=job_id,
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=["1" * 64],
+            aggregated_global_model_digest="1" * 64,
+        )
 
         # 4. Job can be cleanly completed
         rec = recovered_source.complete_training_job(
             job_id=job_id,
             executed_rounds=1,
+            executed_epochs=1,
             sample_count=400,
             observed_metrics={"loss": 0.22},
             artifact_sha256="1" * 64,

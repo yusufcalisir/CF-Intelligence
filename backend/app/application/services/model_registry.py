@@ -26,6 +26,7 @@ from filelock import FileLock
 from app.application.services.training_provenance_service import (
     DOMAIN_APPROVAL_SIGNOFF,
     TrainingExecutionReceipt,
+    TrainingReceiptVerifier,
     derive_domain_key,
     get_default_training_verifier,
 )
@@ -272,8 +273,13 @@ class ModelRegistry:
     A manifest file `registry.json` tracks versions, metrics, and active states.
     """
 
-    def __init__(self, storage_dir: str | None = None) -> None:
+    def __init__(
+        self,
+        storage_dir: str | None = None,
+        verifier: TrainingReceiptVerifier | None = None,
+    ) -> None:
         self._lock = threading.RLock()
+        self._verifier = verifier
         if storage_dir is None:
             # 1. Prefer explicit env override (e.g. set in docker-compose / HF Space secrets)
             env_dir = os.environ.get("CFI_STORAGE_DIR")
@@ -461,7 +467,7 @@ class ModelRegistry:
 
         attestation_status = "NONE"
         if receipt_dict is not None:
-            verifier = get_default_training_verifier()
+            verifier = self._verifier or get_default_training_verifier()
             is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
                 receipt_dict,
                 candidate_artifact_sha256=None,
@@ -524,7 +530,7 @@ class ModelRegistry:
 
             # If receipt provided, verify artifact SHA256 binding and schema constraints
             if receipt_dict is not None and has_valid_receipt:
-                verifier = get_default_training_verifier()
+                verifier = self._verifier or get_default_training_verifier()
                 is_valid_binding, binding_reason = verifier.verify_receipt(
                     receipt_dict,
                     candidate_artifact_sha256=file_sha256,

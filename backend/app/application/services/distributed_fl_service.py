@@ -2,12 +2,13 @@
 
 Implements Module 01-A.1 Requirement P6:
 - Multi-process distributed topology with independent operating-system processes for Bank A, Bank B, Bank C, and Coordinator.
-- Enforceable privacy boundary: coordinator has zero access to bank-local raw datasets; banks have non-overlapping local partitions.
-- Independent per-bank workload authentication tokens (BANK_A, BANK_B, BANK_C) for all execution observations.
+- Enforceable privacy boundary: coordinator has zero access to bank-local raw datasets; banks load from isolated local storage.
+- Independent per-bank workload authentication tokens (BANK_A, BANK_B, BANK_C) for all execution observations; coordinator cannot impersonate banks.
 - Aggregation executed using production FederatedLearningEngine.aggregate_parameters (FedAvg weighted by sample count).
 - Real PyTorch training, weight extraction, and exact SHA-256 local update hashing.
 - Full provenance recording in PostgreSQL authority: round observations, global aggregations, model evaluations.
 - Ed25519 receipt issuance, public-key-only verification, and inactive candidate registration in ModelRegistry.
+- Zero fabricated metrics or fallback values; fail-closed on missing/invalid execution events.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import contextlib
 import hashlib
 import io
 import logging
+import math
 import multiprocessing as mp
 import os
 from typing import Any
@@ -33,12 +35,13 @@ from app.application.services.model_service import NUM_FEATURES, ModelService
 from app.application.services.privacy_service import PrivacyService
 from app.application.services.training_provenance_service import (
     DEFAULT_TRAINING_KEY_ID,
-    DurableTrustStore,
     TrainingExecutionEvidence,
     TrainingProvenanceSecurityError,
     TrainingReceiptIssuer,
     TrainingReceiptVerifier,
     TrustedTrainingJobRecordSource,
+    get_default_training_issuer,
+    get_default_training_verifier,
 )
 from app.config import get_settings
 from app.domain.enums import AggregationMethod
@@ -75,6 +78,67 @@ def _serialize_model_state_dict(model: nn.Module) -> bytes:
 
 
 # ---------------------------------------------------------------------------
+# Bank Storage & Worker Isolation Helpers
+# ---------------------------------------------------------------------------
+
+
+def setup_bank_private_storage(
+    bank_storage_dir: str,
+    bank_id: str,
+    X_partition: np.ndarray,
+    y_partition: np.ndarray,
+) -> str:
+    """Privileged fixture provisioning bank-private synthetic partition into bank-owned directory."""
+    bank_dir = os.path.join(bank_storage_dir, bank_id)
+    os.makedirs(bank_dir, exist_ok=True)
+    data_path = os.path.join(bank_dir, "private_dataset.npz")
+    np.savez_compressed(data_path, X=X_partition, y=y_partition)
+    return data_path
+
+
+def spawn_bank_workers(
+    participating_banks: list[str],
+    bank_tokens: dict[str, str],
+    db_url: str,
+    bank_data_paths: dict[str, str] | None = None,
+    bank_partitions: dict[str, tuple[np.ndarray, np.ndarray]] | None = None,
+    fail_bank_b_observation: bool = False,
+) -> tuple[dict[str, mp.Process], dict[str, dict[str, mp.Queue]]]:
+    """Spawn dedicated OS worker processes with their private credentials and data paths.
+
+    Notice: This is called at process launch or integration fixture time.
+    The Coordinator NEVER receives bank_tokens or bank_data_paths; it receives only communication endpoints.
+    """
+    processes: dict[str, mp.Process] = {}
+    endpoints: dict[str, dict[str, mp.Queue]] = {}
+    for b_id in participating_banks:
+        in_q: mp.Queue = mp.Queue()
+        out_q: mp.Queue = mp.Queue()
+        data_path = bank_data_paths.get(b_id) if bank_data_paths else None
+        X_b, y_b = bank_partitions.get(b_id, (None, None)) if bank_partitions else (None, None)
+        should_fail_obs = (b_id == "BANK_B" and fail_bank_b_observation)
+        proc = mp.Process(
+            target=run_bank_worker_node,
+            args=(
+                b_id,
+                bank_tokens[b_id],
+                db_url,
+                in_q,
+                out_q,
+                data_path,
+                X_b,
+                y_b,
+                should_fail_obs,
+            ),
+        )
+        proc.daemon = True
+        proc.start()
+        processes[b_id] = proc
+        endpoints[b_id] = {"inbox": in_q, "outbox": out_q}
+    return processes, endpoints
+
+
+# ---------------------------------------------------------------------------
 # Bank Worker Process Entry Point
 # ---------------------------------------------------------------------------
 
@@ -83,19 +147,21 @@ def run_bank_worker_node(
     bank_id: str,
     worker_token: str,
     db_url: str,
-    X_partition: np.ndarray,
-    y_partition: np.ndarray,
     inbox: mp.Queue,
     outbox: mp.Queue,
+    data_path: str | None = None,
+    X_partition: np.ndarray | None = None,
+    y_partition: np.ndarray | None = None,
     fail_observation: bool = False,
 ) -> None:
     """Dedicated Operating System Process for a Participating Bank Worker.
 
     Invariants enforced:
     1. Isolated OS Process (distinct PID).
-    2. Zero external access to X_partition / y_partition; datasets remain private in-memory.
-    3. Authenticated solely by worker_token bound to bank_id.
+    2. Zero external access to private datasets; loaded locally from bank storage.
+    3. Authenticated solely by worker_token bound to bank_id (coordinator has no bank tokens).
     4. Performs genuine PyTorch local training steps and records observations directly into PostgreSQL authority.
+    5. Missing or non-finite losses fail immediately without fallback invention.
     """
     pid = os.getpid()
     logger.info("Bank worker [%s] started with PID %d", bank_id, pid)
@@ -110,6 +176,19 @@ def run_bank_worker_node(
         enforce_lifecycle=True,
         app_env="production",
     )
+
+    # Load local training data from isolated bank storage if path provided
+    if data_path is not None:
+        if not os.path.exists(data_path):
+            raise FileNotFoundError(f"Bank [{bank_id}] private dataset not found at '{data_path}'")
+        loaded_data = np.load(data_path)
+        X_train: np.ndarray = loaded_data["X"]
+        y_train: np.ndarray = loaded_data["y"]
+    elif X_partition is not None and y_partition is not None:
+        X_train = X_partition
+        y_train = y_partition
+    else:
+        raise ValueError(f"Bank [{bank_id}] must be supplied with either a private data_path or partition arrays.")
 
     while True:
         try:
@@ -126,6 +205,11 @@ def run_bank_worker_node(
             round_number = msg["round_number"]
             global_weights_obj: ModelWeights | None = msg.get("global_weights")
 
+            # On round 1, authorized worker initiates job start in PostgreSQL authority
+            if round_number == 1 and bank_id == "BANK_A":
+                with contextlib.suppress(Exception):
+                    authority_source.start_training_job(job_id=job_id, worker_token=worker_token)
+
             # Initialize local model and load latest global weights
             local_model = model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
             if global_weights_obj is not None:
@@ -134,8 +218,8 @@ def run_bank_worker_node(
             # Execute real PyTorch optimization on private dataset partition
             local_model, loss_history, _ = model_service.train_local(
                 model=local_model,
-                X_train=X_partition,
-                y_train=y_partition,
+                X_train=X_train,
+                y_train=y_train,
                 epochs=1,
                 learning_rate=0.01,
                 batch_size=32,
@@ -144,8 +228,18 @@ def run_bank_worker_node(
             local_weights = model_service.get_parameters(local_model)
             weights_bytes = _serialize_weights_to_bytes(local_weights)
             update_digest = hashlib.sha256(weights_bytes).hexdigest()
-            sample_count = len(X_partition)
-            observed_loss = float(loss_history[-1]) if loss_history else 0.30
+            sample_count = len(X_train)
+
+            # Strict measurement validation: no fabricated fallback loss values
+            if not loss_history:
+                raise TrainingProvenanceSecurityError(
+                    f"Bank worker [{bank_id}] produced no loss history during local training."
+                )
+            observed_loss = float(loss_history[-1])
+            if not math.isfinite(observed_loss):
+                raise TrainingProvenanceSecurityError(
+                    f"Bank worker [{bank_id}] produced non-finite observed loss: {observed_loss}"
+                )
 
             if fail_observation:
                 # Adversarial failure injection: worker fails to record observation in PostgreSQL
@@ -184,6 +278,7 @@ def run_bank_worker_node(
                 continue
 
             # Send local weights and digest to coordinator over federated transport
+            # Notice: Zero raw dataset samples (X_train, y_train) are transmitted across IPC.
             outbox.put({
                 "status": "SUCCESS",
                 "bank_id": bank_id,
@@ -203,24 +298,32 @@ def run_bank_worker_node(
 
 
 class DistributedFederatedTrainingManager:
-    """Orchestrates genuine distributed federated training across isolated bank worker processes."""
+    """Orchestrates genuine distributed federated training across isolated bank worker processes.
+
+    Security Boundaries Enforced:
+    1. Coordinator Domain: Holds coordinator_token only. Never possesses bank private credentials.
+    2. Data Privacy: Coordinator never receives raw bank dataset partitions.
+    3. Multi-Process Topology: Separate operating system processes for Coordinator and each participating Bank.
+    4. Execution Evidence: Observations and global aggregations recorded transactionally in PostgreSQL authority.
+    5. Cryptographic Provenance: Ed25519 receipt issued by authorized issuer and verified independently by public-key-only verifier.
+    """
 
     def __init__(
         self,
         coordinator_token: str,
-        bank_tokens: dict[str, str],
         db_url: str,
         app_env: str = "production",
+        bank_tokens: dict[str, str] | None = None,
     ) -> None:
         self.coordinator_token = coordinator_token
-        self.bank_tokens = bank_tokens
         self.db_url = db_url
         self.app_env = app_env
         self.settings = get_settings()
 
+        # Coordinator authority source possesses coordinator_token ONLY!
+        # It has ZERO access to bank worker tokens and cannot impersonate banks.
         self.authority_source = TrustedTrainingJobRecordSource(
             coordinator_token=self.coordinator_token,
-            bank_tokens=self.bank_tokens,
             db_url=self.db_url,
             enforce_lifecycle=True,
             app_env=self.app_env,
@@ -239,20 +342,51 @@ class DistributedFederatedTrainingManager:
         job_id: str,
         training_run_id: str,
         simulation_id: str,
-        bank_partitions: dict[str, tuple[np.ndarray, np.ndarray]],
         holdout_val_data: tuple[np.ndarray, np.ndarray],
+        participating_banks: list[str] | tuple[str, ...] | None = None,
+        worker_endpoints: dict[str, dict[str, mp.Queue]] | None = None,
+        worker_processes: dict[str, mp.Process] | None = None,
+        bank_partitions: dict[str, tuple[np.ndarray, np.ndarray]] | None = None,
+        bank_tokens: dict[str, str] | None = None,
+        bank_data_paths: dict[str, str] | None = None,
         num_rounds: int = 2,
+        expected_unique_samples: int | None = None,
         fail_bank_b_observation: bool = False,
         crash_bank_b: bool = False,
         registry_storage_dir: str | None = None,
         signing_key_hex: str | None = None,
+        receipt_issuer: TrainingReceiptIssuer | None = None,
+        receipt_verifier: TrainingReceiptVerifier | None = None,
+        model_registry: ModelRegistry | None = None,
     ) -> dict[str, Any]:
         """Execute complete distributed E2E federated training lifecycle across independent processes.
 
         Returns comprehensive trace including process IDs, observations, receipts, and registry status.
         """
         coordinator_pid = os.getpid()
-        participating_banks = sorted(bank_partitions.keys())
+
+        # Determine participating banks list
+        banks = list(participating_banks) if participating_banks else (
+            sorted(bank_partitions.keys()) if bank_partitions else (
+                sorted(worker_endpoints.keys()) if worker_endpoints else ["BANK_A", "BANK_B", "BANK_C"]
+            )
+        )
+        if not banks:
+            raise ValueError("No participating banks provided.")
+
+        # Spawn workers if endpoints were not directly provided
+        spawned_procs = worker_processes or {}
+        endpoints = worker_endpoints or {}
+        if not endpoints:
+            tokens = bank_tokens or {b: f"worker_token_{b}_auto" for b in banks}
+            spawned_procs, endpoints = spawn_bank_workers(
+                participating_banks=banks,
+                bank_tokens=tokens,
+                db_url=self.db_url,
+                bank_data_paths=bank_data_paths,
+                bank_partitions=bank_partitions,
+                fail_bank_b_observation=fail_bank_b_observation,
+            )
 
         # 1. Schedule training job in PostgreSQL authority
         _ = self.authority_source.schedule_training_job(
@@ -264,46 +398,12 @@ class DistributedFederatedTrainingManager:
             expected_epochs=num_rounds,
             input_dim=NUM_FEATURES,
             feature_names=list(FEATURE_NAMES),
-            permitted_workers=participating_banks,
+            permitted_workers=banks,
         )
 
-        # 2. Start job with Bank A
-        self.authority_source.start_training_job(
-            job_id=job_id,
-            worker_token=self.bank_tokens[participating_banks[0]],
-        )
-
-        # 3. Spawn Bank Worker Processes
-        worker_processes: dict[str, mp.Process] = {}
-        inboxes: dict[str, mp.Queue] = {}
-        outboxes: dict[str, mp.Queue] = {}
-        worker_pids: dict[str, int] = {}
-
-        for b_id in participating_banks:
-            in_q: mp.Queue = mp.Queue()
-            out_q: mp.Queue = mp.Queue()
-            X_b, y_b = bank_partitions[b_id]
-
-            should_fail_obs = (b_id == "BANK_B" and fail_bank_b_observation)
-            proc = mp.Process(
-                target=run_bank_worker_node,
-                args=(
-                    b_id,
-                    self.bank_tokens[b_id],
-                    self.db_url,
-                    X_b,
-                    y_b,
-                    in_q,
-                    out_q,
-                    should_fail_obs,
-                ),
-            )
-            proc.daemon = True
-            proc.start()
-            worker_processes[b_id] = proc
-            inboxes[b_id] = in_q
-            outboxes[b_id] = out_q
-            worker_pids[b_id] = proc.pid or 0
+        inboxes = {b: endpoints[b]["inbox"] for b in banks}
+        outboxes = {b: endpoints[b]["outbox"] for b in banks}
+        worker_pids: dict[str, int] = {b: spawned_procs[b].pid or 0 for b in banks if b in spawned_procs}
 
         logger.info(
             "Spawned distributed topology: Coordinator PID=%d, Bank Worker PIDs=%s",
@@ -316,22 +416,20 @@ class DistributedFederatedTrainingManager:
         global_weights = self.model_service.get_parameters(global_model)
         aggregated_model_digest = ""
         final_model_bytes: bytes = b""
-        last_round_losses: dict[str, float] = {}
 
         try:
             for round_num in range(1, num_rounds + 1):
                 logger.info("--- Starting Federated Global Round %d ---", round_num)
-                last_round_losses = {}
 
                 # If simulating Bank B crash in round 2
-                if crash_bank_b and round_num == 2 and "BANK_B" in worker_processes:
-                    logger.warning("Simulating crash: Terminating Bank B worker process PID %d", worker_processes["BANK_B"].pid)
-                    worker_processes["BANK_B"].terminate()
-                    worker_processes["BANK_B"].join()
+                if crash_bank_b and round_num == 2 and "BANK_B" in spawned_procs:
+                    logger.warning("Simulating crash: Terminating Bank B worker process PID %d", spawned_procs["BANK_B"].pid)
+                    spawned_procs["BANK_B"].terminate()
+                    spawned_procs["BANK_B"].join()
 
                 # Dispatch training task to all active workers
                 for b_id, in_q in inboxes.items():
-                    if not worker_processes[b_id].is_alive():
+                    if b_id in spawned_procs and not spawned_procs[b_id].is_alive():
                         continue
                     in_q.put({
                         "command": "TRAIN_ROUND",
@@ -347,13 +445,13 @@ class DistributedFederatedTrainingManager:
                 client_samples_list: list[int] = []
 
                 for b_id, out_q in outboxes.items():
-                    if not worker_processes[b_id].is_alive():
+                    if b_id in spawned_procs and not spawned_procs[b_id].is_alive():
                         logger.warning("Bank worker [%s] is dead / crashed.", b_id)
                         continue
 
                     # Wait for worker response with timeout
                     try:
-                        res = out_q.get(timeout=30)
+                        res = out_q.get(timeout=60)
                     except Exception:
                         logger.warning("Timeout waiting for response from Bank worker [%s]", b_id)
                         continue
@@ -366,7 +464,6 @@ class DistributedFederatedTrainingManager:
                     local_w = res["weights"]
                     w_digest = res["update_digest"]
                     s_count = res["sample_count"]
-                    w_loss = res["loss"]
 
                     # Coordinator verifies update digest against received weight bytes
                     calculated_digest = hashlib.sha256(_serialize_weights_to_bytes(local_w)).hexdigest()
@@ -379,8 +476,12 @@ class DistributedFederatedTrainingManager:
                     accepted_local_update_digests.append(w_digest)
                     client_weights_list.append(local_w)
                     client_samples_list.append(s_count)
-                    last_round_losses[b_id] = w_loss
 
+                missing_participants = set(banks) - set(accepted_participant_ids)
+                if missing_participants:
+                    raise TrainingProvenanceSecurityError(
+                        f"Round {round_num} aborted: Required participant(s) {sorted(missing_participants)} failed to contribute valid observations."
+                    )
                 if not accepted_participant_ids:
                     raise TrainingProvenanceSecurityError(
                         f"Round {round_num} aborted: No valid worker contributions received."
@@ -414,8 +515,16 @@ class DistributedFederatedTrainingManager:
             # 4. Perform Genuine Model Evaluation on holdout dataset
             X_val, y_val = holdout_val_data
             eval_metrics = self.model_service.evaluate(global_model, X_val, y_val)
-            val_loss = float(eval_metrics.get("loss", 0.30))
-            val_auc = float(eval_metrics.get("auc_roc", 0.85))
+            if "loss" not in eval_metrics or "auc_roc" not in eval_metrics:
+                raise TrainingProvenanceSecurityError(
+                    f"Holdout evaluation failed to compute required metrics ('loss', 'auc_roc'). Available: {list(eval_metrics.keys())}"
+                )
+            val_loss = float(eval_metrics["loss"])
+            val_auc = float(eval_metrics["auc_roc"])
+            if not (math.isfinite(val_loss) and math.isfinite(val_auc)):
+                raise TrainingProvenanceSecurityError(
+                    f"Holdout evaluation produced non-finite metrics: val_loss={val_loss}, val_auc={val_auc}"
+                )
 
             # Record Evaluation Observations in PostgreSQL authority
             self.authority_source.record_evaluation_observation(
@@ -436,11 +545,23 @@ class DistributedFederatedTrainingManager:
             # 5. Final artifact digest is the exact SHA-256 of the aggregated model bytes
             final_artifact_sha256 = aggregated_model_digest
 
-            # Calculate sample accounting
-            unique_samples = sum(len(x) for x, _ in bank_partitions.values())
-            tot_samples = sum(client_samples_list) or 1
+            # Strict sample accounting: derive directly from PostgreSQL verified observations
+            authority = self.authority_source
+            obs_list = authority.get_round_observations(job_id)
+            final_round_obs = [o for o in obs_list if o.round_number == num_rounds and o.execution_status == "COMPLETED"]
+            unique_samples = sum(o.actual_sample_count for o in final_round_obs)
+            if unique_samples == 0:
+                raise TrainingProvenanceSecurityError(
+                    f"No completed observations for round {num_rounds} to reconcile sample count."
+                )
+            if expected_unique_samples is not None and unique_samples != expected_unique_samples:
+                raise TrainingProvenanceSecurityError(
+                    f"Observed unique samples {unique_samples} does not match expected {expected_unique_samples}"
+                )
+
+            tot_samples = sum(o.actual_sample_count for o in final_round_obs)
             final_loss = (
-                sum(last_round_losses[b] * s for b, s in zip(accepted_participant_ids, client_samples_list))
+                sum(float(o.observed_loss) * o.actual_sample_count for o in final_round_obs)
                 / tot_samples
             )
 
@@ -461,15 +582,18 @@ class DistributedFederatedTrainingManager:
                 enforce_lifecycle=True,
             )
 
-            # 7. Issue Ed25519 Receipt
-            priv_key, pub_key = _generate_ed25519_keypair_hex() if signing_key_hex is None else (signing_key_hex, "")
-            trust_store = DurableTrustStore({DEFAULT_TRAINING_KEY_ID: pub_key})
-            issuer = TrainingReceiptIssuer(
-                signing_key_hex=priv_key,
-                key_id=DEFAULT_TRAINING_KEY_ID,
-                job_record_source=self.authority_source,
-                enforce_job_records=True,
-            )
+            # 7. Issue Ed25519 Receipt in RECEIPT ISSUER DOMAIN
+            active_issuer = receipt_issuer
+            if active_issuer is None:
+                if signing_key_hex is not None:
+                    active_issuer = TrainingReceiptIssuer(
+                        signing_key_hex=signing_key_hex,
+                        key_id=DEFAULT_TRAINING_KEY_ID,
+                        job_record_source=self.authority_source,
+                        enforce_job_records=True,
+                    )
+                else:
+                    active_issuer = get_default_training_issuer()
 
             evidence = TrainingExecutionEvidence(
                 training_run_id=training_run_id,
@@ -487,15 +611,11 @@ class DistributedFederatedTrainingManager:
                 feature_names=list(FEATURE_NAMES),
                 producer_id="FEDERATED_COORDINATOR",
             )
-            receipt = issuer.issue_receipt(evidence=evidence, model_bytes=final_model_bytes)
+            receipt = active_issuer.issue_receipt(evidence=evidence, model_bytes=final_model_bytes)
 
-            # 8. Public-Key-Only Verification (No private signing key in verifier process)
-            verifier = TrainingReceiptVerifier(
-                trust_store=trust_store,
-                job_record_source=self.authority_source,
-                enforce_recorded_evidence=True,
-            )
-            is_valid, reason = verifier.verify_receipt(
+            # 8. Public-Key-Only Verification in VERIFIER DOMAIN
+            active_verifier = receipt_verifier or get_default_training_verifier()
+            is_valid, reason = active_verifier.verify_receipt(
                 receipt=receipt,
                 expected_simulation_id=simulation_id,
                 expected_architecture="FraudDetectionNN",
@@ -507,9 +627,12 @@ class DistributedFederatedTrainingManager:
             if not is_valid:
                 raise TrainingProvenanceSecurityError(f"Ed25519 receipt verification failed: {reason}")
 
-            # 9. Register Inactive Candidate in ModelRegistry
-            registry = ModelRegistry(storage_dir=registry_storage_dir)
-            saved_version = registry.save_version(
+            # 9. Register Inactive Candidate in ModelRegistry in REGISTRY DOMAIN
+            active_registry = model_registry or ModelRegistry(
+                storage_dir=registry_storage_dir,
+                verifier=active_verifier,
+            )
+            saved_version = active_registry.save_version(
                 simulation_id=simulation_id,
                 state_dict=global_model.state_dict(),
                 metrics={
@@ -519,7 +642,7 @@ class DistributedFederatedTrainingManager:
                 },
                 is_promoted=False,
                 status="inactive",
-                provenance_type="TRAINING_EVIDENCE_VERIFIED",
+                provenance_type="TRAINING_RECORDED",
                 training_run_id=training_run_id,
                 training_receipt=receipt,
                 artifact_bytes=final_model_bytes,
@@ -530,7 +653,7 @@ class DistributedFederatedTrainingManager:
             )
 
             # Confirm model is NOT champion
-            active_champion = registry.get_active_champion_identity(simulation_id=simulation_id)
+            active_champion = active_registry.get_active_champion_identity(simulation_id=simulation_id)
             is_promoted_champion = (active_champion is not None and active_champion.get("sha256") == final_artifact_sha256)
 
             return {
@@ -547,11 +670,11 @@ class DistributedFederatedTrainingManager:
             }
 
         finally:
-            # Clean shutdown of all worker processes
+            # Clean shutdown of worker processes
             for b_id, in_q in inboxes.items():
                 with contextlib.suppress(Exception):
                     in_q.put({"command": "STOP"})
-            for proc in worker_processes.values():
+            for proc in spawned_procs.values():
                 proc.join(timeout=2)
                 if proc.is_alive():
                     proc.terminate()

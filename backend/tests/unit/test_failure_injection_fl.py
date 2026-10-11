@@ -224,6 +224,15 @@ class TestFederatedLearningFailureInjection:
             worker_token=BANK_A_SECRET,
             model_update_digest="update_fi04",
         )
+        authority.record_global_aggregation(
+            job_id=job_id,
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=["update_fi04"],
+            aggregated_global_model_digest=real_sha,
+            coordinator_token=COORD_SECRET,
+        )
         rec = authority.complete_training_job(
             job_id=job_id,
             executed_rounds=1,

@@ -371,7 +371,7 @@ class TrustedTrainingJobRecordSource:
                             f"Production training bank token for '{b_id}' reuses another bank's credential."
                         )
                     seen_tokens.add(b_tok)
-            else:
+            elif has_worker_creds or not expected_coord:
                 expected_worker = self._resolve_expected_worker_token()
                 if not expected_worker or expected_worker in FORBIDDEN_WORKER_TOKENS or "change_me" in expected_worker:
                     raise TrainingProvenanceConfigurationError(

@@ -230,6 +230,23 @@ class TestFederatedTrainingProvenanceIntegrationAdversarial:
             observed_loss=0.28,
         )
 
+        s2.record_global_aggregation(
+            job_id=job_id,
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A", "BANK_B"],
+            accepted_local_update_digests=["d1_a", "d1_b"],
+            aggregated_global_model_digest="1" * 64,
+        )
+        s2.record_global_aggregation(
+            job_id=job_id,
+            round_number=2,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A", "BANK_B"],
+            accepted_local_update_digests=["d2_a", "d2_b"],
+            aggregated_global_model_digest="a" * 64,
+        )
+
         # Complete job successfully across sessions
         total_samples = 400
         rec = s2.complete_training_job(
@@ -286,6 +303,15 @@ class TestFederatedTrainingProvenanceIntegrationAdversarial:
         model = FraudDetectionModel(input_dim=NUM_FEATURES)
         model_bytes = _serialize_model(model)
         model_sha = hashlib.sha256(model_bytes).hexdigest()
+
+        source.record_global_aggregation(
+            job_id=job_id,
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=["d15"],
+            aggregated_global_model_digest=model_sha,
+        )
 
         rec = source.complete_training_job(
             job_id=job_id,
