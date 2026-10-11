@@ -24,6 +24,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from cryptography.fernet import Fernet
 
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
@@ -42,6 +43,9 @@ from app.application.services.training_provenance_service import (
     TrainingReceiptIssuer,
     TrustedTrainingJobRecordSource,
     get_default_training_verifier,
+)
+from app.infrastructure.database.training_authority_backends import (
+    provision_runtime_service_roles,
 )
 
 COORD_SECRET = "coord_secret_dist_fl_8831_production"
@@ -85,7 +89,10 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
     run_id = f"run_dist_{uuid.uuid4().hex[:8]}"
     sim_id = f"sim_dist_{uuid.uuid4().hex[:8]}"
 
-    # Setup isolated bank private storage vaults
+    # 1. Provision restricted runtime PostgreSQL service roles
+    role_urls = provision_runtime_service_roles(real_pg_instance, app_env="production")
+
+    # 2. Setup isolated bank private storage vaults with independent encryption keys
     vaults_dir = str(tmp_path / "bank_vaults")
     np.random.seed(42)
     X_a = np.random.randn(120, NUM_FEATURES).astype(np.float32)
@@ -97,9 +104,15 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
     X_c = np.random.randn(180, NUM_FEATURES).astype(np.float32)
     y_c = np.random.randint(0, 2, size=180).astype(np.float32)
 
-    data_path_a = setup_bank_private_storage(vaults_dir, "BANK_A", X_a, y_a, bank_token=BANK_TOKENS["BANK_A"])
-    data_path_b = setup_bank_private_storage(vaults_dir, "BANK_B", X_b, y_b, bank_token=BANK_TOKENS["BANK_B"])
-    data_path_c = setup_bank_private_storage(vaults_dir, "BANK_C", X_c, y_c, bank_token=BANK_TOKENS["BANK_C"])
+    bank_enc_keys = {
+        "BANK_A": Fernet.generate_key(),
+        "BANK_B": Fernet.generate_key(),
+        "BANK_C": Fernet.generate_key(),
+    }
+
+    data_path_a = setup_bank_private_storage(vaults_dir, "BANK_A", X_a, y_a, bank_token=BANK_TOKENS["BANK_A"], bank_encryption_key=bank_enc_keys["BANK_A"])
+    data_path_b = setup_bank_private_storage(vaults_dir, "BANK_B", X_b, y_b, bank_token=BANK_TOKENS["BANK_B"], bank_encryption_key=bank_enc_keys["BANK_B"])
+    data_path_c = setup_bank_private_storage(vaults_dir, "BANK_C", X_c, y_c, bank_token=BANK_TOKENS["BANK_C"], bank_encryption_key=bank_enc_keys["BANK_C"])
 
     bank_data_paths = {
         "BANK_A": data_path_a,
@@ -111,22 +124,30 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
     with contextlib.suppress(Exception):
         os.chmod(os.path.dirname(data_path_a), 0o700)
 
-    # Spawn worker processes with isolated credentials and storage paths
+    # 3. Spawn worker processes under bank-specific database roles and data paths
+    bank_db_urls = {
+        "BANK_A": role_urls["worker_bank_a"],
+        "BANK_B": role_urls["worker_bank_b"],
+        "BANK_C": role_urls["worker_bank_c"],
+    }
     procs, endpoints = spawn_bank_workers(
         participating_banks=["BANK_A", "BANK_B", "BANK_C"],
         bank_tokens=BANK_TOKENS,
-        db_url=real_pg_instance,
+        db_url=role_urls["worker"],
         bank_data_paths=bank_data_paths,
+        bank_db_urls=bank_db_urls,
+        bank_encryption_keys=bank_enc_keys,
     )
 
     # Holdout test set for coordinator evaluation
     X_test = np.random.randn(100, NUM_FEATURES).astype(np.float32)
     y_test = np.random.randint(0, 2, size=100).astype(np.float32)
 
-    # Coordinator initialized with ONLY coordinator_token
+    # 4. Coordinator initialized with coordinator role and completion authority role
     manager = DistributedFederatedTrainingManager(
         coordinator_token=COORD_SECRET,
-        db_url=real_pg_instance,
+        db_url=role_urls["coordinator"],
+        completion_db_url=role_urls["completion"],
         app_env="production",
     )
 
@@ -137,7 +158,7 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
     signing_auth = IsolatedReceiptSigningAuthority(
         issuer_key_path=issuer_key_file,
         coordinator_token=COORD_SECRET,
-        db_url=real_pg_instance,
+        db_url=role_urls["issuer"],
         key_id=DEFAULT_TRAINING_KEY_ID,
         app_env="production",
     )

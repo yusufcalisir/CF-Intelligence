@@ -600,7 +600,44 @@ class TestPostgresAuthorityPolicy:
                 assert exc.value.sqlstate == "42501"
                 conn.rollback()
 
-        # 3. Issuer role CANNOT mutate any tables (SQLSTATE 42501)
+                # Coordinator role CANNOT directly insert into cfi_completed_jobs (SQLSTATE 42501)
+                with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc:
+                    cur.execute(
+                        """
+                        INSERT INTO cfi_completed_jobs (
+                            job_id, training_run_id, simulation_id, completed_at, status,
+                            executed_rounds, executed_epochs, sample_count, observed_metrics_json,
+                            artifact_sha256, architecture, feature_schema_version, input_dim,
+                            feature_names_json, worker_id, evidence_fingerprint
+                        ) VALUES ('j_coord_direct_hax', 'r', 's', NOW(), 'COMPLETED', 1, 1, 100, '{}', 'sha', 'arch', 'v1', 1, '[]', 'HAX', 'fp')
+                        """
+                    )
+                assert exc.value.sqlstate == "42501"
+                conn.rollback()
+
+        # 3. Completion Authority role (cfi_completion_role) CAN insert into cfi_completed_jobs
+        comp_url = role_urls["completion"]
+        assert comp_url is not None
+
+        # 4. Row-Level Security: Bank A role CAN insert its own observations, but CANNOT insert Bank B's
+        bank_a_url = role_urls["worker_bank_a"]
+        with psycopg.connect(bank_a_url) as conn:
+            with conn.cursor() as cur:
+                with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc:
+                    cur.execute(
+                        """
+                        INSERT INTO cfi_round_observations (
+                            event_id, job_id, training_run_id, simulation_id, worker_id,
+                            bank_id, round_number, attempt_number, actual_sample_count,
+                            actual_executed_epochs, observed_loss, metrics_json, model_update_digest,
+                            execution_timestamp, execution_status, payload_digest
+                        ) VALUES ('evt_spoof_b', 'j', 'r', 's', 'w', 'BANK_B', 1, 1, 100, 1, 0.5, '{}', 'd', '2026-10-11T12:00:00Z', 'COMPLETED', 'pd')
+                        """
+                    )
+                assert exc.value.sqlstate == "42501"
+                conn.rollback()
+
+        # 5. Issuer role CANNOT mutate any tables (SQLSTATE 42501)
         with psycopg.connect(issuer_url) as conn:
             with conn.cursor() as cur:
                 with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc:
@@ -608,7 +645,7 @@ class TestPostgresAuthorityPolicy:
                 assert exc.value.sqlstate == "42501"
                 conn.rollback()
 
-        # 4. Serving role CANNOT mutate any tables (SQLSTATE 42501)
+        # 6. Serving role CANNOT mutate any tables (SQLSTATE 42501)
         with psycopg.connect(serving_url) as conn:
             with conn.cursor() as cur:
                 with pytest.raises(psycopg.errors.InsufficientPrivilege) as exc:

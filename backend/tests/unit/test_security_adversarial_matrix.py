@@ -42,11 +42,13 @@ import time
 import urllib.parse
 import uuid
 from collections.abc import Generator
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import psycopg
 import pytest
+from cryptography.fernet import Fernet
 
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
@@ -307,15 +309,17 @@ class TestSecurityAdversarialMatrix:
     def test_sec_06_coordinator_attempts_direct_bank_a_dataset_access(self, tmp_path) -> None:
         """SEC-06: Direct access attempt to Bank A private vault from coordinator context is denied."""
         vaults_dir = str(tmp_path / "vaults_sec06")
+        bank_a_enc_key = Fernet.generate_key()
         setup_bank_private_storage(
             bank_storage_dir=vaults_dir,
             bank_id="BANK_A",
             X_partition=np.zeros((10, NUM_FEATURES), dtype=np.float32),
             y_partition=np.zeros(10, dtype=np.float32),
             bank_token=BANK_A_SECRET,
+            bank_encryption_key=bank_a_enc_key,
             lock_boundary=True,
         )
-        vault = BankPrivateStorageVault("BANK_A", vaults_dir, bank_token=BANK_A_SECRET)
+        vault = BankPrivateStorageVault("BANK_A", vaults_dir, bank_token=BANK_A_SECRET, bank_encryption_key=bank_a_enc_key)
         with pytest.raises((PermissionError, TrainingProvenanceSecurityError), match="Access denied|Institutional boundary violation"):
             vault.read_dataset_as_bank("BANK_A", caller_token=COORD_SECRET)
         vault.release_exclusive_os_boundary()
@@ -339,15 +343,17 @@ class TestSecurityAdversarialMatrix:
     def test_sec_08_bank_a_attempts_bank_c_dataset_access(self, tmp_path) -> None:
         """SEC-08: Bank A worker credential attempting to access Bank C private storage vault is denied."""
         vaults_dir = str(tmp_path / "vaults_sec08")
+        bank_c_enc_key = Fernet.generate_key()
         setup_bank_private_storage(
             bank_storage_dir=vaults_dir,
             bank_id="BANK_C",
             X_partition=np.zeros((10, NUM_FEATURES), dtype=np.float32),
             y_partition=np.zeros(10, dtype=np.float32),
             bank_token=BANK_C_SECRET,
+            bank_encryption_key=bank_c_enc_key,
             lock_boundary=True,
         )
-        vault_c = BankPrivateStorageVault("BANK_C", vaults_dir, bank_token=BANK_C_SECRET)
+        vault_c = BankPrivateStorageVault("BANK_C", vaults_dir, bank_token=BANK_C_SECRET, bank_encryption_key=bank_c_enc_key)
         with pytest.raises(PermissionError, match="Access denied: Invalid worker credential"):
             vault_c.read_dataset_as_bank("BANK_C", caller_token=BANK_A_SECRET)
         vault_c.release_exclusive_os_boundary()
@@ -369,11 +375,13 @@ class TestSecurityAdversarialMatrix:
                 signing_key_hex=priv_hex,
             )
 
-    def test_sec_10_unauthorized_caller_requests_receipt_issuance(self, real_pg_instance: str) -> None:
+    def test_sec_10_unauthorized_caller_requests_receipt_issuance(self, real_pg_instance: str, tmp_path) -> None:
         """SEC-10: Unauthorized caller token or identity requesting receipt from isolated issuer is rejected."""
         priv_hex, _ = _generate_ed25519_keypair_hex()
+        key_path = str(tmp_path / "issuer_sec10.key")
+        Path(key_path).write_text(priv_hex, encoding="utf-8")
         signing_auth = IsolatedReceiptSigningAuthority(
-            signing_key_hex=priv_hex,
+            issuer_key_path=key_path,
             coordinator_token=COORD_SECRET,
             db_url=real_pg_instance,
             app_env="production",
@@ -387,11 +395,13 @@ class TestSecurityAdversarialMatrix:
             )
         signing_auth.terminate()
 
-    def test_sec_11_issuer_process_terminated_fails_closed(self, real_pg_instance: str) -> None:
+    def test_sec_11_issuer_process_terminated_fails_closed(self, real_pg_instance: str, tmp_path) -> None:
         """SEC-11: When isolated receipt signing service process is terminated, signing fails closed immediately."""
         priv_hex, _ = _generate_ed25519_keypair_hex()
+        key_path = str(tmp_path / "issuer_sec11.key")
+        Path(key_path).write_text(priv_hex, encoding="utf-8")
         signing_auth = IsolatedReceiptSigningAuthority(
-            signing_key_hex=priv_hex,
+            issuer_key_path=key_path,
             coordinator_token=COORD_SECRET,
             db_url=real_pg_instance,
             app_env="production",
@@ -414,7 +424,7 @@ class TestSecurityAdversarialMatrix:
         job_id = f"job_sec12_{uuid.uuid4().hex[:8]}"
         authority.schedule_job(
             job_id=job_id,
-            training_run_id="run_sec12",
+            training_run_id=f"run_{job_id}",
             simulation_id="sim_sec12",
             coordinator_id="coord_sec12",
             architecture="FraudDetectionNN",
@@ -487,7 +497,7 @@ class TestSecurityAdversarialMatrix:
         art_sha = "15" * 32
         source.schedule_training_job(
             job_id=job_id,
-            training_run_id="run_sec15",
+            training_run_id=f"run_{job_id}",
             simulation_id="sim_sec15",
             coordinator_token=COORD_SECRET,
             permitted_workers=["BANK_A"],
@@ -541,7 +551,7 @@ class TestSecurityAdversarialMatrix:
 
         authority.schedule_job(
             job_id=job_id,
-            training_run_id="run_sec16",
+            training_run_id=f"run_{job_id}",
             simulation_id="sim_sec16",
             coordinator_id="coord_sec16",
             architecture="FraudDetectionNN",
@@ -556,7 +566,7 @@ class TestSecurityAdversarialMatrix:
         with pytest.raises(TrainingProvenanceSecurityError, match="cannot reschedule existing job with different parameters|Configuration fingerprint mismatch"):
             authority.schedule_job(
                 job_id=job_id,
-                training_run_id="run_sec16",
+                training_run_id=f"run_{job_id}",
                 simulation_id="sim_sec16",
                 coordinator_id="coord_sec16",
                 architecture="FraudDetectionNN",
@@ -575,7 +585,7 @@ class TestSecurityAdversarialMatrix:
 
         authority.schedule_job(
             job_id=job_id,
-            training_run_id="run_sec17",
+            training_run_id=f"run_{job_id}",
             simulation_id="sim_sec17",
             coordinator_id="coord_sec17",
             architecture="FraudDetectionNN",
@@ -590,7 +600,7 @@ class TestSecurityAdversarialMatrix:
         with pytest.raises(TrainingProvenanceSecurityError, match="cannot reschedule existing job with different parameters|Configuration fingerprint mismatch"):
             authority.schedule_job(
                 job_id=job_id,
-                training_run_id="run_sec17",
+                training_run_id=f"run_{job_id}",
                 simulation_id="sim_sec17",
                 coordinator_id="coord_sec17",
                 architecture="FraudDetectionNN",
@@ -609,7 +619,7 @@ class TestSecurityAdversarialMatrix:
 
         authority.schedule_job(
             job_id=job_id,
-            training_run_id="run_sec18",
+            training_run_id=f"run_{job_id}",
             simulation_id="sim_sec18",
             coordinator_id="coord_sec18",
             architecture="FraudDetectionNN",
@@ -624,7 +634,7 @@ class TestSecurityAdversarialMatrix:
         with pytest.raises(TrainingProvenanceSecurityError, match="cannot reschedule existing job with different parameters|Configuration fingerprint mismatch"):
             authority.schedule_job(
                 job_id=job_id,
-                training_run_id="run_sec18",
+                training_run_id=f"run_{job_id}",
                 simulation_id="sim_sec18",
                 coordinator_id="coord_sec18",
                 architecture="FraudDetectionNN",
@@ -648,7 +658,7 @@ class TestSecurityAdversarialMatrix:
         job_id = f"job_sec19_{uuid.uuid4().hex[:8]}"
         source.schedule_training_job(
             job_id=job_id,
-            training_run_id="run_sec19",
+            training_run_id=f"run_{job_id}",
             simulation_id="sim_sec19",
             coordinator_token=COORD_SECRET,
             permitted_workers=["BANK_A"],
@@ -688,7 +698,7 @@ class TestSecurityAdversarialMatrix:
         job_id = f"job_sec20_{uuid.uuid4().hex[:8]}"
         source.schedule_training_job(
             job_id=job_id,
-            training_run_id="run_sec20",
+            training_run_id=f"run_{job_id}",
             simulation_id="sim_sec20",
             coordinator_token=COORD_SECRET,
             permitted_workers=["BANK_A"],
@@ -827,10 +837,9 @@ class TestSecurityAdversarialMatrix:
         )
         job_id = f"job_sec24_{uuid.uuid4().hex[:8]}"
         art_sha_valid = "24" * 32
-        art_sha_conflict = "99" * 32
         source.schedule_training_job(
             job_id=job_id,
-            training_run_id="run_sec24",
+            training_run_id=f"run_{job_id}",
             simulation_id="sim_sec24",
             coordinator_token=COORD_SECRET,
             permitted_workers=["BANK_A"],
@@ -863,25 +872,170 @@ class TestSecurityAdversarialMatrix:
             coordinator_token=COORD_SECRET,
         )
 
+        # Concurrency race: Both processes issue the EXACT SAME valid completion payload
         barrier: Any = mp.Barrier(2)
         q1: Any = mp.Queue()
         q2: Any = mp.Queue()
         p1 = mp.Process(target=_sec24_concurrent_completer, args=(real_pg_instance, job_id, 0.25, barrier, q1, art_sha_valid))
-        p2 = mp.Process(target=_sec24_concurrent_completer, args=(real_pg_instance, job_id, 0.25, barrier, q2, art_sha_conflict))
+        p2 = mp.Process(target=_sec24_concurrent_completer, args=(real_pg_instance, job_id, 0.25, barrier, q2, art_sha_valid))
         p1.start()
         p2.start()
         p1.join(timeout=10)
         p2.join(timeout=10)
 
         results = [q1.get(timeout=5), q2.get(timeout=5)]
-        statuses = {r[0] for r in results}
-        assert "SUCCESS" in statuses
-        assert "ERROR" in statuses
+        statuses = [r[0] for r in results]
+        # Both processes resolve successfully (one commits, second resolves idempotently)
+        assert all(s == "SUCCESS" for s in statuses), f"Failed with results: {results}"
 
         persisted = source.get_completed_job_by_id(job_id)
         assert persisted is not None
         assert persisted.observed_metrics["loss"] == 0.25
         assert persisted.artifact_sha256 == art_sha_valid
+
+        # Verify exactly one completion row exists in database
+        with psycopg.connect(real_pg_instance) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                row = cur.fetchone()
+                assert row is not None
+                assert row[0] == 1
+
+    def test_sec_24b_valid_versus_invalid_digest_submission(self, real_pg_instance: str) -> None:
+        """SEC-24b: Submission of artifact digest inconsistent with authoritative aggregation is rejected."""
+        source = TrustedTrainingJobRecordSource(
+            coordinator_token=COORD_SECRET,
+            bank_tokens=BANK_TOKENS,
+            db_url=real_pg_instance,
+            enforce_lifecycle=True,
+            app_env="production",
+        )
+        job_id = f"job_sec24b_{uuid.uuid4().hex[:8]}"
+        art_sha_valid = "24" * 32
+        art_sha_invalid = "99" * 32
+        source.schedule_training_job(
+            job_id=job_id,
+            training_run_id=f"run_{job_id}",
+            simulation_id="sim_sec24b",
+            coordinator_token=COORD_SECRET,
+            permitted_workers=["BANK_A"],
+        )
+        source.start_training_job(job_id=job_id, worker_token=BANK_A_SECRET)
+        source.record_round_observation(
+            job_id=job_id,
+            round_number=1,
+            sample_count=100,
+            actual_executed_epochs=1,
+            observed_loss=0.25,
+            worker_token=BANK_A_SECRET,
+            bank_id="BANK_A",
+            model_update_digest=f"digest_{job_id}",
+        )
+        source.record_global_aggregation(
+            job_id=job_id,
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=[f"digest_{job_id}"],
+            aggregated_global_model_digest=art_sha_valid,
+            coordinator_token=COORD_SECRET,
+        )
+        source.record_evaluation_observation(
+            job_id=job_id,
+            metric_name="loss",
+            metric_value=0.25,
+            evaluated_artifact_digest=art_sha_valid,
+            coordinator_token=COORD_SECRET,
+        )
+
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_info:
+            source.complete_training_job(
+                job_id=job_id,
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=100,
+                observed_metrics={"loss": 0.25},
+                artifact_sha256=art_sha_invalid,
+                worker_id="FEDERATED_COORDINATOR",
+                coordinator_token=COORD_SECRET,
+                enforce_lifecycle=True,
+            )
+        assert "artifact digest" in str(exc_info.value).lower() or "digest" in str(exc_info.value).lower()
+
+    def test_sec_24c_conflicting_completion_rejected_after_commit(self, real_pg_instance: str) -> None:
+        """SEC-24c: Submitting conflicting execution claims after a committed completion is rejected."""
+        source = TrustedTrainingJobRecordSource(
+            coordinator_token=COORD_SECRET,
+            bank_tokens=BANK_TOKENS,
+            db_url=real_pg_instance,
+            enforce_lifecycle=True,
+            app_env="production",
+        )
+        job_id = f"job_sec24c_{uuid.uuid4().hex[:8]}"
+        art_sha_valid = "24" * 32
+        source.schedule_training_job(
+            job_id=job_id,
+            training_run_id=f"run_{job_id}",
+            simulation_id="sim_sec24c",
+            coordinator_token=COORD_SECRET,
+            permitted_workers=["BANK_A"],
+        )
+        source.start_training_job(job_id=job_id, worker_token=BANK_A_SECRET)
+        source.record_round_observation(
+            job_id=job_id,
+            round_number=1,
+            sample_count=100,
+            actual_executed_epochs=1,
+            observed_loss=0.25,
+            worker_token=BANK_A_SECRET,
+            bank_id="BANK_A",
+            model_update_digest=f"digest_{job_id}",
+        )
+        source.record_global_aggregation(
+            job_id=job_id,
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=[f"digest_{job_id}"],
+            aggregated_global_model_digest=art_sha_valid,
+            coordinator_token=COORD_SECRET,
+        )
+        source.record_evaluation_observation(
+            job_id=job_id,
+            metric_name="loss",
+            metric_value=0.25,
+            evaluated_artifact_digest=art_sha_valid,
+            coordinator_token=COORD_SECRET,
+        )
+
+        # First valid commit
+        rec1 = source.complete_training_job(
+            job_id=job_id,
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"loss": 0.25},
+            artifact_sha256=art_sha_valid,
+            worker_id="FEDERATED_COORDINATOR",
+            coordinator_token=COORD_SECRET,
+            enforce_lifecycle=True,
+        )
+        assert rec1.status == "COMPLETED"
+
+        # Conflicting second attempt (different loss: 0.99 vs 0.25)
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_info:
+            source.complete_training_job(
+                job_id=job_id,
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=100,
+                observed_metrics={"loss": 0.99},
+                artifact_sha256=art_sha_valid,
+                worker_id="FEDERATED_COORDINATOR",
+                coordinator_token=COORD_SECRET,
+                enforce_lifecycle=True,
+            )
+        assert "conflicting" in str(exc_info.value).lower()
 
     def test_sec_25_duplicate_and_conflicting_observations_submitted_concurrently(self, real_pg_instance: str) -> None:
         """SEC-25: Concurrent worker processes submit observations without deadlock or database corruption."""
@@ -895,7 +1049,7 @@ class TestSecurityAdversarialMatrix:
         job_id = f"job_sec25_{uuid.uuid4().hex[:8]}"
         source.schedule_training_job(
             job_id=job_id,
-            training_run_id="run_sec25",
+            training_run_id=f"run_{job_id}",
             simulation_id="sim_sec25",
             coordinator_token=COORD_SECRET,
             permitted_workers=["BANK_A"],
@@ -933,7 +1087,7 @@ class TestSecurityAdversarialMatrix:
         art_sha = "26" * 32
         source.schedule_training_job(
             job_id=job_id,
-            training_run_id="run_sec26",
+            training_run_id=f"run_{job_id}",
             simulation_id="sim_sec26",
             coordinator_token=COORD_SECRET,
             permitted_workers=["BANK_A"],

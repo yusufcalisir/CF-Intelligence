@@ -34,6 +34,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from cryptography.fernet import Fernet
 
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
@@ -41,6 +42,7 @@ from app.application.services.distributed_fl_service import (
     DistributedFederatedTrainingManager,
     IsolatedReceiptSigningAuthority,
     _generate_ed25519_keypair_hex,
+    provision_isolated_issuer_vault,
     setup_bank_private_storage,
     spawn_bank_workers,
 )
@@ -301,16 +303,18 @@ class TestAdversarialEndToEndScenarios:
     def test_e2e_neg_06_coordinator_attempts_raw_data_access(self, tmp_path) -> None:
         """E2E-NEG-06: Direct access attempt to bank private vault from coordinator context is rejected."""
         vaults_dir = str(tmp_path / "vaults")
+        bank_a_enc_key = Fernet.generate_key()
         data_path = setup_bank_private_storage(
             bank_storage_dir=vaults_dir,
             bank_id="BANK_A",
             X_partition=np.zeros((10, NUM_FEATURES), dtype=np.float32),
             y_partition=np.zeros(10, dtype=np.float32),
             bank_token=BANK_A_SECRET,
+            bank_encryption_key=bank_a_enc_key,
             lock_boundary=True,
         )
 
-        vault = BankPrivateStorageVault("BANK_A", vaults_dir, bank_token=BANK_A_SECRET)
+        vault = BankPrivateStorageVault("BANK_A", vaults_dir, bank_token=BANK_A_SECRET, bank_encryption_key=bank_a_enc_key)
         # 1. Coordinator identity cannot read private bank dataset through vault API
         with pytest.raises((PermissionError, TrainingProvenanceSecurityError), match="Access denied|Institutional boundary violation"):
             vault.read_dataset_as_bank("BANK_A", caller_token=COORD_SECRET)
@@ -664,7 +668,7 @@ class TestAdversarialEndToEndScenarios:
 
         authority.schedule_job(
             job_id=job_id,
-            training_run_id="run_neg15",
+            training_run_id=f"run_{job_id}",
             simulation_id="sim_neg15",
             coordinator_id="coord15",
             architecture="FraudDetectionNN",
@@ -688,11 +692,12 @@ class TestAdversarialEndToEndScenarios:
         assert len(aggs) == 0
         assert authority.get_completed_job_by_id(job_id) is None
 
-    def test_e2e_neg_16_issuer_service_unavailable(self, real_pg_instance: str) -> None:
+    def test_e2e_neg_16_issuer_service_unavailable(self, real_pg_instance: str, tmp_path) -> None:
         """E2E-NEG-16: When isolated issuer process is terminated, receipt signing fails closed immediately."""
-        priv_hex, _ = _generate_ed25519_keypair_hex()
+        vault_dir = str(tmp_path / "issuer_vault_neg16")
+        key_file, _ = provision_isolated_issuer_vault(vault_dir)
         signing_auth = IsolatedReceiptSigningAuthority(
-            signing_key_hex=priv_hex,
+            issuer_key_path=key_file,
             coordinator_token=COORD_SECRET,
             db_url=real_pg_instance,
             app_env="production",
@@ -763,7 +768,7 @@ class TestAdversarialEndToEndScenarios:
         # 1. Schedule legitimate job
         authority.schedule_job(
             job_id=job_id,
-            training_run_id="run_neg18",
+            training_run_id=f"run_{job_id}",
             simulation_id="sim_neg18",
             coordinator_id="coord18",
             architecture="FraudDetectionNN",

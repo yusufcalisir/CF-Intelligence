@@ -327,14 +327,15 @@ class TestCryptographicReceiptIsolation:
         assert "not trusted" in reason.lower() or "not present in trusted" in reason.lower()
 
     def test_cr_07_signing_authority_fails_closed_when_database_unreachable(
-        self
+        self, tmp_path
     ) -> None:
         """CR-07: When PostgreSQL authority is unavailable, IsolatedReceiptSigningAuthority fails closed."""
-        priv_hex, _ = _generate_ed25519_keypair_hex()
+        vault_dir = str(tmp_path / "issuer_vault_cr07")
+        key_file, _ = provision_isolated_issuer_vault(vault_dir)
         # Invalid DB port fails closed on initialization
         with pytest.raises(TrainingProvenanceConfigurationError, match="Failed to connect to PostgreSQL authority"):
             IsolatedReceiptSigningAuthority(
-                signing_key_hex=priv_hex,
+                issuer_key_path=key_file,
                 coordinator_token=COORD_SECRET,
                 db_url="postgresql://user:pass@127.0.0.1:59999/nonexistent_db",
                 app_env="production",
@@ -529,9 +530,10 @@ class TestCryptographicReceiptIsolation:
         )
 
         # Provision independent signing authority
-        priv_hex, pub_hex = _generate_ed25519_keypair_hex()
+        vault_dir = str(tmp_path / "issuer_vault_cr10")
+        key_file, pub_hex = provision_isolated_issuer_vault(vault_dir)
         signing_auth = IsolatedReceiptSigningAuthority(
-            signing_key_hex=priv_hex,
+            issuer_key_path=key_file,
             coordinator_token=COORD_SECRET,
             db_url=real_pg_instance,
             key_id="authority_key_10",
