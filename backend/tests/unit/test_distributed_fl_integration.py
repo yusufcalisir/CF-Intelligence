@@ -30,6 +30,7 @@ from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
     DistributedFederatedTrainingManager,
     IsolatedReceiptSigningAuthority,
+    IsolatedTrainingCompletionAuthority,
     _generate_ed25519_keypair_hex,
     provision_isolated_issuer_vault,
     setup_bank_private_storage,
@@ -143,11 +144,17 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
     X_test = np.random.randn(100, NUM_FEATURES).astype(np.float32)
     y_test = np.random.randint(0, 2, size=100).astype(np.float32)
 
-    # 4. Coordinator initialized with coordinator role and completion authority role
+    # 4. Independent completion authority initialized outside coordinator boundary
+    completion_auth = IsolatedTrainingCompletionAuthority(
+        completion_db_url=role_urls["completion"],
+        coordinator_token=COORD_SECRET,
+        app_env="production",
+    )
+
+    # 5. Coordinator initialized with coordinator role ONLY (zero completion credentials)
     manager = DistributedFederatedTrainingManager(
         coordinator_token=COORD_SECRET,
         db_url=role_urls["coordinator"],
-        completion_db_url=role_urls["completion"],
         app_env="production",
     )
 
@@ -175,7 +182,9 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
         expected_unique_samples=450,
         registry_storage_dir=registry_dir,
         signing_authority=signing_auth,
+        completion_authority=completion_auth,
     )
+    result["completion_auth"] = completion_auth
     result["job_id"] = job_id
     result["run_id"] = run_id
     result["sim_id"] = sim_id

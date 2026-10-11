@@ -50,6 +50,10 @@ from app.application.services.training_provenance_service import (
     get_default_training_issuer,
     get_default_training_verifier,
 )
+from app.infrastructure.database.training_authority_backends import (
+    CompletedJobExecutionRecord,
+    PostgresTrainingJobAuthority,
+)
 from app.config import get_settings
 from app.domain.enums import AggregationMethod
 from app.domain.value_objects import ModelWeights
@@ -550,6 +554,237 @@ class IsolatedReceiptSigningAuthority:
         raise TrainingProvenanceSecurityError(err_msg)
 
 
+def _run_isolated_completion_worker(
+    completion_db_url: str,
+    coordinator_token: str | None,
+    inbox: mp.Queue,
+    outbox: mp.Queue,
+    app_env: str,
+) -> None:
+    """Isolated OS process executing authoritative PostgreSQL completion reconciliation and writes.
+
+    Resides strictly outside the coordinator security context:
+    - Holds exclusive cfi_completion_role credentials in this child process memory space.
+    - Connects directly to PostgreSQL under cfi_completion_role.
+    - Executes atomic, single-transaction validation and finalization with advisory locking.
+    - Coordinator process never possesses, stores, or derives these completion credentials.
+    """
+    worker_pid = os.getpid()
+    try:
+        authority = PostgresTrainingJobAuthority(db_url=completion_db_url)
+    except Exception as e:
+        outbox.put({"status": "ERROR", "error": f"Failed to initialize completion authority in worker process: {e}"})
+        return
+
+    outbox.put({"status": "READY", "worker_pid": worker_pid})
+
+    while True:
+        try:
+            req = inbox.get()
+        except Exception:
+            break
+
+        if not isinstance(req, dict):
+            continue
+
+        cmd = req.get("command")
+        if cmd == "SHUTDOWN":
+            break
+
+        if cmd == "FINALIZE_COMPLETION":
+            try:
+                auth_token = req.get("coordinator_token")
+                is_prod = app_env.lower() == "production"
+
+                if is_prod and not coordinator_token:
+                    outbox.put({
+                        "status": "ERROR",
+                        "error": "Unauthorized completion request: coordinator token configuration is required in production.",
+                    })
+                    continue
+
+                if coordinator_token is not None:
+                    if not auth_token or not hmac.compare_digest(auth_token, coordinator_token):
+                        outbox.put({
+                            "status": "ERROR",
+                            "error": "Unauthorized completion request: invalid or missing coordinator token.",
+                        })
+                        continue
+                elif req.get("caller_identity") != "COORDINATOR":
+                    outbox.put({
+                        "status": "ERROR",
+                        "error": f"Unauthorized completion caller identity: '{req.get('caller_identity')}'.",
+                    })
+                    continue
+
+                job_id = req["job_id"]
+                executed_rounds = req["executed_rounds"]
+                executed_epochs = req.get("executed_epochs", 0)
+                sample_count = req.get("sample_count", 0)
+                observed_metrics = req.get("observed_metrics") or {}
+                artifact_sha256 = req["artifact_sha256"]
+                worker_id = req.get("worker_id", "FEDERATED_COORDINATOR")
+                git_commit_hash = req.get("git_commit_hash")
+                dataset_manifest_id = req.get("dataset_manifest_id")
+                simulate_failure = req.get("simulate_failure_before_commit", False)
+
+                completed_record = authority.complete_job(
+                    job_id=job_id,
+                    executed_rounds=executed_rounds,
+                    executed_epochs=executed_epochs,
+                    sample_count=sample_count,
+                    observed_metrics=observed_metrics,
+                    artifact_sha256=artifact_sha256,
+                    worker_id=worker_id,
+                    git_commit_hash=git_commit_hash,
+                    dataset_manifest_id=dataset_manifest_id,
+                    enforce_lifecycle=True,
+                    simulate_failure_before_commit=simulate_failure,
+                )
+
+                record_dict = {
+                    "job_id": completed_record.job_id,
+                    "training_run_id": completed_record.training_run_id,
+                    "simulation_id": completed_record.simulation_id,
+                    "completed_at": completed_record.completed_at,
+                    "executed_rounds": completed_record.executed_rounds,
+                    "executed_epochs": completed_record.executed_epochs,
+                    "sample_count": completed_record.sample_count,
+                    "observed_metrics": dict(completed_record.observed_metrics),
+                    "artifact_sha256": completed_record.artifact_sha256,
+                    "architecture": completed_record.architecture,
+                    "feature_schema_version": completed_record.feature_schema_version,
+                    "input_dim": completed_record.input_dim,
+                    "feature_names": tuple(completed_record.feature_names),
+                    "worker_id": completed_record.worker_id,
+                    "status": completed_record.status,
+                    "git_commit_hash": completed_record.git_commit_hash,
+                    "dataset_manifest_id": completed_record.dataset_manifest_id,
+                }
+
+                outbox.put({
+                    "status": "SUCCESS",
+                    "record_dict": record_dict,
+                    "worker_pid": worker_pid,
+                })
+            except Exception as e:
+                outbox.put({
+                    "status": "ERROR",
+                    "error": str(e),
+                })
+
+
+class IsolatedTrainingCompletionAuthority:
+    """Independently authorized completion authority residing outside the coordinator boundary.
+
+    Enforces Architecture & Security Invariants:
+    1. Holds completion database credentials (cfi_completion_role) in an independent OS process memory space.
+    2. Coordinator process never possesses, derives, stores, or forwards the completion database URL or credentials.
+    3. Finalizes completion records exclusively through atomic PostgreSQL transactions with advisory row locks.
+    4. Independently verifies required PostgreSQL observations, accepted aggregation evidence, evaluation records,
+       identity binding, immutable training configuration, execution accounting, and final artifact identity.
+    5. Fails closed on missing/forged evidence, inconsistent sample/epoch accounting, conflicting completions,
+       unauthenticated callers, or process/database failure.
+    """
+
+    def __init__(
+        self,
+        completion_db_url: str,
+        coordinator_token: str | None = None,
+        app_env: str = "production",
+    ) -> None:
+        self.app_env = app_env
+        self._inbox: mp.Queue = mp.Queue()
+        self._outbox: mp.Queue = mp.Queue()
+        self._process = mp.Process(
+            target=_run_isolated_completion_worker,
+            args=(
+                completion_db_url,
+                coordinator_token,
+                self._inbox,
+                self._outbox,
+                self.app_env,
+            ),
+        )
+        self._process.daemon = True
+        self._process.start()
+
+        try:
+            init_msg = self._outbox.get(timeout=15)
+            if isinstance(init_msg, dict) and init_msg.get("status") == "READY":
+                self._worker_pid = init_msg.get("worker_pid")
+            else:
+                err = init_msg.get("error") if isinstance(init_msg, dict) else str(init_msg)
+                raise TrainingProvenanceConfigurationError(f"Failed to initialize completion authority worker: {err}")
+        except Exception as e:
+            if not isinstance(e, TrainingProvenanceConfigurationError):
+                raise TrainingProvenanceConfigurationError(f"Completion authority worker failed to initialize: {e}") from e
+            raise
+
+    @property
+    def pid(self) -> int | None:
+        return self._worker_pid
+
+    def is_alive(self) -> bool:
+        return self._process.is_alive()
+
+    def terminate(self) -> None:
+        if self._process.is_alive():
+            with contextlib.suppress(Exception):
+                self._inbox.put({"command": "SHUTDOWN"})
+            self._process.terminate()
+            self._process.join(timeout=3)
+
+    def __enter__(self) -> IsolatedTrainingCompletionAuthority:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.terminate()
+
+    def finalize_training_completion(
+        self,
+        job_id: str,
+        executed_rounds: int,
+        executed_epochs: int = 0,
+        sample_count: int = 0,
+        observed_metrics: dict[str, float] | None = None,
+        artifact_sha256: str = "",
+        worker_id: str = "FEDERATED_COORDINATOR",
+        coordinator_token: str | None = None,
+        git_commit_hash: str | None = None,
+        dataset_manifest_id: str | None = None,
+        simulate_failure_before_commit: bool = False,
+    ) -> CompletedJobExecutionRecord:
+        """Request atomic finalization from the isolated completion authority process over authenticated IPC."""
+        if not self._process.is_alive():
+            raise TrainingProvenanceSecurityError("Completion authority service unavailable: worker process terminated.")
+
+        self._inbox.put({
+            "command": "FINALIZE_COMPLETION",
+            "job_id": job_id,
+            "executed_rounds": executed_rounds,
+            "executed_epochs": executed_epochs,
+            "sample_count": sample_count,
+            "observed_metrics": observed_metrics or {},
+            "artifact_sha256": artifact_sha256,
+            "worker_id": worker_id,
+            "coordinator_token": coordinator_token,
+            "git_commit_hash": git_commit_hash,
+            "dataset_manifest_id": dataset_manifest_id,
+            "simulate_failure_before_commit": simulate_failure_before_commit,
+            "caller_identity": "COORDINATOR",
+        })
+        try:
+            res = self._outbox.get(timeout=30)
+        except Exception as e:
+            raise TrainingProvenanceSecurityError(f"Completion authority service timeout or communication failure: {e}") from e
+
+        if res.get("status") == "SUCCESS":
+            return CompletedJobExecutionRecord(**res["record_dict"])
+        err_msg = res.get("error") or f"Completion rejected by isolated completion authority: {res}"
+        raise TrainingProvenanceSecurityError(err_msg)
+
+
 def setup_bank_private_storage(
     bank_storage_dir: str,
     bank_id: str,
@@ -817,11 +1052,14 @@ class DistributedFederatedTrainingManager:
         db_url: str,
         app_env: str = "production",
         bank_tokens: dict[str, str] | None = None,
-        completion_db_url: str | None = None,
+        **kwargs: Any,
     ) -> None:
+        if "completion_db_url" in kwargs:
+            raise TrainingProvenanceSecurityError(
+                "Coordinator process cannot receive or hold completion-authority credentials (COMP-01)."
+            )
         self.coordinator_token = coordinator_token
         self.db_url = db_url
-        self.completion_db_url = completion_db_url
         self.app_env = app_env
         self.settings = get_settings()
 
@@ -831,11 +1069,10 @@ class DistributedFederatedTrainingManager:
             )
 
         # Coordinator authority source possesses coordinator_token ONLY!
-        # It has ZERO access to bank worker tokens and cannot impersonate banks.
+        # It has ZERO access to bank worker tokens or completion credentials.
         self.authority_source = TrustedTrainingJobRecordSource(
             coordinator_token=self.coordinator_token,
             db_url=self.db_url,
-            completion_db_url=self.completion_db_url,
             enforce_lifecycle=True,
             app_env=self.app_env,
         )
@@ -867,6 +1104,7 @@ class DistributedFederatedTrainingManager:
         registry_storage_dir: str | None = None,
         signing_key_hex: str | None = None,
         signing_authority: IsolatedReceiptSigningAuthority | None = None,
+        completion_authority: IsolatedTrainingCompletionAuthority | None = None,
         receipt_issuer: TrainingReceiptIssuer | None = None,
         receipt_verifier: TrainingReceiptVerifier | None = None,
         model_registry: ModelRegistry | None = None,
@@ -1105,22 +1343,43 @@ class DistributedFederatedTrainingManager:
                 / tot_samples
             )
 
-            # 6. Complete Job in PostgreSQL Authority
-            completed_record = self.authority_source.complete_training_job(
-                job_id=job_id,
-                executed_rounds=num_rounds,
-                executed_epochs=num_rounds,
-                sample_count=unique_samples,
-                observed_metrics={
-                    "loss": final_loss,
-                    "auc_roc": val_auc,
-                    "val_loss": val_loss,
-                },
-                artifact_sha256=final_artifact_sha256,
-                worker_id="FEDERATED_COORDINATOR",
-                coordinator_token=self.coordinator_token,
-                enforce_lifecycle=True,
-            )
+            # 6. Complete Job in PostgreSQL Authority via Independent Completion Authority
+            if completion_authority is not None:
+                completed_record = completion_authority.finalize_training_completion(
+                    job_id=job_id,
+                    executed_rounds=num_rounds,
+                    executed_epochs=num_rounds,
+                    sample_count=unique_samples,
+                    observed_metrics={
+                        "loss": final_loss,
+                        "auc_roc": val_auc,
+                        "val_loss": val_loss,
+                    },
+                    artifact_sha256=final_artifact_sha256,
+                    worker_id="FEDERATED_COORDINATOR",
+                    coordinator_token=self.coordinator_token,
+                )
+            else:
+                if is_prod:
+                    raise TrainingProvenanceSecurityError(
+                        "Production federated training requires an independent completion authority "
+                        "(IsolatedTrainingCompletionAuthority) to finalize training completion."
+                    )
+                completed_record = self.authority_source.complete_training_job(
+                    job_id=job_id,
+                    executed_rounds=num_rounds,
+                    executed_epochs=num_rounds,
+                    sample_count=unique_samples,
+                    observed_metrics={
+                        "loss": final_loss,
+                        "auc_roc": val_auc,
+                        "val_loss": val_loss,
+                    },
+                    artifact_sha256=final_artifact_sha256,
+                    worker_id="FEDERATED_COORDINATOR",
+                    coordinator_token=self.coordinator_token,
+                    enforce_lifecycle=True,
+                )
 
             # 7. Issue Ed25519 Receipt in RECEIPT ISSUER DOMAIN
             if signing_authority is not None:

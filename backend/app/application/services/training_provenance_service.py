@@ -176,7 +176,6 @@ class TrainingJobAuthorityDatabase:
         app_env: str | None = None,
         db_url: str | None = None,
         is_prod: bool | None = None,
-        completion_db_url: str | None = None,
     ) -> None:
         effective_target = db_target if db_target is not None else (db_url or "")
         self._db_target = effective_target
@@ -200,7 +199,7 @@ class TrainingJobAuthorityDatabase:
                 db_target=":memory:", in_memory=True
             )
         elif clean.startswith("postgresql://") or clean.startswith("postgres://"):
-            self._backend = PostgresTrainingJobAuthority(db_url=clean, completion_db_url=completion_db_url)
+            self._backend = PostgresTrainingJobAuthority(db_url=clean)
         elif clean.startswith("sqlite://") or "://" not in clean:
             self._backend = SQLiteTrainingJobAuthority(db_target=clean, in_memory=False)
         else:
@@ -282,6 +281,7 @@ class TrainingJobAuthorityDatabase:
         input_dim: int | None = None,
         feature_names: Sequence[str] | list[str] | tuple[str, ...] | None = None,
         enforce_lifecycle: bool = True,
+        simulate_failure_before_commit: bool = False,
     ) -> CompletedJobExecutionRecord:
         return self._backend.complete_job(
             job_id=job_id,
@@ -300,6 +300,7 @@ class TrainingJobAuthorityDatabase:
             input_dim=input_dim,
             feature_names=feature_names,
             enforce_lifecycle=enforce_lifecycle,
+            simulate_failure_before_commit=simulate_failure_before_commit,
         )
 
     def get_completed_job_by_id(self, job_id: str) -> CompletedJobExecutionRecord | None:
@@ -345,14 +346,12 @@ class TrustedTrainingJobRecordSource:
         coordinator_token: str | None = None,
         db_url: str | None = None,
         bank_tokens: dict[str, str] | None = None,
-        completion_db_url: str | None = None,
     ) -> None:
         self._lock = threading.RLock()
         self._worker_token = configured_token if configured_token is not None else worker_token
         self._coordinator_token = coordinator_token
         self._enforce_lifecycle = enforce_lifecycle
         self._app_env = app_env
-        self._completion_db_url = completion_db_url
 
         settings = get_settings()
         self._bank_tokens = dict(bank_tokens) if bank_tokens is not None else dict(getattr(settings, "training_bank_tokens", {}))
@@ -443,16 +442,10 @@ class TrustedTrainingJobRecordSource:
                 self._store_file_path = ""
                 self._in_memory = True
 
-        configured_completion = (
-            self._completion_db_url
-            or os.environ.get("CFI_TRAINING_JOB_COMPLETION_DB_URL")
-            or getattr(settings, "training_job_completion_db_url", None)
-        )
         self._db = TrainingJobAuthorityDatabase(
             db_target=self._store_file_path,
             in_memory=self._in_memory,
             app_env=active_env,
-            completion_db_url=configured_completion,
         )
 
     @property
@@ -981,6 +974,7 @@ class TrustedTrainingJobRecordSource:
         simulation_id: str | None = None,
         training_run_id: str | None = None,
         enforce_lifecycle: bool | None = None,
+        simulate_failure_before_commit: bool = False,
     ) -> CompletedJobExecutionRecord:
         """Register completion of an authorized training job with observed execution evidence."""
         if coordinator_token is not None:
@@ -1024,6 +1018,7 @@ class TrustedTrainingJobRecordSource:
             input_dim=input_dim,
             feature_names=feature_names,
             enforce_lifecycle=enforce,
+            simulate_failure_before_commit=simulate_failure_before_commit,
         )
 
     def record_job_completion(

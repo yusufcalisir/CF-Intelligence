@@ -493,6 +493,7 @@ class TrainingJobAuthorityBackend(abc.ABC):
         input_dim: int | None = None,
         feature_names: Sequence[str] | list[str] | tuple[str, ...] | None = None,
         enforce_lifecycle: bool = True,
+        simulate_failure_before_commit: bool = False,
     ) -> CompletedJobExecutionRecord: ...
 
     @abc.abstractmethod
@@ -905,7 +906,7 @@ def provision_runtime_service_roles(
 class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
     """PostgreSQL-backed ACID relational authority enforcing multi-host concurrency and row-level locking."""
 
-    def __init__(self, db_url: str, completion_db_url: str | None = None) -> None:
+    def __init__(self, db_url: str) -> None:
         if psycopg is None:
             raise TrainingProvenanceConfigurationError(
                 "psycopg (v3) driver is not installed. PostgreSQL training authority cannot operate without psycopg."
@@ -919,7 +920,6 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             )
 
         self._db_url = clean_url
-        self._completion_db_url = completion_db_url.strip() if completion_db_url else None
         self._lock = threading.RLock()
         self._test_connection()
         self.init_schema()
@@ -1605,6 +1605,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         input_dim: int | None = None,
         feature_names: Sequence[str] | list[str] | tuple[str, ...] | None = None,
         enforce_lifecycle: bool = True,
+        simulate_failure_before_commit: bool = False,
     ) -> CompletedJobExecutionRecord:
         clean_job_id = job_id.strip()
         if not enforce_lifecycle:
@@ -1618,6 +1619,8 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         with self._connect() as conn:
             with conn.transaction():
                 with conn.cursor() as cur:
+                    # Atomic transaction boundary: acquire exclusive transaction-level advisory lock on job_id
+                    cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (clean_job_id,))
                     cur.execute("SELECT * FROM cfi_scheduled_jobs WHERE job_id = %s", (clean_job_id,))
                     sched_row = cur.fetchone()
 
@@ -1815,79 +1818,44 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                     )
                     record.validate()
 
+                    if simulate_failure_before_commit:
+                        raise RuntimeError(
+                            f"Simulated execution checkpoint failure before commit for job '{clean_job_id}': transaction rolled back."
+                        )
+
                     try:
-                        if self._completion_db_url:
-                            if psycopg is None:
-                                raise TrainingProvenanceConfigurationError("psycopg (v3) driver is not installed.")
-                            driver: Any = psycopg
-                            with driver.connect(self._completion_db_url, autocommit=True) as comp_conn:
-                                with comp_conn.cursor() as comp_cur:
-                                    comp_cur.execute(
-                                        """
-                                        INSERT INTO cfi_completed_jobs (
-                                            job_id, training_run_id, simulation_id, completed_at,
-                                            executed_rounds, executed_epochs, sample_count,
-                                            observed_metrics_json, artifact_sha256, architecture,
-                                            feature_schema_version, input_dim, feature_names_json,
-                                            worker_id, status, git_commit_hash, dataset_manifest_id,
-                                            evidence_fingerprint
-                                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                        """,
-                                        (
-                                            clean_job_id,
-                                            sched_run_id,
-                                            sched_sim_id,
-                                            now_str,
-                                            executed_rounds,
-                                            executed_epochs,
-                                            sample_count,
-                                            json.dumps(target_metrics),
-                                            clean_sha,
-                                            sched_arch,
-                                            sched_schema_ver,
-                                            sched_input_dim,
-                                            json.dumps(list(target_fnames)),
-                                            worker_id,
-                                            "COMPLETED",
-                                            git_commit_hash,
-                                            dataset_manifest_id,
-                                            evidence_fp,
-                                        ),
-                                    )
-                        else:
-                            with conn.transaction():
-                                cur.execute(
-                                    """
-                                    INSERT INTO cfi_completed_jobs (
-                                        job_id, training_run_id, simulation_id, completed_at,
-                                        executed_rounds, executed_epochs, sample_count,
-                                        observed_metrics_json, artifact_sha256, architecture,
-                                        feature_schema_version, input_dim, feature_names_json,
-                                        worker_id, status, git_commit_hash, dataset_manifest_id,
-                                        evidence_fingerprint
-                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                    """,
-                                    (
-                                        clean_job_id,
-                                        sched_run_id,
-                                        sched_sim_id,
-                                        now_str,
-                                        executed_rounds,
-                                        executed_epochs,
-                                        sample_count,
-                                        json.dumps(target_metrics),
-                                        clean_sha,
-                                        sched_arch,
-                                        sched_schema_ver,
-                                        sched_input_dim,
-                                        json.dumps(list(target_fnames)),
-                                        worker_id,
-                                        "COMPLETED",
-                                        git_commit_hash,
-                                        dataset_manifest_id,
-                                        evidence_fp,
-                                    ),
-                                )
+                        cur.execute(
+                            """
+                            INSERT INTO cfi_completed_jobs (
+                                job_id, training_run_id, simulation_id, completed_at,
+                                executed_rounds, executed_epochs, sample_count,
+                                observed_metrics_json, artifact_sha256, architecture,
+                                feature_schema_version, input_dim, feature_names_json,
+                                worker_id, status, git_commit_hash, dataset_manifest_id,
+                                evidence_fingerprint
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """,
+                            (
+                                clean_job_id,
+                                sched_run_id,
+                                sched_sim_id,
+                                now_str,
+                                executed_rounds,
+                                executed_epochs,
+                                sample_count,
+                                json.dumps(target_metrics),
+                                clean_sha,
+                                sched_arch,
+                                sched_schema_ver,
+                                sched_input_dim,
+                                json.dumps(list(target_fnames)),
+                                worker_id,
+                                "COMPLETED",
+                                git_commit_hash,
+                                dataset_manifest_id,
+                                evidence_fp,
+                            ),
+                        )
                     except Exception as insert_err:
                         sanitized_insert_err = str(insert_err)
                         if "unique constraint" in sanitized_insert_err.lower() or "23505" in sanitized_insert_err:
@@ -2752,6 +2720,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         input_dim: int | None = None,
         feature_names: Sequence[str] | list[str] | tuple[str, ...] | None = None,
         enforce_lifecycle: bool = True,
+        simulate_failure_before_commit: bool = False,
     ) -> CompletedJobExecutionRecord:
         clean_job_id = job_id.strip()
         if self._is_prod and not enforce_lifecycle:
@@ -2960,6 +2929,12 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                         dataset_manifest_id=dataset_manifest_id,
                     )
                     record.validate()
+
+                    if simulate_failure_before_commit:
+                        conn.execute("ROLLBACK")
+                        raise RuntimeError(
+                            f"Simulated execution checkpoint failure before commit for job '{clean_job_id}': transaction rolled back."
+                        )
 
                     conn.execute(
                         """
