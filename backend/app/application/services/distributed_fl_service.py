@@ -2205,6 +2205,7 @@ def spawn_bank_workers(
     fail_bank_b_observation: bool = False,
     bank_db_urls: dict[str, str] | None = None,
     bank_encryption_keys: Mapping[str, str | bytes] | None = None,
+    app_env: str = "production",
 ) -> tuple[dict[str, mp.Process], dict[str, dict[str, mp.Queue]]]:
     """Spawn dedicated OS worker processes with their private credentials and data paths.
 
@@ -2219,7 +2220,26 @@ def spawn_bank_workers(
         data_path = bank_data_paths.get(b_id) if bank_data_paths else None
         X_b, y_b = bank_partitions.get(b_id, (None, None)) if bank_partitions else (None, None)
         should_fail_obs = (b_id == "BANK_B" and fail_bank_b_observation)
-        worker_db_url = bank_db_urls[b_id] if bank_db_urls and b_id in bank_db_urls else db_url
+
+        if app_env.lower() == "production":
+            if not bank_db_urls or b_id not in bank_db_urls or not bank_db_urls[b_id]:
+                raise TrainingProvenanceSecurityError(
+                    f"Production bank worker [{b_id}] requires dedicated authenticated bank-specific database credentials. "
+                    f"Fallback to generic database role is strictly forbidden (BANKDB-05)."
+                )
+            candidate_url = bank_db_urls[b_id]
+            import urllib.parse
+
+            parsed_u = urllib.parse.urlsplit(candidate_url).username or ""
+            if parsed_u == "cfi_worker_role":
+                raise TrainingProvenanceSecurityError(
+                    f"Production bank worker [{b_id}] cannot execute under shared generic worker role 'cfi_worker_role'. "
+                    f"Dedicated bank-specific database role is required (BANKDB-05)."
+                )
+            worker_db_url = candidate_url
+        else:
+            worker_db_url = bank_db_urls[b_id] if bank_db_urls and b_id in bank_db_urls else db_url
+
         enc_key = bank_encryption_keys.get(b_id) if bank_encryption_keys else None
         proc = mp.Process(
             target=run_bank_worker_node,
@@ -2234,6 +2254,7 @@ def spawn_bank_workers(
                 y_b,
                 should_fail_obs,
                 enc_key,
+                app_env,
             ),
         )
         proc.daemon = True
@@ -2259,6 +2280,7 @@ def run_bank_worker_node(
     y_partition: np.ndarray | None = None,
     fail_observation: bool = False,
     bank_encryption_key: str | bytes | None = None,
+    app_env: str = "production",
 ) -> None:
     """Dedicated Operating System Process for a Participating Bank Worker.
 
@@ -2274,13 +2296,27 @@ def run_bank_worker_node(
     settings = get_settings()
     model_service = ModelService(settings)
 
+    if app_env.lower() == "production":
+        import urllib.parse
+
+        parsed_u = urllib.parse.urlsplit(db_url).username or ""
+        if parsed_u == "cfi_worker_role":
+            raise TrainingProvenanceSecurityError(
+                f"Production bank worker [{bank_id}] cannot execute under shared generic worker role 'cfi_worker_role' (BANKDB-05)."
+            )
+        expected_role = f"cfi_{bank_id.lower()}_role"
+        if parsed_u.startswith("cfi_bank_") and parsed_u != expected_role:
+            raise TrainingProvenanceSecurityError(
+                f"Production bank worker [{bank_id}] database credential mismatch: connected as '{parsed_u}' instead of '{expected_role}'."
+            )
+
     # Establish connection to authoritative training job database
     authority_source = TrustedTrainingJobRecordSource(
         worker_token=worker_token,
         bank_tokens={bank_id: worker_token},
         db_url=db_url,
         enforce_lifecycle=True,
-        app_env="production",
+        app_env=app_env,
     )
 
     # Load local training data from isolated bank storage if path provided

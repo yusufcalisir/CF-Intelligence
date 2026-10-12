@@ -841,45 +841,57 @@ def provision_runtime_service_roles(
             cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_global_aggregations, cfi_model_evaluations FROM cfi_completion_role")
             cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_completion_role")
 
-            # 5. Worker Roles (cfi_worker_role, cfi_bank_a_role, cfi_bank_b_role, cfi_bank_c_role)
-            worker_roles = ["cfi_worker_role", "cfi_bank_a_role", "cfi_bank_b_role", "cfi_bank_c_role"]
-            for wr in worker_roles:
-                cur.execute(pg_sql.SQL("GRANT SELECT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_completed_jobs TO {role}").format(role=pg_sql.Identifier(wr)))
-                cur.execute(pg_sql.SQL("GRANT INSERT ON cfi_started_jobs, cfi_round_observations TO {role}").format(role=pg_sql.Identifier(wr)))
-                cur.execute(pg_sql.SQL("REVOKE INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs FROM {role}").format(role=pg_sql.Identifier(wr)))
-                cur.execute(pg_sql.SQL("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM {role}").format(role=pg_sql.Identifier(wr)))
+            # 5. Worker Roles
+            # 5a. Bank-Specific Worker Roles (cfi_bank_a_role, cfi_bank_b_role, cfi_bank_c_role)
+            # Dedicated per-bank roles holding exclusive authorization to write observations for their respective bank.
+            bank_roles = ["cfi_bank_a_role", "cfi_bank_b_role", "cfi_bank_c_role"]
+            for br in bank_roles:
+                cur.execute(pg_sql.SQL("GRANT SELECT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_completed_jobs TO {role}").format(role=pg_sql.Identifier(br)))
+                cur.execute(pg_sql.SQL("GRANT INSERT ON cfi_started_jobs, cfi_round_observations TO {role}").format(role=pg_sql.Identifier(br)))
+                cur.execute(pg_sql.SQL("REVOKE INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs FROM {role}").format(role=pg_sql.Identifier(br)))
+                cur.execute(pg_sql.SQL("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM {role}").format(role=pg_sql.Identifier(br)))
+
+            # 5b. Shared Generic Worker Role (cfi_worker_role)
+            # Strictly FORBIDDEN from inserting into cfi_round_observations (BANKDB-04).
+            # No shared worker role may persist authoritative observations for any participating bank.
+            cur.execute("GRANT SELECT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_completed_jobs TO cfi_worker_role")
+            cur.execute("GRANT INSERT ON cfi_started_jobs TO cfi_worker_role")
+            cur.execute("REVOKE ALL ON cfi_round_observations FROM cfi_worker_role")
+            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs FROM cfi_worker_role")
+            cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_worker_role")
 
             # 6. Row-Level Security on cfi_round_observations for bank isolation
             cur.execute("ALTER TABLE cfi_round_observations ENABLE ROW LEVEL SECURITY")
+            cur.execute("ALTER TABLE cfi_round_observations FORCE ROW LEVEL SECURITY")
+            cur.execute("REVOKE ALL ON cfi_round_observations FROM PUBLIC")
+
             cur.execute("DROP POLICY IF EXISTS cfi_bank_a_policy ON cfi_round_observations")
             cur.execute("DROP POLICY IF EXISTS cfi_bank_b_policy ON cfi_round_observations")
             cur.execute("DROP POLICY IF EXISTS cfi_bank_c_policy ON cfi_round_observations")
             cur.execute("DROP POLICY IF EXISTS cfi_general_worker_policy ON cfi_round_observations")
             cur.execute("DROP POLICY IF EXISTS cfi_readers_obs_policy ON cfi_round_observations")
 
+            # Strict policy for Bank A:
+            # - USING: Can only view its own rows (bank_id = 'BANK_A') (BANKDB-07).
+            # - WITH CHECK: Can only insert rows where bank_id = 'BANK_A' AND worker_id is either 'BANK_A'
+            #   or does not claim another bank identity (BANKDB-02, BANKDB-06).
             cur.execute("""
                 CREATE POLICY cfi_bank_a_policy ON cfi_round_observations
                 FOR ALL TO cfi_bank_a_role
                 USING (bank_id = 'BANK_A')
-                WITH CHECK (bank_id = 'BANK_A')
+                WITH CHECK (bank_id = 'BANK_A' AND (worker_id = 'BANK_A' OR worker_id NOT LIKE 'BANK_%'))
             """)
             cur.execute("""
                 CREATE POLICY cfi_bank_b_policy ON cfi_round_observations
                 FOR ALL TO cfi_bank_b_role
                 USING (bank_id = 'BANK_B')
-                WITH CHECK (bank_id = 'BANK_B')
+                WITH CHECK (bank_id = 'BANK_B' AND (worker_id = 'BANK_B' OR worker_id NOT LIKE 'BANK_%'))
             """)
             cur.execute("""
                 CREATE POLICY cfi_bank_c_policy ON cfi_round_observations
                 FOR ALL TO cfi_bank_c_role
                 USING (bank_id = 'BANK_C')
-                WITH CHECK (bank_id = 'BANK_C')
-            """)
-            cur.execute("""
-                CREATE POLICY cfi_general_worker_policy ON cfi_round_observations
-                FOR ALL TO cfi_worker_role
-                USING (true)
-                WITH CHECK (true)
+                WITH CHECK (bank_id = 'BANK_C' AND (worker_id = 'BANK_C' OR worker_id NOT LIKE 'BANK_%'))
             """)
             cur.execute("""
                 CREATE POLICY cfi_readers_obs_policy ON cfi_round_observations
