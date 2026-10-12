@@ -2055,10 +2055,9 @@ def _run_isolated_coordinator_worker(
                 with psycopg.connect(db_url) as conn:
                     conn.autocommit = False
                     with conn.cursor() as cur:
-                        from psycopg import sql as pg_sql
+                        from typing import LiteralString, cast
 
-                        query_obj = pg_sql.SQL(sql) if isinstance(sql, str) else sql
-                        cur.execute(query_obj)
+                        cur.execute(cast("LiteralString", sql))
                         rows = cur.fetchall() if cur.description else None
                     conn.commit()
                 client.send({"status": "SUCCESS", "rows": rows})
