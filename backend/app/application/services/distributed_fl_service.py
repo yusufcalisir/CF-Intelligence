@@ -746,15 +746,89 @@ def create_restricted_coordinator_token() -> Any:
         ) from e
 
 
+COORDINATOR_ALLOWED_WINDOWS_PRIVILEGES: frozenset[str] = frozenset({"SeChangeNotifyPrivilege"})
+
+
+def validate_restricted_coordinator_policy(details: dict[str, Any]) -> None:
+    """Authoritatively validate that process security identity details satisfy the restricted coordinator policy.
+
+    Invariants enforced:
+    1. Mandatory presence and strict types of evidence fields: is_restricted, has_restricted_code_sid,
+       restricted_sids, is_admin_disabled, privileges.
+    2. Missing, malformed, or contradictory security evidence is rejected immediately (fail-closed).
+    3. is_restricted must be True.
+    4. has_restricted_code_sid must be True and 'S-1-5-12' must be present in restricted_sids.
+    5. is_admin_disabled must be True and admin SID S-1-5-32-544 must not be active in group_sids.
+    6. Enabled privileges in 'privileges' must be a subset of COORDINATOR_ALLOWED_WINDOWS_PRIVILEGES.
+       Any unauthorized enabled privilege (e.g., SeDebugPrivilege, SeShutdownPrivilege) is rejected.
+    7. Never interprets missing or misnamed identity evidence as an empty, safe privilege set.
+    """
+    if not isinstance(details, dict):
+        raise TrainingProvenanceSecurityError("Process security identity details must be a valid dictionary.")
+
+    # 1. Mandatory presence of core evidence fields
+    required_fields = ("is_restricted", "has_restricted_code_sid", "restricted_sids", "is_admin_disabled", "privileges")
+    for f in required_fields:
+        if f not in details:
+            raise TrainingProvenanceSecurityError(
+                f"Mandatory coordinator security evidence field '{f}' is missing from process identity details."
+            )
+
+    # 2. Strict type verification (no loose truthiness)
+    if not isinstance(details["is_restricted"], bool):
+        raise TrainingProvenanceSecurityError("Field 'is_restricted' must be a boolean.")
+    if not isinstance(details["has_restricted_code_sid"], bool):
+        raise TrainingProvenanceSecurityError("Field 'has_restricted_code_sid' must be a boolean.")
+    if not isinstance(details["is_admin_disabled"], bool):
+        raise TrainingProvenanceSecurityError("Field 'is_admin_disabled' must be a boolean.")
+    if not isinstance(details["restricted_sids"], (list, tuple, set, frozenset)):
+        raise TrainingProvenanceSecurityError("Field 'restricted_sids' must be a collection of SIDs.")
+    if not isinstance(details["privileges"], (list, tuple, set, frozenset)):
+        raise TrainingProvenanceSecurityError(
+            f"Field 'privileges' must be a collection of privilege names, got {type(details['privileges']).__name__}."
+        )
+
+    # 3. Policy invariants
+    if not details["is_restricted"]:
+        raise TrainingProvenanceSecurityError(
+            "Production federation coordinator must execute under an enforced restricted operating system security token. "
+            "Direct instantiation or execution inside an unrestricted process is prohibited (EXEC-01)."
+        )
+
+    if not details["has_restricted_code_sid"] or "S-1-5-12" not in details["restricted_sids"]:
+        raise TrainingProvenanceSecurityError(
+            "Production federation coordinator process token lacks mandatory WinRestrictedCodeSid (S-1-5-12) restriction."
+        )
+
+    if not details["is_admin_disabled"]:
+        raise TrainingProvenanceSecurityError(
+            "Production federation coordinator process token has active administrative authority (S-1-5-32-544 not disabled)."
+        )
+
+    group_sids = details.get("group_sids")
+    disabled_groups = details.get("disabled_groups")
+    if group_sids is not None and disabled_groups is not None:
+        if "S-1-5-32-544" in group_sids and "S-1-5-32-544" not in disabled_groups:
+            raise TrainingProvenanceSecurityError(
+                "Contradictory security evidence: S-1-5-32-544 is present in group_sids but not in disabled_groups."
+            )
+
+    # 4. Privilege verification against explicit policy
+    actual_privs = set(details["privileges"])
+    unauthorized = actual_privs - COORDINATOR_ALLOWED_WINDOWS_PRIVILEGES
+    if unauthorized:
+        raise TrainingProvenanceSecurityError(
+            f"Production federation coordinator process has unauthorized enabled privileges: {sorted(unauthorized)}. "
+            f"Permitted under restricted policy: {sorted(COORDINATOR_ALLOWED_WINDOWS_PRIVILEGES)}."
+        )
+
+
 def verify_restricted_coordinator_os_boundary(app_env: str = "production") -> SecurityIdentityInfo:
     """Verify that the current operating system process satisfies the mandatory production coordinator isolation policy.
 
     In production:
     - Platform must support enforced operating system token isolation (Windows NT).
-    - Current process access token must have IsTokenRestricted == True.
-    - WinRestrictedCodeSid (S-1-5-12) must be present in TokenRestrictedSids.
-    - Administrators group (S-1-5-32-544) must be disabled (SE_GROUP_USE_FOR_DENY_ONLY).
-    - Administrative privileges must be stripped via DISABLE_MAX_PRIVILEGE (<= 1 enabled privilege).
+    - Current process access token must satisfy validate_restricted_coordinator_policy().
     - Fails closed with TrainingProvenanceSecurityError on any policy violation or unsupported platform.
     """
     if app_env.lower() != "production":
@@ -767,31 +841,7 @@ def verify_restricted_coordinator_os_boundary(app_env: str = "production") -> Se
         )
 
     ident = get_os_process_identity()
-    details = ident.details
-
-    if not details.get("is_restricted"):
-        raise TrainingProvenanceSecurityError(
-            "Production federation coordinator must execute under an enforced restricted operating system security token. "
-            "Direct instantiation or execution inside an unrestricted process is prohibited (EXEC-01)."
-        )
-
-    if not details.get("has_restricted_code_sid"):
-        raise TrainingProvenanceSecurityError(
-            "Production federation coordinator process token lacks mandatory WinRestrictedCodeSid (S-1-5-12) restriction."
-        )
-
-    if not details.get("is_admin_disabled"):
-        raise TrainingProvenanceSecurityError(
-            "Production federation coordinator process token has active administrative authority (S-1-5-32-544 not disabled)."
-        )
-
-    enabled_privs = details.get("enabled_privileges", [])
-    if len(enabled_privs) > 1:
-        raise TrainingProvenanceSecurityError(
-            f"Production federation coordinator process has unauthorized enabled privileges ({enabled_privs}); "
-            "all administrative privileges must be stripped via DISABLE_MAX_PRIVILEGE."
-        )
-
+    validate_restricted_coordinator_policy(ident.details)
     return ident
 
 
@@ -1182,8 +1232,9 @@ def _run_isolated_coordinator_worker(
                     conn.autocommit = False
                     with conn.cursor() as cur:
                         cur.execute(sql)
+                        rows = cur.fetchall() if cur.description else None
                     conn.commit()
-                client.send({"status": "SUCCESS"})
+                client.send({"status": "SUCCESS", "rows": rows})
             except Exception as e:
                 client.send({
                     "status": "DENIED",
@@ -1421,13 +1472,9 @@ def spawn_isolated_coordinator_process(
             actual_child_id = get_os_process_identity(target_proc)
             child_details = actual_child_id.details
 
-            is_violation = (
-                not child_details.get("is_restricted")
-                or not child_details.get("has_restricted_code_sid")
-                or not child_details.get("is_admin_disabled")
-                or len(child_details.get("enabled_privileges", [])) > 1
-            )
-            if is_violation:
+            try:
+                validate_restricted_coordinator_policy(child_details)
+            except TrainingProvenanceSecurityError as e:
                 if os.name == "nt" and proc_handle is not None:
                     with contextlib.suppress(Exception):
                         import win32process
@@ -1438,12 +1485,8 @@ def spawn_isolated_coordinator_process(
                 conn.close()
                 listener.close()
                 raise TrainingProvenanceSecurityError(
-                    "Spawned coordinator process violates mandatory production security policy: "
-                    f"is_restricted={child_details.get('is_restricted')}, "
-                    f"has_restricted_code_sid={child_details.get('has_restricted_code_sid')}, "
-                    f"is_admin_disabled={child_details.get('is_admin_disabled')}, "
-                    f"privileges={child_details.get('enabled_privileges')} (EXEC-05)."
-                )
+                    f"Spawned coordinator process violates mandatory production security policy: {e} (EXEC-05)."
+                ) from e
 
         client = IsolatedCoordinatorClient(
             conn=conn,

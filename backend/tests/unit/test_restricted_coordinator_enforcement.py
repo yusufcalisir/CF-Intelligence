@@ -20,12 +20,15 @@ import unittest.mock as mock
 import uuid
 
 import numpy as np
+import psycopg
 import pytest
 from cryptography.fernet import Fernet
 
 from app.application.services.distributed_fl_service import (
+    COORDINATOR_ALLOWED_WINDOWS_PRIVILEGES,
     DistributedFederatedTrainingManager,
     IsolatedReceiptSigningAuthority,
+    SecurityIdentityInfo,
     get_os_process_identity,
     provision_isolated_completion_authority_vault,
     provision_isolated_issuer_vault,
@@ -34,6 +37,7 @@ from app.application.services.distributed_fl_service import (
     spawn_bank_workers,
     spawn_isolated_completion_authority_service,
     spawn_isolated_coordinator_process,
+    validate_restricted_coordinator_policy,
     verify_restricted_coordinator_os_boundary,
 )
 from app.application.services.model_service import NUM_FEATURES
@@ -145,7 +149,13 @@ class TestRestrictedCoordinatorEnforcement:
             assert details.get("is_restricted") is True, "Spawned process token must be restricted"
             assert details.get("has_restricted_code_sid") is True, "Token must have S-1-5-12 restricting SID"
             assert details.get("is_admin_disabled") is True, "Admin group must be SE_GROUP_USE_FOR_DENY_ONLY"
-            assert len(details.get("enabled_privileges", [])) <= 1, "Administrative privileges must be stripped"
+            assert "privileges" in details, "Mandatory privileges evidence must be present"
+            assert set(details["privileges"]) <= COORDINATOR_ALLOWED_WINDOWS_PRIVILEGES, (
+                f"Unauthorized privileges present: {details['privileges']}"
+            )
+            assert details["privileges"] == ["SeChangeNotifyPrivilege"], (
+                f"Spawned restricted token must contain only SeChangeNotifyPrivilege, got: {details['privileges']}"
+            )
         finally:
             client.terminate()
 
@@ -224,14 +234,58 @@ class TestRestrictedCoordinatorEnforcement:
             assert esc_res.get("is_restricted") is True
             assert esc_res.get("read_err") is not None
 
-            # 3. Attempt direct completion SQL via coordinator connection
-            sql_res = client.attempt_direct_sql(
-                role_urls["coordinator"],
-                "INSERT INTO completed_job_execution_records (job_id, training_run_id, simulation_id, "
-                "completed_at, executed_rounds, executed_epochs, sample_count, observed_metrics, "
-                "artifact_sha256, worker_id, status) VALUES ('forged', 'forged', 'forged', NOW(), 1, 1, 10, '{}', 'sha', 'w', 'COMPLETED')",
-            )
+            # 3. Establish valid prerequisite record in cfi_scheduled_jobs
+            job_id = f"job_exec07_{uuid.uuid4().hex[:8]}"
+            run_id = f"run_exec07_{uuid.uuid4().hex[:8]}"
+            sim_id = f"sim_exec07_{uuid.uuid4().hex[:8]}"
+            with psycopg.connect(role_urls["coordinator"]) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO cfi_scheduled_jobs (
+                            job_id, training_run_id, simulation_id, coordinator_id,
+                            architecture, feature_schema_version, expected_rounds,
+                            expected_epochs, input_dim, feature_names_json,
+                            permitted_workers_json, config_fingerprint, scheduled_at, status
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), 'SCHEDULED')
+                        """,
+                        (
+                            job_id, run_id, sim_id, "COORDINATOR",
+                            "FraudDetectionNN", "v1.0", 2, 1, NUM_FEATURES,
+                            '["f1", "f2"]', '["BANK_A", "BANK_B", "BANK_C"]', "fp_123",
+                        ),
+                    )
+                conn.commit()
+
+            # 4. Attempt direct completion SQL via coordinator connection targeting cfi_completed_jobs
+            valid_completion_sql = f"""
+                INSERT INTO cfi_completed_jobs (
+                    job_id, training_run_id, simulation_id, completed_at,
+                    executed_rounds, executed_epochs, sample_count,
+                    observed_metrics_json, artifact_sha256, architecture,
+                    feature_schema_version, input_dim, feature_names_json,
+                    worker_id, status, git_commit_hash, dataset_manifest_id,
+                    evidence_fingerprint
+                ) VALUES (
+                    '{job_id}', '{run_id}', '{sim_id}', '2026-10-12T00:00:00',
+                    2, 1, 100, '{{}}', 'sha256_fake_artifact', 'FraudDetectionNN',
+                    'v1.0', {NUM_FEATURES}, '["f1", "f2"]', 'COORDINATOR', 'COMPLETED',
+                    NULL, NULL, 'fp_fake_exec07'
+                )
+            """
+            sql_res = client.attempt_direct_sql(role_urls["coordinator"], valid_completion_sql)
             assert sql_res.get("status") == "DENIED"
+            assert sql_res.get("sqlstate") == "42501", (
+                f"Expected SQLSTATE 42501 (insufficient_privilege) on cfi_completed_jobs, got {sql_res.get('sqlstate')}"
+            )
+            assert "InsufficientPrivilege" in sql_res.get("error_type", "") or "permission denied" in sql_res.get("error", "").lower()
+
+            # 5. Verify zero forged completed rows persisted
+            with psycopg.connect(role_urls["coordinator"]) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                    count = cur.fetchone()[0]
+                    assert count == 0, f"No forged completed rows must be persisted, found {count}"
         finally:
             client.terminate()
 
@@ -414,3 +468,423 @@ class TestRestrictedCoordinatorEnforcement:
                 comp_service_endpoint=("127.0.0.1", 1234),
                 signing_authority=mock.MagicMock(),
             )
+
+
+class TestCoordinatorSecurityPolicy:
+    """Mandatory adversarial test suite verifying coordinator operating-system security policy (POLICY-01 to POLICY-08)."""
+
+    def test_policy_01_correctly_restricted_token_passes(self) -> None:
+        """POLICY-01: Correctly restricted token passes authoritative validation."""
+        details = {
+            "pid": 5432,
+            "user_sid": "S-1-5-21-99999-88888-77777-1001",
+            "is_restricted": True,
+            "has_restricted_code_sid": True,
+            "restricted_sids": ["S-1-5-12", "S-1-5-21-99999-88888-77777-1001"],
+            "is_admin_disabled": True,
+            "group_sids": ["S-1-5-32-545", "S-1-5-32-544"],
+            "disabled_groups": ["S-1-5-32-544"],
+            "privileges": ["SeChangeNotifyPrivilege"],
+            "integrity_sid": "S-1-16-8192",
+        }
+        validate_restricted_coordinator_policy(details)
+
+    def test_policy_02_missing_privilege_evidence_is_rejected(self) -> None:
+        """POLICY-02: Missing privilege evidence is rejected rather than assumed safe."""
+        details = {
+            "is_restricted": True,
+            "has_restricted_code_sid": True,
+            "restricted_sids": ["S-1-5-12"],
+            "is_admin_disabled": True,
+        }
+        with pytest.raises(
+            TrainingProvenanceSecurityError,
+            match="Mandatory coordinator security evidence field 'privileges' is missing",
+        ):
+            validate_restricted_coordinator_policy(details)
+
+    def test_policy_03_incorrectly_named_privilege_field_is_rejected(self) -> None:
+        """POLICY-03: Incorrectly named privilege field ('enabled_privileges') is rejected rather than silently accepted."""
+        details = {
+            "is_restricted": True,
+            "has_restricted_code_sid": True,
+            "restricted_sids": ["S-1-5-12"],
+            "is_admin_disabled": True,
+            "enabled_privileges": ["SeChangeNotifyPrivilege"],
+        }
+        with pytest.raises(
+            TrainingProvenanceSecurityError,
+            match="Mandatory coordinator security evidence field 'privileges' is missing",
+        ):
+            validate_restricted_coordinator_policy(details)
+
+    def test_policy_04_token_containing_unauthorized_enabled_privilege_is_rejected(self) -> None:
+        """POLICY-04: Token containing unauthorized enabled privileges is rejected."""
+        unauthorized_privs = [
+            "SeDebugPrivilege",
+            "SeShutdownPrivilege",
+            "SeTakeOwnershipPrivilege",
+            "SeImpersonatePrivilege",
+            "SeTcbPrivilege",
+        ]
+        for bad_priv in unauthorized_privs:
+            details = {
+                "is_restricted": True,
+                "has_restricted_code_sid": True,
+                "restricted_sids": ["S-1-5-12"],
+                "is_admin_disabled": True,
+                "privileges": ["SeChangeNotifyPrivilege", bad_priv],
+            }
+            with pytest.raises(
+                TrainingProvenanceSecurityError,
+                match=f"unauthorized enabled privileges: \\['{bad_priv}'\\]",
+            ):
+                validate_restricted_coordinator_policy(details)
+
+    def test_policy_05_missing_restricting_sid_is_rejected(self) -> None:
+        """POLICY-05: Missing restricting SID (S-1-5-12) is rejected."""
+        # Case A: has_restricted_code_sid is False
+        details_a = {
+            "is_restricted": True,
+            "has_restricted_code_sid": False,
+            "restricted_sids": ["S-1-5-21-99999"],
+            "is_admin_disabled": True,
+            "privileges": ["SeChangeNotifyPrivilege"],
+        }
+        with pytest.raises(
+            TrainingProvenanceSecurityError,
+            match="lacks mandatory WinRestrictedCodeSid \\(S-1-5-12\\) restriction",
+        ):
+            validate_restricted_coordinator_policy(details_a)
+
+        # Case B: S-1-5-12 absent from restricted_sids list
+        details_b = {
+            "is_restricted": True,
+            "has_restricted_code_sid": True,
+            "restricted_sids": ["S-1-5-21-99999"],
+            "is_admin_disabled": True,
+            "privileges": ["SeChangeNotifyPrivilege"],
+        }
+        with pytest.raises(
+            TrainingProvenanceSecurityError,
+            match="lacks mandatory WinRestrictedCodeSid \\(S-1-5-12\\) restriction",
+        ):
+            validate_restricted_coordinator_policy(details_b)
+
+    def test_policy_06_active_administrator_authority_is_rejected(self) -> None:
+        """POLICY-06: Active administrator authority or contradictory evidence is rejected."""
+        # Case A: is_admin_disabled is False
+        details_a = {
+            "is_restricted": True,
+            "has_restricted_code_sid": True,
+            "restricted_sids": ["S-1-5-12"],
+            "is_admin_disabled": False,
+            "privileges": ["SeChangeNotifyPrivilege"],
+        }
+        with pytest.raises(
+            TrainingProvenanceSecurityError,
+            match="active administrative authority \\(S-1-5-32-544 not disabled\\)",
+        ):
+            validate_restricted_coordinator_policy(details_a)
+
+        # Case B: Contradictory evidence (admin SID in group_sids but missing from disabled_groups)
+        details_b = {
+            "is_restricted": True,
+            "has_restricted_code_sid": True,
+            "restricted_sids": ["S-1-5-12"],
+            "is_admin_disabled": True,
+            "group_sids": ["S-1-5-32-544"],
+            "disabled_groups": [],
+            "privileges": ["SeChangeNotifyPrivilege"],
+        }
+        with pytest.raises(
+            TrainingProvenanceSecurityError,
+            match="Contradictory security evidence: S-1-5-32-544 is present in group_sids but not in disabled_groups",
+        ):
+            validate_restricted_coordinator_policy(details_b)
+
+    def test_policy_07_child_violating_policy_terminated(self) -> None:
+        """POLICY-07: A child that reports READY but violates kernel token policy is terminated and rejected."""
+        violating_identity = SecurityIdentityInfo(
+            principal_id="mock_violating:RESTRICTED",
+            principal_type="WindowsRestrictedProcessPrincipal",
+            details={
+                "pid": 9999,
+                "user_sid": "S-1-5-21-mock",
+                "is_restricted": True,
+                "has_restricted_code_sid": True,
+                "restricted_sids": ["S-1-5-12"],
+                "is_admin_disabled": True,
+                "privileges": ["SeChangeNotifyPrivilege", "SeDebugPrivilege"],
+            },
+        )
+        with mock.patch(
+            "app.application.services.distributed_fl_service.get_os_process_identity",
+            return_value=violating_identity,
+        ):
+            with pytest.raises(
+                TrainingProvenanceSecurityError,
+                match="Spawned coordinator process violates mandatory production security policy.*EXEC-05",
+            ):
+                spawn_isolated_coordinator_process(app_env="production")
+
+    def test_policy_08_actual_windows_token_inspection_agrees_with_launcher(self) -> None:
+        """POLICY-08: Actual Windows process-token inspection agrees with the independent launcher decision."""
+        proc, client = spawn_isolated_coordinator_process(app_env="production")
+        try:
+            # Child's internal token check
+            child_ident = client.get_process_identity()
+            validate_restricted_coordinator_policy(child_ident.details)
+
+            # Parent launcher's independent token check of the child process
+            parent_inspected_ident = get_os_process_identity(proc)
+            validate_restricted_coordinator_policy(parent_inspected_ident.details)
+
+            # Exact privilege set agreement
+            assert child_ident.details["privileges"] == ["SeChangeNotifyPrivilege"]
+            assert parent_inspected_ident.details["privileges"] == ["SeChangeNotifyPrivilege"]
+        finally:
+            client.terminate()
+
+
+class TestCoordinatorSqlAuthorization:
+    """Mandatory adversarial test suite verifying genuine PostgreSQL permission boundary (SQL-01 to SQL-06)."""
+
+    def test_sql_01_coordinator_actual_postgresql_role_is_verified(self, real_pg_instance: str) -> None:
+        """SQL-01: Coordinator's actual PostgreSQL role is verified as cfi_coord_role."""
+        role_urls = provision_runtime_service_roles(real_pg_instance, app_env="production")
+        proc, client = spawn_isolated_coordinator_process(app_env="production")
+        try:
+            sql_res = client.attempt_direct_sql(
+                role_urls["coordinator"],
+                "SELECT current_user, session_user;",
+            )
+            assert sql_res.get("status") == "SUCCESS", f"Query failed: {sql_res}"
+            assert sql_res.get("rows") == [("cfi_coord_role", "cfi_coord_role")], (
+                f"Expected cfi_coord_role, got {sql_res.get('rows')}"
+            )
+        finally:
+            client.terminate()
+
+    def test_sql_02_direct_completed_job_insert_denied_with_sqlstate_42501(self, real_pg_instance: str) -> None:
+        """SQL-02: Direct completed-job INSERT into cfi_completed_jobs is denied with SQLSTATE 42501."""
+        role_urls = provision_runtime_service_roles(real_pg_instance, app_env="production")
+        job_id = f"job_sql02_{uuid.uuid4().hex[:8]}"
+        run_id = f"run_sql02_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_sql02_{uuid.uuid4().hex[:8]}"
+
+        # Establish prerequisite scheduled job record
+        with psycopg.connect(role_urls["coordinator"]) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO cfi_scheduled_jobs (
+                        job_id, training_run_id, simulation_id, coordinator_id,
+                        architecture, feature_schema_version, expected_rounds,
+                        expected_epochs, input_dim, feature_names_json,
+                        permitted_workers_json, config_fingerprint, scheduled_at, status
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), 'SCHEDULED')
+                    """,
+                    (
+                        job_id, run_id, sim_id, "COORDINATOR",
+                        "FraudDetectionNN", "v1.0", 2, 1, NUM_FEATURES,
+                        '["f1", "f2"]', '["BANK_A", "BANK_B", "BANK_C"]', "fp_123",
+                    ),
+                )
+            conn.commit()
+
+        # Structurally and syntactically valid completion INSERT targeting authoritative cfi_completed_jobs
+        valid_completion_sql = f"""
+            INSERT INTO cfi_completed_jobs (
+                job_id, training_run_id, simulation_id, completed_at,
+                executed_rounds, executed_epochs, sample_count,
+                observed_metrics_json, artifact_sha256, architecture,
+                feature_schema_version, input_dim, feature_names_json,
+                worker_id, status, git_commit_hash, dataset_manifest_id,
+                evidence_fingerprint
+            ) VALUES (
+                '{job_id}', '{run_id}', '{sim_id}', '2026-10-12T00:00:00',
+                2, 1, 100, '{{}}', 'sha256_fake_artifact', 'FraudDetectionNN',
+                'v1.0', {NUM_FEATURES}, '["f1", "f2"]', 'COORDINATOR', 'COMPLETED',
+                NULL, NULL, 'fp_fake_sql02'
+            )
+        """
+        proc, client = spawn_isolated_coordinator_process(app_env="production")
+        try:
+            sql_res = client.attempt_direct_sql(role_urls["coordinator"], valid_completion_sql)
+            assert sql_res.get("status") == "DENIED"
+            assert sql_res.get("sqlstate") == "42501", (
+                f"Expected SQLSTATE 42501 (insufficient_privilege) on cfi_completed_jobs, got {sql_res.get('sqlstate')}"
+            )
+            assert "InsufficientPrivilege" in sql_res.get("error_type", "") or "permission denied" in sql_res.get("error", "").lower()
+        finally:
+            client.terminate()
+
+    def test_sql_03_test_fails_if_target_table_does_not_exist(self, real_pg_instance: str) -> None:
+        """SQL-03: The authorization test fails if rejection occurs because the target table does not exist (42P01 vs 42501)."""
+        role_urls = provision_runtime_service_roles(real_pg_instance, app_env="production")
+        proc, client = spawn_isolated_coordinator_process(app_env="production")
+        try:
+            # Query against nonexistent table (the old false-positive test target)
+            sql_res = client.attempt_direct_sql(
+                role_urls["coordinator"],
+                "INSERT INTO completed_job_execution_records (job_id, status) VALUES ('f', 'f')",
+            )
+            assert sql_res.get("status") == "DENIED"
+            # Nonexistent table yields 42P01 (UndefinedTable), NOT 42501 (InsufficientPrivilege)
+            assert sql_res.get("sqlstate") == "42P01", (
+                f"Expected SQLSTATE 42P01 for nonexistent table, got {sql_res.get('sqlstate')}"
+            )
+            assert sql_res.get("sqlstate") != "42501", (
+                "False-positive detection: 42P01 must NOT be accepted as 42501"
+            )
+            with pytest.raises(AssertionError):
+                assert sql_res.get("sqlstate") == "42501"
+        finally:
+            client.terminate()
+
+    def test_sql_04_test_fails_if_sql_is_malformed(self, real_pg_instance: str) -> None:
+        """SQL-04: The authorization test fails if rejection occurs because the SQL is malformed (42601 vs 42501)."""
+        role_urls = provision_runtime_service_roles(real_pg_instance, app_env="production")
+        proc, client = spawn_isolated_coordinator_process(app_env="production")
+        try:
+            # Query with syntax error
+            sql_res = client.attempt_direct_sql(
+                role_urls["coordinator"],
+                "INSRT INTO cfi_completed_jobs (job_id) VALUES ('f')",
+            )
+            assert sql_res.get("status") == "DENIED"
+            assert sql_res.get("sqlstate") == "42601", (
+                f"Expected SQLSTATE 42601 for syntax error, got {sql_res.get('sqlstate')}"
+            )
+            assert sql_res.get("sqlstate") != "42501", (
+                "False-positive detection: 42601 syntax error must NOT be accepted as 42501"
+            )
+            with pytest.raises(AssertionError):
+                assert sql_res.get("sqlstate") == "42501"
+        finally:
+            client.terminate()
+
+    def test_sql_05_valid_authorized_finalization_succeeds_through_completion_authority(
+        self, real_pg_instance: str
+    ) -> None:
+        """SQL-05: A valid authorized finalization succeeds through the actual completion authority (cfi_completion_role)."""
+        role_urls = provision_runtime_service_roles(real_pg_instance, app_env="production")
+        job_id = f"job_sql05_{uuid.uuid4().hex[:8]}"
+        run_id = f"run_sql05_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_sql05_{uuid.uuid4().hex[:8]}"
+
+        # 1. Schedule job via coordinator
+        with psycopg.connect(role_urls["coordinator"]) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO cfi_scheduled_jobs (
+                        job_id, training_run_id, simulation_id, coordinator_id,
+                        architecture, feature_schema_version, expected_rounds,
+                        expected_epochs, input_dim, feature_names_json,
+                        permitted_workers_json, config_fingerprint, scheduled_at, status
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), 'SCHEDULED')
+                    """,
+                    (
+                        job_id, run_id, sim_id, "COORDINATOR",
+                        "FraudDetectionNN", "v1.0", 2, 1, NUM_FEATURES,
+                        '["f1", "f2"]', '["BANK_A", "BANK_B", "BANK_C"]', "fp_123",
+                    ),
+                )
+            conn.commit()
+
+        # 2. Completion Authority role (cfi_completion_role) writes to cfi_completed_jobs
+        valid_completion_sql = f"""
+            INSERT INTO cfi_completed_jobs (
+                job_id, training_run_id, simulation_id, completed_at,
+                executed_rounds, executed_epochs, sample_count,
+                observed_metrics_json, artifact_sha256, architecture,
+                feature_schema_version, input_dim, feature_names_json,
+                worker_id, status, git_commit_hash, dataset_manifest_id,
+                evidence_fingerprint
+            ) VALUES (
+                '{job_id}', '{run_id}', '{sim_id}', '2026-10-12T00:00:00',
+                2, 1, 100, '{{}}', 'sha256_legit_artifact', 'FraudDetectionNN',
+                'v1.0', {NUM_FEATURES}, '["f1", "f2"]', 'COMPLETION_AUTHORITY', 'COMPLETED',
+                NULL, NULL, 'fp_legit_sql05'
+            )
+        """
+        with psycopg.connect(role_urls["completion"]) as conn:
+            with conn.cursor() as cur:
+                cur.execute(valid_completion_sql)
+            conn.commit()
+
+        # 3. Verify record was persisted and is readable
+        with psycopg.connect(role_urls["coordinator"]) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT status, worker_id FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                row = cur.fetchone()
+                assert row is not None
+                assert row[0] == "COMPLETED"
+                assert row[1] == "COMPLETION_AUTHORITY"
+
+    def test_sql_06_rejected_coordinator_attempt_leaves_zero_forged_rows(
+        self, real_pg_instance: str
+    ) -> None:
+        """SQL-06: Rejected coordinator attempt leaves zero forged completed rows and cannot produce trusted downstream provenance."""
+        role_urls = provision_runtime_service_roles(real_pg_instance, app_env="production")
+        job_id = f"job_sql06_{uuid.uuid4().hex[:8]}"
+        run_id = f"run_sql06_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_sql06_{uuid.uuid4().hex[:8]}"
+
+        with psycopg.connect(role_urls["coordinator"]) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO cfi_scheduled_jobs (
+                        job_id, training_run_id, simulation_id, coordinator_id,
+                        architecture, feature_schema_version, expected_rounds,
+                        expected_epochs, input_dim, feature_names_json,
+                        permitted_workers_json, config_fingerprint, scheduled_at, status
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), 'SCHEDULED')
+                    """,
+                    (
+                        job_id, run_id, sim_id, "COORDINATOR",
+                        "FraudDetectionNN", "v1.0", 2, 1, NUM_FEATURES,
+                        '["f1", "f2"]', '["BANK_A", "BANK_B", "BANK_C"]', "fp_123",
+                    ),
+                )
+            conn.commit()
+
+        valid_completion_sql = f"""
+            INSERT INTO cfi_completed_jobs (
+                job_id, training_run_id, simulation_id, completed_at,
+                executed_rounds, executed_epochs, sample_count,
+                observed_metrics_json, artifact_sha256, architecture,
+                feature_schema_version, input_dim, feature_names_json,
+                worker_id, status, git_commit_hash, dataset_manifest_id,
+                evidence_fingerprint
+            ) VALUES (
+                '{job_id}', '{run_id}', '{sim_id}', '2026-10-12T00:00:00',
+                2, 1, 100, '{{}}', 'sha256_forged_artifact', 'FraudDetectionNN',
+                'v1.0', {NUM_FEATURES}, '["f1", "f2"]', 'COORDINATOR', 'COMPLETED',
+                NULL, NULL, 'fp_forged_sql06'
+            )
+        """
+        proc, client = spawn_isolated_coordinator_process(app_env="production")
+        try:
+            sql_res = client.attempt_direct_sql(role_urls["coordinator"], valid_completion_sql)
+            assert sql_res.get("status") == "DENIED"
+            assert sql_res.get("sqlstate") == "42501"
+
+            # Verify PostgreSQL state: exactly 0 rows persisted
+            with psycopg.connect(role_urls["coordinator"]) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                    count = cur.fetchone()[0]
+                    assert count == 0, f"Expected 0 completed rows, found {count}"
+
+            # Verify downstream provenance query finds zero evidence
+            with psycopg.connect(role_urls["coordinator"]) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT * FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                    record = cur.fetchone()
+                    assert record is None, "Downstream provenance query must return None for unauthorized coordinator write"
+        finally:
+            client.terminate()
