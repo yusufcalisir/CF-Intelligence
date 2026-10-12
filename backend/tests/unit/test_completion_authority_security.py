@@ -1036,7 +1036,7 @@ class TestCompletionAuthoritySecurity:
             X_test = np.random.randn(100, NUM_FEATURES).astype(np.float32)
             y_test = np.random.randint(0, 2, size=100).astype(np.float32)
 
-            worker_pids = {b: p.pid for b, p in procs.items()} if procs else {}
+            worker_pids: dict[str, int] = {b: (p.pid or 0) for b, p in procs.items()}
             result = coord_client.execute_federation(
                 job_id=job_id,
                 training_run_id=run_id,
@@ -1451,7 +1451,7 @@ class TestCompletionAuthoritySecurity:
             X_test = np.random.randn(100, NUM_FEATURES).astype(np.float32)
             y_test = np.random.randint(0, 2, size=100).astype(np.float32)
 
-            worker_pids = {b: procs[b].pid or 0 for b in procs}
+            worker_pids: dict[str, int] = {b: (procs[b].pid or 0) for b in procs}
 
             result = coord_client.execute_federation(
                 job_id=job_id,
