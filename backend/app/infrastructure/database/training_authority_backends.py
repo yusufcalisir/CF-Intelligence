@@ -25,7 +25,7 @@ import urllib.parse
 import uuid
 from collections.abc import Generator, Mapping, Sequence
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, LiteralString
 
 try:
     import psycopg
@@ -776,7 +776,7 @@ FORBIDDEN_DATABASE_PASSWORDS = {
 }
 
 
-AUTHENTIC_EVIDENCE_TRIGGERS_SQL = """
+AUTHENTIC_EVIDENCE_TRIGGERS_SQL: LiteralString = """
 CREATE OR REPLACE FUNCTION cfi_enforce_global_aggregation_authenticity()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -1119,7 +1119,7 @@ def provision_runtime_service_roles(
             cur.execute("REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_serving_role")
 
             # 9. Apply Authentic Evidence Triggers
-            cur.execute(AUTHENTIC_EVIDENCE_TRIGGERS_SQL)
+            cur.execute(pg_sql.SQL(AUTHENTIC_EVIDENCE_TRIGGERS_SQL) if pg_sql else AUTHENTIC_EVIDENCE_TRIGGERS_SQL)
 
     for role_key, rname in role_mapping.items():
         rpass = passwords[role_key]
@@ -1314,7 +1314,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             );
                             """
                         )
-                        cur.execute(AUTHENTIC_EVIDENCE_TRIGGERS_SQL)
+                        cur.execute(pg_sql.SQL(AUTHENTIC_EVIDENCE_TRIGGERS_SQL) if pg_sql else AUTHENTIC_EVIDENCE_TRIGGERS_SQL)
         except Exception as e:
             sanitized = str(e)
             if "permission denied" in sanitized.lower() or "42501" in sanitized:
