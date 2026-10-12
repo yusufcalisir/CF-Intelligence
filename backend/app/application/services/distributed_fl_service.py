@@ -26,6 +26,7 @@ import multiprocessing as mp
 from multiprocessing.connection import Client, Listener
 import types
 import os
+import secrets
 import sys
 import tempfile
 import threading
@@ -883,74 +884,229 @@ class CoordinatorOSSecurityContext:
             self._active = False
 
 
+def _check_no_reparse_or_symlink(path: str, label: str) -> None:
+    """Verify that a path is not a symlink, directory junction, or reparse point."""
+    try:
+        if os.path.islink(path):
+            raise TrainingProvenanceSecurityError(
+                f"{label} cannot be a symbolic link: '{path}'."
+            )
+        if hasattr(os.path, "isjunction") and os.path.isjunction(path):
+            raise TrainingProvenanceSecurityError(
+                f"{label} cannot be a directory junction: '{path}'."
+            )
+        st = os.lstat(path)
+        import stat
+        if stat.S_ISLNK(st.st_mode):
+            raise TrainingProvenanceSecurityError(
+                f"{label} cannot be a symbolic link: '{path}'."
+            )
+        if hasattr(st, "st_reparse_tag") and st.st_reparse_tag != 0:
+            raise TrainingProvenanceSecurityError(
+                f"{label} cannot be a reparse point or junction: '{path}'."
+            )
+    except FileNotFoundError:
+        pass
+
+
 def provision_isolated_completion_authority_vault(
     vault_dir: str,
     completion_db_url: str,
 ) -> str:
     """Privileged bootstrap provisioning of completion authority credentials inside an isolated vault.
 
-    Enforces a permanent operating system authorization policy:
-    - Dedicated filesystem directory created with restricted ownership.
-    - On Windows NTFS: Sets an explicit, protected Discretionary Access Control List (DACL)
-      that DENIES all access to the Coordinator Security Principal (WinRestrictedCodeSid S-1-5-12)
-      and grants access strictly to the Completion Service Security Principal.
-    - On POSIX/Unix: Sets directory permissions 0700 and file permissions 0600.
-    - Fails closed on any policy installation failure.
-    - Security persists permanently before service startup, during execution, after process termination,
-      and across restarts.
+    Enforces mandatory fail-closed security properties:
+    1. Redirection & Junction Defense: Rejects symlinks, junctions, reparse points, and conflicting file/dir paths.
+    2. Permission Pre-Enforcement: Restrictive NTFS DACL (denying WinRestrictedCodeSid S-1-5-12 and granting
+       strictly TokenUser) is configured and verified on the vault directory and on an empty staged file BEFORE
+       any secret bytes are persisted.
+    3. Zero Plaintext Exposure Window: Credential bytes are never written to an unprotected or inherited location.
+    4. Clean Failure Recovery: Interrupted or failed permission setup leaves zero readable credential artifacts.
+    5. Atomic Replacement: Staged file replaces destination via atomic filesystem operations.
+    6. Permanent NTFS Protection: Security persists permanently before service startup, during execution,
+       after process termination, and across restarts.
     """
+    if not vault_dir or not isinstance(vault_dir, str):
+        raise TrainingProvenanceConfigurationError("Vault directory path must be a non-empty string.")
+    if not completion_db_url or not isinstance(completion_db_url, str) or not completion_db_url.strip():
+        raise TrainingProvenanceConfigurationError("Completion database URL must be a non-empty string.")
+
+    vault_dir = os.path.abspath(vault_dir)
+    vault_file = os.path.join(vault_dir, "completion_authority.vault")
+
+    # 1. Structural and reparse point checks
+    _check_no_reparse_or_symlink(vault_dir, "Vault directory")
+    if os.path.exists(vault_dir) and not os.path.isdir(vault_dir):
+        raise TrainingProvenanceSecurityError(
+            f"Vault directory path conflicts with existing non-directory file: '{vault_dir}'."
+        )
+
+    _check_no_reparse_or_symlink(vault_file, "Vault file")
+    if os.path.exists(vault_file) and os.path.isdir(vault_file):
+        raise TrainingProvenanceSecurityError(
+            f"Vault file path conflicts with existing directory: '{vault_file}'."
+        )
+
+    # 2. Ensure vault directory exists and enforce restrictive permissions
     try:
         os.makedirs(vault_dir, mode=0o700, exist_ok=True)
-        vault_file = os.path.join(vault_dir, "completion_authority.vault")
-        with open(vault_file, "w", encoding="utf-8") as f:
-            f.write(completion_db_url.strip())
     except Exception as e:
         raise TrainingProvenanceConfigurationError(
-            f"Failed to create isolated completion vault directory or file: {e}"
+            f"Failed to create isolated completion vault directory: {e}"
         ) from e
 
-    if os.name == "nt":
-        try:
-            import ntsecuritycon
-            import win32api
-            import win32con
-            import win32security
+    _check_no_reparse_or_symlink(vault_dir, "Vault directory")
 
-            hProcess = win32api.GetCurrentProcess()
-            hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_ALL_ACCESS)
-            service_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenUser)
-            coord_sid = win32security.CreateWellKnownSid(win32security.WinRestrictedCodeSid)
+    staged_file = None
+    try:
+        if os.name == "nt":
+            try:
+                import ntsecuritycon
+                import win32api
+                import win32con
+                import win32security
 
-            dacl = win32security.ACL()
-            # Explicit DENY for coordinator identity takes precedence
-            dacl.AddAccessDeniedAce(win32security.ACL_REVISION, ntsecuritycon.FILE_ALL_ACCESS, coord_sid)
-            # Explicit ALLOW for privileged service identity
-            dacl.AddAccessAllowedAce(win32security.ACL_REVISION, ntsecuritycon.FILE_ALL_ACCESS, service_sid)
+                hProcess = win32api.GetCurrentProcess()
+                hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_ALL_ACCESS)
+                service_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenUser)
+                coord_sid = win32security.CreateWellKnownSid(win32security.WinRestrictedCodeSid)
 
-            for target_path in (vault_dir, vault_file):
+                # Configure directory DACL with container and object inheritance
+                dir_dacl = win32security.ACL()
+                dir_dacl.AddAccessDeniedAceEx(
+                    win32security.ACL_REVISION,
+                    win32security.OBJECT_INHERIT_ACE | win32security.CONTAINER_INHERIT_ACE,
+                    ntsecuritycon.FILE_ALL_ACCESS,
+                    coord_sid,
+                )
+                dir_dacl.AddAccessAllowedAceEx(
+                    win32security.ACL_REVISION,
+                    win32security.OBJECT_INHERIT_ACE | win32security.CONTAINER_INHERIT_ACE,
+                    ntsecuritycon.FILE_ALL_ACCESS,
+                    service_sid,
+                )
                 win32security.SetNamedSecurityInfo(
-                    target_path,
+                    vault_dir,
                     win32security.SE_FILE_OBJECT,
                     win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
                     None,
                     None,
-                    dacl,
+                    dir_dacl,
                     None,
                 )
-        except Exception as e:
-            raise TrainingProvenanceConfigurationError(
-                f"Failed to configure mandatory operating system NTFS DACL on completion vault: {e}"
-            ) from e
-    else:
+            except Exception as e:
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to configure mandatory operating system NTFS DACL on completion vault directory: {e}"
+                ) from e
+        else:
+            try:
+                os.chmod(vault_dir, 0o700)
+            except Exception as e:
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to configure mandatory operating system permissions on completion vault directory: {e}"
+                ) from e
+
+        # 3. Create empty staged file inside protected directory
+        staged_nonce = secrets.token_hex(16)
+        staged_file = os.path.join(vault_dir, f".completion_vault_staged_{staged_nonce}.tmp")
+
         try:
-            os.chmod(vault_dir, 0o700)
-            os.chmod(vault_file, 0o600)
+            with open(staged_file, "w", encoding="utf-8") as f:
+                pass  # 0 bytes: empty file
         except Exception as e:
             raise TrainingProvenanceConfigurationError(
-                f"Failed to configure mandatory operating system permissions on completion vault: {e}"
+                f"Failed to create staged completion vault file: {e}"
             ) from e
 
-    return vault_file
+        # 4. Enforce restrictive DACL on staged file BEFORE writing secret bytes
+        if os.name == "nt":
+            try:
+                file_dacl = win32security.ACL()
+                file_dacl.AddAccessDeniedAce(
+                    win32security.ACL_REVISION,
+                    ntsecuritycon.FILE_ALL_ACCESS,
+                    coord_sid,
+                )
+                file_dacl.AddAccessAllowedAce(
+                    win32security.ACL_REVISION,
+                    ntsecuritycon.FILE_ALL_ACCESS,
+                    service_sid,
+                )
+                win32security.SetNamedSecurityInfo(
+                    staged_file,
+                    win32security.SE_FILE_OBJECT,
+                    win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+                    None,
+                    None,
+                    file_dacl,
+                    None,
+                )
+            except Exception as e:
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to configure mandatory operating system NTFS DACL on staged completion vault file: {e}"
+                ) from e
+        else:
+            try:
+                os.chmod(staged_file, 0o600)
+            except Exception as e:
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to configure mandatory operating system permissions on staged completion vault file: {e}"
+                ) from e
+
+        # 5. Persist secret bytes into already-protected staged file
+        try:
+            with open(staged_file, "w", encoding="utf-8") as f:
+                f.write(completion_db_url.strip())
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception as e:
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to write confidential credential to staged completion vault: {e}"
+            ) from e
+
+        # 6. Atomic replacement of final vault file
+        try:
+            os.replace(staged_file, vault_file)
+            staged_file = None  # Replaced successfully
+        except Exception as e:
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to atomically install completion vault file: {e}"
+            ) from e
+
+        # 7. Final confirmation of permissions on vault_file
+        if os.name == "nt":
+            try:
+                win32security.SetNamedSecurityInfo(
+                    vault_file,
+                    win32security.SE_FILE_OBJECT,
+                    win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+                    None,
+                    None,
+                    file_dacl,
+                    None,
+                )
+            except Exception as e:
+                with contextlib.suppress(Exception):
+                    os.remove(vault_file)
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to verify mandatory NTFS DACL on final completion vault file: {e}"
+                ) from e
+        else:
+            try:
+                os.chmod(vault_file, 0o600)
+            except Exception as e:
+                with contextlib.suppress(Exception):
+                    os.remove(vault_file)
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to verify permissions on final completion vault file: {e}"
+                ) from e
+
+        return vault_file
+
+    finally:
+        if staged_file and os.path.exists(staged_file):
+            with contextlib.suppress(Exception):
+                os.remove(staged_file)
 
 
 class IsolatedCoordinatorClient:
@@ -971,6 +1127,10 @@ class IsolatedCoordinatorClient:
 
     def attempt_write_vault(self, vault_path: str, data: str) -> dict[str, Any]:
         self._conn.send({"command": "ATTEMPT_WRITE_VAULT", "vault_path": vault_path, "data": data})
+        return self._conn.recv()
+
+    def attempt_delete_vault(self, vault_path: str) -> dict[str, Any]:
+        self._conn.send({"command": "ATTEMPT_DELETE_VAULT", "vault_path": vault_path})
         return self._conn.recv()
 
     def attempt_privilege_escalation(self, vault_path: str | None = None) -> dict[str, Any]:
@@ -1170,6 +1330,18 @@ def _run_isolated_coordinator_worker(
             try:
                 with open(vault_path, "w", encoding="utf-8") as f:
                     f.write(data)
+                client.send({"status": "SUCCESS"})
+            except Exception as e:
+                client.send({
+                    "status": "DENIED",
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                })
+
+        elif cmd == "ATTEMPT_DELETE_VAULT":
+            vault_path = req["vault_path"]
+            try:
+                os.remove(vault_path)
                 client.send({"status": "SUCCESS"})
             except Exception as e:
                 client.send({

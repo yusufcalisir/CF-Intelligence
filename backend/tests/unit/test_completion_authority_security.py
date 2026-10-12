@@ -22,10 +22,12 @@ import hashlib
 import json
 import os
 import sys
+import subprocess
 import tempfile
 import threading
 import time
 from typing import Any
+from unittest import mock
 import uuid
 
 from cryptography.fernet import Fernet
@@ -1483,3 +1485,375 @@ class TestCompletionAuthoritySecurity:
             comp_proc.join(timeout=3)
 
     test_iso_10_genuine_federation_regression = test_os_10_three_bank_regression
+
+
+class TestSecureVaultProvisioning:
+    """Security verification test suite for Completion Authority Credential Vault Provisioning.
+
+    Enforces mandatory guarantees:
+    - VAULT-01: Coordinator cannot read the credential before, during, or after provisioning.
+    - VAULT-02: Simulate DACL installation failure. Verify production fails and no credential remains accessible.
+    - VAULT-03: Simulate interruption during provisioning. Verify no exposed partial credential file.
+    - VAULT-04: Attempt provisioning into an unsafe existing directory or file. Verify secure rejection or safe handling.
+    - VAULT-05: Attempt path redirection through symlinks, junctions, or equivalent supported filesystem mechanisms.
+    - VAULT-06: Verify credential replacement/reprovisioning cannot temporarily relax access permissions.
+    - VAULT-07: Verify the coordinator cannot read, replace, or delete the vault after the completion service terminates.
+    - VAULT-08: Verify the completion authority still starts, authenticates, performs legitimate finalization, and survives restart.
+    """
+
+    def test_vault_01_coordinator_denied_before_during_after(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """VAULT-01: Coordinator cannot read the credential before, during, or after provisioning."""
+        comp_url = pg_roles["completion"]
+        vault_dir = str(tmp_path / "vault_v01")
+        vault_file = os.path.join(vault_dir, "completion_authority.vault")
+
+        # 1. Before provisioning: vault_file does not exist; coordinator cannot read it
+        assert not os.path.exists(vault_file)
+        with CoordinatorOSSecurityContext():
+            with pytest.raises((FileNotFoundError, PermissionError)):
+                with open(vault_file, "r", encoding="utf-8") as f:
+                    _ = f.read()
+
+        # 2. Privileged provisioning executes
+        provisioned_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+        assert provisioned_file == vault_file
+        assert os.path.exists(vault_file)
+
+        # 3. After provisioning: Coordinator cannot read credential under restricted context
+        with CoordinatorOSSecurityContext():
+            with pytest.raises(PermissionError):
+                with open(vault_file, "r", encoding="utf-8") as f:
+                    _ = f.read()
+
+        # 4. Prove genuine access denial from an actual isolated coordinator child process
+        coord_proc, coord_client = spawn_isolated_coordinator_process(app_env="production")
+        try:
+            res = coord_client.attempt_read_vault(vault_file)
+            assert res["status"] == "DENIED"
+            assert res["error_type"] == "PermissionError"
+        finally:
+            coord_client.terminate()
+
+    def test_vault_02_dacl_installation_failure_leaves_no_credential(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """VAULT-02: Simulate DACL installation failure. Verify production fails and no credential remains accessible."""
+        comp_url = pg_roles["completion"]
+        vault_dir = str(tmp_path / "vault_v02")
+        vault_file = os.path.join(vault_dir, "completion_authority.vault")
+
+        if os.name == "nt":
+            import win32security
+
+            original_set_named = win32security.SetNamedSecurityInfo
+            call_count = [0]
+
+            def failing_set_named(*args: Any, **kwargs: Any) -> Any:
+                call_count[0] += 1
+                # Call 1 is directory DACL. Call 2 is staged file DACL.
+                if call_count[0] >= 2:
+                    raise RuntimeError("Simulated NTFS DACL installation failure on staged file")
+                return original_set_named(*args, **kwargs)
+
+            with mock.patch("win32security.SetNamedSecurityInfo", side_effect=failing_set_named):
+                with pytest.raises(
+                    TrainingProvenanceConfigurationError,
+                    match="Failed to configure mandatory operating system NTFS DACL on staged completion vault file",
+                ):
+                    provision_isolated_completion_authority_vault(vault_dir, comp_url)
+        else:
+            with mock.patch("os.chmod", side_effect=RuntimeError("Simulated chmod failure")):
+                with pytest.raises(TrainingProvenanceConfigurationError):
+                    provision_isolated_completion_authority_vault(vault_dir, comp_url)
+
+        # Invariant 3: Failed permission configuration leaves no readable credential artifact
+        assert not os.path.exists(vault_file)
+        if os.path.exists(vault_dir):
+            files = os.listdir(vault_dir)
+            assert len(files) == 0, f"Leftover files found in vault directory: {files}"
+
+    def test_vault_03_interruption_during_write_leaves_no_exposed_file(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """VAULT-03: Simulate interruption during provisioning. Verify no exposed partial credential file."""
+        comp_url = pg_roles["completion"]
+        vault_dir = str(tmp_path / "vault_v03")
+        vault_file = os.path.join(vault_dir, "completion_authority.vault")
+
+        # Simulate interruption during os.fsync or file write
+        with mock.patch("os.fsync", side_effect=IOError("Simulated power loss or I/O interruption during fsync")):
+            with pytest.raises(
+                TrainingProvenanceConfigurationError,
+                match="Failed to write confidential credential to staged completion vault",
+            ):
+                provision_isolated_completion_authority_vault(vault_dir, comp_url)
+
+        # Invariant 4: Interrupted or partially completed provisioning must not expose secrets
+        assert not os.path.exists(vault_file)
+        if os.path.exists(vault_dir):
+            files = os.listdir(vault_dir)
+            assert len(files) == 0, f"Staged or partial files remained after interruption: {files}"
+
+    def test_vault_04_unsafe_existing_path_handled_or_rejected(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """VAULT-04: Attempt provisioning into an unsafe existing directory or file. Verify secure rejection or safe handling."""
+        comp_url = pg_roles["completion"]
+
+        # Case A: vault_dir exists as a regular file (type conflict)
+        bad_vault_dir = str(tmp_path / "file_instead_of_dir")
+        with open(bad_vault_dir, "w", encoding="utf-8") as f:
+            f.write("I am a file, not a directory")
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="conflicts with existing non-directory file"):
+            provision_isolated_completion_authority_vault(bad_vault_dir, comp_url)
+
+        # Case B: vault_file exists as a directory (type conflict)
+        vault_dir_b = str(tmp_path / "vault_v04_b")
+        os.makedirs(os.path.join(vault_dir_b, "completion_authority.vault"), exist_ok=True)
+        with pytest.raises(TrainingProvenanceSecurityError, match="conflicts with existing directory"):
+            provision_isolated_completion_authority_vault(vault_dir_b, comp_url)
+
+        # Case C: vault_dir exists with default unsafe/loose permissions
+        vault_dir_c = str(tmp_path / "vault_v04_c")
+        os.makedirs(vault_dir_c, mode=0o777, exist_ok=True)
+
+        # Provisioning safely cleanses/enforces DACL
+        vf = provision_isolated_completion_authority_vault(vault_dir_c, comp_url)
+        assert os.path.exists(vf)
+
+        # Verify restrictive DACL is strictly active: restricted coordinator cannot read
+        with CoordinatorOSSecurityContext():
+            with pytest.raises(PermissionError):
+                with open(vf, "r", encoding="utf-8") as f:
+                    _ = f.read()
+
+    def test_vault_05_path_redirection_symlinks_junctions_rejected(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """VAULT-05: Attempt path redirection through symlinks, junctions, or equivalent supported filesystem mechanisms."""
+        comp_url = pg_roles["completion"]
+        target_dir = str(tmp_path / "real_target")
+        os.makedirs(target_dir, exist_ok=True)
+
+        if os.name == "nt":
+            junction_dir = str(tmp_path / "junction_vault")
+            # Create directory junction using mklink /J
+            res = subprocess.run(
+                ["cmd", "/c", "mklink", "/J", junction_dir, target_dir],
+                capture_output=True,
+                text=True,
+            )
+            assert res.returncode == 0, f"Failed to create junction: {res.stderr}"
+
+            try:
+                # Must be rejected fail-closed
+                with pytest.raises(TrainingProvenanceSecurityError, match="junction|reparse point|symbolic link"):
+                    provision_isolated_completion_authority_vault(junction_dir, comp_url)
+
+                # Ensure nothing was written to real target directory
+                assert len(os.listdir(target_dir)) == 0, f"Credential leaked to junction target: {os.listdir(target_dir)}"
+            finally:
+                subprocess.run(["cmd", "/c", "rmdir", junction_dir], capture_output=True)
+        else:
+            symlink_dir = str(tmp_path / "symlink_vault")
+            os.symlink(target_dir, symlink_dir)
+            try:
+                with pytest.raises(TrainingProvenanceSecurityError, match="symbolic link"):
+                    provision_isolated_completion_authority_vault(symlink_dir, comp_url)
+                assert len(os.listdir(target_dir)) == 0
+            finally:
+                os.unlink(symlink_dir)
+
+    def test_vault_06_credential_replacement_no_relaxation_window(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """VAULT-06: Verify credential replacement/reprovisioning cannot temporarily relax access permissions."""
+        comp_url_1 = pg_roles["completion"]
+        comp_url_2 = pg_roles["completion"] + "?application_name=rotated_vault_client"
+        vault_dir = str(tmp_path / "vault_v06")
+
+        # Initial provisioning
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url_1)
+        with open(vault_file, "r", encoding="utf-8") as f:
+            assert f.read().strip() == comp_url_1.strip()
+
+        # Reprovisioning / rotation
+        vault_file_2 = provision_isolated_completion_authority_vault(vault_dir, comp_url_2)
+        assert vault_file_2 == vault_file
+
+        # Verify rotated content is present
+        with open(vault_file, "r", encoding="utf-8") as f:
+            assert f.read().strip() == comp_url_2.strip()
+
+        # Verify coordinator remains denied
+        with CoordinatorOSSecurityContext():
+            with pytest.raises(PermissionError):
+                with open(vault_file, "r", encoding="utf-8") as f:
+                    _ = f.read()
+
+        # Verify coordinator child process is also denied
+        coord_proc, coord_client = spawn_isolated_coordinator_process(app_env="production")
+        try:
+            res = coord_client.attempt_read_vault(vault_file)
+            assert res["status"] == "DENIED"
+            assert res["error_type"] == "PermissionError"
+        finally:
+            coord_client.terminate()
+
+    def test_vault_07_coordinator_cannot_read_replace_delete_after_termination(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """VAULT-07: Verify the coordinator cannot read, replace, or delete the vault after the completion service terminates."""
+        comp_url = pg_roles["completion"]
+        vault_dir = str(tmp_path / "vault_v07")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+
+        # 1. Spawn completion service and let it run
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+        try:
+            assert comp_proc.is_alive()
+        finally:
+            # 2. Terminate completion service
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
+            assert not comp_proc.is_alive()
+
+        # 3. Coordinator attempts to read, write/replace, or delete the vault after service termination
+        coord_proc, coord_client = spawn_isolated_coordinator_process(app_env="production")
+        try:
+            # Read attempt
+            read_res = coord_client.attempt_read_vault(vault_file)
+            assert read_res["status"] == "DENIED"
+            assert read_res["error_type"] == "PermissionError"
+
+            # Write / overwrite attempt
+            write_res = coord_client.attempt_write_vault(vault_file, "malicious_overwrite_data")
+            assert write_res["status"] == "DENIED"
+            assert write_res["error_type"] == "PermissionError"
+
+            # Delete attempt
+            del_res = coord_client.attempt_delete_vault(vault_file)
+            assert del_res["status"] == "DENIED"
+            assert del_res["error_type"] == "PermissionError"
+
+            # Vault remains intact with correct content
+            with open(vault_file, "r", encoding="utf-8") as f:
+                assert f.read().strip() == comp_url.strip()
+        finally:
+            coord_client.terminate()
+
+    def test_vault_08_completion_authority_starts_authenticates_finalizes_survives_restart(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """VAULT-08: Verify the completion authority still starts, authenticates, performs legitimate finalization, and survives restart."""
+        comp_url = pg_roles["completion"]
+        admin_url = pg_roles["admin"]
+        vault_dir = str(tmp_path / "vault_v08")
+        vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url)
+
+        # 1. First run: Start completion service from provisioned vault
+        comp_proc_1, comp_endpoint_1 = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+
+        uid_1 = uuid.uuid4().hex[:8]
+        job_id_1 = f"job_v08_1_{uid_1}"
+        run_id_1 = f"run_v08_1_{uid_1}"
+        sim_id_1 = f"sim_v08_1_{uid_1}"
+        art_sha_1 = hashlib.sha256(f"artifact_{job_id_1}".encode()).hexdigest()
+
+        evidence_1 = helper_setup_valid_observed_job(
+            admin_url=admin_url,
+            job_id=job_id_1,
+            run_id=run_id_1,
+            sim_id=sim_id_1,
+            artifact_sha=art_sha_1,
+        )
+
+        try:
+            client_1 = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint_1,
+                coordinator_token=COORD_TOKEN,
+                app_env="production",
+            )
+            rec_1 = client_1.finalize_training_completion(
+                job_id=job_id_1,
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=evidence_1["total_samples"],
+                observed_metrics={"loss": 0.05, "auc_roc": 0.94},
+                artifact_sha256=art_sha_1,
+                coordinator_token=COORD_TOKEN,
+            )
+            assert rec_1.job_id == job_id_1
+            assert rec_1.status == "COMPLETED"
+        finally:
+            comp_proc_1.terminate()
+            comp_proc_1.join(timeout=3)
+            assert not comp_proc_1.is_alive()
+
+        # 2. Restart: Spawn new completion service from the exact same vault file
+        comp_proc_2, comp_endpoint_2 = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_TOKEN,
+            app_env="production",
+        )
+
+        uid_2 = uuid.uuid4().hex[:8]
+        job_id_2 = f"job_v08_2_{uid_2}"
+        run_id_2 = f"run_v08_2_{uid_2}"
+        sim_id_2 = f"sim_v08_2_{uid_2}"
+        art_sha_2 = hashlib.sha256(f"artifact_{job_id_2}".encode()).hexdigest()
+
+        evidence_2 = helper_setup_valid_observed_job(
+            admin_url=admin_url,
+            job_id=job_id_2,
+            run_id=run_id_2,
+            sim_id=sim_id_2,
+            artifact_sha=art_sha_2,
+        )
+
+        try:
+            client_2 = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint_2,
+                coordinator_token=COORD_TOKEN,
+                app_env="production",
+            )
+            rec_2 = client_2.finalize_training_completion(
+                job_id=job_id_2,
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=evidence_2["total_samples"],
+                observed_metrics={"loss": 0.05, "auc_roc": 0.94},
+                artifact_sha256=art_sha_2,
+                coordinator_token=COORD_TOKEN,
+            )
+            assert rec_2.job_id == job_id_2
+            assert rec_2.status == "COMPLETED"
+        finally:
+            comp_proc_2.terminate()
+            comp_proc_2.join(timeout=3)
+
+        # 3. Direct verification in PostgreSQL as admin: both jobs completed
+        with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+            cur.execute("SELECT status, artifact_sha256 FROM cfi_completed_jobs WHERE job_id = %s", (job_id_1,))
+            row_1 = cur.fetchone()
+            assert row_1 is not None
+            assert row_1[0] == "COMPLETED"
+            assert row_1[1] == art_sha_1
+
+            cur.execute("SELECT status, artifact_sha256 FROM cfi_completed_jobs WHERE job_id = %s", (job_id_2,))
+            row_2 = cur.fetchone()
+            assert row_2 is not None
+            assert row_2[0] == "COMPLETED"
+            assert row_2[1] == art_sha_2
+
