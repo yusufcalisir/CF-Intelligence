@@ -863,7 +863,10 @@ class TestConcurrencyFailureRecoverySecurity:
             coordinator_token=COORD_SECRET,
             app_env="production",
         )
-        coord_proc, coord_client = spawn_isolated_coordinator_process(app_env="production")
+        coord_proc, coord_client = spawn_isolated_coordinator_process(app_env="testing")
+        ident = coord_client.get_process_identity()
+        if os.name == "nt":
+            assert ident.details.get("is_restricted") is True, "Coordinator must run under genuine Windows restricted token"
         procs = {}
         try:
             bank_enc_keys = {
@@ -917,6 +920,7 @@ class TestConcurrencyFailureRecoverySecurity:
             run_id = f"run_con09_{uid}"
             sim_id = f"sim_con09_{uid}"
             registry_dir = str(tmp_path / "model_reg_con09")
+            agg_checkpoint_file = str(tmp_path / f"agg_checkpoint_con09_{uid}.txt")
 
             X_test = np.random.randn(50, NUM_FEATURES).astype(np.float32)
             y_test = np.random.randint(0, 2, size=50).astype(np.float32)
@@ -942,6 +946,7 @@ class TestConcurrencyFailureRecoverySecurity:
                         comp_service_endpoint=comp_endpoint,
                         signing_authority=signing_auth,
                         worker_pids=worker_pids,
+                        pause_aggregation_checkpoint_file=agg_checkpoint_file,
                     )
                 except Exception as exc:
                     fed_errors.append(exc)
@@ -949,21 +954,29 @@ class TestConcurrencyFailureRecoverySecurity:
             t_fed = threading.Thread(target=_run_fed)
             t_fed.start()
 
-            # Wait until bank workers complete round 1 training and commit observations to PostgreSQL
-            # This is a verifiable in-progress aggregation checkpoint before completion
+            # Wait until coordinator executes FedAvg aggregation in memory and reaches the exact aggregation checkpoint
+            # before the global aggregation event is committed to PostgreSQL
             reached_checkpoint = False
-            for _ in range(80):
-                with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
-                    cur.execute("SELECT COUNT(*) FROM cfi_round_observations WHERE job_id = %s", (job_id,))
-                    row = cur.fetchone()
-                    if row and row[0] >= 3:
-                        reached_checkpoint = True
-                        break
+            checkpoint_payload = ""
+            for _ in range(120):
+                if os.path.exists(agg_checkpoint_file):
+                    try:
+                        with open(agg_checkpoint_file, encoding="utf-8") as f:
+                            checkpoint_payload = f.read().strip()
+                        if checkpoint_payload.startswith("AGGREGATION_EXECUTED_ROUND_1:"):
+                            reached_checkpoint = True
+                            break
+                    except Exception:
+                        pass
                 time.sleep(0.1)
 
-            assert reached_checkpoint, "Did not reach verifiable in-progress aggregation checkpoint"
+            assert reached_checkpoint, (
+                f"Coordinator did not reach deterministic aggregation checkpoint (content: {checkpoint_payload})"
+            )
+            computed_agg_digest = checkpoint_payload.split(":", 1)[1]
+            assert len(computed_agg_digest) == 64, f"Invalid model digest in checkpoint: {computed_agg_digest}"
 
-            # Terminate the coordinator process abruptly during aggregation
+            # Terminate the coordinator process abruptly during aggregation execution
             if os.name == "nt" and coord_proc is not None:
                 import win32process
                 with contextlib.suppress(Exception):
@@ -971,15 +984,23 @@ class TestConcurrencyFailureRecoverySecurity:
             coord_client.terminate()
             t_fed.join(timeout=5)
 
-            # Inspect authoritative PostgreSQL records: 0 completed jobs
+            # Inspect authoritative PostgreSQL records: 0 completed jobs, 0 global aggregations, 1 started job, 3 round observations
             with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
                 zero_comp = cur.fetchone()
                 assert zero_comp is not None and zero_comp[0] == 0
 
+                cur.execute("SELECT COUNT(*) FROM cfi_global_aggregations WHERE job_id = %s", (job_id,))
+                zero_agg = cur.fetchone()
+                assert zero_agg is not None and zero_agg[0] == 0
+
                 cur.execute("SELECT COUNT(*) FROM cfi_started_jobs WHERE job_id = %s", (job_id,))
                 started_row = cur.fetchone()
                 assert started_row is not None and started_row[0] == 1
+
+                cur.execute("SELECT COUNT(*) FROM cfi_round_observations WHERE job_id = %s", (job_id,))
+                obs_row = cur.fetchone()
+                assert obs_row is not None and obs_row[0] == 3
 
             # Prove no trusted receipt can be issued
             issuer_source = TrustedTrainingJobRecordSource(
@@ -1034,6 +1055,29 @@ class TestConcurrencyFailureRecoverySecurity:
             )
             assert version_entry["is_production_eligible"] is False
             assert version_entry["provenance_type"] == "UNVERIFIED"
+
+            # Prove ISO-07: Production coordinator strictly rejects test aggregation checkpoint hooks
+            prod_proc, prod_client = spawn_isolated_coordinator_process(app_env="production")
+            try:
+                with pytest.raises(TrainingProvenanceSecurityError, match="ISO-07"):
+                    prod_client.execute_federation(
+                        job_id=f"job_iso07_{uid}",
+                        training_run_id=f"run_iso07_{uid}",
+                        simulation_id=f"sim_iso07_{uid}",
+                        holdout_val_data=(X_test, y_test),
+                        participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+                        worker_endpoints=endpoints,
+                        num_rounds=1,
+                        expected_unique_samples=300,
+                        registry_storage_dir=registry_dir,
+                        coordinator_token=COORD_SECRET,
+                        db_url=coord_url,
+                        comp_service_endpoint=comp_endpoint,
+                        signing_authority=signing_auth,
+                        pause_aggregation_checkpoint_file=agg_checkpoint_file,
+                    )
+            finally:
+                prod_client.terminate()
 
         finally:
             for p in procs.values():

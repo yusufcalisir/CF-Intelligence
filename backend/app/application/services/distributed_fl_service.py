@@ -28,6 +28,7 @@ import secrets
 import sys
 import tempfile
 import threading
+import time
 import types
 import uuid
 from collections.abc import Mapping
@@ -1828,6 +1829,7 @@ class IsolatedCoordinatorClient:
         bank_tokens: Any = None,
         bank_data_paths: Any = None,
         signing_key_hex: str | None = None,
+        pause_aggregation_checkpoint_file: str | None = None,
     ) -> dict[str, Any]:
         req = {
             "command": "EXECUTE_FEDERATION",
@@ -1848,6 +1850,7 @@ class IsolatedCoordinatorClient:
             "bank_tokens": bank_tokens,
             "bank_data_paths": bank_data_paths,
             "signing_key_hex": signing_key_hex,
+            "pause_aggregation_checkpoint_file": pause_aggregation_checkpoint_file,
             "has_worker_endpoints": bool(worker_endpoints),
         }
         try:
@@ -2091,6 +2094,14 @@ def _run_isolated_coordinator_worker(
                     })
                     continue
 
+                if app_env.lower() == "production" and req.get("pause_aggregation_checkpoint_file"):
+                    client.send({
+                        "command": "FEDERATION_RESULT",
+                        "status": "ERROR",
+                        "error": "Production coordinator cannot accept test aggregation checkpoint hooks (ISO-07).",
+                    })
+                    continue
+
                 manager = DistributedFederatedTrainingManager(
                     coordinator_token=coord_tok,
                     db_url=db_url,
@@ -2176,6 +2187,7 @@ def _run_isolated_coordinator_worker(
                     bank_tokens=req.get("bank_tokens"),
                     bank_data_paths=req.get("bank_data_paths"),
                     signing_key_hex=req.get("signing_key_hex"),
+                    pause_aggregation_checkpoint_file=req.get("pause_aggregation_checkpoint_file"),
                 )
 
                 if "worker_pids" in req:
@@ -3850,6 +3862,7 @@ class DistributedFederatedTrainingManager:
         expected_unique_samples: int | None = None,
         fail_bank_b_observation: bool = False,
         crash_bank_b: bool = False,
+        pause_aggregation_checkpoint_file: str | None = None,
         registry_storage_dir: str | None = None,
         signing_key_hex: str | None = None,
         signing_authority: Any | None = None,
@@ -3867,6 +3880,10 @@ class DistributedFederatedTrainingManager:
         is_prod = self.app_env.lower() == "production"
         if is_prod:
             verify_restricted_coordinator_os_boundary(self.app_env)
+            if pause_aggregation_checkpoint_file is not None:
+                raise TrainingProvenanceSecurityError(
+                    "Production coordinator cannot accept test aggregation checkpoint hooks (ISO-07)."
+                )
             if bank_partitions is not None:
                 raise TrainingProvenanceSecurityError(
                     "Production coordinator cannot receive bank private dataset partitions (BI-01)."
@@ -4027,6 +4044,19 @@ class DistributedFederatedTrainingManager:
                 # Derive exact serialized model artifact bytes and its SHA-256 digest
                 final_model_bytes = _serialize_model_state_dict(global_model)
                 aggregated_model_digest = hashlib.sha256(final_model_bytes).hexdigest()
+
+                if pause_aggregation_checkpoint_file:
+                    try:
+                        with open(pause_aggregation_checkpoint_file, "w", encoding="utf-8") as _pf:
+                            _pf.write(f"AGGREGATION_EXECUTED_ROUND_{round_num}:{aggregated_model_digest}\n")
+                            _pf.flush()
+                            os.fsync(_pf.fileno())
+                    except Exception as _e:
+                        logger.warning("Failed writing aggregation checkpoint file: %s", _e)
+                    _release_file = f"{pause_aggregation_checkpoint_file}.release"
+                    _wait_start = time.time()
+                    while not os.path.exists(_release_file) and (time.time() - _wait_start < 30.0):
+                        time.sleep(0.05)
 
                 # Record global aggregation event in PostgreSQL authority
                 self.authority_source.record_global_aggregation(
