@@ -106,17 +106,198 @@ def _serialize_model_state_dict(model: nn.Module) -> bytes:
 # Bank Storage & Worker Isolation Helpers
 # ---------------------------------------------------------------------------
 
+BANK_SECURITY_SIDS: dict[str, str] = {
+    "BANK_A": "S-1-5-21-4192661148-2837192312-3928174921-1001",
+    "BANK_B": "S-1-5-21-4192661148-2837192312-3928174921-1002",
+    "BANK_C": "S-1-5-21-4192661148-2837192312-3928174921-1003",
+}
+COORDINATOR_RESTRICTED_SID: str = "S-1-5-12"
+
+
+def get_bank_security_sid(bank_id: str) -> str:
+    """Return the authoritative Windows Security Identifier (SID) bound to a specific bank."""
+    if bank_id in BANK_SECURITY_SIDS:
+        return BANK_SECURITY_SIDS[bank_id]
+    h = int(hashlib.sha256(bank_id.encode("utf-8")).hexdigest()[:8], 16) % 100000 + 2000
+    return f"S-1-5-21-4192661148-2837192312-3928174921-{h}"
+
+
+def _check_no_reparse_or_symlink(path: str, label: str) -> None:
+    """Verify that a path is not a symlink, directory junction, or reparse point."""
+    try:
+        if os.path.islink(path):
+            raise TrainingProvenanceSecurityError(
+                f"{label} cannot be a symbolic link: '{path}'."
+            )
+        if hasattr(os.path, "isjunction") and os.path.isjunction(path):
+            raise TrainingProvenanceSecurityError(
+                f"{label} cannot be a directory junction: '{path}'."
+            )
+        st = os.lstat(path)
+        import stat
+        if stat.S_ISLNK(st.st_mode):
+            raise TrainingProvenanceSecurityError(
+                f"{label} cannot be a symbolic link: '{path}'."
+            )
+        if hasattr(st, "st_reparse_tag") and st.st_reparse_tag != 0:
+            raise TrainingProvenanceSecurityError(
+                f"{label} cannot be a reparse point or junction: '{path}'."
+            )
+    except FileNotFoundError:
+        pass
+
+
+def configure_bank_vault_os_permissions(vault_dir: str, bank_id: str) -> None:
+    """Configure mandatory operating system permissions (NTFS DACL / POSIX mode) on bank vault directory.
+
+    Enforces that:
+    1. Federation Coordinator (WinRestrictedCodeSid S-1-5-12) is explicitly denied all access.
+    2. Other participating banks (BANK_A, BANK_B, BANK_C) are explicitly denied all access.
+    3. Only the designated bank's security identity and host service user are granted access.
+    4. Child objects and containers inherit the protection.
+    """
+    if os.name == "nt":
+        try:
+            import ntsecuritycon
+            import win32api
+            import win32con
+            import win32security
+
+            hProcess = win32api.GetCurrentProcess()
+            hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_ALL_ACCESS)
+            service_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenUser)
+            coord_sid = win32security.CreateWellKnownSid(win32security.WinRestrictedCodeSid)
+            bank_sid = win32security.GetBinarySid(get_bank_security_sid(bank_id))
+
+            other_banks = [b for b in ("BANK_A", "BANK_B", "BANK_C") if b != bank_id]
+
+            dir_dacl = win32security.ACL()
+            # Explicit Deny ACEs must precede Allow ACEs
+            dir_dacl.AddAccessDeniedAceEx(
+                win32security.ACL_REVISION,
+                win32security.OBJECT_INHERIT_ACE | win32security.CONTAINER_INHERIT_ACE,
+                ntsecuritycon.FILE_ALL_ACCESS,
+                coord_sid,
+            )
+            for ob in other_banks:
+                other_sid = win32security.GetBinarySid(get_bank_security_sid(ob))
+                dir_dacl.AddAccessDeniedAceEx(
+                    win32security.ACL_REVISION,
+                    win32security.OBJECT_INHERIT_ACE | win32security.CONTAINER_INHERIT_ACE,
+                    ntsecuritycon.FILE_ALL_ACCESS,
+                    other_sid,
+                )
+
+            # Explicit Allow ACEs
+            dir_dacl.AddAccessAllowedAceEx(
+                win32security.ACL_REVISION,
+                win32security.OBJECT_INHERIT_ACE | win32security.CONTAINER_INHERIT_ACE,
+                ntsecuritycon.FILE_ALL_ACCESS,
+                bank_sid,
+            )
+            dir_dacl.AddAccessAllowedAceEx(
+                win32security.ACL_REVISION,
+                win32security.OBJECT_INHERIT_ACE | win32security.CONTAINER_INHERIT_ACE,
+                ntsecuritycon.FILE_ALL_ACCESS,
+                service_sid,
+            )
+
+            win32security.SetNamedSecurityInfo(
+                vault_dir,
+                win32security.SE_FILE_OBJECT,
+                win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+                None,
+                None,
+                dir_dacl,
+                None,
+            )
+        except Exception as e:
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to configure mandatory operating system NTFS DACL on bank '{bank_id}' vault directory: {e}"
+            ) from e
+    else:
+        try:
+            os.chmod(vault_dir, 0o700)
+        except Exception as e:
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to configure mandatory operating system permissions on bank '{bank_id}' vault directory: {e}"
+            ) from e
+
+
+def configure_bank_file_os_permissions(file_path: str, bank_id: str) -> None:
+    """Configure mandatory operating system permissions (NTFS DACL / POSIX mode) on bank private file."""
+    if os.name == "nt":
+        try:
+            import ntsecuritycon
+            import win32api
+            import win32con
+            import win32security
+
+            hProcess = win32api.GetCurrentProcess()
+            hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_ALL_ACCESS)
+            service_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenUser)
+            coord_sid = win32security.CreateWellKnownSid(win32security.WinRestrictedCodeSid)
+            bank_sid = win32security.GetBinarySid(get_bank_security_sid(bank_id))
+
+            other_banks = [b for b in ("BANK_A", "BANK_B", "BANK_C") if b != bank_id]
+
+            file_dacl = win32security.ACL()
+            file_dacl.AddAccessDeniedAce(
+                win32security.ACL_REVISION,
+                ntsecuritycon.FILE_ALL_ACCESS,
+                coord_sid,
+            )
+            for ob in other_banks:
+                other_sid = win32security.GetBinarySid(get_bank_security_sid(ob))
+                file_dacl.AddAccessDeniedAce(
+                    win32security.ACL_REVISION,
+                    ntsecuritycon.FILE_ALL_ACCESS,
+                    other_sid,
+                )
+
+            file_dacl.AddAccessAllowedAce(
+                win32security.ACL_REVISION,
+                ntsecuritycon.FILE_ALL_ACCESS,
+                bank_sid,
+            )
+            file_dacl.AddAccessAllowedAce(
+                win32security.ACL_REVISION,
+                ntsecuritycon.FILE_ALL_ACCESS,
+                service_sid,
+            )
+
+            win32security.SetNamedSecurityInfo(
+                file_path,
+                win32security.SE_FILE_OBJECT,
+                win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+                None,
+                None,
+                file_dacl,
+                None,
+            )
+        except Exception as e:
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to configure mandatory operating system NTFS DACL on bank '{bank_id}' file: {e}"
+            ) from e
+    else:
+        try:
+            os.chmod(file_path, 0o600)
+        except Exception as e:
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to configure mandatory operating system permissions on bank '{bank_id}' file: {e}"
+            ) from e
+
 
 class BankPrivateStorageVault:
     """Institution-isolated storage vault enforcing physical, cryptographic, and logical boundary protection.
 
     Enforces Module 01-A.1 Requirement:
     - Dedicated local storage vault per financial institution (BANK_A, BANK_B, BANK_C).
-    - Hard access denial on unauthorized cross-bank reads or coordinator read attempts.
+    - Hard access denial on unauthorized cross-bank reads or coordinator read attempts enforced via native OS NTFS DACLs.
+    - Persistent operating system authorization persisting before startup, during training, and after worker termination.
     - Token-derived cryptographic sealing (PBKDF2-HMAC-SHA256 with 100k iterations and Fernet AES-128-CBC + HMAC-SHA256 authenticated encryption) of raw datasets at rest with mandatory key configuration in production.
     - Zero plaintext fallback in production (unencrypted zip/npz strictly rejected with TrainingProvenanceSecurityError).
-    - Native OS-level exclusive handle on the private dataset during worker execution,
-      causing genuine OS-level PermissionError when external processes attempt open().
+    - Native OS-level exclusive handle on the private dataset during worker execution.
     """
 
     VAULT_MAGIC_V1 = b"CFI_VAULT_V1\x00"
@@ -130,20 +311,45 @@ class BankPrivateStorageVault:
         app_env: str = "production",
     ) -> None:
         self.bank_id = bank_id
-        self.vault_dir = os.path.join(vault_dir, bank_id)
-        os.makedirs(self.vault_dir, exist_ok=True)
+        if os.path.basename(os.path.abspath(vault_dir)) == bank_id:
+            self.vault_dir = os.path.abspath(vault_dir)
+        else:
+            self.vault_dir = os.path.join(vault_dir, bank_id)
+
         self.data_path = os.path.join(self.vault_dir, "private_dataset.npz")
+        self.key_path = os.path.join(self.vault_dir, "encryption.key")
         self.bank_token = bank_token
         self.bank_encryption_key = bank_encryption_key
         self.app_env = app_env
         self._is_prod = app_env.lower() == "production"
         self._os_lock_handle: Any = None
 
+        if self.bank_encryption_key is None and os.path.exists(self.key_path):
+            with contextlib.suppress(Exception):
+                with open(self.key_path, "rb") as f:
+                    self.bank_encryption_key = f.read().decode("utf-8")
+
         if self._is_prod and self.bank_encryption_key is None:
             raise TrainingProvenanceConfigurationError(
                 f"Production bank private storage vault for '{self.bank_id}' requires dedicated data-at-rest "
                 "encryption key (bank_encryption_key). Deriving data encryption keys from authentication credentials is forbidden in production."
             )
+
+        _check_no_reparse_or_symlink(self.vault_dir, f"Bank private vault directory for '{self.bank_id}'")
+        if os.path.exists(self.vault_dir) and not os.path.isdir(self.vault_dir):
+            raise TrainingProvenanceSecurityError(
+                f"Bank private vault directory path conflicts with existing non-directory file: '{self.vault_dir}'."
+            )
+
+        try:
+            os.makedirs(self.vault_dir, mode=0o700, exist_ok=True)
+        except Exception as e:
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to create bank private storage vault directory for '{self.bank_id}': {e}"
+            ) from e
+
+        _check_no_reparse_or_symlink(self.vault_dir, f"Bank private vault directory for '{self.bank_id}'")
+        configure_bank_vault_os_permissions(self.vault_dir, self.bank_id)
 
     def _get_encryption_cipher(self) -> Fernet | None:
         if self.bank_encryption_key is not None:
@@ -166,6 +372,40 @@ class BankPrivateStorageVault:
         derived_key = hashlib.pbkdf2_hmac("sha256", self.bank_token.encode(), salt, 100_000, 32)
         return Fernet(base64.urlsafe_b64encode(derived_key))
 
+    def store_encryption_key(self, key_material: str | bytes) -> str:
+        """Store the bank's encryption key with mandatory OS NTFS DACL protection."""
+        if not key_material:
+            raise TrainingProvenanceConfigurationError(f"Cannot store empty encryption key for bank '{self.bank_id}'.")
+        key_bytes = key_material.encode("utf-8") if isinstance(key_material, str) else key_material
+
+        _check_no_reparse_or_symlink(self.key_path, f"Bank encryption key file for '{self.bank_id}'")
+        if os.path.exists(self.key_path) and os.path.isdir(self.key_path):
+            raise TrainingProvenanceSecurityError(
+                f"Bank encryption key path conflicts with existing directory: '{self.key_path}'."
+            )
+
+        staged_nonce = secrets.token_hex(16)
+        staged_file = os.path.join(self.vault_dir, f".key_staged_{staged_nonce}.tmp")
+        try:
+            with open(staged_file, "wb"):
+                pass
+            configure_bank_file_os_permissions(staged_file, self.bank_id)
+            with open(staged_file, "wb") as f:
+                f.write(key_bytes)
+            os.replace(staged_file, self.key_path)
+            configure_bank_file_os_permissions(self.key_path, self.bank_id)
+            self.bank_encryption_key = key_bytes.decode("utf-8") if isinstance(key_material, str) else key_bytes
+            return self.key_path
+        except Exception as e:
+            with contextlib.suppress(Exception):
+                if os.path.exists(staged_file):
+                    os.remove(staged_file)
+            if isinstance(e, (TrainingProvenanceConfigurationError, TrainingProvenanceSecurityError)):
+                raise
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to persist encryption key in vault for bank '{self.bank_id}': {e}"
+            ) from e
+
     def store_dataset(self, X: np.ndarray, y: np.ndarray) -> str:
         buf = io.BytesIO()
         np.savez_compressed(buf, X=X, y=y)
@@ -180,12 +420,35 @@ class BankPrivateStorageVault:
         else:
             payload = self.VAULT_MAGIC_V1 + cipher.encrypt(raw_bytes)
 
-        with open(self.data_path, "wb") as f:
-            f.write(payload)
-        with contextlib.suppress(Exception):
-            os.chmod(self.vault_dir, 0o700)
-            os.chmod(self.data_path, 0o600)
-        return self.data_path
+        _check_no_reparse_or_symlink(self.data_path, f"Bank private dataset file for '{self.bank_id}'")
+        if os.path.exists(self.data_path) and os.path.isdir(self.data_path):
+            raise TrainingProvenanceSecurityError(
+                f"Bank dataset path conflicts with existing directory: '{self.data_path}'."
+            )
+
+        if self.bank_encryption_key is not None:
+            self.store_encryption_key(self.bank_encryption_key)
+
+        staged_nonce = secrets.token_hex(16)
+        staged_file = os.path.join(self.vault_dir, f".dataset_staged_{staged_nonce}.tmp")
+        try:
+            with open(staged_file, "wb"):
+                pass
+            configure_bank_file_os_permissions(staged_file, self.bank_id)
+            with open(staged_file, "wb") as f:
+                f.write(payload)
+            os.replace(staged_file, self.data_path)
+            configure_bank_file_os_permissions(self.data_path, self.bank_id)
+            return self.data_path
+        except Exception as e:
+            with contextlib.suppress(Exception):
+                if os.path.exists(staged_file):
+                    os.remove(staged_file)
+            if isinstance(e, (TrainingProvenanceConfigurationError, TrainingProvenanceSecurityError)):
+                raise
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to persist dataset in vault for bank '{self.bank_id}': {e}"
+            ) from e
 
     def acquire_exclusive_os_boundary(self) -> None:
         """Lock the physical file using native OS kernel primitives so external open() fails with PermissionError."""
@@ -247,6 +510,10 @@ class BankPrivateStorageVault:
             raise PermissionError(
                 f"Access denied: Invalid worker credential presented for bank '{self.bank_id}' storage vault."
             )
+        if self.bank_encryption_key is None and os.path.exists(self.key_path):
+            with open(self.key_path, "rb") as f:
+                self.bank_encryption_key = f.read().decode("utf-8")
+
         if not os.path.exists(self.data_path):
             raise FileNotFoundError(f"Vault data file not found at '{self.data_path}'")
         with open(self.data_path, "rb") as f:
@@ -848,7 +1115,14 @@ def get_os_process_identity(target: Any = None) -> SecurityIdentityInfo:
             pid = os.getpid()
 
         try:
-            hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_QUERY)
+            hToken = None
+            if target is None:
+                try:
+                    hToken = win32security.OpenThreadToken(win32api.GetCurrentThread(), win32con.TOKEN_QUERY, True)
+                except Exception:
+                    hToken = None
+            if hToken is None:
+                hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_QUERY)
             user_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenUser)
             user_sid_str = win32security.ConvertSidToStringSid(user_sid)
 
@@ -1115,29 +1389,165 @@ class CoordinatorOSSecurityContext:
             self._active = False
 
 
-def _check_no_reparse_or_symlink(path: str, label: str) -> None:
-    """Verify that a path is not a symlink, directory junction, or reparse point."""
+def create_bank_worker_security_token(bank_id: str) -> Any:
+    """Create a Windows restricted security token for a specific bank worker.
+
+    The restricted token:
+    1. Contains strictly the designated bank's SID in its restricted SIDs.
+    2. Explicitly disables administrative group authority (S-1-5-32-544).
+    3. Excludes other banks' SIDs and coordinator restricted SID (S-1-5-12).
+    4. Sets DISABLE_MAX_PRIVILEGE.
+    Fails closed if the operating system restricted token cannot be created.
+    """
+    if os.name != "nt":
+        return None
     try:
-        if os.path.islink(path):
+        import win32api
+        import win32con
+        import win32security
+
+        hProcess = win32api.GetCurrentProcess()
+        hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_ALL_ACCESS)
+        user_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenUser)
+        bank_sid = win32security.GetBinarySid(get_bank_security_sid(bank_id))
+        admin_sid = win32security.CreateWellKnownSid(win32security.WinBuiltinAdministratorsSid)
+
+        groups = win32security.GetTokenInformation(hToken, win32security.TokenGroups)
+        all_sids = [(user_sid, 0), (bank_sid, 0)]
+        for g in groups:
+            sid_str = win32security.ConvertSidToStringSid(g[0])
+            if "544" not in sid_str and "114" not in sid_str:
+                all_sids.append((g[0], 0))
+
+        sids_to_disable: Any = ((admin_sid, 0),)
+        sids_to_restrict: Any = tuple(all_sids)
+        restricted_token = win32security.CreateRestrictedToken(
+            hToken,
+            win32security.DISABLE_MAX_PRIVILEGE,
+            sids_to_disable,
+            (),
+            sids_to_restrict,
+        )
+        return restricted_token
+    except Exception as e:
+        raise TrainingProvenanceConfigurationError(
+            f"Failed to create operating system security token for bank worker '{bank_id}': {e}"
+        ) from e
+
+
+class BankWorkerOSSecurityContext:
+    """Context manager executing under the restricted bank worker operating system security identity.
+
+    Enforces that filesystem access checks, token queries, and OS permissions are evaluated under
+    the specific bank's restricted principal.
+    Fails closed if the restricted security token or impersonation cannot be established.
+    """
+
+    def __init__(self, bank_id: str) -> None:
+        self.bank_id = bank_id
+        self._active = False
+        self._token: Any = None
+
+    def __enter__(self) -> BankWorkerOSSecurityContext:
+        if os.name == "nt":
+            try:
+                self._token = create_bank_worker_security_token(self.bank_id)
+                import win32security
+
+                win32security.ImpersonateLoggedOnUser(self._token)
+                self._active = True
+            except Exception as e:
+                raise TrainingProvenanceSecurityError(
+                    f"Failed to establish operating system security context for bank '{self.bank_id}': {e}"
+                ) from e
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if self._active and os.name == "nt":
+            try:
+                import win32security
+
+                win32security.RevertToSelf()
+            except Exception:
+                pass
+            self._active = False
+
+
+def get_bank_worker_os_identity(bank_id: str, target: Any = None) -> SecurityIdentityInfo:
+    """Return the real effective operating system security principal under which a bank worker runs."""
+    info = get_os_process_identity(target)
+    bank_sid = get_bank_security_sid(bank_id)
+    info.details["bank_id"] = bank_id
+    info.details["bank_sid"] = bank_sid
+    info.principal_type = "WindowsBankWorkerPrincipal" if info.details.get("is_restricted") else "WindowsUserPrincipal"
+    user_sid = info.details.get("user_sid", "")
+    info.principal_id = f"{user_sid}:{bank_id}:RESTRICTED" if info.details.get("is_restricted") else f"{user_sid}:{bank_id}"
+    return info
+
+
+def validate_restricted_bank_worker_policy(details: dict[str, Any], bank_id: str) -> None:
+    """Authoritatively validate that process security identity satisfies the restricted bank worker policy."""
+    if not isinstance(details, dict):
+        raise TrainingProvenanceSecurityError("Process security identity details must be a valid dictionary.")
+
+    required_fields = ("is_restricted", "restricted_sids", "is_admin_disabled")
+    for f in required_fields:
+        if f not in details:
             raise TrainingProvenanceSecurityError(
-                f"{label} cannot be a symbolic link: '{path}'."
+                f"Mandatory bank worker security evidence field '{f}' is missing from process identity details."
             )
-        if hasattr(os.path, "isjunction") and os.path.isjunction(path):
-            raise TrainingProvenanceSecurityError(
-                f"{label} cannot be a directory junction: '{path}'."
-            )
-        st = os.lstat(path)
-        import stat
-        if stat.S_ISLNK(st.st_mode):
-            raise TrainingProvenanceSecurityError(
-                f"{label} cannot be a symbolic link: '{path}'."
-            )
-        if hasattr(st, "st_reparse_tag") and st.st_reparse_tag != 0:
-            raise TrainingProvenanceSecurityError(
-                f"{label} cannot be a reparse point or junction: '{path}'."
-            )
-    except FileNotFoundError:
-        pass
+
+    if not isinstance(details["is_restricted"], bool):
+        raise TrainingProvenanceSecurityError("Field 'is_restricted' must be a boolean.")
+    if not isinstance(details["is_admin_disabled"], bool):
+        raise TrainingProvenanceSecurityError("Field 'is_admin_disabled' must be a boolean.")
+    if not isinstance(details["restricted_sids"], (list, tuple, set, frozenset)):
+        raise TrainingProvenanceSecurityError("Field 'restricted_sids' must be a collection of SIDs.")
+
+    if not details["is_restricted"]:
+        raise TrainingProvenanceSecurityError(
+            f"Production bank worker '{bank_id}' must execute under an enforced restricted operating system security token."
+        )
+
+    expected_bank_sid = get_bank_security_sid(bank_id)
+    if expected_bank_sid not in details["restricted_sids"]:
+        raise TrainingProvenanceSecurityError(
+            f"Production bank worker '{bank_id}' process token lacks mandatory bank SID '{expected_bank_sid}'."
+        )
+
+    if COORDINATOR_RESTRICTED_SID in details["restricted_sids"]:
+        raise TrainingProvenanceSecurityError(
+            f"Bank worker '{bank_id}' process token cannot possess coordinator restricted code SID '{COORDINATOR_RESTRICTED_SID}'."
+        )
+
+    for other_bank in ("BANK_A", "BANK_B", "BANK_C"):
+        if other_bank != bank_id:
+            other_sid = get_bank_security_sid(other_bank)
+            if other_sid in details["restricted_sids"]:
+                raise TrainingProvenanceSecurityError(
+                    f"Bank worker '{bank_id}' process token illegally possesses another bank's SID '{other_sid}' ({other_bank})."
+                )
+
+    if not details["is_admin_disabled"]:
+        raise TrainingProvenanceSecurityError(
+            f"Production bank worker '{bank_id}' process token has active administrative authority (S-1-5-32-544 not disabled)."
+        )
+
+
+def verify_restricted_bank_worker_os_boundary(bank_id: str, app_env: str = "production") -> SecurityIdentityInfo:
+    """Verify that current operating system execution context satisfies mandatory bank worker isolation policy."""
+    if app_env.lower() != "production":
+        return get_bank_worker_os_identity(bank_id)
+
+    if os.name != "nt":
+        raise TrainingProvenanceSecurityError(
+            f"Production bank worker isolation is not supported on platform '{sys.platform}'. "
+            "Production federated training requires enforced Windows Restricted Token isolation."
+        )
+
+    ident = get_bank_worker_os_identity(bank_id)
+    validate_restricted_bank_worker_policy(ident.details, bank_id)
+    return ident
 
 
 def provision_isolated_completion_authority_vault(
@@ -2525,170 +2935,187 @@ def run_bank_worker_node(
 
     Invariants enforced:
     1. Isolated OS Process (distinct PID).
-    2. Zero external access to private datasets; loaded locally from bank storage.
+    2. Zero external access to private datasets; loaded locally from bank storage under dedicated Bank OS identity.
     3. Authenticated solely by worker_token bound to bank_id (coordinator has no bank tokens).
-    4. Performs genuine PyTorch local training steps and records observations directly into PostgreSQL authority.
-    5. Missing or non-finite losses fail immediately without fallback invention.
+    4. Enforced Windows Restricted Token bound to designated bank SID.
+    5. Performs genuine PyTorch local training steps and records observations directly into PostgreSQL authority.
+    6. Missing or non-finite losses fail immediately without fallback invention.
     """
     pid = os.getpid()
     logger.info("Bank worker [%s] started with PID %d", bank_id, pid)
-    settings = get_settings()
-    model_service = ModelService(settings)
 
-    if app_env.lower() == "production":
-        import urllib.parse
+    with BankWorkerOSSecurityContext(bank_id):
+        if app_env.lower() == "production" and os.name == "nt":
+            ident = get_bank_worker_os_identity(bank_id)
+            validate_restricted_bank_worker_policy(ident.details, bank_id)
 
-        parsed_u = urllib.parse.urlsplit(db_url).username or ""
-        if parsed_u == "cfi_worker_role":
-            raise TrainingProvenanceSecurityError(
-                f"Production bank worker [{bank_id}] cannot execute under shared generic worker role 'cfi_worker_role' (BANKDB-05)."
-            )
-        expected_role = f"cfi_{bank_id.lower()}_role"
-        if parsed_u.startswith("cfi_bank_") and parsed_u != expected_role:
-            raise TrainingProvenanceSecurityError(
-                f"Production bank worker [{bank_id}] database credential mismatch: connected as '{parsed_u}' instead of '{expected_role}'."
-            )
+        settings = get_settings()
+        model_service = ModelService(settings)
 
-    # Establish connection to authoritative training job database
-    authority_source = TrustedTrainingJobRecordSource(
-        worker_token=worker_token,
-        bank_tokens={bank_id: worker_token},
-        db_url=db_url,
-        enforce_lifecycle=True,
-        app_env=app_env,
-    )
+        if app_env.lower() == "production":
+            import urllib.parse
 
-    # Load local training data from isolated bank storage if path provided
-    vault_handle: BankPrivateStorageVault | None = None
-    if data_path is not None:
-        if not os.path.exists(data_path):
-            raise FileNotFoundError(f"Bank [{bank_id}] private dataset not found at '{data_path}'")
-        bank_vault_dir = os.path.dirname(os.path.dirname(data_path))
-        vault_handle = BankPrivateStorageVault(
-            bank_id,
-            bank_vault_dir,
-            bank_token=worker_token,
-            bank_encryption_key=bank_encryption_key,
-        )
-        X_train, y_train = vault_handle.read_dataset_as_bank(bank_id, caller_token=worker_token)
-        vault_handle.acquire_exclusive_os_boundary()
-    elif X_partition is not None and y_partition is not None:
-        X_train = X_partition
-        y_train = y_partition
-    else:
-        raise ValueError(f"Bank [{bank_id}] must be supplied with either a private data_path or partition arrays.")
-
-    try:
-        while True:
-            try:
-                msg = inbox.get()
-            except Exception:
-                break
-
-            if msg is None or msg.get("command") == "STOP":
-                logger.info("Bank worker [%s] received STOP command. Exiting.", bank_id)
-                break
-
-            if msg.get("command") == "GET_RAW_DATA":
-                outbox.put({
-                    "status": "ERROR",
-                    "error": f"Institutional boundary violation: coordinator cannot request raw bank dataset from {bank_id}.",
-                })
-                continue
-
-            if msg.get("command") == "TRAIN_ROUND":
-                job_id = msg["job_id"]
-                round_number = msg["round_number"]
-                global_weights_obj: ModelWeights | None = msg.get("global_weights")
-
-                # On round 1, authorized worker initiates job start in PostgreSQL authority
-                if round_number == 1 and bank_id == "BANK_A":
-                    with contextlib.suppress(Exception):
-                        authority_source.start_training_job(job_id=job_id, worker_token=worker_token)
-
-                # Initialize local model and load latest global weights
-                local_model = model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
-                if global_weights_obj is not None:
-                    model_service.set_parameters(local_model, global_weights_obj)
-
-                # Execute real PyTorch optimization on private dataset partition
-                local_model, loss_history, _ = model_service.train_local(
-                    model=local_model,
-                    X_train=X_train,
-                    y_train=y_train,
-                    epochs=1,
-                    learning_rate=0.01,
-                    batch_size=32,
+            parsed_u = urllib.parse.urlsplit(db_url).username or ""
+            if parsed_u == "cfi_worker_role":
+                raise TrainingProvenanceSecurityError(
+                    f"Production bank worker [{bank_id}] cannot execute under shared generic worker role 'cfi_worker_role' (BANKDB-05)."
+                )
+            expected_role = f"cfi_{bank_id.lower()}_role"
+            if parsed_u.startswith("cfi_bank_") and parsed_u != expected_role:
+                raise TrainingProvenanceSecurityError(
+                    f"Production bank worker [{bank_id}] database credential mismatch: connected as '{parsed_u}' instead of '{expected_role}'."
                 )
 
-                local_weights = model_service.get_parameters(local_model)
-                weights_bytes = _serialize_weights_to_bytes(local_weights)
-                update_digest = hashlib.sha256(weights_bytes).hexdigest()
-                sample_count = len(X_train)
+        # Establish connection to authoritative training job database
+        authority_source = TrustedTrainingJobRecordSource(
+            worker_token=worker_token,
+            bank_tokens={bank_id: worker_token},
+            db_url=db_url,
+            enforce_lifecycle=True,
+            app_env=app_env,
+        )
 
-                # Strict measurement validation: no fabricated fallback loss values
-                if not loss_history:
-                    raise TrainingProvenanceSecurityError(
-                        f"Bank worker [{bank_id}] produced no loss history during local training."
-                    )
-                observed_loss = float(loss_history[-1])
-                if not math.isfinite(observed_loss):
-                    raise TrainingProvenanceSecurityError(
-                        f"Bank worker [{bank_id}] produced non-finite observed loss: {observed_loss}"
-                    )
+        # Load local training data from isolated bank storage if path provided
+        vault_handle: BankPrivateStorageVault | None = None
+        if data_path is not None:
+            if not os.path.exists(data_path):
+                raise FileNotFoundError(f"Bank [{bank_id}] private dataset not found at '{data_path}'")
+            bank_vault_dir = os.path.dirname(os.path.dirname(data_path))
+            vault_handle = BankPrivateStorageVault(
+                bank_id,
+                bank_vault_dir,
+                bank_token=worker_token,
+                bank_encryption_key=bank_encryption_key,
+                app_env=app_env,
+            )
+            X_train, y_train = vault_handle.read_dataset_as_bank(bank_id, caller_token=worker_token)
+            vault_handle.acquire_exclusive_os_boundary()
+        elif X_partition is not None and y_partition is not None:
+            X_train = X_partition
+            y_train = y_partition
+        else:
+            raise ValueError(f"Bank [{bank_id}] must be supplied with either a private data_path or partition arrays.")
 
-                if fail_observation:
-                    # Adversarial failure injection: worker fails to record observation in PostgreSQL
-                    logger.warning("Bank worker [%s] simulated observation persistence failure for round %d", bank_id, round_number)
+        try:
+            while True:
+                try:
+                    msg = inbox.get()
+                except Exception:
+                    break
+
+                if msg is None or msg.get("command") == "STOP":
+                    logger.info("Bank worker [%s] received STOP command. Exiting.", bank_id)
+                    break
+
+                if msg.get("command") == "GET_SECURITY_IDENTITY":
                     outbox.put({
-                        "status": "OBSERVATION_FAILED",
+                        "status": "SUCCESS",
                         "bank_id": bank_id,
-                        "round_number": round_number,
                         "pid": pid,
+                        "identity": get_bank_worker_os_identity(bank_id).details,
                     })
                     continue
 
-                # Record authoritative execution observation directly in PostgreSQL
-                try:
-                    obs = authority_source.record_round_observation(
-                        job_id=job_id,
-                        round_number=round_number,
-                        sample_count=sample_count,
-                        actual_executed_epochs=1,
-                        observed_loss=observed_loss,
-                        metrics={"loss": observed_loss},
-                        worker_token=worker_token,
-                        bank_id=bank_id,
-                        model_update_digest=update_digest,
-                        execution_status="COMPLETED",
-                    )
-                    logger.info("Bank worker [%s] persisted observation event %s for round %d", bank_id, obs.event_id, round_number)
-                except Exception as e:
-                    logger.error("Bank worker [%s] failed to record observation: %s", bank_id, e)
+                if msg.get("command") == "GET_RAW_DATA":
                     outbox.put({
                         "status": "ERROR",
-                        "bank_id": bank_id,
-                        "error": str(e),
-                        "pid": pid,
+                        "error": f"Institutional boundary violation: coordinator cannot request raw bank dataset from {bank_id}.",
                     })
                     continue
 
-                # Send local weights and digest to coordinator over federated transport
-                # Notice: Zero raw dataset samples (X_train, y_train) are transmitted across IPC.
-                outbox.put({
-                    "status": "SUCCESS",
-                    "bank_id": bank_id,
-                    "pid": pid,
-                    "round_number": round_number,
-                    "weights": local_weights,
-                    "update_digest": update_digest,
-                    "sample_count": sample_count,
-                    "loss": observed_loss,
-                    "executed_epochs": 1,
-                })
-    finally:
-        if vault_handle is not None:
-            vault_handle.release_exclusive_os_boundary()
+                if msg.get("command") == "TRAIN_ROUND":
+                    job_id = msg["job_id"]
+                    round_number = msg["round_number"]
+                    global_weights_obj: ModelWeights | None = msg.get("global_weights")
+
+                    # On round 1, authorized worker initiates job start in PostgreSQL authority
+                    if round_number == 1 and bank_id == "BANK_A":
+                        with contextlib.suppress(Exception):
+                            authority_source.start_training_job(job_id=job_id, worker_token=worker_token)
+
+                    # Initialize local model and load latest global weights
+                    local_model = model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+                    if global_weights_obj is not None:
+                        model_service.set_parameters(local_model, global_weights_obj)
+
+                    # Execute real PyTorch optimization on private dataset partition
+                    local_model, loss_history, _ = model_service.train_local(
+                        model=local_model,
+                        X_train=X_train,
+                        y_train=y_train,
+                        epochs=1,
+                        learning_rate=0.01,
+                        batch_size=32,
+                    )
+
+                    local_weights = model_service.get_parameters(local_model)
+                    weights_bytes = _serialize_weights_to_bytes(local_weights)
+                    update_digest = hashlib.sha256(weights_bytes).hexdigest()
+                    sample_count = len(X_train)
+
+                    # Strict measurement validation: no fabricated fallback loss values
+                    if not loss_history:
+                        raise TrainingProvenanceSecurityError(
+                            f"Bank worker [{bank_id}] produced no loss history during local training."
+                        )
+                    observed_loss = float(loss_history[-1])
+                    if not math.isfinite(observed_loss):
+                        raise TrainingProvenanceSecurityError(
+                            f"Bank worker [{bank_id}] produced non-finite observed loss: {observed_loss}"
+                        )
+
+                    if fail_observation:
+                        # Adversarial failure injection: worker fails to record observation in PostgreSQL
+                        logger.warning("Bank worker [%s] simulated observation persistence failure for round %d", bank_id, round_number)
+                        outbox.put({
+                            "status": "OBSERVATION_FAILED",
+                            "bank_id": bank_id,
+                            "round_number": round_number,
+                            "pid": pid,
+                        })
+                        continue
+
+                    # Record authoritative execution observation directly in PostgreSQL
+                    try:
+                        obs = authority_source.record_round_observation(
+                            job_id=job_id,
+                            round_number=round_number,
+                            sample_count=sample_count,
+                            actual_executed_epochs=1,
+                            observed_loss=observed_loss,
+                            metrics={"loss": observed_loss},
+                            worker_token=worker_token,
+                            bank_id=bank_id,
+                            model_update_digest=update_digest,
+                            execution_status="COMPLETED",
+                        )
+                        logger.info("Bank worker [%s] persisted observation event %s for round %d", bank_id, obs.event_id, round_number)
+                    except Exception as e:
+                        logger.error("Bank worker [%s] failed to record observation: %s", bank_id, e)
+                        outbox.put({
+                            "status": "ERROR",
+                            "bank_id": bank_id,
+                            "error": str(e),
+                            "pid": pid,
+                        })
+                        continue
+
+                    # Send local weights and digest to coordinator over federated transport
+                    # Notice: Zero raw dataset samples (X_train, y_train) are transmitted across IPC.
+                    outbox.put({
+                        "status": "SUCCESS",
+                        "bank_id": bank_id,
+                        "pid": pid,
+                        "round_number": round_number,
+                        "weights": local_weights,
+                        "update_digest": update_digest,
+                        "sample_count": sample_count,
+                        "loss": observed_loss,
+                        "executed_epochs": 1,
+                    })
+        finally:
+            if vault_handle is not None:
+                vault_handle.release_exclusive_os_boundary()
 
 
 # ---------------------------------------------------------------------------
