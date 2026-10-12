@@ -950,10 +950,12 @@ class TestReceiptIssuerKeyOwnership:
             # Verify PostgreSQL state
             with psycopg.connect(pg_roles["admin"]) as conn, conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-                assert cur.fetchone()[0] == 1  # type: ignore[index]
+                comp_row = cur.fetchone()
+                assert comp_row is not None and comp_row[0] == 1
 
                 cur.execute("SELECT COUNT(*) FROM cfi_round_observations WHERE job_id = %s", (job_id,))
-                assert cur.fetchone()[0] == 6  # 2 rounds * 3 banks
+                obs_row = cur.fetchone()
+                assert obs_row is not None and obs_row[0] == 6  # 2 rounds * 3 banks
         finally:
             coord_client.terminate()
             comp_proc.terminate()
