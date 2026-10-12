@@ -1,10 +1,10 @@
 # Elliptic Bitcoin GraphSAGE Inductive Benchmark Audit Dossier
 
 > **Dataset**: Elliptic Bitcoin Transaction Graph (Weber et al., 2019)  
-> **Execution Timestamp**: `2026-10-05T21:38:41.244330+00:00`  
-> **Git Commit**: `5dc1d495704bd43117927a70aa0e83831642cd23`  
+> **Execution Timestamp**: `2026-10-11T19:17:19.244434+00:00`  
+> **Git Commit**: `867537360d23d4e4fec7d16ecc2a1cf2ce1c28d5`  
 > **Temporal Invariant**: Strict chronological split (Timesteps 1-30 Train, 31-34 Val, 35-49 Test)  
-> **Hardware**: AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD (16 vCPUs), 16.0 GB RAM, Windows 11  
+> **Hardware**: AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD (16 vCPUs), 7.3 GB RAM, Windows 11  
 
 ---
 

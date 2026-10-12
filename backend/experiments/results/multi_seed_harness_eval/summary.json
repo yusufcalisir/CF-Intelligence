@@ -1,0 +1,62 @@
+{
+  "experiment_name": "FraudNeuralNetwork_MultiSeed",
+  "num_runs": 2,
+  "seeds": [
+    42,
+    123
+  ],
+  "metrics": {
+    "pr_auc": {
+      "mean": 0.150923,
+      "std": 0.026727,
+      "min": 0.132024,
+      "max": 0.169821,
+      "ci_95_lower": 0.113881,
+      "ci_95_upper": 0.187964
+    },
+    "roc_auc": {
+      "mean": 0.733332,
+      "std": 0.128573,
+      "min": 0.642417,
+      "max": 0.824246,
+      "ci_95_lower": 0.555139,
+      "ci_95_upper": 0.911524
+    },
+    "f1_score": {
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "ci_95_lower": 0.0,
+      "ci_95_upper": 0.0
+    },
+    "precision": {
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "ci_95_lower": 0.0,
+      "ci_95_upper": 0.0
+    },
+    "recall": {
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "ci_95_lower": 0.0,
+      "ci_95_upper": 0.0
+    },
+    "brier_score": {
+      "mean": 0.191862,
+      "std": 0.01488,
+      "min": 0.181341,
+      "max": 0.202384,
+      "ci_95_lower": 0.17124,
+      "ci_95_upper": 0.212485
+    }
+  },
+  "individual_results": [
+    "multi_seed_harness_eval_seed42",
+    "multi_seed_harness_eval_seed123"
+  ]
+}

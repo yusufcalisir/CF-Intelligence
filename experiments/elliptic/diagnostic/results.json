@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
-  "experiment_id": "exp-elliptic-graphsage-1791236321",
+  "experiment_id": "exp-elliptic-graphsage-1791746239",
   "config": {
-    "experiment_id": "exp-elliptic-graphsage-1791236321",
+    "experiment_id": "exp-elliptic-graphsage-1791746239",
     "experiment_name": "Elliptic Bitcoin GraphSAGE Inductive Benchmark",
     "description": "Canonical multi-seed benchmark evaluating GraphSAGE on physical Elliptic Bitcoin graph with strict temporal validation.",
     "tags": [
@@ -45,10 +45,10 @@
     "os_version": "10.0.26300",
     "cpu_model": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
     "cpu_architecture": "AMD64",
-    "cpu_physical_cores": 16,
+    "cpu_physical_cores": 8,
     "cpu_logical_cores": 16,
-    "total_ram_gb": 16.0,
-    "available_ram_gb": 8.0,
+    "total_ram_gb": 7.34,
+    "available_ram_gb": 0.24,
     "python_version": "3.12.10",
     "torch_version": "2.12.1+cpu",
     "cuda_available": false,
@@ -68,11 +68,11 @@
       "test_nodes": 0.4
     }
   },
-  "git_commit": "5dc1d495704bd43117927a70aa0e83831642cd23",
+  "git_commit": "867537360d23d4e4fec7d16ecc2a1cf2ce1c28d5",
   "git_branch": "main",
   "status": "COMPLETED",
-  "start_time_utc": "2026-10-05T21:38:41.354060+00:00",
-  "end_time_utc": "2026-10-05T21:38:41.362813+00:00",
+  "start_time_utc": "2026-10-11T19:17:19.378693+00:00",
+  "end_time_utc": "2026-10-11T19:17:19.390691+00:00",
   "total_duration_seconds": 0.01,
   "final_metrics": {
     "pr_auc": 0.5,
@@ -98,7 +98,7 @@
       "precision": null,
       "recall": null,
       "duration_seconds": 0.001,
-      "timestamp_utc": "2026-10-05T21:38:41.397546+00:00",
+      "timestamp_utc": "2026-10-11T19:17:19.441120+00:00",
       "extra": {}
     }
   ],
