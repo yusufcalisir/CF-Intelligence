@@ -620,7 +620,7 @@ def get_os_process_identity(target: Any = None) -> SecurityIdentityInfo:
             user_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenUser)
             user_sid_str = win32security.ConvertSidToStringSid(user_sid)
 
-            is_restricted = bool(win32security.IsTokenRestricted(hToken))
+            is_restricted = win32security.IsTokenRestricted(hToken)
             restricted_sids: list[str] = []
             if is_restricted:
                 r_sids = win32security.GetTokenInformation(hToken, win32security.TokenRestrictedSids)
@@ -637,7 +637,7 @@ def get_os_process_identity(target: Any = None) -> SecurityIdentityInfo:
 
             privs = win32security.GetTokenInformation(hToken, win32security.TokenPrivileges)
             enabled_privs = [
-                win32security.LookupPrivilegeName(None, p[0])
+                win32security.LookupPrivilegeName("", p[0])
                 for p in privs
                 if p[1] & (win32security.SE_PRIVILEGE_ENABLED | win32security.SE_PRIVILEGE_ENABLED_BY_DEFAULT)
             ]
@@ -729,13 +729,15 @@ def create_restricted_coordinator_token() -> Any:
                 all_sids.append((g[0], 0))
         all_sids.append((coord_sid, 0))
 
-        sids_to_disable = ((admin_sid, 0),)
-        restricted_token = win32security.CreateRestrictedToken(
+        sids_to_disable: Any = ((admin_sid, 0),)
+        sids_to_restrict: Any = tuple(all_sids)
+        create_restricted_token: Any = win32security.CreateRestrictedToken
+        restricted_token = create_restricted_token(
             hToken,
             win32security.DISABLE_MAX_PRIVILEGE,
             sids_to_disable,
             (),
-            tuple(all_sids),
+            sids_to_restrict,
         )
         return restricted_token
     except Exception as e:
@@ -1007,7 +1009,7 @@ def _run_isolated_coordinator_worker(
             import win32api
             import win32security
             h = win32security.OpenProcessToken(win32api.GetCurrentProcess(), 8)
-            is_restricted = bool(win32security.IsTokenRestricted(h))
+            is_restricted = win32security.IsTokenRestricted(h)
         except Exception:
             pass
 
@@ -1265,8 +1267,9 @@ def spawn_isolated_coordinator_process(
         restricted_token = create_restricted_coordinator_token()
         si = win32process.STARTUPINFO()
         cmd = f'"{sys.executable}" -c "{worker_code}" {host} {port} {authkey.hex()}'
+        create_process_as_user: Any = win32process.CreateProcessAsUser
         try:
-            hProc, hThread, pid, tid = win32process.CreateProcessAsUser(
+            hProc, hThread, pid, tid = create_process_as_user(
                 restricted_token,
                 None,
                 cmd,
@@ -2094,7 +2097,7 @@ class DistributedFederatedTrainingManager:
         simulation_id: str,
         holdout_val_data: tuple[np.ndarray, np.ndarray],
         participating_banks: list[str] | tuple[str, ...] | None = None,
-        worker_endpoints: dict[str, dict[str, mp.Queue]] | None = None,
+        worker_endpoints: dict[str, dict[str, Any]] | None = None,
         worker_processes: dict[str, mp.Process] | None = None,
         bank_partitions: dict[str, tuple[np.ndarray, np.ndarray]] | None = None,
         bank_tokens: dict[str, str] | None = None,
@@ -2105,7 +2108,7 @@ class DistributedFederatedTrainingManager:
         crash_bank_b: bool = False,
         registry_storage_dir: str | None = None,
         signing_key_hex: str | None = None,
-        signing_authority: IsolatedReceiptSigningAuthority | None = None,
+        signing_authority: Any | None = None,
         completion_authority: IsolatedTrainingCompletionAuthority | None = None,
         receipt_issuer: TrainingReceiptIssuer | None = None,
         receipt_verifier: TrainingReceiptVerifier | None = None,
