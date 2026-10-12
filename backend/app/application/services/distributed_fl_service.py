@@ -23,23 +23,15 @@ import io
 import logging
 import math
 import multiprocessing as mp
-from multiprocessing.connection import Client, Listener
-import types
 import os
 import secrets
 import sys
 import tempfile
 import threading
-import time
+import types
 from collections.abc import Mapping
+from multiprocessing.connection import Client, Listener
 from typing import Any
-
-
-def _reconstruct_mappingproxy(d: dict[Any, Any]) -> types.MappingProxyType:
-    return types.MappingProxyType(d)
-
-
-copyreg.pickle(types.MappingProxyType, lambda mp: (_reconstruct_mappingproxy, (dict(mp),)))
 
 import numpy as np
 import torch
@@ -65,15 +57,22 @@ from app.application.services.training_provenance_service import (
     get_default_training_issuer,
     get_default_training_verifier,
 )
+from app.config import get_settings
+from app.domain.enums import AggregationMethod
+from app.domain.value_objects import ModelWeights
 from app.infrastructure.database.training_authority_backends import (
     CompletedJobExecutionRecord,
     PostgresTrainingJobAuthority,
 )
-from app.config import get_settings
-from app.domain.enums import AggregationMethod
-from app.domain.value_objects import ModelWeights
 
 logger = logging.getLogger(__name__)
+
+
+def _reconstruct_mappingproxy(d: dict[Any, Any]) -> types.MappingProxyType:
+    return types.MappingProxyType(d)
+
+
+copyreg.pickle(types.MappingProxyType, lambda mp: (_reconstruct_mappingproxy, (dict(mp),)))
 
 
 def _generate_ed25519_keypair_hex() -> tuple[str, str]:
@@ -1313,11 +1312,15 @@ def validate_restricted_coordinator_policy(details: dict[str, Any]) -> None:
 
     group_sids = details.get("group_sids")
     disabled_groups = details.get("disabled_groups")
-    if group_sids is not None and disabled_groups is not None:
-        if "S-1-5-32-544" in group_sids and "S-1-5-32-544" not in disabled_groups:
-            raise TrainingProvenanceSecurityError(
-                "Contradictory security evidence: S-1-5-32-544 is present in group_sids but not in disabled_groups."
-            )
+    if (
+        group_sids is not None
+        and disabled_groups is not None
+        and "S-1-5-32-544" in group_sids
+        and "S-1-5-32-544" not in disabled_groups
+    ):
+        raise TrainingProvenanceSecurityError(
+            "Contradictory security evidence: S-1-5-32-544 is present in group_sids but not in disabled_groups."
+        )
 
     # 4. Privilege verification against explicit policy
     actual_privs = set(details["privileges"])
@@ -1956,7 +1959,7 @@ def _run_isolated_coordinator_worker(
         elif cmd == "ATTEMPT_READ_VAULT":
             vault_path = req["vault_path"]
             try:
-                with open(vault_path, "r", encoding="utf-8") as f:
+                with open(vault_path, encoding="utf-8") as f:
                     content = f.read()
                 client.send({"status": "SUCCESS", "content": content})
             except Exception as e:
@@ -2005,7 +2008,7 @@ def _run_isolated_coordinator_worker(
             vault_path = req.get("vault_path")
             if vault_path:
                 try:
-                    with open(vault_path, "r", encoding="utf-8") as f:
+                    with open(vault_path, encoding="utf-8") as f:
                         _ = f.read()
                 except Exception as e:
                     read_err = {"error_type": type(e).__name__, "error": str(e)}
@@ -2201,7 +2204,8 @@ def spawn_isolated_coordinator_process(
 
     authkey = secrets.token_bytes(32)
     listener = Listener(("127.0.0.1", 0), authkey=authkey)
-    host, port = listener.address
+    assert isinstance(listener.address, tuple)
+    host, port = listener.address[0], listener.address[1]
 
     backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     env = dict(os.environ)
@@ -2635,7 +2639,7 @@ def spawn_isolated_completion_authority_service(
     if not os.path.exists(vault_path):
         raise TrainingProvenanceSecurityError(f"Vault path does not exist or access denied: {vault_path}")
     try:
-        with open(vault_path, "r", encoding="utf-8") as f:
+        with open(vault_path, encoding="utf-8") as f:
             _ = f.read(1)
     except PermissionError as e:
         raise TrainingProvenanceSecurityError(
@@ -2941,11 +2945,10 @@ class IsolatedWorkerOutboxProxy:
         with self._lock:
             if self._buffer:
                 return self._buffer.pop(0)
-            if timeout is not None:
-                if not self._conn.poll(timeout):
-                    import queue
+            if timeout is not None and not self._conn.poll(timeout):
+                import queue
 
-                    raise queue.Empty()
+                raise queue.Empty()
             return self._conn.recv()
 
     def empty(self) -> bool:
@@ -2960,11 +2963,10 @@ class _WorkerChildInbox:
         self._conn = conn
 
     def get(self, block: bool = True, timeout: float | None = None) -> Any:
-        if timeout is not None:
-            if not self._conn.poll(timeout):
-                import queue
+        if timeout is not None and not self._conn.poll(timeout):
+            import queue
 
-                raise queue.Empty()
+            raise queue.Empty()
         return self._conn.recv()
 
 
@@ -3051,6 +3053,7 @@ def spawn_bank_workers(
 
     if os.name == "nt":
         import secrets
+
         import win32process
 
         backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -3084,7 +3087,8 @@ def spawn_bank_workers(
             # 1. Dedicated loopback listener for this bank worker
             authkey = secrets.token_bytes(32)
             listener = Listener(("127.0.0.1", 0), authkey=authkey)
-            host, port = listener.address
+            assert isinstance(listener.address, tuple)
+            host, port = listener.address[0], listener.address[1]
 
             # 2. Dedicated restricted primary token
             try:
@@ -3110,8 +3114,9 @@ def spawn_bank_workers(
             cmd = f'"{sys.executable}" -c "{worker_code}" {host} {port} {authkey.hex()}'
 
             si = win32process.STARTUPINFO()
+            create_process_as_user: Any = win32process.CreateProcessAsUser
             try:
-                hProc, hThread, pid, tid = win32process.CreateProcessAsUser(
+                hProc, hThread, pid, tid = create_process_as_user(
                     restricted_token,
                     None,
                     cmd,
@@ -3228,8 +3233,8 @@ def run_bank_worker_node(
     bank_id: str,
     worker_token: str,
     db_url: str,
-    inbox: mp.Queue,
-    outbox: mp.Queue,
+    inbox: Any,
+    outbox: Any,
     data_path: str | None = None,
     X_partition: np.ndarray | None = None,
     y_partition: np.ndarray | None = None,

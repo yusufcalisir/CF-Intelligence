@@ -15,29 +15,22 @@ Verifies the elimination of cross-bank worker identity bypass:
 
 from __future__ import annotations
 
-import contextlib
-from datetime import datetime, timezone
 import hashlib
 import json
-import os
-import sys
-import tempfile
-import time
-from typing import Any
 import uuid
+from datetime import UTC, datetime
+from typing import Any
 
-from cryptography.fernet import Fernet
 import numpy as np
 import psycopg
 import psycopg.conninfo
 import pytest
+from cryptography.fernet import Fernet
 
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
-    DistributedFederatedTrainingManager,
     IsolatedReceiptSigningAuthority,
     IsolatedTrainingCompletionAuthority,
-    _generate_ed25519_keypair_hex,
     provision_isolated_completion_authority_vault,
     provision_isolated_issuer_vault,
     setup_bank_private_storage,
@@ -45,17 +38,14 @@ from app.application.services.distributed_fl_service import (
     spawn_isolated_completion_authority_service,
     spawn_isolated_coordinator_process,
 )
-from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES
 from app.application.services.training_provenance_service import (
     DEFAULT_TRAINING_KEY_ID,
-    TrainingProvenanceConfigurationError,
     TrainingProvenanceSecurityError,
     TrustedTrainingJobRecordSource,
 )
 from app.infrastructure.database.training_authority_backends import (
     PostgresTrainingJobAuthority,
-    RoundObservation,
     provision_runtime_service_roles,
 )
 
@@ -132,7 +122,7 @@ def helper_build_observation_tuple(
     observed_loss: float = 0.05,
 ) -> tuple[Any, ...]:
     """Construct a syntactically valid observation tuple matching cfi_round_observations schema."""
-    now_str = datetime.now(timezone.utc).isoformat()
+    now_str = datetime.now(UTC).isoformat()
     event_id = f"evt_{job_id}_r{round_number}_{bank_id}_{attempt_number}_{uuid.uuid4().hex[:8]}"
     update_digest = hashlib.sha256(f"up_{job_id}_{round_number}_{bank_id}".encode()).hexdigest()
     metrics_json = json.dumps({"loss": observed_loss})

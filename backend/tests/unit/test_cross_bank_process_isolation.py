@@ -27,12 +27,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
-import multiprocessing as mp
 import os
-import queue
-import secrets
-import sys
-import tempfile
 import uuid
 from collections.abc import Generator
 from typing import Any
@@ -41,21 +36,12 @@ from unittest import mock
 import numpy as np
 import pytest
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from app.application.services.distributed_fl_service import (
-    BANK_SECURITY_SIDS,
     COORDINATOR_RESTRICTED_SID,
-    BankPrivateStorageVault,
-    BankWorkerOSSecurityContext,
     CoordinatorOSSecurityContext,
-    IsolatedBankWorkerProcessProxy,
     IsolatedReceiptSigningAuthority,
-    create_bank_worker_security_token,
     get_bank_security_sid,
-    get_bank_worker_os_identity,
-    get_coordinator_os_identity,
     get_os_process_identity,
     provision_isolated_completion_authority_vault,
     provision_isolated_issuer_vault,
@@ -63,19 +49,15 @@ from app.application.services.distributed_fl_service import (
     spawn_bank_workers,
     spawn_isolated_completion_authority_service,
     spawn_isolated_coordinator_process,
-    validate_restricted_bank_worker_policy,
     verify_restricted_bank_worker_os_boundary,
-    verify_restricted_coordinator_os_boundary,
 )
-from app.application.services.model_registry import ModelRegistry
-from app.application.services.model_service import NUM_FEATURES, ModelService
+from app.application.services.model_service import NUM_FEATURES
 from app.application.services.training_provenance_service import (
     DEFAULT_TRAINING_KEY_ID,
     PostgresTrainingJobAuthority,
     TrainingProvenanceConfigurationError,
     TrainingProvenanceSecurityError,
 )
-from app.config import get_settings
 from app.infrastructure.database.training_authority_backends import provision_runtime_service_roles
 
 COORD_SECRET = "coord_secret_bank_fix_suite_prod_771"
@@ -110,13 +92,14 @@ def pg_roles() -> Generator[dict[str, str], None, None]:
 
 def _provision_test_vaults(
     tmp_path: Any,
-    banks: list[str] = ["BANK_A", "BANK_B", "BANK_C"],
+    banks: list[str] | None = None,
 ) -> tuple[str, dict[str, str], dict[str, bytes]]:
     """Helper to provision isolated NTFS vaults with genuine datasets and Fernet keys."""
+    target_banks = banks if banks is not None else ["BANK_A", "BANK_B", "BANK_C"]
     vault_root = str(tmp_path / "bank_vaults")
     data_paths = {}
     encryption_keys = {}
-    for b in banks:
+    for b in target_banks:
         rng = np.random.RandomState(hash(b) % (2**31))
         X = rng.randn(64, NUM_FEATURES).astype(np.float32)
         y = rng.randint(0, 2, size=64).astype(np.int64)
@@ -387,6 +370,14 @@ class TestCrossBankProcessIsolation:
             assert resp_revert["status"] == "DENIED", f"Expected DENIED after RevertToSelf, got: {resp_revert}"
             assert resp_revert["is_restricted"] is True, "Process must remain restricted after RevertToSelf"
             assert get_bank_security_sid("BANK_A") in resp_revert["restricted_sids"]
+
+            # 1b. Compromised Bank A worker also attempts to read Bank B key after RevertToSelf()
+            endpoints["BANK_A"]["inbox"].put({
+                "command": "ATTEMPT_REVERT_AND_READ",
+                "path": key_path_b,
+            })
+            resp_revert_key = endpoints["BANK_A"]["outbox"].get(timeout=10)
+            assert resp_revert_key["status"] == "DENIED"
 
             # 2. Compromised Bank A worker attempts privilege recovery
             endpoints["BANK_A"]["inbox"].put({"command": "ATTEMPT_PRIVILEGE_RECOVERY"})

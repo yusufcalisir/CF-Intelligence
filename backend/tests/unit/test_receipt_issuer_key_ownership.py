@@ -15,15 +15,13 @@ Mandatory tests verifying that:
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import io
 import json
 import os
-import tempfile
 import uuid
 from collections.abc import Generator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import patch
 
@@ -32,16 +30,12 @@ import psycopg
 import pytest
 import torch
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from app.config import get_settings
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
     CoordinatorOSSecurityContext,
     DistributedFederatedTrainingManager,
-    IsolatedCoordinatorClient,
     IsolatedReceiptSigningAuthority,
-    _generate_ed25519_keypair_hex,
     provision_isolated_completion_authority_vault,
     provision_isolated_issuer_vault,
     setup_bank_private_storage,
@@ -56,14 +50,10 @@ from app.application.services.model_registry import (
 from app.application.services.model_service import NUM_FEATURES, FraudDetectionModel
 from app.application.services.training_provenance_service import (
     DEFAULT_TRAINING_KEY_ID,
-    TrainingExecutionEvidence,
-    TrainingProvenanceConfigurationError,
     TrainingProvenanceSecurityError,
-    TrainingReceiptIssuer,
     TrainingReceiptVerifier,
-    TrustedTrainingJobRecordSource,
-    get_default_training_verifier,
 )
+from app.config import get_settings
 from app.domain.model_serving_errors import ModelIntegrityError
 from app.infrastructure.database.training_authority_backends import (
     GlobalAggregationEvent,
@@ -148,7 +138,7 @@ def helper_record_global_aggregations(
                 accepted_local_update_digests=("digest123", "digest123", "digest123"),
                 aggregation_configuration={},
                 aggregated_global_model_digest=sha,
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
                 aggregation_status="COMPLETED",
             )
         )
@@ -165,7 +155,7 @@ def helper_build_observation_tuple(
     sample_count: int = 100,
     observed_loss: float = 0.05,
 ) -> tuple[Any, ...]:
-    now_str = datetime.now(timezone.utc).isoformat()
+    now_str = datetime.now(UTC).isoformat()
     event_id = f"evt_{job_id}_r{round_number}_{bank_id}_{attempt_number}_{uuid.uuid4().hex[:8]}"
     update_digest = hashlib.sha256(f"up_{job_id}_{round_number}_{bank_id}".encode()).hexdigest()
     metrics_json = json.dumps({"loss": observed_loss})
@@ -219,7 +209,7 @@ class TestReceiptIssuerKeyOwnership:
         # 1. Verify via CoordinatorOSSecurityContext thread token
         with CoordinatorOSSecurityContext():
             with pytest.raises(PermissionError):
-                with open(key_file, "r", encoding="utf-8") as f:
+                with open(key_file, encoding="utf-8") as f:
                     _ = f.read()
 
         # 2. Verify via actual separate restricted coordinator process
@@ -277,7 +267,7 @@ class TestReceiptIssuerKeyOwnership:
         key_file, pub_hex = provision_isolated_issuer_vault(vault_dir, app_env="production")
 
         # Read original key as privileged administrator
-        with open(key_file, "r", encoding="utf-8") as f:
+        with open(key_file, encoding="utf-8") as f:
             original_key_content = f.read()
 
         coord_proc, coord_client = spawn_isolated_coordinator_process(app_env="production")
@@ -299,7 +289,7 @@ class TestReceiptIssuerKeyOwnership:
             assert create_res["error_type"] == "PermissionError"
 
             # Verify original key file remains 100% intact and uncorrupted
-            with open(key_file, "r", encoding="utf-8") as f:
+            with open(key_file, encoding="utf-8") as f:
                 current_content = f.read()
             assert current_content == original_key_content
         finally:
@@ -523,7 +513,9 @@ class TestReceiptIssuerKeyOwnership:
                 )
 
                 # Finalize job through completion authority
-                from app.application.services.distributed_fl_service import IsolatedTrainingCompletionAuthority
+                from app.application.services.distributed_fl_service import (
+                    IsolatedTrainingCompletionAuthority,
+                )
                 comp_client = IsolatedTrainingCompletionAuthority(
                     service_endpoint=comp_endpoint,
                     coordinator_token=COORD_SECRET,
@@ -647,7 +639,9 @@ class TestReceiptIssuerKeyOwnership:
                 final_sha=model_sha,
             )
 
-            from app.application.services.distributed_fl_service import IsolatedTrainingCompletionAuthority
+            from app.application.services.distributed_fl_service import (
+                IsolatedTrainingCompletionAuthority,
+            )
             comp_client = IsolatedTrainingCompletionAuthority(
                 service_endpoint=comp_endpoint,
                 coordinator_token=COORD_SECRET,
@@ -770,7 +764,9 @@ class TestReceiptIssuerKeyOwnership:
             )
 
             # Complete job
-            from app.application.services.distributed_fl_service import IsolatedTrainingCompletionAuthority
+            from app.application.services.distributed_fl_service import (
+                IsolatedTrainingCompletionAuthority,
+            )
             comp_client = IsolatedTrainingCompletionAuthority(
                 service_endpoint=comp_endpoint,
                 coordinator_token=COORD_SECRET,

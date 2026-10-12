@@ -284,7 +284,9 @@ class TestRestrictedCoordinatorEnforcement:
             with psycopg.connect(role_urls["coordinator"]) as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-                    count = cur.fetchone()[0]
+                    row = cur.fetchone()
+                    assert row is not None
+                    count = row[0]
                     assert count == 0, f"No forged completed rows must be persisted, found {count}"
         finally:
             client.terminate()
@@ -877,7 +879,9 @@ class TestCoordinatorSqlAuthorization:
             with psycopg.connect(role_urls["coordinator"]) as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-                    count = cur.fetchone()[0]
+                    row = cur.fetchone()
+                    assert row is not None
+                    count = row[0]
                     assert count == 0, f"Expected 0 completed rows, found {count}"
 
             # Verify downstream provenance query finds zero evidence

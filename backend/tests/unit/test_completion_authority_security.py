@@ -17,24 +17,22 @@ from __future__ import annotations
 
 import concurrent.futures
 import contextlib
-from datetime import datetime, timezone
 import hashlib
-import json
 import os
-import sys
 import subprocess
-import tempfile
+import sys
 import threading
 import time
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 from unittest import mock
-import uuid
 
-from cryptography.fernet import Fernet
 import numpy as np
 import psycopg
 import psycopg.conninfo
 import pytest
+from cryptography.fernet import Fernet
 
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
@@ -43,10 +41,7 @@ from app.application.services.distributed_fl_service import (
     IsolatedReceiptSigningAuthority,
     IsolatedTrainingCompletionAuthority,
     SecurityIdentityInfo,
-    _generate_ed25519_keypair_hex,
     get_completion_service_os_identity,
-    get_coordinator_os_identity,
-    get_os_process_identity,
     provision_isolated_completion_authority_vault,
     provision_isolated_issuer_vault,
     setup_bank_private_storage,
@@ -69,7 +64,6 @@ from app.infrastructure.database.training_authority_backends import (
     ModelEvaluationEvent,
     PostgresTrainingJobAuthority,
     RoundObservation,
-    compute_evidence_fingerprint,
     provision_runtime_service_roles,
 )
 
@@ -125,7 +119,7 @@ def helper_setup_valid_observed_job(
     auc_roc: float = 0.94,
 ) -> dict[str, Any]:
     """Populate PostgreSQL authority with genuine scheduled, started, observation, aggregation, and evaluation events."""
-    now_str = datetime.now(timezone.utc).isoformat()
+    now_str = datetime.now(UTC).isoformat()
     fnames = list(FEATURE_NAMES)
     admin_auth = PostgresTrainingJobAuthority(db_url=admin_url)
 
@@ -256,7 +250,7 @@ class TestCompletionAuthoritySecurity:
         # Permanent OS authorization denial before service startup (prior to any file lock)
         with CoordinatorOSSecurityContext():
             with pytest.raises(PermissionError):
-                with open(vault_file, "r", encoding="utf-8") as f:
+                with open(vault_file, encoding="utf-8") as f:
                     _ = f.read()
 
         # 2. Spawn isolated completion service owning the vault
@@ -305,12 +299,12 @@ class TestCompletionAuthoritySecurity:
 
             # Assert genuine OS kernel boundary access denial on vault file during operation
             with pytest.raises(PermissionError):
-                with open(vault_file, "r", encoding="utf-8") as f:
+                with open(vault_file, encoding="utf-8") as f:
                     _ = f.read()
 
             with CoordinatorOSSecurityContext():
                 with pytest.raises(PermissionError):
-                    with open(vault_file, "r", encoding="utf-8") as f:
+                    with open(vault_file, encoding="utf-8") as f:
                         _ = f.read()
         finally:
             comp_proc.terminate()
@@ -318,7 +312,7 @@ class TestCompletionAuthoritySecurity:
             # Permanent OS authorization denial after process termination
             with CoordinatorOSSecurityContext():
                 with pytest.raises(PermissionError):
-                    with open(vault_file, "r", encoding="utf-8") as f:
+                    with open(vault_file, encoding="utf-8") as f:
                         _ = f.read()
 
     def test_comp_r02_coordinator_cannot_create_privileged_connection(
@@ -555,7 +549,7 @@ class TestCompletionAuthoritySecurity:
                 actual_executed_epochs=1,
                 observed_loss=0.08,
                 metrics={"loss": 0.08},
-                execution_timestamp=datetime.now(timezone.utc).isoformat(),
+                execution_timestamp=datetime.now(UTC).isoformat(),
                 model_update_digest=hashlib.sha256(b"late").hexdigest(),
                 execution_status="COMPLETED",
             )
@@ -1513,7 +1507,7 @@ class TestSecureVaultProvisioning:
         assert not os.path.exists(vault_file)
         with CoordinatorOSSecurityContext():
             with pytest.raises((FileNotFoundError, PermissionError)):
-                with open(vault_file, "r", encoding="utf-8") as f:
+                with open(vault_file, encoding="utf-8") as f:
                     _ = f.read()
 
         # 2. Privileged provisioning executes
@@ -1524,7 +1518,7 @@ class TestSecureVaultProvisioning:
         # 3. After provisioning: Coordinator cannot read credential under restricted context
         with CoordinatorOSSecurityContext():
             with pytest.raises(PermissionError):
-                with open(vault_file, "r", encoding="utf-8") as f:
+                with open(vault_file, encoding="utf-8") as f:
                     _ = f.read()
 
         # 4. Prove genuine access denial from an actual isolated coordinator child process
@@ -1583,7 +1577,7 @@ class TestSecureVaultProvisioning:
         vault_file = os.path.join(vault_dir, "completion_authority.vault")
 
         # Simulate interruption during os.fsync or file write
-        with mock.patch("os.fsync", side_effect=IOError("Simulated power loss or I/O interruption during fsync")):
+        with mock.patch("os.fsync", side_effect=OSError("Simulated power loss or I/O interruption during fsync")):
             with pytest.raises(
                 TrainingProvenanceConfigurationError,
                 match="Failed to write confidential credential to staged completion vault",
@@ -1627,7 +1621,7 @@ class TestSecureVaultProvisioning:
         # Verify restrictive DACL is strictly active: restricted coordinator cannot read
         with CoordinatorOSSecurityContext():
             with pytest.raises(PermissionError):
-                with open(vf, "r", encoding="utf-8") as f:
+                with open(vf, encoding="utf-8") as f:
                     _ = f.read()
 
     def test_vault_05_path_redirection_symlinks_junctions_rejected(
@@ -1677,7 +1671,7 @@ class TestSecureVaultProvisioning:
 
         # Initial provisioning
         vault_file = provision_isolated_completion_authority_vault(vault_dir, comp_url_1)
-        with open(vault_file, "r", encoding="utf-8") as f:
+        with open(vault_file, encoding="utf-8") as f:
             assert f.read().strip() == comp_url_1.strip()
 
         # Reprovisioning / rotation
@@ -1685,13 +1679,13 @@ class TestSecureVaultProvisioning:
         assert vault_file_2 == vault_file
 
         # Verify rotated content is present
-        with open(vault_file, "r", encoding="utf-8") as f:
+        with open(vault_file, encoding="utf-8") as f:
             assert f.read().strip() == comp_url_2.strip()
 
         # Verify coordinator remains denied
         with CoordinatorOSSecurityContext():
             with pytest.raises(PermissionError):
-                with open(vault_file, "r", encoding="utf-8") as f:
+                with open(vault_file, encoding="utf-8") as f:
                     _ = f.read()
 
         # Verify coordinator child process is also denied
@@ -1744,7 +1738,7 @@ class TestSecureVaultProvisioning:
             assert del_res["error_type"] == "PermissionError"
 
             # Vault remains intact with correct content
-            with open(vault_file, "r", encoding="utf-8") as f:
+            with open(vault_file, encoding="utf-8") as f:
                 assert f.read().strip() == comp_url.strip()
         finally:
             coord_client.terminate()
