@@ -128,6 +128,10 @@ def helper_record_global_aggregations(
     dummy_sha = "0123456789abcdef" * 4
     for r in range(1, num_rounds + 1):
         sha = final_sha if r == num_rounds else dummy_sha
+        digests = tuple(
+            hashlib.sha256(f"up_{job_id}_{r}_{b_id}".encode()).hexdigest()
+            for b_id in ("BANK_A", "BANK_B", "BANK_C")
+        )
         admin_auth.record_global_aggregation(
             GlobalAggregationEvent(
                 event_id=f"evt_agg_{job_id}_r{r}_{uuid.uuid4().hex[:8]}",
@@ -135,7 +139,7 @@ def helper_record_global_aggregations(
                 round_number=r,
                 aggregation_algorithm="fed_avg",
                 accepted_participant_ids=("BANK_A", "BANK_B", "BANK_C"),
-                accepted_local_update_digests=("digest123", "digest123", "digest123"),
+                accepted_local_update_digests=digests,
                 aggregation_configuration={},
                 aggregated_global_model_digest=sha,
                 timestamp=datetime.now(UTC).isoformat(),
