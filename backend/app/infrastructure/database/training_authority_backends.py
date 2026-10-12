@@ -669,6 +669,38 @@ def reconcile_job_completion_evidence(
         raise TrainingProvenanceSecurityError(
             f"Global aggregation round continuity mismatch for job '{clean_job_id}': expected rounds {expected_seq}, but got aggregated rounds {agg_round_nums}."
         )
+
+    # Strictly cross-reference accepted update digests in each round against completed round observations
+    seen_digests: set[str] = set()
+    for agg in sorted(agg_rows, key=lambda a: a.round_number):
+        r_num = agg.round_number
+        round_obs = [o for o in completed_obs if o.round_number == r_num]
+        obs_map = {o.bank_id: o.model_update_digest for o in round_obs if o.model_update_digest}
+
+        if len(agg.accepted_participant_ids) != len(agg.accepted_local_update_digests):
+            raise TrainingProvenanceSecurityError(
+                f"Global aggregation for job '{clean_job_id}' round {r_num} has mismatched participants and update digests count."
+            )
+        if not agg.accepted_participant_ids:
+            raise TrainingProvenanceSecurityError(
+                f"Global aggregation for job '{clean_job_id}' round {r_num} has zero accepted participants."
+            )
+
+        for p_id, u_dig in zip(agg.accepted_participant_ids, agg.accepted_local_update_digests, strict=True):
+            if p_id not in obs_map:
+                raise TrainingProvenanceSecurityError(
+                    f"Global aggregation for job '{clean_job_id}' round {r_num} accepted unobserved participant '{p_id}'."
+                )
+            if obs_map[p_id] != u_dig:
+                raise TrainingProvenanceSecurityError(
+                    f"Global aggregation for job '{clean_job_id}' round {r_num} update digest mismatch for '{p_id}': accepted {u_dig}, observed {obs_map[p_id]}."
+                )
+            if u_dig in seen_digests:
+                raise TrainingProvenanceSecurityError(
+                    f"Global aggregation for job '{clean_job_id}' round {r_num} replayed update digest '{u_dig}' from an earlier round."
+                )
+            seen_digests.add(u_dig)
+
     latest_agg = max(agg_rows, key=lambda a: a.round_number)
     if latest_agg.aggregated_global_model_digest != clean_sha:
         raise TrainingProvenanceSecurityError(
@@ -706,6 +738,14 @@ def reconcile_job_completion_evidence(
             raise TrainingProvenanceSecurityError(
                 f"Evaluation metrics {list(eval_metrics.keys())} claimed for job '{clean_job_id}' without verified model evaluation observations."
             )
+
+        valid_agg_digests = {a.aggregated_global_model_digest for a in agg_rows}
+        for e in eval_rows:
+            if e.evaluated_artifact_digest not in valid_agg_digests:
+                raise TrainingProvenanceSecurityError(
+                    f"Evaluation event '{e.event_id}' for job '{clean_job_id}' references unaggregated artifact digest '{e.evaluated_artifact_digest}'."
+                )
+
         for m_name, m_val in eval_metrics.items():
             matching_evals = [
                 e for e in eval_rows
@@ -728,6 +768,7 @@ FORBIDDEN_DATABASE_PASSWORDS = {
     "cfi_issuer_pass_2026",
     "cfi_serving_pass_2026",
     "cfi_completion_pass_2026",
+    "cfi_evaluator_pass_2026",
     "password",
     "admin",
     "123456",
@@ -735,18 +776,180 @@ FORBIDDEN_DATABASE_PASSWORDS = {
 }
 
 
+AUTHENTIC_EVIDENCE_TRIGGERS_SQL = """
+CREATE OR REPLACE FUNCTION cfi_enforce_global_aggregation_authenticity()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_started INT;
+    v_completed INT;
+    v_prev_agg INT;
+    v_part_count INT;
+    v_dig_count INT;
+    v_part TEXT;
+    v_dig TEXT;
+    v_i INT;
+    v_parts JSONB;
+    v_digs JSONB;
+    v_obs_count INT;
+BEGIN
+    SELECT COUNT(*) INTO v_started FROM cfi_started_jobs WHERE job_id = NEW.job_id;
+    IF v_started = 0 THEN
+        RAISE EXCEPTION 'Aggregation rejected: job % has not been started.', NEW.job_id
+            USING ERRCODE = 'insufficient_privilege';
+    END IF;
+
+    SELECT COUNT(*) INTO v_completed FROM cfi_completed_jobs WHERE job_id = NEW.job_id;
+    IF v_completed > 0 THEN
+        RAISE EXCEPTION 'Aggregation rejected: job % is already finalized.', NEW.job_id
+            USING ERRCODE = 'insufficient_privilege';
+    END IF;
+
+    IF NEW.round_number < 1 THEN
+        RAISE EXCEPTION 'Invalid aggregation round number %.', NEW.round_number
+            USING ERRCODE = 'check_violation';
+    END IF;
+    IF NEW.round_number > 1 THEN
+        SELECT COUNT(*) INTO v_prev_agg FROM cfi_global_aggregations
+        WHERE job_id = NEW.job_id AND round_number = NEW.round_number - 1;
+        IF v_prev_agg = 0 THEN
+            RAISE EXCEPTION 'Aggregation round continuity violation: round % requires round %.', NEW.round_number, NEW.round_number - 1
+                USING ERRCODE = 'insufficient_privilege';
+        END IF;
+    END IF;
+
+    BEGIN
+        v_parts := NEW.accepted_participants_json::jsonb;
+        v_digs := NEW.accepted_digests_json::jsonb;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE EXCEPTION 'Invalid JSON format in accepted participants or digests.'
+            USING ERRCODE = 'check_violation';
+    END;
+
+    v_part_count := jsonb_array_length(v_parts);
+    v_dig_count := jsonb_array_length(v_digs);
+
+    IF v_part_count = 0 OR v_part_count <> v_dig_count THEN
+        RAISE EXCEPTION 'Aggregation participant and digest arrays must be non-empty and of identical length.'
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    FOR v_i IN 0..(v_part_count - 1) LOOP
+        v_part := v_parts->>v_i;
+        v_dig := v_digs->>v_i;
+
+        SELECT COUNT(*) INTO v_obs_count
+        FROM cfi_round_observations
+        WHERE job_id = NEW.job_id
+          AND round_number = NEW.round_number
+          AND bank_id = v_part
+          AND model_update_digest = v_dig
+          AND execution_status = 'COMPLETED';
+
+        IF v_obs_count = 0 THEN
+            RAISE EXCEPTION 'Direct aggregation forgery: participant % digest % has no authentic completed observation in round % for job %',
+                v_part, v_dig, NEW.round_number, NEW.job_id
+                USING ERRCODE = 'insufficient_privilege';
+        END IF;
+
+        IF NEW.round_number > 1 THEN
+            IF EXISTS (
+                SELECT 1 FROM cfi_global_aggregations
+                WHERE job_id = NEW.job_id
+                  AND round_number < NEW.round_number
+                  AND accepted_digests_json::jsonb @> to_jsonb(v_dig)
+            ) THEN
+                RAISE EXCEPTION 'Direct aggregation forgery: update digest % was already used in a previous round.', v_dig
+                    USING ERRCODE = 'insufficient_privilege';
+            END IF;
+        END IF;
+    END LOOP;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_cfi_enforce_global_aggregation_authenticity ON cfi_global_aggregations;
+CREATE TRIGGER trg_cfi_enforce_global_aggregation_authenticity
+BEFORE INSERT OR UPDATE ON cfi_global_aggregations
+FOR EACH ROW
+EXECUTE FUNCTION cfi_enforce_global_aggregation_authenticity();
+
+CREATE OR REPLACE FUNCTION cfi_enforce_model_evaluation_authenticity()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_started INT;
+    v_completed INT;
+    v_agg_count INT;
+BEGIN
+    SELECT COUNT(*) INTO v_started FROM cfi_started_jobs WHERE job_id = NEW.job_id;
+    IF v_started = 0 THEN
+        RAISE EXCEPTION 'Evaluation rejected: job % has not been started.', NEW.job_id
+            USING ERRCODE = 'insufficient_privilege';
+    END IF;
+
+    SELECT COUNT(*) INTO v_completed FROM cfi_completed_jobs WHERE job_id = NEW.job_id;
+    IF v_completed > 0 THEN
+        RAISE EXCEPTION 'Evaluation rejected: job % is already finalized.', NEW.job_id
+            USING ERRCODE = 'insufficient_privilege';
+    END IF;
+
+    SELECT COUNT(*) INTO v_agg_count FROM cfi_global_aggregations
+    WHERE job_id = NEW.job_id
+      AND aggregated_model_digest = NEW.evaluated_artifact_digest;
+
+    IF v_agg_count = 0 THEN
+        RAISE EXCEPTION 'Evaluation forgery: evaluated artifact digest % does not match any authentic global aggregation for job %',
+            NEW.evaluated_artifact_digest, NEW.job_id
+            USING ERRCODE = 'insufficient_privilege';
+    END IF;
+
+    IF NEW.metric_value = 'NaN'::double precision
+       OR NEW.metric_value = 'Infinity'::double precision
+       OR NEW.metric_value = '-Infinity'::double precision THEN
+        RAISE EXCEPTION 'Evaluation metric % has non-finite value.', NEW.metric_name
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    IF NEW.metric_name IN ('auc_roc', 'pr_auc') THEN
+        IF NEW.metric_value < 0.0 OR NEW.metric_value > 1.0 THEN
+            RAISE EXCEPTION 'Evaluation metric % out of valid range [0.0, 1.0]: %', NEW.metric_name, NEW.metric_value
+                USING ERRCODE = 'check_violation';
+        END IF;
+    END IF;
+
+    IF NEW.metric_name IN ('loss', 'val_loss', 'train_loss') THEN
+        IF NEW.metric_value < 0.0 THEN
+            RAISE EXCEPTION 'Evaluation loss cannot be negative: %', NEW.metric_value
+                USING ERRCODE = 'check_violation';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_cfi_enforce_model_evaluation_authenticity ON cfi_model_evaluations;
+CREATE TRIGGER trg_cfi_enforce_model_evaluation_authenticity
+BEFORE INSERT OR UPDATE ON cfi_model_evaluations
+FOR EACH ROW
+EXECUTE FUNCTION cfi_enforce_model_evaluation_authenticity();
+"""
+
+
 def provision_runtime_service_roles(
     admin_db_url: str,
     custom_passwords: dict[str, str] | None = None,
     app_env: str = "production",
 ) -> dict[str, str]:
-    """Provision strictly isolated PostgreSQL service roles for coordinator, workers, completion, issuer, and serving.
+    """Provision strictly isolated PostgreSQL service roles for coordinator, workers, completion, evaluator, issuer, and serving.
 
     Enforces Module 01-A.1 Role Separation:
-    - cfi_coord_role: Can schedule, record aggregations & evaluations.
+    - cfi_coord_role: Can schedule, record aggregations (governed by authenticity trigger).
       Forbidden from directly inserting completed evidence (SQLSTATE 42501).
+      Forbidden from directly inserting evaluations (SQLSTATE 42501).
       Forbidden from inserting bank round observations (SQLSTATE 42501).
-    - cfi_completion_role: Dedicated completion authority possessing exclusive INSERT on cfi_completed_jobs.
+    - cfi_completion_role: Dedicated completion authority possessing exclusive INSERT on cfi_completed_jobs and authorized model evaluations.
+    - cfi_evaluator_role: Dedicated evaluation authority possessing exclusive INSERT on cfi_model_evaluations.
     - cfi_worker_role & per-bank roles (cfi_bank_a_role, cfi_bank_b_role, cfi_bank_c_role):
       Can start jobs and record bank round observations with Row-Level Security isolation.
       Forbidden from scheduling, completing, or modifying global aggregations/evaluations (SQLSTATE 42501).
@@ -767,6 +970,7 @@ def provision_runtime_service_roles(
     role_mapping = {
         "coordinator": "cfi_coord_role",
         "completion": "cfi_completion_role",
+        "evaluator": "cfi_evaluator_role",
         "worker": "cfi_worker_role",
         "worker_bank_a": "cfi_bank_a_role",
         "worker_bank_b": "cfi_bank_b_role",
@@ -827,19 +1031,26 @@ def provision_runtime_service_roles(
                 cur.execute(pg_sql.SQL("GRANT USAGE ON SCHEMA public TO {role}").format(role=pg_sql.Identifier(rname)))
 
             # 3. Coordinator Role (cfi_coord_role)
-            # Can schedule jobs, record global aggregations and evaluations.
-            # Strictly CANNOT insert into completed_jobs or round observations!
+            # Can schedule jobs, record global aggregations (subject to authenticity trigger).
+            # Strictly CANNOT insert into completed_jobs, model_evaluations, or round observations!
             cur.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO cfi_coord_role")
-            cur.execute("GRANT INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations TO cfi_coord_role")
-            cur.execute("REVOKE INSERT ON cfi_completed_jobs, cfi_started_jobs, cfi_round_observations FROM cfi_coord_role")
+            cur.execute("GRANT INSERT ON cfi_scheduled_jobs, cfi_global_aggregations TO cfi_coord_role")
+            cur.execute("REVOKE INSERT ON cfi_completed_jobs, cfi_model_evaluations, cfi_started_jobs, cfi_round_observations FROM cfi_coord_role")
             cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_coord_role")
 
             # 4. Completion Authority Role (cfi_completion_role)
-            # Dedicated role with exclusive authorization to write reconciled completion records to cfi_completed_jobs.
+            # Dedicated role with exclusive authorization to write reconciled completion records to cfi_completed_jobs and evaluations.
             cur.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO cfi_completion_role")
-            cur.execute("GRANT INSERT ON cfi_completed_jobs TO cfi_completion_role")
-            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_global_aggregations, cfi_model_evaluations FROM cfi_completion_role")
+            cur.execute("GRANT INSERT ON cfi_completed_jobs, cfi_model_evaluations TO cfi_completion_role")
+            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_global_aggregations FROM cfi_completion_role")
             cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_completion_role")
+
+            # 4b. Dedicated Model Evaluator Role (cfi_evaluator_role)
+            # Dedicated role holding exclusive authorization to record model evaluations.
+            cur.execute("GRANT SELECT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs TO cfi_evaluator_role")
+            cur.execute("GRANT INSERT ON cfi_model_evaluations TO cfi_evaluator_role")
+            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_global_aggregations, cfi_completed_jobs FROM cfi_evaluator_role")
+            cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_evaluator_role")
 
             # 5. Worker Roles
             # 5a. Bank-Specific Worker Roles (cfi_bank_a_role, cfi_bank_b_role, cfi_bank_c_role)
@@ -895,7 +1106,7 @@ def provision_runtime_service_roles(
             """)
             cur.execute("""
                 CREATE POLICY cfi_readers_obs_policy ON cfi_round_observations
-                FOR SELECT TO cfi_coord_role, cfi_completion_role, cfi_issuer_role
+                FOR SELECT TO cfi_coord_role, cfi_completion_role, cfi_evaluator_role, cfi_issuer_role
                 USING (true)
             """)
 
@@ -906,6 +1117,9 @@ def provision_runtime_service_roles(
             # 8. Serving Role (cfi_serving_role)
             cur.execute("GRANT SELECT ON cfi_completed_jobs TO cfi_serving_role")
             cur.execute("REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_serving_role")
+
+            # 9. Apply Authentic Evidence Triggers
+            cur.execute(AUTHENTIC_EVIDENCE_TRIGGERS_SQL)
 
     for role_key, rname in role_mapping.items():
         rpass = passwords[role_key]
@@ -1100,6 +1314,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             );
                             """
                         )
+                        cur.execute(AUTHENTIC_EVIDENCE_TRIGGERS_SQL)
         except Exception as e:
             sanitized = str(e)
             if "permission denied" in sanitized.lower() or "42501" in sanitized:
@@ -1112,6 +1327,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             authorized_service_roles = {
                                 "cfi_coord_role",
                                 "cfi_completion_role",
+                                "cfi_evaluator_role",
                                 "cfi_worker_role",
                                 "cfi_bank_a_role",
                                 "cfi_bank_b_role",
@@ -1459,6 +1675,21 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
 
                     cur.execute(
                         """
+                        SELECT bank_id, model_update_digest FROM cfi_round_observations
+                        WHERE job_id = %s AND round_number = %s AND execution_status = 'COMPLETED'
+                        """,
+                        (clean_job_id, event.round_number),
+                    )
+                    obs_rows = cur.fetchall()
+                    obs_dict = {r["bank_id"]: r["model_update_digest"] for r in obs_rows}
+                    for p_id, d_val in zip(event.accepted_participant_ids, event.accepted_local_update_digests, strict=True):
+                        if p_id not in obs_dict or obs_dict[p_id] != d_val:
+                            raise TrainingProvenanceSecurityError(
+                                f"Direct aggregation forgery: participant '{p_id}' digest '{d_val}' has no authentic completed observation in round {event.round_number} for job '{clean_job_id}'."
+                            )
+
+                    cur.execute(
+                        """
                         INSERT INTO cfi_global_aggregations (
                             event_id, job_id, round_number, aggregation_algorithm,
                             accepted_participants_json, accepted_digests_json,
@@ -1538,6 +1769,18 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             return event
                         raise TrainingProvenanceSecurityError(
                             f"Conflicting model evaluation event ID '{event.event_id}'."
+                        )
+
+                    cur.execute(
+                        """
+                        SELECT 1 FROM cfi_global_aggregations
+                        WHERE job_id = %s AND aggregated_model_digest = %s
+                        """,
+                        (clean_job_id, event.evaluated_artifact_digest),
+                    )
+                    if not cur.fetchone():
+                        raise TrainingProvenanceSecurityError(
+                            f"Evaluation forgery: evaluated artifact digest '{event.evaluated_artifact_digest}' does not match any authentic global aggregation for job '{clean_job_id}'."
                         )
 
                     cur.execute(
@@ -2576,6 +2819,21 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                             f"Conflicting global aggregation for job '{clean_job_id}' round {event.round_number}."
                         )
 
+                    cur = conn.execute(
+                        """
+                        SELECT bank_id, model_update_digest FROM cfi_round_observations
+                        WHERE job_id = ? AND round_number = ? AND execution_status = 'COMPLETED'
+                        """,
+                        (clean_job_id, event.round_number),
+                    )
+                    obs_rows = cur.fetchall()
+                    obs_dict = {r[0]: r[1] for r in obs_rows}
+                    for p_id, d_val in zip(event.accepted_participant_ids, event.accepted_local_update_digests, strict=True):
+                        if p_id not in obs_dict or obs_dict[p_id] != d_val:
+                            raise TrainingProvenanceSecurityError(
+                                f"Direct aggregation forgery: participant '{p_id}' digest '{d_val}' has no authentic completed observation in round {event.round_number} for job '{clean_job_id}'."
+                            )
+
                     conn.execute(
                         """
                         INSERT INTO cfi_global_aggregations (
@@ -2662,6 +2920,18 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                             return event
                         raise TrainingProvenanceSecurityError(
                             f"Conflicting model evaluation event ID '{event.event_id}'."
+                        )
+
+                    cur = conn.execute(
+                        """
+                        SELECT 1 FROM cfi_global_aggregations
+                        WHERE job_id = ? AND aggregated_model_digest = ?
+                        """,
+                        (clean_job_id, event.evaluated_artifact_digest),
+                    )
+                    if not cur.fetchone():
+                        raise TrainingProvenanceSecurityError(
+                            f"Evaluation forgery: evaluated artifact digest '{event.evaluated_artifact_digest}' does not match any authentic global aggregation for job '{clean_job_id}'."
                         )
 
                     cur = conn.execute(

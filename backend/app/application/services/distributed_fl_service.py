@@ -29,9 +29,11 @@ import sys
 import tempfile
 import threading
 import types
+import uuid
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from multiprocessing.connection import Client, Listener
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import torch
@@ -43,7 +45,11 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.fl_engine import FederatedLearningEngine
 from app.application.services.model_registry import ModelRegistry
-from app.application.services.model_service import NUM_FEATURES, ModelService
+from app.application.services.model_service import (
+    NUM_FEATURES,
+    FraudDetectionModel,
+    ModelService,
+)
 from app.application.services.privacy_service import PrivacyService
 from app.application.services.training_provenance_service import (
     DEFAULT_TRAINING_KEY_ID,
@@ -62,6 +68,7 @@ from app.domain.enums import AggregationMethod
 from app.domain.value_objects import ModelWeights
 from app.infrastructure.database.training_authority_backends import (
     CompletedJobExecutionRecord,
+    ModelEvaluationEvent,
     PostgresTrainingJobAuthority,
 )
 
@@ -2504,6 +2511,140 @@ def _run_isolated_completion_service_worker(
                 conn.send({"status": "SUCCESS", "message": "SHUTDOWN_ACK"})
                 return
 
+            if cmd == "RECORD_EVALUATION":
+                auth_tok = req.get("coordinator_token")
+                is_prod = app_env.lower() == "production"
+
+                if is_prod and not coordinator_token:
+                    conn.send({
+                        "status": "ERROR",
+                        "error": "Unauthorized evaluation request: coordinator token configuration is required in production.",
+                    })
+                    return
+
+                if coordinator_token is not None:
+                    if not auth_tok or not hmac.compare_digest(auth_tok, coordinator_token):
+                        conn.send({
+                            "status": "ERROR",
+                            "error": "Unauthorized evaluation request: invalid or missing coordinator token.",
+                        })
+                        return
+                elif req.get("caller_identity") not in ("COORDINATOR", "EVALUATOR"):
+                    conn.send({
+                        "status": "ERROR",
+                        "error": f"Unauthorized evaluation caller identity: '{req.get('caller_identity')}'.",
+                    })
+                    return
+
+                job_id = req["job_id"]
+                metric_name = req["metric_name"]
+                metric_value = req["metric_value"]
+                evaluated_artifact_digest = req["evaluated_artifact_digest"]
+                evaluator_identity = req.get("evaluator_identity", "COMPLETION_AUTHORITY")
+
+                evt = ModelEvaluationEvent(
+                    event_id=req.get("event_id") or f"eval_{job_id}_{metric_name}_{uuid.uuid4().hex[:8]}",
+                    job_id=job_id,
+                    evaluation_run_id=req.get("evaluation_run_id") or f"eval_run_{job_id}",
+                    metric_name=metric_name,
+                    metric_value=float(metric_value),
+                    evaluated_artifact_digest=evaluated_artifact_digest,
+                    evaluator_identity=evaluator_identity,
+                    evaluation_timestamp=datetime.now(UTC).isoformat(),
+                    evaluation_dataset_manifest=req.get("dataset_manifest_id"),
+                )
+                recorded_evt = authority.record_model_evaluation(evt)
+                conn.send({
+                    "status": "SUCCESS",
+                    "event_id": recorded_evt.event_id,
+                    "payload_digest": recorded_evt.payload_digest,
+                })
+                return
+
+            if cmd == "EVALUATE_AND_RECORD":
+                auth_tok = req.get("coordinator_token")
+                is_prod = app_env.lower() == "production"
+
+                if is_prod and not coordinator_token:
+                    conn.send({
+                        "status": "ERROR",
+                        "error": "Unauthorized evaluation request: coordinator token configuration is required in production.",
+                    })
+                    return
+
+                if coordinator_token is not None:
+                    if not auth_tok or not hmac.compare_digest(auth_tok, coordinator_token):
+                        conn.send({
+                            "status": "ERROR",
+                            "error": "Unauthorized evaluation request: invalid or missing coordinator token.",
+                        })
+                        return
+                elif req.get("caller_identity") not in ("COORDINATOR", "EVALUATOR"):
+                    conn.send({
+                        "status": "ERROR",
+                        "error": f"Unauthorized evaluation caller identity: '{req.get('caller_identity')}'.",
+                    })
+                    return
+
+                job_id = req["job_id"]
+                artifact_bytes = req["artifact_bytes"]
+                holdout_features = req["holdout_features"]
+                holdout_labels = req["holdout_labels"]
+                evaluator_identity = req.get("evaluator_identity", "ISOLATED_EVALUATOR")
+
+                artifact_digest = hashlib.sha256(artifact_bytes).hexdigest()
+
+                aggs = authority.get_global_aggregations(job_id)
+                valid_digests = {a.aggregated_global_model_digest for a in aggs}
+                if artifact_digest not in valid_digests:
+                    conn.send({
+                        "status": "ERROR",
+                        "error": f"Evaluation forgery: evaluated artifact digest '{artifact_digest}' does not match any authentic global aggregation for job '{job_id}'.",
+                    })
+                    return
+
+                model = FraudDetectionModel(input_dim=NUM_FEATURES, dp_compatible=True)
+                buf = io.BytesIO(artifact_bytes)
+                state_dict = torch.load(buf, weights_only=True)
+                model.load_state_dict(state_dict)
+
+                model_svc = ModelService(get_settings())
+                eval_metrics = model_svc.evaluate(model, holdout_features, holdout_labels)
+
+                val_loss = float(eval_metrics["loss"])
+                val_auc = float(eval_metrics["auc_roc"])
+
+                evt_auc = ModelEvaluationEvent(
+                    event_id=f"eval_{job_id}_auc_roc_{uuid.uuid4().hex[:8]}",
+                    job_id=job_id,
+                    evaluation_run_id=f"eval_run_{job_id}",
+                    metric_name="auc_roc",
+                    metric_value=val_auc,
+                    evaluated_artifact_digest=artifact_digest,
+                    evaluator_identity=evaluator_identity,
+                    evaluation_timestamp=datetime.now(UTC).isoformat(),
+                )
+                authority.record_model_evaluation(evt_auc)
+
+                evt_loss = ModelEvaluationEvent(
+                    event_id=f"eval_{job_id}_val_loss_{uuid.uuid4().hex[:8]}",
+                    job_id=job_id,
+                    evaluation_run_id=f"eval_run_{job_id}",
+                    metric_name="val_loss",
+                    metric_value=val_loss,
+                    evaluated_artifact_digest=artifact_digest,
+                    evaluator_identity=evaluator_identity,
+                    evaluation_timestamp=datetime.now(UTC).isoformat(),
+                )
+                authority.record_model_evaluation(evt_loss)
+
+                conn.send({
+                    "status": "SUCCESS",
+                    "metrics": {"auc_roc": val_auc, "val_loss": val_loss},
+                    "artifact_digest": artifact_digest,
+                })
+                return
+
             if cmd == "FINALIZE_COMPLETION":
                 auth_tok = req.get("coordinator_token")
                 is_prod = app_env.lower() == "production"
@@ -2822,6 +2963,96 @@ class IsolatedTrainingCompletionAuthority:
         if res.get("status") == "SUCCESS":
             return CompletedJobExecutionRecord(**res["record_dict"])
         err_msg = res.get("error") or f"Completion rejected by isolated completion authority: {res}"
+        raise TrainingProvenanceSecurityError(err_msg)
+
+    def record_model_evaluation(
+        self,
+        job_id: str,
+        metric_name: str,
+        metric_value: float,
+        evaluated_artifact_digest: str,
+        evaluator_identity: str = "COMPLETION_AUTHORITY",
+        coordinator_token: str | None = None,
+        dataset_manifest_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Record an evaluation observation into PostgreSQL through the isolated completion authority."""
+        token = coordinator_token if coordinator_token is not None else self._coordinator_token
+        authkey_bytes = token.encode("utf-8") if token else b""
+        try:
+            conn = Client(self.service_endpoint, authkey=authkey_bytes)
+        except Exception as e:
+            raise TrainingProvenanceSecurityError(
+                f"Completion authority service unavailable or connection failed: {e}"
+            ) from e
+
+        try:
+            conn.send({
+                "command": "RECORD_EVALUATION",
+                "job_id": job_id,
+                "metric_name": metric_name,
+                "metric_value": float(metric_value),
+                "evaluated_artifact_digest": evaluated_artifact_digest,
+                "evaluator_identity": evaluator_identity,
+                "coordinator_token": token,
+                "dataset_manifest_id": dataset_manifest_id,
+                "caller_identity": "COORDINATOR",
+            })
+            res = conn.recv()
+        except Exception as e:
+            raise TrainingProvenanceSecurityError(
+                f"Completion authority communication failure during evaluation recording: {e}"
+            ) from e
+        finally:
+            with contextlib.suppress(Exception):
+                conn.close()
+
+        if res.get("status") == "SUCCESS":
+            return res
+        err_msg = res.get("error") or f"Evaluation rejected by isolated completion authority: {res}"
+        raise TrainingProvenanceSecurityError(err_msg)
+
+    def evaluate_and_record_artifact(
+        self,
+        job_id: str,
+        artifact_bytes: bytes,
+        holdout_features: np.ndarray,
+        holdout_labels: np.ndarray,
+        evaluator_identity: str = "ISOLATED_EVALUATOR",
+        coordinator_token: str | None = None,
+    ) -> dict[str, float]:
+        """Execute genuine evaluation in the isolated process and persist authentic evaluation evidence."""
+        token = coordinator_token if coordinator_token is not None else self._coordinator_token
+        authkey_bytes = token.encode("utf-8") if token else b""
+        try:
+            conn = Client(self.service_endpoint, authkey=authkey_bytes)
+        except Exception as e:
+            raise TrainingProvenanceSecurityError(
+                f"Completion authority service unavailable or connection failed: {e}"
+            ) from e
+
+        try:
+            conn.send({
+                "command": "EVALUATE_AND_RECORD",
+                "job_id": job_id,
+                "artifact_bytes": artifact_bytes,
+                "holdout_features": holdout_features,
+                "holdout_labels": holdout_labels,
+                "evaluator_identity": evaluator_identity,
+                "coordinator_token": token,
+                "caller_identity": "COORDINATOR",
+            })
+            res = conn.recv()
+        except Exception as e:
+            raise TrainingProvenanceSecurityError(
+                f"Completion authority communication failure during artifact evaluation: {e}"
+            ) from e
+        finally:
+            with contextlib.suppress(Exception):
+                conn.close()
+
+        if res.get("status") == "SUCCESS":
+            return cast("dict[str, float]", res["metrics"])
+        err_msg = res.get("error") or f"Artifact evaluation rejected by isolated completion authority: {res}"
         raise TrainingProvenanceSecurityError(err_msg)
 
 
@@ -3797,33 +4028,44 @@ class DistributedFederatedTrainingManager:
 
             # 4. Perform Genuine Model Evaluation on holdout dataset
             X_val, y_val = holdout_val_data
-            eval_metrics = self.model_service.evaluate(global_model, X_val, y_val)
-            if "loss" not in eval_metrics or "auc_roc" not in eval_metrics:
-                raise TrainingProvenanceSecurityError(
-                    f"Holdout evaluation failed to compute required metrics ('loss', 'auc_roc'). Available: {list(eval_metrics.keys())}"
+            if completion_authority is not None:
+                eval_res = completion_authority.evaluate_and_record_artifact(
+                    job_id=job_id,
+                    artifact_bytes=final_model_bytes,
+                    holdout_features=X_val,
+                    holdout_labels=y_val,
+                    coordinator_token=self.coordinator_token,
                 )
-            val_loss = float(eval_metrics["loss"])
-            val_auc = float(eval_metrics["auc_roc"])
-            if not (math.isfinite(val_loss) and math.isfinite(val_auc)):
-                raise TrainingProvenanceSecurityError(
-                    f"Holdout evaluation produced non-finite metrics: val_loss={val_loss}, val_auc={val_auc}"
-                )
+                val_loss = float(eval_res["val_loss"])
+                val_auc = float(eval_res["auc_roc"])
+            else:
+                eval_metrics = self.model_service.evaluate(global_model, X_val, y_val)
+                if "loss" not in eval_metrics or "auc_roc" not in eval_metrics:
+                    raise TrainingProvenanceSecurityError(
+                        f"Holdout evaluation failed to compute required metrics ('loss', 'auc_roc'). Available: {list(eval_metrics.keys())}"
+                    )
+                val_loss = float(eval_metrics["loss"])
+                val_auc = float(eval_metrics["auc_roc"])
+                if not (math.isfinite(val_loss) and math.isfinite(val_auc)):
+                    raise TrainingProvenanceSecurityError(
+                        f"Holdout evaluation produced non-finite metrics: val_loss={val_loss}, val_auc={val_auc}"
+                    )
 
-            # Record Evaluation Observations in PostgreSQL authority
-            self.authority_source.record_evaluation_observation(
-                job_id=job_id,
-                metric_name="auc_roc",
-                metric_value=val_auc,
-                evaluated_artifact_digest=aggregated_model_digest,
-                coordinator_token=self.coordinator_token,
-            )
-            self.authority_source.record_evaluation_observation(
-                job_id=job_id,
-                metric_name="val_loss",
-                metric_value=val_loss,
-                evaluated_artifact_digest=aggregated_model_digest,
-                coordinator_token=self.coordinator_token,
-            )
+                # Record Evaluation Observations in authority
+                self.authority_source.record_evaluation_observation(
+                    job_id=job_id,
+                    metric_name="auc_roc",
+                    metric_value=val_auc,
+                    evaluated_artifact_digest=aggregated_model_digest,
+                    coordinator_token=self.coordinator_token,
+                )
+                self.authority_source.record_evaluation_observation(
+                    job_id=job_id,
+                    metric_name="val_loss",
+                    metric_value=val_loss,
+                    evaluated_artifact_digest=aggregated_model_digest,
+                    coordinator_token=self.coordinator_token,
+                )
 
             # 5. Final artifact digest is the exact SHA-256 of the aggregated model bytes
             final_artifact_sha256 = aggregated_model_digest

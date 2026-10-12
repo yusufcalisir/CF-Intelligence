@@ -932,6 +932,14 @@ class TrustedTrainingJobRecordSource:
         self._validate_coordinator_token(coordinator_token)
         clean_job_id = job_id.strip()
         clean_sha = evaluated_artifact_digest.strip()
+
+        aggs = self._db.get_global_aggregations(clean_job_id)
+        valid_digests = {a.aggregated_global_model_digest for a in aggs}
+        if clean_sha not in valid_digests:
+            raise TrainingProvenanceSecurityError(
+                f"Evaluation forgery: evaluated artifact digest '{clean_sha}' does not match any authentic global aggregation for job '{clean_job_id}'."
+            )
+
         run_id = evaluation_run_id or f"eval_{clean_job_id}_{metric_name}"
         eid = event_id or f"evt_eval_{clean_job_id}_{metric_name}_{uuid.uuid4().hex[:8]}"
 
