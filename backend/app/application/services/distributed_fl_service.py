@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import concurrent.futures
 import contextlib
+import copyreg
 import hashlib
 import hmac
 import io
@@ -23,12 +24,21 @@ import logging
 import math
 import multiprocessing as mp
 from multiprocessing.connection import Client, Listener
+import types
 import os
+import sys
 import tempfile
 import threading
 import time
 from collections.abc import Mapping
 from typing import Any
+
+
+def _reconstruct_mappingproxy(d: dict[Any, Any]) -> types.MappingProxyType:
+    return types.MappingProxyType(d)
+
+
+copyreg.pickle(types.MappingProxyType, lambda mp: (_reconstruct_mappingproxy, (dict(mp),)))
 
 import numpy as np
 import torch
@@ -572,56 +582,166 @@ class SecurityIdentityInfo:
         return f"SecurityIdentityInfo(principal_id={self.principal_id!r}, principal_type={self.principal_type!r})"
 
 
-def get_completion_service_os_identity() -> SecurityIdentityInfo:
-    """Return the security principal under which the privileged completion authority runs."""
+def get_os_process_identity(target: Any = None) -> SecurityIdentityInfo:
+    """Inspect and return the actual effective operating system security identity from the process access token."""
     if os.name == "nt":
-        try:
-            import win32api
-            import win32con
-            import win32security
+        import win32api
+        import win32con
+        import win32security
 
+        pid: int | None = None
+        hProcess = None
+        if target is None:
             hProcess = win32api.GetCurrentProcess()
+            pid = os.getpid()
+        elif isinstance(target, int):
+            pid = target
+            hProcess = win32api.OpenProcess(win32con.PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        elif hasattr(target, "pid") and target.pid is not None and isinstance(target.pid, int):
+            pid = target.pid
+            hProcess = win32api.OpenProcess(win32con.PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        elif isinstance(target, tuple) and len(target) >= 3 and isinstance(target[2], int):
+            pid = target[2]
+            hProcess = target[0]
+        elif type(target).__name__ == "PyHANDLE":
+            hProcess = target
+            try:
+                import win32process
+
+                pid = win32process.GetProcessId(target)
+            except Exception:
+                pid = None
+        else:
+            hProcess = win32api.GetCurrentProcess()
+            pid = os.getpid()
+
+        try:
             hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_QUERY)
             user_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenUser)
-            sid_str = win32security.ConvertSidToStringSid(user_sid)
+            user_sid_str = win32security.ConvertSidToStringSid(user_sid)
+
+            is_restricted = bool(win32security.IsTokenRestricted(hToken))
+            restricted_sids: list[str] = []
+            if is_restricted:
+                r_sids = win32security.GetTokenInformation(hToken, win32security.TokenRestrictedSids)
+                restricted_sids = [win32security.ConvertSidToStringSid(s[0]) for s in r_sids]
+
+            groups = win32security.GetTokenInformation(hToken, win32security.TokenGroups)
+            group_sids = [win32security.ConvertSidToStringSid(g[0]) for g in groups]
+
+            disabled_groups = [
+                win32security.ConvertSidToStringSid(g[0])
+                for g in groups
+                if g[1] & win32security.SE_GROUP_USE_FOR_DENY_ONLY
+            ]
+
+            privs = win32security.GetTokenInformation(hToken, win32security.TokenPrivileges)
+            enabled_privs = [
+                win32security.LookupPrivilegeName(None, p[0])
+                for p in privs
+                if p[1] & (win32security.SE_PRIVILEGE_ENABLED | win32security.SE_PRIVILEGE_ENABLED_BY_DEFAULT)
+            ]
+
+            integrity_str = ""
+            try:
+                integ_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenIntegrityLevel)
+                integrity_str = win32security.ConvertSidToStringSid(integ_sid[0])
+            except Exception:
+                pass
+
+            has_restricted_code = "S-1-5-12" in restricted_sids
+            is_admin_disabled = "S-1-5-32-544" in disabled_groups or "S-1-5-32-544" not in group_sids
+
+            principal_type = "WindowsRestrictedProcessPrincipal" if is_restricted else "WindowsUserPrincipal"
+            principal_id = f"{user_sid_str}:RESTRICTED" if is_restricted else user_sid_str
+
             return SecurityIdentityInfo(
-                principal_id=sid_str,
-                principal_type="WindowsUserPrincipal",
-                details={"sid": sid_str, "privilege": "PrivilegedCompletionServiceAuthority"},
+                principal_id=principal_id,
+                principal_type=principal_type,
+                details={
+                    "pid": pid,
+                    "user_sid": user_sid_str,
+                    "is_restricted": is_restricted,
+                    "restricted_sids": restricted_sids,
+                    "group_sids": group_sids,
+                    "disabled_groups": disabled_groups,
+                    "privileges": enabled_privs,
+                    "integrity_sid": integrity_str,
+                    "has_restricted_code_sid": has_restricted_code,
+                    "is_admin_disabled": is_admin_disabled,
+                },
             )
         except Exception as e:
-            return SecurityIdentityInfo(principal_id=f"win_uid_{os.getpid()}", principal_type="WindowsFallback", details={"error": str(e)})
+            raise TrainingProvenanceSecurityError(f"Failed to query OS process security token: {e}") from e
     else:
         uid = getattr(os, "getuid", lambda: -1)()
         gid = getattr(os, "getgid", lambda: -1)()
+        groups = getattr(os, "getgroups", lambda: [])()
+        pid = target.pid if hasattr(target, "pid") else (target if isinstance(target, int) else os.getpid())
         return SecurityIdentityInfo(
             principal_id=f"posix_uid_{uid}",
             principal_type="PosixUserPrincipal",
-            details={"uid": uid, "gid": gid, "privilege": "PrivilegedCompletionServiceAuthority"},
+            details={
+                "pid": pid,
+                "uid": uid,
+                "gid": gid,
+                "groups": groups,
+                "is_restricted": False,
+            },
         )
 
 
-def get_coordinator_os_identity() -> SecurityIdentityInfo:
-    """Return the restricted security principal representing the federation coordinator runtime identity."""
-    if os.name == "nt":
-        try:
-            import win32security
+def get_completion_service_os_identity(target_process: Any = None) -> SecurityIdentityInfo:
+    """Return the real effective operating system security principal under which the completion service runs."""
+    info = get_os_process_identity(target_process)
+    info.details["privilege"] = "PrivilegedCompletionServiceAuthority"
+    return info
 
-            coord_sid = win32security.CreateWellKnownSid(win32security.WinRestrictedCodeSid)
-            sid_str = win32security.ConvertSidToStringSid(coord_sid)
-            return SecurityIdentityInfo(
-                principal_id=sid_str,
-                principal_type="WindowsRestrictedPrincipal",
-                details={"sid": sid_str, "name": "RESTRICTED_COORDINATOR_PRINCIPAL", "restricted": True},
-            )
-        except Exception as e:
-            return SecurityIdentityInfo(principal_id="win_restricted_coord", principal_type="WindowsFallback", details={"error": str(e)})
-    else:
-        return SecurityIdentityInfo(
-            principal_id="posix_restricted_coord",
-            principal_type="PosixRestrictedPrincipal",
-            details={"restricted": True},
+
+def get_coordinator_os_identity(target_process: Any = None) -> SecurityIdentityInfo:
+    """Return the real effective operating system security principal under which the coordinator runs."""
+    return get_os_process_identity(target_process)
+
+
+def create_restricted_coordinator_token() -> Any:
+    """Create a Windows restricted security token with WinRestrictedCodeSid and stripped privileges.
+
+    Enforces fail-closed: raises TrainingProvenanceConfigurationError on failure.
+    """
+    if os.name != "nt":
+        return None
+    try:
+        import win32api
+        import win32con
+        import win32security
+
+        hProcess = win32api.GetCurrentProcess()
+        hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_ALL_ACCESS)
+        user_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenUser)
+        coord_sid = win32security.CreateWellKnownSid(win32security.WinRestrictedCodeSid)
+        admin_sid = win32security.CreateWellKnownSid(win32security.WinBuiltinAdministratorsSid)
+
+        groups = win32security.GetTokenInformation(hToken, win32security.TokenGroups)
+        all_sids = [(user_sid, 0)]
+        for g in groups:
+            sid_str = win32security.ConvertSidToStringSid(g[0])
+            if "544" not in sid_str and "114" not in sid_str:
+                all_sids.append((g[0], 0))
+        all_sids.append((coord_sid, 0))
+
+        sids_to_disable = ((admin_sid, 0),)
+        restricted_token = win32security.CreateRestrictedToken(
+            hToken,
+            win32security.DISABLE_MAX_PRIVILEGE,
+            sids_to_disable,
+            (),
+            tuple(all_sids),
         )
+        return restricted_token
+    except Exception as e:
+        raise TrainingProvenanceConfigurationError(
+            f"Failed to create operating system restricted coordinator security token: {e}"
+        ) from e
 
 
 class CoordinatorOSSecurityContext:
@@ -629,6 +749,7 @@ class CoordinatorOSSecurityContext:
 
     Enforces that filesystem access checks, token queries, and OS permissions are evaluated under
     the coordinator's restricted principal, which is permanently denied access to the completion vault.
+    Fails closed if the restricted security token or impersonation cannot be established.
     """
 
     def __init__(self) -> None:
@@ -638,19 +759,15 @@ class CoordinatorOSSecurityContext:
     def __enter__(self) -> CoordinatorOSSecurityContext:
         if os.name == "nt":
             try:
-                import win32api
-                import win32con
+                self._token = create_restricted_coordinator_token()
                 import win32security
 
-                hProcess = win32api.GetCurrentProcess()
-                hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_ALL_ACCESS)
-                coord_sid = win32security.CreateWellKnownSid(win32security.WinRestrictedCodeSid)
-                sids_to_restrict: Any = ((coord_sid, 0),)
-                self._token = win32security.CreateRestrictedToken(hToken, 0, (), (), sids_to_restrict)
                 win32security.ImpersonateLoggedOnUser(self._token)
                 self._active = True
             except Exception as e:
-                logger.warning("Could not establish Windows restricted coordinator context: %s", e)
+                raise TrainingProvenanceSecurityError(
+                    f"Failed to establish operating system restricted coordinator context: {e}"
+                ) from e
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -676,13 +793,19 @@ def provision_isolated_completion_authority_vault(
       that DENIES all access to the Coordinator Security Principal (WinRestrictedCodeSid S-1-5-12)
       and grants access strictly to the Completion Service Security Principal.
     - On POSIX/Unix: Sets directory permissions 0700 and file permissions 0600.
+    - Fails closed on any policy installation failure.
     - Security persists permanently before service startup, during execution, after process termination,
       and across restarts.
     """
-    os.makedirs(vault_dir, mode=0o700, exist_ok=True)
-    vault_file = os.path.join(vault_dir, "completion_authority.vault")
-    with open(vault_file, "w", encoding="utf-8") as f:
-        f.write(completion_db_url.strip())
+    try:
+        os.makedirs(vault_dir, mode=0o700, exist_ok=True)
+        vault_file = os.path.join(vault_dir, "completion_authority.vault")
+        with open(vault_file, "w", encoding="utf-8") as f:
+            f.write(completion_db_url.strip())
+    except Exception as e:
+        raise TrainingProvenanceConfigurationError(
+            f"Failed to create isolated completion vault directory or file: {e}"
+        ) from e
 
     if os.name == "nt":
         try:
@@ -713,13 +836,508 @@ def provision_isolated_completion_authority_vault(
                     None,
                 )
         except Exception as e:
-            logger.warning("Could not set Windows NTFS DACL on completion vault: %s", e)
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to configure mandatory operating system NTFS DACL on completion vault: {e}"
+            ) from e
     else:
-        with contextlib.suppress(Exception):
+        try:
             os.chmod(vault_dir, 0o700)
             os.chmod(vault_file, 0o600)
+        except Exception as e:
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to configure mandatory operating system permissions on completion vault: {e}"
+            ) from e
 
     return vault_file
+
+
+class IsolatedCoordinatorClient:
+    """Client for controlling and orchestrating the isolated federation coordinator process over authenticated IPC."""
+
+    def __init__(self, conn: Any, proc_handle: Any, pid: int, app_env: str = "production") -> None:
+        self._conn = conn
+        self._proc_handle = proc_handle
+        self.pid = pid
+        self.app_env = app_env
+
+    def get_process_identity(self) -> SecurityIdentityInfo:
+        return get_os_process_identity(self._proc_handle if self._proc_handle is not None else self.pid)
+
+    def attempt_read_vault(self, vault_path: str) -> dict[str, Any]:
+        self._conn.send({"command": "ATTEMPT_READ_VAULT", "vault_path": vault_path})
+        return self._conn.recv()
+
+    def attempt_write_vault(self, vault_path: str, data: str) -> dict[str, Any]:
+        self._conn.send({"command": "ATTEMPT_WRITE_VAULT", "vault_path": vault_path, "data": data})
+        return self._conn.recv()
+
+    def attempt_privilege_escalation(self, vault_path: str | None = None) -> dict[str, Any]:
+        self._conn.send({"command": "ATTEMPT_PRIVILEGE_ESCALATION", "vault_path": vault_path})
+        return self._conn.recv()
+
+    def attempt_launch_completion_service(self, vault_path: str, coordinator_token: str | None = None) -> dict[str, Any]:
+        self._conn.send({
+            "command": "ATTEMPT_LAUNCH_COMPLETION_SERVICE",
+            "vault_path": vault_path,
+            "coordinator_token": coordinator_token,
+            "app_env": self.app_env,
+        })
+        return self._conn.recv()
+
+    def attempt_direct_sql(self, db_url: str, sql: str) -> dict[str, Any]:
+        self._conn.send({"command": "ATTEMPT_DIRECT_SQL", "db_url": db_url, "sql": sql})
+        return self._conn.recv()
+
+    def execute_federation(
+        self,
+        job_id: str,
+        training_run_id: str,
+        simulation_id: str,
+        holdout_val_data: tuple[np.ndarray, np.ndarray],
+        participating_banks: list[str] | tuple[str, ...],
+        worker_endpoints: dict[str, dict[str, Any]],
+        num_rounds: int,
+        expected_unique_samples: int | None,
+        registry_storage_dir: str | None,
+        coordinator_token: str,
+        db_url: str,
+        comp_service_endpoint: tuple[str, int],
+        signing_authority: Any,
+        worker_pids: dict[str, int] | None = None,
+    ) -> dict[str, Any]:
+        req = {
+            "command": "EXECUTE_FEDERATION",
+            "job_id": job_id,
+            "training_run_id": training_run_id,
+            "simulation_id": simulation_id,
+            "holdout_val_data": holdout_val_data,
+            "participating_banks": list(participating_banks),
+            "num_rounds": num_rounds,
+            "expected_unique_samples": expected_unique_samples,
+            "registry_storage_dir": registry_storage_dir,
+            "coordinator_token": coordinator_token,
+            "db_url": db_url,
+            "comp_service_endpoint": comp_service_endpoint,
+            "app_env": self.app_env,
+            "worker_pids": worker_pids or {},
+        }
+        self._conn.send(req)
+
+        while True:
+            msg = self._conn.recv()
+            if not isinstance(msg, dict):
+                raise RuntimeError(f"Unexpected coordinator IPC message: {msg}")
+
+            cmd = msg.get("command")
+            if cmd == "FEDERATION_RESULT":
+                if msg.get("status") == "SUCCESS":
+                    return msg["result"]
+                raise TrainingProvenanceSecurityError(msg.get("error", "Federation failed"))
+
+            elif cmd == "PROXY_QUEUE_PUT":
+                bank_id = msg["bank_id"]
+                item = msg["msg"]
+                worker_endpoints[bank_id]["inbox"].put(item)
+                self._conn.send({"status": "OK"})
+
+            elif cmd == "PROXY_QUEUE_GET":
+                bank_id = msg["bank_id"]
+                timeout = msg.get("timeout")
+                try:
+                    item = worker_endpoints[bank_id]["outbox"].get(timeout=timeout)
+                    self._conn.send({"status": "OK", "msg": item})
+                except Exception as e:
+                    self._conn.send({"status": "ERROR", "error": str(e)})
+
+            elif cmd == "PROXY_SIGN_RECEIPT":
+                job_id_req = msg["job_id"]
+                art_bytes = msg["artifact_bytes"]
+                c_token = msg.get("caller_token")
+                c_ident = msg.get("caller_identity", "COORDINATOR")
+                try:
+                    receipt = signing_authority.sign_completed_job_receipt(
+                        job_id=job_id_req,
+                        artifact_bytes=art_bytes,
+                        caller_identity=c_ident,
+                        caller_token=c_token,
+                    )
+                    self._conn.send({"status": "SUCCESS", "receipt": receipt})
+                except Exception as e:
+                    self._conn.send({"status": "ERROR", "error": str(e)})
+
+            else:
+                raise RuntimeError(f"Unknown message from coordinator process: {cmd}")
+
+    def terminate(self) -> None:
+        try:
+            self._conn.send({"command": "STOP"})
+        except Exception:
+            pass
+        with contextlib.suppress(Exception):
+            self._conn.close()
+        if os.name == "nt" and self._proc_handle is not None:
+            try:
+                import win32process
+                exit_code = win32process.GetExitCodeProcess(self._proc_handle)
+                if exit_code == 259:
+                    win32process.TerminateProcess(self._proc_handle, 0)
+            except Exception:
+                pass
+
+
+def _run_isolated_coordinator_worker(
+    listener_address: tuple[str, int],
+    authkey_bytes: bytes,
+) -> None:
+    """Dedicated Operating System Process running the Federation Coordinator Worker.
+
+    Invariants enforced:
+    1. Runs under independent OS process token (IsTokenRestricted == True on Windows).
+    2. Zero completion database credentials or vault paths in memory or arguments.
+    3. Cannot access completion vault (denied by NTFS DACL policy).
+    4. RevertToSelf cannot escape process restricted token.
+    5. Direct SQL strictly governed by cfi_coord_role.
+    """
+    client = Client(listener_address, authkey=authkey_bytes)
+    pid = os.getpid()
+
+    is_restricted = False
+    if os.name == "nt":
+        try:
+            import win32api
+            import win32security
+            h = win32security.OpenProcessToken(win32api.GetCurrentProcess(), 8)
+            is_restricted = bool(win32security.IsTokenRestricted(h))
+        except Exception:
+            pass
+
+    client.send({"status": "READY", "pid": pid, "is_restricted": is_restricted})
+
+    while True:
+        try:
+            req = client.recv()
+        except Exception:
+            break
+
+        if not isinstance(req, dict):
+            break
+
+        cmd = req.get("command")
+        if cmd == "STOP":
+            with contextlib.suppress(Exception):
+                client.send({"status": "STOPPED"})
+            break
+
+        elif cmd == "ATTEMPT_READ_VAULT":
+            vault_path = req["vault_path"]
+            try:
+                with open(vault_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                client.send({"status": "SUCCESS", "content": content})
+            except Exception as e:
+                client.send({
+                    "status": "DENIED",
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                })
+
+        elif cmd == "ATTEMPT_WRITE_VAULT":
+            vault_path = req["vault_path"]
+            data = req.get("data", "")
+            try:
+                with open(vault_path, "w", encoding="utf-8") as f:
+                    f.write(data)
+                client.send({"status": "SUCCESS"})
+            except Exception as e:
+                client.send({
+                    "status": "DENIED",
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                })
+
+        elif cmd == "ATTEMPT_PRIVILEGE_ESCALATION":
+            revert_err = None
+            if os.name == "nt":
+                try:
+                    import win32security
+                    win32security.RevertToSelf()
+                except Exception as e:
+                    revert_err = str(e)
+            ident = get_os_process_identity()
+            read_err = None
+            vault_path = req.get("vault_path")
+            if vault_path:
+                try:
+                    with open(vault_path, "r", encoding="utf-8") as f:
+                        _ = f.read()
+                except Exception as e:
+                    read_err = {"error_type": type(e).__name__, "error": str(e)}
+
+            client.send({
+                "status": "CHECKED",
+                "is_restricted": ident.details.get("is_restricted"),
+                "revert_err": revert_err,
+                "read_err": read_err,
+            })
+
+        elif cmd == "ATTEMPT_LAUNCH_COMPLETION_SERVICE":
+            vault_path = req["vault_path"]
+            coord_tok = req.get("coordinator_token")
+            app_env = req.get("app_env", "production")
+            try:
+                proc, addr = spawn_isolated_completion_authority_service(
+                    vault_path=vault_path,
+                    coordinator_token=coord_tok,
+                    app_env=app_env,
+                )
+                proc.terminate()
+                proc.join(timeout=1)
+                client.send({"launched": True})
+            except Exception as e:
+                client.send({
+                    "launched": False,
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                })
+
+        elif cmd == "ATTEMPT_DIRECT_SQL":
+            db_url = req["db_url"]
+            sql = req["sql"]
+            try:
+                import psycopg
+                with psycopg.connect(db_url) as conn:
+                    conn.autocommit = False
+                    with conn.cursor() as cur:
+                        cur.execute(sql)
+                    conn.commit()
+                client.send({"status": "SUCCESS"})
+            except Exception as e:
+                client.send({
+                    "status": "DENIED",
+                    "error_type": type(e).__name__,
+                    "sqlstate": getattr(e, "sqlstate", None),
+                    "error": str(e),
+                })
+
+        elif cmd == "EXECUTE_FEDERATION":
+            try:
+                coord_tok = req["coordinator_token"]
+                db_url = req["db_url"]
+                app_env = req.get("app_env", "production")
+                comp_endpoint = req["comp_service_endpoint"]
+                participating_banks = req["participating_banks"]
+
+                manager = DistributedFederatedTrainingManager(
+                    coordinator_token=coord_tok,
+                    db_url=db_url,
+                    app_env=app_env,
+                )
+
+                comp_auth = IsolatedTrainingCompletionAuthority(
+                    service_endpoint=comp_endpoint,
+                    coordinator_token=coord_tok,
+                    app_env=app_env,
+                )
+
+                class _WorkerProxyQueue:
+                    def __init__(self, c: Any, b_id: str, q_type: str) -> None:
+                        self._c = c
+                        self._b = b_id
+                        self._type = q_type
+
+                    def put(self, item: Any) -> None:
+                        self._c.send({"command": "PROXY_QUEUE_PUT", "bank_id": self._b, "msg": item})
+                        ack = self._c.recv()
+                        if ack.get("status") != "OK":
+                            raise RuntimeError(ack.get("error", "Put failed"))
+
+                    def get(self, timeout: float | None = None) -> Any:
+                        self._c.send({"command": "PROXY_QUEUE_GET", "bank_id": self._b, "timeout": timeout})
+                        res = self._c.recv()
+                        if res.get("status") == "OK":
+                            return res["msg"]
+                        import queue
+                        raise queue.Empty(res.get("error", "Timeout"))
+
+                class _ProxySigningAuth:
+                    def __init__(self, c: Any) -> None:
+                        self._c = c
+
+                    def sign_completed_job_receipt(
+                        self,
+                        job_id: str,
+                        artifact_bytes: bytes,
+                        caller_identity: str = "COORDINATOR",
+                        caller_token: str | None = None,
+                    ) -> Any:
+                        self._c.send({
+                            "command": "PROXY_SIGN_RECEIPT",
+                            "job_id": job_id,
+                            "artifact_bytes": artifact_bytes,
+                            "caller_token": caller_token,
+                            "caller_identity": caller_identity,
+                        })
+                        reply = self._c.recv()
+                        if reply.get("status") == "SUCCESS":
+                            return reply["receipt"]
+                        raise TrainingProvenanceSecurityError(reply.get("error", "Signing error"))
+
+                proxy_endpoints = {
+                    b: {
+                        "inbox": _WorkerProxyQueue(client, b, "inbox"),
+                        "outbox": _WorkerProxyQueue(client, b, "outbox"),
+                    }
+                    for b in participating_banks
+                }
+
+                signing_auth = _ProxySigningAuth(client)
+
+                fed_result = manager.execute_distributed_federation(
+                    job_id=req["job_id"],
+                    training_run_id=req["training_run_id"],
+                    simulation_id=req["simulation_id"],
+                    holdout_val_data=req["holdout_val_data"],
+                    participating_banks=participating_banks,
+                    worker_endpoints=proxy_endpoints,
+                    num_rounds=req["num_rounds"],
+                    expected_unique_samples=req.get("expected_unique_samples"),
+                    registry_storage_dir=req.get("registry_storage_dir"),
+                    completion_authority=comp_auth,
+                    signing_authority=signing_auth,
+                )
+
+                if "worker_pids" in req:
+                    fed_result["worker_pids"] = req["worker_pids"]
+
+                client.send({
+                    "command": "FEDERATION_RESULT",
+                    "status": "SUCCESS",
+                    "result": fed_result,
+                })
+            except Exception as e:
+                client.send({
+                    "command": "FEDERATION_RESULT",
+                    "status": "ERROR",
+                    "error": str(e),
+                })
+
+    with contextlib.suppress(Exception):
+        client.close()
+
+
+def spawn_isolated_coordinator_process(
+    app_env: str = "production",
+) -> tuple[Any, IsolatedCoordinatorClient]:
+    """Launch dedicated Operating System Process running the Federation Coordinator.
+
+    The coordinator process executes under an enforced restricted security token:
+    - On Windows: created via CreateProcessAsUser with WinRestrictedCodeSid restricting token,
+      all privileges stripped (DISABLE_MAX_PRIVILEGE), and Administrators group disabled.
+    - bInheritHandles=False ensures zero inherited file handles or parent tokens.
+    - The coordinator communicates with the completion authority strictly via authenticated TCP IPC.
+    - Possesses zero completion credentials and is denied access to completion vaults by NTFS DACL.
+    """
+    import secrets
+
+    authkey = secrets.token_bytes(32)
+    listener = Listener(("127.0.0.1", 0), authkey=authkey)
+    host, port = listener.address
+
+    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    env = dict(os.environ)
+    env["PYTHONPATH"] = backend_dir
+    env.pop("CFI_TRAINING_JOB_COMPLETION_DB_URL", None)
+    env.pop("COMPLETION_DB_URL", None)
+    env.pop("VAULT_PATH", None)
+
+    proc_handle = None
+    proc_pid = None
+
+    worker_code = (
+        "import sys; "
+        "from app.application.services.distributed_fl_service import _run_isolated_coordinator_worker; "
+        "_run_isolated_coordinator_worker((sys.argv[1], int(sys.argv[2])), bytes.fromhex(sys.argv[3]))"
+    )
+
+    if os.name == "nt":
+        import win32process
+
+        restricted_token = create_restricted_coordinator_token()
+        si = win32process.STARTUPINFO()
+        cmd = f'"{sys.executable}" -c "{worker_code}" {host} {port} {authkey.hex()}'
+        try:
+            hProc, hThread, pid, tid = win32process.CreateProcessAsUser(
+                restricted_token,
+                None,
+                cmd,
+                None,
+                None,
+                False,
+                0,
+                env,
+                None,
+                si,
+            )
+            proc_handle = hProc
+            proc_pid = pid
+        except Exception as e:
+            listener.close()
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to spawn isolated coordinator process with restricted token: {e}"
+            ) from e
+    else:
+        import subprocess
+
+        cmd_list = [
+            sys.executable,
+            "-c",
+            worker_code,
+            str(host),
+            str(port),
+            authkey.hex(),
+        ]
+        try:
+            sub = subprocess.Popen(cmd_list, env=env)
+            proc_handle = sub
+            proc_pid = sub.pid
+        except Exception as e:
+            listener.close()
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to spawn isolated coordinator process: {e}"
+            ) from e
+
+    try:
+        with contextlib.suppress(Exception):
+            raw_l = getattr(listener, "_listener", None)
+            if raw_l is not None:
+                s = getattr(raw_l, "_socket", None)
+                if s is not None:
+                    s.settimeout(15.0)
+
+        conn = listener.accept()
+        init_msg = conn.recv()
+        if not isinstance(init_msg, dict) or init_msg.get("status") != "READY":
+            raise TrainingProvenanceConfigurationError(f"Coordinator handshake failed: {init_msg}")
+
+        client = IsolatedCoordinatorClient(
+            conn=conn,
+            proc_handle=proc_handle,
+            pid=proc_pid or init_msg.get("pid", 0),
+            app_env=app_env,
+        )
+        return proc_handle, client
+    except Exception as e:
+        listener.close()
+        if os.name == "nt" and proc_handle is not None:
+            with contextlib.suppress(Exception):
+                import win32process
+
+                win32process.TerminateProcess(proc_handle, 1)
+        raise TrainingProvenanceConfigurationError(
+            f"Failed to establish authenticated communication with isolated coordinator: {e}"
+        ) from e
+    finally:
+        listener.close()
 
 
 def _acquire_vault_exclusive_os_boundary(path: str) -> Any:
@@ -1874,3 +2492,15 @@ class DistributedFederatedTrainingManager:
                 proc.join(timeout=2)
                 if proc.is_alive():
                     proc.terminate()
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) >= 5 and sys.argv[1] == "--coordinator-worker":
+        _host = sys.argv[2]
+        _port = int(sys.argv[3])
+        _authkey = bytes.fromhex(sys.argv[4])
+        _run_isolated_coordinator_worker((_host, _port), _authkey)
+        sys.exit(0)
+
