@@ -637,7 +637,7 @@ def get_os_process_identity(target: Any = None) -> SecurityIdentityInfo:
 
             privs = win32security.GetTokenInformation(hToken, win32security.TokenPrivileges)
             enabled_privs = [
-                win32security.LookupPrivilegeName("", p[0])
+                win32security.LookupPrivilegeName("", int(p[0]))
                 for p in privs
                 if p[1] & (win32security.SE_PRIVILEGE_ENABLED | win32security.SE_PRIVILEGE_ENABLED_BY_DEFAULT)
             ]
