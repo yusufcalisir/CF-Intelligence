@@ -262,7 +262,8 @@ class TestConcurrencyFailureRecoverySecurity:
             # Exactly 1 completed row persisted in PostgreSQL
             with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-                assert cur.fetchone()[0] == 1
+                row = cur.fetchone()
+                assert row is not None and row[0] == 1
         finally:
             comp_proc.terminate()
             comp_proc.join(timeout=3)
@@ -437,10 +438,9 @@ class TestConcurrencyFailureRecoverySecurity:
         authority_worker = PostgresTrainingJobAuthority(db_url=worker_url)
 
         marker_file = str(tmp_path / f"checkpoint_con04_{uid}.txt")
-        obs_rejected = False
+        obs_rejected: list[bool] = []
 
         def _late_worker():
-            nonlocal obs_rejected
             late_obs = RoundObservation(
                 event_id=f"obs_late_con04_{uid}",
                 job_id=job_id,
@@ -462,7 +462,7 @@ class TestConcurrencyFailureRecoverySecurity:
                 authority_worker.record_observation(late_obs)
             except TrainingProvenanceSecurityError as e:
                 if "finalized completed job" in str(e):
-                    obs_rejected = True
+                    obs_rejected.append(True)
 
         def _completion():
             return authority_comp.complete_job(
@@ -499,7 +499,7 @@ class TestConcurrencyFailureRecoverySecurity:
         t_comp.join(timeout=5)
         t_obs.join(timeout=5)
 
-        assert obs_rejected is True
+        assert True in obs_rejected
 
         with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
             cur.execute("SELECT sample_count, executed_rounds FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
@@ -509,7 +509,8 @@ class TestConcurrencyFailureRecoverySecurity:
             assert row[1] == 1
 
             cur.execute("SELECT COUNT(*) FROM cfi_round_observations WHERE event_id = %s", (f"obs_late_con04_{uid}",))
-            assert cur.fetchone()[0] == 0
+            late_row = cur.fetchone()
+            assert late_row is not None and late_row[0] == 0
 
     # -------------------------------------------------------------------------
     # CON-05: Duplicate Observations Cannot Inflate Accounting
@@ -570,7 +571,8 @@ class TestConcurrencyFailureRecoverySecurity:
 
         with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM cfi_round_observations WHERE job_id = %s", (job_id,))
-            assert cur.fetchone()[0] == 1
+            obs_row = cur.fetchone()
+            assert obs_row is not None and obs_row[0] == 1
 
         # 3. Duplicate record with conflicting payload is rejected
         conflicting_obs = RoundObservation(
@@ -714,7 +716,8 @@ class TestConcurrencyFailureRecoverySecurity:
         # Inspect PostgreSQL: 0 rows committed
         with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            assert cur.fetchone()[0] == 0
+            zero_row = cur.fetchone()
+            assert zero_row is not None and zero_row[0] == 0
 
     # -------------------------------------------------------------------------
     # CON-08: Restart and Retry After Ambiguous Completion (Idempotency)
@@ -780,7 +783,8 @@ class TestConcurrencyFailureRecoverySecurity:
             # Exactly 1 row in PostgreSQL
             with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-                assert cur.fetchone()[0] == 1
+                one_row = cur.fetchone()
+                assert one_row is not None and one_row[0] == 1
         finally:
             restarted_proc.terminate()
             restarted_proc.join(timeout=3)
@@ -820,7 +824,8 @@ class TestConcurrencyFailureRecoverySecurity:
         # No completed job record exists
         with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            assert cur.fetchone()[0] == 0
+            no_row = cur.fetchone()
+            assert no_row is not None and no_row[0] == 0
 
         # Receipt issuer rejects issuance for unfinished job
         issuer_source = TrustedTrainingJobRecordSource(
