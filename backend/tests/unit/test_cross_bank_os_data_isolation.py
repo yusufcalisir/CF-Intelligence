@@ -20,10 +20,9 @@ from __future__ import annotations
 
 import hashlib
 import os
-import secrets
-import sys
 import uuid
 from collections.abc import Generator
+from typing import Any
 from unittest import mock
 
 import numpy as np
@@ -38,7 +37,6 @@ from app.application.services.distributed_fl_service import (
     BankWorkerOSSecurityContext,
     CoordinatorOSSecurityContext,
     IsolatedReceiptSigningAuthority,
-    get_bank_security_sid,
     get_bank_worker_os_identity,
     get_coordinator_os_identity,
     provision_isolated_completion_authority_vault,
@@ -50,12 +48,12 @@ from app.application.services.distributed_fl_service import (
     validate_restricted_bank_worker_policy,
 )
 from app.application.services.model_service import NUM_FEATURES, ModelService
-from app.config import get_settings
 from app.application.services.training_provenance_service import (
     DEFAULT_TRAINING_KEY_ID,
     TrainingProvenanceConfigurationError,
     TrainingProvenanceSecurityError,
 )
+from app.config import get_settings
 from app.infrastructure.database.training_authority_backends import provision_runtime_service_roles
 
 COORD_SECRET = "coord_secret_bank_os_suite_prod_991"
@@ -411,7 +409,6 @@ class TestCrossBankOSDataIsolation:
 
         # 1. DACL enforcement failure in setup_bank_private_storage raises fail-closed exception
         if os.name == "nt":
-            import win32security
 
             def failing_set_security(*args: Any, **kwargs: Any) -> None:
                 raise OSError("Simulated Windows Security API failure")
@@ -484,6 +481,7 @@ class TestCrossBankOSDataIsolation:
                 bank_encryption_key=enc_key,
                 app_env="production",
             )
+            assert os.path.exists(data_path)
 
             # Authorized bank worker executes under its dedicated OS security context
             with BankWorkerOSSecurityContext(b_id):
@@ -507,7 +505,7 @@ class TestCrossBankOSDataIsolation:
                     learning_rate=0.01,
                 )
                 assert len(loss_history) == 2
-                assert all(np.isfinite(l) for l in loss_history)
+                assert all(np.isfinite(val) for val in loss_history)
 
     def test_bank_os_10_genuine_three_bank_two_round_federation_with_enforced_isolation(
         self, pg_roles: dict[str, str], tmp_path
