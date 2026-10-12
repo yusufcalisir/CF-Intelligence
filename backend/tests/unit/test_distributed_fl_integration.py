@@ -37,6 +37,7 @@ from app.application.services.distributed_fl_service import (
     setup_bank_private_storage,
     spawn_bank_workers,
     spawn_isolated_completion_authority_service,
+    spawn_isolated_coordinator_process,
 )
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES
@@ -164,12 +165,8 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
         app_env="production",
     )
 
-    # 5. Coordinator initialized with coordinator role ONLY (zero completion credentials)
-    manager = DistributedFederatedTrainingManager(
-        coordinator_token=COORD_SECRET,
-        db_url=role_urls["coordinator"],
-        app_env="production",
-    )
+    # 5. Coordinator launched under mandatory restricted OS process boundary
+    coord_proc, coord_client = spawn_isolated_coordinator_process(app_env="production")
 
     registry_dir = str(tmp_path / "registry")
     dev_seed = hashlib.sha256(b"cfi_dev_ed25519_training_issuer_seed_v1").digest().hex()
@@ -183,20 +180,39 @@ def federated_execution_result(real_pg_instance: str, tmp_path_factory: pytest.T
         app_env="production",
     )
 
-    result = manager.execute_distributed_federation(
-        job_id=job_id,
-        training_run_id=run_id,
-        simulation_id=sim_id,
-        holdout_val_data=(X_test, y_test),
-        participating_banks=["BANK_A", "BANK_B", "BANK_C"],
-        worker_endpoints=endpoints,
-        worker_processes=procs,
-        num_rounds=2,
-        expected_unique_samples=450,
-        registry_storage_dir=registry_dir,
-        signing_authority=signing_auth,
-        completion_authority=completion_auth,
+    worker_pids = {b_id: p.pid for b_id, p in procs.items()}
+
+    try:
+        result = coord_client.execute_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(X_test, y_test),
+            participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+            worker_endpoints=endpoints,
+            num_rounds=2,
+            expected_unique_samples=450,
+            registry_storage_dir=registry_dir,
+            coordinator_token=COORD_SECRET,
+            db_url=role_urls["coordinator"],
+            comp_service_endpoint=comp_endpoint,
+            signing_authority=signing_auth,
+            worker_pids=worker_pids,
+        )
+    finally:
+        coord_client.terminate()
+
+    class CoordinatorAuthorityProxy:
+        def __init__(self, authority_source: Any) -> None:
+            self.authority_source = authority_source
+
+    coord_authority = TrustedTrainingJobRecordSource(
+        coordinator_token=COORD_SECRET,
+        db_url=role_urls["coordinator"],
+        enforce_lifecycle=True,
+        app_env="production",
     )
+    manager = CoordinatorAuthorityProxy(coord_authority)
     result["completion_auth"] = completion_auth
     result["comp_proc"] = comp_proc
     result["comp_vault_file"] = comp_vault_file

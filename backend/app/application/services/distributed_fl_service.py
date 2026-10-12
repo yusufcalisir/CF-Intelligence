@@ -746,6 +746,56 @@ def create_restricted_coordinator_token() -> Any:
         ) from e
 
 
+def verify_restricted_coordinator_os_boundary(app_env: str = "production") -> SecurityIdentityInfo:
+    """Verify that the current operating system process satisfies the mandatory production coordinator isolation policy.
+
+    In production:
+    - Platform must support enforced operating system token isolation (Windows NT).
+    - Current process access token must have IsTokenRestricted == True.
+    - WinRestrictedCodeSid (S-1-5-12) must be present in TokenRestrictedSids.
+    - Administrators group (S-1-5-32-544) must be disabled (SE_GROUP_USE_FOR_DENY_ONLY).
+    - Administrative privileges must be stripped via DISABLE_MAX_PRIVILEGE (<= 1 enabled privilege).
+    - Fails closed with TrainingProvenanceSecurityError on any policy violation or unsupported platform.
+    """
+    if app_env.lower() != "production":
+        return get_os_process_identity()
+
+    if os.name != "nt":
+        raise TrainingProvenanceSecurityError(
+            f"Production coordinator isolation is not supported on platform '{sys.platform}'. "
+            "Production federated training requires enforced Windows Restricted Token isolation (EXEC-06)."
+        )
+
+    ident = get_os_process_identity()
+    details = ident.details
+
+    if not details.get("is_restricted"):
+        raise TrainingProvenanceSecurityError(
+            "Production federation coordinator must execute under an enforced restricted operating system security token. "
+            "Direct instantiation or execution inside an unrestricted process is prohibited (EXEC-01)."
+        )
+
+    if not details.get("has_restricted_code_sid"):
+        raise TrainingProvenanceSecurityError(
+            "Production federation coordinator process token lacks mandatory WinRestrictedCodeSid (S-1-5-12) restriction."
+        )
+
+    if not details.get("is_admin_disabled"):
+        raise TrainingProvenanceSecurityError(
+            "Production federation coordinator process token has active administrative authority (S-1-5-32-544 not disabled)."
+        )
+
+    enabled_privs = details.get("enabled_privileges", [])
+    if len(enabled_privs) > 1:
+        raise TrainingProvenanceSecurityError(
+            f"Production federation coordinator process has unauthorized enabled privileges ({enabled_privs}); "
+            "all administrative privileges must be stripped via DISABLE_MAX_PRIVILEGE."
+        )
+
+    return ident
+
+
+
 class CoordinatorOSSecurityContext:
     """Context manager executing under the restricted coordinator operating system security identity.
 
@@ -906,6 +956,10 @@ class IsolatedCoordinatorClient:
         comp_service_endpoint: tuple[str, int],
         signing_authority: Any,
         worker_pids: dict[str, int] | None = None,
+        bank_partitions: Any = None,
+        bank_tokens: Any = None,
+        bank_data_paths: Any = None,
+        signing_key_hex: str | None = None,
     ) -> dict[str, Any]:
         req = {
             "command": "EXECUTE_FEDERATION",
@@ -922,59 +976,76 @@ class IsolatedCoordinatorClient:
             "comp_service_endpoint": comp_service_endpoint,
             "app_env": self.app_env,
             "worker_pids": worker_pids or {},
+            "bank_partitions": bank_partitions,
+            "bank_tokens": bank_tokens,
+            "bank_data_paths": bank_data_paths,
+            "signing_key_hex": signing_key_hex,
+            "has_worker_endpoints": bool(worker_endpoints),
         }
-        self._conn.send(req)
+        try:
+            self._conn.send(req)
 
-        while True:
-            msg = self._conn.recv()
-            if not isinstance(msg, dict):
-                raise RuntimeError(f"Unexpected coordinator IPC message: {msg}")
+            while True:
+                msg = self._conn.recv()
+                if not isinstance(msg, dict):
+                    raise RuntimeError(f"Unexpected coordinator IPC message: {msg}")
 
-            cmd = msg.get("command")
-            if cmd == "FEDERATION_RESULT":
-                if msg.get("status") == "SUCCESS":
-                    return msg["result"]
-                raise TrainingProvenanceSecurityError(msg.get("error", "Federation failed"))
+                cmd = msg.get("command")
+                if cmd == "FEDERATION_RESULT":
+                    if msg.get("status") == "SUCCESS":
+                        return msg["result"]
+                    raise TrainingProvenanceSecurityError(msg.get("error", "Federation failed"))
 
-            elif cmd == "PROXY_QUEUE_PUT":
-                bank_id = msg["bank_id"]
-                item = msg["msg"]
-                worker_endpoints[bank_id]["inbox"].put(item)
-                self._conn.send({"status": "OK"})
+                elif cmd == "PROXY_QUEUE_PUT":
+                    bank_id = msg["bank_id"]
+                    item = msg["msg"]
+                    worker_endpoints[bank_id]["inbox"].put(item)
+                    self._conn.send({"status": "OK"})
 
-            elif cmd == "PROXY_QUEUE_GET":
-                bank_id = msg["bank_id"]
-                timeout = msg.get("timeout")
-                try:
-                    item = worker_endpoints[bank_id]["outbox"].get(timeout=timeout)
-                    self._conn.send({"status": "OK", "msg": item})
-                except Exception as e:
-                    self._conn.send({"status": "ERROR", "error": str(e)})
+                elif cmd == "PROXY_QUEUE_GET":
+                    bank_id = msg["bank_id"]
+                    timeout = msg.get("timeout")
+                    try:
+                        item = worker_endpoints[bank_id]["outbox"].get(timeout=timeout)
+                        self._conn.send({"status": "OK", "msg": item})
+                    except Exception as e:
+                        self._conn.send({"status": "ERROR", "error": str(e)})
 
-            elif cmd == "PROXY_SIGN_RECEIPT":
-                job_id_req = msg["job_id"]
-                art_bytes = msg["artifact_bytes"]
-                c_token = msg.get("caller_token")
-                c_ident = msg.get("caller_identity", "COORDINATOR")
-                try:
-                    receipt = signing_authority.sign_completed_job_receipt(
-                        job_id=job_id_req,
-                        artifact_bytes=art_bytes,
-                        caller_identity=c_ident,
-                        caller_token=c_token,
-                    )
-                    self._conn.send({"status": "SUCCESS", "receipt": receipt})
-                except Exception as e:
-                    self._conn.send({"status": "ERROR", "error": str(e)})
+                elif cmd == "PROXY_SIGN_RECEIPT":
+                    job_id_req = msg["job_id"]
+                    art_bytes = msg["artifact_bytes"]
+                    c_token = msg.get("caller_token")
+                    c_ident = msg.get("caller_identity", "COORDINATOR")
+                    try:
+                        receipt = signing_authority.sign_completed_job_receipt(
+                            job_id=job_id_req,
+                            artifact_bytes=art_bytes,
+                            caller_identity=c_ident,
+                            caller_token=c_token,
+                        )
+                        self._conn.send({"status": "SUCCESS", "receipt": receipt})
+                    except Exception as e:
+                        self._conn.send({"status": "ERROR", "error": str(e)})
 
-            else:
-                raise RuntimeError(f"Unknown message from coordinator process: {cmd}")
+                else:
+                    raise RuntimeError(f"Unknown message from coordinator process: {cmd}")
+        except (EOFError, ConnectionResetError, BrokenPipeError, OSError) as e:
+            raise TrainingProvenanceSecurityError(
+                f"Restricted coordinator process disconnected or terminated during execution: {e} (EXEC-10). "
+                "Silent fallback to unrestricted execution or incomplete evidence creation is prohibited."
+            ) from e
+
+    execute = execute_federation
+
+    def __enter__(self) -> IsolatedCoordinatorClient:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.terminate()
 
     def terminate(self) -> None:
-        try:
+        with contextlib.suppress(Exception):
             self._conn.send({"command": "STOP"})
-        except Exception:
-            pass
         with contextlib.suppress(Exception):
             self._conn.close()
         if os.name == "nt" and self._proc_handle is not None:
@@ -1184,13 +1255,17 @@ def _run_isolated_coordinator_worker(
                             return reply["receipt"]
                         raise TrainingProvenanceSecurityError(reply.get("error", "Signing error"))
 
-                proxy_endpoints = {
-                    b: {
-                        "inbox": _WorkerProxyQueue(client, b, "inbox"),
-                        "outbox": _WorkerProxyQueue(client, b, "outbox"),
+                proxy_endpoints = (
+                    {
+                        b: {
+                            "inbox": _WorkerProxyQueue(client, b, "inbox"),
+                            "outbox": _WorkerProxyQueue(client, b, "outbox"),
+                        }
+                        for b in participating_banks
                     }
-                    for b in participating_banks
-                }
+                    if req.get("has_worker_endpoints", True)
+                    else None
+                )
 
                 signing_auth = _ProxySigningAuth(client)
 
@@ -1206,6 +1281,10 @@ def _run_isolated_coordinator_worker(
                     registry_storage_dir=req.get("registry_storage_dir"),
                     completion_authority=comp_auth,
                     signing_authority=signing_auth,
+                    bank_partitions=req.get("bank_partitions"),
+                    bank_tokens=req.get("bank_tokens"),
+                    bank_data_paths=req.get("bank_data_paths"),
+                    signing_key_hex=req.get("signing_key_hex"),
                 )
 
                 if "worker_pids" in req:
@@ -1239,6 +1318,12 @@ def spawn_isolated_coordinator_process(
     - The coordinator communicates with the completion authority strictly via authenticated TCP IPC.
     - Possesses zero completion credentials and is denied access to completion vaults by NTFS DACL.
     """
+    if app_env.lower() == "production" and os.name != "nt":
+        raise TrainingProvenanceSecurityError(
+            f"Production coordinator isolation is not supported on platform '{sys.platform}'. "
+            "Production federated training requires enforced Windows Restricted Token isolation (EXEC-06)."
+        )
+
     import secrets
 
     authkey = secrets.token_bytes(32)
@@ -1264,7 +1349,14 @@ def spawn_isolated_coordinator_process(
     if os.name == "nt":
         import win32process
 
-        restricted_token = create_restricted_coordinator_token()
+        try:
+            restricted_token = create_restricted_coordinator_token()
+        except Exception as e:
+            listener.close()
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to create operating system restricted coordinator security token: {e}"
+            ) from e
+
         si = win32process.STARTUPINFO()
         cmd = f'"{sys.executable}" -c "{worker_code}" {host} {port} {authkey.hex()}'
         create_process_as_user: Any = win32process.CreateProcessAsUser
@@ -1315,12 +1407,43 @@ def spawn_isolated_coordinator_process(
             if raw_l is not None:
                 s = getattr(raw_l, "_socket", None)
                 if s is not None:
-                    s.settimeout(15.0)
+                    s.settimeout(45.0)
 
         conn = listener.accept()
         init_msg = conn.recv()
         if not isinstance(init_msg, dict) or init_msg.get("status") != "READY":
             raise TrainingProvenanceConfigurationError(f"Coordinator handshake failed: {init_msg}")
+
+        # MANDATORY STARTUP VERIFICATION:
+        # Independently audit the actual OS kernel process token of the spawned process
+        if app_env.lower() == "production":
+            target_proc = proc_handle if proc_handle is not None else proc_pid
+            actual_child_id = get_os_process_identity(target_proc)
+            child_details = actual_child_id.details
+
+            is_violation = (
+                not child_details.get("is_restricted")
+                or not child_details.get("has_restricted_code_sid")
+                or not child_details.get("is_admin_disabled")
+                or len(child_details.get("enabled_privileges", [])) > 1
+            )
+            if is_violation:
+                if os.name == "nt" and proc_handle is not None:
+                    with contextlib.suppress(Exception):
+                        import win32process
+                        win32process.TerminateProcess(proc_handle, 1)
+                elif hasattr(proc_handle, "terminate"):
+                    with contextlib.suppress(Exception):
+                        proc_handle.terminate()
+                conn.close()
+                listener.close()
+                raise TrainingProvenanceSecurityError(
+                    "Spawned coordinator process violates mandatory production security policy: "
+                    f"is_restricted={child_details.get('is_restricted')}, "
+                    f"has_restricted_code_sid={child_details.get('has_restricted_code_sid')}, "
+                    f"is_admin_disabled={child_details.get('is_admin_disabled')}, "
+                    f"privileges={child_details.get('enabled_privileges')} (EXEC-05)."
+                )
 
         client = IsolatedCoordinatorClient(
             conn=conn,
@@ -1336,11 +1459,54 @@ def spawn_isolated_coordinator_process(
                 import win32process
 
                 win32process.TerminateProcess(proc_handle, 1)
+        if isinstance(e, (TrainingProvenanceSecurityError, TrainingProvenanceConfigurationError)):
+            raise
         raise TrainingProvenanceConfigurationError(
             f"Failed to establish authenticated communication with isolated coordinator: {e}"
         ) from e
     finally:
         listener.close()
+
+
+def run_production_federation(
+    coordinator_token: str,
+    db_url: str,
+    job_id: str,
+    training_run_id: str,
+    simulation_id: str,
+    holdout_val_data: tuple[np.ndarray, np.ndarray],
+    participating_banks: list[str] | tuple[str, ...],
+    worker_endpoints: dict[str, dict[str, Any]],
+    comp_service_endpoint: tuple[str, int],
+    signing_authority: Any,
+    num_rounds: int = 2,
+    expected_unique_samples: int | None = None,
+    registry_storage_dir: str | None = None,
+    worker_pids: dict[str, int] | None = None,
+    app_env: str = "production",
+) -> dict[str, Any]:
+    """Canonical production entry point executing distributed federation under the mandatory restricted coordinator boundary."""
+    proc, client = spawn_isolated_coordinator_process(app_env=app_env)
+    try:
+        return client.execute_federation(
+            job_id=job_id,
+            training_run_id=training_run_id,
+            simulation_id=simulation_id,
+            holdout_val_data=holdout_val_data,
+            participating_banks=participating_banks,
+            worker_endpoints=worker_endpoints,
+            num_rounds=num_rounds,
+            expected_unique_samples=expected_unique_samples,
+            registry_storage_dir=registry_storage_dir,
+            coordinator_token=coordinator_token,
+            db_url=db_url,
+            comp_service_endpoint=comp_service_endpoint,
+            signing_authority=signing_authority,
+            worker_pids=worker_pids,
+        )
+    finally:
+        client.terminate()
+
 
 
 def _acquire_vault_exclusive_os_boundary(path: str) -> Any:
@@ -1619,7 +1785,7 @@ def spawn_isolated_completion_authority_service(
     proc.daemon = True
     proc.start()
 
-    init_msg = ready_q.get(timeout=15)
+    init_msg = ready_q.get(timeout=45)
     if not isinstance(init_msg, dict) or init_msg.get("status") != "READY":
         err = init_msg.get("error") if isinstance(init_msg, dict) else str(init_msg)
         proc.terminate()
@@ -2068,10 +2234,12 @@ class DistributedFederatedTrainingManager:
         self.app_env = app_env
         self.settings = get_settings()
 
-        if self.app_env.lower() == "production" and bank_tokens is not None:
-            raise TrainingProvenanceSecurityError(
-                "Production coordinator cannot receive bank private credentials (BI-02)."
-            )
+        if self.app_env.lower() == "production":
+            if bank_tokens is not None:
+                raise TrainingProvenanceSecurityError(
+                    "Production coordinator cannot receive bank private credentials (BI-02)."
+                )
+            verify_restricted_coordinator_os_boundary(self.app_env)
 
         # Coordinator authority source possesses coordinator_token ONLY!
         # It has ZERO access to bank worker tokens or completion credentials.
@@ -2122,6 +2290,7 @@ class DistributedFederatedTrainingManager:
 
         is_prod = self.app_env.lower() == "production"
         if is_prod:
+            verify_restricted_coordinator_os_boundary(self.app_env)
             if bank_partitions is not None:
                 raise TrainingProvenanceSecurityError(
                     "Production coordinator cannot receive bank private dataset partitions (BI-01)."

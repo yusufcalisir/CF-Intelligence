@@ -16,6 +16,7 @@ Verifies the mandatory proof matrix against a real PostgreSQL 18.1 instance:
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -264,15 +265,22 @@ class TestCompletionAuthoritySecurity:
         )
         try:
             # 3. Coordinator is initialized with service_endpoint only
-            comp_auth = IsolatedTrainingCompletionAuthority(
+            _ = IsolatedTrainingCompletionAuthority(
                 service_endpoint=comp_endpoint,
                 coordinator_token=COORD_TOKEN,
                 app_env="production",
             )
+            # Direct instantiation in production outside restricted boundary is prohibited:
+            with pytest.raises(TrainingProvenanceSecurityError, match="Direct instantiation or execution inside an unrestricted process is prohibited"):
+                DistributedFederatedTrainingManager(
+                    coordinator_token=COORD_TOKEN,
+                    db_url=coord_url,
+                    app_env="production",
+                )
             coordinator = DistributedFederatedTrainingManager(
                 coordinator_token=COORD_TOKEN,
                 db_url=coord_url,
-                app_env="production",
+                app_env="development",
             )
 
             # Assert coordinator object graph contains NO completion URL
@@ -967,20 +975,9 @@ class TestCompletionAuthoritySecurity:
             coordinator_token=COORD_TOKEN,
             app_env="production",
         )
+        coord_proc, coord_client = spawn_isolated_coordinator_process(app_env="production")
         try:
-            # 2. Coordinator receives client with service_endpoint ONLY
-            comp_auth = IsolatedTrainingCompletionAuthority(
-                service_endpoint=comp_endpoint,
-                coordinator_token=COORD_TOKEN,
-                app_env="production",
-            )
-            manager = DistributedFederatedTrainingManager(
-                coordinator_token=COORD_TOKEN,
-                db_url=coord_url,
-                app_env="production",
-            )
-
-            # 3. Provision bank partitions and spawn bank worker processes
+            # 2. Provision bank partitions and spawn bank worker processes
             bank_enc_keys = {
                 "BANK_A": Fernet.generate_key(),
                 "BANK_B": Fernet.generate_key(),
@@ -1016,7 +1013,7 @@ class TestCompletionAuthoritySecurity:
                 bank_encryption_keys=bank_enc_keys,
             )
 
-            # 4. Provision signing authority
+            # 3. Provision signing authority
             dev_seed = hashlib.sha256(b"cfi_dev_ed25519_training_issuer_seed_v1").digest().hex()
             issuer_vault_dir = str(tmp_path / "issuer_vault")
             issuer_key_file, _ = provision_isolated_issuer_vault(issuer_vault_dir, signing_key_hex=dev_seed)
@@ -1037,19 +1034,22 @@ class TestCompletionAuthoritySecurity:
             X_test = np.random.randn(100, NUM_FEATURES).astype(np.float32)
             y_test = np.random.randint(0, 2, size=100).astype(np.float32)
 
-            result = manager.execute_distributed_federation(
+            worker_pids = {b: p.pid for b, p in procs.items()} if procs else {}
+            result = coord_client.execute_federation(
                 job_id=job_id,
                 training_run_id=run_id,
                 simulation_id=sim_id,
                 holdout_val_data=(X_test, y_test),
                 participating_banks=["BANK_A", "BANK_B", "BANK_C"],
                 worker_endpoints=endpoints,
-                worker_processes=procs,
                 num_rounds=2,
                 expected_unique_samples=450,
                 registry_storage_dir=registry_dir,
+                coordinator_token=COORD_TOKEN,
+                db_url=coord_url,
+                comp_service_endpoint=comp_endpoint,
                 signing_authority=signing_auth,
-                completion_authority=comp_auth,
+                worker_pids=worker_pids,
             )
 
             assert result["completed_record"].job_id == job_id
@@ -1062,6 +1062,8 @@ class TestCompletionAuthoritySecurity:
 
             signing_auth.terminate()
         finally:
+            with contextlib.suppress(Exception):
+                coord_client.terminate()
             comp_proc.terminate()
             comp_proc.join(timeout=3)
 

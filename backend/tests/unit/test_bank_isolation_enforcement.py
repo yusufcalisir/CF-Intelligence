@@ -27,6 +27,7 @@ from app.application.services.distributed_fl_service import (
     BankPrivateStorageVault,
     DistributedFederatedTrainingManager,
     setup_bank_private_storage,
+    spawn_isolated_coordinator_process,
 )
 from app.application.services.model_service import NUM_FEATURES
 from app.application.services.training_provenance_service import (
@@ -71,30 +72,40 @@ def real_pg_instance() -> Generator[str, None, None]:
 class TestBankIsolationEnforcement:
     """Rigorous verification of institutional privacy and workload isolation."""
 
+    @pytest.fixture(scope="class")
+    def isolated_coord(self):
+        proc, client = spawn_isolated_coordinator_process(app_env="production")
+        yield client
+        client.terminate()
+
     def test_bi_01_coordinator_receiving_bank_partitions_rejected_in_production(
-        self, real_pg_instance: str, tmp_path
+        self, real_pg_instance: str, tmp_path, isolated_coord
     ) -> None:
         """BI-01: Production coordinator cannot receive raw bank training partitions."""
-        manager = DistributedFederatedTrainingManager(
-            coordinator_token=COORD_SECRET,
-            db_url=real_pg_instance,
-            app_env="production",
-        )
         fake_partitions: dict[str, Any] = {
             "BANK_A": (np.zeros((10, NUM_FEATURES), dtype=np.float32), np.zeros(10, dtype=np.float32))
         }
 
         with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot receive bank private dataset partitions"):
-            manager.execute_distributed_federation(
+            isolated_coord.execute_federation(
                 job_id="job_bi01",
                 training_run_id="run_bi01",
                 simulation_id="sim_bi01",
                 holdout_val_data=(np.zeros((5, NUM_FEATURES)), np.zeros(5)),
+                participating_banks=["BANK_A"],
+                worker_endpoints={"BANK_A": {"inbox": None, "outbox": None}},
+                num_rounds=1,
+                expected_unique_samples=100,
+                registry_storage_dir=None,
+                coordinator_token=COORD_SECRET,
+                db_url=real_pg_instance,
+                comp_service_endpoint=("127.0.0.1", 1234),
+                signing_authority=None,
                 bank_partitions=fake_partitions,
             )
 
     def test_bi_02_coordinator_receiving_bank_tokens_rejected_in_production(
-        self, real_pg_instance: str
+        self, real_pg_instance: str, isolated_coord
     ) -> None:
         """BI-02: Production coordinator cannot receive bank private credentials."""
         # 1. Constructor injection rejected
@@ -106,55 +117,66 @@ class TestBankIsolationEnforcement:
                 bank_tokens=BANK_TOKENS,
             )
 
-        # 2. Execution-time injection rejected
-        manager = DistributedFederatedTrainingManager(
-            coordinator_token=COORD_SECRET,
-            db_url=real_pg_instance,
-            app_env="production",
-        )
+        # 2. Execution-time injection rejected through enforced isolated coordinator
         with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot receive bank private credentials"):
-            manager.execute_distributed_federation(
+            isolated_coord.execute_federation(
                 job_id="job_bi02",
                 training_run_id="run_bi02",
                 simulation_id="sim_bi02",
                 holdout_val_data=(np.zeros((5, NUM_FEATURES)), np.zeros(5)),
+                participating_banks=["BANK_A"],
+                worker_endpoints={"BANK_A": {"inbox": None, "outbox": None}},
+                num_rounds=1,
+                expected_unique_samples=100,
+                registry_storage_dir=None,
+                coordinator_token=COORD_SECRET,
+                db_url=real_pg_instance,
+                comp_service_endpoint=("127.0.0.1", 1234),
+                signing_authority=None,
                 bank_tokens=BANK_TOKENS,
             )
 
     def test_bi_03_coordinator_receiving_bank_data_paths_rejected_in_production(
-        self, real_pg_instance: str
+        self, real_pg_instance: str, isolated_coord
     ) -> None:
         """BI-03: Production coordinator cannot receive bank private data paths."""
-        manager = DistributedFederatedTrainingManager(
-            coordinator_token=COORD_SECRET,
-            db_url=real_pg_instance,
-            app_env="production",
-        )
         with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot receive bank private data paths"):
-            manager.execute_distributed_federation(
+            isolated_coord.execute_federation(
                 job_id="job_bi03",
                 training_run_id="run_bi03",
                 simulation_id="sim_bi03",
                 holdout_val_data=(np.zeros((5, NUM_FEATURES)), np.zeros(5)),
+                participating_banks=["BANK_A"],
+                worker_endpoints={"BANK_A": {"inbox": None, "outbox": None}},
+                num_rounds=1,
+                expected_unique_samples=100,
+                registry_storage_dir=None,
+                coordinator_token=COORD_SECRET,
+                db_url=real_pg_instance,
+                comp_service_endpoint=("127.0.0.1", 1234),
+                signing_authority=None,
                 bank_data_paths={"BANK_A": "/vaults/BANK_A/private_dataset.npz"},
             )
 
     def test_bi_04_coordinator_auto_token_generation_rejected_in_production(
-        self, real_pg_instance: str
+        self, real_pg_instance: str, isolated_coord
     ) -> None:
         """BI-04: Coordinator cannot automatically generate bank credentials or spawn workers with generated secrets."""
-        manager = DistributedFederatedTrainingManager(
-            coordinator_token=COORD_SECRET,
-            db_url=real_pg_instance,
-            app_env="production",
-        )
         with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot generate bank credentials"):
-            manager.execute_distributed_federation(
+            isolated_coord.execute_federation(
                 job_id="job_bi04",
                 training_run_id="run_bi04",
                 simulation_id="sim_bi04",
                 holdout_val_data=(np.zeros((5, NUM_FEATURES)), np.zeros(5)),
-                worker_endpoints=None,  # Triggering auto-fallback
+                participating_banks=["BANK_A"],
+                worker_endpoints={},  # Triggering auto-fallback
+                num_rounds=1,
+                expected_unique_samples=100,
+                registry_storage_dir=None,
+                coordinator_token=COORD_SECRET,
+                db_url=real_pg_instance,
+                comp_service_endpoint=("127.0.0.1", 1234),
+                signing_authority=None,
             )
 
     def test_bi_05_coordinator_attempts_bank_impersonation_rejected(
@@ -281,10 +303,16 @@ class TestBankIsolationEnforcement:
         self, real_pg_instance: str
     ) -> None:
         """BI-09: Coordinator domain holds only coordinator_token and has zero bank private credentials."""
+        with pytest.raises(TrainingProvenanceSecurityError, match="Direct instantiation or execution inside an unrestricted process is prohibited"):
+            DistributedFederatedTrainingManager(
+                coordinator_token=COORD_SECRET,
+                db_url=real_pg_instance,
+                app_env="production",
+            )
         manager = DistributedFederatedTrainingManager(
             coordinator_token=COORD_SECRET,
             db_url=real_pg_instance,
-            app_env="production",
+            app_env="development",
         )
         assert manager.coordinator_token == COORD_SECRET
         assert not hasattr(manager, "bank_tokens")

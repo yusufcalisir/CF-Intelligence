@@ -29,6 +29,7 @@ from app.application.services.distributed_fl_service import (
     IsolatedReceiptSigningAuthority,
     _generate_ed25519_keypair_hex,
     provision_isolated_issuer_vault,
+    spawn_isolated_coordinator_process,
 )
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES, ModelService
@@ -76,10 +77,16 @@ class TestCryptographicReceiptIsolation:
         self, real_pg_instance: str
     ) -> None:
         """CR-01: Coordinator manager domain holds no signing private key or private key attributes."""
+        with pytest.raises(TrainingProvenanceSecurityError, match="Direct instantiation or execution inside an unrestricted process is prohibited"):
+            DistributedFederatedTrainingManager(
+                coordinator_token=COORD_SECRET,
+                db_url=real_pg_instance,
+                app_env="production",
+            )
         manager = DistributedFederatedTrainingManager(
             coordinator_token=COORD_SECRET,
             db_url=real_pg_instance,
-            app_env="production",
+            app_env="development",
         )
         assert not hasattr(manager, "signing_key_hex")
         assert not hasattr(manager, "_private_key")
@@ -89,21 +96,28 @@ class TestCryptographicReceiptIsolation:
         self, real_pg_instance: str
     ) -> None:
         """CR-02: Supplying signing_key_hex to coordinator execute_distributed_federation in production is rejected."""
-        manager = DistributedFederatedTrainingManager(
-            coordinator_token=COORD_SECRET,
-            db_url=real_pg_instance,
-            app_env="production",
-        )
         priv_hex, _ = _generate_ed25519_keypair_hex()
-
-        with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot receive signing private key"):
-            manager.execute_distributed_federation(
-                job_id="job_cr02",
-                training_run_id="run_cr02",
-                simulation_id="sim_cr02",
-                holdout_val_data=(None, None),  # type: ignore[arg-type]
-                signing_key_hex=priv_hex,
-            )
+        proc, client = spawn_isolated_coordinator_process(app_env="production")
+        try:
+            with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot receive signing private key"):
+                client.execute_federation(
+                    job_id="job_cr02",
+                    training_run_id="run_cr02",
+                    simulation_id="sim_cr02",
+                    holdout_val_data=(None, None),  # type: ignore[arg-type]
+                    participating_banks=["BANK_A"],
+                    worker_endpoints={"BANK_A": {"inbox": None, "outbox": None}},
+                    num_rounds=1,
+                    expected_unique_samples=100,
+                    registry_storage_dir=None,
+                    coordinator_token=COORD_SECRET,
+                    db_url=real_pg_instance,
+                    comp_service_endpoint=("127.0.0.1", 1234),
+                    signing_authority=None,
+                    signing_key_hex=priv_hex,
+                )
+        finally:
+            client.terminate()
 
     def test_cr_03_rogue_signing_key_rejected_by_registry(
         self, real_pg_instance: str, tmp_path
