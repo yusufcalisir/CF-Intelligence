@@ -1213,6 +1213,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             with self._connect() as conn:
                 with conn.transaction():
                     with conn.cursor() as cur:
+                        cur.execute("SELECT pg_advisory_xact_lock(hashtext('cfi_schema_init_lock'))")
                         cur.execute(
                             """
                             CREATE TABLE IF NOT EXISTS cfi_scheduled_jobs (

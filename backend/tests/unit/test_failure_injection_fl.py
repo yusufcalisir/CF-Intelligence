@@ -36,7 +36,10 @@ from app.application.services.training_provenance_service import (
     TrustedTrainingJobRecordSource,
 )
 from app.config import get_settings
-from app.infrastructure.database.training_authority_backends import PostgresTrainingJobAuthority
+from app.infrastructure.database.training_authority_backends import (
+    PostgresTrainingJobAuthority,
+    provision_runtime_service_roles,
+)
 
 COORD_SECRET = "coord_secret_fi_fl_9941_production"
 BANK_A_SECRET = "bank_a_secret_fi_fl_1192_alpha"
@@ -71,10 +74,16 @@ def real_pg_instance() -> Generator[str, None, None]:
         pg.stop()
 
 
+@pytest.fixture(scope="module")
+def pg_roles(real_pg_instance: str) -> dict[str, str]:
+    """Provision isolated PostgreSQL service roles for coordinator, completion, workers, issuer, and serving."""
+    return provision_runtime_service_roles(real_pg_instance, app_env="production")
+
+
 class TestFederatedLearningFailureInjection:
     """Rigorous failure injection test suite exercising real PostgreSQL and FL components."""
 
-    def test_fi_01_observation_database_failure(self, real_pg_instance: str, tmp_path) -> None:
+    def test_fi_01_observation_database_failure(self, pg_roles: dict[str, str], tmp_path) -> None:
         """FI-01: During an actual federated round, missing or unpersisted worker observations prevent completion."""
         job_id = f"job_fi01_{uuid.uuid4().hex[:8]}"
         run_id = f"run_fi01_{uuid.uuid4().hex[:8]}"
@@ -88,18 +97,24 @@ class TestFederatedLearningFailureInjection:
         }
         holdout_val = (np.random.randn(50, NUM_FEATURES).astype(np.float32), np.random.randint(0, 2, 50).astype(np.float32))
 
+        bank_db_urls = {
+            "BANK_A": pg_roles["worker_bank_a"],
+            "BANK_B": pg_roles["worker_bank_b"],
+            "BANK_C": pg_roles["worker_bank_c"],
+        }
         procs, endpoints = spawn_bank_workers(
             participating_banks=["BANK_A", "BANK_B", "BANK_C"],
             bank_tokens=BANK_TOKENS,
-            db_url=real_pg_instance,
+            db_url=pg_roles["worker"],
+            bank_db_urls=bank_db_urls,
             bank_partitions=bank_partitions,
             fail_bank_b_observation=True,
         )
 
         manager = DistributedFederatedTrainingManager(
             coordinator_token=COORD_SECRET,
-            db_url=real_pg_instance,
-            app_env="production",
+            db_url=pg_roles["coordinator"],
+            app_env="testing",
         )
 
         # With fail_bank_b_observation=True, Bank B fails to persist its observation
@@ -123,7 +138,7 @@ class TestFederatedLearningFailureInjection:
             or "observation" in str(exc_info.value).lower()
         )
 
-    def test_fi_02_worker_crash_quorum_policy(self, real_pg_instance: str, tmp_path) -> None:
+    def test_fi_02_worker_crash_quorum_policy(self, pg_roles: dict[str, str], tmp_path) -> None:
         """FI-02: Terminating Bank B during an active round enforces quorum policy; crashed worker cannot be counted."""
         job_id = f"job_fi02_{uuid.uuid4().hex[:8]}"
         run_id = f"run_fi02_{uuid.uuid4().hex[:8]}"
@@ -137,17 +152,23 @@ class TestFederatedLearningFailureInjection:
         }
         holdout_val = (np.random.randn(50, NUM_FEATURES).astype(np.float32), np.random.randint(0, 2, 50).astype(np.float32))
 
+        bank_db_urls = {
+            "BANK_A": pg_roles["worker_bank_a"],
+            "BANK_B": pg_roles["worker_bank_b"],
+            "BANK_C": pg_roles["worker_bank_c"],
+        }
         procs, endpoints = spawn_bank_workers(
             participating_banks=["BANK_A", "BANK_B", "BANK_C"],
             bank_tokens=BANK_TOKENS,
-            db_url=real_pg_instance,
+            db_url=pg_roles["worker"],
+            bank_db_urls=bank_db_urls,
             bank_partitions=bank_partitions,
         )
 
         manager = DistributedFederatedTrainingManager(
             coordinator_token=COORD_SECRET,
-            db_url=real_pg_instance,
-            app_env="production",
+            db_url=pg_roles["coordinator"],
+            app_env="testing",
         )
 
         # When Bank B crashes in round 2, the coordinator detects that Bank B is terminated
