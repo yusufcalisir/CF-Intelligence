@@ -145,7 +145,7 @@ def _check_no_reparse_or_symlink(path: str, label: str) -> None:
             raise TrainingProvenanceSecurityError(
                 f"{label} cannot be a symbolic link: '{path}'."
             )
-        if hasattr(st, "st_reparse_tag") and st.st_reparse_tag != 0:
+        if getattr(st, "st_reparse_tag", 0) != 0:
             raise TrainingProvenanceSecurityError(
                 f"{label} cannot be a reparse point or junction: '{path}'."
             )
