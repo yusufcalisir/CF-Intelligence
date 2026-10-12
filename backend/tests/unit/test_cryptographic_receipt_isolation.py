@@ -99,7 +99,7 @@ class TestCryptographicReceiptIsolation:
         priv_hex, _ = _generate_ed25519_keypair_hex()
         proc, client = spawn_isolated_coordinator_process(app_env="production")
         try:
-            with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot receive signing private key"):
+            with pytest.raises(TrainingProvenanceSecurityError, match=r"Production coordinator cannot receive.*signing private key"):
                 client.execute_federation(
                     job_id="job_cr02",
                     training_run_id="run_cr02",

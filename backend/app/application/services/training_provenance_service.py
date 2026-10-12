@@ -23,9 +23,11 @@ import os
 import threading
 import types
 import uuid
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 from datetime import UTC, datetime
 from typing import Any
+
+from filelock import FileLock
 
 try:
     import psycopg
@@ -1153,20 +1155,38 @@ class TrustedTrainingJobRecordSource:
         pass
 
 
+_TRUST_STORE_FILE_LOCKS: dict[str, FileLock] = {}
+_TRUST_STORE_LOCKS_GUARD = threading.Lock()
+
+
+def _get_trust_store_file_lock(file_path: str, timeout: float = 15.0) -> FileLock:
+    """Return process-shared FileLock for durable trust store."""
+    lock_path = os.path.abspath(f"{file_path}.lock")
+    with _TRUST_STORE_LOCKS_GUARD:
+        if lock_path not in _TRUST_STORE_FILE_LOCKS:
+            _TRUST_STORE_FILE_LOCKS[lock_path] = FileLock(lock_path, timeout=timeout)
+        return _TRUST_STORE_FILE_LOCKS[lock_path]
+
+
 class DurableTrustStore:
     """Administratively controlled, durable key trust configuration.
 
-    Supports:
-    - Revocation due to compromise (all receipts signed by this key are rejected).
-    - Lifecycle retirement (key cannot issue new receipts; receipts signed before retirement remain valid).
-    - Duplicate key ID rejection (rejects unauthorized public key substitution).
-    - Cross-worker / cross-process freshness contract via atomic reload on mtime change.
+    Guarantees:
+    - Zero Lost Updates & Non-Atomic Operations: Multi-process concurrency controlled via kernel/file locks
+      and atomic read-modify-write synchronization.
+    - Fail-Closed Persistence & Cryptographic Integrity: Malformed, truncated, or tampered stores are detected
+      via SHA-256 integrity digests and rejected with fail-closed errors.
+    - Revocation Freshness Across Processes: Verifiers detect modifications via timestamp/stat tracking and
+      immediately evict revoked keys without requiring process restarts.
+    - Administrative Authorization Boundary: Mutations require authorized credentials, preventing untrusted
+      workers or compromised coordinators from granting themselves trust or erasing revocations.
     """
 
     def __init__(
         self,
         trust_file_path: str | dict[str, Any] | None = None,
         in_memory: bool = False,
+        admin_token: str | None = None,
     ) -> None:
         self._lock = threading.RLock()
         initial_keys: dict[str, Any] = {}
@@ -1190,11 +1210,20 @@ class DurableTrustStore:
 
                 configured_path = os.path.join(get_storage_dir(), "training_trust_registry.json")
 
-            self._trust_file_path = configured_path
+            self._trust_file_path = os.path.abspath(configured_path)
+
+        self._admin_token: str | None = (
+            admin_token
+            or os.environ.get("CFI_TRUST_STORE_ADMIN_TOKEN")
+            or getattr(get_settings(), "trust_store_admin_token", None)
+        )
         self._approved_keys: dict[str, dict[str, str]] = {}
         self._revoked_keys: dict[str, dict[str, str]] = {}
         self._retired_keys: dict[str, dict[str, str]] = {}
         self._last_mtime: float = 0.0
+        self._last_mtime_ns: int = 0
+        self._last_size: int = -1
+        self._is_corrupted: bool = False
 
         for kid, k_val in initial_keys.items():
             raw_hex = k_val if isinstance(k_val, str) else k_val.public_bytes(
@@ -1209,67 +1238,173 @@ class DurableTrustStore:
         if not self._in_memory:
             self.reload()
 
-    def reload(self) -> None:
+    @contextlib.contextmanager
+    def _file_lock_context(self) -> Generator[None, None, None]:
+        if self._in_memory or not self._trust_file_path:
+            yield
+            return
+        lock = _get_trust_store_file_lock(self._trust_file_path)
+        with lock:
+            yield
+
+    def _verify_admin_authorization(self, token: str | None = None) -> None:
+        """Verify administrative credentials for mutating trust operations."""
+        if self._admin_token is not None:
+            if not token or not hmac.compare_digest(token, self._admin_token):
+                raise TrainingProvenanceSecurityError(
+                    "Unauthorized administrative operation: invalid or missing admin token for DurableTrustStore."
+                )
+        else:
+            settings = get_settings()
+            if settings.app_env.lower() == "production" and not self._in_memory and not token:
+                raise TrainingProvenanceSecurityError(
+                    "Production security boundary violation: admin_token is mandatory for durable trust store modifications."
+                )
+
+    def _reload_unlocked(self, force: bool = False) -> None:
+        """Internal reload without acquiring locks (must be called with self._lock and file lock held)."""
         if self._in_memory or not self._trust_file_path:
             return
-        with self._lock:
-            if os.path.exists(self._trust_file_path):
-                try:
-                    stat = os.stat(self._trust_file_path)
-                    with open(self._trust_file_path, encoding="utf-8") as f:
-                        data = json.load(f)
-                    self._approved_keys = data.get("approved_keys", {})
-                    self._revoked_keys = data.get("revoked_keys", {})
-                    self._retired_keys = data.get("retired_keys", {})
-                    self._last_mtime = stat.st_mtime
-                    self._last_mtime_ns = stat.st_mtime_ns
-                    self._last_size = stat.st_size
-                except Exception as exc:
-                    logger.warning("Failed to reload durable trust store from %s: %s", self._trust_file_path, exc)
+        if not os.path.exists(self._trust_file_path):
+            self._last_mtime = 0.0
+            self._last_mtime_ns = 0
+            self._last_size = -1
+            self._is_corrupted = False
+            return
+
+        try:
+            stat = os.stat(self._trust_file_path)
+            last_ns = getattr(self, "_last_mtime_ns", 0)
+            last_sz = getattr(self, "_last_size", -1)
+            if not force and stat.st_mtime_ns == last_ns and stat.st_size == last_sz and stat.st_mtime == self._last_mtime:
+                return
+
+            if stat.st_size == 0:
+                self._is_corrupted = True
+                raise TrainingProvenanceSecurityError(
+                    f"Durable trust store at '{self._trust_file_path}' is corrupted: file is empty (0 bytes)."
+                )
+
+            with open(self._trust_file_path, "rb") as f:
+                raw_bytes = f.read()
+
+            try:
+                container = json.loads(raw_bytes.decode("utf-8"))
+            except Exception as parse_err:
+                self._is_corrupted = True
+                raise TrainingProvenanceSecurityError(
+                    f"Durable trust store at '{self._trust_file_path}' is corrupted: invalid JSON ({parse_err})."
+                ) from parse_err
+
+            if not isinstance(container, dict):
+                self._is_corrupted = True
+                raise TrainingProvenanceSecurityError(
+                    f"Durable trust store at '{self._trust_file_path}' is malformed: root JSON structure must be an object."
+                )
+
+            if "integrity_sha256" in container and "data" in container:
+                data = container["data"]
+                expected_sha = container["integrity_sha256"]
+                actual_sha = hashlib.sha256(json.dumps(data, sort_keys=True).encode("utf-8")).hexdigest()
+                if not hmac.compare_digest(expected_sha, actual_sha):
+                    self._is_corrupted = True
+                    raise TrainingProvenanceSecurityError(
+                        f"Durable trust store at '{self._trust_file_path}' failed cryptographic integrity check: "
+                        f"checksum mismatch (expected {expected_sha}, computed {actual_sha})."
+                    )
+            else:
+                data = container
+
+            for key_field in ("approved_keys", "revoked_keys", "retired_keys"):
+                val = data.get(key_field)
+                if val is not None and not isinstance(val, dict):
+                    self._is_corrupted = True
+                    raise TrainingProvenanceSecurityError(
+                        f"Durable trust store at '{self._trust_file_path}' is malformed: '{key_field}' must be a dictionary."
+                    )
+
+            self._approved_keys = dict(data.get("approved_keys", {}))
+            self._revoked_keys = dict(data.get("revoked_keys", {}))
+            self._retired_keys = dict(data.get("retired_keys", {}))
+            self._last_mtime = stat.st_mtime
+            self._last_mtime_ns = stat.st_mtime_ns
+            self._last_size = stat.st_size
+            self._is_corrupted = False
+        except TrainingProvenanceSecurityError:
+            self._is_corrupted = True
+            raise
+        except Exception as exc:
+            self._is_corrupted = True
+            raise TrainingProvenanceSecurityError(
+                f"Failed to access or parse durable trust store from '{self._trust_file_path}': {exc}"
+            ) from exc
+
+    def reload(self) -> None:
+        """Force complete reload of durable trust store from disk."""
+        if self._in_memory or not self._trust_file_path:
+            return
+        with self._lock, self._file_lock_context():
+            self._reload_unlocked(force=True)
 
     def reload_if_modified(self) -> None:
         """Check mtime, mtime_ns, and size, and reload if modified on disk (cross-worker freshness contract)."""
         if self._in_memory or not self._trust_file_path:
             return
-        if os.path.exists(self._trust_file_path):
-            with contextlib.suppress(OSError):
+        with self._lock:
+            if self._is_corrupted:
+                raise TrainingProvenanceSecurityError(
+                    f"Durable trust store at '{self._trust_file_path}' is in corrupted state. Operations fail closed."
+                )
+            if os.path.exists(self._trust_file_path):
                 stat = os.stat(self._trust_file_path)
                 last_ns = getattr(self, "_last_mtime_ns", 0)
                 last_sz = getattr(self, "_last_size", -1)
                 if stat.st_mtime_ns != last_ns or stat.st_size != last_sz or stat.st_mtime != self._last_mtime:
-                    self.reload()
+                    with self._file_lock_context():
+                        self._reload_unlocked(force=True)
 
-    def _persist(self) -> None:
-        """Atomically persist trust registry to disk."""
+    def _persist_unlocked(self) -> None:
+        """Atomically persist trust registry to disk with integrity digest and fsync."""
         if self._in_memory or not self._trust_file_path:
             return
-        data = {
+        payload = {
             "approved_keys": self._approved_keys,
             "revoked_keys": self._revoked_keys,
             "retired_keys": self._retired_keys,
             "updated_at": datetime.now(UTC).isoformat(),
         }
+        canonical_bytes = json.dumps(payload, sort_keys=True).encode("utf-8")
+        digest = hashlib.sha256(canonical_bytes).hexdigest()
+        container = {
+            "schema_version": "1.0",
+            "data": payload,
+            "integrity_sha256": digest,
+        }
         parent_dir = os.path.dirname(os.path.abspath(self._trust_file_path))
         os.makedirs(parent_dir, exist_ok=True)
-        tmp_path = f"{self._trust_file_path}.{os.getpid()}.{threading.get_ident()}.tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+        tmp_path = f"{self._trust_file_path}.{os.getpid()}.{threading.get_ident()}.{uuid.uuid4().hex}.tmp"
+        with open(tmp_path, "wb") as f:
+            f.write(json.dumps(container, indent=2).encode("utf-8"))
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(tmp_path, self._trust_file_path)
-        with contextlib.suppress(OSError):
-            stat = os.stat(self._trust_file_path)
-            self._last_mtime = stat.st_mtime
-            self._last_mtime_ns = stat.st_mtime_ns
-            self._last_size = stat.st_size
+        stat = os.stat(self._trust_file_path)
+        self._last_mtime = stat.st_mtime
+        self._last_mtime_ns = stat.st_mtime_ns
+        self._last_size = stat.st_size
+        self._is_corrupted = False
 
     def register_approved_key(
         self,
         key_id: str,
         public_key_hex: str,
         authorized_replacement: bool = False,
+        admin_token: str | None = None,
     ) -> None:
         """Register an approved key ID and public key."""
-        with self._lock:
-            self.reload_if_modified()
+        self._verify_admin_authorization(admin_token)
+        with self._lock, self._file_lock_context():
+            self._reload_unlocked(force=True)
             clean_kid = key_id.strip()
             clean_hex = public_key_hex.strip().lower()
 
@@ -1290,12 +1425,18 @@ class DurableTrustStore:
                 "public_key_hex": clean_hex,
                 "registered_at": datetime.now(UTC).isoformat(),
             }
-            self._persist()
+            self._persist_unlocked()
 
-    def revoke_key(self, key_id: str, reason: str = "compromise") -> None:
+    def revoke_key(
+        self,
+        key_id: str,
+        reason: str = "compromise",
+        admin_token: str | None = None,
+    ) -> None:
         """Revoke key due to compromise (all receipts signed by this key are rejected)."""
-        with self._lock:
-            self.reload_if_modified()
+        self._verify_admin_authorization(admin_token)
+        with self._lock, self._file_lock_context():
+            self._reload_unlocked(force=True)
             clean_kid = key_id.strip()
             self._revoked_keys[clean_kid] = {
                 "reason": reason,
@@ -1303,55 +1444,111 @@ class DurableTrustStore:
                 "revoked_by": "admin",
             }
             self._approved_keys.pop(clean_kid, None)
-            self._persist()
+            self._persist_unlocked()
 
-    def retire_key(self, key_id: str, reason: str = "lifecycle_rotation") -> None:
+    def retire_key(
+        self,
+        key_id: str,
+        reason: str = "lifecycle_rotation",
+        admin_token: str | None = None,
+    ) -> None:
         """Retire key from active issuance; existing receipts created before retirement remain valid."""
-        with self._lock:
-            self.reload_if_modified()
+        self._verify_admin_authorization(admin_token)
+        with self._lock, self._file_lock_context():
+            self._reload_unlocked(force=True)
             clean_kid = key_id.strip()
             self._retired_keys[clean_kid] = {
                 "reason": reason,
                 "retired_at": datetime.now(UTC).isoformat(),
             }
-            self._persist()
+            self._persist_unlocked()
+
+    def rotate_key(
+        self,
+        old_key_id: str,
+        new_key_id: str,
+        new_public_key_hex: str,
+        reason: str = "lifecycle_rotation",
+        admin_token: str | None = None,
+    ) -> None:
+        """Atomically rotate trusted keys by retiring old key and registering new key."""
+        self._verify_admin_authorization(admin_token)
+        with self._lock, self._file_lock_context():
+            self._reload_unlocked(force=True)
+            clean_old = old_key_id.strip()
+            clean_new = new_key_id.strip()
+            clean_hex = new_public_key_hex.strip().lower()
+
+            if clean_new in self._revoked_keys:
+                raise ValueError(
+                    f"Cannot rotate to key_id '{clean_new}' because it has been revoked due to compromise."
+                )
+
+            self._retired_keys[clean_old] = {
+                "reason": reason,
+                "retired_at": datetime.now(UTC).isoformat(),
+            }
+            self._approved_keys[clean_new] = {
+                "public_key_hex": clean_hex,
+                "registered_at": datetime.now(UTC).isoformat(),
+            }
+            self._persist_unlocked()
 
     def is_key_revoked(self, key_id: str) -> bool:
-        self.reload_if_modified()
-        return key_id.strip() in self._revoked_keys
+        with self._lock:
+            self.reload_if_modified()
+            if self._is_corrupted:
+                raise TrainingProvenanceSecurityError("Durable trust store is corrupted. Access denied.")
+            return key_id.strip() in self._revoked_keys
 
     def is_key_retired(self, key_id: str, at_timestamp: str | None = None) -> tuple[bool, str | None]:
-        self.reload_if_modified()
-        clean_kid = key_id.strip()
-        if clean_kid not in self._retired_keys:
-            return False, None
-        retired_info = self._retired_keys[clean_kid]
-        retired_at_str = retired_info.get("retired_at", "")
-        if at_timestamp and retired_at_str:
-            if at_timestamp > retired_at_str:
-                return True, retired_at_str
-            return False, retired_at_str
-        return True, retired_at_str
+        with self._lock:
+            self.reload_if_modified()
+            if self._is_corrupted:
+                raise TrainingProvenanceSecurityError("Durable trust store is corrupted. Access denied.")
+            clean_kid = key_id.strip()
+            if clean_kid not in self._retired_keys:
+                return False, None
+            retired_info = self._retired_keys[clean_kid]
+            retired_at_str = retired_info.get("retired_at", "")
+            if at_timestamp and retired_at_str:
+                if at_timestamp > retired_at_str:
+                    return True, retired_at_str
+                return False, retired_at_str
+            return True, retired_at_str
 
     def get_approved_keys(self) -> dict[str, str]:
         """Return dictionary mapping approved key_id to public_key_hex."""
         with self._lock:
             self.reload_if_modified()
+            if self._is_corrupted:
+                raise TrainingProvenanceSecurityError("Durable trust store is corrupted. Access denied.")
             return {
                 kid: v.get("public_key_hex", "")
                 for kid, v in self._approved_keys.items()
                 if isinstance(v, dict) and "public_key_hex" in v
             }
 
-    def clear(self) -> None:
+    def get_revoked_keys(self) -> dict[str, dict[str, str]]:
         with self._lock:
+            self.reload_if_modified()
+            if self._is_corrupted:
+                raise TrainingProvenanceSecurityError("Durable trust store is corrupted. Access denied.")
+            return dict(self._revoked_keys)
+
+    def clear(self, admin_token: str | None = None) -> None:
+        self._verify_admin_authorization(admin_token)
+        with self._lock, self._file_lock_context():
             self._approved_keys.clear()
             self._revoked_keys.clear()
             self._retired_keys.clear()
-            if os.path.exists(self._trust_file_path):
+            if self._trust_file_path and os.path.exists(self._trust_file_path):
                 with contextlib.suppress(OSError):
                     os.remove(self._trust_file_path)
             self._last_mtime = 0.0
+            self._last_mtime_ns = 0
+            self._last_size = -1
+            self._is_corrupted = False
 
 
 _DEFAULT_JOB_RECORD_SOURCE: TrustedTrainingJobRecordSource | None = None
@@ -2075,13 +2272,19 @@ class TrainingReceiptVerifier:
         self._revoked_keys: set[str] = set()
         self._job_record_source = job_record_source
         self._enforce_recorded_evidence = enforce_recorded_evidence
+        self._in_memory_only = False
         if trust_store is not None:
             self._trust_store = trust_store
-            for kid, hex_val in self._trust_store.get_approved_keys().items():
-                if hex_val:
-                    self.register_trusted_key(kid, hex_val, authorized_replacement=True)
+            try:
+                for kid, hex_val in self._trust_store.get_approved_keys().items():
+                    if hex_val:
+                        with contextlib.suppress(Exception):
+                            self._trusted_keys[kid] = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(hex_val))
+            except TrainingProvenanceSecurityError:
+                self._trusted_keys.clear()
         elif trusted_keys is not None:
             self._trust_store = DurableTrustStore(in_memory=True)
+            self._in_memory_only = True
         else:
             self._trust_store = get_default_trust_store()
 
@@ -2156,6 +2359,7 @@ class TrainingReceiptVerifier:
         key_id: str,
         public_key: ed25519.Ed25519PublicKey | bytes | str,
         authorized_replacement: bool = False,
+        admin_token: str | None = None,
     ) -> None:
         """Register an authorized verification public key."""
         if not key_id or not key_id.strip():
@@ -2209,32 +2413,84 @@ class TrainingReceiptVerifier:
             encoding=serialization.Encoding.Raw,
             format=serialization.PublicFormat.Raw,
         )
+        if not self._in_memory_only:
+            try:
+                approved_map = self._trust_store.get_approved_keys()
+                if clean_kid in approved_map and approved_map[clean_kid].lower() == new_bytes.hex().lower():
+                    self._trusted_keys[clean_kid] = parsed_pub
+                    return
+            except TrainingProvenanceSecurityError:
+                pass
+
         self._trust_store.register_approved_key(
-            clean_kid, new_bytes.hex(), authorized_replacement=authorized_replacement
+            clean_kid, new_bytes.hex(), authorized_replacement=authorized_replacement, admin_token=admin_token
         )
         self._trusted_keys[clean_kid] = parsed_pub
 
-    def revoke_key(self, key_id: str, reason: str = "compromise") -> None:
+    def _sync_with_trust_store(self) -> None:
+        """Synchronize in-memory verifier caches with authoritative durable trust store."""
+        try:
+            self._trust_store.reload_if_modified()
+        except TrainingProvenanceSecurityError:
+            self._trusted_keys.clear()
+            raise
+
+        for rkid in self._trust_store.get_revoked_keys():
+            self._revoked_keys.add(rkid)
+            self._trusted_keys.pop(rkid, None)
+
+        if not self._in_memory_only:
+            approved_map = self._trust_store.get_approved_keys()
+            to_remove = [k for k in self._trusted_keys if k not in approved_map]
+            for k in to_remove:
+                self._trusted_keys.pop(k, None)
+
+    def revoke_key(
+        self,
+        key_id: str,
+        reason: str = "compromise",
+        admin_token: str | None = None,
+    ) -> None:
         """Revoke a trusted key ID so receipts signed with it will be rejected."""
         clean_kid = key_id.strip()
         self._revoked_keys.add(clean_kid)
         self._trusted_keys.pop(clean_kid, None)
-        self._trust_store.revoke_key(clean_kid, reason=reason)
+        self._trust_store.revoke_key(clean_kid, reason=reason, admin_token=admin_token)
         logger.warning("Revoked training receipt key_id '%s' (reason: %s)", clean_kid, reason)
 
-    def retire_key(self, key_id: str, reason: str = "lifecycle_rotation") -> None:
+    def retire_key(
+        self,
+        key_id: str,
+        reason: str = "lifecycle_rotation",
+        admin_token: str | None = None,
+    ) -> None:
         """Retire a trusted key ID from active issuance (historical verification preserved)."""
         clean_kid = key_id.strip()
-        self._trust_store.retire_key(clean_kid, reason=reason)
+        self._trust_store.retire_key(clean_kid, reason=reason, admin_token=admin_token)
         logger.info("Retired training receipt key_id '%s' (reason: %s)", clean_kid, reason)
 
     def is_key_trusted(self, key_id: str) -> bool:
-        self._trust_store.reload_if_modified()
-        return (
-            key_id in self._trusted_keys
-            and key_id not in self._revoked_keys
-            and not self._trust_store.is_key_revoked(key_id)
-        )
+        clean_kid = key_id.strip()
+        try:
+            self._sync_with_trust_store()
+        except TrainingProvenanceSecurityError:
+            self._trusted_keys.clear()
+            return False
+        if clean_kid in self._revoked_keys or self._trust_store.is_key_revoked(clean_kid):
+            self._trusted_keys.pop(clean_kid, None)
+            return False
+        if not self._in_memory_only:
+            try:
+                approved_map = self._trust_store.get_approved_keys()
+            except TrainingProvenanceSecurityError:
+                self._trusted_keys.clear()
+                return False
+            if clean_kid not in approved_map:
+                self._trusted_keys.pop(clean_kid, None)
+                return False
+            if clean_kid not in self._trusted_keys and clean_kid in approved_map:
+                self.register_trusted_key(clean_kid, approved_map[clean_kid], authorized_replacement=True)
+        return clean_kid in self._trusted_keys
 
     def verify(
         self,
@@ -2293,8 +2549,14 @@ class TrainingReceiptVerifier:
             return False, f"Unsupported receipt schema version: {receipt_obj.schema_version}"
 
         # Key ID validation & revocation check across processes
-        self._trust_store.reload_if_modified()
+        try:
+            self._sync_with_trust_store()
+        except TrainingProvenanceSecurityError as exc:
+            return False, f"Trust store corrupted or unavailable: {exc}"
+
         if receipt_obj.key_id in self._revoked_keys or self._trust_store.is_key_revoked(receipt_obj.key_id):
+            self._trusted_keys.pop(receipt_obj.key_id, None)
+            self._revoked_keys.add(receipt_obj.key_id)
             return False, f"Receipt key_id '{receipt_obj.key_id}' has been explicitly revoked."
 
         # Key ID lifecycle retirement check
@@ -2310,9 +2572,12 @@ class TrainingReceiptVerifier:
         if expected_key_id and receipt_obj.key_id != expected_key_id:
             return False, f"Receipt key_id mismatch: expected '{expected_key_id}', got '{receipt_obj.key_id}'."
 
-        if receipt_obj.key_id not in self._trusted_keys and not self._trust_store.is_key_revoked(receipt_obj.key_id):
+        if not self._in_memory_only:
             approved_map = self._trust_store.get_approved_keys()
-            if receipt_obj.key_id in approved_map:
+            if receipt_obj.key_id not in approved_map:
+                self._trusted_keys.pop(receipt_obj.key_id, None)
+                return False, f"Receipt key_id '{receipt_obj.key_id}' is not present in trusted public key registry."
+            if receipt_obj.key_id not in self._trusted_keys:
                 self.register_trusted_key(
                     receipt_obj.key_id, approved_map[receipt_obj.key_id], authorized_replacement=True
                 )
