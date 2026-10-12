@@ -2675,9 +2675,10 @@ def _run_isolated_completion_service_worker(
                 dataset_manifest_id = req.get("dataset_manifest_id")
                 simulate_failure = req.get("simulate_failure_before_commit", False)
                 pause_marker = req.get("pause_checkpoint_marker_file")
+                pause_after_commit = req.get("pause_after_commit_marker_file")
 
                 # Section 4 & ISO-07: Prohibit caller-controlled arbitrary filesystem writes and failure injection in production
-                if is_prod and (pause_marker or simulate_failure):
+                if is_prod and (pause_marker or pause_after_commit or simulate_failure):
                     conn.send({
                         "status": "ERROR",
                         "error": (
@@ -2714,6 +2715,7 @@ def _run_isolated_completion_service_worker(
                     enforce_lifecycle=True,
                     simulate_failure_before_commit=simulate_failure,
                     pause_checkpoint_marker_file=pause_marker,
+                    pause_after_commit_marker_file=pause_after_commit,
                 )
 
                 record_dict = {
@@ -2925,9 +2927,12 @@ class IsolatedTrainingCompletionAuthority:
         dataset_manifest_id: str | None = None,
         simulate_failure_before_commit: bool = False,
         pause_checkpoint_marker_file: str | None = None,
+        pause_after_commit_marker_file: str | None = None,
     ) -> CompletedJobExecutionRecord:
         """Request atomic finalization from the isolated completion authority process over authenticated IPC."""
-        if self.app_env.lower() == "production" and (pause_checkpoint_marker_file or simulate_failure_before_commit):
+        if self.app_env.lower() == "production" and (
+            pause_checkpoint_marker_file or pause_after_commit_marker_file or simulate_failure_before_commit
+        ):
             raise TrainingProvenanceSecurityError(
                 "Security validation failure: Caller-controlled failure injection and checkpoint "
                 "marker file paths are strictly forbidden in production completion requests (ISO-07)."
@@ -2957,6 +2962,7 @@ class IsolatedTrainingCompletionAuthority:
                 "dataset_manifest_id": dataset_manifest_id,
                 "simulate_failure_before_commit": simulate_failure_before_commit,
                 "pause_checkpoint_marker_file": pause_checkpoint_marker_file,
+                "pause_after_commit_marker_file": pause_after_commit_marker_file,
                 "caller_identity": "COORDINATOR",
             })
             res = conn.recv()

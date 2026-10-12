@@ -496,6 +496,7 @@ class TrainingJobAuthorityBackend(abc.ABC):
         enforce_lifecycle: bool = True,
         simulate_failure_before_commit: bool = False,
         pause_checkpoint_marker_file: str | None = None,
+        pause_after_commit_marker_file: str | None = None,
     ) -> CompletedJobExecutionRecord: ...
 
     @abc.abstractmethod
@@ -1883,6 +1884,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         enforce_lifecycle: bool = True,
         simulate_failure_before_commit: bool = False,
         pause_checkpoint_marker_file: str | None = None,
+        pause_after_commit_marker_file: str | None = None,
     ) -> CompletedJobExecutionRecord:
         clean_job_id = job_id.strip()
         if not enforce_lifecycle:
@@ -2175,6 +2177,19 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 f"Conflicting completion record for job '{clean_job_id}': cannot overwrite existing completed execution record with conflicting evidence."
                             ) from None
                         raise
+
+        if pause_after_commit_marker_file:
+            if self._is_prod:
+                raise TrainingProvenanceSecurityError(
+                    f"Arbitrary filesystem checkpoint files are strictly forbidden in production authority for job '{clean_job_id}' (ISO-07)."
+                )
+            with open(pause_after_commit_marker_file, "w", encoding="utf-8") as f:
+                f.write("COMMITTED_CHECKPOINT")
+            release_file = pause_after_commit_marker_file + ".release"
+            for _ in range(300):
+                if os.path.exists(release_file):
+                    break
+                time.sleep(0.1)
 
         return record
 
@@ -3039,6 +3054,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         enforce_lifecycle: bool = True,
         simulate_failure_before_commit: bool = False,
         pause_checkpoint_marker_file: str | None = None,
+        pause_after_commit_marker_file: str | None = None,
     ) -> CompletedJobExecutionRecord:
         clean_job_id = job_id.strip()
         if self._is_prod and not enforce_lifecycle:
@@ -3290,6 +3306,15 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 except Exception:
                     conn.execute("ROLLBACK")
                     raise
+
+        if pause_after_commit_marker_file:
+            with open(pause_after_commit_marker_file, "w", encoding="utf-8") as f:
+                f.write("COMMITTED_CHECKPOINT")
+            release_file = pause_after_commit_marker_file + ".release"
+            for _ in range(300):
+                if os.path.exists(release_file):
+                    break
+                time.sleep(0.1)
 
         return record
 

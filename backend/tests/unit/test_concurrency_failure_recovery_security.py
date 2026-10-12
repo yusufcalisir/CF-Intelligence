@@ -740,34 +740,88 @@ class TestConcurrencyFailureRecoverySecurity:
 
         helper_setup_observed_job(admin_url, job_id, run_id, sim_id, art_sha, sample_count=300)
 
-        # 1. Complete job directly in DB to simulate completed commit before client network loss
-        authority = PostgresTrainingJobAuthority(db_url=comp_url)
-        committed_rec = authority.complete_job(
-            job_id=job_id,
-            executed_rounds=1,
-            executed_epochs=1,
-            sample_count=300,
-            observed_metrics={"loss": 0.25, "auc_roc": 0.92, "val_loss": 0.25},
-            artifact_sha256=art_sha,
-            worker_id="FEDERATED_COORDINATOR",
+        # 1. Spawn completion authority service in testing mode (allows checkpoint marker file)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=vault_file,
+            coordinator_token=COORD_SECRET,
+            app_env="testing",
         )
-        assert committed_rec.status == "COMPLETED"
+        try:
+            client1 = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token=COORD_SECRET,
+                app_env="testing",
+            )
 
-        # 2. Restart service after simulated crash
+            marker_file = str(tmp_path / f"post_commit_marker_con08_{uid}.txt")
+            client_error: list[Exception] = []
+
+            def _call_service():
+                try:
+                    client1.finalize_training_completion(
+                        job_id=job_id,
+                        executed_rounds=1,
+                        executed_epochs=1,
+                        sample_count=300,
+                        observed_metrics={"loss": 0.25, "auc_roc": 0.92, "val_loss": 0.25},
+                        artifact_sha256=art_sha,
+                        coordinator_token=COORD_SECRET,
+                        pause_after_commit_marker_file=marker_file,
+                    )
+                except Exception as exc:
+                    client_error.append(exc)
+
+            t = threading.Thread(target=_call_service)
+            t.start()
+
+            # Wait until PostgreSQL transaction has committed and service pauses at the post-commit checkpoint
+            for _ in range(60):
+                if os.path.exists(marker_file):
+                    break
+                time.sleep(0.1)
+            assert os.path.exists(marker_file), "Service did not reach post-commit checkpoint"
+
+            # 2. Verify the actual commit checkpoint in PostgreSQL while service is paused before returning ACK
+            with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+                cur.execute(
+                    "SELECT completed_at, artifact_sha256, sample_count FROM cfi_completed_jobs WHERE job_id = %s",
+                    (job_id,),
+                )
+                commit_row = cur.fetchone()
+                assert commit_row is not None, "PostgreSQL row was not committed before acknowledgment loss"
+                first_completed_at, first_sha, first_samples = commit_row
+                assert first_sha == art_sha
+                assert first_samples == 300
+
+            # 3. Interrupt communication / terminate the service abruptly after commit, before client receives ACK
+            comp_proc.kill()
+            comp_proc.join(timeout=5)
+            t.join(timeout=5)
+
+            # Client must have experienced communication failure
+            assert len(client_error) == 1, "Client did not observe network/service interruption"
+            assert isinstance(client_error[0], TrainingProvenanceSecurityError)
+
+        finally:
+            if comp_proc.is_alive():
+                comp_proc.terminate()
+                comp_proc.join(timeout=3)
+
+        # 4. Restart the service under production configuration
         restarted_proc, new_endpoint = spawn_isolated_completion_authority_service(
             vault_path=vault_file,
             coordinator_token=COORD_SECRET,
             app_env="production",
         )
         try:
-            client = IsolatedTrainingCompletionAuthority(
+            client2 = IsolatedTrainingCompletionAuthority(
                 service_endpoint=new_endpoint,
                 coordinator_token=COORD_SECRET,
                 app_env="production",
             )
 
-            # 3. Client retries completion
-            retry_rec = client.finalize_training_completion(
+            # 5. Retry completion request through the normal production interface
+            retry_rec = client2.finalize_training_completion(
                 job_id=job_id,
                 executed_rounds=1,
                 executed_epochs=1,
@@ -777,10 +831,11 @@ class TestConcurrencyFailureRecoverySecurity:
                 coordinator_token=COORD_SECRET,
             )
 
+            # 6. Prove exactly one unchanged authoritative record exists
             assert retry_rec.job_id == job_id
-            assert retry_rec.completed_at == committed_rec.completed_at
+            assert retry_rec.artifact_sha256 == art_sha
+            assert retry_rec.completed_at == first_completed_at
 
-            # Exactly 1 row in PostgreSQL
             with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
                 one_row = cur.fetchone()
@@ -796,72 +851,198 @@ class TestConcurrencyFailureRecoverySecurity:
         self, pg_roles: dict[str, str], tmp_path
     ) -> None:
         """CON-09: Coordinator termination during aggregation cannot publish an invalid completed model or receipt."""
+        comp_url = pg_roles["completion"]
+        coord_url = pg_roles["coordinator"]
         admin_url = pg_roles["admin"]
         issuer_url = pg_roles["issuer"]
 
-        uid = uuid.uuid4().hex[:8]
-        job_id = f"job_con09_{uid}"
-        run_id = f"run_con09_{uid}"
-        sim_id = f"sim_con09_{uid}"
+        comp_vault_dir = str(tmp_path / "comp_vault_con09")
+        comp_vault_file = provision_isolated_completion_authority_vault(comp_vault_dir, comp_url)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=comp_vault_file,
+            coordinator_token=COORD_SECRET,
+            app_env="production",
+        )
+        coord_proc, coord_client = spawn_isolated_coordinator_process(app_env="production")
+        procs = {}
+        try:
+            bank_enc_keys = {
+                "BANK_A": Fernet.generate_key(),
+                "BANK_B": Fernet.generate_key(),
+                "BANK_C": Fernet.generate_key(),
+            }
+            vaults_dir = str(tmp_path / "bank_vaults_con09")
+            np.random.seed(99)
+            bank_data_paths = {}
+            for b_id, n_samples in [("BANK_A", 100), ("BANK_B", 100), ("BANK_C", 100)]:
+                X_part = np.random.randn(n_samples, NUM_FEATURES).astype(np.float32)
+                y_part = np.random.randint(0, 2, size=n_samples).astype(np.float32)
+                p = setup_bank_private_storage(
+                    bank_storage_dir=vaults_dir,
+                    bank_id=b_id,
+                    X_partition=X_part,
+                    y_partition=y_part,
+                    bank_token=BANK_TOKENS[b_id],
+                    bank_encryption_key=bank_enc_keys[b_id],
+                )
+                bank_data_paths[b_id] = p
 
-        # Schedule job
-        auth = PostgresTrainingJobAuthority(db_url=admin_url)
-        auth.schedule_job(
-            job_id=job_id,
-            training_run_id=run_id,
-            simulation_id=sim_id,
-            architecture="FraudDetectionNN",
-            feature_schema_version="v1.0",
-            expected_rounds=2,
-            expected_epochs=2,
-            input_dim=len(FEATURE_NAMES),
-            feature_names=list(FEATURE_NAMES),
-            permitted_workers=["BANK_A"],
-        )
-        auth.start_job(job_id=job_id, worker_id="BANK_A")
+            bank_db_urls = {
+                "BANK_A": pg_roles["worker_bank_a"],
+                "BANK_B": pg_roles["worker_bank_b"],
+                "BANK_C": pg_roles["worker_bank_c"],
+            }
+            procs, endpoints = spawn_bank_workers(
+                participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+                bank_tokens=BANK_TOKENS,
+                db_url=pg_roles["worker"],
+                bank_data_paths=bank_data_paths,
+                bank_db_urls=bank_db_urls,
+                bank_encryption_keys=bank_enc_keys,
+            )
 
-        # Simulate coordinator process terminating abruptly during aggregation of round 1
-        # No completed job record exists
-        with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
-            no_row = cur.fetchone()
-            assert no_row is not None and no_row[0] == 0
+            dev_seed = hashlib.sha256(b"cfi_dev_ed25519_training_issuer_seed_con09").digest().hex()
+            issuer_vault_dir = str(tmp_path / "issuer_vault_con09")
+            issuer_key_file, _ = provision_isolated_issuer_vault(issuer_vault_dir, signing_key_hex=dev_seed)
+            signing_auth = IsolatedReceiptSigningAuthority(
+                issuer_key_path=issuer_key_file,
+                coordinator_token=COORD_SECRET,
+                db_url=issuer_url,
+                key_id=DEFAULT_TRAINING_KEY_ID,
+                app_env="production",
+            )
 
-        # Receipt issuer rejects issuance for unfinished job
-        issuer_source = TrustedTrainingJobRecordSource(
-            db_url=issuer_url,
-            enforce_lifecycle=True,
-            coordinator_token="coord_tok_con09",
-            bank_tokens={"BANK_A": "bank_a_tok_con09"},
-            app_env="testing",
-        )
-        issuer = TrainingReceiptIssuer(
-            signing_key_hex=hashlib.sha256(b"dev_seed_con09").digest().hex(),
-            key_id=DEFAULT_TRAINING_KEY_ID,
-            job_record_source=issuer_source,
-            enforce_job_records=True,
-            app_env="testing",
-        )
-        model_payload = b"model_bytes_con09"
-        evidence = TrainingExecutionEvidence(
-            training_run_id=run_id,
-            job_id=job_id,
-            simulation_id=sim_id,
-            completed_at=datetime.now(UTC).isoformat(),
-            status="COMPLETED",
-            executed_rounds=1,
-            executed_epochs=1,
-            sample_count=100,
-            observed_metrics={"loss": 0.25},
-            artifact_sha256=hashlib.sha256(model_payload).hexdigest(),
-            architecture="FraudDetectionNN",
-            feature_schema_version="v1.0",
-            feature_names=list(FEATURE_NAMES),
-            producer_id="FEDERATED_COORDINATOR",
-        )
-        with pytest.raises(TrainingProvenanceSecurityError) as exc_info:
-            issuer.issue_receipt(evidence=evidence, model_bytes=model_payload)
-        assert "Cannot issue receipt" in str(exc_info.value) or "not found" in str(exc_info.value).lower()
+            uid = uuid.uuid4().hex[:8]
+            job_id = f"job_con09_{uid}"
+            run_id = f"run_con09_{uid}"
+            sim_id = f"sim_con09_{uid}"
+            registry_dir = str(tmp_path / "model_reg_con09")
+
+            X_test = np.random.randn(50, NUM_FEATURES).astype(np.float32)
+            y_test = np.random.randint(0, 2, size=50).astype(np.float32)
+
+            worker_pids: dict[str, int] = {b: (p.pid or 0) for b, p in procs.items()}
+
+            fed_errors: list[Exception] = []
+
+            def _run_fed():
+                try:
+                    coord_client.execute_federation(
+                        job_id=job_id,
+                        training_run_id=run_id,
+                        simulation_id=sim_id,
+                        holdout_val_data=(X_test, y_test),
+                        participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+                        worker_endpoints=endpoints,
+                        num_rounds=2,
+                        expected_unique_samples=300,
+                        registry_storage_dir=registry_dir,
+                        coordinator_token=COORD_SECRET,
+                        db_url=coord_url,
+                        comp_service_endpoint=comp_endpoint,
+                        signing_authority=signing_auth,
+                        worker_pids=worker_pids,
+                    )
+                except Exception as exc:
+                    fed_errors.append(exc)
+
+            t_fed = threading.Thread(target=_run_fed)
+            t_fed.start()
+
+            # Wait until bank workers complete round 1 training and commit observations to PostgreSQL
+            # This is a verifiable in-progress aggregation checkpoint before completion
+            reached_checkpoint = False
+            for _ in range(80):
+                with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+                    cur.execute("SELECT COUNT(*) FROM cfi_round_observations WHERE job_id = %s", (job_id,))
+                    row = cur.fetchone()
+                    if row and row[0] >= 3:
+                        reached_checkpoint = True
+                        break
+                time.sleep(0.1)
+
+            assert reached_checkpoint, "Did not reach verifiable in-progress aggregation checkpoint"
+
+            # Terminate the coordinator process abruptly during aggregation
+            if os.name == "nt" and coord_proc is not None:
+                import win32process
+                with contextlib.suppress(Exception):
+                    win32process.TerminateProcess(coord_proc, 9)
+            coord_client.terminate()
+            t_fed.join(timeout=5)
+
+            # Inspect authoritative PostgreSQL records: 0 completed jobs
+            with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                zero_comp = cur.fetchone()
+                assert zero_comp is not None and zero_comp[0] == 0
+
+                cur.execute("SELECT COUNT(*) FROM cfi_started_jobs WHERE job_id = %s", (job_id,))
+                started_row = cur.fetchone()
+                assert started_row is not None and started_row[0] == 1
+
+            # Prove no trusted receipt can be issued
+            issuer_source = TrustedTrainingJobRecordSource(
+                db_url=issuer_url,
+                enforce_lifecycle=True,
+                coordinator_token=COORD_SECRET,
+                bank_tokens=BANK_TOKENS,
+                app_env="production",
+            )
+            issuer = TrainingReceiptIssuer(
+                signing_key_hex=dev_seed,
+                key_id=DEFAULT_TRAINING_KEY_ID,
+                job_record_source=issuer_source,
+                enforce_job_records=True,
+                app_env="production",
+            )
+            model_payload = b"incomplete_aggregated_model_bytes_con09"
+            evidence = TrainingExecutionEvidence(
+                training_run_id=run_id,
+                job_id=job_id,
+                simulation_id=sim_id,
+                completed_at=datetime.now(UTC).isoformat(),
+                status="COMPLETED",
+                executed_rounds=2,
+                executed_epochs=2,
+                sample_count=300,
+                observed_metrics={"loss": 0.25},
+                artifact_sha256=hashlib.sha256(model_payload).hexdigest(),
+                architecture="FraudDetectionNN",
+                feature_schema_version="v1.0",
+                feature_names=list(FEATURE_NAMES),
+                producer_id="FEDERATED_COORDINATOR",
+            )
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_info:
+                issuer.issue_receipt(evidence=evidence, model_bytes=model_payload)
+            assert "Cannot issue receipt" in str(exc_info.value) or "not found" in str(exc_info.value).lower()
+
+            # Prove no verified Registry candidate can result
+            verifier = get_default_training_verifier()
+            registry = ModelRegistry(
+                storage_dir=registry_dir,
+                verifier=verifier,
+            )
+            model_svc = ModelService(get_settings())
+            unverified_model = model_svc.create_model(input_dim=NUM_FEATURES)
+            version_entry = registry.save_version(
+                simulation_id=sim_id,
+                state_dict=unverified_model.state_dict(),
+                metrics={"loss": 0.25},
+                is_promoted=False,
+                training_receipt=None,
+            )
+            assert version_entry["is_production_eligible"] is False
+            assert version_entry["provenance_type"] == "UNVERIFIED"
+
+        finally:
+            for p in procs.values():
+                with contextlib.suppress(Exception):
+                    p.terminate()
+                    p.join(timeout=2)
+            coord_client.terminate()
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
 
     # -------------------------------------------------------------------------
     # CON-10: Bank Worker Failure Cannot Be Silently Counted
@@ -1134,6 +1315,8 @@ class TestConcurrencyFailureRecoverySecurity:
     ) -> None:
         """CON-15: Conflicting concurrent evidence mutations cannot bypass reconciliation or atomic finalization."""
         admin_url = pg_roles["admin"]
+        comp_url = pg_roles["completion"]
+        worker_url = pg_roles["worker_bank_a"]
 
         uid = uuid.uuid4().hex[:8]
         job_id = f"job_con15_{uid}"
@@ -1141,30 +1324,158 @@ class TestConcurrencyFailureRecoverySecurity:
         sim_id = f"sim_con15_{uid}"
         art_sha = hashlib.sha256(b"con15_art").hexdigest()
 
-        helper_setup_observed_job(admin_url, job_id, run_id, sim_id, art_sha, sample_count=300)
+        # Setup an observed job with round 1 observations and aggregation completed
+        helper_setup_observed_job(admin_url, job_id, run_id, sim_id, art_sha, sample_count=300, num_rounds=1)
 
-        # Attempt to insert an unobserved participant in aggregation
-        coord_auth = PostgresTrainingJobAuthority(db_url=pg_roles["coordinator"])
-        with pytest.raises((TrainingProvenanceSecurityError, psycopg.Error)) as exc_info:
-            coord_auth.record_global_aggregation(
-                GlobalAggregationEvent(
-                    event_id=f"agg_forged_{uid}",
-                    job_id=job_id,
-                    round_number=2,
-                    aggregation_algorithm="fed_avg_weighted",
-                    accepted_participant_ids=("BANK_UNKNOWN",),
-                    accepted_local_update_digests=(hashlib.sha256(b"fake").hexdigest(),),
-                    aggregation_configuration={},
-                    aggregated_global_model_digest=hashlib.sha256(b"fake_agg").hexdigest(),
-                    timestamp=datetime.now(UTC).isoformat(),
-                )
-            )
-        assert (
-            "Direct aggregation forgery" in str(exc_info.value)
-            or "unobserved participant" in str(exc_info.value)
-            or "has no authentic completed observation" in str(exc_info.value)
-            or "insufficient_privilege" in str(exc_info.value)
+        # 1. Establish counterfactual: Prove that in the absence of finalization, an otherwise valid
+        # round 2 observation or aggregation succeeds without error
+        twin_job_id = f"job_twin_con15_{uid}"
+        auth_admin = PostgresTrainingJobAuthority(db_url=admin_url)
+        auth_admin.schedule_job(
+            job_id=twin_job_id,
+            training_run_id=f"run_twin_{uid}",
+            simulation_id=f"sim_twin_{uid}",
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=2,
+            expected_epochs=2,
+            input_dim=len(FEATURE_NAMES),
+            feature_names=list(FEATURE_NAMES),
+            permitted_workers=["BANK_A", "BANK_B", "BANK_C"],
         )
+        auth_admin.start_job(job_id=twin_job_id, worker_id="BANK_A")
+
+        worker_auth_twin = PostgresTrainingJobAuthority(db_url=worker_url)
+        twin_obs = RoundObservation(
+            event_id=f"evt_twin_{uid}",
+            job_id=twin_job_id,
+            training_run_id=f"run_twin_{uid}",
+            simulation_id=f"sim_twin_{uid}",
+            worker_id="BANK_A",
+            bank_id="BANK_A",
+            round_number=2,
+            attempt_number=1,
+            actual_sample_count=100,
+            actual_executed_epochs=1,
+            observed_loss=0.18,
+            metrics={"loss": 0.18},
+            execution_timestamp=datetime.now(UTC).isoformat(),
+            model_update_digest=hashlib.sha256(b"competing_twin_up").hexdigest(),
+            execution_status="COMPLETED",
+        )
+        recorded_twin = worker_auth_twin.record_observation(twin_obs)
+        assert recorded_twin.event_id == twin_obs.event_id, "Counterfactual failed: valid mutation was rejected"
+
+        # 2. Establish a real race using independent PostgreSQL connections on the target job
+        authority_comp = PostgresTrainingJobAuthority(db_url=comp_url)
+        authority_worker = PostgresTrainingJobAuthority(db_url=worker_url)
+
+        marker_file = str(tmp_path / f"checkpoint_con15_{uid}.txt")
+
+        # Competing mutation A: Valid round 2 observation from BANK_A
+        competing_obs = RoundObservation(
+            event_id=f"evt_competing_con15_{uid}",
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            worker_id="BANK_A",
+            bank_id="BANK_A",
+            round_number=2,
+            attempt_number=1,
+            actual_sample_count=100,
+            actual_executed_epochs=1,
+            observed_loss=0.18,
+            metrics={"loss": 0.18},
+            execution_timestamp=datetime.now(UTC).isoformat(),
+            model_update_digest=hashlib.sha256(b"competing_update_15").hexdigest(),
+            execution_status="COMPLETED",
+        )
+
+        obs_rejected: list[bool] = []
+        obs_error: list[Exception] = []
+
+        def _competing_worker():
+            try:
+                authority_worker.record_observation(competing_obs)
+            except TrainingProvenanceSecurityError as e:
+                obs_error.append(e)
+                if "finalized completed job" in str(e):
+                    obs_rejected.append(True)
+
+        # Thread 1: Finalization holding exclusive transaction advisory lock pre-commit
+        def _finalization():
+            return authority_comp.complete_job(
+                job_id=job_id,
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=300,
+                observed_metrics={"loss": 0.25, "auc_roc": 0.92, "val_loss": 0.25},
+                artifact_sha256=art_sha,
+                worker_id="FEDERATED_COORDINATOR",
+                pause_checkpoint_marker_file=marker_file,
+            )
+
+        t_comp = threading.Thread(target=_finalization)
+        t_comp.start()
+
+        # Wait until finalization holds exclusive advisory lock at the checkpoint
+        for _ in range(60):
+            if os.path.exists(marker_file):
+                break
+            time.sleep(0.1)
+        assert os.path.exists(marker_file), "Finalization did not reach in-transaction checkpoint"
+
+        # Thread 2: Competing evidence mutation launched while finalization holds exclusive advisory lock
+        t_worker = threading.Thread(target=_competing_worker)
+        t_worker.start()
+
+        time.sleep(0.3)
+        assert t_worker.is_alive(), "Worker mutation did not block on transaction advisory lock"
+
+        # 3. Verify intended transaction/advisory-lock ordering directly via PostgreSQL pg_locks
+        with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT mode, granted FROM pg_locks
+                WHERE locktype = 'advisory' AND objid = hashtext(%s)
+                ORDER BY granted DESC
+                """,
+                (job_id,),
+            )
+            locks = cur.fetchall()
+            assert len(locks) >= 2, f"Expected active and waiting advisory locks, found: {locks}"
+            granted_modes = [lock_entry[0] for lock_entry in locks if lock_entry[1] is True]
+            waiting_modes = [lock_entry[0] for lock_entry in locks if lock_entry[1] is False]
+            assert "ExclusiveLock" in granted_modes, f"Finalization exclusive lock not held: {granted_modes}"
+            assert "ShareLock" in waiting_modes, f"Worker shared lock not waiting: {waiting_modes}"
+
+        # 4. Release finalization checkpoint so transaction commits
+        with open(marker_file + ".release", "w", encoding="utf-8") as f:
+            f.write("RELEASE")
+
+        t_comp.join(timeout=5)
+        t_worker.join(timeout=5)
+
+        # 5. Worker mutation unblocked and was rejected upon seeing finalized job
+        assert len(obs_rejected) == 1, f"Competing mutation was not rejected: errors={obs_error}"
+
+        # 6. Verify persistent database state: no inconsistent trusted completion
+        with psycopg.connect(admin_url) as conn, conn.cursor() as cur:
+            # Completed job record remains exactly the snapshot finalized by completion authority
+            cur.execute(
+                "SELECT sample_count, artifact_sha256, executed_rounds FROM cfi_completed_jobs WHERE job_id = %s",
+                (job_id,),
+            )
+            comp_row = cur.fetchone()
+            assert comp_row is not None
+            assert comp_row[0] == 300
+            assert comp_row[1] == art_sha
+            assert comp_row[2] == 1
+
+            # Competing round 2 observation was never committed
+            cur.execute("SELECT COUNT(*) FROM cfi_round_observations WHERE event_id = %s", (competing_obs.event_id,))
+            zero_competing = cur.fetchone()
+            assert zero_competing is not None and zero_competing[0] == 0
 
     # -------------------------------------------------------------------------
     # POS-01: Mandatory Positive Regression (Genuine 3-Bank 2-Round Training)
