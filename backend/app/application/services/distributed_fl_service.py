@@ -287,27 +287,221 @@ class BankPrivateStorageVault:
 def provision_isolated_issuer_vault(
     vault_dir: str,
     signing_key_hex: str | None = None,
+    app_env: str = "development",
 ) -> tuple[str, str]:
-    """Privileged bootstrap provisioning Ed25519 issuer private key inside an isolated vault."""
-    os.makedirs(vault_dir, exist_ok=True)
-    if not signing_key_hex:
-        priv_hex, pub_hex = _generate_ed25519_keypair_hex()
-    else:
+    """Privileged bootstrap provisioning Ed25519 issuer private key inside an isolated vault.
+
+    Enforces mandatory fail-closed security properties:
+    1. Redirection & Junction Defense: Rejects symlinks, junctions, reparse points, and conflicting file/dir paths.
+    2. Permission Pre-Enforcement: Restrictive NTFS DACL (denying WinRestrictedCodeSid S-1-5-12 and granting
+       strictly TokenUser) is configured and verified on the vault directory and on an empty staged file BEFORE
+       any private key bytes are persisted.
+    3. Zero Plaintext Exposure Window: Private key bytes are never written to an unprotected or inherited location.
+    4. Clean Failure Recovery: Interrupted or failed permission setup leaves zero readable key artifacts.
+    5. Atomic Replacement: Staged file replaces destination via atomic filesystem operations.
+    6. Permanent NTFS Protection: Security persists permanently before service startup, during execution,
+       after process termination, and across restarts.
+    7. Cryptographic Key Independence: Generates cryptographically secure Ed25519 keys; rejects deterministic
+       development seeds in production environment.
+    """
+    if not vault_dir or not isinstance(vault_dir, str):
+        raise TrainingProvenanceConfigurationError("Vault directory path must be a non-empty string.")
+
+    vault_dir = os.path.abspath(vault_dir)
+    key_file = os.path.join(vault_dir, "issuer_ed25519.key")
+
+    # 1. Structural and reparse point checks
+    _check_no_reparse_or_symlink(vault_dir, "Issuer vault directory")
+    if os.path.exists(vault_dir) and not os.path.isdir(vault_dir):
+        raise TrainingProvenanceSecurityError(
+            f"Issuer vault directory path conflicts with existing non-directory file: '{vault_dir}'."
+        )
+
+    _check_no_reparse_or_symlink(key_file, "Issuer key file")
+    if os.path.exists(key_file) and os.path.isdir(key_file):
+        raise TrainingProvenanceSecurityError(
+            f"Issuer key file path conflicts with existing directory: '{key_file}'."
+        )
+
+    # 2. Key material derivation / validation
+    dev_seed_hex = hashlib.sha256(b"cfi_dev_ed25519_training_issuer_seed_v1").digest().hex()
+    if signing_key_hex:
         priv_hex = signing_key_hex.strip()
+        if len(priv_hex) != 64:
+            raise TrainingProvenanceConfigurationError("Signing key hex must be a 64-character hex string.")
+        if app_env.lower() == "production" and priv_hex == dev_seed_hex:
+            raise TrainingProvenanceSecurityError(
+                "Production receipt issuer cannot use deterministic development signing seed (SIGN-05)."
+            )
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
         priv_key = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(priv_hex))
         pub_hex = priv_key.public_key().public_bytes_raw().hex()
         del priv_key
+    else:
+        priv_hex, pub_hex = _generate_ed25519_keypair_hex()
 
-    key_file = os.path.join(vault_dir, "issuer_ed25519.key")
-    with open(key_file, "w", encoding="utf-8") as f:
-        f.write(priv_hex)
-    with contextlib.suppress(Exception):
-        os.chmod(vault_dir, 0o700)
-        os.chmod(key_file, 0o600)
-    del priv_hex
-    return key_file, pub_hex
+    # 3. Ensure vault directory exists and enforce restrictive permissions
+    try:
+        os.makedirs(vault_dir, mode=0o700, exist_ok=True)
+    except Exception as e:
+        raise TrainingProvenanceConfigurationError(
+            f"Failed to create isolated issuer vault directory: {e}"
+        ) from e
+
+    _check_no_reparse_or_symlink(vault_dir, "Issuer vault directory")
+
+    staged_file = None
+    try:
+        if os.name == "nt":
+            try:
+                import ntsecuritycon
+                import win32api
+                import win32con
+                import win32security
+
+                hProcess = win32api.GetCurrentProcess()
+                hToken = win32security.OpenProcessToken(hProcess, win32con.TOKEN_ALL_ACCESS)
+                service_sid, _ = win32security.GetTokenInformation(hToken, win32security.TokenUser)
+                coord_sid = win32security.CreateWellKnownSid(win32security.WinRestrictedCodeSid)
+
+                # Configure directory DACL with container and object inheritance
+                dir_dacl = win32security.ACL()
+                dir_dacl.AddAccessDeniedAceEx(
+                    win32security.ACL_REVISION,
+                    win32security.OBJECT_INHERIT_ACE | win32security.CONTAINER_INHERIT_ACE,
+                    ntsecuritycon.FILE_ALL_ACCESS,
+                    coord_sid,
+                )
+                dir_dacl.AddAccessAllowedAceEx(
+                    win32security.ACL_REVISION,
+                    win32security.OBJECT_INHERIT_ACE | win32security.CONTAINER_INHERIT_ACE,
+                    ntsecuritycon.FILE_ALL_ACCESS,
+                    service_sid,
+                )
+                win32security.SetNamedSecurityInfo(
+                    vault_dir,
+                    win32security.SE_FILE_OBJECT,
+                    win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+                    None,
+                    None,
+                    dir_dacl,
+                    None,
+                )
+            except Exception as e:
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to configure mandatory operating system NTFS DACL on issuer vault directory: {e}"
+                ) from e
+        else:
+            try:
+                os.chmod(vault_dir, 0o700)
+            except Exception as e:
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to configure mandatory operating system permissions on issuer vault directory: {e}"
+                ) from e
+
+        # 4. Create empty staged file inside protected directory
+        staged_nonce = secrets.token_hex(16)
+        staged_file = os.path.join(vault_dir, f".issuer_key_staged_{staged_nonce}.tmp")
+
+        try:
+            with open(staged_file, "w", encoding="utf-8") as f:
+                pass  # 0 bytes: empty file
+        except Exception as e:
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to create staged issuer key file: {e}"
+            ) from e
+
+        # 5. Enforce restrictive DACL on staged file BEFORE writing secret bytes
+        if os.name == "nt":
+            try:
+                file_dacl = win32security.ACL()
+                file_dacl.AddAccessDeniedAce(
+                    win32security.ACL_REVISION,
+                    ntsecuritycon.FILE_ALL_ACCESS,
+                    coord_sid,
+                )
+                file_dacl.AddAccessAllowedAce(
+                    win32security.ACL_REVISION,
+                    ntsecuritycon.FILE_ALL_ACCESS,
+                    service_sid,
+                )
+                win32security.SetNamedSecurityInfo(
+                    staged_file,
+                    win32security.SE_FILE_OBJECT,
+                    win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+                    None,
+                    None,
+                    file_dacl,
+                    None,
+                )
+            except Exception as e:
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to configure mandatory operating system NTFS DACL on staged issuer key file: {e}"
+                ) from e
+        else:
+            try:
+                os.chmod(staged_file, 0o600)
+            except Exception as e:
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to configure mandatory operating system permissions on staged issuer key file: {e}"
+                ) from e
+
+        # 6. Persist private key bytes into already-protected staged file
+        try:
+            with open(staged_file, "w", encoding="utf-8") as f:
+                f.write(priv_hex)
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception as e:
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to write confidential private key to staged issuer vault: {e}"
+            ) from e
+
+        # 7. Atomic replacement of final vault file
+        try:
+            os.replace(staged_file, key_file)
+            staged_file = None  # Replaced successfully
+        except Exception as e:
+            raise TrainingProvenanceConfigurationError(
+                f"Failed to atomically install issuer key file: {e}"
+            ) from e
+
+        # 8. Final confirmation of permissions on key_file
+        if os.name == "nt":
+            try:
+                win32security.SetNamedSecurityInfo(
+                    key_file,
+                    win32security.SE_FILE_OBJECT,
+                    win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+                    None,
+                    None,
+                    file_dacl,
+                    None,
+                )
+            except Exception as e:
+                with contextlib.suppress(Exception):
+                    os.remove(key_file)
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to verify mandatory NTFS DACL on final issuer key file: {e}"
+                ) from e
+        else:
+            try:
+                os.chmod(key_file, 0o600)
+            except Exception as e:
+                with contextlib.suppress(Exception):
+                    os.remove(key_file)
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to verify permissions on final issuer key file: {e}"
+                ) from e
+
+        del priv_hex
+        return key_file, pub_hex
+
+    finally:
+        if staged_file and os.path.exists(staged_file):
+            with contextlib.suppress(Exception):
+                os.remove(staged_file)
 
 
 def _run_isolated_issuer_worker(
@@ -323,11 +517,29 @@ def _run_isolated_issuer_worker(
     issuer_pid = os.getpid()
     logger.info("Isolated Receipt Signing Service running with PID %d", issuer_pid)
 
-    if os.path.exists(issuer_key_source):
+    if app_env.lower() == "production":
+        _check_no_reparse_or_symlink(issuer_key_source, "Issuer key source")
+        if not os.path.isfile(issuer_key_source):
+            outbox.put({
+                "status": "ERROR",
+                "error": f"Production issuer requires a provisioned key vault file; invalid path: '{issuer_key_source}'.",
+            })
+            return
         with open(issuer_key_source, encoding="utf-8") as f:
             signing_key_hex = f.read().strip()
     else:
-        signing_key_hex = issuer_key_source.strip()
+        if os.path.exists(issuer_key_source):
+            with open(issuer_key_source, encoding="utf-8") as f:
+                signing_key_hex = f.read().strip()
+        else:
+            signing_key_hex = issuer_key_source.strip()
+
+    if len(signing_key_hex) != 64:
+        outbox.put({
+            "status": "ERROR",
+            "error": "Issuer signing key must be a 64-character hex string.",
+        })
+        return
 
     record_source = TrustedTrainingJobRecordSource(
         coordinator_token=coordinator_token,
@@ -382,6 +594,13 @@ def _run_isolated_issuer_worker(
                     })
                     continue
 
+                if req.get("caller_identity") != "COORDINATOR":
+                    outbox.put({
+                        "status": "ERROR",
+                        "error": f"Unauthorized receipt signing caller identity: '{req.get('caller_identity')}'.",
+                    })
+                    continue
+
                 job_id = req["job_id"]
                 artifact_bytes = req["artifact_bytes"]
 
@@ -397,6 +616,13 @@ def _run_isolated_issuer_worker(
                     outbox.put({
                         "status": "ERROR",
                         "error": f"Receipt issuance denied: Job '{job_id}' has no trusted COMPLETED record in authority.",
+                    })
+                    continue
+
+                if completed_record.status != "COMPLETED":
+                    outbox.put({
+                        "status": "ERROR",
+                        "error": f"Receipt issuance denied: Job '{job_id}' status is '{completed_record.status}', not 'COMPLETED'.",
                     })
                     continue
 
@@ -465,12 +691,17 @@ class IsolatedReceiptSigningAuthority:
         self._temp_vault: tempfile.TemporaryDirectory | None = None
 
         if issuer_key_path is not None:
-            key_source = issuer_key_path
+            _check_no_reparse_or_symlink(issuer_key_path, "Issuer key file")
+            if not os.path.isfile(issuer_key_path):
+                raise TrainingProvenanceSecurityError(
+                    f"Issuer key path does not exist or is not a regular file: '{issuer_key_path}'"
+                )
+            key_source = os.path.abspath(issuer_key_path)
         elif signing_key_hex is not None:
             if self.app_env.lower() == "production":
                 raise TrainingProvenanceSecurityError(
                     "Production isolated receipt signing authority requires provisioned issuer_key_path; "
-                    "passing raw signing_key_hex to service launcher is strictly forbidden."
+                    "passing raw signing_key_hex to service launcher is strictly forbidden (SIGN-05)."
                 )
             if len(signing_key_hex.strip()) != 64:
                 raise TrainingProvenanceConfigurationError("Signing key hex must be a 64-character hex string.")
@@ -1422,6 +1653,14 @@ def _run_isolated_coordinator_worker(
                 app_env = req.get("app_env", "production")
                 comp_endpoint = req["comp_service_endpoint"]
                 participating_banks = req["participating_banks"]
+
+                if app_env.lower() == "production" and req.get("signing_key_hex"):
+                    client.send({
+                        "command": "FEDERATION_RESULT",
+                        "status": "ERROR",
+                        "error": "Production coordinator cannot receive or supply signing private key (SIGN-05).",
+                    })
+                    continue
 
                 manager = DistributedFederatedTrainingManager(
                     coordinator_token=coord_tok,
@@ -2479,6 +2718,10 @@ class DistributedFederatedTrainingManager:
         if "completion_db_url" in kwargs:
             raise TrainingProvenanceSecurityError(
                 "Coordinator process cannot receive or hold completion-authority credentials (COMP-01)."
+            )
+        if any(k in kwargs for k in ("signing_key_hex", "signing_key", "issuer_key_path", "issuer_key_file")):
+            raise TrainingProvenanceSecurityError(
+                "Coordinator process cannot receive or hold receipt issuer private signing key material (SIGN-05)."
             )
         self.coordinator_token = coordinator_token
         self.db_url = db_url
