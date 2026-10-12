@@ -1081,7 +1081,7 @@ class SecurityIdentityInfo:
         return f"SecurityIdentityInfo(principal_id={self.principal_id!r}, principal_type={self.principal_type!r})"
 
 
-def get_os_process_identity(target: Any = None) -> SecurityIdentityInfo:
+def get_os_process_identity(target: Any = None, check_thread: bool = True) -> SecurityIdentityInfo:
     """Inspect and return the actual effective operating system security identity from the process access token."""
     if os.name == "nt":
         import win32api
@@ -1116,7 +1116,7 @@ def get_os_process_identity(target: Any = None) -> SecurityIdentityInfo:
 
         try:
             hToken = None
-            if target is None:
+            if target is None and check_thread:
                 try:
                     hToken = win32security.OpenThreadToken(win32api.GetCurrentThread(), win32con.TOKEN_QUERY, True)
                 except Exception:
@@ -1473,9 +1473,9 @@ class BankWorkerOSSecurityContext:
             self._active = False
 
 
-def get_bank_worker_os_identity(bank_id: str, target: Any = None) -> SecurityIdentityInfo:
+def get_bank_worker_os_identity(bank_id: str, target: Any = None, check_thread: bool = True) -> SecurityIdentityInfo:
     """Return the real effective operating system security principal under which a bank worker runs."""
-    info = get_os_process_identity(target)
+    info = get_os_process_identity(target, check_thread=check_thread)
     bank_sid = get_bank_security_sid(bank_id)
     info.details["bank_id"] = bank_id
     info.details["bank_sid"] = bank_sid
@@ -1534,10 +1534,10 @@ def validate_restricted_bank_worker_policy(details: dict[str, Any], bank_id: str
         )
 
 
-def verify_restricted_bank_worker_os_boundary(bank_id: str, app_env: str = "production") -> SecurityIdentityInfo:
+def verify_restricted_bank_worker_os_boundary(bank_id: str, app_env: str = "production", target: Any = None) -> SecurityIdentityInfo:
     """Verify that current operating system execution context satisfies mandatory bank worker isolation policy."""
     if app_env.lower() != "production":
-        return get_bank_worker_os_identity(bank_id)
+        return get_bank_worker_os_identity(bank_id, target=target)
 
     if os.name != "nt":
         raise TrainingProvenanceSecurityError(
@@ -1545,7 +1545,8 @@ def verify_restricted_bank_worker_os_boundary(bank_id: str, app_env: str = "prod
             "Production federated training requires enforced Windows Restricted Token isolation."
         )
 
-    ident = get_bank_worker_os_identity(bank_id)
+    # In production, verify the PRIMARY process token (not merely a temporary thread impersonation)
+    ident = get_bank_worker_os_identity(bank_id, target=target, check_thread=False)
     validate_restricted_bank_worker_policy(ident.details, bank_id)
     return ident
 
@@ -2845,6 +2846,180 @@ def setup_bank_private_storage(
 
 
 
+class IsolatedBankWorkerProcessProxy:
+    """Process proxy object representing an isolated operating system bank worker process.
+
+    Provides a process management interface compatible with multiprocessing.Process:
+    - pid: Operating System Process ID
+    - is_alive(): True if the process is currently executing
+    - terminate(): Terminate the OS process handle
+    - join(timeout): Wait for process termination
+    - exitcode: Process termination exit code
+    """
+
+    def __init__(self, pid: int, proc_handle: Any = None, conn: Any = None, bank_id: str = "") -> None:
+        self.pid = pid
+        self._proc_handle = proc_handle
+        self._conn = conn
+        self._bank_id = bank_id
+        self._is_alive = True
+        self.exitcode: int | None = None
+
+    def is_alive(self) -> bool:
+        if not self._is_alive:
+            return False
+        if os.name == "nt" and self._proc_handle is not None:
+            import win32event
+            import win32process
+
+            res = win32event.WaitForSingleObject(self._proc_handle, 0)
+            if res == 0:
+                self._is_alive = False
+                self.exitcode = win32process.GetExitCodeProcess(self._proc_handle)
+                return False
+            return True
+        elif hasattr(self._proc_handle, "poll"):
+            ret = self._proc_handle.poll()
+            if ret is not None:
+                self._is_alive = False
+                self.exitcode = ret
+                return False
+            return True
+        return self._is_alive
+
+    def terminate(self) -> None:
+        if os.name == "nt" and self._proc_handle is not None:
+            import win32process
+
+            with contextlib.suppress(Exception):
+                win32process.TerminateProcess(self._proc_handle, 1)
+        elif hasattr(self._proc_handle, "terminate"):
+            with contextlib.suppress(Exception):
+                self._proc_handle.terminate()
+        if self._conn is not None:
+            with contextlib.suppress(Exception):
+                self._conn.close()
+        self._is_alive = False
+        self.exitcode = 1
+
+    def join(self, timeout: float | None = None) -> None:
+        timeout_ms = int(timeout * 1000) if timeout is not None else 10000
+        if os.name == "nt" and self._proc_handle is not None:
+            import win32event
+            import win32process
+
+            win32event.WaitForSingleObject(self._proc_handle, timeout_ms)
+            self._is_alive = False
+            self.exitcode = win32process.GetExitCodeProcess(self._proc_handle)
+        elif hasattr(self._proc_handle, "wait"):
+            with contextlib.suppress(Exception):
+                self._proc_handle.wait(timeout=timeout)
+                self.exitcode = self._proc_handle.returncode
+
+
+class IsolatedWorkerInboxProxy:
+    """Inbox proxy for sending commands and data to the isolated worker process."""
+
+    def __init__(self, conn: Any) -> None:
+        self._conn = conn
+        self._lock = threading.Lock()
+
+    def put(self, item: Any, block: bool = True, timeout: float | None = None) -> None:
+        with self._lock:
+            self._conn.send(item)
+
+
+class IsolatedWorkerOutboxProxy:
+    """Outbox proxy for receiving responses and observations from the isolated worker process."""
+
+    def __init__(self, conn: Any) -> None:
+        self._conn = conn
+        self._lock = threading.Lock()
+        self._buffer: list[Any] = []
+
+    def get(self, block: bool = True, timeout: float | None = None) -> Any:
+        with self._lock:
+            if self._buffer:
+                return self._buffer.pop(0)
+            if timeout is not None:
+                if not self._conn.poll(timeout):
+                    import queue
+
+                    raise queue.Empty()
+            return self._conn.recv()
+
+    def empty(self) -> bool:
+        with self._lock:
+            if self._buffer:
+                return False
+            return not self._conn.poll(0)
+
+
+class _WorkerChildInbox:
+    def __init__(self, conn: Any) -> None:
+        self._conn = conn
+
+    def get(self, block: bool = True, timeout: float | None = None) -> Any:
+        if timeout is not None:
+            if not self._conn.poll(timeout):
+                import queue
+
+                raise queue.Empty()
+        return self._conn.recv()
+
+
+class _WorkerChildOutbox:
+    def __init__(self, conn: Any) -> None:
+        self._conn = conn
+
+    def put(self, item: Any, block: bool = True, timeout: float | None = None) -> None:
+        self._conn.send(item)
+
+
+def _run_isolated_bank_worker(conn_address: tuple[str, int], authkey: bytes) -> None:
+    """Dedicated Operating System entrypoint for an isolated bank worker process."""
+    from multiprocessing.connection import Client
+
+    conn = Client(conn_address, authkey=authkey)
+    pid = os.getpid()
+    conn.send({"status": "READY", "pid": pid})
+
+    config = conn.recv()
+    bank_id = config["bank_id"]
+    worker_token = config["worker_token"]
+    db_url = config["db_url"]
+    data_path = config.get("data_path")
+    X_partition = config.get("X_partition")
+    y_partition = config.get("y_partition")
+    fail_observation = config.get("fail_observation", False)
+    bank_encryption_key = config.get("bank_encryption_key")
+    app_env = config.get("app_env", "production")
+
+    # In production on Windows, verify that the worker's own primary process token satisfies policy
+    if app_env.lower() == "production" and os.name == "nt":
+        primary_ident = get_os_process_identity(check_thread=False)
+        validate_restricted_bank_worker_policy(primary_ident.details, bank_id)
+
+    conn.send({"status": "CONFIGURED", "pid": pid})
+
+    inbox = _WorkerChildInbox(conn)
+    outbox = _WorkerChildOutbox(conn)
+
+    run_bank_worker_node(
+        bank_id=bank_id,
+        worker_token=worker_token,
+        db_url=db_url,
+        inbox=inbox,
+        outbox=outbox,
+        data_path=data_path,
+        X_partition=X_partition,
+        y_partition=y_partition,
+        fail_observation=fail_observation,
+        bank_encryption_key=bank_encryption_key,
+        app_env=app_env,
+    )
+
+
 def spawn_bank_workers(
     participating_banks: list[str],
     bank_tokens: dict[str, str],
@@ -2855,61 +3030,192 @@ def spawn_bank_workers(
     bank_db_urls: dict[str, str] | None = None,
     bank_encryption_keys: Mapping[str, str | bytes] | None = None,
     app_env: str = "production",
-) -> tuple[dict[str, mp.Process], dict[str, dict[str, mp.Queue]]]:
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     """Spawn dedicated OS worker processes with their private credentials and data paths.
 
-    Notice: This is called at process launch or integration fixture time.
-    The Coordinator NEVER receives bank_tokens or bank_data_paths; it receives only communication endpoints.
+    In production:
+    - Each bank worker process executes under a dedicated restricted Windows primary process token
+      created via CreateProcessAsUser with bInheritHandles=False.
+    - Zero inherited parent handles, secrets, or coordinator capabilities.
+    - Strict boundary verification of the child process token prior to dispatching workload.
+    - Fails closed on any security or policy configuration defect.
     """
-    processes: dict[str, mp.Process] = {}
-    endpoints: dict[str, dict[str, mp.Queue]] = {}
-    for b_id in participating_banks:
-        in_q: mp.Queue = mp.Queue()
-        out_q: mp.Queue = mp.Queue()
-        data_path = bank_data_paths.get(b_id) if bank_data_paths else None
-        X_b, y_b = bank_partitions.get(b_id, (None, None)) if bank_partitions else (None, None)
-        should_fail_obs = (b_id == "BANK_B" and fail_bank_b_observation)
-
-        if app_env.lower() == "production":
-            if not bank_db_urls or b_id not in bank_db_urls or not bank_db_urls[b_id]:
-                raise TrainingProvenanceSecurityError(
-                    f"Production bank worker [{b_id}] requires dedicated authenticated bank-specific database credentials. "
-                    f"Fallback to generic database role is strictly forbidden (BANKDB-05)."
-                )
-            candidate_url = bank_db_urls[b_id]
-            import urllib.parse
-
-            parsed_u = urllib.parse.urlsplit(candidate_url).username or ""
-            if parsed_u == "cfi_worker_role":
-                raise TrainingProvenanceSecurityError(
-                    f"Production bank worker [{b_id}] cannot execute under shared generic worker role 'cfi_worker_role'. "
-                    f"Dedicated bank-specific database role is required (BANKDB-05)."
-                )
-            worker_db_url = candidate_url
-        else:
-            worker_db_url = bank_db_urls[b_id] if bank_db_urls and b_id in bank_db_urls else db_url
-
-        enc_key = bank_encryption_keys.get(b_id) if bank_encryption_keys else None
-        proc = mp.Process(
-            target=run_bank_worker_node,
-            args=(
-                b_id,
-                bank_tokens[b_id],
-                worker_db_url,
-                in_q,
-                out_q,
-                data_path,
-                X_b,
-                y_b,
-                should_fail_obs,
-                enc_key,
-                app_env,
-            ),
+    if app_env.lower() == "production" and os.name != "nt":
+        raise TrainingProvenanceSecurityError(
+            f"Production bank worker isolation is not supported on platform '{sys.platform}'. "
+            "Production federated training requires enforced Windows Restricted Token isolation."
         )
-        proc.daemon = True
-        proc.start()
-        processes[b_id] = proc
-        endpoints[b_id] = {"inbox": in_q, "outbox": out_q}
+
+    processes: dict[str, Any] = {}
+    endpoints: dict[str, dict[str, Any]] = {}
+
+    if os.name == "nt":
+        import secrets
+        import win32process
+
+        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+        for b_id in participating_banks:
+            data_path = bank_data_paths.get(b_id) if bank_data_paths else None
+            X_b, y_b = bank_partitions.get(b_id, (None, None)) if bank_partitions else (None, None)
+            should_fail_obs = (b_id == "BANK_B" and fail_bank_b_observation)
+
+            if app_env.lower() == "production":
+                if not bank_db_urls or b_id not in bank_db_urls or not bank_db_urls[b_id]:
+                    raise TrainingProvenanceSecurityError(
+                        f"Production bank worker [{b_id}] requires dedicated authenticated bank-specific database credentials. "
+                        f"Fallback to generic database role is strictly forbidden (BANKDB-05)."
+                    )
+                candidate_url = bank_db_urls[b_id]
+                import urllib.parse
+
+                parsed_u = urllib.parse.urlsplit(candidate_url).username or ""
+                if parsed_u == "cfi_worker_role":
+                    raise TrainingProvenanceSecurityError(
+                        f"Production bank worker [{b_id}] cannot execute under shared generic worker role 'cfi_worker_role'. "
+                        f"Dedicated bank-specific database role is required (BANKDB-05)."
+                    )
+                worker_db_url = candidate_url
+            else:
+                worker_db_url = bank_db_urls[b_id] if bank_db_urls and b_id in bank_db_urls else db_url
+
+            enc_key = bank_encryption_keys.get(b_id) if bank_encryption_keys else None
+
+            # 1. Dedicated loopback listener for this bank worker
+            authkey = secrets.token_bytes(32)
+            listener = Listener(("127.0.0.1", 0), authkey=authkey)
+            host, port = listener.address
+
+            # 2. Dedicated restricted primary token
+            try:
+                restricted_token = create_bank_worker_security_token(b_id)
+            except Exception as e:
+                listener.close()
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to create operating system restricted security token for bank worker '{b_id}': {e}"
+                ) from e
+
+            # 3. Sanitized child environment (no leaked completion/coordinator secrets)
+            env = dict(os.environ)
+            env["PYTHONPATH"] = backend_dir
+            env.pop("CFI_TRAINING_JOB_COMPLETION_DB_URL", None)
+            env.pop("COMPLETION_DB_URL", None)
+            env.pop("VAULT_PATH", None)
+
+            worker_code = (
+                "import sys; "
+                "from app.application.services.distributed_fl_service import _run_isolated_bank_worker; "
+                "_run_isolated_bank_worker((sys.argv[1], int(sys.argv[2])), bytes.fromhex(sys.argv[3]))"
+            )
+            cmd = f'"{sys.executable}" -c "{worker_code}" {host} {port} {authkey.hex()}'
+
+            si = win32process.STARTUPINFO()
+            try:
+                hProc, hThread, pid, tid = win32process.CreateProcessAsUser(
+                    restricted_token,
+                    None,
+                    cmd,
+                    None,
+                    None,
+                    False,  # bInheritHandles = False: zero inherited handles or parent tokens!
+                    0,
+                    env,
+                    None,
+                    si,
+                )
+            except Exception as e:
+                listener.close()
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to spawn isolated bank worker process '{b_id}' via CreateProcessAsUser: {e}"
+                ) from e
+
+            try:
+                raw_l = getattr(listener, "_listener", None)
+                if raw_l is not None:
+                    s = getattr(raw_l, "_socket", None)
+                    if s is not None:
+                        s.settimeout(45.0)
+
+                conn = listener.accept()
+                init_msg = conn.recv()
+                if not isinstance(init_msg, dict) or init_msg.get("status") != "READY":
+                    raise TrainingProvenanceConfigurationError(f"Bank worker [{b_id}] handshake failed: {init_msg}")
+
+                # 4. Mandatory independent audit of spawned process's primary token
+                if app_env.lower() == "production":
+                    child_id = get_os_process_identity(hProc, check_thread=False)
+                    try:
+                        validate_restricted_bank_worker_policy(child_id.details, b_id)
+                    except TrainingProvenanceSecurityError as se:
+                        import win32process
+
+                        with contextlib.suppress(Exception):
+                            win32process.TerminateProcess(hProc, 1)
+                        conn.close()
+                        listener.close()
+                        raise TrainingProvenanceSecurityError(
+                            f"Spawned bank worker [{b_id}] process violates mandatory security policy: {se} (BANK-FIX-01)."
+                        ) from se
+
+                # 5. Dispatch bank credentials and configuration strictly to this specific worker
+                config_payload = {
+                    "bank_id": b_id,
+                    "worker_token": bank_tokens[b_id],
+                    "db_url": worker_db_url,
+                    "data_path": data_path,
+                    "X_partition": X_b,
+                    "y_partition": y_b,
+                    "fail_observation": should_fail_obs,
+                    "bank_encryption_key": enc_key,
+                    "app_env": app_env,
+                }
+                conn.send(config_payload)
+                ack = conn.recv()
+                if not isinstance(ack, dict) or ack.get("status") != "CONFIGURED":
+                    raise TrainingProvenanceConfigurationError(f"Bank worker [{b_id}] failed configuration handshake: {ack}")
+
+                proc_proxy = IsolatedBankWorkerProcessProxy(pid=pid, proc_handle=hProc, conn=conn, bank_id=b_id)
+                processes[b_id] = proc_proxy
+                endpoints[b_id] = {
+                    "inbox": IsolatedWorkerInboxProxy(conn),
+                    "outbox": IsolatedWorkerOutboxProxy(conn),
+                }
+            except Exception:
+                listener.close()
+                raise
+            finally:
+                listener.close()
+
+    else:
+        # Development non-Windows fallback
+        for b_id in participating_banks:
+            in_q: mp.Queue = mp.Queue()
+            out_q: mp.Queue = mp.Queue()
+            data_path = bank_data_paths.get(b_id) if bank_data_paths else None
+            X_b, y_b = bank_partitions.get(b_id, (None, None)) if bank_partitions else (None, None)
+            should_fail_obs = (b_id == "BANK_B" and fail_bank_b_observation)
+            worker_db_url = bank_db_urls[b_id] if bank_db_urls and b_id in bank_db_urls else db_url
+            enc_key = bank_encryption_keys.get(b_id) if bank_encryption_keys else None
+            proc = mp.Process(
+                target=run_bank_worker_node,
+                args=(
+                    b_id,
+                    bank_tokens[b_id],
+                    worker_db_url,
+                    in_q,
+                    out_q,
+                    data_path,
+                    X_b,
+                    y_b,
+                    should_fail_obs,
+                    enc_key,
+                    app_env,
+                ),
+            )
+            proc.daemon = True
+            proc.start()
+            processes[b_id] = proc
+            endpoints[b_id] = {"inbox": in_q, "outbox": out_q}
     return processes, endpoints
 
 
@@ -2946,8 +3252,13 @@ def run_bank_worker_node(
 
     with BankWorkerOSSecurityContext(bank_id):
         if app_env.lower() == "production" and os.name == "nt":
-            ident = get_bank_worker_os_identity(bank_id)
-            validate_restricted_bank_worker_policy(ident.details, bank_id)
+            primary_ident = get_os_process_identity(check_thread=False)
+            if not primary_ident.details.get("is_restricted"):
+                raise TrainingProvenanceSecurityError(
+                    f"Production bank worker [{bank_id}] must execute under an enforced restricted primary process token (BANK-FIX-08). "
+                    f"Unrestricted multiprocessing worker or thread impersonation is strictly rejected."
+                )
+            validate_restricted_bank_worker_policy(primary_ident.details, bank_id)
 
         settings = get_settings()
         model_service = ModelService(settings)
@@ -3012,7 +3323,8 @@ def run_bank_worker_node(
                         "status": "SUCCESS",
                         "bank_id": bank_id,
                         "pid": pid,
-                        "identity": get_bank_worker_os_identity(bank_id).details,
+                        "identity": get_os_process_identity(check_thread=False).details,
+                        "effective_identity": get_os_process_identity(check_thread=True).details,
                     })
                     continue
 
@@ -3020,6 +3332,99 @@ def run_bank_worker_node(
                     outbox.put({
                         "status": "ERROR",
                         "error": f"Institutional boundary violation: coordinator cannot request raw bank dataset from {bank_id}.",
+                    })
+                    continue
+
+                if msg.get("command") == "ATTEMPT_READ_FILE":
+                    path = msg.get("path")
+                    try:
+                        with open(path, "rb") as f:
+                            d = f.read()
+                        outbox.put({
+                            "status": "SUCCESS",
+                            "bank_id": bank_id,
+                            "path": path,
+                            "bytes_read": len(d),
+                        })
+                    except PermissionError as pe:
+                        outbox.put({
+                            "status": "DENIED",
+                            "bank_id": bank_id,
+                            "path": path,
+                            "error": str(pe),
+                            "errno": getattr(pe, "errno", None),
+                        })
+                    except Exception as e:
+                        outbox.put({
+                            "status": "ERROR",
+                            "bank_id": bank_id,
+                            "path": path,
+                            "error": str(e),
+                        })
+                    continue
+
+                if msg.get("command") == "ATTEMPT_REVERT_AND_READ":
+                    path = msg.get("path")
+                    if os.name == "nt":
+                        import win32security
+
+                        win32security.RevertToSelf()
+                    ident = get_os_process_identity(check_thread=False)
+                    try:
+                        with open(path, "rb") as f:
+                            d = f.read()
+                        outbox.put({
+                            "status": "SUCCESS",
+                            "bank_id": bank_id,
+                            "path": path,
+                            "bytes_read": len(d),
+                            "is_restricted": ident.details.get("is_restricted"),
+                            "restricted_sids": ident.details.get("restricted_sids"),
+                        })
+                    except PermissionError as pe:
+                        outbox.put({
+                            "status": "DENIED",
+                            "bank_id": bank_id,
+                            "path": path,
+                            "error": str(pe),
+                            "errno": getattr(pe, "errno", None),
+                            "is_restricted": ident.details.get("is_restricted"),
+                            "restricted_sids": ident.details.get("restricted_sids"),
+                        })
+                    except Exception as e:
+                        outbox.put({
+                            "status": "ERROR",
+                            "bank_id": bank_id,
+                            "path": path,
+                            "error": str(e),
+                            "is_restricted": ident.details.get("is_restricted"),
+                            "restricted_sids": ident.details.get("restricted_sids"),
+                        })
+                    continue
+
+                if msg.get("command") == "ATTEMPT_PRIVILEGE_RECOVERY":
+                    revert_success = False
+                    if os.name == "nt":
+                        import win32security
+
+                        try:
+                            win32security.RevertToSelf()
+                            revert_success = True
+                        except Exception:
+                            revert_success = False
+                        ident = get_os_process_identity(check_thread=False)
+                        is_restricted = ident.details.get("is_restricted", False)
+                        is_admin_disabled = ident.details.get("is_admin_disabled", False)
+                    else:
+                        is_restricted = False
+                        is_admin_disabled = False
+                    outbox.put({
+                        "status": "SUCCESS",
+                        "bank_id": bank_id,
+                        "pid": pid,
+                        "revert_called": revert_success,
+                        "is_restricted": is_restricted,
+                        "is_admin_disabled": is_admin_disabled,
                     })
                     continue
 
