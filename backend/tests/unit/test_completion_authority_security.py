@@ -199,7 +199,7 @@ def helper_setup_valid_observed_job(
             metric_name="auc_roc",
             metric_value=auc_roc,
             evaluated_artifact_digest=artifact_sha,
-            evaluator_identity="cfi_coord_role",
+            evaluator_identity="cfi_evaluator_role",
             evaluation_timestamp=now_str,
         )
     )
@@ -211,7 +211,7 @@ def helper_setup_valid_observed_job(
             metric_name="loss",
             metric_value=observed_loss,
             evaluated_artifact_digest=artifact_sha,
-            evaluator_identity="cfi_coord_role",
+            evaluator_identity="cfi_evaluator_role",
             evaluation_timestamp=now_str,
         )
     )

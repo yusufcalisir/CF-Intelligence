@@ -745,11 +745,17 @@ def reconcile_job_completion_evidence(
                 raise TrainingProvenanceSecurityError(
                     f"Evaluation event '{e.event_id}' for job '{clean_job_id}' references unaggregated artifact digest '{e.evaluated_artifact_digest}'."
                 )
+            if e.evaluator_identity in ("UNTRUSTED", "ANONYMOUS", "CLIENT", "cfi_coord_role"):
+                raise TrainingProvenanceSecurityError(
+                    f"Evaluation event '{e.event_id}' for job '{clean_job_id}' claims unauthorized evaluator identity '{e.evaluator_identity}'."
+                )
 
         for m_name, m_val in eval_metrics.items():
             matching_evals = [
                 e for e in eval_rows
-                if e.metric_name == m_name and e.evaluated_artifact_digest == clean_sha
+                if e.metric_name == m_name
+                and e.evaluated_artifact_digest == clean_sha
+                and e.evaluator_identity not in ("UNTRUSTED", "ANONYMOUS", "CLIENT", "cfi_coord_role")
             ]
             if not matching_evals:
                 raise TrainingProvenanceSecurityError(
@@ -900,6 +906,13 @@ BEGIN
     IF v_agg_count = 0 THEN
         RAISE EXCEPTION 'Evaluation forgery: evaluated artifact digest % does not match any authentic global aggregation for job %',
             NEW.evaluated_artifact_digest, NEW.job_id
+            USING ERRCODE = 'insufficient_privilege';
+    END IF;
+
+    IF (CURRENT_USER = 'cfi_completion_role' AND NEW.evaluator_identity ILIKE '%COORD%')
+       OR NEW.evaluator_identity = 'cfi_coord_role'
+       OR NEW.evaluator_identity IN ('UNTRUSTED', 'ANONYMOUS', 'CLIENT') THEN
+        RAISE EXCEPTION 'Evaluation rejected: unauthorized or coordinator-controlled evaluator identity %', NEW.evaluator_identity
             USING ERRCODE = 'insufficient_privilege';
     END IF;
 

@@ -149,8 +149,14 @@ def _check_no_reparse_or_symlink(path: str, label: str) -> None:
             raise TrainingProvenanceSecurityError(
                 f"{label} cannot be a reparse point or junction: '{path}'."
             )
+    except TrainingProvenanceSecurityError:
+        raise
     except FileNotFoundError:
         pass
+    except OSError as e:
+        raise TrainingProvenanceConfigurationError(
+            f"Failed to access or inspect path for {label} '{path}': {e}"
+        ) from e
 
 
 def configure_bank_vault_os_permissions(vault_dir: str, bank_id: str) -> None:
@@ -2514,52 +2520,13 @@ def _run_isolated_completion_service_worker(
                 return
 
             if cmd == "RECORD_EVALUATION":
-                auth_tok = req.get("coordinator_token")
-                is_prod = app_env.lower() == "production"
-
-                if is_prod and not coordinator_token:
-                    conn.send({
-                        "status": "ERROR",
-                        "error": "Unauthorized evaluation request: coordinator token configuration is required in production.",
-                    })
-                    return
-
-                if coordinator_token is not None:
-                    if not auth_tok or not hmac.compare_digest(auth_tok, coordinator_token):
-                        conn.send({
-                            "status": "ERROR",
-                            "error": "Unauthorized evaluation request: invalid or missing coordinator token.",
-                        })
-                        return
-                elif req.get("caller_identity") not in ("COORDINATOR", "EVALUATOR"):
-                    conn.send({
-                        "status": "ERROR",
-                        "error": f"Unauthorized evaluation caller identity: '{req.get('caller_identity')}'.",
-                    })
-                    return
-
-                job_id = req["job_id"]
-                metric_name = req["metric_name"]
-                metric_value = req["metric_value"]
-                evaluated_artifact_digest = req["evaluated_artifact_digest"]
-                evaluator_identity = req.get("evaluator_identity", "COMPLETION_AUTHORITY")
-
-                evt = ModelEvaluationEvent(
-                    event_id=req.get("event_id") or f"eval_{job_id}_{metric_name}_{uuid.uuid4().hex[:8]}",
-                    job_id=job_id,
-                    evaluation_run_id=req.get("evaluation_run_id") or f"eval_run_{job_id}",
-                    metric_name=metric_name,
-                    metric_value=float(metric_value),
-                    evaluated_artifact_digest=evaluated_artifact_digest,
-                    evaluator_identity=evaluator_identity,
-                    evaluation_timestamp=datetime.now(UTC).isoformat(),
-                    evaluation_dataset_manifest=req.get("dataset_manifest_id"),
-                )
-                recorded_evt = authority.record_model_evaluation(evt)
                 conn.send({
-                    "status": "SUCCESS",
-                    "event_id": recorded_evt.event_id,
-                    "payload_digest": recorded_evt.payload_digest,
+                    "status": "ERROR",
+                    "error": (
+                        "Security validation failure: Caller-supplied evaluation metrics are forbidden. "
+                        "Authoritative evaluation evidence must originate from genuine evaluation execution "
+                        "via EVALUATE_AND_RECORD under trusted completion authority (EVAL-01)."
+                    ),
                 })
                 return
 
@@ -2588,11 +2555,22 @@ def _run_isolated_completion_service_worker(
                     })
                     return
 
+                claimed_evaluator = req.get("evaluator_identity")
+                if claimed_evaluator and claimed_evaluator != "ISOLATED_EVALUATOR":
+                    conn.send({
+                        "status": "ERROR",
+                        "error": (
+                            f"Unauthorized evaluator identity: '{claimed_evaluator}'. "
+                            "Genuine evaluation must execute under 'ISOLATED_EVALUATOR'."
+                        ),
+                    })
+                    return
+                evaluator_identity = "ISOLATED_EVALUATOR"
+
                 job_id = req["job_id"]
                 artifact_bytes = req["artifact_bytes"]
                 holdout_features = req["holdout_features"]
                 holdout_labels = req["holdout_labels"]
-                evaluator_identity = req.get("evaluator_identity", "ISOLATED_EVALUATOR")
 
                 artifact_digest = hashlib.sha256(artifact_bytes).hexdigest()
 
@@ -2605,16 +2583,30 @@ def _run_isolated_completion_service_worker(
                     })
                     return
 
-                model = FraudDetectionModel(input_dim=NUM_FEATURES, dp_compatible=True)
-                buf = io.BytesIO(artifact_bytes)
-                state_dict = torch.load(buf, weights_only=True)
-                model.load_state_dict(state_dict)
+                try:
+                    model = FraudDetectionModel(input_dim=NUM_FEATURES, dp_compatible=True)
+                    buf = io.BytesIO(artifact_bytes)
+                    state_dict = torch.load(buf, weights_only=True)
+                    model.load_state_dict(state_dict)
 
-                model_svc = ModelService(get_settings())
-                eval_metrics = model_svc.evaluate(model, holdout_features, holdout_labels)
+                    model_svc = ModelService(get_settings())
+                    eval_metrics = model_svc.evaluate(model, holdout_features, holdout_labels)
 
-                val_loss = float(eval_metrics["loss"])
-                val_auc = float(eval_metrics["auc_roc"])
+                    val_loss = float(eval_metrics["loss"])
+                    val_auc = float(eval_metrics["auc_roc"])
+                except Exception as e:
+                    conn.send({
+                        "status": "ERROR",
+                        "error": f"Genuine model evaluation execution failed: {e}",
+                    })
+                    return
+
+                if not (math.isfinite(val_loss) and math.isfinite(val_auc)):
+                    conn.send({
+                        "status": "ERROR",
+                        "error": f"Genuine model evaluation produced non-finite metrics: loss={val_loss}, auc={val_auc}",
+                    })
+                    return
 
                 evt_auc = ModelEvaluationEvent(
                     event_id=f"eval_{job_id}_auc_roc_{uuid.uuid4().hex[:8]}",
@@ -2694,6 +2686,20 @@ def _run_isolated_completion_service_worker(
                         ),
                     })
                     return
+
+                # Enforce that evaluation evidence originates from genuine evaluation under trusted authority
+                eval_records = authority.get_model_evaluations(job_id)
+                for er in eval_records:
+                    if "COORD" in er.evaluator_identity.upper() or er.evaluator_identity in ("UNTRUSTED", "ANONYMOUS", "CLIENT"):
+                        conn.send({
+                            "status": "ERROR",
+                            "error": (
+                                f"Security validation failure: Evaluation evidence '{er.event_id}' for job '{job_id}' "
+                                f"claims coordinator-controlled or untrusted evaluator identity '{er.evaluator_identity}'. "
+                                "Authoritative completion requires genuine evaluation under trusted evaluator authority (ISOLATED_EVALUATOR)."
+                            ),
+                        })
+                        return
 
                 completed_record = authority.complete_job(
                     job_id=job_id,

@@ -36,7 +36,7 @@ from app.application.services.distributed_fl_service import (
     spawn_isolated_coordinator_process,
 )
 from app.application.services.model_registry import ModelRegistry
-from app.application.services.model_service import NUM_FEATURES
+from app.application.services.model_service import NUM_FEATURES, FraudDetectionModel
 from app.application.services.training_provenance_service import (
     DEFAULT_TRAINING_KEY_ID,
     TrainingProvenanceSecurityError,
@@ -332,6 +332,481 @@ class TestAuthenticEvidenceEnforcement:
                     artifact_sha256=unagg_digest,
                     coordinator_token=COORD_SECRET,
                 )
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
+
+    def test_evid_02b_coordinator_controlled_evaluation_injection_rejected(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """Adversarial Verification: Coordinator cannot create evaluation evidence via RECORD_EVALUATION IPC.
+
+        Tests:
+        - Coordinator uses legitimate coordinator IPC credentials and authentic aggregated model digest.
+        - Submits fabricated but numerically valid ROC-AUC (0.9999).
+        - Worker IPC endpoint rejects the request with TrainingProvenanceSecurityError.
+        - Direct raw IPC request receives ERROR with security failure message.
+        - Zero evaluation records persisted in PostgreSQL cfi_model_evaluations.
+        - Subsequent completion attempt claiming the fabricated metric fails closed.
+        - Zero completion records persisted in PostgreSQL cfi_completed_jobs.
+        """
+        from multiprocessing.connection import Client
+
+        admin_url = pg_roles["admin"]
+        comp_url = pg_roles["completion"]
+        coord_url = pg_roles["coordinator"]
+        bank_a_url = pg_roles["worker_bank_a"]
+
+        uid = uuid.uuid4().hex[:8]
+        job_id = f"job_eval_inj_{uid}"
+        run_id = f"run_eval_inj_{uid}"
+        sim_id = f"sim_eval_inj_{uid}"
+
+        helper_setup_prerequisite_job(admin_url, job_id, run_id, sim_id, expected_rounds=1, permitted_workers=("BANK_A",))
+
+        # 1. Genuine observation
+        up_digest = hashlib.sha256(b"authentic_update_inj_test").hexdigest()
+        helper_insert_bank_observation(bank_a_url, job_id, run_id, sim_id, "BANK_A", 1, up_digest, sample_count=100)
+
+        # 2. Genuine global aggregation -> authentic aggregated model digest
+        authentic_digest = hashlib.sha256(b"authentic_global_model_inj_test").hexdigest()
+        coord_auth = PostgresTrainingJobAuthority(db_url=coord_url)
+        coord_auth.record_global_aggregation(
+            GlobalAggregationEvent(
+                event_id=f"agg_{job_id}_1",
+                job_id=job_id,
+                round_number=1,
+                aggregation_algorithm="fed_avg_weighted",
+                accepted_participant_ids=("BANK_A",),
+                accepted_local_update_digests=(up_digest,),
+                aggregation_configuration={},
+                aggregated_global_model_digest=authentic_digest,
+                timestamp=datetime.now(UTC).isoformat(),
+            )
+        )
+
+        # 3. Spawn isolated completion authority service
+        comp_vault_dir = str(tmp_path / "comp_vault_inj_test")
+        comp_vault_file = provision_isolated_completion_authority_vault(comp_vault_dir, comp_url)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=comp_vault_file,
+            coordinator_token=COORD_SECRET,
+            app_env="production",
+        )
+        try:
+            client = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token=COORD_SECRET,
+                app_env="production",
+            )
+
+            # Adversarial Attempt A: Via client.record_model_evaluation with legitimate token and authentic digest
+            with pytest.raises(TrainingProvenanceSecurityError, match="Caller-supplied evaluation metrics are forbidden"):
+                client.record_model_evaluation(
+                    job_id=job_id,
+                    metric_name="auc_roc",
+                    metric_value=0.9999,
+                    evaluated_artifact_digest=authentic_digest,
+                    coordinator_token=COORD_SECRET,
+                )
+
+            # Adversarial Attempt B: Via raw IPC client sending RECORD_EVALUATION directly
+            conn = Client(comp_endpoint, authkey=COORD_SECRET.encode("utf-8"))
+            try:
+                conn.send({
+                    "command": "RECORD_EVALUATION",
+                    "job_id": job_id,
+                    "metric_name": "auc_roc",
+                    "metric_value": 0.9999,
+                    "evaluated_artifact_digest": authentic_digest,
+                    "coordinator_token": COORD_SECRET,
+                    "caller_identity": "COORDINATOR",
+                })
+                res = conn.recv()
+                assert res.get("status") == "ERROR"
+                assert "Caller-supplied evaluation metrics are forbidden" in res.get("error", "")
+            finally:
+                conn.close()
+
+            # Verify PostgreSQL database: exactly 0 evaluation records exist for this job
+            with psycopg.connect(admin_url) as pg_conn, pg_conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM cfi_model_evaluations WHERE job_id = %s", (job_id,))
+                assert cur.fetchone()[0] == 0
+
+            # Adversarial Attempt C: Attempt to finalize completion claiming the fabricated metric
+            with pytest.raises(TrainingProvenanceSecurityError, match="without verified model evaluation observations"):
+                client.finalize_training_completion(
+                    job_id=job_id,
+                    executed_rounds=1,
+                    executed_epochs=1,
+                    sample_count=100,
+                    observed_metrics={"loss": 0.05, "auc_roc": 0.9999},
+                    artifact_sha256=authentic_digest,
+                    coordinator_token=COORD_SECRET,
+                )
+
+            # Verify PostgreSQL database: exactly 0 completion records exist for this job
+            with psycopg.connect(admin_url) as pg_conn, pg_conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                assert cur.fetchone()[0] == 0
+
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
+
+    def test_evid_02c_genuine_evaluation_and_completion_succeeds(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """Adversarial Verification: Genuine evaluation produces correctly bound metrics and permits legitimate completion.
+
+        Tests:
+        - Evaluation executed via EVALUATE_AND_RECORD using authentic model artifact bytes.
+        - Correctly bound to ISOLATED_EVALUATOR identity and authentic digest in cfi_model_evaluations.
+        - Permits legitimate completion with exact matching metrics.
+        - Completed job record persisted in PostgreSQL.
+        """
+        import io
+
+        import torch
+
+        admin_url = pg_roles["admin"]
+        comp_url = pg_roles["completion"]
+        coord_url = pg_roles["coordinator"]
+        bank_a_url = pg_roles["worker_bank_a"]
+
+        uid = uuid.uuid4().hex[:8]
+        job_id = f"job_gen_eval_{uid}"
+        run_id = f"run_gen_eval_{uid}"
+        sim_id = f"sim_gen_eval_{uid}"
+
+        helper_setup_prerequisite_job(admin_url, job_id, run_id, sim_id, expected_rounds=1, permitted_workers=("BANK_A",))
+
+        # 1. Genuine observation
+        up_digest = hashlib.sha256(b"authentic_update_gen_test").hexdigest()
+        helper_insert_bank_observation(bank_a_url, job_id, run_id, sim_id, "BANK_A", 1, up_digest, sample_count=100)
+
+        # 2. Genuine PyTorch model artifact and digest
+        model = FraudDetectionModel(input_dim=NUM_FEATURES, dp_compatible=True)
+        buf = io.BytesIO()
+        torch.save(model.state_dict(), buf)
+        authentic_model_bytes = buf.getvalue()
+        authentic_digest = hashlib.sha256(authentic_model_bytes).hexdigest()
+
+        # Record aggregation in PostgreSQL
+        coord_auth = PostgresTrainingJobAuthority(db_url=coord_url)
+        coord_auth.record_global_aggregation(
+            GlobalAggregationEvent(
+                event_id=f"agg_{job_id}_1",
+                job_id=job_id,
+                round_number=1,
+                aggregation_algorithm="fed_avg_weighted",
+                accepted_participant_ids=("BANK_A",),
+                accepted_local_update_digests=(up_digest,),
+                aggregation_configuration={},
+                aggregated_global_model_digest=authentic_digest,
+                timestamp=datetime.now(UTC).isoformat(),
+            )
+        )
+
+        # 3. Spawn completion authority service
+        comp_vault_dir = str(tmp_path / "comp_vault_gen_test")
+        comp_vault_file = provision_isolated_completion_authority_vault(comp_vault_dir, comp_url)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=comp_vault_file,
+            coordinator_token=COORD_SECRET,
+            app_env="production",
+        )
+        try:
+            client = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token=COORD_SECRET,
+                app_env="production",
+            )
+
+            # Holdout data
+            np.random.seed(42)
+            X_val = np.random.randn(50, NUM_FEATURES).astype(np.float32)
+            y_val = np.random.randint(0, 2, size=50).astype(np.float32)
+
+            # Genuine execution
+            eval_res = client.evaluate_and_record_artifact(
+                job_id=job_id,
+                artifact_bytes=authentic_model_bytes,
+                holdout_features=X_val,
+                holdout_labels=y_val,
+                coordinator_token=COORD_SECRET,
+            )
+            assert "auc_roc" in eval_res
+            assert "val_loss" in eval_res
+            assert 0.0 <= eval_res["auc_roc"] <= 1.0
+
+            # Verify PostgreSQL rows
+            with psycopg.connect(admin_url) as pg_conn, pg_conn.cursor() as cur:
+                cur.execute(
+                    "SELECT metric_name, metric_value, evaluator_identity, evaluated_artifact_digest FROM cfi_model_evaluations WHERE job_id = %s",
+                    (job_id,),
+                )
+                rows = cur.fetchall()
+                assert len(rows) == 2
+                identities = {r[2] for r in rows}
+                assert identities == {"ISOLATED_EVALUATOR"}
+                digests = {r[3] for r in rows}
+                assert digests == {authentic_digest}
+
+            # Finalize completion with genuine metrics
+            rec = client.finalize_training_completion(
+                job_id=job_id,
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=100,
+                observed_metrics={
+                    "loss": 0.05,
+                    "auc_roc": eval_res["auc_roc"],
+                    "val_loss": eval_res["val_loss"],
+                },
+                artifact_sha256=authentic_digest,
+                coordinator_token=COORD_SECRET,
+            )
+            assert rec.status == "COMPLETED"
+            assert rec.artifact_sha256 == authentic_digest
+
+            # Verify in PostgreSQL
+            with psycopg.connect(admin_url) as pg_conn, pg_conn.cursor() as cur:
+                cur.execute("SELECT status, artifact_sha256 FROM cfi_completed_jobs WHERE job_id = %s", (job_id,))
+                c_row = cur.fetchone()
+                assert c_row is not None
+                assert c_row[0] == "COMPLETED"
+                assert c_row[1] == authentic_digest
+
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
+
+    def test_evid_02d_evaluate_and_record_substituted_and_unauthorized_fail_closed(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """Adversarial Verification: Substituted artifacts and unauthorized evaluator operations fail closed.
+
+        Tests:
+        - EVALUATE_AND_RECORD fails closed when artifact bytes digest is not in accepted global aggregations.
+        - EVALUATE_AND_RECORD fails closed when caller claims unauthorized evaluator identity.
+        - Completion fails closed when pre-inserted evaluation record claims coordinator identity.
+        """
+        import io
+        from multiprocessing.connection import Client
+
+        import torch
+
+        admin_url = pg_roles["admin"]
+        comp_url = pg_roles["completion"]
+        coord_url = pg_roles["coordinator"]
+        bank_a_url = pg_roles["worker_bank_a"]
+
+        uid = uuid.uuid4().hex[:8]
+        job_id = f"job_fail_closed_{uid}"
+        run_id = f"run_fail_closed_{uid}"
+        sim_id = f"sim_fail_closed_{uid}"
+
+        helper_setup_prerequisite_job(admin_url, job_id, run_id, sim_id, expected_rounds=1, permitted_workers=("BANK_A",))
+
+        up_digest = hashlib.sha256(b"authentic_update_fail_closed").hexdigest()
+        helper_insert_bank_observation(bank_a_url, job_id, run_id, sim_id, "BANK_A", 1, up_digest, sample_count=100)
+
+        model = FraudDetectionModel(input_dim=NUM_FEATURES, dp_compatible=True)
+        buf = io.BytesIO()
+        torch.save(model.state_dict(), buf)
+        authentic_model_bytes = buf.getvalue()
+        authentic_digest = hashlib.sha256(authentic_model_bytes).hexdigest()
+
+        coord_auth = PostgresTrainingJobAuthority(db_url=coord_url)
+        coord_auth.record_global_aggregation(
+            GlobalAggregationEvent(
+                event_id=f"agg_{job_id}_1",
+                job_id=job_id,
+                round_number=1,
+                aggregation_algorithm="fed_avg_weighted",
+                accepted_participant_ids=("BANK_A",),
+                accepted_local_update_digests=(up_digest,),
+                aggregation_configuration={},
+                aggregated_global_model_digest=authentic_digest,
+                timestamp=datetime.now(UTC).isoformat(),
+            )
+        )
+
+        comp_vault_dir = str(tmp_path / "comp_vault_fail_closed")
+        comp_vault_file = provision_isolated_completion_authority_vault(comp_vault_dir, comp_url)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=comp_vault_file,
+            coordinator_token=COORD_SECRET,
+            app_env="production",
+        )
+        try:
+            client = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token=COORD_SECRET,
+                app_env="production",
+            )
+
+            np.random.seed(42)
+            X_val = np.random.randn(50, NUM_FEATURES).astype(np.float32)
+            y_val = np.random.randint(0, 2, size=50).astype(np.float32)
+
+            # 1. Substituted artifact bytes
+            substituted_bytes = b"random_different_model_bytes"
+            with pytest.raises(TrainingProvenanceSecurityError, match="Evaluation forgery"):
+                client.evaluate_and_record_artifact(
+                    job_id=job_id,
+                    artifact_bytes=substituted_bytes,
+                    holdout_features=X_val,
+                    holdout_labels=y_val,
+                    coordinator_token=COORD_SECRET,
+                )
+
+            # 2. Unauthorized evaluator identity over raw IPC
+            conn = Client(comp_endpoint, authkey=COORD_SECRET.encode("utf-8"))
+            try:
+                conn.send({
+                    "command": "EVALUATE_AND_RECORD",
+                    "job_id": job_id,
+                    "artifact_bytes": authentic_model_bytes,
+                    "holdout_features": X_val,
+                    "holdout_labels": y_val,
+                    "evaluator_identity": "COORDINATOR",
+                    "coordinator_token": COORD_SECRET,
+                    "caller_identity": "COORDINATOR",
+                })
+                res = conn.recv()
+                assert res.get("status") == "ERROR"
+                assert "Unauthorized evaluator identity" in res.get("error", "")
+            finally:
+                conn.close()
+
+            # 3. Database trigger rejects coordinator evaluator identity
+            eval_auth = PostgresTrainingJobAuthority(db_url=admin_url)
+            with pytest.raises(psycopg.Error) as exc_info:
+                eval_auth.record_model_evaluation(
+                    ModelEvaluationEvent(
+                        event_id=f"eval_coord_{job_id}",
+                        job_id=job_id,
+                        evaluation_run_id=f"run_eval_{job_id}",
+                        metric_name="auc_roc",
+                        metric_value=0.88,
+                        evaluated_artifact_digest=authentic_digest,
+                        evaluator_identity="cfi_coord_role",
+                        evaluation_timestamp=datetime.now(UTC).isoformat(),
+                    )
+                )
+            assert "unauthorized or coordinator-controlled evaluator identity" in str(exc_info.value)
+
+            # 4. If an unauthorized evaluation row somehow existed (e.g. injected while trigger disabled),
+            # the completion authority FINALIZE_COMPLETION defense-in-depth rejects it!
+            with psycopg.connect(admin_url) as pg_conn:
+                pg_conn.autocommit = True
+                with pg_conn.cursor() as cur:
+                    cur.execute("ALTER TABLE cfi_model_evaluations DISABLE TRIGGER ALL")
+                    cur.execute(
+                        """
+                        INSERT INTO cfi_model_evaluations (
+                            event_id, job_id, evaluation_run_id, metric_name,
+                            metric_value, evaluated_artifact_digest, evaluator_identity,
+                            evaluation_timestamp, dataset_manifest_id, payload_digest
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            f"eval_coord_{job_id}", job_id, f"run_eval_{job_id}",
+                            "auc_roc", 0.88, authentic_digest, "cfi_coord_role",
+                            datetime.now(UTC).isoformat(), None,
+                            hashlib.sha256(b"injected_fake").hexdigest(),
+                        ),
+                    )
+                    cur.execute("ALTER TABLE cfi_model_evaluations ENABLE TRIGGER ALL")
+
+            # Finalize completion must fail closed because evaluation is coordinator-controlled
+            with pytest.raises(TrainingProvenanceSecurityError, match="coordinator-controlled"):
+                client.finalize_training_completion(
+                    job_id=job_id,
+                    executed_rounds=1,
+                    executed_epochs=1,
+                    sample_count=100,
+                    observed_metrics={"loss": 0.05, "auc_roc": 0.88},
+                    artifact_sha256=authentic_digest,
+                    coordinator_token=COORD_SECRET,
+                )
+
+        finally:
+            comp_proc.terminate()
+            comp_proc.join(timeout=3)
+
+    def test_evid_02e_regression_coordinator_controlled_recording_prevented(
+        self, pg_roles: dict[str, str], tmp_path
+    ) -> None:
+        """Regression Test: Prove coordinator-controlled metric recording fails closed and would fail if re-enabled.
+
+        If RECORD_EVALUATION were re-enabled to accept caller-supplied metrics:
+        This test would fail because it explicitly asserts that caller-supplied metrics
+        are rejected and no record is inserted into cfi_model_evaluations.
+        """
+        admin_url = pg_roles["admin"]
+        comp_url = pg_roles["completion"]
+        coord_url = pg_roles["coordinator"]
+        bank_a_url = pg_roles["worker_bank_a"]
+
+        uid = uuid.uuid4().hex[:8]
+        job_id = f"job_regr_{uid}"
+        run_id = f"run_regr_{uid}"
+        sim_id = f"sim_regr_{uid}"
+
+        helper_setup_prerequisite_job(admin_url, job_id, run_id, sim_id, expected_rounds=1, permitted_workers=("BANK_A",))
+
+        up_digest = hashlib.sha256(b"authentic_update_regr").hexdigest()
+        helper_insert_bank_observation(bank_a_url, job_id, run_id, sim_id, "BANK_A", 1, up_digest, sample_count=100)
+
+        authentic_digest = hashlib.sha256(b"authentic_global_model_regr").hexdigest()
+        coord_auth = PostgresTrainingJobAuthority(db_url=coord_url)
+        coord_auth.record_global_aggregation(
+            GlobalAggregationEvent(
+                event_id=f"agg_{job_id}_1",
+                job_id=job_id,
+                round_number=1,
+                aggregation_algorithm="fed_avg_weighted",
+                accepted_participant_ids=("BANK_A",),
+                accepted_local_update_digests=(up_digest,),
+                aggregation_configuration={},
+                aggregated_global_model_digest=authentic_digest,
+                timestamp=datetime.now(UTC).isoformat(),
+            )
+        )
+
+        comp_vault_dir = str(tmp_path / "comp_vault_regr")
+        comp_vault_file = provision_isolated_completion_authority_vault(comp_vault_dir, comp_url)
+        comp_proc, comp_endpoint = spawn_isolated_completion_authority_service(
+            vault_path=comp_vault_file,
+            coordinator_token=COORD_SECRET,
+            app_env="production",
+        )
+        try:
+            client = IsolatedTrainingCompletionAuthority(
+                service_endpoint=comp_endpoint,
+                coordinator_token=COORD_SECRET,
+                app_env="production",
+            )
+
+            # Regression assertion: client.record_model_evaluation MUST fail
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_info:
+                client.record_model_evaluation(
+                    job_id=job_id,
+                    metric_name="auc_roc",
+                    metric_value=0.95,
+                    evaluated_artifact_digest=authentic_digest,
+                    coordinator_token=COORD_SECRET,
+                )
+            assert "Caller-supplied evaluation metrics are forbidden" in str(exc_info.value)
+
+            # Database verification: zero rows inserted
+            with psycopg.connect(admin_url) as pg_conn, pg_conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM cfi_model_evaluations WHERE job_id = %s", (job_id,))
+                assert cur.fetchone()[0] == 0
+
         finally:
             comp_proc.terminate()
             comp_proc.join(timeout=3)
