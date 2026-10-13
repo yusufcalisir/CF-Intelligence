@@ -36,39 +36,68 @@ class ConsortiumGovernanceService:
         expected_bank: str,
         auth_token: str | None = None,
         actor: str | None = None,
+        trusted_context: Any | None = None,
+        action_name: str = "consortium_mutation",
     ) -> None:
-        """Validate that direct service calls with auth_token or actor cannot impersonate another institution."""
-        if not auth_token and not actor:
+        """Validate that direct service mutations enforce authentic institutional authority.
+
+        Rejects unauthenticated calls, caller-supplied actor identity without authentication,
+        and cross-bank institutional impersonation.
+        """
+        if trusted_context is not None:
+            from app.application.services.model_registry import verify_trusted_internal_context
+
+            is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                trusted_context, expected_action=action_name
+            )
+            if not is_valid_ctx:
+                raise PermissionError(
+                    f"Internal orchestration authority rejected for {action_name}: {ctx_reason}"
+                )
+            if getattr(trusted_context, "service_name", "") != "consortium_coordinator":
+                raise PermissionError(
+                    f"Internal service '{getattr(trusted_context, 'service_name', '')}' is not authorized for {action_name}."
+                )
             return
+
+        if actor and not auth_token:
+            raise PermissionError(
+                f"Caller-supplied actor identity ('{actor}') cannot establish authority without valid authentication."
+            )
+
+        if not auth_token:
+            raise PermissionError(
+                f"Authentication required: Direct service operation '{action_name}' requires a valid Bearer auth_token or trusted internal context."
+            )
 
         from app.infrastructure.security.auth_service import AuthenticationService
 
         auth_svc = AuthenticationService.get_instance()
         clean_expected = expected_bank.lower().strip()
 
-        if auth_token:
-            is_valid, claims, err = auth_svc.verify_access_token(auth_token)
-            if not is_valid or not claims:
-                raise PermissionError(f"Direct service authentication failed: {err}")
-            username = (claims.get("username") or claims.get("sub") or "").strip()
-            user_rec = auth_svc.get_user(username)
-            if not user_rec:
-                raise PermissionError(f"Direct service actor '{username}' is not a valid authoritative principal.")
-            user_bank = (getattr(user_rec, "bank_id", "") or "").lower().strip()
-            if user_bank != clean_expected:
-                raise PermissionError(
-                    f"Cross-bank direct service operation rejected: Principal '{username}' from institution '{user_bank}' "
-                    f"cannot perform governance actions on behalf of institution '{expected_bank}'."
-                )
-        elif actor:
-            user_rec = auth_svc.get_user(actor)
-            if user_rec:
-                user_bank = (getattr(user_rec, "bank_id", "") or "").lower().strip()
-                if user_bank != clean_expected:
-                    raise PermissionError(
-                        f"Cross-bank direct service operation rejected: Actor '{actor}' from institution '{user_bank}' "
-                        f"cannot perform governance actions on behalf of institution '{expected_bank}'."
-                    )
+        is_valid, claims, err = auth_svc.verify_access_token(auth_token)
+        if not is_valid or not claims:
+            raise PermissionError(f"Direct service authentication failed: {err}")
+        username = (claims.get("username") or claims.get("sub") or "").strip()
+        if actor and actor.lower().strip() != username.lower():
+            raise PermissionError(
+                f"Actor '{actor}' does not match authenticated token principal '{username}'."
+            )
+        user_rec = auth_svc.get_user(username)
+        if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
+            raise PermissionError(f"Direct service actor '{username}' is not a valid authoritative principal.")
+        user_bank = (getattr(user_rec, "bank_id", "") or "").lower().strip()
+        if user_bank != clean_expected:
+            raise PermissionError(
+                f"Cross-bank direct service operation rejected: Principal '{username}' from institution '{user_bank}' "
+                f"cannot perform governance actions on behalf of institution '{expected_bank}'."
+            )
+        user_roles = {r.lower().strip() for r in getattr(user_rec, "roles", [])}
+        governance_roles = {"admin", "ml_lead", "compliance"}
+        if not (user_roles & governance_roles):
+            raise PermissionError(
+                f"Principal '{username}' lacks required governance role for {action_name}."
+            )
 
     def create_consortium(
         self,
@@ -80,14 +109,13 @@ class ConsortiumGovernanceService:
         min_members_n: int = 2,
         auth_token: str | None = None,
         actor: str | None = None,
+        trusted_context: Any | None = None,
     ) -> Consortium:
         """Initializes a new multi-bank consortium with founder member."""
         with self._lock:
             clean_id = consortium_id.lower().strip()
             clean_name = name.strip()
             clean_founder = founder_bank_id.lower().strip()
-
-            self._verify_service_actor_bank(clean_founder, auth_token=auth_token, actor=actor)
 
             if not clean_id:
                 raise ValueError("consortium_id cannot be empty or whitespace.")
@@ -101,6 +129,14 @@ class ConsortiumGovernanceService:
                 raise ValueError(f"max_epsilon must be positive finite number, got {max_epsilon}")
             if min_members_n < 1:
                 raise ValueError(f"min_members_n must be >= 1, got {min_members_n}")
+
+            self._verify_service_actor_bank(
+                clean_founder,
+                auth_token=auth_token,
+                actor=actor,
+                trusted_context=trusted_context,
+                action_name="create_consortium",
+            )
 
             if clean_id in self._consortia:
                 return self._consortia[clean_id]
@@ -139,6 +175,7 @@ class ConsortiumGovernanceService:
         metadata: dict[str, Any] | None = None,
         auth_token: str | None = None,
         actor: str | None = None,
+        trusted_context: Any | None = None,
     ) -> MembershipProposal:
         """Creates a membership voting proposal (e.g. ADD_MEMBER or REMOVE_MEMBER)."""
         with self._lock:
@@ -146,7 +183,13 @@ class ConsortiumGovernanceService:
             clean_creator = creator_bank_id.lower().strip()
             clean_target = target_bank_id.lower().strip()
 
-            self._verify_service_actor_bank(clean_creator, auth_token=auth_token, actor=actor)
+            self._verify_service_actor_bank(
+                clean_creator,
+                auth_token=auth_token,
+                actor=actor,
+                trusted_context=trusted_context,
+                action_name="propose_membership_change",
+            )
 
             if clean_id not in self._consortia:
                 raise KeyError(f"Consortium '{clean_id}' does not exist.")
@@ -207,13 +250,20 @@ class ConsortiumGovernanceService:
         ttl_seconds: int = 86400,
         auth_token: str | None = None,
         actor: str | None = None,
+        trusted_context: Any | None = None,
     ) -> MembershipProposal:
         """Creates a policy modification voting proposal (e.g. updating quorum ratio, max epsilon, min members)."""
         with self._lock:
             clean_id = consortium_id.lower().strip()
             clean_creator = creator_bank_id.lower().strip()
 
-            self._verify_service_actor_bank(clean_creator, auth_token=auth_token, actor=actor)
+            self._verify_service_actor_bank(
+                clean_creator,
+                auth_token=auth_token,
+                actor=actor,
+                trusted_context=trusted_context,
+                action_name="propose_policy_update",
+            )
 
             if clean_id not in self._consortia:
                 raise KeyError(f"Consortium '{clean_id}' does not exist.")
@@ -251,6 +301,7 @@ class ConsortiumGovernanceService:
                 metadata=policy_updates,
                 auth_token=auth_token,
                 actor=actor,
+                trusted_context=trusted_context,
             )
 
     def cast_vote(
@@ -260,13 +311,20 @@ class ConsortiumGovernanceService:
         approve: bool,
         auth_token: str | None = None,
         actor: str | None = None,
+        trusted_context: Any | None = None,
     ) -> MembershipProposal:
         """Casts a vote FOR or AGAINST an active proposal with weighted voting power."""
         with self._lock:
             clean_prop_id = proposal_id.strip()
             clean_bank_id = bank_id.lower().strip()
 
-            self._verify_service_actor_bank(clean_bank_id, auth_token=auth_token, actor=actor)
+            self._verify_service_actor_bank(
+                clean_bank_id,
+                auth_token=auth_token,
+                actor=actor,
+                trusted_context=trusted_context,
+                action_name="cast_vote",
+            )
 
             if clean_prop_id not in self._proposals:
                 raise KeyError(f"Proposal '{clean_prop_id}' does not exist.")
@@ -316,13 +374,20 @@ class ConsortiumGovernanceService:
         creator_bank_id: str,
         auth_token: str | None = None,
         actor: str | None = None,
+        trusted_context: Any | None = None,
     ) -> MembershipProposal:
         """Allows the sponsoring bank to withdraw/cancel a pending proposal before resolution."""
         with self._lock:
             clean_prop_id = proposal_id.strip()
             clean_creator = creator_bank_id.lower().strip()
 
-            self._verify_service_actor_bank(clean_creator, auth_token=auth_token, actor=actor)
+            self._verify_service_actor_bank(
+                clean_creator,
+                auth_token=auth_token,
+                actor=actor,
+                trusted_context=trusted_context,
+                action_name="cancel_proposal",
+            )
 
             if clean_prop_id not in self._proposals:
                 raise KeyError(f"Proposal '{clean_prop_id}' does not exist.")
@@ -574,6 +639,12 @@ class ConsortiumGovernanceService:
 
 def init_default_consortium(service: ConsortiumGovernanceService) -> Consortium:
     """Initializes canonical consortium with founding and participant institutions."""
+    from app.application.services.model_registry import create_trusted_internal_context
+
+    ctx = create_trusted_internal_context(
+        service_name="consortium_coordinator",
+        action="create_consortium",
+    )
     c = service.create_consortium(
         consortium_id="cfi-consortium",
         name="Cross-Bank Federated Intelligence Consortium",
@@ -581,6 +652,7 @@ def init_default_consortium(service: ConsortiumGovernanceService) -> Consortium:
         quorum_ratio=0.51,
         max_epsilon=5.0,
         min_members_n=2,
+        trusted_context=ctx,
     )
     service.add_member("cfi-consortium", "bank_b", role=MemberRole.FULL_MEMBER, voting_power=1.0)
     service.add_member("cfi-consortium", "bank_c", role=MemberRole.FULL_MEMBER, voting_power=1.0)

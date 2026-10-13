@@ -135,7 +135,11 @@ def verify_trusted_internal_context(
     if not isinstance(context, TrustedInternalContext):
         return False, "Invalid context type: expected TrustedInternalContext instance."
 
-    ALLOWED_SERVICES = {"model_evaluation_engine", "training_orchestrator"}
+    ALLOWED_SERVICES = {
+        "model_evaluation_engine",
+        "training_orchestrator",
+        "consortium_coordinator",
+    }
     if context.service_name not in ALLOWED_SERVICES:
         return False, f"Unauthorized internal service name: '{context.service_name}'."
 
@@ -586,6 +590,9 @@ class ModelRegistry:
         owning_bank_id: str | None = None,
         consortium_id: str | None = None,
         bound_by: str | None = None,
+        auth_token: str | None = None,
+        trusted_context: TrustedInternalContext | None = None,
+        _from_save_version: bool = False,
     ) -> dict[str, Any]:
         """Authoritatively bind simulation model artifacts to an owning bank or consortium."""
         clean_bank = owning_bank_id.strip() if isinstance(owning_bank_id, str) and owning_bank_id.strip() else None
@@ -597,12 +604,105 @@ class ModelRegistry:
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
         with self._lock, file_lock:
+            existing = self.get_simulation_ownership(simulation_id)
+            is_already_bound = not existing.get("is_unbound", True) and (
+                existing.get("owning_bank_id") or existing.get("consortium_id")
+            )
+
+            if is_already_bound:
+                curr_bank = existing.get("owning_bank_id")
+                curr_consortium = existing.get("consortium_id")
+                if clean_bank == curr_bank and clean_consortium == curr_consortium:
+                    return existing
+
+                # Established ownership rebinding requires authenticated transfer authority
+                has_transfer_authority = False
+                effective_bound_by = bound_by or "ownership_transfer"
+                if trusted_context is not None:
+                    is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                        trusted_context, expected_action="transfer_ownership"
+                    )
+                    if is_valid_ctx:
+                        has_transfer_authority = True
+                        effective_bound_by = f"internal:{trusted_context.service_name}"
+                elif auth_token is not None:
+                    from app.infrastructure.security.auth_service import AuthenticationService
+
+                    auth_svc = AuthenticationService.get_instance()
+                    is_valid, claims, _ = auth_svc.verify_access_token(auth_token)
+                    if is_valid and claims:
+                        uname = (claims.get("username") or claims.get("sub") or "").strip()
+                        user_rec = auth_svc.get_user(uname)
+                        if user_rec and user_rec.is_active and user_rec.status.lower() == "active":
+                            user_bank = (getattr(user_rec, "bank_id", "") or "").lower().strip()
+                            user_roles = {r.lower().strip() for r in getattr(user_rec, "roles", [])}
+                            if curr_bank and user_bank == curr_bank.lower() and (user_roles & {"admin", "ml_lead"}):
+                                has_transfer_authority = True
+                                effective_bound_by = f"user:{uname} ({curr_bank})"
+
+                if not has_transfer_authority:
+                    raise ModelAuthorizationError(
+                        f"Unauthorized model ownership rebinding: Model '{simulation_id}' is authoritatively owned by "
+                        f"'{curr_bank or curr_consortium}'. Rebinding to '{clean_bank or clean_consortium}' rejected without authenticated transfer authority."
+                    )
+            else:
+                # First-time ownership binding requires verifiable institutional evidence
+                has_init_authority = False
+                effective_bound_by = bound_by or "initial_binding"
+                if trusted_context is not None:
+                    is_valid_ctx, _ = verify_trusted_internal_context(
+                        trusted_context, expected_action="bind_ownership"
+                    )
+                    if not is_valid_ctx:
+                        is_valid_ctx, _ = verify_trusted_internal_context(
+                            trusted_context, expected_action="register_model"
+                        )
+                    if is_valid_ctx:
+                        has_init_authority = True
+                        effective_bound_by = f"internal:{trusted_context.service_name}"
+                elif auth_token is not None:
+                    from app.infrastructure.security.auth_service import AuthenticationService
+
+                    auth_svc = AuthenticationService.get_instance()
+                    is_valid, claims, _ = auth_svc.verify_access_token(auth_token)
+                    if is_valid and claims:
+                        uname = (claims.get("username") or claims.get("sub") or "").strip()
+                        user_rec = auth_svc.get_user(uname)
+                        if user_rec and user_rec.is_active and user_rec.status.lower() == "active":
+                            user_bank = (getattr(user_rec, "bank_id", "") or "").lower().strip()
+                            user_roles = {r.lower().strip() for r in getattr(user_rec, "roles", [])}
+                            if clean_bank and user_bank == clean_bank.lower() and (user_roles & {"admin", "ml_lead", "ml_engineer"}):
+                                has_init_authority = True
+                                effective_bound_by = f"user:{uname} ({clean_bank})"
+                            elif clean_consortium and (user_roles & {"admin", "ml_lead", "ml_engineer"}):
+                                from app.application.services.consortium_service import (
+                                    consortium_governance_service,
+                                )
+
+                                c = consortium_governance_service.get_consortium(clean_consortium)
+                                if c and user_bank in c.members:
+                                    has_init_authority = True
+                                    effective_bound_by = f"consortium_member:{uname} ({user_bank})"
+                elif _from_save_version or bound_by in ("save_version", "save_version_with_verified_receipt"):
+                    has_init_authority = True
+                    effective_bound_by = (
+                        "verified_training_receipt"
+                        if bound_by == "save_version_with_verified_receipt"
+                        else "save_version_registration"
+                    )
+
+                if not has_init_authority:
+                    raise ModelAuthorizationError(
+                        f"Initial institutional ownership binding for model '{simulation_id}' rejected: "
+                        f"Requires verifiable institutional evidence (authenticated token, cryptographic training receipt, or trusted internal context)."
+                    )
+
             record = {
                 "simulation_id": simulation_id,
                 "owning_bank_id": clean_bank,
                 "consortium_id": clean_consortium,
                 "bound_at": datetime.now(UTC).isoformat(),
-                "bound_by": bound_by,
+                "bound_by": effective_bound_by,
                 "is_unbound": False,
             }
             own_path = self._get_ownership_path(simulation_id)
@@ -781,6 +881,8 @@ class ModelRegistry:
         model_contract: Any | None = None,
         owning_bank_id: str | None = None,
         consortium_id: str | None = None,
+        auth_token: str | None = None,
+        trusted_context: TrustedInternalContext | None = None,
     ) -> dict[str, Any]:
         """Save a new version of the global model weights. Defaults to inactive candidate.
 
@@ -806,6 +908,10 @@ class ModelRegistry:
             expected_input_dim: Expected input dimension derived from candidate contract.
             expected_feature_names: Expected feature names list with exact ordering.
             model_contract: Optional candidate model contract object/dict providing expected schema.
+            owning_bank_id: Bank identifier claiming authoritative ownership of the model.
+            consortium_id: Consortium identifier claiming authoritative ownership of the model.
+            auth_token: Bearer JWT token of the authenticated operator.
+            trusted_context: Signed trusted internal context for internal pipeline execution.
 
         Returns:
             The created version entry metadata.
@@ -815,16 +921,40 @@ class ModelRegistry:
 
         # Authoritative institutional or consortium ownership handling
         existing_ownership = self.get_simulation_ownership(simulation_id)
-        effective_owning_bank = owning_bank_id if owning_bank_id is not None else existing_ownership.get("owning_bank_id")
-        effective_consortium = consortium_id if consortium_id is not None else existing_ownership.get("consortium_id")
+        is_already_bound = not existing_ownership.get("is_unbound", True) and (
+            existing_ownership.get("owning_bank_id") or existing_ownership.get("consortium_id")
+        )
 
-        if owning_bank_id is not None or consortium_id is not None:
-            self.bind_simulation_ownership(
-                simulation_id,
-                owning_bank_id=effective_owning_bank,
-                consortium_id=effective_consortium,
-                bound_by="save_version",
-            )
+        should_bind_initial = False
+        if is_already_bound:
+            est_bank = existing_ownership.get("owning_bank_id")
+            est_consortium = existing_ownership.get("consortium_id")
+            if owning_bank_id is not None:
+                clean_req_bank = owning_bank_id.strip() if owning_bank_id else ""
+                clean_est_bank = est_bank.strip() if est_bank else ""
+                if clean_req_bank != clean_est_bank:
+                    raise ModelAuthorizationError(
+                        f"Cannot overwrite established model ownership: Model '{simulation_id}' is authoritatively owned by "
+                        f"'{est_bank}'. Ordinary model saves cannot rebind ownership to '{owning_bank_id}'."
+                    )
+            if consortium_id is not None:
+                clean_req_consortium = consortium_id.strip() if consortium_id else ""
+                clean_est_consortium = est_consortium.strip() if est_consortium else ""
+                if clean_req_consortium != clean_est_consortium:
+                    raise ModelAuthorizationError(
+                        f"Cannot overwrite established model ownership: Model '{simulation_id}' is authoritatively owned by consortium "
+                        f"'{est_consortium}'. Ordinary model saves cannot rebind ownership to '{consortium_id}'."
+                    )
+            effective_owning_bank = est_bank
+            effective_consortium = est_consortium
+        else:
+            if owning_bank_id is not None or consortium_id is not None:
+                effective_owning_bank = owning_bank_id.strip() if owning_bank_id and owning_bank_id.strip() else None
+                effective_consortium = consortium_id.strip() if consortium_id and consortium_id.strip() else None
+                should_bind_initial = bool(effective_owning_bank or effective_consortium)
+            else:
+                effective_owning_bank = None
+                effective_consortium = None
 
         # Derive expected contract parameters if model_contract provided
         exp_arch = expected_architecture
@@ -1022,6 +1152,22 @@ class ModelRegistry:
                         existing_entry["is_active"] = False
                         if existing_entry.get("status") == "champion":
                             existing_entry["status"] = "inactive"
+
+                if should_bind_initial:
+                    bound_by_label = (
+                        "save_version_with_verified_receipt"
+                        if has_valid_receipt
+                        else "save_version"
+                    )
+                    self.bind_simulation_ownership(
+                        simulation_id,
+                        owning_bank_id=effective_owning_bank,
+                        consortium_id=effective_consortium,
+                        bound_by=bound_by_label,
+                        auth_token=auth_token,
+                        trusted_context=trusted_context,
+                        _from_save_version=True,
+                    )
 
                 manifest.append(entry)
                 # Authoritative manifest is saved FIRST (Section 9.1)
