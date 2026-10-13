@@ -622,7 +622,7 @@ async def sign_off_model(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Validate requested role authority against token claims
+    # Validate requested role authority against current authoritative store
     norm_role = (
         "compliance"
         if payload.role in ("compliance", "compliance_officer")
@@ -634,13 +634,27 @@ async def sign_off_model(
             detail="Role must be 'compliance' or 'ml_engineer'",
         )
 
-    user_roles = [r.lower().strip() for r in claims.get("roles", [])]
-    if norm_role == "compliance" and not any(r in ("compliance", "compliance_officer", "admin") for r in user_roles):
+    # 1. Authoritative RBAC: Verify current roles from DurableAccountStore (prevents stale JWT exploit)
+    authoritative_roles = [r.lower().strip() for r in authoritative_user.roles]
+    if norm_role == "compliance" and not any(r in ("compliance", "compliance_officer", "admin") for r in authoritative_roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Authenticated principal '{authenticated_user}' lacks compliance role authority.",
         )
-    if norm_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in user_roles):
+    if norm_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in authoritative_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Authenticated principal '{authenticated_user}' lacks ml_engineer role authority.",
+        )
+
+    # 2. Token claims defense-in-depth: Token itself must also have carried the role authority
+    token_roles = [r.lower().strip() for r in claims.get("roles", [])]
+    if norm_role == "compliance" and not any(r in ("compliance", "compliance_officer", "admin") for r in token_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Authenticated principal '{authenticated_user}' lacks compliance role authority.",
+        )
+    if norm_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in token_roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Authenticated principal '{authenticated_user}' lacks ml_engineer role authority.",

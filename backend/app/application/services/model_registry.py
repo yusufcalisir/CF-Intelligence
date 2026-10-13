@@ -252,8 +252,13 @@ def validate_production_admission(
             ml_s = ml_signs[0]
             comp_s = comp_signs[0]
 
-            # Four-Eyes Principle: distinct individuals
-            if ml_s.get("user") == comp_s.get("user"):
+            # Four-Eyes Principle: distinct individuals (prevents alias, case, and token evasion)
+            ml_user = (ml_s.get("user") or "").lower().strip()
+            comp_user = (comp_s.get("user") or "").lower().strip()
+            ml_uid = (ml_s.get("user_id") or "").strip()
+            comp_uid = (comp_s.get("user_id") or "").strip()
+
+            if ml_user == comp_user or (ml_uid and comp_uid and ml_uid == comp_uid):
                 raise ModelIntegrityError(
                     f"Production promotion rejected: Four-Eyes Principle violation, user '{ml_s.get('user')}' cannot approve both roles ({context})."
                 )
@@ -292,10 +297,9 @@ def validate_production_admission(
                 )
 
             domain_key = derive_domain_key(secret, DOMAIN_APPROVAL_SIGNOFF)
-            from app.infrastructure.security.auth_service import AuthenticationService
-            auth_svc = AuthenticationService.get_instance()
-
             SEEDED_ACCOUNTS = {"admin", "analyst_a1", "analyst_b1", "analyst_c1", "auditor"}
+
+            # Phase 1: Cryptographic verification of all sign-off payloads and HMAC signatures
             for s, expected_role in ((ml_s, "ml_engineer"), (comp_s, "compliance")):
                 u = s.get("user", "")
                 if not u or not isinstance(u, str) or not u.strip():
@@ -310,19 +314,6 @@ def validate_production_admission(
                     raise ModelIntegrityError(
                         f"Production promotion rejected: sign-off missing verified role authority ({context})."
                     )
-
-                # Authoritative RBAC check against AuthenticationService
-                user_rec = auth_svc.get_user(u)
-                if user_rec is not None:
-                    user_roles = [r.lower().strip() for r in user_rec.roles]
-                    if expected_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in user_roles):
-                        raise ModelIntegrityError(
-                            f"Production promotion rejected: user '{u}' lacks authoritative ml_engineer role ({context})."
-                        )
-                    if expected_role == "compliance" and not any(r in ("compliance", "compliance_officer") for r in user_roles):
-                        raise ModelIntegrityError(
-                            f"Production promotion rejected: user '{u}' lacks authoritative compliance role ({context})."
-                        )
 
                 # Authoritative cryptographic HMAC validation
                 canonical_payload = f"{sim_id}:{version_val}:{sha256_val}:{expected_role}:{u}"
@@ -348,9 +339,42 @@ def validate_production_admission(
                     or hmac.compare_digest(sig, exp_sig_raw)
                 ):
                     raise ModelIntegrityError(
-                        f"Production promotion rejected: sign-off for user '{u}' ({expected_role}) "
+                        f"Production promotion rejected: sign-off for user '{u}' "
                         f"lacks valid cryptographic signature ({context})."
                     )
+
+            # Phase 2: Live Authoritative RBAC check and cross-principal Four-Eyes validation
+            from app.infrastructure.security.auth_service import AuthenticationService
+            auth_svc = AuthenticationService.get_instance()
+
+            for s, expected_role in ((ml_s, "ml_engineer"), (comp_s, "compliance")):
+                u = s.get("user", "")
+                user_rec = auth_svc.get_user(u)
+                if user_rec is not None:
+                    if not user_rec.is_active:
+                        raise ModelIntegrityError(
+                            f"Production promotion rejected: approver '{u}' is deactivated ({context})."
+                        )
+                    user_roles = [r.lower().strip() for r in user_rec.roles]
+                    if expected_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in user_roles):
+                        raise ModelIntegrityError(
+                            f"Production promotion rejected: user '{u}' lacks authoritative ml_engineer role ({context})."
+                        )
+                    if expected_role == "compliance" and not any(r in ("compliance", "compliance_officer") for r in user_roles):
+                        raise ModelIntegrityError(
+                            f"Production promotion rejected: user '{u}' lacks authoritative compliance role ({context})."
+                        )
+                elif settings.app_env.lower() == "production":
+                    raise ModelIntegrityError(
+                        f"Production promotion rejected: approver principal '{u}' is not an active authoritative user ({context})."
+                    )
+
+            ml_rec = auth_svc.get_user(ml_user)
+            comp_rec = auth_svc.get_user(comp_user)
+            if ml_rec and comp_rec and ml_rec.user_id == comp_rec.user_id:
+                raise ModelIntegrityError(
+                    f"Production promotion rejected: Four-Eyes Principle violation, approvers resolve to same principal '{ml_rec.user_id}' ({context})."
+                )
 
 
 class ModelRegistry:
@@ -1703,16 +1727,31 @@ class ModelRegistry:
             if norm_role in existing_roles:
                 raise ValueError(f"Role '{role}' has already signed off on this version")
 
-            # Four-Eyes Principle: Prevent same user from approving multiple roles on the same version
-            existing_users = [s["user"] for s in entry["sign_offs"] if s.get("is_revoked") is not True]
-            if user in existing_users:
-                raise ValueError(
-                    f"Four-Eyes Principle violation: user '{user}' cannot approve multiple roles on the same version"
-                )
-
             # Verify identity and role membership against AuthenticationService
             from app.infrastructure.security.auth_service import AuthenticationService
             auth_svc = AuthenticationService.get_instance()
+
+            # Retrieve authoritative user record first for stable identity and live RBAC checks
+            authoritative_user = auth_svc.get_user(user)
+
+            # Four-Eyes Principle: Prevent same user from approving multiple roles on the same version
+            # Defend against aliases, casing differences, and token identifier variations
+            user_canonical = authoritative_user.username.lower() if authoritative_user else user.lower().strip()
+            user_id_canonical = authoritative_user.user_id if authoritative_user else None
+
+            for s in entry["sign_offs"]:
+                if s.get("is_revoked") is True:
+                    continue
+                existing_u = (s.get("user") or "").lower().strip()
+                existing_uid = (s.get("user_id") or "").strip()
+                if (
+                    user_canonical == existing_u
+                    or (user_id_canonical and existing_uid and user_id_canonical == existing_uid)
+                    or (user.lower().strip() == existing_u)
+                ):
+                    raise ValueError(
+                        f"Four-Eyes Principle violation: user '{user}' cannot approve multiple roles on the same version"
+                    )
 
             is_identity_verified = False
             is_role_verified = False
@@ -1723,8 +1762,14 @@ class ModelRegistry:
                     raise ModelIntegrityError(
                         f"Production promotion rejected: sign-off authentication failed: {tok_err}"
                     )
-                tok_user = tok_payload.get("username", "").lower()
-                if tok_user != user.lower() and tok_payload.get("sub") != user:
+                tok_user = (tok_payload.get("username") or "").lower().strip()
+                tok_sub = (tok_payload.get("sub") or "").strip()
+                if (
+                    tok_user != user_canonical
+                    and tok_sub != user_canonical
+                    and (not user_id_canonical or tok_sub != user_id_canonical)
+                    and tok_user != user.lower().strip()
+                ):
                     raise ModelIntegrityError(
                         f"Production promotion rejected: token user '{tok_user}' does not match sign-off user '{user}'."
                     )
@@ -1733,10 +1778,21 @@ class ModelRegistry:
                     raise ModelIntegrityError("Production promotion rejected: token claims lack compliance role authority.")
                 if norm_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in tok_roles):
                     raise ModelIntegrityError("Production promotion rejected: token claims lack ml_engineer role authority.")
-                authoritative_user = auth_svc.get_user(user)
+
                 if not authoritative_user or not authoritative_user.is_active:
                     raise ModelIntegrityError(
                         f"Production promotion rejected: approver principal '{user}' is not an active authoritative user."
+                    )
+
+                # Live Authoritative RBAC check: Must currently possess the required role in DurableAccountStore
+                auth_roles = [r.lower().strip() for r in authoritative_user.roles]
+                if norm_role == "compliance" and not any(r in ("compliance", "compliance_officer", "admin") for r in auth_roles):
+                    raise ModelIntegrityError(
+                        f"Production promotion rejected: user '{user}' lacks authoritative compliance role permissions."
+                    )
+                if norm_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in auth_roles):
+                    raise ModelIntegrityError(
+                        f"Production promotion rejected: user '{user}' lacks authoritative ml_engineer role permissions."
                     )
                 is_identity_verified = True
                 is_role_verified = True
@@ -1745,14 +1801,21 @@ class ModelRegistry:
                     "Production promotion rejected: authenticated session token is required for institutional sign-off."
                 )
             else:
-                user_rec = auth_svc.get_user(user)
-                is_identity_verified = user_rec is not None
-                if user_rec is not None:
-                    user_roles = [r.lower().strip() for r in user_rec.roles]
-                    if norm_role == "compliance":
-                        is_role_verified = any(r in ("compliance", "compliance_officer", "admin") for r in user_roles)
-                    elif norm_role == "ml_engineer":
-                        is_role_verified = any(r in ("ml_engineer", "ml_lead") for r in user_roles)
+                if not authoritative_user or not authoritative_user.is_active:
+                    raise ModelIntegrityError(
+                        f"Sign-off rejected: user '{user}' is not an active authoritative user."
+                    )
+                auth_roles = [r.lower().strip() for r in authoritative_user.roles]
+                if norm_role == "compliance" and not any(r in ("compliance", "compliance_officer", "admin") for r in auth_roles):
+                    raise ModelIntegrityError(
+                        f"Sign-off rejected: user '{user}' lacks authoritative compliance role permissions."
+                    )
+                if norm_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in auth_roles):
+                    raise ModelIntegrityError(
+                        f"Sign-off rejected: user '{user}' lacks authoritative ml_engineer role permissions."
+                    )
+                is_identity_verified = True
+                is_role_verified = True
 
             # Cryptographic signature verification over canonical payload
             artifact_sha = entry.get("sha256") or compute_file_sha256(os.path.join(sim_dir, entry["filename"]))
@@ -1782,6 +1845,7 @@ class ModelRegistry:
                 {
                     "role": norm_role,
                     "user": user,
+                    "user_id": user_id_canonical,
                     "signature": signature,
                     "signature_scheme": "APPLICATION_HMAC_SHA256",
                     "is_signature_valid": is_signature_valid,

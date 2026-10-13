@@ -71,6 +71,14 @@ def _setup_test_env(tmp_dir: str):
     trust_store.register_approved_key(kid, pub_hex, admin_token=admin_token)
     verifier = TrainingReceiptVerifier(trust_store=trust_store)
     reg = ModelRegistry(storage_dir=storage_dir, verifier=verifier)
+    auth_file = os.path.join(tmp_dir, "auth_store.json")
+    auth_svc = AuthenticationService(
+        signing_secret="test-jwt-secret-for-signoff-auth-32bytes!",
+        store_path=auth_file,
+        authority_secret="test-authority-secret-32bytes-len!",
+        app_env="development",
+    )
+    AuthenticationService._instance = auth_svc
     return storage_dir, trust_store, verifier, reg, priv, kid, admin_token
 
 
