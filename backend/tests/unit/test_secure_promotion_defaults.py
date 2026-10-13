@@ -22,6 +22,7 @@ import os
 import tempfile
 import threading
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -116,11 +117,15 @@ def _create_users_and_signoffs(
     version: int,
     sha256: str,
     secret: str = TEST_SIGNING_SECRET,
-):
+) -> tuple[list[dict[str, Any]], str]:
     """Register authorized approver users and compute authentic HMAC sign-offs."""
     auth_svc = AuthenticationService.get_instance()
-    u_ml = auth_svc.register_user(f"ml_{sim_id}_{version}", "Pass123!Secure", "bank_a", roles=["ml_engineer"])
-    u_cp = auth_svc.register_user(f"cp_{sim_id}_{version}", "Pass123!Secure", "bank_a", roles=["compliance"])
+    u_ml = auth_svc.register_user(
+        f"ml_{sim_id}_{version}", "Pass123!Secure", "bank_a", roles=["ml_engineer"], clearance_level=2
+    )
+    u_cp = auth_svc.register_user(
+        f"cp_{sim_id}_{version}", "Pass123!Secure", "bank_a", roles=["compliance"], clearance_level=3
+    )
 
     sig_ml = generate_signoff_signature(sim_id, version, sha256, "ml_engineer", u_ml.username, signing_secret=secret)
     sig_cp = generate_signoff_signature(sim_id, version, sha256, "compliance", u_cp.username, signing_secret=secret)
@@ -149,7 +154,8 @@ def _create_users_and_signoffs(
             "payload_bound": f"{sim_id}:{version}:{sha256}:compliance:{u_cp.username}",
         },
     ]
-    return sign_offs
+    token = auth_svc.create_token_bundle(u_ml).access_token
+    return sign_offs, token
 
 
 def test_save01_unspecified_promotion_defaults_to_inactive_candidate():
@@ -197,7 +203,7 @@ def test_save03_explicit_authorized_champion_promotion_succeeds():
         entry, _, _, sha256, _ = _create_authentic_candidate(reg, priv, kid, sim_id)
         assert entry["is_active"] is False
 
-        sign_offs = _create_users_and_signoffs(sim_id, entry["version"], sha256, TEST_SIGNING_SECRET)
+        sign_offs, token_ml = _create_users_and_signoffs(sim_id, entry["version"], sha256, TEST_SIGNING_SECRET)
         manifest = reg._load_manifest(sim_id)
         manifest[0]["sign_offs"] = sign_offs
         reg._save_manifest(sim_id, manifest)
@@ -206,7 +212,7 @@ def test_save03_explicit_authorized_champion_promotion_succeeds():
             patch.object(settings, "app_env", "production"),
             patch.object(settings, "payload_signing_secret", TEST_SIGNING_SECRET),
         ):
-            promoted = reg.promote_version(sim_id, entry["version"], target_status="champion")
+            promoted = reg.promote_version(sim_id, entry["version"], target_status="champion", auth_token=token_ml)
             assert promoted["is_active"] is True
             assert promoted["status"] == "champion"
 
@@ -257,7 +263,7 @@ def test_save05_failed_save_does_not_modify_existing_active_champion():
 
         # Create and promote v1 to champion
         entry1, _, _, sha1, _ = _create_authentic_candidate(reg, priv, kid, sim_id)
-        sign_offs = _create_users_and_signoffs(sim_id, 1, sha1, TEST_SIGNING_SECRET)
+        sign_offs, token_ml = _create_users_and_signoffs(sim_id, 1, sha1, TEST_SIGNING_SECRET)
         manifest = reg._load_manifest(sim_id)
         manifest[0]["sign_offs"] = sign_offs
         reg._save_manifest(sim_id, manifest)
@@ -266,7 +272,7 @@ def test_save05_failed_save_does_not_modify_existing_active_champion():
             patch.object(settings, "app_env", "production"),
             patch.object(settings, "payload_signing_secret", TEST_SIGNING_SECRET),
         ):
-            reg.promote_version(sim_id, 1, target_status="champion")
+            reg.promote_version(sim_id, 1, target_status="champion", auth_token=token_ml)
             v1_ident = reg.get_active_champion_identity(sim_id)
             assert v1_ident is not None
             assert v1_ident["version"] == 1
@@ -447,17 +453,20 @@ def test_save10_existing_challenger_revocation_and_signoff_protections_intact():
         entry, _, _, sha256, _ = _create_authentic_candidate(reg, priv, kid, sim_id)
 
         # Step 2: Promote candidate to challenger without dual sign-offs (challenger governance)
+        auth_svc = AuthenticationService.get_instance()
+        u_ml = auth_svc.register_user(f"ml_{sim_id}_chall", "Pass123!Secure", "bank_a", roles=["ml_engineer"], clearance_level=2)
+        token_ml = auth_svc.create_token_bundle(u_ml).access_token
         with (
             patch.object(settings, "app_env", "production"),
             patch.object(settings, "payload_signing_secret", TEST_SIGNING_SECRET),
         ):
-            chall_promoted = reg.promote_version(sim_id, entry["version"], target_status="challenger")
+            chall_promoted = reg.promote_version(sim_id, entry["version"], target_status="challenger", auth_token=token_ml)
             assert chall_promoted["status"] == "challenger"
             assert chall_promoted["is_active"] is False
 
         # Step 3: Revoking issuer key prevents promotion to champion
         trust_store.revoke_key(kid, "Compromised authority", admin_token=admin_token)
-        sign_offs = _create_users_and_signoffs(sim_id, entry["version"], sha256, TEST_SIGNING_SECRET)
+        sign_offs, token_ml2 = _create_users_and_signoffs(sim_id, entry["version"], sha256, TEST_SIGNING_SECRET)
         manifest = reg._load_manifest(sim_id)
         manifest[0]["sign_offs"] = sign_offs
         reg._save_manifest(sim_id, manifest)
@@ -467,4 +476,4 @@ def test_save10_existing_challenger_revocation_and_signoff_protections_intact():
             patch.object(settings, "payload_signing_secret", TEST_SIGNING_SECRET),
             pytest.raises(ModelIntegrityError, match="revoked or untrusted|explicitly revoked"),
         ):
-            reg.promote_version(sim_id, entry["version"], target_status="champion")
+            reg.promote_version(sim_id, entry["version"], target_status="champion", auth_token=token_ml2)

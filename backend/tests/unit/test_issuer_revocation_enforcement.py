@@ -70,6 +70,9 @@ def _setup_test_env(tmp_dir: str):
     )
     verifier = TrainingReceiptVerifier(trust_store=trust_store)
     registry = ModelRegistry(storage_dir=storage_dir, verifier=verifier)
+    auth_file = os.path.join(tmp_dir, "auth_store.json")
+    auth_svc = AuthenticationService(signing_secret="revocation_test_secret_32bytes_long!", store_path=auth_file)
+    AuthenticationService._instance = auth_svc
     return storage_dir, trust_store, verifier, registry, admin_token
 
 
@@ -131,8 +134,12 @@ def _build_candidate(
 def _attach_champion_signoffs(reg: ModelRegistry, sim_id: str, version: int, sha256: str):
     """Attach ML Engineer and Compliance signoffs to manifest without auto-promoting."""
     auth_svc = AuthenticationService.get_instance()
-    u1 = auth_svc.register_user(f"eng_{sim_id}_{version}", "Pass123!Secure", "bank_a", roles=["ml_engineer"])
-    u2 = auth_svc.register_user(f"comp_{sim_id}_{version}", "Pass123!Secure", "bank_a", roles=["compliance"])
+    u1 = auth_svc.register_user(
+        f"eng_{sim_id}_{version}", "Pass123!Secure", "bank_a", roles=["ml_engineer"], clearance_level=2
+    )
+    u2 = auth_svc.register_user(
+        f"comp_{sim_id}_{version}", "Pass123!Secure", "bank_a", roles=["compliance"], clearance_level=3
+    )
 
     sig_ml = generate_signoff_signature(sim_id, version, sha256, "ml_engineer", u1.username)
     sig_comp = generate_signoff_signature(sim_id, version, sha256, "compliance", u2.username)
@@ -174,6 +181,7 @@ def _attach_champion_signoffs(reg: ModelRegistry, sim_id: str, version: int, sha
         },
     ]
     reg._save_manifest(sim_id, manifest)
+    return auth_svc.create_token_bundle(u1).access_token
 
 
 # ── REV-01: Valid candidate, then issuer revocation, then champion promotion ──
@@ -243,14 +251,14 @@ def test_rev03_previously_active_champion_rejected_on_subsequent_resolution():
         sim_id = "sim_rev03"
         entry, _, _, sha256, _ = _build_candidate(reg, priv1, kid1, sim_id)
         v = entry["version"]
-        _attach_champion_signoffs(reg, sim_id, v, sha256)
+        token_ml = _attach_champion_signoffs(reg, sim_id, v, sha256)
 
         settings = get_settings()
         with (
             patch.object(settings, "app_env", "production"),
             patch.object(prov_service, "_DEFAULT_VERIFIER", verifier),
         ):
-            reg.promote_version(sim_id, v, target_status="champion")
+            reg.promote_version(sim_id, v, target_status="champion", auth_token=token_ml)
             # Verify resolution succeeds before revocation
             resolved_before = reg.resolve_and_verify_champion(sim_id)
             assert resolved_before is not None
@@ -277,13 +285,16 @@ def test_rev04_previously_active_challenger_rejected_on_subsequent_resolution():
         sim_id = "sim_rev04"
         entry, _, _, _, _ = _build_candidate(reg, priv1, kid1, sim_id)
         v = entry["version"]
+        auth_svc = AuthenticationService.get_instance()
+        u_ml = auth_svc.register_user(f"eng_{sim_id}_{v}", "Pass123!Secure", "bank_a", roles=["ml_engineer"], clearance_level=2)
+        token_ml = auth_svc.create_token_bundle(u_ml).access_token
 
         settings = get_settings()
         with (
             patch.object(settings, "app_env", "production"),
             patch.object(prov_service, "_DEFAULT_VERIFIER", verifier),
         ):
-            reg.promote_version(sim_id, v, target_status="challenger")
+            reg.promote_version(sim_id, v, target_status="challenger", auth_token=token_ml)
             resolved_before = reg.resolve_and_verify_challenger(sim_id)
             assert resolved_before is not None
 
@@ -305,7 +316,7 @@ def test_rev05_champion_cached_before_revocation_fails_closed_on_subsequent_infe
         sim_id = "sim_rev05"
         entry, _, _, sha256, _ = _build_candidate(reg, priv1, kid1, sim_id)
         v = entry["version"]
-        _attach_champion_signoffs(reg, sim_id, v, sha256)
+        token_ml = _attach_champion_signoffs(reg, sim_id, v, sha256)
 
         svc = ModelService(get_settings())
         settings = get_settings()
@@ -315,7 +326,7 @@ def test_rev05_champion_cached_before_revocation_fails_closed_on_subsequent_infe
             patch("app.application.services.model_registry.ModelRegistry", return_value=reg),
             patch("app.presentation.routers.realtime_inference._get_redis_client", return_value=None),
         ):
-            reg.promote_version(sim_id, v, target_status="champion")
+            reg.promote_version(sim_id, v, target_status="champion", auth_token=token_ml)
 
             # Warm caches before revocation
             champ_model = svc.get_champion(simulation_id=sim_id, dp_compatible=True, registry=reg)
@@ -349,7 +360,7 @@ def test_rev06_challenger_cached_before_revocation_cannot_be_served():
         # Champion signed by kid1
         entry1, _, _, sha256_1, _ = _build_candidate(reg, priv1, kid1, sim_id)
         v1 = entry1["version"]
-        _attach_champion_signoffs(reg, sim_id, v1, sha256_1)
+        token_ml = _attach_champion_signoffs(reg, sim_id, v1, sha256_1)
 
         # Challenger signed by kid2
         entry2, _, _, _, _ = _build_candidate(reg, priv2, kid2, sim_id)
@@ -366,8 +377,8 @@ def test_rev06_challenger_cached_before_revocation_cannot_be_served():
             patch.object(predict_module, "_eval_engine", eval_engine),
             patch.object(eval_engine, "get_traffic_share", return_value=1.0),
         ):
-            reg.promote_version(sim_id, v1, target_status="champion")
-            reg.promote_version(sim_id, v2, target_status="challenger")
+            reg.promote_version(sim_id, v1, target_status="champion", auth_token=token_ml)
+            reg.promote_version(sim_id, v2, target_status="challenger", auth_token=token_ml)
 
             # Warm cache for challenger model
             cached_chall = predict_module._load_challenger_model(sim_id, v2, dp_compatible=True)
@@ -447,12 +458,16 @@ def test_rev07_rollback_cannot_restore_revoked_issuer_model():
         # v1 signed by kid1
         entry1, _, _, sha256_1, _ = _build_candidate(reg, priv1, kid1, sim_id)
         v1 = entry1["version"]
-        _attach_champion_signoffs(reg, sim_id, v1, sha256_1)
+        tok1 = _attach_champion_signoffs(reg, sim_id, v1, sha256_1)
 
         # v2 signed by kid2
         entry2, _, _, sha256_2, _ = _build_candidate(reg, priv2, kid2, sim_id)
         v2 = entry2["version"]
-        _attach_champion_signoffs(reg, sim_id, v2, sha256_2)
+        tok2 = _attach_champion_signoffs(reg, sim_id, v2, sha256_2)
+
+        auth_svc = AuthenticationService.get_instance()
+        u_rb = auth_svc.register_user(f"rb_{sim_id}", "Pass123!Secure", "bank_a", roles=["compliance"], clearance_level=3)
+        tok_rb = auth_svc.create_token_bundle(u_rb).access_token
 
         settings = get_settings()
         with (
@@ -460,15 +475,15 @@ def test_rev07_rollback_cannot_restore_revoked_issuer_model():
             patch.object(prov_service, "_DEFAULT_VERIFIER", verifier),
         ):
             # Promote v1, then promote v2
-            reg.promote_version(sim_id, v1, target_status="champion")
-            reg.promote_version(sim_id, v2, target_status="champion")
+            reg.promote_version(sim_id, v1, target_status="champion", auth_token=tok1)
+            reg.promote_version(sim_id, v2, target_status="champion", auth_token=tok2)
 
             # Revoke v1's issuer key kid1
             trust_store.revoke_key(kid1, reason="v1_compromised", admin_token=admin_token)
 
             # Rollback to v1 must be rejected
             with pytest.raises(ModelIntegrityError, match="revoked"):
-                reg.rollback(sim_id, v1)
+                reg.rollback(sim_id, v1, auth_token=tok_rb)
 
             # Champion remains v2
             active = reg.get_active_version(sim_id)
@@ -491,7 +506,7 @@ def test_rev08_still_trusted_issuer_continues_working():
         # v2 signed by kid2 (good)
         entry2, _, _, sha256_2, _ = _build_candidate(reg, priv2, kid2, sim_id)
         v2 = entry2["version"]
-        _attach_champion_signoffs(reg, sim_id, v2, sha256_2)
+        token_ml = _attach_champion_signoffs(reg, sim_id, v2, sha256_2)
 
         # Revoke only kid1
         trust_store.revoke_key(kid1, reason="compromised", admin_token=admin_token)
@@ -503,7 +518,7 @@ def test_rev08_still_trusted_issuer_continues_working():
             patch.object(prov_service, "_DEFAULT_VERIFIER", verifier),
         ):
             # Promote v2 signed by kid2 -> succeeds
-            promoted = reg.promote_version(sim_id, v2, target_status="champion")
+            promoted = reg.promote_version(sim_id, v2, target_status="champion", auth_token=token_ml)
             assert promoted["status"] == "champion"
 
             # Resolve v2 -> succeeds
@@ -526,7 +541,7 @@ def test_rev09_corrupted_or_inaccessible_trust_state_fails_closed():
         sim_id = "sim_rev09"
         entry, _, _, sha256, _ = _build_candidate(reg, priv1, kid1, sim_id)
         v = entry["version"]
-        _attach_champion_signoffs(reg, sim_id, v, sha256)
+        token_ml = _attach_champion_signoffs(reg, sim_id, v, sha256)
 
         svc = ModelService(get_settings())
         settings = get_settings()
@@ -536,7 +551,7 @@ def test_rev09_corrupted_or_inaccessible_trust_state_fails_closed():
             patch("app.application.services.model_registry.ModelRegistry", return_value=reg),
             patch("app.presentation.routers.realtime_inference._get_redis_client", return_value=None),
         ):
-            reg.promote_version(sim_id, v, target_status="champion")
+            reg.promote_version(sim_id, v, target_status="champion", auth_token=token_ml)
 
             # Cache the model
             champ_model = svc.get_champion(simulation_id=sim_id, dp_compatible=True, registry=reg)
@@ -579,7 +594,7 @@ def test_rev10_legitimate_lifecycle_functional_while_trust_valid():
         assert entry["provenance_type"] == "TRAINING_RECORDED"
 
         # 2. Sign-offs
-        _attach_champion_signoffs(reg, sim_id, v, sha256)
+        token_ml = _attach_champion_signoffs(reg, sim_id, v, sha256)
 
         settings = get_settings()
         svc = ModelService(settings)
@@ -590,7 +605,7 @@ def test_rev10_legitimate_lifecycle_functional_while_trust_valid():
             patch("app.presentation.routers.realtime_inference._get_redis_client", return_value=None),
         ):
             # 3. Promotion
-            promoted = reg.promote_version(sim_id, v, target_status="champion")
+            promoted = reg.promote_version(sim_id, v, target_status="champion", auth_token=token_ml)
             assert promoted["status"] == "champion"
             assert promoted["is_active"] is True
 

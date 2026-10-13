@@ -37,6 +37,7 @@ from app.application.services.model_registry import (
     ModelEvaluationEngine,
     ModelRegistry,
     compute_file_sha256,
+    create_trusted_internal_context,
     generate_signoff_signature,
 )
 from app.application.services.model_service import NUM_FEATURES, ModelService
@@ -314,7 +315,13 @@ def test_authentic_eligible_candidate_promotion_succeeds():
             assert v1["is_production_eligible"] is True
 
             # Promote to challenger under production environment
-            promoted = reg.promote_version("sim_auth_chall", version=v1["version"], target_status="challenger")
+            ctx_internal = create_trusted_internal_context("model_evaluation_engine", action="promote_version")
+            promoted = reg.promote_version(
+                "sim_auth_chall",
+                version=v1["version"],
+                target_status="challenger",
+                trusted_context=ctx_internal,
+            )
             assert promoted["status"] == "challenger"
             assert promoted["is_active"] is False
 
@@ -495,7 +502,10 @@ def test_existing_champion_and_legitimate_challenger_inference_correct():
 
             # Challenger v2
             v2 = reg.save_version("sim_both_ok", state_dict, metrics={"auc": 0.90}, is_promoted=False, training_receipt=rcpt, artifact_bytes=raw_bytes)
-            promoted_chall = reg.promote_version("sim_both_ok", version=v2["version"], target_status="challenger")
+            user_eng = auth_svc.get_user("eng_ml")
+            assert user_eng is not None
+            token_ml = auth_svc.create_token_bundle(user_eng).access_token
+            promoted_chall = reg.promote_version("sim_both_ok", version=v2["version"], target_status="challenger", auth_token=token_ml)
             assert promoted_chall["status"] == "challenger"
 
             # Both resolve cleanly

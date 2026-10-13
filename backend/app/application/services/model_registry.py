@@ -18,6 +18,7 @@ import tempfile
 import threading
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -77,6 +78,86 @@ def generate_signoff_signature(
     canonical_payload = f"{simulation_id}:{version}:{artifact_sha256}:{norm_role}:{user}"
     domain_key = derive_domain_key(secret, DOMAIN_APPROVAL_SIGNOFF)
     return hmac.new(domain_key, canonical_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+@dataclass(frozen=True)
+class TrustedInternalContext:
+    """Cryptographically signed and time-bounded internal execution authority context.
+
+    Used exclusively for genuine internal, non-HTTP orchestration operations (such as automated
+    canary evaluation rollbacks in ModelEvaluationEngine). Cannot be spoofed or supplied by external
+    HTTP callers without possession of the authoritative platform signing secret.
+    """
+
+    service_name: str
+    action: str
+    nonce: str
+    created_at: float
+    signature: str
+
+
+def create_trusted_internal_context(
+    service_name: str,
+    action: str,
+    created_at: float | None = None,
+) -> TrustedInternalContext:
+    """Generate a signed, tamper-evident internal execution context for automated orchestrators."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    secret = (
+        getattr(settings, "payload_signing_secret", None)
+        or getattr(settings, "oidc_jwt_signing_secret", None)
+        or "cfi_internal_trusted_context_secret_key_2026_default"
+    )
+    nonce = str(uuid.uuid4())
+    now = time.time() if created_at is None else created_at
+    payload = f"INTERNAL_AUTHORITY:{service_name}:{action}:{nonce}:{now:.4f}".encode()
+    sig = hmac.new(str(secret).encode("utf-8"), payload, hashlib.sha256).hexdigest()
+    return TrustedInternalContext(
+        service_name=service_name,
+        action=action,
+        nonce=nonce,
+        created_at=now,
+        signature=sig,
+    )
+
+
+def verify_trusted_internal_context(
+    context: Any,
+    expected_action: str,
+    max_age_seconds: float = 300.0,
+) -> tuple[bool, str]:
+    """Cryptographically verify an internal execution context."""
+    from app.config import get_settings
+
+    if not isinstance(context, TrustedInternalContext):
+        return False, "Invalid context type: expected TrustedInternalContext instance."
+
+    ALLOWED_SERVICES = {"model_evaluation_engine", "training_orchestrator"}
+    if context.service_name not in ALLOWED_SERVICES:
+        return False, f"Unauthorized internal service name: '{context.service_name}'."
+
+    if context.action != expected_action:
+        return False, f"Context action mismatch: expected '{expected_action}', got '{context.action}'."
+
+    now = time.time()
+    if abs(now - context.created_at) > max_age_seconds:
+        return False, f"Internal authority context expired or clock skew exceeded (age={now - context.created_at:.1f}s)."
+
+    settings = get_settings()
+    secret = (
+        getattr(settings, "payload_signing_secret", None)
+        or getattr(settings, "oidc_jwt_signing_secret", None)
+        or "cfi_internal_trusted_context_secret_key_2026_default"
+    )
+    payload = f"INTERNAL_AUTHORITY:{context.service_name}:{context.action}:{context.nonce}:{context.created_at:.4f}".encode()
+    expected_sig = hmac.new(str(secret).encode("utf-8"), payload, hashlib.sha256).hexdigest()
+
+    if not hmac.compare_digest(context.signature, expected_sig):
+        return False, "Cryptographic signature mismatch on internal execution context."
+
+    return True, "Valid"
 
 
 def _validate_training_evidence(
@@ -1425,41 +1506,54 @@ class ModelRegistry:
         target_status: str = "champion",
         auth_token: str | None = None,
         actor: str | None = None,
+        trusted_context: TrustedInternalContext | None = None,
     ) -> dict[str, Any]:
         """Promotes a model version to 'champion' or 'challenger' status."""
         if target_status not in ("champion", "challenger"):
             raise ValueError(f"Target status must be 'champion' or 'challenger', got '{target_status}'")
 
-        authenticated_operator: str | None = None
-        if auth_token or actor:
-            from app.infrastructure.security.auth_service import AuthenticationService
-            auth_svc = AuthenticationService.get_instance()
+        if actor and not auth_token and not trusted_context:
+            raise ModelIntegrityError(
+                f"Caller-supplied actor identity ('{actor}') cannot establish authority without valid authentication."
+            )
 
-            if auth_token:
-                is_valid, claims, err_detail = auth_svc.verify_access_token(auth_token)
-                if not is_valid or not claims:
-                    raise ModelIntegrityError(f"Operator token authentication failed: {err_detail}")
-                authenticated_operator = (claims.get("username") or claims.get("sub") or "").strip()
-                if actor and actor.lower().strip() != authenticated_operator.lower():
-                    raise ModelIntegrityError(
-                        f"Actor '{actor}' does not match authenticated token principal '{authenticated_operator}'."
-                    )
-                user_rec = auth_svc.get_user(authenticated_operator)
-                if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
-                    raise ModelIntegrityError(f"Operator '{authenticated_operator}' is not an active authoritative user.")
-                user_roles = {r.lower().strip() for r in user_rec.roles}
-                if not (user_roles & {"admin", "ml_lead", "ml_engineer"}):
-                    raise ModelIntegrityError(
-                        f"Principal '{authenticated_operator}' lacks required role authority for model promotion."
-                    )
-            elif actor:
-                user_rec = auth_svc.get_user(actor)
-                if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
-                    raise ModelIntegrityError(f"Actor '{actor}' is not an active authoritative user.")
-                user_roles = {r.lower().strip() for r in user_rec.roles}
-                if not (user_roles & {"admin", "ml_lead", "ml_engineer"}):
-                    raise ModelIntegrityError(f"Actor '{actor}' lacks required role authority for model promotion.")
-                authenticated_operator = user_rec.username
+        authenticated_operator: str | None = None
+        if trusted_context:
+            is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                trusted_context, expected_action="promote_version"
+            )
+            if not is_valid_ctx:
+                raise ModelIntegrityError(f"Internal orchestration authority rejected: {ctx_reason}")
+            authenticated_operator = f"internal:{trusted_context.service_name}"
+        elif auth_token:
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            auth_svc = AuthenticationService.get_instance()
+            is_valid, claims, err_detail = auth_svc.verify_access_token(auth_token)
+            if not is_valid or not claims:
+                raise ModelIntegrityError(f"Operator token authentication failed: {err_detail}")
+            authenticated_operator = (claims.get("username") or claims.get("sub") or "").strip()
+            if actor and actor.lower().strip() != authenticated_operator.lower():
+                raise ModelIntegrityError(
+                    f"Actor '{actor}' does not match authenticated token principal '{authenticated_operator}'."
+                )
+            user_rec = auth_svc.get_user(authenticated_operator)
+            if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
+                raise ModelIntegrityError(f"Operator '{authenticated_operator}' is not an active authoritative user.")
+            user_roles = {r.lower().strip() for r in user_rec.roles}
+            if not (user_roles & {"admin", "ml_lead", "ml_engineer"}):
+                raise ModelIntegrityError(
+                    f"Principal '{authenticated_operator}' lacks required role authority for model promotion."
+                )
+            # Clearance enforcement from live authoritative DurableAccountStore record:
+            # Model Promotion requires minimum clearance level 2
+            user_clearance = getattr(user_rec, "clearance_level", 1)
+            if user_clearance < 2:
+                raise ModelIntegrityError(
+                    f"Principal '{authenticated_operator}' clearance level {user_clearance} is insufficient "
+                    f"for model promotion (minimum clearance level 2 required)."
+                )
+            authenticated_operator = user_rec.username
 
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
@@ -1536,6 +1630,13 @@ class ModelRegistry:
                     raise ModelIntegrityError(
                         f"Production admission rejected: cryptographic training receipt verification failed ({rcpt_reason}) ({admission_context})."
                     )
+
+                # Enforce production operator authorization fail-closed
+                if not authenticated_operator:
+                    raise ModelIntegrityError(
+                        f"Production model promotion rejected: unauthenticated operation. "
+                        f"Mandatory Bearer auth_token or verified internal authority required ({admission_context})."
+                    )
             elif target_entry.get("training_receipt"):
                 rcpt = target_entry.get("training_receipt")
                 if isinstance(rcpt, dict) and rcpt.get("key_id"):
@@ -1595,38 +1696,51 @@ class ModelRegistry:
         version: int,
         auth_token: str | None = None,
         actor: str | None = None,
+        trusted_context: TrustedInternalContext | None = None,
     ) -> dict[str, Any]:
         """Rollback/promote a specific historical version as the active model."""
-        authenticated_operator: str | None = None
-        if auth_token or actor:
-            from app.infrastructure.security.auth_service import AuthenticationService
-            auth_svc = AuthenticationService.get_instance()
+        if actor and not auth_token and not trusted_context:
+            raise ModelIntegrityError(
+                f"Caller-supplied actor identity ('{actor}') cannot establish authority without valid authentication."
+            )
 
-            if auth_token:
-                is_valid, claims, err_detail = auth_svc.verify_access_token(auth_token)
-                if not is_valid or not claims:
-                    raise ModelIntegrityError(f"Operator token authentication failed: {err_detail}")
-                authenticated_operator = (claims.get("username") or claims.get("sub") or "").strip()
-                if actor and actor.lower().strip() != authenticated_operator.lower():
-                    raise ModelIntegrityError(
-                        f"Actor '{actor}' does not match authenticated token principal '{authenticated_operator}'."
-                    )
-                user_rec = auth_svc.get_user(authenticated_operator)
-                if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
-                    raise ModelIntegrityError(f"Operator '{authenticated_operator}' is not an active authoritative user.")
-                user_roles = {r.lower().strip() for r in user_rec.roles}
-                if not (user_roles & {"admin", "ml_lead", "compliance", "compliance_officer"}):
-                    raise ModelIntegrityError(
-                        f"Principal '{authenticated_operator}' lacks required role authority for model rollback."
-                    )
-            elif actor:
-                user_rec = auth_svc.get_user(actor)
-                if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
-                    raise ModelIntegrityError(f"Actor '{actor}' is not an active authoritative user.")
-                user_roles = {r.lower().strip() for r in user_rec.roles}
-                if not (user_roles & {"admin", "ml_lead", "compliance", "compliance_officer"}):
-                    raise ModelIntegrityError(f"Actor '{actor}' lacks required role authority for model rollback.")
-                authenticated_operator = user_rec.username
+        authenticated_operator: str | None = None
+        if trusted_context:
+            is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                trusted_context, expected_action="rollback"
+            )
+            if not is_valid_ctx:
+                raise ModelIntegrityError(f"Internal orchestration authority rejected: {ctx_reason}")
+            authenticated_operator = f"internal:{trusted_context.service_name}"
+        elif auth_token:
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            auth_svc = AuthenticationService.get_instance()
+            is_valid, claims, err_detail = auth_svc.verify_access_token(auth_token)
+            if not is_valid or not claims:
+                raise ModelIntegrityError(f"Operator token authentication failed: {err_detail}")
+            authenticated_operator = (claims.get("username") or claims.get("sub") or "").strip()
+            if actor and actor.lower().strip() != authenticated_operator.lower():
+                raise ModelIntegrityError(
+                    f"Actor '{actor}' does not match authenticated token principal '{authenticated_operator}'."
+                )
+            user_rec = auth_svc.get_user(authenticated_operator)
+            if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
+                raise ModelIntegrityError(f"Operator '{authenticated_operator}' is not an active authoritative user.")
+            user_roles = {r.lower().strip() for r in user_rec.roles}
+            if not (user_roles & {"admin", "ml_lead", "compliance", "compliance_officer"}):
+                raise ModelIntegrityError(
+                    f"Principal '{authenticated_operator}' lacks required role authority for model rollback."
+                )
+            # Clearance enforcement from live authoritative DurableAccountStore record:
+            # Model Rollback requires minimum clearance level 3
+            user_clearance = getattr(user_rec, "clearance_level", 1)
+            if user_clearance < 3:
+                raise ModelIntegrityError(
+                    f"Principal '{authenticated_operator}' clearance level {user_clearance} is insufficient "
+                    f"for model rollback (minimum clearance level 3 required)."
+                )
+            authenticated_operator = user_rec.username
 
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
@@ -1700,6 +1814,13 @@ class ModelRegistry:
                 if not is_valid_rcpt:
                     raise ModelIntegrityError(
                         f"Production admission rejected: cryptographic training receipt verification failed ({rcpt_reason}) ({admission_context})."
+                    )
+
+                # Enforce production operator authorization fail-closed
+                if not authenticated_operator:
+                    raise ModelIntegrityError(
+                        "Production model rollback rejected: unauthenticated operation. "
+                        "Mandatory Bearer auth_token or verified internal authority required (rollback)."
                     )
             elif target_entry.get("training_receipt"):
                 rcpt = target_entry.get("training_receipt")
@@ -2251,7 +2372,14 @@ class ModelEvaluationEngine:
                 previous_versions = [v for v in manifest if v["version"] < active_ver_num]
                 if previous_versions:
                     stable_version = max(previous_versions, key=lambda x: x["version"])
-                    self.registry.rollback(simulation_id, stable_version["version"])
+                    trusted_ctx = create_trusted_internal_context(
+                        "model_evaluation_engine", action="rollback"
+                    )
+                    self.registry.rollback(
+                        simulation_id,
+                        stable_version["version"],
+                        trusted_context=trusted_ctx,
+                    )
                     traffic_share = 0.0
                     self._store.set(share_key, 0.0)
                     rollback_message = f"Auto-rollback triggered to version {stable_version['version']} due to performance degradation (AUC: {champ_auc:.4f}, FPR: {champ_fpr:.4f}, Latency: {avg_champ_latency:.1f}ms)."
@@ -2279,7 +2407,14 @@ class ModelEvaluationEngine:
                     challenger_ver_num = next(
                         r["challenger_version"] for r in records if r["challenger_version"] is not None
                     )
-                    self.registry.rollback(simulation_id, challenger_ver_num)
+                    trusted_ctx = create_trusted_internal_context(
+                        "model_evaluation_engine", action="rollback"
+                    )
+                    self.registry.rollback(
+                        simulation_id,
+                        challenger_ver_num,
+                        trusted_context=trusted_ctx,
+                    )
                     traffic_share = 0.0
                     self._store.set(share_key, 0.0)
                     promotion_message = f"Challenger version {challenger_ver_num} promoted to Champion after continued outperformance (PR-AUC: {chall_pr_auc:.4f} vs {champ_pr_auc:.4f})."

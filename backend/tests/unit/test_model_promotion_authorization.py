@@ -69,9 +69,9 @@ def _create_verified_model(registry: ModelRegistry, simulation_id: str = "sim_te
     return metadata["version"]
 
 
-def _register_and_create_token(username: str, role: str, bank_id: str = "bank_test") -> str:
+def _register_and_create_token(username: str, role: str, bank_id: str = "bank_test", clearance_level: int = 2) -> str:
     auth_svc = AuthenticationService.get_instance()
-    user = auth_svc.register_user(username, "StrongPass123!", bank_id, roles=[role])
+    user = auth_svc.register_user(username, "StrongPass123!", bank_id, roles=[role], clearance_level=clearance_level)
     bundle = auth_svc.create_token_bundle(user)
     return bundle.access_token
 
@@ -123,7 +123,7 @@ class TestDualApprovalAndInstitutionalGovernance:
             registry.sign_off("sim_test_gov", version, "compliance", user="comp_carol", signature=sig_comp, auth_token=token_comp)
 
             with patch.object(get_settings(), "app_env", "production"):
-                promoted = registry.promote_version("sim_test_gov", version)
+                promoted = registry.promote_version("sim_test_gov", version, auth_token=token_ml)
                 assert promoted["status"] == "champion"
                 assert promoted["is_active"] is True
 
@@ -198,9 +198,10 @@ class TestDualApprovalAndInstitutionalGovernance:
             registry.sign_off("sim_test_gov", v2, "ml_engineer", user="eng_one", signature=sig_ml, auth_token=token_ml)
             registry.sign_off("sim_test_gov", v2, "compliance", user="comp_two", signature=sig_comp, auth_token=token_comp)
 
+            token_admin = _register_and_create_token("admin_op", "admin", clearance_level=3)
             with patch.object(get_settings(), "app_env", "production"):
-                registry.promote_version("sim_test_gov", v2)
+                registry.promote_version("sim_test_gov", v2, auth_token=token_ml)
 
                 # Attempt rollback to v1 (which has 0 approvals)
                 with pytest.raises(ModelIntegrityError, match="Missing required sign-offs"):
-                    registry.rollback("sim_test_gov", version=v1)
+                    registry.rollback("sim_test_gov", version=v1, auth_token=token_admin)

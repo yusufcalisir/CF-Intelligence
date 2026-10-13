@@ -57,16 +57,18 @@ def _authenticate_and_authorize_operator(
     authorization: str | None,
     allowed_roles: set[str],
     operation_name: str,
+    min_clearance: int = 1,
 ) -> tuple[Any, dict[str, Any], str]:
-    """Authenticate Bearer JWT and verify authoritative active identity and live RBAC clearance.
+    """Authenticate Bearer JWT and verify authoritative active identity, live RBAC, and clearance level.
 
     Guarantees:
     1. Rejects missing, malformed, or empty Authorization headers with 401.
     2. Cryptographically verifies JWT signature, expiration, and durable revocation via DurableAccountStore.
     3. Verifies principal exists, is active, and is not deactivated, suspended, or disabled.
     4. Evaluates live effective roles from authoritative DurableAccountStore (defending against stale JWTs).
-    5. Evaluates token claims for required role as defense-in-depth against privilege elevation without re-authentication.
-    6. Refuses to use caller-supplied request fields (user, role, approved_by, actor) for authority.
+    5. Evaluates live clearance level from authoritative DurableAccountStore against declared minimum threshold.
+    6. Evaluates token claims for required role and clearance as defense-in-depth against privilege elevation without re-authentication.
+    7. Refuses to use caller-supplied request fields (user, role, approved_by, actor) for authority.
     """
     if not authorization:
         raise HTTPException(
@@ -126,6 +128,28 @@ def _authenticate_and_authorize_operator(
             detail=(
                 f"Authenticated principal '{authoritative_user.username}' is not authorized to execute {operation_name}. "
                 f"Token claims do not satisfy required role."
+            ),
+        )
+
+    # Live clearance level verification from authoritative DurableAccountStore record
+    user_clearance = getattr(authoritative_user, "clearance_level", 1)
+    if user_clearance < min_clearance:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Authenticated principal '{authoritative_user.username}' has clearance level {user_clearance}, "
+                f"which is insufficient for {operation_name} (minimum clearance level {min_clearance} required)."
+            ),
+        )
+
+    # Token claims defense-in-depth: Token must not carry insufficient clearance claim
+    token_clearance = int(claims.get("clearance_level", 0))
+    if token_clearance < min_clearance:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Authenticated principal '{authoritative_user.username}' token clearance claim {token_clearance} "
+                f"does not satisfy required minimum clearance level {min_clearance} for {operation_name}."
             ),
         )
 
@@ -209,7 +233,9 @@ async def initiate_deployment(
     authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> DeploymentSessionResponse:
     """Initiates a zero-downtime rolling upgrade session."""
-    _authenticate_and_authorize_operator(authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment initiation")
+    _authenticate_and_authorize_operator(
+        authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment initiation", min_clearance=2
+    )
     try:
         session = deployer.initiate_upgrade(
             target_version=payload.target_version,
@@ -275,7 +301,9 @@ async def drain_deployment_connections(
     authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> DrainConnectionsResponse:
     """Gracefully drains active client connections without dropping requests."""
-    _authenticate_and_authorize_operator(authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment connection draining")
+    _authenticate_and_authorize_operator(
+        authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment connection draining", min_clearance=2
+    )
     try:
         active_remaining, drained_total = deployer.drain_client_connections(
             session_id=session_id,
@@ -311,7 +339,9 @@ async def execute_deployment_rolling_update(
     authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> DeploymentSessionResponse:
     """Executes rolling instance updates across cluster instances."""
-    _authenticate_and_authorize_operator(authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment rolling update")
+    _authenticate_and_authorize_operator(
+        authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment rolling update", min_clearance=2
+    )
     try:
         session = deployer.execute_rolling_instance_update(
             session_id=session_id,
@@ -339,7 +369,9 @@ async def finalize_deployment(
     authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> DeploymentSessionResponse:
     """Finalizes deployment session and promotes target version to current."""
-    _authenticate_and_authorize_operator(authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment finalization")
+    _authenticate_and_authorize_operator(
+        authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment finalization", min_clearance=2
+    )
     try:
         session = deployer.finalize_upgrade(session_id)
         return _session_to_response(session)
@@ -365,7 +397,9 @@ async def abort_deployment(
     authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> DeploymentSessionResponse:
     """Aborts deployment session on health check failure, restoring connections."""
-    _authenticate_and_authorize_operator(authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment abort")
+    _authenticate_and_authorize_operator(
+        authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment abort", min_clearance=2
+    )
     try:
         session = deployer.abort_upgrade(session_id, reason=payload.reason)
         return _session_to_response(session)
@@ -464,7 +498,7 @@ async def promote_model_version(
 ) -> ModelPromoteResponse:
     """Promote a specific model version to champion or challenger with SR 11-7 gate validation."""
     operator, claims, token_str = _authenticate_and_authorize_operator(
-        authorization, MODEL_PROMOTION_ROLES, "model promotion"
+        authorization, MODEL_PROMOTION_ROLES, "model promotion", min_clearance=2
     )
     entry = registry.get_version_metadata(simulation_id, version)
     if not entry:
@@ -590,8 +624,18 @@ async def promote_model_version(
                 detail=err_msg,
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        if "lacks required role" in err_msg.lower() or "not authorized" in err_msg.lower():
+        if (
+            "lacks required role" in err_msg.lower()
+            or "not authorized" in err_msg.lower()
+            or "clearance" in err_msg.lower()
+        ):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=err_msg)
+        if "cannot establish authority" in err_msg.lower() or "unauthenticated" in err_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=err_msg,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err_msg)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -618,7 +662,9 @@ async def promote_model_by_simulation(
     authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> ModelPromoteResponse:
     """Convenience alias to promote a simulation model under /models/{model_id}/promote."""
-    _authenticate_and_authorize_operator(authorization, MODEL_PROMOTION_ROLES, "model promotion")
+    _authenticate_and_authorize_operator(
+        authorization, MODEL_PROMOTION_ROLES, "model promotion", min_clearance=2
+    )
     manifest = registry._load_manifest(simulation_id)
     if not manifest:
         raise HTTPException(
@@ -640,7 +686,7 @@ async def rollback_model_version(
 ) -> ModelVersionItem:
     """Rollback and reinstate a specific historical model version as active champion."""
     operator, claims, token_str = _authenticate_and_authorize_operator(
-        authorization, MODEL_ROLLBACK_ROLES, "model rollback"
+        authorization, MODEL_ROLLBACK_ROLES, "model rollback", min_clearance=3
     )
     try:
         updated_entry = registry.rollback(
@@ -670,8 +716,18 @@ async def rollback_model_version(
                 detail=err_msg,
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        if "lacks required role" in err_msg.lower() or "not authorized" in err_msg.lower():
+        if (
+            "lacks required role" in err_msg.lower()
+            or "not authorized" in err_msg.lower()
+            or "clearance" in err_msg.lower()
+        ):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=err_msg)
+        if "cannot establish authority" in err_msg.lower() or "unauthenticated" in err_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=err_msg,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err_msg)
     except (ValueError, FileNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

@@ -99,8 +99,12 @@ def isolated_production_env():
     # Seed approver users in AuthenticationService
     AuthenticationService.reset_instance()
     auth_svc = AuthenticationService.get_instance()
-    u_mle = auth_svc.register_user("mle_lead_officer", "Pass123!Secure", "bank_a", roles=["ml_engineer"])
-    u_comp = auth_svc.register_user("compliance_chief", "Pass123!Secure", "bank_a", roles=["compliance"])
+    u_mle = auth_svc.register_user(
+        "mle_lead_officer", "Pass123!Secure", "bank_a", roles=["ml_engineer"], clearance_level=2
+    )
+    u_comp = auth_svc.register_user(
+        "compliance_chief", "Pass123!Secure", "bank_a", roles=["compliance"], clearance_level=3
+    )
     u_analyst = auth_svc.register_user("analyst_viewer", "Pass123!Secure", "bank_a", roles=["analyst"])
     u_dual = auth_svc.register_user("dual_approver_user", "Pass123!Secure", "bank_a", roles=["ml_engineer", "compliance"])
 
@@ -658,7 +662,7 @@ class TestRestSignOffTokenPropagation:
         assert entry_v2["is_active"] is False
 
         # Promote to challenger
-        registry.promote_version(sim_id, 2, target_status="challenger")
+        registry.promote_version(sim_id, 2, target_status="challenger", auth_token=ctx["tok_mle"])
         challenger_meta = registry.get_challenger_metadata(sim_id)
         assert challenger_meta is not None
         assert challenger_meta["status"] == "challenger"
@@ -673,4 +677,6 @@ class TestRestSignOffTokenPropagation:
 
         # In production, promoting v3 signed by the revoked issuer key fails admission
         with pytest.raises(Exception, match="revoked"):
-            registry.promote_version(sim_id, entry_v3["version"], target_status="challenger")
+            registry.promote_version(
+                sim_id, entry_v3["version"], target_status="challenger", auth_token=ctx["tok_mle"]
+            )

@@ -132,8 +132,12 @@ def _create_users_and_signoffs(
 ):
     """Register authorized approver users and compute authentic HMAC sign-offs."""
     auth_svc = AuthenticationService.get_instance()
-    u_ml = auth_svc.register_user(f"ml_{sim_id}_{version}", "Pass123!Secure", "bank_a", roles=["ml_engineer"])
-    u_cp = auth_svc.register_user(f"cp_{sim_id}_{version}", "Pass123!Secure", "bank_a", roles=["compliance"])
+    u_ml = auth_svc.register_user(
+        f"ml_{sim_id}_{version}", "Pass123!Secure", "bank_a", roles=["ml_engineer"], clearance_level=2
+    )
+    u_cp = auth_svc.register_user(
+        f"cp_{sim_id}_{version}", "Pass123!Secure", "bank_a", roles=["compliance"], clearance_level=3
+    )
 
     sig_ml = generate_signoff_signature(sim_id, version, sha256, "ml_engineer", u_ml.username, signing_secret=secret)
     sig_cp = generate_signoff_signature(sim_id, version, sha256, "compliance", u_cp.username, signing_secret=secret)
@@ -170,7 +174,8 @@ def _create_users_and_signoffs(
             "is_revoked": False,
         },
     ]
-    return sign_offs, u_ml.username, u_cp.username
+    token_ml = auth_svc.create_token_bundle(u_ml).access_token
+    return sign_offs, u_ml.username, u_cp.username, token_ml
 
 
 def test_sign01_forged_is_signature_valid_rejected():
@@ -281,7 +286,7 @@ def test_sign03_modified_registry_signatures_champion_resolution_rejected():
         sim_id = "sim_sign03"
         entry, _, _, sha256, _ = _create_authentic_candidate(reg, priv, kid, sim_id)
         v = entry["version"]
-        sign_offs, _, _ = _create_users_and_signoffs(sim_id, v, sha256)
+        sign_offs, _, _, token = _create_users_and_signoffs(sim_id, v, sha256)
 
         # Legitimate promotion
         manifest = reg._load_manifest(sim_id)
@@ -294,7 +299,7 @@ def test_sign03_modified_registry_signatures_champion_resolution_rejected():
             patch.object(settings, "payload_signing_secret", TEST_SIGNING_SECRET),
             patch.object(prov_service, "_DEFAULT_VERIFIER", verifier),
         ):
-            promoted = reg.promote_version(sim_id, v, target_status="champion")
+            promoted = reg.promote_version(sim_id, v, target_status="champion", auth_token=token)
             assert promoted["status"] == "champion"
 
             # Attacker modifies the signature in registry.json post-promotion
@@ -314,7 +319,7 @@ def test_sign04_missing_or_invalid_signing_secret_fails_closed():
         sim_id = "sim_sign04"
         entry, _, _, sha256, _ = _create_authentic_candidate(reg, priv, kid, sim_id)
         v = entry["version"]
-        sign_offs, _, _ = _create_users_and_signoffs(sim_id, v, sha256)
+        sign_offs, _, _, _ = _create_users_and_signoffs(sim_id, v, sha256)
 
         manifest = reg._load_manifest(sim_id)
         manifest[0]["sign_offs"] = sign_offs
@@ -349,7 +354,7 @@ def test_sign05_signature_copied_from_different_version_or_sim_rejected():
 
         # Model A
         entry_a, _, _, sha256_a, _ = _create_authentic_candidate(reg, priv, kid, sim_a)
-        sign_offs_a, _, _ = _create_users_and_signoffs(sim_a, entry_a["version"], sha256_a)
+        sign_offs_a, _, _, _ = _create_users_and_signoffs(sim_a, entry_a["version"], sha256_a)
 
         # Model B
         entry_b, _, _, sha256_b, _ = _create_authentic_candidate(reg, priv, kid, sim_b)
@@ -421,7 +426,7 @@ def test_sign07_tampered_signoff_record_rejects_subsequent_serving():
         sim_id = "sim_sign07"
         entry, _, _, sha256, _ = _create_authentic_candidate(reg, priv, kid, sim_id)
         v = entry["version"]
-        sign_offs, _, _ = _create_users_and_signoffs(sim_id, v, sha256)
+        sign_offs, _, _, token = _create_users_and_signoffs(sim_id, v, sha256)
 
         manifest = reg._load_manifest(sim_id)
         manifest[0]["sign_offs"] = sign_offs
@@ -435,7 +440,7 @@ def test_sign07_tampered_signoff_record_rejects_subsequent_serving():
             patch.object(predict_module, "_registry", reg),
             patch.dict(os.environ, {"CFI_STORAGE_DIR": storage_dir}),
         ):
-            promoted = reg.promote_version(sim_id, v, target_status="champion")
+            promoted = reg.promote_version(sim_id, v, target_status="champion", auth_token=token)
             assert promoted["status"] == "champion"
 
             # Warm serving cache with valid champion
@@ -465,7 +470,7 @@ def test_sign08_genuine_dual_signoffs_promotion_and_inference_succeed():
         sim_id = "sim_sign08"
         entry, model, raw_bytes, sha256, rcpt = _create_authentic_candidate(reg, priv, kid, sim_id)
         v = entry["version"]
-        sign_offs, u_ml, u_cp = _create_users_and_signoffs(sim_id, v, sha256)
+        sign_offs, u_ml, u_cp, token = _create_users_and_signoffs(sim_id, v, sha256)
 
         manifest = reg._load_manifest(sim_id)
         manifest[0]["sign_offs"] = sign_offs
@@ -480,7 +485,7 @@ def test_sign08_genuine_dual_signoffs_promotion_and_inference_succeed():
             patch.dict(os.environ, {"CFI_STORAGE_DIR": storage_dir}),
         ):
             # Legitimate promotion succeeds
-            promoted = reg.promote_version(sim_id, v, target_status="champion")
+            promoted = reg.promote_version(sim_id, v, target_status="champion", auth_token=token)
             assert promoted["status"] == "champion"
             assert promoted["is_active"] is True
 
@@ -511,13 +516,16 @@ def test_sign09_challenger_evaluation_continues_without_champion_dual_signoffs()
         v = entry["version"]
 
         settings = get_settings()
+        auth_svc = AuthenticationService.get_instance()
+        u_ml = auth_svc.register_user(f"ml_{sim_id}", "Pass123!Secure", "bank_a", roles=["ml_engineer"], clearance_level=2)
+        token_ml = auth_svc.create_token_bundle(u_ml).access_token
         with (
             patch.object(settings, "app_env", "production"),
             patch.object(settings, "payload_signing_secret", TEST_SIGNING_SECRET),
             patch.object(prov_service, "_DEFAULT_VERIFIER", verifier),
         ):
             # Challenger promotion must succeed without demanding champion dual sign-offs
-            promoted_chall = reg.promote_version(sim_id, v, target_status="challenger")
+            promoted_chall = reg.promote_version(sim_id, v, target_status="challenger", auth_token=token_ml)
             assert promoted_chall["status"] == "challenger"
             assert promoted_chall["is_active"] is False
 
@@ -535,7 +543,7 @@ def test_sign10_issuer_revocation_from_01_b2_continues_to_reject():
         sim_id = "sim_sign10"
         entry, _, _, sha256, _ = _create_authentic_candidate(reg, priv, kid, sim_id)
         v = entry["version"]
-        sign_offs, _, _ = _create_users_and_signoffs(sim_id, v, sha256)
+        sign_offs, _, _, token = _create_users_and_signoffs(sim_id, v, sha256)
 
         manifest = reg._load_manifest(sim_id)
         manifest[0]["sign_offs"] = sign_offs
@@ -547,7 +555,7 @@ def test_sign10_issuer_revocation_from_01_b2_continues_to_reject():
             patch.object(settings, "payload_signing_secret", TEST_SIGNING_SECRET),
             patch.object(prov_service, "_DEFAULT_VERIFIER", verifier),
         ):
-            promoted = reg.promote_version(sim_id, v, target_status="champion")
+            promoted = reg.promote_version(sim_id, v, target_status="champion", auth_token=token)
             assert promoted["status"] == "champion"
 
             # Revoke issuer key

@@ -541,17 +541,22 @@ async def test_gate_10_delegation_and_direct_service_security(auth_gateway_env):
         await promote_model_by_simulation(simulation_id=sim_id, payload=payload, version=v1, authorization=None)
     assert exc_deleg.value.status_code == 401
 
-    # 3. Direct service call to promote_version with unauthorized actor fails closed
-    with pytest.raises(ModelIntegrityError, match="lacks required role authority"):
+    # 3. Direct service call to promote_version with unauthenticated actor fails closed
+    with pytest.raises(ModelIntegrityError, match="cannot establish authority without valid authentication"):
         reg.promote_version(sim_id, v1, target_status="challenger", actor="unprivileged_analyst")
 
-    # 4. Direct service call to rollback with unauthorized actor fails closed
-    with pytest.raises(ModelIntegrityError, match="lacks required role authority"):
+    # 4. Direct service call to rollback with unauthenticated actor fails closed
+    with pytest.raises(ModelIntegrityError, match="cannot establish authority without valid authentication"):
         reg.rollback(sim_id, v1, actor="unprivileged_analyst")
 
     # 5. Direct service call with non-existent actor fails closed
-    with pytest.raises(ModelIntegrityError, match="is not an active authoritative user"):
+    with pytest.raises(ModelIntegrityError, match="cannot establish authority without valid authentication"):
         reg.promote_version(sim_id, v1, target_status="challenger", actor="non_existent_user")
+
+    # 5b. Authenticated service call with unauthorized actor fails closed
+    token_analyst = auth_gateway_env["tokens"]["analyst"]
+    with pytest.raises(ModelIntegrityError, match="lacks required role authority"):
+        reg.promote_version(sim_id, v1, target_status="challenger", auth_token=token_analyst, actor="unprivileged_analyst")
 
     # 6. Direct service call with valid token succeeds
     res = reg.promote_version(sim_id, v1, target_status="challenger", auth_token=token_ml)
