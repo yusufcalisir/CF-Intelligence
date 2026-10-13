@@ -25,11 +25,25 @@ from dataclasses import dataclass, field
 from typing import Any, Generator
 
 from filelock import FileLock
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from app.config import get_settings
 from app.infrastructure.storage.storage_utils import get_storage_dir
 
 logger = logging.getLogger(__name__)
+
+FORBIDDEN_AUTHORITY_SECRETS = {
+    "",
+    "secret",
+    "admin",
+    "password",
+    "changeme",
+    "change_me",
+    "change_me_in_production",
+    "default",
+    "token",
+}
 
 
 class AuthenticationSecurityError(Exception):
@@ -114,12 +128,18 @@ class DurableAccountStore:
         self,
         store_path: str | None = None,
         in_memory: bool = False,
+        authority_secret: str | None = None,
+        authority_public_key: str | None = None,
+        app_env: str | None = None,
     ) -> None:
         settings = get_settings()
-        is_prod = (
-            (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or getattr(settings, "app_env", "")).lower()
-            == "production"
-        )
+        self._app_env = (
+            app_env
+            or os.environ.get("APP_ENV")
+            or os.environ.get("ENVIRONMENT")
+            or getattr(settings, "app_env", "")
+        ).lower()
+        is_prod = self._is_prod
 
         if is_prod and in_memory:
             raise AuthenticationSecurityError(
@@ -139,6 +159,54 @@ class DurableAccountStore:
                 configured_path = os.path.join(get_storage_dir(), "auth_identity_store.json")
             self._store_path = os.path.abspath(configured_path)
 
+        # Independently configured authority credentials
+        if authority_public_key and authority_secret is None:
+            # Explicit public-key verifier: do not fall back to ambient symmetric authority secret
+            self._authority_secret = None
+            self._authority_public_key_hex = authority_public_key
+        else:
+            self._authority_secret = (
+                authority_secret
+                or os.environ.get("CFI_IDENTITY_STORE_SECRET")
+                or os.environ.get("CFI_IDENTITY_STORE_HMAC_SECRET")
+                or getattr(settings, "identity_store_secret", None)
+                or (None if is_prod else "cfi_dev_identity_store_authority_secret_2026_default")
+            )
+            self._authority_public_key_hex = (
+                authority_public_key
+                or os.environ.get("CFI_IDENTITY_STORE_AUTHORITY_KEY")
+                or getattr(settings, "identity_store_authority_key", None)
+            )
+
+        self._authority_priv: ed25519.Ed25519PrivateKey | None = None
+        self._hmac_key: bytes | None = None
+
+        if self._authority_secret:
+            if is_prod and (self._authority_secret in FORBIDDEN_AUTHORITY_SECRETS or "change_me" in self._authority_secret):
+                raise AuthenticationSecurityError(
+                    "Production identity store authority secret is empty or uses a forbidden default/placeholder."
+                )
+            seed = hashlib.sha256(b"CFI-IDENTITY-STORE-AUTH-SEED-V1:" + self._authority_secret.encode("utf-8")).digest()
+            self._authority_priv = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
+            derived_pub = self._authority_priv.public_key().public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw,
+            ).hex()
+            if self._authority_public_key_hex and not hmac.compare_digest(
+                self._authority_public_key_hex.lower(), derived_pub.lower()
+            ):
+                raise AuthenticationSecurityError(
+                    "Authority key mismatch: configured authority_public_key does not match "
+                    "the authority key derived from authority_secret."
+                )
+            self._authority_public_key_hex = derived_pub
+            self._hmac_key = hashlib.sha256(b"CFI-IDENTITY-STORE-HMAC-KEY-V1:" + self._authority_secret.encode("utf-8")).digest()
+        elif is_prod and not self._authority_public_key_hex:
+            raise AuthenticationSecurityError(
+                "Production identity store requires independently configured authority secret "
+                "(CFI_IDENTITY_STORE_SECRET) or pinned authority public key (CFI_IDENTITY_STORE_AUTHORITY_KEY)."
+            )
+
         self._lock = threading.RLock()
         self._users: dict[str, dict[str, Any]] = {}
         self._revoked_tokens: dict[str, dict[str, Any]] = {}
@@ -152,9 +220,24 @@ class DurableAccountStore:
             self.reload()
 
     @property
+    def _is_prod(self) -> bool:
+        """Whether this store operates in production mode."""
+        active_env = (
+            self._app_env
+            or os.environ.get("APP_ENV")
+            or os.environ.get("ENVIRONMENT")
+            or getattr(get_settings(), "app_env", "")
+        ).lower()
+        return active_env == "production"
+
+    @property
     def store_path(self) -> str:
         """Return absolute path to store file."""
         return self._store_path
+
+    def get_authority_public_key(self) -> str | None:
+        """Return the hex-encoded Ed25519 authority public key."""
+        return self._authority_public_key_hex
 
     @contextlib.contextmanager
     def _file_lock_context(self) -> Generator[None, None, None]:
@@ -178,6 +261,14 @@ class DurableAccountStore:
             separators=(",", ":"),
         ).encode("utf-8")
         return hashlib.sha256(canonical).hexdigest()
+
+    def _check_mutating_allowed(self) -> None:
+        """Ensure current process possesses authority credentials to mutate store in production."""
+        if self._is_prod and not self._authority_secret:
+            raise AuthenticationSecurityError(
+                "Read-only verifier process cannot perform mutating operations on DurableAccountStore: "
+                "authority_secret is required."
+            )
 
     def _reload_unlocked(self, force: bool = False) -> None:
         """Internal reload without acquiring locks (must be called with locks held)."""
@@ -218,9 +309,17 @@ class DurableAccountStore:
                     f"Durable identity store at '{self._store_path}' is malformed: root JSON structure must be an object."
                 )
 
-            raw_users = container.get("users")
-            raw_revoked = container.get("revoked_tokens")
-            raw_refresh = container.get("active_refresh_tokens")
+            data = container.get("data")
+            if not isinstance(data, dict):
+                data = {
+                    "users": container.get("users", {}),
+                    "revoked_tokens": container.get("revoked_tokens", {}),
+                    "active_refresh_tokens": container.get("active_refresh_tokens", {}),
+                }
+
+            raw_users = data.get("users")
+            raw_revoked = data.get("revoked_tokens")
+            raw_refresh = data.get("active_refresh_tokens")
 
             if not isinstance(raw_users, dict) or not isinstance(raw_revoked, dict) or not isinstance(raw_refresh, dict):
                 self._is_corrupted = True
@@ -228,20 +327,80 @@ class DurableAccountStore:
                     f"Durable identity store at '{self._store_path}' is malformed: schema elements invalid."
                 )
 
-            # Validate integrity digest if present
+            canonical_bytes = json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            computed_sha = hashlib.sha256(canonical_bytes).hexdigest()
+
+            # Layer 1: Integrity digest verification
             stored_digest = container.get("integrity_sha256")
+            if self._is_prod and not stored_digest:
+                self._is_corrupted = True
+                raise AuthenticationSecurityError(
+                    f"Durable identity store at '{self._store_path}' rejected: missing required 'integrity_sha256' in production."
+                )
+            if stored_digest and not hmac.compare_digest(stored_digest, computed_sha):
+                self._is_corrupted = True
+                raise AuthenticationSecurityError(
+                    f"Durable identity store at '{self._store_path}' failed integrity verification: digest mismatch."
+                )
+
+            # Layer 2: Cryptographic Authenticity & Authority Verification
+            has_auth = "integrity_hmac_sha256" in container or "authority_signature" in container
+            if self._is_prod and not has_auth:
+                self._is_corrupted = True
+                raise AuthenticationSecurityError(
+                    f"Durable identity store at '{self._store_path}' rejected: unauthenticated persistence format "
+                    f"lacking cryptographic authentication signature or HMAC in production."
+                )
+
+            if self._hmac_key:
+                expected_hmac = container.get("integrity_hmac_sha256")
+                if not expected_hmac:
+                    if self._is_prod:
+                        self._is_corrupted = True
+                        raise AuthenticationSecurityError(
+                            f"Durable identity store at '{self._store_path}' failed cryptographic authentication: "
+                            f"missing 'integrity_hmac_sha256' tag."
+                        )
+                else:
+                    actual_hmac = hmac.new(self._hmac_key, canonical_bytes, hashlib.sha256).hexdigest()
+                    if not hmac.compare_digest(expected_hmac, actual_hmac):
+                        self._is_corrupted = True
+                        raise AuthenticationSecurityError(
+                            f"Durable identity store at '{self._store_path}' failed cryptographic HMAC authentication: "
+                            f"authentication tag mismatch."
+                        )
+
+            if self._authority_public_key_hex:
+                expected_sig = container.get("authority_signature")
+                if not expected_sig:
+                    if self._is_prod:
+                        self._is_corrupted = True
+                        raise AuthenticationSecurityError(
+                            f"Durable identity store at '{self._store_path}' failed cryptographic authentication: "
+                            f"missing 'authority_signature' signature."
+                        )
+                else:
+                    try:
+                        pub_bytes = bytes.fromhex(self._authority_public_key_hex)
+                        verifier_pub = ed25519.Ed25519PublicKey.from_public_bytes(pub_bytes)
+                        verifier_pub.verify(bytes.fromhex(expected_sig), canonical_bytes)
+                    except Exception as sig_err:
+                        self._is_corrupted = True
+                        raise AuthenticationSecurityError(
+                            f"Durable identity store at '{self._store_path}' failed authority signature verification "
+                            f"against independently pinned authority public key ({sig_err})."
+                        ) from sig_err
+
+            if self._is_prod and not self._hmac_key and not self._authority_public_key_hex:
+                self._is_corrupted = True
+                raise AuthenticationSecurityError(
+                    f"Production identity store at '{self._store_path}' requires independently configured authority secret "
+                    f"or authority public key."
+                )
+
             self._users = raw_users
             self._revoked_tokens = raw_revoked
             self._active_refresh_tokens = raw_refresh
-
-            if stored_digest:
-                computed = self._compute_digest()
-                if not hmac.compare_digest(stored_digest, computed):
-                    self._is_corrupted = True
-                    raise AuthenticationSecurityError(
-                        f"Durable identity store at '{self._store_path}' failed integrity verification: digest mismatch."
-                    )
-
             self._last_mtime_ns = stat.st_mtime_ns
             self._last_size = stat.st_size
             self._is_corrupted = False
@@ -258,18 +417,38 @@ class DurableAccountStore:
         if self._in_memory or not self._store_path:
             return
 
+        self._check_mutating_allowed()
+
         dir_name = os.path.dirname(self._store_path)
         os.makedirs(dir_name, exist_ok=True)
 
-        digest = self._compute_digest()
-        container = {
-            "schema_version": 1,
-            "integrity_sha256": digest,
-            "updated_at": time.time(),
+        data = {
             "users": self._users,
             "revoked_tokens": self._revoked_tokens,
             "active_refresh_tokens": self._active_refresh_tokens,
         }
+        canonical_bytes = json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        digest = hashlib.sha256(canonical_bytes).hexdigest()
+
+        container: dict[str, Any] = {
+            "schema_version": 2,
+            "updated_at": time.time(),
+            "data": data,
+            "integrity_sha256": digest,
+            "users": self._users,
+            "revoked_tokens": self._revoked_tokens,
+            "active_refresh_tokens": self._active_refresh_tokens,
+        }
+
+        if self._authority_secret and self._authority_priv and self._hmac_key:
+            container["integrity_hmac_sha256"] = hmac.new(self._hmac_key, canonical_bytes, hashlib.sha256).hexdigest()
+            container["authority_public_key_hex"] = self._authority_public_key_hex
+            container["authority_signature"] = self._authority_priv.sign(canonical_bytes).hex()
+        elif self._is_prod:
+            raise AuthenticationSecurityError(
+                "Cannot persist durable identity store in production without configured authority_secret."
+            )
+
         raw_bytes = json.dumps(container, indent=2, sort_keys=True).encode("utf-8")
         tmp_path = f"{self._store_path}.tmp.{os.getpid()}.{uuid.uuid4().hex[:8]}"
 
@@ -305,6 +484,10 @@ class DurableAccountStore:
         with self._lock:
             with self._file_lock_context():
                 self._reload_unlocked()
+                if self._is_corrupted:
+                    raise AuthenticationSecurityError(
+                        f"Durable identity store at '{self._store_path}' is in corrupted state."
+                    )
                 u = self._users.get(username.lower().strip())
                 if not u:
                     return None
@@ -317,6 +500,10 @@ class DurableAccountStore:
         with self._lock:
             with self._file_lock_context():
                 self._reload_unlocked()
+                if self._is_corrupted:
+                    raise AuthenticationSecurityError(
+                        f"Durable identity store at '{self._store_path}' is in corrupted state."
+                    )
                 for u in self._users.values():
                     if u.get("user_id") == user_id:
                         if not include_inactive and not u.get("is_active", True):
@@ -437,6 +624,10 @@ class DurableAccountStore:
         with self._lock:
             with self._file_lock_context():
                 self._reload_unlocked()
+                if self._is_corrupted:
+                    raise AuthenticationSecurityError(
+                        f"Durable identity store at '{self._store_path}' is in corrupted state."
+                    )
                 return jti in self._revoked_tokens
 
     def track_refresh_token(self, jti: str, username: str) -> None:

@@ -264,6 +264,10 @@ def test_auth_lockout_endpoint_triggers_429(client: TestClient):
     assert "Retry-After" in res_5.headers
     assert "locked out" in res_5.json()["detail"].lower()
 
+    # Reset lockout state to ensure test isolation
+    svc.lockout_manager.reset("testclient")
+    svc.lockout_manager.reset(target_user)
+
 
 # ── OIDC Cryptographic Signature Verification Tests ───────────────────────────
 

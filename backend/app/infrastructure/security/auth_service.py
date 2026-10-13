@@ -11,6 +11,7 @@ Features:
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 import uuid
@@ -160,6 +161,19 @@ class BruteForceLockoutManager:
             self._locked_until.pop(key, None)
 
 
+FORBIDDEN_JWT_SECRETS = {
+    "",
+    "cfi_oidc_jwt_secret_key_2026_enterprise_hs256",
+    "cfi_oidc_jwt_secret_key_2026_super_secure_256bit_key_!",
+    "secret",
+    "changeme",
+    "admin",
+    "password",
+    "default",
+    "token",
+}
+
+
 class AuthenticationService:
     """Coordinates bcrypt credential validation, JWT token issuance, lockout policies, and durable identity verification."""
 
@@ -174,13 +188,43 @@ class AuthenticationService:
         lockout_duration_seconds: int = 900,
         store_path: str | None = None,
         in_memory: bool = False,
+        authority_secret: str | None = None,
+        authority_public_key: str | None = None,
+        app_env: str | None = None,
     ) -> None:
         settings = get_settings()
-        self.signing_secret = (
-            signing_secret
-            or getattr(settings, "oidc_jwt_signing_secret", None)
-            or "cfi_oidc_jwt_secret_key_2026_super_secure_256bit_key_!"
-        )
+        active_env = (
+            app_env
+            or os.environ.get("APP_ENV")
+            or os.environ.get("ENVIRONMENT")
+            or getattr(settings, "app_env", "")
+        ).lower()
+        is_prod = active_env == "production"
+
+        if signing_secret is not None:
+            resolved_secret = signing_secret
+        else:
+            resolved_secret = (
+                os.environ.get("CFI_JWT_SIGNING_SECRET")
+                or os.environ.get("CFI_OIDC_JWT_SIGNING_SECRET")
+                or getattr(settings, "oidc_jwt_signing_secret", None)
+            )
+
+        if is_prod:
+            if (
+                not resolved_secret
+                or resolved_secret in FORBIDDEN_JWT_SECRETS
+                or "change_me" in resolved_secret
+                or len(resolved_secret.strip()) < 32
+            ):
+                raise AuthenticationSecurityError(
+                    "Production JWT signing secret is unconfigured or uses a forbidden default/placeholder. "
+                    "Production authentication fails closed."
+                )
+        elif not resolved_secret:
+            resolved_secret = "cfi_oidc_jwt_secret_key_2026_super_secure_256bit_key_!"
+
+        self.signing_secret = resolved_secret
         self.access_token_expire_minutes = access_token_expire_minutes
         self.refresh_token_expire_days = refresh_token_expire_days
         self.lockout_manager = BruteForceLockoutManager(
@@ -188,14 +232,25 @@ class AuthenticationService:
             lockout_duration_seconds=lockout_duration_seconds,
         )
 
+        resolved_auth_secret = authority_secret
+        if not is_prod and not resolved_auth_secret:
+            resolved_auth_secret = (
+                os.environ.get("CFI_IDENTITY_STORE_SECRET")
+                or getattr(settings, "identity_store_secret", None)
+                or "cfi_dev_identity_store_authority_secret_2026_default"
+            )
+
         # Durable multi-process identity and account state store
         self.identity_store = DurableAccountStore(
             store_path=store_path,
             in_memory=in_memory,
+            authority_secret=resolved_auth_secret,
+            authority_public_key=authority_public_key,
+            app_env=active_env,
         )
 
-        # Seed default administrative and analyst test accounts if store is uninitialized
-        self._seed_default_users()
+        # Seed default administrative and analyst test accounts if store is uninitialized (non-production only)
+        self._seed_default_users(is_prod=is_prod)
 
     @property
     def _users(self) -> dict[str, UserRecord]:
@@ -224,8 +279,12 @@ class AuthenticationService:
         """Testing utility to clear singleton instance."""
         cls._instance = None
 
-    def _seed_default_users(self) -> None:
+    def _seed_default_users(self, is_prod: bool = False) -> None:
         """Provision default platform users if not already present in the durable identity store."""
+        if is_prod:
+            logger.info("Production environment: automatic demo/test user seeding is disabled.")
+            return
+
         if self.identity_store.has_users():
             # Store already contains persisted accounts across worker processes / restarts
             return

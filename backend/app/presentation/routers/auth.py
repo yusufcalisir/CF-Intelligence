@@ -48,7 +48,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
 
-_auth_service = AuthenticationService.get_instance()
+def _get_auth_service() -> AuthenticationService:
+    return AuthenticationService.get_instance()
 
 
 def _derive_permissions(roles: list[str]) -> list[str]:
@@ -109,7 +110,7 @@ async def login(
 
     # Execute CPU-intensive bcrypt hashing in threadpool (Vector 13: Non-Blocking I/O)
     success, user, message, lockout = await asyncio.to_thread(
-        _auth_service.authenticate,
+        _get_auth_service().authenticate,
         username=payload.username,
         plain_password=payload.password,
         client_ip=client_ip,
@@ -148,7 +149,7 @@ async def login(
                 detail=f"User '{user.username}' is assigned to bank '{user.bank_id}' and cannot access tenant '{payload.tenant_id}'.",
             )
 
-    token_bundle = _auth_service.create_token_bundle(user)
+    token_bundle = _get_auth_service().create_token_bundle(user)
     derived_perms = _derive_permissions(user.roles)
     primary_role = user.roles[0] if user.roles else "analyst"
 
@@ -182,7 +183,7 @@ async def refresh_token(
     request: Request,
 ) -> LoginResponse:
     """Exchange a valid refresh token for a new access token and rotated refresh token."""
-    success, bundle, detail = _auth_service.refresh_access_token(payload.refresh_token)
+    success, bundle, detail = _get_auth_service().refresh_access_token(payload.refresh_token)
 
     if not success or bundle is None:
         raise HTTPException(
@@ -191,7 +192,7 @@ async def refresh_token(
         )
 
     # Decode claims to return user details
-    _, claims, _ = _auth_service.verify_access_token(bundle.access_token)
+    _, claims, _ = _get_auth_service().verify_access_token(bundle.access_token)
     roles = claims.get("roles", ["analyst"]) if claims else ["analyst"]
     bank_id = claims.get("bank_id", "bank_a") if claims else "bank_a"
     username = claims.get("username", "") if claims else ""
@@ -245,7 +246,7 @@ async def get_current_user(
         )
 
     token_str = token_parts[1]
-    is_valid, claims, detail = _auth_service.verify_access_token(token_str)
+    is_valid, claims, detail = _get_auth_service().verify_access_token(token_str)
 
     if not is_valid or not claims:
         raise HTTPException(
@@ -276,7 +277,7 @@ async def get_current_user(
                 detail=f"Cross-tenant access forbidden. Token bank '{token_bank_id}' does not match requested tenant '{x_tenant_id}'.",
             )
 
-    user = _auth_service.get_user(username)
+    user = _get_auth_service().get_user(username)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -316,7 +317,7 @@ async def verify_token(
         )
 
     token_str = token_parts[1]
-    is_valid, claims, detail = _auth_service.verify_access_token(token_str)
+    is_valid, claims, detail = _get_auth_service().verify_access_token(token_str)
 
     if not is_valid:
         raise HTTPException(
@@ -345,7 +346,7 @@ async def logout(
         token_to_revoke = authorization[7:].strip()
 
     if token_to_revoke:
-        _auth_service.revoke_token(token_to_revoke)
+        _get_auth_service().revoke_token(token_to_revoke)
 
     return LogoutResponse(
         status="logged_out",
@@ -358,7 +359,7 @@ async def get_lockout_status(
     identifier: str,
 ) -> LockoutStatusResponse:
     """Query lockout status for an IP address or username account."""
-    status_obj = _auth_service.lockout_manager.check_lockout(identifier)
+    status_obj = _get_auth_service().lockout_manager.check_lockout(identifier)
     return LockoutStatusResponse(
         identifier=identifier,
         is_locked=status_obj.is_locked,

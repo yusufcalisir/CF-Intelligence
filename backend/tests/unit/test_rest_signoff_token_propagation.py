@@ -60,10 +60,19 @@ def isolated_production_env():
     settings = get_settings()
     orig_env = settings.app_env
     orig_secret = settings.payload_signing_secret
-    settings.app_env = "production"
-    settings.payload_signing_secret = TEST_SIGNING_SECRET
+    orig_jwt = settings.oidc_jwt_signing_secret
+    orig_ident_sec = settings.identity_store_secret
+    orig_ident_path = settings.identity_store_path
 
     temp_dir = tempfile.mkdtemp()
+    store_file = os.path.join(temp_dir, "isolated_identity_store.json")
+
+    settings.app_env = "production"
+    settings.payload_signing_secret = TEST_SIGNING_SECRET
+    settings.oidc_jwt_signing_secret = "test-prod-jwt-signing-secret-32-chars-long!"
+    settings.identity_store_secret = "test-prod-identity-authority-secret-32-chars-long!"
+    settings.identity_store_path = store_file
+
     old_storage = registry.storage_dir
     old_root = registry.registry_root
     old_verifier = getattr(registry, "_verifier", None)
@@ -90,6 +99,7 @@ def isolated_production_env():
     registry._verifier = verifier
 
     # Seed approver users in AuthenticationService
+    AuthenticationService.reset_instance()
     auth_svc = AuthenticationService.get_instance()
     u_mle = auth_svc.register_user("mle_lead_officer", "Pass123!Secure", "bank_a", roles=["ml_engineer"])
     u_comp = auth_svc.register_user("compliance_chief", "Pass123!Secure", "bank_a", roles=["compliance"])
@@ -122,8 +132,12 @@ def isolated_production_env():
     yield context
 
     # Teardown
+    AuthenticationService.reset_instance()
     settings.app_env = orig_env
     settings.payload_signing_secret = orig_secret
+    settings.oidc_jwt_signing_secret = orig_jwt
+    settings.identity_store_secret = orig_ident_sec
+    settings.identity_store_path = orig_ident_path
     registry.storage_dir = old_storage
     registry.registry_root = old_root
     registry._verifier = old_verifier

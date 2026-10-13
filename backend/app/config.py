@@ -206,6 +206,24 @@ class Settings(BaseSettings):
         ),
         description="Path to durable identity store file tracking authoritative users and token revocations across processes.",
     )
+    identity_store_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "identity_store_secret",
+            "cfi_identity_store_secret",
+            "identity_store_hmac_secret",
+            "cfi_identity_store_hmac_secret",
+        ),
+        description="Independently provisioned authority secret for signing durable identity store state.",
+    )
+    identity_store_authority_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "identity_store_authority_key",
+            "cfi_identity_store_authority_key",
+        ),
+        description="Independently pinned Ed25519 authority public key for verifying identity store state.",
+    )
 
     abac_enabled: bool = True
     vault_enabled: bool = False
@@ -431,6 +449,38 @@ class Settings(BaseSettings):
         ):
             violations.append(
                 "training_job_db_url in production must be a PostgreSQL connection URL (e.g. postgresql://...). SQLite URLs are forbidden in production."
+            )
+
+        forbidden_jwt_secrets = {
+            "",
+            "cfi_oidc_jwt_secret_key_2026_enterprise_hs256",
+            "cfi_oidc_jwt_secret_key_2026_super_secure_256bit_key_!",
+            "secret",
+            "changeme",
+            "admin",
+            "password",
+            "default",
+            "token",
+        }
+        if (
+            not self.oidc_jwt_signing_secret
+            or self.oidc_jwt_signing_secret in forbidden_jwt_secrets
+            or "change_me" in self.oidc_jwt_signing_secret
+            or len(self.oidc_jwt_signing_secret.strip()) < 32
+        ):
+            violations.append(
+                "oidc_jwt_signing_secret must be set to an independently configured high-entropy secret in production (minimum 32 characters, cannot be default repository placeholder)."
+            )
+
+        if not self.identity_store_secret and not self.identity_store_authority_key:
+            violations.append(
+                "identity_store_secret (or identity_store_authority_key) must be explicitly configured in production to establish authenticated identity state."
+            )
+        elif self.identity_store_secret and (
+            self.identity_store_secret in forbidden_tokens or "change_me" in self.identity_store_secret
+        ):
+            violations.append(
+                "identity_store_secret cannot be a forbidden placeholder in production."
             )
 
         if violations:
