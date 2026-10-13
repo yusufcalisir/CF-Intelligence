@@ -10,7 +10,7 @@ import logging
 import time
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Path, Query, status
+from fastapi import APIRouter, Header, HTTPException, Path, Query, status
 
 from app.application.schemas.coordinator import (
     AsyncFLEngineStatusResponse,
@@ -47,6 +47,86 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/coordinator", tags=["coordinator"])
 api_router = APIRouter(prefix="/v1/coordinator", tags=["coordinator"])
+
+CONSORTIUM_ADMIN_ROLES = {"admin", "compliance", "compliance_officer", "ml_lead", "ml_engineer", "consortium_admin"}
+CONSORTIUM_POLICY_ROLES = {"admin", "compliance", "compliance_officer", "ml_lead", "consortium_admin"}
+CONSORTIUM_VOTING_ROLES = {
+    "admin",
+    "compliance",
+    "compliance_officer",
+    "ml_lead",
+    "ml_engineer",
+    "analyst",
+    "investigator",
+    "consortium_admin",
+}
+
+
+def _authenticate_and_authorize_consortium_actor(
+    authorization: str | None,
+    allowed_roles: set[str],
+    operation_name: str,
+    min_clearance: int = 1,
+) -> tuple[Any, dict[str, Any], str]:
+    """Authenticate Bearer JWT and verify authoritative active identity, live RBAC, and clearance level."""
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header. Expected 'Bearer <token>'.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_parts = authorization.strip().split()
+    if len(token_parts) != 2 or token_parts[0].lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header format. Expected 'Bearer <token>'.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_str = token_parts[1]
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    auth_svc = AuthenticationService.get_instance()
+    is_valid, claims, err_detail = auth_svc.verify_access_token(token_str)
+    if not is_valid or not claims:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=err_detail or "Authentication token is invalid or has expired.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    authenticated_user = (claims.get("username") or claims.get("sub") or "").strip()
+    authoritative_user = auth_svc.get_user(authenticated_user)
+    if not authoritative_user or not authoritative_user.is_active or authoritative_user.status.lower() != "active":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Actor principal '{authenticated_user}' is not an active authoritative user.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    norm_allowed = {r.lower().strip() for r in allowed_roles}
+    authoritative_roles = {r.lower().strip() for r in authoritative_user.roles}
+    if not (authoritative_roles & norm_allowed):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Authenticated principal '{authoritative_user.username}' is not authorized to execute {operation_name}. "
+                f"Requires one of: {sorted(norm_allowed)}."
+            ),
+        )
+
+    user_clearance = getattr(authoritative_user, "clearance_level", 1)
+    if user_clearance < min_clearance:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Authenticated principal '{authoritative_user.username}' has clearance level {user_clearance}, "
+                f"which is insufficient for {operation_name} (minimum clearance level {min_clearance} required)."
+            ),
+        )
+
+    return authoritative_user, claims, token_str
 
 
 # ── Domain Mapping Helpers ────────────────────────────────────
@@ -279,18 +359,45 @@ async def get_consortium_by_id(
     return _consortium_to_response(c)
 
 
-async def create_new_consortium(req: CreateConsortiumRequest) -> ConsortiumResponse:
+async def create_new_consortium(
+    req: CreateConsortiumRequest,
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
+) -> ConsortiumResponse:
     """Establish a new multi-bank federated consortium alliance."""
+    actor, claims, token_str = _authenticate_and_authorize_consortium_actor(
+        authorization, CONSORTIUM_ADMIN_ROLES, "consortium creation", min_clearance=2
+    )
+    actor_bank = (getattr(actor, "bank_id", "") or "").strip()
+    if not actor_bank:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Actor principal '{actor.username}' has no authoritative institution assignment.",
+        )
+
+    # TENANT-03: Reject forged founder_bank_id
+    if req.founder_bank_id and req.founder_bank_id.lower().strip() != actor_bank.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Cross-bank institutional impersonation rejected: Authenticated actor '{actor.username}' "
+                f"from institution '{actor_bank}' cannot establish a consortium as founder '{req.founder_bank_id}'."
+            ),
+        )
+
     try:
         c = consortium_governance_service.create_consortium(
             consortium_id=req.consortium_id,
             name=req.name,
-            founder_bank_id=req.founder_bank_id,
+            founder_bank_id=actor_bank,
             quorum_ratio=req.quorum_ratio,
             max_epsilon=req.max_epsilon,
             min_members_n=req.min_members_n,
+            auth_token=token_str,
+            actor=actor.username,
         )
         return _consortium_to_response(c)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
@@ -341,37 +448,137 @@ async def get_governance_proposal_by_id(
     return _proposal_to_response(prop)
 
 
-async def create_membership_proposal(req: CreateMembershipProposalRequest) -> ProposalResponse:
+async def create_membership_proposal(
+    req: CreateMembershipProposalRequest,
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
+) -> ProposalResponse:
     """Open a member onboarding or removal voting proposal."""
+    actor, claims, token_str = _authenticate_and_authorize_consortium_actor(
+        authorization, CONSORTIUM_ADMIN_ROLES, "membership proposal creation", min_clearance=2
+    )
+    actor_bank = (getattr(actor, "bank_id", "") or "").strip()
+    if not actor_bank:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Actor principal '{actor.username}' has no authoritative institution assignment.",
+        )
+
+    # TENANT-03: Reject forged creator_bank_id
+    if req.creator_bank_id and req.creator_bank_id.lower().strip() != actor_bank.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Cross-bank institutional impersonation rejected: Authenticated actor '{actor.username}' "
+                f"from institution '{actor_bank}' cannot sponsor proposal as '{req.creator_bank_id}'."
+            ),
+        )
+
+    c = consortium_governance_service.get_consortium(req.consortium_id)
+    if not c:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Consortium '{req.consortium_id}' does not exist.",
+        )
+
+    clean_actor_bank = actor_bank.lower()
+    # TENANT-05: Non-member or removed member cannot create proposals
+    if clean_actor_bank not in c.members:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Institution '{actor_bank}' is not an active member of consortium '{req.consortium_id}'.",
+        )
+
+    member = c.members[clean_actor_bank]
+    # TENANT-06: Member lacking voting/governance rights cannot create proposals
+    if not member.can_vote:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Institution '{actor_bank}' has role '{member.role.value}' with no governance voting power in consortium '{req.consortium_id}'.",
+        )
+
     try:
         action = ProposalAction(req.action)
         prop = consortium_governance_service.propose_membership_change(
             consortium_id=req.consortium_id,
-            creator_bank_id=req.creator_bank_id,
+            creator_bank_id=actor_bank,
             target_bank_id=req.target_bank_id,
             action=action,
             ttl_seconds=req.ttl_seconds,
             metadata=req.metadata,
+            auth_token=token_str,
+            actor=actor.username,
         )
         return _proposal_to_response(prop)
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
-async def create_policy_proposal(req: CreatePolicyProposalRequest) -> ProposalResponse:
+async def create_policy_proposal(
+    req: CreatePolicyProposalRequest,
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
+) -> ProposalResponse:
     """Open a policy modification voting proposal (e.g. quorum, epsilon)."""
+    actor, claims, token_str = _authenticate_and_authorize_consortium_actor(
+        authorization, CONSORTIUM_POLICY_ROLES, "policy proposal creation", min_clearance=2
+    )
+    actor_bank = (getattr(actor, "bank_id", "") or "").strip()
+    if not actor_bank:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Actor principal '{actor.username}' has no authoritative institution assignment.",
+        )
+
+    # TENANT-03: Reject forged creator_bank_id
+    if req.creator_bank_id and req.creator_bank_id.lower().strip() != actor_bank.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Cross-bank institutional impersonation rejected: Authenticated actor '{actor.username}' "
+                f"from institution '{actor_bank}' cannot sponsor policy proposal as '{req.creator_bank_id}'."
+            ),
+        )
+
+    c = consortium_governance_service.get_consortium(req.consortium_id)
+    if not c:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Consortium '{req.consortium_id}' does not exist.",
+        )
+
+    clean_actor_bank = actor_bank.lower()
+    # TENANT-05: Non-member cannot create proposals
+    if clean_actor_bank not in c.members:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Institution '{actor_bank}' is not an active member of consortium '{req.consortium_id}'.",
+        )
+
+    member = c.members[clean_actor_bank]
+    # TENANT-06: Member lacking voting/governance rights cannot create policy proposals
+    if not member.can_vote:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Institution '{actor_bank}' has role '{member.role.value}' with no governance voting power in consortium '{req.consortium_id}'.",
+        )
+
     try:
         prop = consortium_governance_service.propose_policy_update(
             consortium_id=req.consortium_id,
-            creator_bank_id=req.creator_bank_id,
+            creator_bank_id=actor_bank,
             policy_updates=req.policy_updates,
             ttl_seconds=req.ttl_seconds,
+            auth_token=token_str,
+            actor=actor.username,
         )
         return _proposal_to_response(prop)
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
@@ -379,25 +586,79 @@ async def create_policy_proposal(req: CreatePolicyProposalRequest) -> ProposalRe
 async def cast_governance_vote(
     req: VoteProposalRequest,
     proposal_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> VoteProposalResponse:
     """Cast a weighted vote FOR or AGAINST an active consortium proposal."""
+    actor, claims, token_str = _authenticate_and_authorize_consortium_actor(
+        authorization, CONSORTIUM_VOTING_ROLES, "consortium voting", min_clearance=1
+    )
+    actor_bank = (getattr(actor, "bank_id", "") or "").strip()
+    if not actor_bank:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Actor principal '{actor.username}' has no authoritative institution assignment.",
+        )
+
+    # TENANT-04: Reject voting on behalf of another institution
+    if req.bank_id and req.bank_id.lower().strip() != actor_bank.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Cross-bank voting rejected: Authenticated actor '{actor.username}' from institution '{actor_bank}' "
+                f"cannot cast a vote on behalf of institution '{req.bank_id}'."
+            ),
+        )
+
+    prop = consortium_governance_service.get_proposal(proposal_id)
+    if not prop:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proposal '{proposal_id}' does not exist.",
+        )
+
+    c = consortium_governance_service.get_consortium(prop.consortium_id)
+    if not c:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Consortium '{prop.consortium_id}' does not exist.",
+        )
+
+    clean_actor_bank = actor_bank.lower()
+    # TENANT-05: Non-member or removed member cannot vote
+    if clean_actor_bank not in c.members:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Institution '{actor_bank}' is not an active member of consortium '{prop.consortium_id}'.",
+        )
+
+    member = c.members[clean_actor_bank]
+    if not member.can_vote:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Institution '{actor_bank}' has non-voting role '{member.role.value}' in consortium '{prop.consortium_id}'.",
+        )
+
     try:
-        prop = consortium_governance_service.cast_vote(
+        resolved_prop = consortium_governance_service.cast_vote(
             proposal_id=proposal_id,
-            bank_id=req.bank_id,
+            bank_id=actor_bank,
             approve=req.approve,
+            auth_token=token_str,
+            actor=actor.username,
         )
         return VoteProposalResponse(
-            proposal_id=prop.proposal_id,
-            status=prop.status.value if hasattr(prop.status, "value") else str(prop.status),
-            votes_for_count=len(prop.votes_for),
-            votes_against_count=len(prop.votes_against),
-            votes_for=sorted(prop.votes_for),
-            votes_against=sorted(prop.votes_against),
-            resolved=prop.status in (ProposalStatus.APPROVED, ProposalStatus.REJECTED),
+            proposal_id=resolved_prop.proposal_id,
+            status=resolved_prop.status.value if hasattr(resolved_prop.status, "value") else str(resolved_prop.status),
+            votes_for_count=len(resolved_prop.votes_for),
+            votes_against_count=len(resolved_prop.votes_against),
+            votes_for=sorted(resolved_prop.votes_for),
+            votes_against=sorted(resolved_prop.votes_against),
+            resolved=resolved_prop.status in (ProposalStatus.APPROVED, ProposalStatus.REJECTED),
         )
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
@@ -405,16 +666,58 @@ async def cast_governance_vote(
 async def cancel_governance_proposal(
     proposal_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
     creator_bank_id: str = Query(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> ProposalResponse:
     """Cancel an open voting proposal by the original sponsoring institution."""
-    try:
-        prop = consortium_governance_service.cancel_proposal(
-            proposal_id=proposal_id,
-            creator_bank_id=creator_bank_id,
+    actor, claims, token_str = _authenticate_and_authorize_consortium_actor(
+        authorization, CONSORTIUM_ADMIN_ROLES, "proposal cancellation", min_clearance=2
+    )
+    actor_bank = (getattr(actor, "bank_id", "") or "").strip()
+    if not actor_bank:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Actor principal '{actor.username}' has no authoritative institution assignment.",
         )
-        return _proposal_to_response(prop)
+
+    # TENANT-03: Creator bank identifier must match authenticated institution
+    if creator_bank_id and creator_bank_id.lower().strip() != actor_bank.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Cross-bank cancellation rejected: Authenticated actor '{actor.username}' from institution '{actor_bank}' "
+                f"cannot cancel proposal on behalf of sponsoring institution '{creator_bank_id}'."
+            ),
+        )
+
+    prop = consortium_governance_service.get_proposal(proposal_id)
+    if not prop:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proposal '{proposal_id}' does not exist.",
+        )
+
+    # TENANT-06: Only the sponsoring bank can cancel
+    if prop.creator_bank_id.lower().strip() != actor_bank.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Unauthorized proposal cancellation: Only the original sponsoring institution "
+                f"'{prop.creator_bank_id}' can withdraw proposal '{proposal_id}', not '{actor_bank}'."
+            ),
+        )
+
+    try:
+        cancelled = consortium_governance_service.cancel_proposal(
+            proposal_id=proposal_id,
+            creator_bank_id=actor_bank,
+            auth_token=token_str,
+            actor=actor.username,
+        )
+        return _proposal_to_response(cancelled)
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 

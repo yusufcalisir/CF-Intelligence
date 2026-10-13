@@ -126,6 +126,7 @@ def _create_genuine_candidate(
         artifact_bytes=model_bytes,
         training_receipt=receipt,
         is_promoted=False,
+        owning_bank_id="bank_a",
     )
     return entry, model_bytes, sha256
 

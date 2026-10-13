@@ -189,6 +189,7 @@ def _seed_valid_candidate(ctx: dict[str, Any], sim_id: str) -> tuple[dict[str, A
             artifact_bytes=model_bytes,
             training_receipt=receipt,
             is_promoted=False,
+            owning_bank_id="bank_a",
         )
         return entry, sha256
     finally:

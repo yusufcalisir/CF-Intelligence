@@ -33,6 +33,7 @@ from app.application.services.training_provenance_service import (
     get_default_training_verifier,
 )
 from app.domain.model_serving_errors import (
+    ModelAuthorizationError,
     ModelCompatibilityError,
     ModelIntegrityError,
     ModelNotAvailableError,
@@ -511,6 +512,196 @@ class ModelRegistry:
         os.makedirs(sim_dir, exist_ok=True)
         return sim_dir
 
+    def _get_ownership_path(self, simulation_id: str) -> str:
+        return os.path.join(self._get_sim_dir(simulation_id), "ownership.json")
+
+    def get_simulation_ownership(self, simulation_id: str) -> dict[str, Any]:
+        """Retrieve authoritative institutional or consortium ownership record for a simulation."""
+        sim_dir = self._get_sim_dir(simulation_id)
+        file_lock = _get_registry_file_lock(sim_dir)
+        with self._lock, file_lock:
+            own_path = self._get_ownership_path(simulation_id)
+            if os.path.exists(own_path):
+                try:
+                    with open(own_path, encoding="utf-8") as f:
+                        raw = f.read().strip()
+                        if raw:
+                            data = json.loads(raw)
+                            if isinstance(data, dict):
+                                owning_bank = data.get("owning_bank_id")
+                                consortium = data.get("consortium_id")
+                                is_unbound = not owning_bank and not consortium
+                                return {
+                                    "simulation_id": simulation_id,
+                                    "owning_bank_id": owning_bank,
+                                    "consortium_id": consortium,
+                                    "bound_at": data.get("bound_at"),
+                                    "bound_by": data.get("bound_by"),
+                                    "is_unbound": is_unbound,
+                                }
+                except Exception as exc:
+                    logger.warning("Failed to load ownership record for %s: %s", simulation_id, exc)
+
+            # Fallback probe to manifest entries
+            manifest = self._load_manifest(simulation_id)
+            banks_found = {
+                e.get("owning_bank_id").strip()
+                for e in manifest
+                if isinstance(e.get("owning_bank_id"), str) and e.get("owning_bank_id").strip()
+            }
+            consortia_found = {
+                e.get("consortium_id").strip()
+                for e in manifest
+                if isinstance(e.get("consortium_id"), str) and e.get("consortium_id").strip()
+            }
+            if len(banks_found) == 1 and len(consortia_found) <= 1:
+                return {
+                    "simulation_id": simulation_id,
+                    "owning_bank_id": next(iter(banks_found)),
+                    "consortium_id": next(iter(consortia_found), None),
+                    "bound_at": None,
+                    "bound_by": None,
+                    "is_unbound": False,
+                }
+            if not banks_found and len(consortia_found) == 1:
+                return {
+                    "simulation_id": simulation_id,
+                    "owning_bank_id": None,
+                    "consortium_id": next(iter(consortia_found)),
+                    "bound_at": None,
+                    "bound_by": None,
+                    "is_unbound": False,
+                }
+
+            # Unbound or ambiguous ownership -> fail-closed indicator
+            return {
+                "simulation_id": simulation_id,
+                "owning_bank_id": None,
+                "consortium_id": None,
+                "is_unbound": True,
+            }
+
+    def bind_simulation_ownership(
+        self,
+        simulation_id: str,
+        owning_bank_id: str | None = None,
+        consortium_id: str | None = None,
+        bound_by: str | None = None,
+    ) -> dict[str, Any]:
+        """Authoritatively bind simulation model artifacts to an owning bank or consortium."""
+        clean_bank = owning_bank_id.strip() if isinstance(owning_bank_id, str) and owning_bank_id.strip() else None
+        clean_consortium = consortium_id.strip() if isinstance(consortium_id, str) and consortium_id.strip() else None
+
+        if not clean_bank and not clean_consortium:
+            raise ValueError("bind_simulation_ownership requires non-empty owning_bank_id or consortium_id.")
+
+        sim_dir = self._get_sim_dir(simulation_id)
+        file_lock = _get_registry_file_lock(sim_dir)
+        with self._lock, file_lock:
+            record = {
+                "simulation_id": simulation_id,
+                "owning_bank_id": clean_bank,
+                "consortium_id": clean_consortium,
+                "bound_at": datetime.now(UTC).isoformat(),
+                "bound_by": bound_by,
+                "is_unbound": False,
+            }
+            own_path = self._get_ownership_path(simulation_id)
+            tmp_path = f"{own_path}.{uuid.uuid4().hex}.tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(record, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            shutil.move(tmp_path, own_path)
+
+            # Update existing manifest entries if present
+            manifest = self._load_manifest(simulation_id)
+            if manifest:
+                updated = False
+                for entry in manifest:
+                    if entry.get("owning_bank_id") != clean_bank or entry.get("consortium_id") != clean_consortium:
+                        entry["owning_bank_id"] = clean_bank
+                        entry["consortium_id"] = clean_consortium
+                        updated = True
+                if updated:
+                    self._save_manifest(simulation_id, manifest)
+
+            return record
+
+    def _verify_institutional_governance_authority(
+        self,
+        simulation_id: str,
+        user_rec: Any,
+        action_name: str,
+    ) -> None:
+        """Verify that the user's authoritative institution owns or is authorized to govern the simulation model."""
+        if user_rec is None:
+            raise ModelAuthorizationError(
+                f"Action '{action_name}' rejected: no authoritative identity provided."
+            )
+
+        actor_bank = getattr(user_rec, "bank_id", None)
+        if not actor_bank or not str(actor_bank).strip():
+            raise ModelAuthorizationError(
+                f"Institutional authorization rejected: Principal '{user_rec.username}' "
+                f"has no authoritative institution (bank_id) assignment in DurableAccountStore."
+            )
+
+        clean_actor_bank = str(actor_bank).lower().strip()
+        ownership = self.get_simulation_ownership(simulation_id)
+
+        # TENANT-09: Unbound or ambiguous model ownership fails closed
+        if ownership.get("is_unbound") or (not ownership.get("owning_bank_id") and not ownership.get("consortium_id")):
+            raise ModelAuthorizationError(
+                f"Institutional authorization rejected: Model '{simulation_id}' lacks authoritative institutional "
+                f"ownership binding. Governance operation '{action_name}' rejected fail-closed."
+            )
+
+        owning_bank = (ownership.get("owning_bank_id") or "").lower().strip()
+        consortium_id = (ownership.get("consortium_id") or "").strip()
+
+        # Case 1: Directly owned by an institution
+        if owning_bank:
+            if clean_actor_bank == owning_bank:
+                return  # Authorized: same-bank governance
+
+            # Check if actor belongs to an explicitly authorized consortium that includes this model
+            if consortium_id:
+                from app.application.services.consortium_service import consortium_governance_service
+
+                c = consortium_governance_service.get_consortium(consortium_id)
+                if c and clean_actor_bank in c.members:
+                    member = c.members[clean_actor_bank]
+                    if member.can_vote:
+                        return  # Authorized via active consortium policy
+
+            # Cross-tenant mismatch -> REJECT (TENANT-01, TENANT-02)
+            raise ModelAuthorizationError(
+                f"Cross-bank authorization rejected: Principal '{user_rec.username}' from institution '{actor_bank}' "
+                f"cannot execute '{action_name}' on model '{simulation_id}' owned by institution '{ownership.get('owning_bank_id')}'."
+            )
+
+        # Case 2: Consortium-owned model (owning_bank is None, consortium_id is present)
+        if consortium_id:
+            from app.application.services.consortium_service import consortium_governance_service
+
+            c = consortium_governance_service.get_consortium(consortium_id)
+            if not c:
+                raise ModelAuthorizationError(
+                    f"Consortium governance rejected: Consortium '{consortium_id}' bound to model '{simulation_id}' does not exist."
+                )
+            if clean_actor_bank not in c.members:
+                raise ModelAuthorizationError(
+                    f"Consortium governance rejected: Institution '{actor_bank}' is not a member of consortium '{consortium_id}'."
+                )
+            member = c.members[clean_actor_bank]
+            if not member.can_vote:
+                raise ModelAuthorizationError(
+                    f"Consortium governance rejected: Institution '{actor_bank}' has non-voting role ({member.role.value}) in consortium '{consortium_id}'."
+                )
+            return
+
+
     def _load_manifest(self, simulation_id: str) -> list[dict[str, Any]]:
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
@@ -587,6 +778,8 @@ class ModelRegistry:
         expected_input_dim: int | None = None,
         expected_feature_names: list[str] | tuple[str, ...] | None = None,
         model_contract: Any | None = None,
+        owning_bank_id: str | None = None,
+        consortium_id: str | None = None,
     ) -> dict[str, Any]:
         """Save a new version of the global model weights. Defaults to inactive candidate.
 
@@ -618,6 +811,19 @@ class ModelRegistry:
         """
         from app.config import get_settings
         settings = get_settings()
+
+        # Authoritative institutional or consortium ownership handling
+        existing_ownership = self.get_simulation_ownership(simulation_id)
+        effective_owning_bank = owning_bank_id if owning_bank_id is not None else existing_ownership.get("owning_bank_id")
+        effective_consortium = consortium_id if consortium_id is not None else existing_ownership.get("consortium_id")
+
+        if owning_bank_id is not None or consortium_id is not None:
+            self.bind_simulation_ownership(
+                simulation_id,
+                owning_bank_id=effective_owning_bank,
+                consortium_id=effective_consortium,
+                bound_by="save_version",
+            )
 
         # Derive expected contract parameters if model_contract provided
         exp_arch = expected_architecture
@@ -794,6 +1000,8 @@ class ModelRegistry:
                     "training_receipt": receipt_dict if has_valid_receipt else None,
                     "attestation_status": attestation_status,
                     "sign_offs": [],
+                    "owning_bank_id": effective_owning_bank,
+                    "consortium_id": effective_consortium,
                     "created_at": datetime.now(UTC).isoformat(),
                 }
 
@@ -1554,6 +1762,14 @@ class ModelRegistry:
                     f"for model promotion (minimum clearance level 2 required)."
                 )
             authenticated_operator = user_rec.username
+            self._verify_institutional_governance_authority(simulation_id, user_rec, "model promotion")
+        elif actor:
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            auth_svc = AuthenticationService.get_instance()
+            user_rec = auth_svc.get_user(actor)
+            if user_rec is not None:
+                self._verify_institutional_governance_authority(simulation_id, user_rec, "model promotion")
 
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
@@ -1741,6 +1957,14 @@ class ModelRegistry:
                     f"for model rollback (minimum clearance level 3 required)."
                 )
             authenticated_operator = user_rec.username
+            self._verify_institutional_governance_authority(simulation_id, user_rec, "model rollback")
+        elif actor:
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            auth_svc = AuthenticationService.get_instance()
+            user_rec = auth_svc.get_user(actor)
+            if user_rec is not None:
+                self._verify_institutional_governance_authority(simulation_id, user_rec, "model rollback")
 
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
@@ -1991,6 +2215,12 @@ class ModelRegistry:
                     raise ModelIntegrityError(
                         f"Production promotion rejected: user '{user}' lacks authoritative ml_engineer role permissions."
                     )
+                tok_bank = (tok_payload.get("bank_id") or "").lower().strip()
+                user_bank = (getattr(authoritative_user, "bank_id", "") or "").lower().strip()
+                if tok_bank and user_bank and tok_bank != user_bank:
+                    raise ModelAuthorizationError(
+                        f"Sign-off token bank claim '{tok_bank}' does not match authoritative institution '{user_bank}'."
+                    )
                 is_identity_verified = True
                 is_role_verified = True
             elif settings.app_env.lower() == "production":
@@ -2013,6 +2243,9 @@ class ModelRegistry:
                     )
                 is_identity_verified = True
                 is_role_verified = True
+
+            # Authoritative institutional tenant check
+            self._verify_institutional_governance_authority(simulation_id, authoritative_user, "model sign-off")
 
             # Cryptographic signature verification over canonical payload
             artifact_sha = entry.get("sha256") or compute_file_sha256(os.path.join(sim_dir, entry["filename"]))

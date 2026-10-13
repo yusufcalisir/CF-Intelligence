@@ -92,12 +92,14 @@ def auth_gateway_env():
             state_dict={"weight": torch.tensor([1.0, 2.0])},
             metrics={"auc_roc": 0.85, "auc": 0.85, "f1_score": 0.80},
             is_promoted=False,
+            owning_bank_id="bank_a",
         )
         v2 = test_registry.save_version(
             simulation_id=sim_id,
             state_dict={"weight": torch.tensor([3.0, 4.0])},
             metrics={"auc_roc": 0.90, "auc": 0.90, "f1_score": 0.85},
             is_promoted=False,
+            owning_bank_id="bank_a",
         )
 
         # Patch application singletons

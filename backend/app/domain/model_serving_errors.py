@@ -54,3 +54,15 @@ class ModelExecutionError(ModelServingError):
         code: str = "MODEL_EXECUTION_ERROR",
     ) -> None:
         super().__init__(message, code=code)
+
+
+class ModelAuthorizationError(ModelServingError):
+    """Raised when an actor lacks institutional tenant authority or model ownership authority."""
+
+    def __init__(
+        self,
+        message: str = "Actor lacks institutional authority for the requested model governance operation.",
+        code: str = "MODEL_AUTHORIZATION_ERROR",
+    ) -> None:
+        super().__init__(message, code=code)
+

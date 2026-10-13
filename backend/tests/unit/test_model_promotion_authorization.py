@@ -35,7 +35,9 @@ from app.infrastructure.security.auth_service import (
 )
 
 
-def _create_verified_model(registry: ModelRegistry, simulation_id: str = "sim_test_gov") -> int:
+def _create_verified_model(
+    registry: ModelRegistry, simulation_id: str = "sim_test_gov", owning_bank_id: str = "bank_test"
+) -> int:
     """Helper creating a cryptographically verified candidate model version."""
     state_dict = {
         "fc.weight": torch.randn(2, 10, dtype=torch.float32),
@@ -65,6 +67,7 @@ def _create_verified_model(registry: ModelRegistry, simulation_id: str = "sim_te
         provenance_type="TRAINING_RECORDED",
         provenance_receipt=receipt.to_dict(),
         artifact_bytes=raw_bytes,
+        owning_bank_id=owning_bank_id,
     )
     return metadata["version"]
 

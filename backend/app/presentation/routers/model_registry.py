@@ -30,7 +30,11 @@ from app.application.schemas.model_registry import (
 )
 from app.application.services.model_registry import ModelEvaluationEngine, ModelRegistry
 from app.application.services.zero_downtime_deployer import ZeroDowntimeDeploymentManager
-from app.domain.model_serving_errors import ModelCompatibilityError, ModelIntegrityError
+from app.domain.model_serving_errors import (
+    ModelAuthorizationError,
+    ModelCompatibilityError,
+    ModelIntegrityError,
+)
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.presentation.routers.simulation import _simulation_events
 
@@ -507,6 +511,12 @@ async def promote_model_version(
             detail=f"Version {version} not found in registry for {simulation_id}",
         )
 
+    # Authoritative institutional authority check
+    try:
+        registry._verify_institutional_governance_authority(simulation_id, operator, "model promotion")
+    except ModelAuthorizationError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+
     sr11_7_result = None
     if payload.enforce_sr11_7 and payload.target_status == "champion":
         metrics = entry.get("metrics", {})
@@ -689,6 +699,10 @@ async def rollback_model_version(
         authorization, MODEL_ROLLBACK_ROLES, "model rollback", min_clearance=3
     )
     try:
+        registry._verify_institutional_governance_authority(simulation_id, operator, "model rollback")
+    except ModelAuthorizationError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    try:
         updated_entry = registry.rollback(
             simulation_id,
             version,
@@ -708,6 +722,8 @@ async def rollback_model_version(
             },
         )
         return ModelVersionItem(**updated_entry)
+    except ModelAuthorizationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except ModelIntegrityError as e:
         err_msg = str(e)
         if "authentication failed" in err_msg.lower() or "token" in err_msg.lower():
@@ -863,6 +879,12 @@ async def sign_off_model(
 
     effective_user = authenticated_user or payload.user
 
+    # Authoritative institutional authority check
+    try:
+        registry._verify_institutional_governance_authority(simulation_id, authoritative_user, "model sign-off")
+    except ModelAuthorizationError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+
     try:
         updated_entry = registry.sign_off(
             simulation_id=simulation_id,
@@ -876,6 +898,8 @@ async def sign_off_model(
             drift_divergence=payload.drift_divergence,
         )
         return ModelVersionItem(**updated_entry)
+    except ModelAuthorizationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except ValueError as e:
         err_msg = str(e)
         if "not found in registry" in err_msg.lower():
