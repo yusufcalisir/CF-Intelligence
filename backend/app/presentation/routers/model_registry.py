@@ -613,6 +613,15 @@ async def sign_off_model(
             detail=f"Authenticated principal '{authenticated_user}' does not match claimed approver '{payload.user}'.",
         )
 
+    # Ensure authoritative approver account is active in durable store (defense-in-depth)
+    authoritative_user = auth_svc.get_user(claimed_user)
+    if not authoritative_user or not authoritative_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Approver principal '{claimed_user}' is not an active authoritative user.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     # Validate requested role authority against token claims
     norm_role = (
         "compliance"

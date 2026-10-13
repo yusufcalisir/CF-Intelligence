@@ -1733,6 +1733,11 @@ class ModelRegistry:
                     raise ModelIntegrityError("Production promotion rejected: token claims lack compliance role authority.")
                 if norm_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in tok_roles):
                     raise ModelIntegrityError("Production promotion rejected: token claims lack ml_engineer role authority.")
+                authoritative_user = auth_svc.get_user(user)
+                if not authoritative_user or not authoritative_user.is_active:
+                    raise ModelIntegrityError(
+                        f"Production promotion rejected: approver principal '{user}' is not an active authoritative user."
+                    )
                 is_identity_verified = True
                 is_role_verified = True
             elif settings.app_env.lower() == "production":

@@ -28,18 +28,11 @@ from app.infrastructure.security.password_hasher import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class UserRecord:
-    """Internal user model holding hashed credentials and RBAC attributes."""
-
-    user_id: str
-    username: str
-    password_hash: str
-    bank_id: str
-    roles: list[str]
-    clearance_level: int = 1
-    is_active: bool = True
-    created_at: float = field(default_factory=time.time)
+from app.infrastructure.security.durable_account_store import (
+    AuthenticationSecurityError,
+    DurableAccountStore,
+    UserRecord,
+)
 
 
 @dataclass
@@ -168,7 +161,7 @@ class BruteForceLockoutManager:
 
 
 class AuthenticationService:
-    """Coordinates bcrypt credential validation, JWT token issuance, and lockout policies."""
+    """Coordinates bcrypt credential validation, JWT token issuance, lockout policies, and durable identity verification."""
 
     _instance: AuthenticationService | None = None
 
@@ -179,6 +172,8 @@ class AuthenticationService:
         refresh_token_expire_days: int = 7,
         max_auth_failures: int = 5,
         lockout_duration_seconds: int = 900,
+        store_path: str | None = None,
+        in_memory: bool = False,
     ) -> None:
         settings = get_settings()
         self.signing_secret = (
@@ -193,15 +188,29 @@ class AuthenticationService:
             lockout_duration_seconds=lockout_duration_seconds,
         )
 
-        # In-memory user store (username -> UserRecord)
-        self._users: dict[str, UserRecord] = {}
+        # Durable multi-process identity and account state store
+        self.identity_store = DurableAccountStore(
+            store_path=store_path,
+            in_memory=in_memory,
+        )
 
-        # Active / Revoked refresh token tracking (jti -> user_id)
-        self._active_refresh_tokens: dict[str, str] = {}
-        self._revoked_tokens: set[str] = set()
-
-        # Seed default administrative and analyst test accounts with bcrypt hashes
+        # Seed default administrative and analyst test accounts if store is uninitialized
         self._seed_default_users()
+
+    @property
+    def _users(self) -> dict[str, UserRecord]:
+        """Backward-compatible mapping view of all users."""
+        return {u.username: u for u in self.identity_store.list_users(include_inactive=True)}
+
+    @property
+    def _revoked_tokens(self) -> set[str]:
+        """Backward-compatible set view of revoked JTIs."""
+        return set(self.identity_store._revoked_tokens.keys())
+
+    @property
+    def _active_refresh_tokens(self) -> dict[str, str]:
+        """Backward-compatible mapping of active refresh tokens."""
+        return dict(self.identity_store._active_refresh_tokens)
 
     @classmethod
     def get_instance(cls) -> AuthenticationService:
@@ -210,8 +219,17 @@ class AuthenticationService:
             cls._instance = cls()
         return cls._instance
 
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Testing utility to clear singleton instance."""
+        cls._instance = None
+
     def _seed_default_users(self) -> None:
-        """Provision default platform users with cryptographically secure bcrypt hashes."""
+        """Provision default platform users if not already present in the durable identity store."""
+        if self.identity_store.has_users():
+            # Store already contains persisted accounts across worker processes / restarts
+            return
+
         default_accounts = [
             ("admin", "AdminSecure2026!", "bank_a", ["admin", "compliance_officer"], 3),
             ("analyst_a1", "AnalystSecure2026!", "bank_a", ["analyst", "investigator"], 2),
@@ -247,17 +265,31 @@ class AuthenticationService:
             roles=roles or ["analyst"],
             clearance_level=clearance_level,
             is_active=True,
+            status="active",
         )
-        self._users[uname] = user
+        self.identity_store.save_user(user)
         return user
 
-    def get_user(self, username: str) -> UserRecord | None:
-        """Safely fetch an active user by username."""
+    def get_user(self, username: str, include_inactive: bool = False) -> UserRecord | None:
+        """Safely fetch a user by username from the authoritative durable store."""
         uname = username.lower().strip()
-        user = self._users.get(uname)
-        if user and user.is_active:
-            return user
-        return None
+        return self.identity_store.get_user(uname, include_inactive=include_inactive)
+
+    def deactivate_user(self, username: str) -> bool:
+        """Deactivate account across all processes."""
+        return self.identity_store.deactivate_user(username)
+
+    def activate_user(self, username: str) -> bool:
+        """Activate account across all processes."""
+        return self.identity_store.activate_user(username)
+
+    def suspend_user(self, username: str) -> bool:
+        """Suspend account across all processes."""
+        return self.identity_store.suspend_user(username)
+
+    def delete_user(self, username: str) -> bool:
+        """Permanently delete account across all processes."""
+        return self.identity_store.delete_user(username)
 
     def authenticate(
         self,
@@ -290,8 +322,13 @@ class AuthenticationService:
                 ip_lockout,
             )
 
-        user = self._users.get(uname)
-        if not user or not user.is_active:
+        try:
+            user = self.identity_store.get_user(uname, include_inactive=True)
+        except AuthenticationSecurityError as sec_err:
+            logger.error("Authoritative identity store security failure during authentication: %s", sec_err)
+            return False, None, "Authentication authority unavailable.", user_lockout
+
+        if not user or not user.is_active or user.status.lower() != "active":
             # Record failure against both user and IP
             u_stat = self.lockout_manager.record_failure(uname)
             ip_stat = self.lockout_manager.record_failure(client_ip)
@@ -373,8 +410,8 @@ class AuthenticationService:
             algorithm="HS256",
         )
 
-        # Track active refresh token for rotation / revocation
-        self._active_refresh_tokens[refresh_jti] = user.username
+        # Track active refresh token for rotation / revocation in durable store
+        self.identity_store.track_refresh_token(refresh_jti, user.username)
 
         return TokenBundle(
             access_token=access_token,
@@ -397,20 +434,20 @@ class AuthenticationService:
                 return False, None, "Invalid token type. Expected refresh token."
 
             jti = payload.get("jti")
-            if not jti or jti not in self._active_refresh_tokens:
+            if not jti or not self.identity_store.is_refresh_token_active(jti):
                 return False, None, "Refresh token is invalid, revoked, or has already been used."
 
-            if jti in self._revoked_tokens:
+            if self.identity_store.is_token_revoked(jti):
                 return False, None, "Refresh token has been revoked."
 
             username = payload.get("username", "").lower()
-            user = self._users.get(username)
-            if not user or not user.is_active:
+            user = self.identity_store.get_user(username)
+            if not user or not user.is_active or user.status.lower() != "active":
                 return False, None, "Associated user account not found or disabled."
 
             # Invalidate the old refresh token (Token Rotation)
-            self._active_refresh_tokens.pop(jti, None)
-            self._revoked_tokens.add(jti)
+            self.identity_store.pop_refresh_token(jti)
+            self.identity_store.revoke_token(jti, reason="rotated")
 
             # Issue new bundle
             new_bundle = self.create_token_bundle(user)
@@ -422,38 +459,102 @@ class AuthenticationService:
             return False, None, f"Invalid refresh token: {err}"
 
     def verify_access_token(self, token_str: str) -> tuple[bool, dict[str, Any] | None, str]:
-        """Verify and decode a short-lived access token."""
+        """Verify and decode a short-lived access token with authoritative principal verification.
+
+        Enforces:
+        1. Cryptographic JWT signature and expiration verification.
+        2. Access token type enforcement.
+        3. Mandatory JTI identifier and durable revocation check across workers.
+        4. Authoritative principal existence in durable store.
+        5. Token claims-to-principal binding verification.
+        6. Active account eligibility (rejects deactivated, suspended, or deleted accounts).
+        7. Fail-closed rejection on store unavailability or corruption.
+        """
         try:
             payload = jwt.decode(
                 token_str,
                 self.signing_secret,
                 algorithms=["HS256"],
             )
-
-            if payload.get("token_type") != "access":
-                return False, None, "Invalid token type. Expected access token."
-
-            jti = payload.get("jti")
-            if jti and jti in self._revoked_tokens:
-                return False, None, "Access token has been revoked."
-
-            return True, payload, "Token is valid."
-
         except jwt.ExpiredSignatureError:
             return False, None, "Access token has expired."
         except jwt.InvalidTokenError as err:
             return False, None, f"Invalid access token: {err}"
 
+        if payload.get("token_type") != "access":
+            return False, None, "Invalid token type. Expected access token."
+
+        jti = payload.get("jti")
+        if not jti:
+            return False, None, "Access token is missing required 'jti' identifier."
+
+        try:
+            if self.identity_store.is_token_revoked(jti):
+                return False, None, "Access token has been revoked."
+        except AuthenticationSecurityError as sec_err:
+            logger.error("Durable identity store corruption / security error: %s", sec_err)
+            return False, None, f"Authoritative identity authority unavailable: {sec_err}"
+        except Exception as exc:
+            logger.error("Durable identity store query failed: %s", exc)
+            return False, None, "Authoritative identity verification unavailable."
+
+        token_username = (payload.get("username") or "").lower().strip()
+        token_sub = (payload.get("sub") or "").strip()
+
+        if not token_username and not token_sub:
+            return False, None, "Access token lacks principal identity claims ('username' / 'sub')."
+
+        try:
+            user: UserRecord | None = None
+            if token_username:
+                user = self.identity_store.get_user(token_username, include_inactive=True)
+            if not user and token_sub:
+                user = self.identity_store.get_user_by_id(token_sub, include_inactive=True)
+                if not user:
+                    user = self.identity_store.get_user(token_sub, include_inactive=True)
+        except AuthenticationSecurityError as sec_err:
+            logger.error("Durable identity store corruption / security error: %s", sec_err)
+            return False, None, f"Authoritative identity authority unavailable: {sec_err}"
+        except Exception as exc:
+            logger.error("Durable identity store query failed: %s", exc)
+            return False, None, "Authoritative identity verification unavailable."
+
+        if user is None:
+            principal_name = token_username or token_sub
+            return False, None, f"Authoritative principal '{principal_name}' does not exist or has been deleted."
+
+        # Principal binding checks
+        if token_username and user.username.lower() != token_username:
+            return (
+                False,
+                None,
+                f"Token username '{token_username}' does not match authoritative principal '{user.username}'.",
+            )
+
+        if token_sub and user.user_id != token_sub and user.username.lower() != token_sub.lower():
+            return (
+                False,
+                None,
+                f"Token subject '{token_sub}' is not bound to authoritative principal '{user.username}'.",
+            )
+
+        # Active account eligibility check
+        if not user.is_active or user.status.lower() in ("deactivated", "suspended", "disabled", "inactive"):
+            status_label = user.status if user.status.lower() in ("deactivated", "suspended", "disabled") else "deactivated"
+            return False, None, f"Principal account '{user.username}' is {status_label}."
+
+        return True, payload, "Token is valid."
+
     def revoke_token(self, token_str: str) -> bool:
-        """Revoke a token by adding its JTI to the blacklist."""
+        """Revoke a token across all workers by adding its JTI to the durable store."""
         try:
             # Decode without signature verification just to get JTI if expired
             unverified = jwt.decode(token_str, options={"verify_signature": False})
             jti = unverified.get("jti")
             if jti:
-                self._revoked_tokens.add(jti)
-                self._active_refresh_tokens.pop(jti, None)
+                self.identity_store.revoke_token(jti, reason="explicit_revocation")
                 return True
         except Exception as exc:
             logger.warning("Failed to revoke token: %s", exc)
         return False
+

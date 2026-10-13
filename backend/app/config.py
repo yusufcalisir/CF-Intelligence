@@ -198,6 +198,14 @@ class Settings(BaseSettings):
     oidc_issuer_url: str = "https://auth.cfi-platform.internal/realms/cfi"
     oidc_client_id: str = "cfi-api"
     oidc_jwt_signing_secret: str = "cfi_oidc_jwt_secret_key_2026_enterprise_hs256"
+    identity_store_path: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "identity_store_path",
+            "cfi_identity_store_path",
+        ),
+        description="Path to durable identity store file tracking authoritative users and token revocations across processes.",
+    )
 
     abac_enabled: bool = True
     vault_enabled: bool = False
