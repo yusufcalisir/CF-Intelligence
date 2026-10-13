@@ -212,6 +212,7 @@ class TestAuthoritativePrincipalIdentity:
         # 1. Valid prior to deactivation
         is_valid, claims, _ = auth_svc.verify_access_token(token)
         assert is_valid is True
+        assert claims is not None
         assert claims["username"] == "approver_cp1"
 
         # 2. Deactivate owner
@@ -345,6 +346,7 @@ class TestAuthoritativePrincipalIdentity:
         # Verification succeeds
         is_valid, claims, msg = auth_svc.verify_access_token(token)
         assert is_valid is True
+        assert claims is not None
         assert claims["username"] == "legit_compliance"
 
         entry, sha256 = _seed_valid_candidate(ctx, "sim_ident_05")
@@ -365,6 +367,7 @@ class TestAuthoritativePrincipalIdentity:
 
         # Stored metadata record in registry
         stored_meta = registry.get_version_metadata("sim_ident_05", 1)
+        assert stored_meta is not None
         signoff_rec = stored_meta["sign_offs"][0]
         assert signoff_rec["user"] == "legit_compliance"
         assert signoff_rec["role"] == "compliance"
@@ -505,6 +508,7 @@ class TestAuthoritativePrincipalIdentity:
 
         # Invariant: Four-Eyes dual approvals verified and champion promoted in metadata
         final_meta = registry.get_version_metadata("sim_ident_10", 1)
+        assert final_meta is not None
         assert final_meta["status"] == "champion"
         assert final_meta["is_active"] is True
         assert len(final_meta["sign_offs"]) == 2
