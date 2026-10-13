@@ -18,9 +18,12 @@ Verifies that:
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import multiprocessing as mp
+import os
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -103,6 +106,29 @@ def _mp_verify_receipt_worker(
     """Multiprocessing worker verifying a receipt using an independent verifier instance."""
     try:
         store = DurableTrustStore(trust_file_path=trust_path)
+        verifier = TrainingReceiptVerifier(trust_store=store)
+        is_valid, reason = verifier.verify_receipt(
+            receipt_dict,
+            candidate_artifact_sha256=artifact_sha,
+        )
+        out_q.put(("SUCCESS", is_valid, reason))
+    except Exception as exc:
+        out_q.put(("ERROR", str(exc)))
+
+
+def _mp_pinned_anchor_worker(
+    trust_path: str,
+    pinned_authority: str | None,
+    receipt_dict: dict[str, Any],
+    artifact_sha: str,
+    out_q: mp.Queue[Any],
+    app_env: str = "production",
+) -> None:
+    """Multiprocessing worker verifying receipt with an independently pinned authority key."""
+    try:
+        os.environ["APP_ENV"] = app_env
+        os.environ["ENVIRONMENT"] = app_env
+        store = DurableTrustStore(trust_file_path=trust_path, authority_public_key=pinned_authority)
         verifier = TrainingReceiptVerifier(trust_store=store)
         is_valid, reason = verifier.verify_receipt(
             receipt_dict,
@@ -1052,3 +1078,385 @@ class TestDurableTrustStoreAuthorizationAndIntegrityAdversarial:
         )
         assert entry["is_production_eligible"] is True
         assert entry["provenance_type"] == "TRAINING_RECORDED"
+
+
+# ---------------------------------------------------------------------------
+# Trust Anchor Bootstrap Security (ANCHOR-01 to ANCHOR-08)
+# ---------------------------------------------------------------------------
+
+
+class TestTrustAnchorBootstrapSecurity:
+    """Adversarial security test suite verifying trust anchor bootstrap and source-of-authority boundaries."""
+
+    def test_anchor_01_no_independently_trusted_authority_in_production_fails_closed(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """ANCHOR-01: No independently trusted authority key in production -> fail closed."""
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        from app.config import get_settings
+
+        get_settings.cache_clear()
+
+        try:
+            store_path = str(tmp_path / "trust_store.json")
+            admin_tok = "admin_secret_anchor_01"
+            admin_store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+            _, pub_hex, kid = _generate_ed25519_key()
+            admin_store.register_approved_key(kid, pub_hex, admin_token=admin_tok)
+
+            # Fresh production verifier store with NO configured authority key
+            with pytest.raises(
+                TrainingProvenanceSecurityError,
+                match="Production security boundary violation.*independently provisioned authority public key",
+            ):
+                DurableTrustStore(trust_file_path=store_path)
+        finally:
+            monkeypatch.delenv("APP_ENV", raising=False)
+            monkeypatch.delenv("ENVIRONMENT", raising=False)
+            get_settings.cache_clear()
+
+    def test_anchor_02_valid_trust_store_and_independently_pinned_authority_succeeds(
+        self, tmp_path: Path
+    ) -> None:
+        """ANCHOR-02: Valid trust store and independently pinned authority key -> verification succeeds."""
+        store_path = str(tmp_path / "trust_store.json")
+        admin_tok = "admin_secret_anchor_02"
+        admin_store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+        priv, pub_hex, kid = _generate_ed25519_key()
+        admin_store.register_approved_key(kid, pub_hex, admin_token=admin_tok)
+        auth_pub = admin_store.get_authority_public_key()
+        assert auth_pub is not None
+
+        # Worker store initialized with independently pinned authority key
+        worker_store = DurableTrustStore(trust_file_path=store_path, authority_public_key=auth_pub)
+        verifier = TrainingReceiptVerifier(trust_store=worker_store)
+
+        issuer = TrainingReceiptIssuer(private_key=priv, key_id=kid, app_env="development")
+        dummy_sha = hashlib.sha256(b"artifact_anchor_02").hexdigest()
+        receipt = issuer.issue_receipt(
+            training_run_id="run_anchor_02",
+            job_id="job_anchor_02",
+            artifact_sha256=dummy_sha,
+            simulation_id="sim_anchor_02",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            metrics={"loss": 0.03},
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="WORKER",
+        )
+
+        is_ok, reason = verifier.verify_receipt(receipt, candidate_artifact_sha256=dummy_sha)
+        assert is_ok is True, f"Verification failed unexpectedly: {reason}"
+        assert verifier.is_key_trusted(kid) is True
+
+    def test_anchor_03_trust_store_and_adjacent_anchor_replaced_with_attacker_signed_rejected(
+        self, tmp_path: Path
+    ) -> None:
+        """ANCHOR-03: Trust-store JSON and adjacent anchor replaced with attacker-signed versions -> rejected."""
+        store_path = str(tmp_path / "trust_store.json")
+        admin_tok = "admin_secret_anchor_03"
+        admin_store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+        _, legit_pub, legit_kid = _generate_ed25519_key()
+        admin_store.register_approved_key(legit_kid, legit_pub, admin_token=admin_tok)
+        legit_auth_pub = admin_store.get_authority_public_key()
+        assert legit_auth_pub is not None
+
+        # ATTACK: Attacker creates their own authority keypair and signs a malicious container
+        attacker_auth_priv = ed25519.Ed25519PrivateKey.generate()
+        attacker_auth_pub = attacker_auth_priv.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        ).hex()
+
+        _, attacker_issuer_pub, attacker_issuer_kid = _generate_ed25519_key()
+        malicious_payload = {
+            "approved_keys": {attacker_issuer_kid: {"public_key_hex": attacker_issuer_pub}},
+            "revoked_keys": {},
+            "retired_keys": {},
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        canonical_bytes = json.dumps(malicious_payload, sort_keys=True).encode("utf-8")
+        malicious_container = {
+            "schema_version": "2.0",
+            "data": malicious_payload,
+            "integrity_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
+            "integrity_hmac_sha256": hmac.new(b"attacker_hmac", canonical_bytes, hashlib.sha256).hexdigest(),
+            "authority_public_key_hex": attacker_auth_pub,
+            "authority_signature": attacker_auth_priv.sign(canonical_bytes).hex(),
+        }
+
+        # Replace both trust_store.json and .authority_pub on disk
+        Path(store_path).write_text(json.dumps(malicious_container, indent=2), encoding="utf-8")
+        Path(f"{store_path}.authority_pub").write_text(attacker_auth_pub, encoding="utf-8")
+
+        # Worker configured with legitimate pinned authority key MUST reject immediately
+        with pytest.raises(TrainingProvenanceSecurityError, match="authority anchor mismatch|authority mismatch"):
+            DurableTrustStore(trust_file_path=store_path, authority_public_key=legit_auth_pub)
+
+    def test_anchor_04_adjacent_authority_anchor_deleted_attacker_key_in_json_rejected(
+        self, tmp_path: Path
+    ) -> None:
+        """ANCHOR-04: Adjacent authority anchor deleted, attacker key supplied in JSON -> rejected."""
+        store_path = str(tmp_path / "trust_store.json")
+        admin_tok = "admin_secret_anchor_04"
+        admin_store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+        _, legit_pub, legit_kid = _generate_ed25519_key()
+        admin_store.register_approved_key(legit_kid, legit_pub, admin_token=admin_tok)
+        legit_auth_pub = admin_store.get_authority_public_key()
+        assert legit_auth_pub is not None
+
+        # Attacker crafts malicious container
+        attacker_auth_priv = ed25519.Ed25519PrivateKey.generate()
+        attacker_auth_pub = attacker_auth_priv.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        ).hex()
+        _, attacker_issuer_pub, attacker_issuer_kid = _generate_ed25519_key()
+
+        malicious_payload = {
+            "approved_keys": {attacker_issuer_kid: {"public_key_hex": attacker_issuer_pub}},
+            "revoked_keys": {},
+            "retired_keys": {},
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        canonical_bytes = json.dumps(malicious_payload, sort_keys=True).encode("utf-8")
+        malicious_container = {
+            "schema_version": "2.0",
+            "data": malicious_payload,
+            "integrity_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
+            "integrity_hmac_sha256": hmac.new(b"attacker_hmac", canonical_bytes, hashlib.sha256).hexdigest(),
+            "authority_public_key_hex": attacker_auth_pub,
+            "authority_signature": attacker_auth_priv.sign(canonical_bytes).hex(),
+        }
+        Path(store_path).write_text(json.dumps(malicious_container, indent=2), encoding="utf-8")
+
+        # Delete adjacent .authority_pub anchor file
+        anchor_file = Path(f"{store_path}.authority_pub")
+        if anchor_file.exists():
+            anchor_file.unlink()
+
+        # 1. Verifier with pinned authority key rejects due to authority mismatch
+        with pytest.raises(TrainingProvenanceSecurityError, match="authority mismatch"):
+            DurableTrustStore(trust_file_path=store_path, authority_public_key=legit_auth_pub)
+
+        # 2. Unpinned store in development rejects because anchor is missing (no TOFU from JSON allowed)
+        with pytest.raises(TrainingProvenanceSecurityError, match="no authority anchor file found|Trust-on-First-Use"):
+            DurableTrustStore(trust_file_path=store_path)
+
+    def test_anchor_05_existing_verifier_detects_unauthorized_authority_replacement(
+        self, tmp_path: Path
+    ) -> None:
+        """ANCHOR-05: Existing verifier detects unauthorized authority replacement."""
+        store_path = str(tmp_path / "trust_store.json")
+        admin_tok = "admin_secret_anchor_05"
+        admin_store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+        priv, pub_hex, kid = _generate_ed25519_key()
+        admin_store.register_approved_key(kid, pub_hex, admin_token=admin_tok)
+        auth_pub = admin_store.get_authority_public_key()
+        assert auth_pub is not None
+
+        # Existing verifier instance pins legitimate authority key
+        worker_store = DurableTrustStore(trust_file_path=store_path, authority_public_key=auth_pub)
+        verifier = TrainingReceiptVerifier(trust_store=worker_store)
+
+        issuer = TrainingReceiptIssuer(private_key=priv, key_id=kid, app_env="development")
+        dummy_sha = hashlib.sha256(b"artifact_anchor_05").hexdigest()
+        receipt = issuer.issue_receipt(
+            training_run_id="run_anchor_05",
+            job_id="job_anchor_05",
+            artifact_sha256=dummy_sha,
+            simulation_id="sim_anchor_05",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            metrics={"loss": 0.04},
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="WORKER",
+        )
+        ok1, reason1 = verifier.verify_receipt(receipt, candidate_artifact_sha256=dummy_sha)
+        assert ok1 is True, f"Initial verification failed: {reason1}"
+
+        # Attacker replaces store with a new unauthorized authority key
+        attacker_auth_priv = ed25519.Ed25519PrivateKey.generate()
+        attacker_auth_pub = attacker_auth_priv.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        ).hex()
+        malicious_payload = {
+            "approved_keys": {kid: {"public_key_hex": pub_hex}},
+            "revoked_keys": {},
+            "retired_keys": {},
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        canonical_bytes = json.dumps(malicious_payload, sort_keys=True).encode("utf-8")
+        malicious_container = {
+            "schema_version": "2.0",
+            "data": malicious_payload,
+            "integrity_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
+            "integrity_hmac_sha256": "00" * 32,
+            "authority_public_key_hex": attacker_auth_pub,
+            "authority_signature": attacker_auth_priv.sign(canonical_bytes).hex(),
+        }
+        Path(store_path).write_text(json.dumps(malicious_container, indent=2), encoding="utf-8")
+        Path(f"{store_path}.authority_pub").write_text(attacker_auth_pub, encoding="utf-8")
+
+        # Existing verifier instance calls verify_receipt; reload_if_modified detects authority mismatch
+        ok2, reason2 = verifier.verify_receipt(receipt, candidate_artifact_sha256=dummy_sha)
+        assert ok2 is False
+        assert "Trust store corrupted or unavailable" in reason2 or "authority" in reason2
+        assert verifier.is_key_trusted(kid) is False
+
+    def test_anchor_06_fresh_independent_os_process_rejects_attacker_controlled_bootstrap(
+        self, tmp_path: Path
+    ) -> None:
+        """ANCHOR-06: Fresh independent OS process rejects attacker-controlled bootstrap."""
+        store_path = str(tmp_path / "trust_store.json")
+        admin_tok = "admin_secret_anchor_06"
+        admin_store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+        priv, pub_hex, kid = _generate_ed25519_key()
+        admin_store.register_approved_key(kid, pub_hex, admin_token=admin_tok)
+        auth_pub = admin_store.get_authority_public_key()
+        assert auth_pub is not None
+
+        issuer = TrainingReceiptIssuer(private_key=priv, key_id=kid, app_env="development")
+        dummy_sha = hashlib.sha256(b"artifact_anchor_06").hexdigest()
+        receipt = issuer.issue_receipt(
+            training_run_id="run_anchor_06",
+            job_id="job_anchor_06",
+            artifact_sha256=dummy_sha,
+            simulation_id="sim_anchor_06",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            metrics={"loss": 0.04},
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="WORKER",
+        )
+
+        # Attacker replaces store on disk with unauthorized authority
+        attacker_auth_priv = ed25519.Ed25519PrivateKey.generate()
+        attacker_auth_pub = attacker_auth_priv.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        ).hex()
+        malicious_payload = {
+            "approved_keys": {kid: {"public_key_hex": pub_hex}},
+            "revoked_keys": {},
+            "retired_keys": {},
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        canonical_bytes = json.dumps(malicious_payload, sort_keys=True).encode("utf-8")
+        malicious_container = {
+            "schema_version": "2.0",
+            "data": malicious_payload,
+            "integrity_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
+            "integrity_hmac_sha256": "00" * 32,
+            "authority_public_key_hex": attacker_auth_pub,
+            "authority_signature": attacker_auth_priv.sign(canonical_bytes).hex(),
+        }
+        Path(store_path).write_text(json.dumps(malicious_container, indent=2), encoding="utf-8")
+        Path(f"{store_path}.authority_pub").write_text(attacker_auth_pub, encoding="utf-8")
+
+        # Spawn independent OS process with legitimate pinned authority key
+        ctx = mp.get_context("spawn")
+        out_q = ctx.Queue()
+        p = ctx.Process(
+            target=_mp_pinned_anchor_worker,
+            args=(store_path, auth_pub, receipt.to_dict(), dummy_sha, out_q, "production"),
+        )
+        p.start()
+        p.join(timeout=30)
+        if p.is_alive():
+            p.terminate()
+            p.join(timeout=5)
+        res = out_q.get(timeout=5)
+        if res[0] == "ERROR":
+            assert "authority" in res[1] or "anchor" in res[1] or "mismatch" in res[1] or "Production" in res[1]
+        else:
+            status, res_ok, _ = res
+            assert status == "SUCCESS" and res_ok is False
+
+    def test_anchor_07_legitimate_authorized_update_preserves_pinned_authority_identity(
+        self, tmp_path: Path
+    ) -> None:
+        """ANCHOR-07: Legitimate authorized update preserves the pinned authority identity."""
+        store_path = str(tmp_path / "trust_store.json")
+        admin_tok = "admin_secret_anchor_07"
+        admin_store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+        _, pub_a, kid_a = _generate_ed25519_key()
+        _, pub_b, kid_b = _generate_ed25519_key()
+        admin_store.register_approved_key(kid_a, pub_a, admin_token=admin_tok)
+        admin_store.register_approved_key(kid_b, pub_b, admin_token=admin_tok)
+        auth_pub = admin_store.get_authority_public_key()
+        assert auth_pub is not None
+
+        worker_store = DurableTrustStore(trust_file_path=store_path, authority_public_key=auth_pub)
+        assert kid_a in worker_store.get_approved_keys()
+        assert kid_b in worker_store.get_approved_keys()
+
+        # Legitimate administrator revokes kid_b
+        admin_store.revoke_key(kid_b, reason="compromise", admin_token=admin_tok)
+
+        # Worker reloads and verifies authority identity remains identical
+        worker_store.reload_if_modified()
+        assert worker_store.get_authority_public_key() == auth_pub
+        assert kid_a in worker_store.get_approved_keys()
+        assert kid_b not in worker_store.get_approved_keys()
+        assert worker_store.is_key_revoked(kid_b) is True
+
+    def test_anchor_08_revoked_issuer_cannot_become_trusted_through_unauthorized_replacement_or_restart(
+        self, tmp_path: Path
+    ) -> None:
+        """ANCHOR-08: Revoked issuer cannot become trusted through unauthorized replacement or restart."""
+        store_path = str(tmp_path / "trust_store.json")
+        admin_tok = "admin_secret_anchor_08"
+        admin_store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+        priv, pub_hex, kid = _generate_ed25519_key()
+        admin_store.register_approved_key(kid, pub_hex, admin_token=admin_tok)
+        admin_store.revoke_key(kid, reason="compromised_key", admin_token=admin_tok)
+        auth_pub = admin_store.get_authority_public_key()
+        assert auth_pub is not None
+
+        # Attacker attempts to modify store to un-revoke kid and replace authority
+        attacker_auth_priv = ed25519.Ed25519PrivateKey.generate()
+        attacker_auth_pub = attacker_auth_priv.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        ).hex()
+        forged_payload = {
+            "approved_keys": {kid: {"public_key_hex": pub_hex}},
+            "revoked_keys": {},
+            "retired_keys": {},
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        canonical_bytes = json.dumps(forged_payload, sort_keys=True).encode("utf-8")
+        forged_container = {
+            "schema_version": "2.0",
+            "data": forged_payload,
+            "integrity_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
+            "integrity_hmac_sha256": "00" * 32,
+            "authority_public_key_hex": attacker_auth_pub,
+            "authority_signature": attacker_auth_priv.sign(canonical_bytes).hex(),
+        }
+        Path(store_path).write_text(json.dumps(forged_container, indent=2), encoding="utf-8")
+        Path(f"{store_path}.authority_pub").write_text(attacker_auth_pub, encoding="utf-8")
+
+        # Verifier restarted with legitimate authority key MUST fail closed
+        with pytest.raises(TrainingProvenanceSecurityError, match="authority anchor mismatch|authority mismatch"):
+            DurableTrustStore(trust_file_path=store_path, authority_public_key=auth_pub)

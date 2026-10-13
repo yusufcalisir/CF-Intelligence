@@ -1231,8 +1231,21 @@ class DurableTrustStore:
         self._authority_public_key_hex: str | None = (
             authority_public_key
             or os.environ.get("CFI_TRUST_STORE_AUTHORITY_KEY")
-            or None
+            or getattr(get_settings(), "trust_store_authority_key", None)
         )
+
+        if self._admin_token:
+            _, derived_pub, _ = self._get_authority_keys()
+            if derived_pub:
+                if self._authority_public_key_hex and not hmac.compare_digest(
+                    self._authority_public_key_hex.lower(), derived_pub.lower()
+                ):
+                    raise TrainingProvenanceSecurityError(
+                        "Authority key mismatch: configured authority_public_key does not match "
+                        "the authority key derived from admin_token."
+                    )
+                self._authority_public_key_hex = derived_pub
+
         self._approved_keys: dict[str, dict[str, str]] = {}
         self._revoked_keys: dict[str, dict[str, str]] = {}
         self._retired_keys: dict[str, dict[str, str]] = {}
@@ -1253,6 +1266,10 @@ class DurableTrustStore:
 
         if not self._in_memory:
             self.reload()
+
+    def get_authority_public_key(self) -> str | None:
+        """Return the hex-encoded Ed25519 authority public key."""
+        return self._authority_public_key_hex
 
     @contextlib.contextmanager
     def _file_lock_context(self) -> Generator[None, None, None]:
@@ -1417,17 +1434,50 @@ class DurableTrustStore:
                         "missing authority public key or signature."
                     )
 
+                is_prod = (
+                    (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or get_settings().app_env).lower()
+                    == "production"
+                )
+
+                if is_prod and not self._authority_public_key_hex:
+                    self._is_corrupted = True
+                    raise TrainingProvenanceSecurityError(
+                        f"Production security boundary violation: DurableTrustStore at '{self._trust_file_path}' "
+                        "requires an independently provisioned authority public key (authority_public_key or "
+                        "CFI_TRUST_STORE_AUTHORITY_KEY). Establishing trust from unverified disk files is prohibited."
+                    )
+
                 if self._authority_public_key_hex:
                     expected_pub = self._authority_public_key_hex
+                    anchor_path = f"{self._trust_file_path}.authority_pub"
+                    if os.path.exists(anchor_path):
+                        with open(anchor_path, encoding="utf-8") as af:
+                            anchor_pub = af.read().strip()
+                        if not hmac.compare_digest(anchor_pub.lower(), expected_pub.lower()):
+                            self._is_corrupted = True
+                            raise TrainingProvenanceSecurityError(
+                                f"Durable trust store at '{self._trust_file_path}' authority anchor mismatch: "
+                                f"expected authority '{expected_pub}', anchor file contains '{anchor_pub}'."
+                            )
                 else:
                     anchor_path = f"{self._trust_file_path}.authority_pub"
                     if os.path.exists(anchor_path):
                         with open(anchor_path, encoding="utf-8") as af:
                             expected_pub = af.read().strip()
+                        if not expected_pub:
+                            self._is_corrupted = True
+                            raise TrainingProvenanceSecurityError(
+                                f"Durable trust store at '{self._trust_file_path}' rejected: "
+                                "authority anchor file is empty. Trust-on-First-Use from unverified JSON container is prohibited."
+                            )
                         self._authority_public_key_hex = expected_pub
                     else:
-                        expected_pub = file_pub
-                        self._authority_public_key_hex = file_pub
+                        self._is_corrupted = True
+                        raise TrainingProvenanceSecurityError(
+                            f"Durable trust store at '{self._trust_file_path}' rejected: "
+                            "no trusted authority public key configured and no authority anchor file found. "
+                            "Trust-on-First-Use from unverified JSON container is prohibited."
+                        )
 
                 if not hmac.compare_digest(file_pub.lower(), expected_pub.lower()):
                     self._is_corrupted = True
@@ -1496,6 +1546,24 @@ class DurableTrustStore:
             raise TrainingProvenanceSecurityError(
                 "Cannot persist durable trust store: authoritative administrative signing credentials are required."
             )
+
+        # Ensure administrator authority cannot be replaced merely by supplying a different admin_token
+        if os.path.exists(self._trust_file_path) and os.path.getsize(self._trust_file_path) > 0:
+            try:
+                with open(self._trust_file_path, "rb") as ef:
+                    existing_raw = ef.read().decode("utf-8")
+                existing_container = json.loads(existing_raw)
+                if isinstance(existing_container, dict):
+                    existing_pub = existing_container.get("authority_public_key_hex")
+                    if existing_pub and not hmac.compare_digest(existing_pub.lower(), pub_hex.lower()):
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot persist durable trust store at '{self._trust_file_path}': "
+                            f"cannot replace existing authoritative trust anchor '{existing_pub}' with '{pub_hex}'."
+                        )
+            except (TrainingProvenanceSecurityError, json.JSONDecodeError):
+                raise
+            except Exception:
+                pass
 
         payload = {
             "approved_keys": self._approved_keys,
