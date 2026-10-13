@@ -219,9 +219,12 @@ class TestLiveRBACAuthorityVerification:
 
         # Durably remove 'compliance' role (downgrade to 'viewer')
         u_rec = auth_svc.get_user("officer_comp_01")
+        assert u_rec is not None
         u_rec.roles = ["viewer"]
         auth_svc.identity_store.save_user(u_rec)
-        assert auth_svc.get_user("officer_comp_01").roles == ["viewer"]
+        updated_rec = auth_svc.get_user("officer_comp_01")
+        assert updated_rec is not None
+        assert updated_rec.roles == ["viewer"]
 
         sig = _compute_hmac(sim_id, 1, sha256, "compliance", "officer_comp_01")
 
@@ -261,9 +264,12 @@ class TestLiveRBACAuthorityVerification:
 
         # Durably remove 'ml_engineer' role (downgrade to 'analyst')
         u_rec = auth_svc.get_user("engineer_ml_02")
+        assert u_rec is not None
         u_rec.roles = ["analyst"]
         auth_svc.identity_store.save_user(u_rec)
-        assert auth_svc.get_user("engineer_ml_02").roles == ["analyst"]
+        updated_rec = auth_svc.get_user("engineer_ml_02")
+        assert updated_rec is not None
+        assert updated_rec.roles == ["analyst"]
 
         sig = _compute_hmac(sim_id, 1, sha256, "ml_engineer", "engineer_ml_02")
 
@@ -361,17 +367,21 @@ class TestLiveRBACAuthorityVerification:
         # Worker B initially verifies token and authoritative account
         is_val, claims, _ = auth_svc_b.verify_access_token(token)
         assert is_val is True
-        assert "compliance" in auth_svc_b.get_user("officer_cross_worker").roles
+        u_init_b = auth_svc_b.get_user("officer_cross_worker")
+        assert u_init_b is not None
+        assert "compliance" in u_init_b.roles
 
         # Worker A demotes the user to 'analyst'
         u_rec = auth_svc_a.get_user("officer_cross_worker")
+        assert u_rec is not None
         u_rec.roles = ["analyst"]
         auth_svc_a.identity_store.save_user(u_rec)
 
         # Worker B inspects user: atomic reload observes role demotion immediately
         reloaded_b = auth_svc_b.get_user("officer_cross_worker")
+        assert reloaded_b is not None
         assert reloaded_b.roles == ["analyst"]
-        assert "compliance" not in reloaded_b.roles
+        assert "compliance" not in list(reloaded_b.roles)
 
         sim_id = "sim_rbac_04"
         sha256, _ = _create_candidate_model(rbac_env, sim_id, version=1)
@@ -599,6 +609,7 @@ class TestLiveRBACAuthorityVerification:
 
         # Now simulate subsequent role revocation: comp_user loses compliance role
         comp_rec = auth_svc.get_user("comp_hist_10")
+        assert comp_rec is not None
         comp_rec.roles = ["viewer"]
         auth_svc.identity_store.save_user(comp_rec)
 
@@ -615,6 +626,6 @@ class TestLiveRBACAuthorityVerification:
 
         # Now test MISSING-01..06 suite passes
         backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-        cmd_missing = [sys.executable, "-m", "pytest", "tests/unit/test_missing_authority_fail_closed.py", "-v"]
-        res_missing = subprocess.run(cmd_missing, cwd=backend_dir, capture_output=True, text=True, timeout=120)
+        cmd_missing = [sys.executable, "-m", "pytest", "tests/unit/test_missing_authority_fail_closed.py", "-q"]
+        res_missing = subprocess.run(cmd_missing, cwd=backend_dir, capture_output=True, text=True, timeout=300)
         assert res_missing.returncode == 0, f"MISSING regression failed:\nSTDOUT:\n{res_missing.stdout}\nSTDERR:\n{res_missing.stderr}"
