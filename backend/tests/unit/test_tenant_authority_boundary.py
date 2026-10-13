@@ -280,7 +280,9 @@ def test_boundary_03_direct_proposal_creation_and_cancellation_without_credentia
         auth_token=tok_a,
     )
     assert cancelled.status == ProposalStatus.CANCELLED
-    assert svc.get_proposal(prop.proposal_id).status == ProposalStatus.CANCELLED
+    final_prop = svc.get_proposal(prop.proposal_id)
+    assert final_prop is not None
+    assert final_prop.status == ProposalStatus.CANCELLED
 
 
 # ── BOUNDARY-04: Caller-Supplied Actor String Impersonation Rejected ─────────
@@ -440,7 +442,9 @@ def test_boundary_09_legitimate_consortium_proposals_votes_and_governance_succee
     # Bank A sponsors membership for Bank B
     prop_b = svc.propose_membership_change(cid, "bank_a", "bank_b", ProposalAction.ADD_MEMBER, auth_token=tok_a)
     assert prop_b.status == ProposalStatus.APPROVED
-    assert "bank_b" in svc.get_consortium(cid).members
+    c_b = svc.get_consortium(cid)
+    assert c_b is not None
+    assert "bank_b" in c_b.members
 
     # Policy update sponsored by Bank B
     pol_prop = svc.propose_policy_update(cid, "bank_b", {"new_quorum_ratio": 0.60}, auth_token=tok_b)
@@ -449,7 +453,9 @@ def test_boundary_09_legitimate_consortium_proposals_votes_and_governance_succee
     # Bank A votes FOR -> quorum reached -> APPROVED
     res_prop = svc.cast_vote(pol_prop.proposal_id, "bank_a", approve=True, auth_token=tok_a)
     assert res_prop.status == ProposalStatus.APPROVED
-    assert svc.get_consortium(cid).quorum_ratio == 0.60
+    c_updated = svc.get_consortium(cid)
+    assert c_updated is not None
+    assert c_updated.quorum_ratio == 0.60
 
     # Multi-bank consortium-owned model signoff and promotion
     sim_cons = "sim_boundary_09_consortium"
