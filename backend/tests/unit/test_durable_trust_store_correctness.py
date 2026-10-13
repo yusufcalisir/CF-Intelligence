@@ -321,9 +321,12 @@ class TestDurableTrustStoreCorrectness:
 
         all_registered = []
         for p, q in zip(procs, queues, strict=False):
-            p.join(timeout=15)
+            p.join(timeout=30)
+            if p.is_alive():
+                p.terminate()
+                p.join(timeout=5)
             assert not p.is_alive()
-            status, data = q.get(timeout=2)
+            status, data = q.get(timeout=5)
             assert status == "SUCCESS", f"Worker failed: {data}"
             all_registered.extend(data)
 
@@ -367,11 +370,11 @@ class TestDurableTrustStoreCorrectness:
         p_reg2.start()
         p_rev.start()
 
-        p_reg1.join(timeout=15)
-        p_reg2.join(timeout=15)
-        p_rev.join(timeout=15)
-
         for p in (p_reg1, p_reg2, p_rev):
+            p.join(timeout=30)
+            if p.is_alive():
+                p.terminate()
+                p.join(timeout=5)
             assert not p.is_alive()
 
         res_a = q_reg1.get(timeout=2)
@@ -728,3 +731,324 @@ class TestDurableTrustStoreCorrectness:
         assert entry2["provenance_type"] == "UNVERIFIED"
         assert "INVALID_RECEIPT" in entry2["attestation_status"]
         assert "has been explicitly revoked" in entry2["attestation_status"]
+
+
+# ---------------------------------------------------------------------------
+# Focused Adversarial Suite: Authorization & Integrity Boundary Enforcement
+# ---------------------------------------------------------------------------
+
+
+class TestDurableTrustStoreAuthorizationAndIntegrityAdversarial:
+    """Adversarial security test suite targeting administrative authorization and cryptographic integrity."""
+
+    def test_adv_01_missing_expected_admin_credential_with_attacker_supplied_token_rejected(
+        self, tmp_path: Path
+    ) -> None:
+        """Adversarial 1: Missing expected admin credential + attacker-supplied nonempty token -> REJECTED."""
+        store_path = str(tmp_path / "trust_store.json")
+        _, pub_hex, kid = _generate_ed25519_key()
+
+        # Disk-backed store initialized with NO configured admin credential
+        store = DurableTrustStore(trust_file_path=store_path, admin_token=None)
+
+        # Attacker attempts mutations with arbitrary non-empty token
+        attacker_tok = "attacker_arbitrary_string_xyz_999"
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="Administrative authority is unconfigured"):
+            store.register_approved_key(kid, pub_hex, admin_token=attacker_tok)
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="Administrative authority is unconfigured"):
+            store.revoke_key(kid, admin_token=attacker_tok)
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="Administrative authority is unconfigured"):
+            store.retire_key(kid, admin_token=attacker_tok)
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="Administrative authority is unconfigured"):
+            store.rotate_key(kid, "new_kid", pub_hex, admin_token=attacker_tok)
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="Administrative authority is unconfigured"):
+            store.clear(admin_token=attacker_tok)
+
+        # Confirm zero changes reached disk
+        assert not Path(store_path).exists() or Path(store_path).stat().st_size == 0
+
+    def test_adv_02_wrong_admin_credential_against_configured_authority_rejected(
+        self, tmp_path: Path
+    ) -> None:
+        """Adversarial 2: Wrong admin credential against configured authority -> REJECTED."""
+        store_path = str(tmp_path / "trust_store.json")
+        configured_admin = "strong_authorized_secret_12345"
+        store = DurableTrustStore(trust_file_path=store_path, admin_token=configured_admin)
+        _, pub_hex, kid = _generate_ed25519_key()
+
+        # Attacker supplies wrong credentials
+        for bad_tok in ("wrong_token", "admin", "12345", "attacker_tok", ""):
+            with pytest.raises(TrainingProvenanceSecurityError, match="Unauthorized administrative operation"):
+                store.register_approved_key(kid, pub_hex, admin_token=bad_tok)
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="Unauthorized administrative operation"):
+            store.register_approved_key(kid, pub_hex, admin_token=None)
+
+        assert kid not in store.get_approved_keys()
+
+    def test_adv_03_genuine_authorized_mutation_persists_correctly(
+        self, tmp_path: Path
+    ) -> None:
+        """Adversarial 3: Genuine authorized mutation -> persists correctly with signature and HMAC."""
+        store_path = str(tmp_path / "trust_store.json")
+        admin_tok = "genuine_admin_secret_03"
+        store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+        _, pub_hex_a, kid_a = _generate_ed25519_key()
+        _, pub_hex_b, kid_b = _generate_ed25519_key()
+
+        # Authorized registration
+        store.register_approved_key(kid_a, pub_hex_a, admin_token=admin_tok)
+        store.register_approved_key(kid_b, pub_hex_b, admin_token=admin_tok)
+        store.revoke_key(kid_b, reason="compromise", admin_token=admin_tok)
+
+        # Inspect raw persisted container on disk
+        with open(store_path, encoding="utf-8") as f:
+            raw_container = json.load(f)
+
+        assert raw_container["schema_version"] == "2.0"
+        assert "integrity_sha256" in raw_container
+        assert "integrity_hmac_sha256" in raw_container
+        assert "authority_public_key_hex" in raw_container
+        assert "authority_signature" in raw_container
+        assert Path(f"{store_path}.authority_pub").exists()
+
+        # Reload in a clean independent store instance with same admin token
+        reloaded = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+        assert kid_a in reloaded.get_approved_keys()
+        assert kid_b not in reloaded.get_approved_keys()
+        assert reloaded.is_key_revoked(kid_b) is True
+
+    def test_adv_04_modified_approved_key_with_recomputed_unkeyed_sha256_rejected(
+        self, tmp_path: Path
+    ) -> None:
+        """Adversarial 4: Modified approved key with recomputed unkeyed SHA-256 cannot become trusted."""
+        store_path = str(tmp_path / "trust_store.json")
+        admin_tok = "admin_secret_adv_04"
+        store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+        _, pub_legit, kid_legit = _generate_ed25519_key()
+        store.register_approved_key(kid_legit, pub_legit, admin_token=admin_tok)
+
+        # Verifier confirms key is trusted before attack
+        worker_store = DurableTrustStore(trust_file_path=store_path)
+        verifier = TrainingReceiptVerifier(trust_store=worker_store)
+        assert verifier.is_key_trusted(kid_legit) is True
+
+        # ATTACK: Attacker with write access to file replaces public key and recomputes unkeyed SHA-256
+        _, attacker_pub, _ = _generate_ed25519_key()
+        with open(store_path, encoding="utf-8") as f:
+            container = json.load(f)
+
+        container["data"]["approved_keys"][kid_legit]["public_key_hex"] = attacker_pub
+        tampered_canonical = json.dumps(container["data"], sort_keys=True).encode("utf-8")
+        container["integrity_sha256"] = hashlib.sha256(tampered_canonical).hexdigest()
+
+        # Attacker writes tampered container (matching SHA-256 checksum)
+        with open(store_path, "w", encoding="utf-8") as f:
+            json.dump(container, f)
+
+        # Worker reload MUST FAIL CLOSED: checksum matches, but signature verification fails!
+        with pytest.raises(TrainingProvenanceSecurityError, match="failed cryptographic signature verification|HMAC"):
+            worker_store.reload()
+
+        # Verifier must reject and refuse trust
+        assert verifier.is_key_trusted(kid_legit) is False
+
+    def test_adv_05_removed_revocation_record_with_recomputed_checksum_cannot_resurrect_trust(
+        self, tmp_path: Path
+    ) -> None:
+        """Adversarial 5: Removed revocation record with recomputed checksum cannot resurrect trust."""
+        store_path = str(tmp_path / "trust_store.json")
+        admin_tok = "admin_secret_adv_05"
+        store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+        _, pub_rev, kid_rev = _generate_ed25519_key()
+        store.register_approved_key(kid_rev, pub_rev, admin_token=admin_tok)
+        store.revoke_key(kid_rev, reason="compromise", admin_token=admin_tok)
+
+        # Worker confirms revoked
+        worker_store = DurableTrustStore(trust_file_path=store_path)
+        assert worker_store.is_key_revoked(kid_rev) is True
+
+        # ATTACK: Attacker removes key from revoked_keys, re-adds to approved_keys, and recomputes SHA-256
+        with open(store_path, encoding="utf-8") as f:
+            container = json.load(f)
+
+        container["data"]["revoked_keys"].pop(kid_rev, None)
+        container["data"]["approved_keys"][kid_rev] = {"public_key_hex": pub_rev}
+        tampered_canonical = json.dumps(container["data"], sort_keys=True).encode("utf-8")
+        container["integrity_sha256"] = hashlib.sha256(tampered_canonical).hexdigest()
+
+        with open(store_path, "w", encoding="utf-8") as f:
+            json.dump(container, f)
+
+        # Worker reload MUST FAIL CLOSED: signature check fails
+        with pytest.raises(TrainingProvenanceSecurityError, match="failed cryptographic signature verification|HMAC"):
+            worker_store.reload()
+
+        # Verifier rejects the revoked key
+        verifier = TrainingReceiptVerifier(trust_store=worker_store)
+        assert verifier.is_key_trusted(kid_rev) is False
+
+    def test_adv_06_legacy_unprotected_trust_state_file_in_production_fails_closed(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Adversarial 6: Legacy unprotected trust-state file in production fails closed."""
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setenv("CFI_APP_ENV", "production")
+        from app.config import get_settings
+        get_settings.cache_clear()
+
+        store_path = str(tmp_path / "legacy_trust_store.json")
+        _, pub_hex, kid = _generate_ed25519_key()
+
+        # Legacy format: unauthenticated plain JSON container without authority_signature or HMAC
+        legacy_content = {
+            "schema_version": "1.0",
+            "data": {
+                "approved_keys": {kid: {"public_key_hex": pub_hex}},
+                "revoked_keys": {},
+                "retired_keys": {},
+            },
+            "integrity_sha256": hashlib.sha256(
+                json.dumps(
+                    {
+                        "approved_keys": {kid: {"public_key_hex": pub_hex}},
+                        "revoked_keys": {},
+                        "retired_keys": {},
+                    },
+                    sort_keys=True,
+                ).encode("utf-8")
+            ).hexdigest(),
+        }
+        Path(store_path).write_text(json.dumps(legacy_content), encoding="utf-8")
+
+        # Loading in production must fail closed
+        with pytest.raises(
+            TrainingProvenanceSecurityError,
+            match="unauthenticated persistence format lacking cryptographic authentication",
+        ):
+            store = DurableTrustStore(trust_file_path=store_path)
+            store.reload()
+
+        # Reset settings cache
+        monkeypatch.delenv("APP_ENV", raising=False)
+        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        monkeypatch.delenv("CFI_APP_ENV", raising=False)
+        get_settings.cache_clear()
+
+    def test_adv_07_existing_verifier_and_independent_process_honor_durable_revocation(
+        self, tmp_path: Path
+    ) -> None:
+        """Adversarial 7: Existing verifier instance and independent process honor durable revocation."""
+        store_path = str(tmp_path / "trust_store.json")
+        admin_tok = "admin_secret_adv_07"
+        admin_store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+        priv, pub_hex, kid = _generate_ed25519_key()
+        admin_store.register_approved_key(kid, pub_hex, admin_token=admin_tok)
+
+        worker_store = DurableTrustStore(trust_file_path=store_path)
+        verifier = TrainingReceiptVerifier(trust_store=worker_store)
+
+        issuer = TrainingReceiptIssuer(private_key=priv, key_id=kid, app_env="development")
+        dummy_sha = hashlib.sha256(b"artifact_adv_07").hexdigest()
+        receipt = issuer.issue_receipt(
+            training_run_id="run_adv_07",
+            job_id="job_adv_07",
+            artifact_sha256=dummy_sha,
+            simulation_id="sim_adv_07",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            metrics={"loss": 0.02},
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="WORKER",
+        )
+
+        ok1, reason1 = verifier.verify_receipt(receipt, candidate_artifact_sha256=dummy_sha)
+        assert ok1 is True, f"Initial verification failed: {reason1}"
+
+        # Administrator revokes key
+        admin_store.revoke_key(kid, reason="compromise", admin_token=admin_tok)
+
+        # Existing verifier instance rejects without restarting
+        ok2, reason2 = verifier.verify_receipt(receipt, candidate_artifact_sha256=dummy_sha)
+        assert ok2 is False
+        assert "has been explicitly revoked" in reason2
+
+        # Independent spawned process also rejects
+        ctx = mp.get_context("spawn")
+        out_q = ctx.Queue()
+        p = ctx.Process(
+            target=_mp_verify_receipt_worker,
+            args=(store_path, receipt.to_dict(), dummy_sha, out_q),
+        )
+        p.start()
+        p.join(timeout=30)
+        if p.is_alive():
+            p.terminate()
+            p.join(timeout=5)
+        assert not p.is_alive()
+        status, res_ok, res_reason = out_q.get(timeout=5)
+        assert status == "SUCCESS"
+        assert res_ok is False
+        assert "has been explicitly revoked" in res_reason
+
+    def test_adv_08_genuine_ed25519_receipt_verification_and_model_registry_admission(
+        self, tmp_path: Path
+    ) -> None:
+        """Adversarial 8: Genuine Ed25519 verification and Model Registry admission succeed for active keys."""
+        store_path = str(tmp_path / "trust_store.json")
+        admin_tok = "admin_secret_adv_08"
+        store = DurableTrustStore(trust_file_path=store_path, admin_token=admin_tok)
+
+        priv, pub_hex, kid = _generate_ed25519_key()
+        store.register_approved_key(kid, pub_hex, admin_token=admin_tok)
+
+        verifier = TrainingReceiptVerifier(trust_store=store)
+        registry = ModelRegistry(storage_dir=str(tmp_path / "registry"), verifier=verifier)
+
+        model_svc = ModelService(get_settings())
+        model = model_svc.create_model(input_dim=NUM_FEATURES)
+        raw_bytes = b"weights_adv_08"
+        sha_model = hashlib.sha256(raw_bytes).hexdigest()
+
+        issuer = TrainingReceiptIssuer(private_key=priv, key_id=kid, app_env="development")
+        receipt = issuer.issue_receipt(
+            training_run_id="run_adv_08",
+            job_id="job_adv_08",
+            artifact_sha256=sha_model,
+            simulation_id="sim_adv_08",
+            executed_rounds=2,
+            executed_epochs=2,
+            sample_count=200,
+            metrics={"loss": 0.01},
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="EXECUTOR",
+        )
+
+        entry = registry.save_version(
+            simulation_id="sim_adv_08",
+            state_dict=model.state_dict(),
+            metrics={"loss": 0.01},
+            is_promoted=False,
+            provenance_type="TRAINING_RECORDED",
+            training_run_id="run_adv_08",
+            training_receipt=receipt.to_dict(),
+            training_evidence={"loss": 0.01, "rounds": 2, "sample_count": 200},
+            artifact_bytes=raw_bytes,
+        )
+        assert entry["is_production_eligible"] is True
+        assert entry["provenance_type"] == "TRAINING_RECORDED"

@@ -1168,18 +1168,28 @@ def _get_trust_store_file_lock(file_path: str, timeout: float = 15.0) -> FileLoc
         return _TRUST_STORE_FILE_LOCKS[lock_path]
 
 
+def _restrict_file_permissions(filepath: str) -> None:
+    """Restrict file permissions to owner read/write on POSIX systems."""
+    try:
+        if os.name == "posix":
+            os.chmod(filepath, 0o600)
+    except Exception:
+        pass
+
+
 class DurableTrustStore:
     """Administratively controlled, durable key trust configuration.
 
     Guarantees:
     - Zero Lost Updates & Non-Atomic Operations: Multi-process concurrency controlled via kernel/file locks
       and atomic read-modify-write synchronization.
-    - Fail-Closed Persistence & Cryptographic Integrity: Malformed, truncated, or tampered stores are detected
-      via SHA-256 integrity digests and rejected with fail-closed errors.
+    - Fail-Closed Persistence & Cryptographic Authenticity: Malformed, truncated, or tampered stores are
+      detected via SHA-256 integrity digests, HMAC authentication tags, and Ed25519 administrative signatures.
+      Recomputed unkeyed checksums without legitimate cryptographic authority strictly fail closed.
     - Revocation Freshness Across Processes: Verifiers detect modifications via timestamp/stat tracking and
       immediately evict revoked keys without requiring process restarts.
-    - Administrative Authorization Boundary: Mutations require authorized credentials, preventing untrusted
-      workers or compromised coordinators from granting themselves trust or erasing revocations.
+    - Administrative Authorization Boundary: Mutations require authorized credentials independently provisioned.
+      Missing administrator credentials fail closed and disable mutations.
     """
 
     def __init__(
@@ -1187,6 +1197,7 @@ class DurableTrustStore:
         trust_file_path: str | dict[str, Any] | None = None,
         in_memory: bool = False,
         admin_token: str | None = None,
+        authority_public_key: str | None = None,
     ) -> None:
         self._lock = threading.RLock()
         initial_keys: dict[str, Any] = {}
@@ -1216,6 +1227,11 @@ class DurableTrustStore:
             admin_token
             or os.environ.get("CFI_TRUST_STORE_ADMIN_TOKEN")
             or getattr(get_settings(), "trust_store_admin_token", None)
+        )
+        self._authority_public_key_hex: str | None = (
+            authority_public_key
+            or os.environ.get("CFI_TRUST_STORE_AUTHORITY_KEY")
+            or None
         )
         self._approved_keys: dict[str, dict[str, str]] = {}
         self._revoked_keys: dict[str, dict[str, str]] = {}
@@ -1247,19 +1263,46 @@ class DurableTrustStore:
         with lock:
             yield
 
+    def _get_authority_keys(self) -> tuple[ed25519.Ed25519PrivateKey | None, str | None, bytes | None]:
+        """Derive authoritative cryptographic key material from independently provisioned admin secret."""
+        if not self._admin_token:
+            return None, self._authority_public_key_hex, None
+        seed = hashlib.sha256(b"CFI-TRUST-STORE-AUTH-SEED-V2:" + self._admin_token.encode("utf-8")).digest()
+        priv = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
+        pub_hex = priv.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        ).hex()
+        hmac_key = hashlib.sha256(b"CFI-TRUST-STORE-HMAC-KEY-V2:" + self._admin_token.encode("utf-8")).digest()
+        return priv, pub_hex, hmac_key
+
     def _verify_admin_authorization(self, token: str | None = None) -> None:
-        """Verify administrative credentials for mutating trust operations."""
-        if self._admin_token is not None:
+        """Verify administrative credentials for mutating trust operations.
+
+        Enforces strict fail-closed authorization:
+        - Any disk-backed store or production environment MUST have an independently provisioned admin credential.
+        - Missing or unconfigured administrator authority strictly disables mutations (fail-closed).
+        - Caller-supplied tokens must match the authoritative credential via timing-safe comparison.
+        - Arbitrary caller-controlled parameters cannot establish administrative authority.
+        """
+        is_prod = (
+            (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or get_settings().app_env).lower()
+            == "production"
+        )
+        if not self._in_memory or is_prod:
+            if not self._admin_token:
+                raise TrainingProvenanceSecurityError(
+                    "Administrative authority is unconfigured for DurableTrustStore: "
+                    "mutating operations are disabled (fail-closed)."
+                )
             if not token or not hmac.compare_digest(token, self._admin_token):
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized administrative operation: invalid or missing admin token for DurableTrustStore."
                 )
-        else:
-            settings = get_settings()
-            if settings.app_env.lower() == "production" and not self._in_memory and not token:
-                raise TrainingProvenanceSecurityError(
-                    "Production security boundary violation: admin_token is mandatory for durable trust store modifications."
-                )
+        elif self._admin_token is not None and (not token or not hmac.compare_digest(token, self._admin_token)):
+            raise TrainingProvenanceSecurityError(
+                "Unauthorized administrative operation: invalid or missing admin token for DurableTrustStore."
+            )
 
     def _reload_unlocked(self, force: bool = False) -> None:
         """Internal reload without acquiring locks (must be called with self._lock and file lock held)."""
@@ -1302,18 +1345,13 @@ class DurableTrustStore:
                     f"Durable trust store at '{self._trust_file_path}' is malformed: root JSON structure must be an object."
                 )
 
-            if "integrity_sha256" in container and "data" in container:
-                data = container["data"]
-                expected_sha = container["integrity_sha256"]
-                actual_sha = hashlib.sha256(json.dumps(data, sort_keys=True).encode("utf-8")).hexdigest()
-                if not hmac.compare_digest(expected_sha, actual_sha):
-                    self._is_corrupted = True
-                    raise TrainingProvenanceSecurityError(
-                        f"Durable trust store at '{self._trust_file_path}' failed cryptographic integrity check: "
-                        f"checksum mismatch (expected {expected_sha}, computed {actual_sha})."
-                    )
-            else:
-                data = container
+            # Layer 1: Schema structure validation
+            data = container.get("data", container)
+            if not isinstance(data, dict):
+                self._is_corrupted = True
+                raise TrainingProvenanceSecurityError(
+                    f"Durable trust store at '{self._trust_file_path}' is malformed: 'data' payload must be a dictionary."
+                )
 
             for key_field in ("approved_keys", "revoked_keys", "retired_keys"):
                 val = data.get(key_field)
@@ -1322,6 +1360,91 @@ class DurableTrustStore:
                     raise TrainingProvenanceSecurityError(
                         f"Durable trust store at '{self._trust_file_path}' is malformed: '{key_field}' must be a dictionary."
                     )
+
+            canonical_bytes = json.dumps(data, sort_keys=True).encode("utf-8")
+
+            # Layer 2: Fast accidental corruption detection (checksum)
+            if "integrity_sha256" in container:
+                expected_sha = container["integrity_sha256"]
+                actual_sha = hashlib.sha256(canonical_bytes).hexdigest()
+                if not hmac.compare_digest(expected_sha, actual_sha):
+                    self._is_corrupted = True
+                    raise TrainingProvenanceSecurityError(
+                        f"Durable trust store at '{self._trust_file_path}' failed cryptographic integrity check: "
+                        f"checksum mismatch (expected {expected_sha}, computed {actual_sha})."
+                    )
+
+            # Layer 3: Cryptographic Authenticity & Source-of-Authority Verification
+            is_prod = (
+                (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or get_settings().app_env).lower()
+                == "production"
+            )
+            has_auth = "authority_signature" in container or "integrity_hmac_sha256" in container
+            if not has_auth:
+                if is_prod or self._admin_token is not None or self._authority_public_key_hex is not None:
+                    self._is_corrupted = True
+                    raise TrainingProvenanceSecurityError(
+                        f"Durable trust store at '{self._trust_file_path}' rejected: "
+                        f"unauthenticated persistence format lacking cryptographic authentication signature or HMAC."
+                    )
+            else:
+                # Keyed HMAC check if administrator credentials available
+                if self._admin_token:
+                    _, _, hmac_key = self._get_authority_keys()
+                    if hmac_key:
+                        expected_hmac = container.get("integrity_hmac_sha256")
+                        if not expected_hmac:
+                            self._is_corrupted = True
+                            raise TrainingProvenanceSecurityError(
+                                f"Durable trust store at '{self._trust_file_path}' failed cryptographic authentication: "
+                                "missing 'integrity_hmac_sha256' authentication tag."
+                            )
+                        actual_hmac = hmac.new(hmac_key, canonical_bytes, hashlib.sha256).hexdigest()
+                        if not hmac.compare_digest(expected_hmac, actual_hmac):
+                            self._is_corrupted = True
+                            raise TrainingProvenanceSecurityError(
+                                f"Durable trust store at '{self._trust_file_path}' failed cryptographic authentication: "
+                                "HMAC authentication tag mismatch (unauthorized modification)."
+                            )
+
+                # Signature verification (applicable to both workers and admin)
+                file_pub = container.get("authority_public_key_hex")
+                file_sig = container.get("authority_signature")
+                if not file_pub or not file_sig:
+                    self._is_corrupted = True
+                    raise TrainingProvenanceSecurityError(
+                        f"Durable trust store at '{self._trust_file_path}' failed cryptographic authentication: "
+                        "missing authority public key or signature."
+                    )
+
+                if self._authority_public_key_hex:
+                    expected_pub = self._authority_public_key_hex
+                else:
+                    anchor_path = f"{self._trust_file_path}.authority_pub"
+                    if os.path.exists(anchor_path):
+                        with open(anchor_path, encoding="utf-8") as af:
+                            expected_pub = af.read().strip()
+                        self._authority_public_key_hex = expected_pub
+                    else:
+                        expected_pub = file_pub
+                        self._authority_public_key_hex = file_pub
+
+                if not hmac.compare_digest(file_pub.lower(), expected_pub.lower()):
+                    self._is_corrupted = True
+                    raise TrainingProvenanceSecurityError(
+                        f"Durable trust store at '{self._trust_file_path}' authority mismatch: "
+                        f"expected authority '{expected_pub}', found '{file_pub}'."
+                    )
+
+                try:
+                    pub_obj = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(expected_pub))
+                    pub_obj.verify(bytes.fromhex(file_sig), canonical_bytes)
+                except Exception as sig_err:
+                    self._is_corrupted = True
+                    raise TrainingProvenanceSecurityError(
+                        f"Durable trust store at '{self._trust_file_path}' failed cryptographic signature verification: "
+                        f"unauthorized modification detected ({sig_err})."
+                    ) from sig_err
 
             self._approved_keys = dict(data.get("approved_keys", {}))
             self._revoked_keys = dict(data.get("revoked_keys", {}))
@@ -1364,9 +1487,16 @@ class DurableTrustStore:
                         self._reload_unlocked(force=True)
 
     def _persist_unlocked(self) -> None:
-        """Atomically persist trust registry to disk with integrity digest and fsync."""
+        """Atomically persist trust registry to disk with cryptographic authentication, integrity digest, and fsync."""
         if self._in_memory or not self._trust_file_path:
             return
+
+        priv_key, pub_hex, hmac_key = self._get_authority_keys()
+        if priv_key is None or pub_hex is None or hmac_key is None:
+            raise TrainingProvenanceSecurityError(
+                "Cannot persist durable trust store: authoritative administrative signing credentials are required."
+            )
+
         payload = {
             "approved_keys": self._approved_keys,
             "revoked_keys": self._revoked_keys,
@@ -1374,12 +1504,19 @@ class DurableTrustStore:
             "updated_at": datetime.now(UTC).isoformat(),
         }
         canonical_bytes = json.dumps(payload, sort_keys=True).encode("utf-8")
-        digest = hashlib.sha256(canonical_bytes).hexdigest()
+        checksum = hashlib.sha256(canonical_bytes).hexdigest()
+        auth_sig = priv_key.sign(canonical_bytes).hex()
+        auth_hmac = hmac.new(hmac_key, canonical_bytes, hashlib.sha256).hexdigest()
+
         container = {
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "data": payload,
-            "integrity_sha256": digest,
+            "integrity_sha256": checksum,
+            "integrity_hmac_sha256": auth_hmac,
+            "authority_public_key_hex": pub_hex,
+            "authority_signature": auth_sig,
         }
+
         parent_dir = os.path.dirname(os.path.abspath(self._trust_file_path))
         os.makedirs(parent_dir, exist_ok=True)
         tmp_path = f"{self._trust_file_path}.{os.getpid()}.{threading.get_ident()}.{uuid.uuid4().hex}.tmp"
@@ -1387,11 +1524,25 @@ class DurableTrustStore:
             f.write(json.dumps(container, indent=2).encode("utf-8"))
             f.flush()
             os.fsync(f.fileno())
+
+        _restrict_file_permissions(tmp_path)
         os.replace(tmp_path, self._trust_file_path)
+
+        # Write authority anchor file
+        anchor_path = f"{self._trust_file_path}.authority_pub"
+        anchor_tmp = f"{anchor_path}.{os.getpid()}.{threading.get_ident()}.{uuid.uuid4().hex}.tmp"
+        with open(anchor_tmp, "w", encoding="utf-8") as af:
+            af.write(pub_hex)
+            af.flush()
+            os.fsync(af.fileno())
+        _restrict_file_permissions(anchor_tmp)
+        os.replace(anchor_tmp, anchor_path)
+
         stat = os.stat(self._trust_file_path)
         self._last_mtime = stat.st_mtime
         self._last_mtime_ns = stat.st_mtime_ns
         self._last_size = stat.st_size
+        self._authority_public_key_hex = pub_hex
         self._is_corrupted = False
 
     def register_approved_key(
@@ -2286,7 +2437,12 @@ class TrainingReceiptVerifier:
             self._trust_store = DurableTrustStore(in_memory=True)
             self._in_memory_only = True
         else:
-            self._trust_store = get_default_trust_store()
+            settings = get_settings()
+            if settings.app_env.lower() != "production" and not os.environ.get("CFI_TRAINING_RECEIPT_TRUST_STORE"):
+                self._trust_store = DurableTrustStore(in_memory=True)
+                self._in_memory_only = True
+            else:
+                self._trust_store = get_default_trust_store()
 
         if trusted_keys is not None:
             for kid, k_val in trusted_keys.items():
