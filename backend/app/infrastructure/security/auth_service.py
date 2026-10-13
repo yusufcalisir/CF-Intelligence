@@ -15,25 +15,23 @@ import os
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import jwt
 
 from app.config import get_settings
+from app.infrastructure.security.durable_account_store import (
+    AuthenticationSecurityError,
+    DurableAccountStore,
+    UserRecord,
+)
 from app.infrastructure.security.password_hasher import (
     hash_password,
     verify_password,
 )
 
 logger = logging.getLogger(__name__)
-
-
-from app.infrastructure.security.durable_account_store import (
-    AuthenticationSecurityError,
-    DurableAccountStore,
-    UserRecord,
-)
 
 
 @dataclass
@@ -193,22 +191,25 @@ class AuthenticationService:
         app_env: str | None = None,
     ) -> None:
         settings = get_settings()
-        active_env = (
+        raw_env = (
             app_env
             or os.environ.get("APP_ENV")
             or os.environ.get("ENVIRONMENT")
             or getattr(settings, "app_env", "")
-        ).lower()
+            or ""
+        )
+        active_env = str(raw_env).lower()
         is_prod = active_env == "production"
 
         if signing_secret is not None:
             resolved_secret = signing_secret
         else:
-            resolved_secret = (
+            raw_sec = (
                 os.environ.get("CFI_JWT_SIGNING_SECRET")
                 or os.environ.get("CFI_OIDC_JWT_SIGNING_SECRET")
                 or getattr(settings, "oidc_jwt_signing_secret", None)
             )
+            resolved_secret = str(raw_sec) if raw_sec else ""
 
         if is_prod:
             if (

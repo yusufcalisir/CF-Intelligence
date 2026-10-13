@@ -41,9 +41,7 @@ from fastapi.testclient import TestClient
 from app.application.services.model_registry import (
     DOMAIN_APPROVAL_SIGNOFF,
     ModelRegistry,
-    compute_file_sha256,
     derive_domain_key,
-    generate_signoff_signature,
     validate_production_admission,
 )
 from app.application.services.model_service import NUM_FEATURES, ModelService

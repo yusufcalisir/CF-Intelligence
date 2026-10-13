@@ -11,7 +11,6 @@ Verifies:
 
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import subprocess
@@ -25,7 +24,6 @@ from app.config import get_settings
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.security.durable_account_store import (
     AuthenticationSecurityError,
-    DurableAccountStore,
 )
 
 PROD_JWT_SECRET = "missing-test-prod-jwt-signing-secret-64bytes-entropy!"

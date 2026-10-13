@@ -37,10 +37,8 @@ from fastapi.testclient import TestClient
 
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.model_registry import (
-    ModelRegistry,
-    compute_file_sha256,
-    generate_signoff_signature,
     ModelIntegrityError,
+    generate_signoff_signature,
 )
 from app.application.services.model_service import NUM_FEATURES, ModelService
 from app.application.services.training_provenance_service import (
@@ -54,7 +52,6 @@ from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.security.durable_account_store import (
     AuthenticationSecurityError,
     DurableAccountStore,
-    UserRecord,
 )
 from app.main import app
 from app.presentation.routers.model_registry import registry

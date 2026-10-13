@@ -16,38 +16,20 @@ Verifies:
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
-import time
-from datetime import UTC, datetime
 from typing import Any
 
-import jwt
 import pytest
-import torch
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from fastapi.testclient import TestClient
 
-from app.application.services.model_registry import (
-    ModelRegistry,
-    compute_file_sha256,
-    generate_signoff_signature,
-)
-from app.application.services.model_service import NUM_FEATURES, ModelService
-from app.application.services.training_provenance_service import (
-    DurableTrustStore,
-    TrainingExecutionEvidence,
-    TrainingReceiptIssuer,
-    TrainingReceiptVerifier,
-)
 from app.config import Settings, get_settings
-from app.domain.model_serving_errors import ModelIntegrityError
 from app.infrastructure.security.auth_service import (
     AuthenticationSecurityError,
     AuthenticationService,
@@ -171,7 +153,7 @@ class TestIdentityAuthorityHardening:
         assert "deactivated" in msg.lower()
 
         # 2. Attacker modifies persistent JSON: reactivates user and recomputes unkeyed SHA-256
-        with open(store_path, "r", encoding="utf-8") as f:
+        with open(store_path, encoding="utf-8") as f:
             container = json.load(f)
 
         data = container["data"]
@@ -219,7 +201,7 @@ class TestIdentityAuthorityHardening:
         assert "revoked" in msg.lower()
 
         # 2. Attacker removes JTI from revocation list and recomputes SHA-256
-        with open(store_path, "r", encoding="utf-8") as f:
+        with open(store_path, encoding="utf-8") as f:
             container = json.load(f)
 
         data = container["data"]
@@ -258,7 +240,7 @@ class TestIdentityAuthorityHardening:
         store.save_user(u)
 
         # Case A: Remove HMAC and signature fields
-        with open(store_path, "r", encoding="utf-8") as f:
+        with open(store_path, encoding="utf-8") as f:
             container = json.load(f)
         container.pop("integrity_hmac_sha256", None)
         container.pop("authority_signature", None)
@@ -276,7 +258,7 @@ class TestIdentityAuthorityHardening:
             )
 
         # Case B: Remove integrity_sha256
-        with open(store_path, "r", encoding="utf-8") as f:
+        with open(store_path, encoding="utf-8") as f:
             container = json.load(f)
         container.pop("integrity_sha256", None)
         with open(store_path, "w", encoding="utf-8") as f:
@@ -326,7 +308,7 @@ class TestIdentityAuthorityHardening:
             format=serialization.PublicFormat.Raw,
         ).hex()
 
-        with open(store_path, "r", encoding="utf-8") as f:
+        with open(store_path, encoding="utf-8") as f:
             container = json.load(f)
 
         data = container["data"]
@@ -480,7 +462,7 @@ class TestIdentityAuthorityHardening:
         assert "deactivated" in res1["msg"].lower()
 
         # Attacker attempts unauthorized modification of store on disk
-        with open(store_path, "r", encoding="utf-8") as f:
+        with open(store_path, encoding="utf-8") as f:
             container = json.load(f)
         container["data"]["users"]["cross_proc_harden"]["is_active"] = True
         container["integrity_sha256"] = hashlib.sha256(

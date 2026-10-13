@@ -34,8 +34,6 @@ from fastapi.testclient import TestClient
 
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.model_registry import (
-    ModelRegistry,
-    compute_file_sha256,
     generate_signoff_signature,
 )
 from app.application.services.model_service import NUM_FEATURES, ModelService

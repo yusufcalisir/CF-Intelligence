@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import os
 import tempfile
-import time
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -21,18 +19,13 @@ from fastapi.testclient import TestClient
 from app.application.schemas.model_registry import ModelPromoteRequest
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.zero_downtime_deployer import ZeroDowntimeDeploymentManager
-from app.config import get_settings
 from app.domain.deployment_state import DeploymentStage
 from app.domain.model_serving_errors import ModelIntegrityError
 from app.infrastructure.security.auth_service import AuthenticationService
-from app.infrastructure.security.durable_account_store import DurableAccountStore
 from app.main import app
 from app.presentation.routers.model_registry import (
-    deployer as global_deployer,
     promote_model_by_simulation,
     promote_model_version,
-    registry as global_registry,
-    rollback_model_version,
 )
 
 

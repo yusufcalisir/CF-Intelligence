@@ -21,12 +21,13 @@ import os
 import threading
 import time
 import uuid
+from collections.abc import Generator
 from dataclasses import dataclass, field
-from typing import Any, Generator
+from typing import Any
 
-from filelock import FileLock
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
+from filelock import FileLock
 
 from app.config import get_settings
 from app.infrastructure.storage.storage_utils import get_storage_dir
@@ -133,12 +134,14 @@ class DurableAccountStore:
         app_env: str | None = None,
     ) -> None:
         settings = get_settings()
-        self._app_env = (
+        raw_env = (
             app_env
             or os.environ.get("APP_ENV")
             or os.environ.get("ENVIRONMENT")
             or getattr(settings, "app_env", "")
-        ).lower()
+            or ""
+        )
+        self._app_env = str(raw_env).lower()
         is_prod = self._is_prod
 
         if is_prod and in_memory:
@@ -160,6 +163,7 @@ class DurableAccountStore:
             self._store_path = os.path.abspath(configured_path)
 
         # Independently configured authority credentials
+        self._authority_public_key_hex: str | None = None
         if authority_public_key and authority_secret is None:
             # Explicit public-key verifier: do not fall back to ambient symmetric authority secret
             self._authority_secret = None
@@ -172,11 +176,12 @@ class DurableAccountStore:
                 or getattr(settings, "identity_store_secret", None)
                 or (None if is_prod else "cfi_dev_identity_store_authority_secret_2026_default")
             )
-            self._authority_public_key_hex = (
+            auth_key_val = (
                 authority_public_key
                 or os.environ.get("CFI_IDENTITY_STORE_AUTHORITY_KEY")
                 or getattr(settings, "identity_store_authority_key", None)
             )
+            self._authority_public_key_hex = str(auth_key_val) if auth_key_val else None
 
         self._authority_priv: ed25519.Ed25519PrivateKey | None = None
         self._hmac_key: bytes | None = None
@@ -223,11 +228,12 @@ class DurableAccountStore:
     @property
     def _is_prod(self) -> bool:
         """Whether this store operates in production mode."""
-        active_env = (
+        active_env = str(
             self._app_env
             or os.environ.get("APP_ENV")
             or os.environ.get("ENVIRONMENT")
             or getattr(get_settings(), "app_env", "")
+            or ""
         ).lower()
         return active_env == "production"
 
