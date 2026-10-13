@@ -182,10 +182,11 @@ def validate_production_admission(
     else:
         prov = entry_or_provenance.strip().upper()
 
+    status = entry_or_provenance.get("status", "") if isinstance(entry_or_provenance, dict) else ""
     target_role = (
         "champion"
-        if context in CHAMPION_CONTEXTS
-        else ("challenger" if "challenger" in context else "operational")
+        if (context in CHAMPION_CONTEXTS or "champion" in context or status in ("champion", "active"))
+        else ("challenger" if ("challenger" in context or status == "challenger") else "operational")
     )
 
     if prov == "STRUCTURAL_FIXTURE":
