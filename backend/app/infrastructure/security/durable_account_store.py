@@ -215,6 +215,7 @@ class DurableAccountStore:
         self._last_mtime_ns: int = 0
         self._last_size: int = -1
         self._is_corrupted: bool = False
+        self._is_established: bool = False
 
         if not self._in_memory:
             self.reload()
@@ -276,6 +277,17 @@ class DurableAccountStore:
             return
 
         if not os.path.exists(self._store_path):
+            if self._is_established or self._last_mtime_ns > 0 or len(self._users) > 0 or len(self._revoked_tokens) > 0:
+                self._is_corrupted = True
+                self._users.clear()
+                self._revoked_tokens.clear()
+                self._active_refresh_tokens.clear()
+                self._last_mtime_ns = 0
+                self._last_size = -1
+                raise AuthenticationSecurityError(
+                    f"Authoritative identity store at '{self._store_path}' disappeared: "
+                    f"persistence file is missing or inaccessible."
+                )
             self._last_mtime_ns = 0
             self._last_size = -1
             self._is_corrupted = False
@@ -404,10 +416,18 @@ class DurableAccountStore:
             self._last_mtime_ns = stat.st_mtime_ns
             self._last_size = stat.st_size
             self._is_corrupted = False
+            self._is_established = True
         except AuthenticationSecurityError:
+            self._is_corrupted = True
+            self._users.clear()
+            self._revoked_tokens.clear()
+            self._active_refresh_tokens.clear()
             raise
         except Exception as err:
             self._is_corrupted = True
+            self._users.clear()
+            self._revoked_tokens.clear()
+            self._active_refresh_tokens.clear()
             raise AuthenticationSecurityError(
                 f"Failed to read durable identity store at '{self._store_path}': {err}"
             ) from err
@@ -468,6 +488,7 @@ class DurableAccountStore:
             self._last_mtime_ns = stat.st_mtime_ns
             self._last_size = stat.st_size
             self._is_corrupted = False
+            self._is_established = True
         finally:
             if os.path.exists(tmp_path):
                 with contextlib.suppress(OSError):
@@ -584,6 +605,10 @@ class DurableAccountStore:
         with self._lock:
             with self._file_lock_context():
                 self._reload_unlocked()
+                if self._is_corrupted:
+                    raise AuthenticationSecurityError(
+                        f"Durable identity store at '{self._store_path}' is in corrupted state."
+                    )
                 return len(self._users) > 0
 
     def has_user(self, username: str) -> bool:
@@ -591,6 +616,10 @@ class DurableAccountStore:
         with self._lock:
             with self._file_lock_context():
                 self._reload_unlocked()
+                if self._is_corrupted:
+                    raise AuthenticationSecurityError(
+                        f"Durable identity store at '{self._store_path}' is in corrupted state."
+                    )
                 return username.lower().strip() in self._users
 
     def list_users(self, include_inactive: bool = True) -> list[UserRecord]:
@@ -598,6 +627,10 @@ class DurableAccountStore:
         with self._lock:
             with self._file_lock_context():
                 self._reload_unlocked()
+                if self._is_corrupted:
+                    raise AuthenticationSecurityError(
+                        f"Durable identity store at '{self._store_path}' is in corrupted state."
+                    )
                 results: list[UserRecord] = []
                 for u in self._users.values():
                     if include_inactive or u.get("is_active", True):
@@ -635,6 +668,10 @@ class DurableAccountStore:
         with self._lock:
             with self._file_lock_context():
                 self._reload_unlocked()
+                if self._is_corrupted:
+                    raise AuthenticationSecurityError(
+                        f"Durable identity store at '{self._store_path}' is in corrupted state."
+                    )
                 self._active_refresh_tokens[jti] = username.lower().strip()
                 self._save_unlocked()
 
@@ -643,6 +680,10 @@ class DurableAccountStore:
         with self._lock:
             with self._file_lock_context():
                 self._reload_unlocked()
+                if self._is_corrupted:
+                    raise AuthenticationSecurityError(
+                        f"Durable identity store at '{self._store_path}' is in corrupted state."
+                    )
                 uname = self._active_refresh_tokens.pop(jti, None)
                 if uname is not None:
                     self._save_unlocked()
@@ -653,6 +694,10 @@ class DurableAccountStore:
         with self._lock:
             with self._file_lock_context():
                 self._reload_unlocked()
+                if self._is_corrupted:
+                    raise AuthenticationSecurityError(
+                        f"Durable identity store at '{self._store_path}' is in corrupted state."
+                    )
                 return jti in self._active_refresh_tokens
 
     def clear(self) -> None:
