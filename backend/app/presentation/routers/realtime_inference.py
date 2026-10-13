@@ -61,6 +61,7 @@ class ModelCacheEntry:
         from_redis: bool,
         cached_at: float,
         generation: int = 1,
+        issuer_key_id: str | None = None,
     ) -> None:
         self.model = model
         self.version = version
@@ -69,6 +70,7 @@ class ModelCacheEntry:
         self.from_redis = from_redis
         self.cached_at = cached_at
         self.generation = generation
+        self.issuer_key_id = issuer_key_id
 
 
 class LocalModelCache:
@@ -94,8 +96,12 @@ class LocalModelCache:
             else:
                 self._entries[val.simulation_id or "default"] = val
 
-    def get(self, current_meta: dict[str, Any] | None) -> tuple[Any, bool] | None:
-        """Return cached model if valid and matches current authoritative champion metadata."""
+    def get(
+        self,
+        current_meta: dict[str, Any] | None,
+        verifier: Any | None = None,
+    ) -> tuple[Any, bool] | None:
+        """Return cached model if valid, matching active metadata, and signed by a currently trusted issuer."""
         with self._lock:
             if current_meta is None:
                 self.clear()
@@ -104,6 +110,32 @@ class LocalModelCache:
             entry = self._entries.get(sim_key)
             if entry is None:
                 return None
+
+            # Verify current trust status of issuer key
+            target_kid = entry.issuer_key_id or current_meta.get("issuer_key_id") or current_meta.get("key_id")
+            if target_kid:
+                from app.application.services.training_provenance_service import (
+                    get_default_training_verifier,
+                )
+
+                active_verifier = verifier or get_default_training_verifier()
+                try:
+                    if not active_verifier.is_key_trusted(target_kid):
+                        logger.warning(
+                            "Evicting cached model for '%s' because issuer key '%s' is no longer trusted.",
+                            sim_key,
+                            target_kid,
+                        )
+                        self._entries.pop(sim_key, None)
+                        return None
+                except Exception as exc:
+                    logger.warning(
+                        "Evicting cached model for '%s' because trust check failed: %s",
+                        sim_key,
+                        exc,
+                    )
+                    self._entries.pop(sim_key, None)
+                    return None
 
             meta_gen = current_meta.get("generation")
             gen_matches = True if meta_gen is None else (entry.generation == meta_gen)
@@ -135,6 +167,7 @@ class LocalModelCache:
         artifact_sha256: str,
         from_redis: bool = False,
         generation: int = 1,
+        issuer_key_id: str | None = None,
     ) -> None:
         """Atomically store a verified champion model bound to its version identity."""
         with self._lock:
@@ -147,6 +180,7 @@ class LocalModelCache:
                 from_redis=from_redis,
                 cached_at=time.time(),
                 generation=generation,
+                issuer_key_id=issuer_key_id,
             )
 
     def clear(self, simulation_id: str | None = None) -> None:
@@ -216,7 +250,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
     # 1. Fast path: lightweight manifest identity check (avoids reading and hashing champion weights on every warm request - Defect F)
     champion_ident = registry.get_active_champion_identity(simulation_id=simulation_id)
     if champion_ident is not None:
-        cached = _local_cache.get(champion_ident)
+        cached = _local_cache.get(champion_ident, verifier=registry._verifier)
         if cached is not None:
             return cached
 
@@ -226,7 +260,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
             # Re-check lightweight identity inside lock
             champion_ident = registry.get_active_champion_identity(simulation_id=simulation_id)
             if champion_ident is not None:
-                cached = _local_cache.get(champion_ident)
+                cached = _local_cache.get(champion_ident, verifier=registry._verifier)
                 if cached is not None:
                     return cached
 
@@ -408,6 +442,11 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                             with torch.no_grad():
                                                 test_val = loaded_jit(dummy)
                                                 if torch.isfinite(test_val).all():
+                                                    kid_val = (
+                                                        (current_meta.get("training_receipt") or {}).get("key_id")
+                                                        if isinstance(current_meta.get("training_receipt"), dict)
+                                                        else (current_meta.get("issuer_key_id") or current_meta.get("key_id"))
+                                                    )
                                                     _local_cache.set(
                                                         model=loaded_jit,
                                                         version=current_meta["version"],
@@ -415,6 +454,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                                         artifact_sha256=current_meta["sha256"],
                                                         from_redis=True,
                                                         generation=current_meta.get("generation", 1),
+                                                        issuer_key_id=kid_val,
                                                     )
                                                     logger.info(
                                                         "Loaded authenticated champion v%d gen %d TorchScript model from Redis cache.",
@@ -467,6 +507,11 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                 continue
 
             # Publish to local process cache
+            kid_val = (
+                (current_meta.get("training_receipt") or {}).get("key_id")
+                if isinstance(current_meta.get("training_receipt"), dict)
+                else (current_meta.get("issuer_key_id") or current_meta.get("key_id"))
+            )
             _local_cache.set(
                 model=scripted,
                 version=current_meta["version"],
@@ -474,6 +519,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                 artifact_sha256=current_meta["sha256"],
                 from_redis=False,
                 generation=current_meta.get("generation", 1),
+                issuer_key_id=kid_val,
             )
 
             # 7. Securely populate Redis cache using atomic pipeline ONLY (Defect D)

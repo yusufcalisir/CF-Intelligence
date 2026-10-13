@@ -2697,7 +2697,7 @@ class TrainingReceiptVerifier:
         clean_kid = key_id.strip()
         try:
             self._sync_with_trust_store()
-        except TrainingProvenanceSecurityError:
+        except (TrainingProvenanceSecurityError, Exception):
             self._trusted_keys.clear()
             return False
         if clean_kid in self._revoked_keys or self._trust_store.is_key_revoked(clean_kid):
@@ -2706,7 +2706,7 @@ class TrainingReceiptVerifier:
         if not self._in_memory_only:
             try:
                 approved_map = self._trust_store.get_approved_keys()
-            except TrainingProvenanceSecurityError:
+            except (TrainingProvenanceSecurityError, Exception):
                 self._trusted_keys.clear()
                 return False
             if clean_kid not in approved_map:
@@ -2775,7 +2775,7 @@ class TrainingReceiptVerifier:
         # Key ID validation & revocation check across processes
         try:
             self._sync_with_trust_store()
-        except TrainingProvenanceSecurityError as exc:
+        except (TrainingProvenanceSecurityError, Exception) as exc:
             return False, f"Trust store corrupted or unavailable: {exc}"
 
         if receipt_obj.key_id in self._revoked_keys or self._trust_store.is_key_revoked(receipt_obj.key_id):

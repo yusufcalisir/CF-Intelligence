@@ -754,7 +754,36 @@ class ModelRegistry:
             provenance_type = entry.get("provenance_type", "UNVERIFIED")
             from app.config import get_settings
             settings = get_settings()
-            validate_production_admission(entry, context="resolve_and_verify_champion")
+            if settings.app_env.lower() == "production":
+                validate_production_admission(entry, context="resolve_and_verify_champion")
+                receipt_dict = entry.get("training_receipt")
+                if not receipt_dict:
+                    raise ModelIntegrityError(
+                        "Production admission rejected: model lacks verified cryptographic training execution receipt (resolve_and_verify_champion)."
+                    )
+                verifier = self._verifier or get_default_training_verifier()
+                is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
+                    receipt_dict,
+                    candidate_artifact_sha256=actual_sha256,
+                    candidate_artifact_bytes=bytes_data,
+                    simulation_id=sim_id,
+                    expected_architecture=entry.get("architecture"),
+                    expected_feature_schema_version=entry.get("feature_schema_version"),
+                    expected_input_dim=entry.get("input_dim"),
+                    expected_feature_names=entry.get("feature_names"),
+                )
+                if not is_valid_rcpt:
+                    raise ModelIntegrityError(
+                        f"Production admission rejected: cryptographic training receipt verification failed ({rcpt_reason}) (resolve_and_verify_champion)."
+                    )
+            elif entry.get("training_receipt"):
+                receipt_dict = entry.get("training_receipt")
+                if isinstance(receipt_dict, dict) and receipt_dict.get("key_id"):
+                    verifier = self._verifier or get_default_training_verifier()
+                    if not verifier.is_key_trusted(receipt_dict["key_id"]):
+                        raise ModelIntegrityError(
+                            f"Cryptographic training receipt verification failed (Receipt key_id '{receipt_dict['key_id']}' has been explicitly revoked.) (resolve_and_verify_champion)."
+                        )
 
             # Truthful classification of sign-offs
             sign_offs = entry.get("sign_offs", [])
@@ -981,12 +1010,25 @@ class ModelRegistry:
                 is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
                     receipt_dict,
                     candidate_artifact_sha256=actual_sha256,
+                    candidate_artifact_bytes=bytes_data,
                     simulation_id=sim_id,
+                    expected_architecture=entry.get("architecture"),
+                    expected_feature_schema_version=entry.get("feature_schema_version"),
+                    expected_input_dim=entry.get("input_dim"),
+                    expected_feature_names=entry.get("feature_names"),
                 )
                 if not is_valid_rcpt:
                     raise ModelIntegrityError(
                         f"Production admission rejected: cryptographic training receipt verification failed ({rcpt_reason}) (challenger_serving)."
                     )
+            elif entry.get("training_receipt"):
+                receipt_dict = entry.get("training_receipt")
+                if isinstance(receipt_dict, dict) and receipt_dict.get("key_id"):
+                    verifier = self._verifier or get_default_training_verifier()
+                    if not verifier.is_key_trusted(receipt_dict["key_id"]):
+                        raise ModelIntegrityError(
+                            f"Cryptographic training receipt verification failed (Receipt key_id '{receipt_dict['key_id']}' has been explicitly revoked.) (challenger_serving)."
+                        )
 
             provenance_type = entry.get("provenance_type", "UNVERIFIED")
             is_prod_eligible = provenance_type in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED")
@@ -1105,6 +1147,34 @@ class ModelRegistry:
                     "TRAINING_EVIDENCE_VERIFIED",
                 ):
                     return None
+
+            key_id = None
+            rcpt = entry.get("training_receipt")
+            if isinstance(rcpt, dict):
+                key_id = rcpt.get("key_id")
+            if key_id:
+                from app.application.services.training_provenance_service import (
+                    get_default_training_verifier,
+                )
+                verifier = self._verifier or get_default_training_verifier()
+                try:
+                    if not verifier.is_key_trusted(key_id):
+                        logger.warning(
+                            "Active champion key_id '%s' for simulation '%s' is revoked or untrusted.",
+                            key_id,
+                            s_id,
+                        )
+                        return None
+                except Exception as exc:
+                    logger.error(
+                        "Failed to verify trust for active champion key_id '%s': %s",
+                        key_id,
+                        exc,
+                    )
+                    return None
+            elif settings.app_env.lower() == "production":
+                return None
+
             return {
                 "version": entry.get("version"),
                 "generation": entry.get("generation", 1),
@@ -1117,6 +1187,8 @@ class ModelRegistry:
                 "feature_names": entry.get("feature_names"),
                 "verified_schema": entry.get("verified_schema"),
                 "provenance_type": entry.get("provenance_type", "UNVERIFIED"),
+                "issuer_key_id": key_id,
+                "key_id": key_id,
             }
 
     def _update_global_model_link(self, simulation_id: str, filepath: str) -> None:
@@ -1233,15 +1305,30 @@ class ModelRegistry:
                         f"Production admission rejected: model lacks verified cryptographic training execution receipt ({admission_context})."
                     )
                 verifier = self._verifier or get_default_training_verifier()
+                with open(real_filepath, "rb") as rf:
+                    artifact_bytes = rf.read()
                 is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
                     receipt_dict,
                     candidate_artifact_sha256=actual_sha256,
+                    candidate_artifact_bytes=artifact_bytes,
                     simulation_id=simulation_id,
+                    expected_architecture=target_entry.get("architecture"),
+                    expected_feature_schema_version=target_entry.get("feature_schema_version"),
+                    expected_input_dim=target_entry.get("input_dim"),
+                    expected_feature_names=target_entry.get("feature_names"),
                 )
                 if not is_valid_rcpt:
                     raise ModelIntegrityError(
                         f"Production admission rejected: cryptographic training receipt verification failed ({rcpt_reason}) ({admission_context})."
                     )
+            elif target_entry.get("training_receipt"):
+                rcpt = target_entry.get("training_receipt")
+                if isinstance(rcpt, dict) and rcpt.get("key_id"):
+                    verifier = self._verifier or get_default_training_verifier()
+                    if not verifier.is_key_trusted(rcpt["key_id"]):
+                        raise ModelIntegrityError(
+                            f"Cryptographic training receipt verification failed (Receipt key_id '{rcpt['key_id']}' has been explicitly revoked.) ({admission_context})."
+                        )
 
             max_gen = max((e.get("generation", 0) for e in manifest), default=0)
             if target_status == "champion":
@@ -1274,6 +1361,16 @@ class ModelRegistry:
 
                     ModelService(settings).invalidate_model_cache()
 
+            with contextlib.suppress(Exception):
+                from app.presentation.routers.realtime_inference import reset_model_cache
+
+                reset_model_cache(simulation_id)
+
+            with contextlib.suppress(Exception):
+                from app.presentation.routers.predict import clear_all_serving_caches
+
+                clear_all_serving_caches()
+
             logger.info("Promoted model version %d to %s for %s", version, target_status, simulation_id)
             return target_entry
 
@@ -1293,7 +1390,69 @@ class ModelRegistry:
 
             from app.config import get_settings
             settings = get_settings()
-            validate_production_admission(target_entry, context="rollback")
+            admission_context = "rollback"
+            validate_production_admission(target_entry, context=admission_context)
+
+            if settings.app_env.lower() == "production":
+                fname = target_entry.get("filename", "")
+                if ".." in fname or os.path.isabs(fname):
+                    raise ModelIntegrityError(f"Path traversal detected in manifest filename '{fname}'.")
+                real_filepath = os.path.realpath(filepath)
+                real_storage = os.path.realpath(self.storage_dir)
+                try:
+                    common = os.path.commonpath([real_filepath, real_storage])
+                    if common != real_storage:
+                        raise ModelIntegrityError(
+                            f"Artifact path '{filepath}' is outside trusted storage directory '{self.storage_dir}'."
+                        )
+                except ValueError as exc:
+                    raise ModelIntegrityError(f"Path containment check failed for artifact '{filepath}': {exc}") from exc
+
+                if not os.path.isfile(real_filepath) or os.path.getsize(real_filepath) == 0:
+                    raise ModelIntegrityError(f"Artifact file '{filepath}' is missing, not a regular file, or empty.")
+
+                actual_sha256 = compute_file_sha256(real_filepath)
+                expected_sha256 = target_entry.get("sha256")
+                if not expected_sha256:
+                    raise ModelIntegrityError(
+                        f"Production admission rejected: model version {version} lacks recorded sha256 ({admission_context})."
+                    )
+                if not hmac.compare_digest(actual_sha256, expected_sha256):
+                    raise ModelIntegrityError(
+                        f"Production admission rejected: artifact SHA-256 digest mismatch for {simulation_id} v{version}: "
+                        f"expected '{expected_sha256}', actual '{actual_sha256}' ({admission_context})."
+                    )
+
+                receipt_dict = target_entry.get("training_receipt")
+                if not receipt_dict:
+                    raise ModelIntegrityError(
+                        f"Production admission rejected: model lacks verified cryptographic training execution receipt ({admission_context})."
+                    )
+                verifier = self._verifier or get_default_training_verifier()
+                with open(real_filepath, "rb") as rf:
+                    artifact_bytes = rf.read()
+                is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
+                    receipt_dict,
+                    candidate_artifact_sha256=actual_sha256,
+                    candidate_artifact_bytes=artifact_bytes,
+                    simulation_id=simulation_id,
+                    expected_architecture=target_entry.get("architecture"),
+                    expected_feature_schema_version=target_entry.get("feature_schema_version"),
+                    expected_input_dim=target_entry.get("input_dim"),
+                    expected_feature_names=target_entry.get("feature_names"),
+                )
+                if not is_valid_rcpt:
+                    raise ModelIntegrityError(
+                        f"Production admission rejected: cryptographic training receipt verification failed ({rcpt_reason}) ({admission_context})."
+                    )
+            elif target_entry.get("training_receipt"):
+                rcpt = target_entry.get("training_receipt")
+                if isinstance(rcpt, dict) and rcpt.get("key_id"):
+                    verifier = self._verifier or get_default_training_verifier()
+                    if not verifier.is_key_trusted(rcpt["key_id"]):
+                        raise ModelIntegrityError(
+                            f"Cryptographic training receipt verification failed (Receipt key_id '{rcpt['key_id']}' has been explicitly revoked.) ({admission_context})."
+                        )
 
             max_gen = max((e.get("generation", 0) for e in manifest), default=0)
             target_entry["generation"] = max_gen + 1
@@ -1319,6 +1478,16 @@ class ModelRegistry:
                 from app.application.services.model_service import ModelService
 
                 ModelService(settings).invalidate_model_cache()
+
+            with contextlib.suppress(Exception):
+                from app.presentation.routers.realtime_inference import reset_model_cache
+
+                reset_model_cache(simulation_id)
+
+            with contextlib.suppress(Exception):
+                from app.presentation.routers.predict import clear_all_serving_caches
+
+                clear_all_serving_caches()
 
             logger.info("Rolled back registry of %s to version %d (generation %d)", simulation_id, version, target_entry["generation"])
             return target_entry

@@ -7,12 +7,12 @@ computes risk scores, generates explainability reports, and triggers alerts.
 from __future__ import annotations
 
 import asyncio
-import functools
 import io
 import logging
 import math
 import os
 import random
+import threading
 import time
 import uuid
 from typing import Any
@@ -120,22 +120,56 @@ _feature_store = FeatureStoreService()
 
 _cached_serving_model: torch.nn.Module | None = None
 _cached_serving_model_mtime: float = 0.0
+_cached_serving_model_kid: str | None = None
+
+_challenger_cache_lock = threading.RLock()
+_challenger_model_cache: dict[tuple[str, int, bool], tuple[torch.nn.Module, str | None]] = {}
 
 
-@functools.lru_cache(maxsize=8)
 def _load_challenger_model(simulation_id: str, version: int, dp_compatible: bool) -> torch.nn.Module:
-    """Load and cache challenger model by simulation_id + version (LRU, max 8 entries).
+    """Load and cache challenger model by simulation_id + version with issuer trust verification.
 
-    Avoids per-request disk I/O for challenger shadow evaluation.
-    Cache is invalidated automatically when a new version key is seen.
+    Avoids per-request disk I/O for challenger shadow evaluation while guaranteeing that
+    revoked issuer keys immediately evict cached models.
     """
+    cache_key = (simulation_id, version, dp_compatible)
+    with _challenger_cache_lock:
+        if cache_key in _challenger_model_cache:
+            cached_m, cached_kid = _challenger_model_cache[cache_key]
+            if cached_kid:
+                from app.application.services.training_provenance_service import (
+                    get_default_training_verifier,
+                )
+
+                verifier = _registry._verifier or get_default_training_verifier()
+                try:
+                    if not verifier.is_key_trusted(cached_kid):
+                        logger.warning(
+                            "Evicting cached challenger model for sim '%s' v%d: issuer key '%s' revoked.",
+                            simulation_id,
+                            version,
+                            cached_kid,
+                        )
+                        _challenger_model_cache.pop(cache_key, None)
+                    else:
+                        return cached_m
+                except Exception as exc:
+                    logger.warning("Trust check failed for cached challenger: %s", exc)
+                    _challenger_model_cache.pop(cache_key, None)
+            else:
+                return cached_m
+
     res = _registry.resolve_and_verify_challenger(simulation_id)
+    kid: str | None = None
     if res is not None:
         _, bytes_data, entry = res
         if entry.get("version") != version:
             raise ModelIntegrityError(
                 f"Challenger version mismatch: requested {version}, resolved active challenger is {entry.get('version')}"
             )
+        rcpt = entry.get("training_receipt")
+        if isinstance(rcpt, dict):
+            kid = rcpt.get("key_id")
         state_dict = torch.load(io.BytesIO(bytes_data), map_location="cpu", weights_only=True)
     else:
         from app.config import get_settings
@@ -164,12 +198,35 @@ def _load_challenger_model(simulation_id: str, version: int, dp_compatible: bool
     model.load_state_dict(state_dict)
     model.eval()
     logger.debug("Challenger model v%d loaded and cached (sim=%s).", version, simulation_id[:8])
+
+    with _challenger_cache_lock:
+        if len(_challenger_model_cache) >= 8:
+            _challenger_model_cache.pop(next(iter(_challenger_model_cache)), None)
+        _challenger_model_cache[cache_key] = (model, kid)
+
     return model
+
+
+def _clear_challenger_model_cache() -> None:
+    with _challenger_cache_lock:
+        _challenger_model_cache.clear()
+
+
+_load_challenger_model.cache_clear = _clear_challenger_model_cache
+
+
+def clear_all_serving_caches() -> None:
+    """Clear all process-local model serving caches."""
+    global _cached_serving_model, _cached_serving_model_mtime, _cached_serving_model_kid
+    _cached_serving_model = None
+    _cached_serving_model_mtime = 0.0
+    _cached_serving_model_kid = None
+    _clear_challenger_model_cache()
 
 
 def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Module:
     """Resolve and cache active serving neural network model in memory."""
-    global _cached_serving_model, _cached_serving_model_mtime
+    global _cached_serving_model, _cached_serving_model_mtime, _cached_serving_model_kid
     if simulation_id:
         active_entry = _registry.get_active_version(simulation_id)
         if not active_entry:
@@ -181,6 +238,21 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"No trained models found for simulation ID: {simulation_id}",
             )
+
+        # Check issuer key revocation if present
+        rcpt = active_entry.get("training_receipt")
+        if isinstance(rcpt, dict) and rcpt.get("key_id"):
+            from app.application.services.training_provenance_service import (
+                get_default_training_verifier,
+            )
+
+            verifier = _registry._verifier or get_default_training_verifier()
+            if not verifier.is_key_trusted(rcpt["key_id"]):
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"Serving model for simulation '{simulation_id}' rejected: issuer key has been revoked.",
+                )
+
         state_dict = _registry.load_version(simulation_id, active_entry["version"])
         sim_dp = True
         for key in state_dict:
@@ -208,6 +280,27 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
         model.eval()
         return model
 
+    # Recheck issuer key of cached serving model
+    if _cached_serving_model is not None and _cached_serving_model_kid:
+        from app.application.services.training_provenance_service import (
+            get_default_training_verifier,
+        )
+
+        verifier = _registry._verifier or get_default_training_verifier()
+        try:
+            if not verifier.is_key_trusted(_cached_serving_model_kid):
+                logger.warning(
+                    "Evicting cached global serving model: issuer key '%s' revoked.",
+                    _cached_serving_model_kid,
+                )
+                _cached_serving_model = None
+                _cached_serving_model_mtime = 0.0
+                _cached_serving_model_kid = None
+        except Exception:
+            _cached_serving_model = None
+            _cached_serving_model_mtime = 0.0
+            _cached_serving_model_kid = None
+
     global_path = os.path.join(_registry.storage_dir, "global_model.pt")
     if not os.path.exists(global_path):
         os.makedirs(_registry.storage_dir, exist_ok=True)
@@ -215,6 +308,7 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
         torch.save(default_m.state_dict(), global_path)
         _cached_serving_model = default_m
         _cached_serving_model_mtime = time.time()
+        _cached_serving_model_kid = None
         _cached_serving_model.eval()
         return _cached_serving_model
 
@@ -245,6 +339,11 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
         model.eval()
         _cached_serving_model = model
         _cached_serving_model_mtime = current_mtime
+        try:
+            active_ident = _registry.get_active_champion_identity()
+            _cached_serving_model_kid = active_ident.get("issuer_key_id") if active_ident else None
+        except Exception:
+            _cached_serving_model_kid = None
 
     return _cached_serving_model
 
