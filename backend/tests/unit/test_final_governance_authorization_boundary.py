@@ -245,6 +245,7 @@ def test_final_gate_02_direct_production_rollback_without_authority_rejected():
             reg.promote_version(sim_id, v2, target_status="champion", auth_token=tok2_ml)
 
             active = reg.get_active_version(sim_id)
+            assert active is not None
             assert active["version"] == v2
 
             # Direct rollback call omitting auth_token and actor
@@ -253,6 +254,7 @@ def test_final_gate_02_direct_production_rollback_without_authority_rejected():
 
             # Active champion must remain v2
             active_after = reg.get_active_version(sim_id)
+            assert active_after is not None
             assert active_after["version"] == v2
 
 
@@ -449,6 +451,7 @@ def test_final_gate_07_authorized_operator_with_required_clearance_succeeds():
             assert resp_rb.status_code == 200
             assert resp_rb.json()["version"] == v1
             active = reg.get_active_version(sim_id)
+            assert active is not None
             assert active["version"] == v1
 
             # D. Deployment mutation via REST API
