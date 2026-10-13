@@ -30,6 +30,7 @@ from app.application.schemas.model_registry import (
 )
 from app.application.services.model_registry import ModelEvaluationEngine, ModelRegistry
 from app.application.services.zero_downtime_deployer import ZeroDowntimeDeploymentManager
+from app.domain.model_serving_errors import ModelCompatibilityError, ModelIntegrityError
 from app.presentation.routers.simulation import _simulation_events
 
 logger = logging.getLogger(__name__)
@@ -469,6 +470,8 @@ async def promote_model_version(
             sr11_7_validation=sr11_7_result,
             timestamp=updated_entry.get("created_at"),
         )
+    except (ModelIntegrityError, ModelCompatibilityError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except FileNotFoundError as e:

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import io
 import logging
 import math
 import os
@@ -52,7 +53,11 @@ from app.application.services.data_generator import (
 )
 from app.application.services.explainability_service import ExplainabilityService
 from app.application.services.feature_store_service import FeatureStoreService
-from app.application.services.model_registry import ModelEvaluationEngine, ModelRegistry
+from app.application.services.model_registry import (
+    ModelEvaluationEngine,
+    ModelRegistry,
+    validate_production_admission,
+)
 from app.application.services.model_service import NUM_FEATURES, ModelService
 from app.application.services.risk_engine import RiskScoringEngine
 from app.config import get_settings
@@ -61,6 +66,10 @@ from app.dependencies import (
     TenantDep,
     enforce_tenant_isolation,
     enforce_tenant_quota,
+)
+from app.domain.model_serving_errors import (
+    ModelIntegrityError,
+    ModelNotAvailableError,
 )
 from app.infrastructure.security.rate_limiter import (
     is_benchmark_mode,
@@ -120,7 +129,23 @@ def _load_challenger_model(simulation_id: str, version: int, dp_compatible: bool
     Avoids per-request disk I/O for challenger shadow evaluation.
     Cache is invalidated automatically when a new version key is seen.
     """
-    state_dict = _registry.load_version(simulation_id, version)
+    res = _registry.resolve_and_verify_challenger(simulation_id)
+    if res is not None:
+        _, bytes_data, entry = res
+        if entry.get("version") != version:
+            raise ModelIntegrityError(
+                f"Challenger version mismatch: requested {version}, resolved active challenger is {entry.get('version')}"
+            )
+        state_dict = torch.load(io.BytesIO(bytes_data), map_location="cpu", weights_only=True)
+    else:
+        from app.config import get_settings
+
+        if get_settings().app_env.lower() == "production":
+            raise ModelNotAvailableError(
+                f"No verified challenger model found for simulation '{simulation_id}' v{version} in production."
+            )
+        state_dict = _registry.load_version(simulation_id, version)
+
     chall_dp = dp_compatible
     for key in state_dict:
         if "running_mean" in key or "running_var" in key:
@@ -335,11 +360,17 @@ async def predict_transaction(
         active_entry = None
         if payload.simulation_id:
             manifest = _registry._load_manifest(payload.simulation_id)
-            active_entry = next((e for e in manifest if e.get("status") == "active"), None)
+            active_entry = next((e for e in manifest if (e.get("status") in ("champion", "active") and e.get("is_active")) or e.get("status") == "active"), None)
             challenger_entry = next((e for e in manifest if e.get("status") == "challenger"), None)
             if challenger_entry:
                 challenger_ver = challenger_entry["version"]
                 try:
+                    from app.config import get_settings
+
+                    _st = get_settings()
+                    if _st.app_env.lower() == "production":
+                        validate_production_admission(challenger_entry, context="predict_challenger_serving")
+
                     # Use LRU-cached loader — avoids per-request disk I/O
                     chall_model = _load_challenger_model(
                         payload.simulation_id, challenger_ver, dp_compatible=True
@@ -369,6 +400,8 @@ async def predict_transaction(
                         challenger_ver,
                         exc,
                     )
+                    chall_prob = None
+                    challenger_ver = None
 
 
         # Traffic Routing: Route a portion of the traffic to the Challenger

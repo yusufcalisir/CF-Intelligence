@@ -156,6 +156,17 @@ def validate_production_admission(
     if settings.app_env.lower() != "production":
         return
 
+    # Enforce dual-approval contract on champion activation and serving entry points
+    CHAMPION_CONTEXTS = (
+        "save_version",
+        "promote_version",
+        "rollback",
+        "resolve_and_verify_champion",
+        "get_active_champion_identity",
+        "champion_activation",
+        "ModelService.get_champion",
+    )
+
     prov: str
     is_eligible: bool | None = None
     sha256_val: str | None = None
@@ -171,16 +182,22 @@ def validate_production_admission(
     else:
         prov = entry_or_provenance.strip().upper()
 
+    target_role = (
+        "champion"
+        if context in CHAMPION_CONTEXTS
+        else ("challenger" if "challenger" in context else "operational")
+    )
+
     if prov == "STRUCTURAL_FIXTURE":
         raise ModelIntegrityError(
-            f"Production admission rejected: Structural fixture cannot be promoted to champion in production environment ({context}). "
+            f"Production admission rejected: Structural fixture cannot be promoted to {target_role} in production environment ({context}). "
             f"Structural test fixture cannot be promoted."
         )
 
     if prov in ("UNVERIFIED", "LEGACY_UNVERIFIED", "CALLER_REPORTED_UNVERIFIED"):
         raise ModelIntegrityError(
             f"Production admission rejected: model provenance '{prov}' is ineligible for "
-            f"operational champion serving in production environment ({context})."
+            f"operational {target_role} serving in production environment ({context})."
         )
 
     if prov not in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED"):
@@ -205,16 +222,6 @@ def validate_production_admission(
                 f"Production admission rejected: model lacks verified cryptographic training execution receipt ({context})."
             )
 
-        # Enforce dual-approval contract on champion activation and serving entry points
-        CHAMPION_CONTEXTS = (
-            "save_version",
-            "promote_version",
-            "rollback",
-            "resolve_and_verify_champion",
-            "get_active_champion_identity",
-            "champion_activation",
-            "ModelService.get_champion",
-        )
         if context in CHAMPION_CONTEXTS:
             sign_offs = entry_or_provenance.get("sign_offs", [])
             if not isinstance(sign_offs, list) or len(sign_offs) < 2:
@@ -838,6 +845,207 @@ class ModelRegistry:
 
             return filepath, bytes_data, resolved_metadata
 
+    def resolve_and_verify_challenger(
+        self, simulation_id: str | None = None
+    ) -> tuple[str, bytes, dict[str, Any]] | None:
+        """Resolve, verify integrity, and return (artifact_path, bytes_data, metadata) for active challenger.
+
+        Enforces:
+        1. Registry manifest is the single source of truth (status='challenger').
+        2. Rejects ambiguous multiple active challengers deterministically.
+        3. Verifies file existence, containment within storage, regular file type, non-emptiness.
+        4. Verifies in-memory snapshot SHA-256 against recorded manifest digest.
+        5. In production, enforces valid cryptographic receipt, trusted issuer, artifact integrity,
+           schema compatibility, and production admission eligibility (without demanding champion-only signoffs).
+        6. Returns in-memory bytes to eliminate TOCTOU races during model loading.
+        """
+        with self._lock:
+            if not os.path.isdir(self.registry_root):
+                return None
+
+            candidates: list[tuple[str, dict[str, Any], str]] = []
+
+            sim_dirs = [simulation_id] if simulation_id else sorted(os.listdir(self.registry_root))
+            for s_id in sim_dirs:
+                sim_path = os.path.join(self.registry_root, s_id)
+                if not os.path.isdir(sim_path):
+                    continue
+                manifest = self._load_manifest(s_id)
+                challenger_entries = [
+                    e for e in manifest if e.get("status") == "challenger"
+                ]
+                if len(challenger_entries) > 1:
+                    raise ModelIntegrityError(
+                        f"Corrupt manifest in simulation '{s_id}': multiple active challenger entries found "
+                        f"({[e.get('version') for e in challenger_entries]})."
+                    )
+                if len(challenger_entries) == 1:
+                    entry = challenger_entries[0]
+                    fname = entry.get("filename") or f"model_v{entry.get('version')}.pt"
+                    fpath = os.path.join(sim_path, fname)
+                    candidates.append((s_id, entry, fpath))
+
+            if not candidates:
+                return None
+
+            if len(candidates) > 1:
+                conflicting_sims = [c[0] for c in candidates]
+                raise ModelCompatibilityError(
+                    f"Ambiguous challenger state: multiple conflicting active challengers exist across simulations: "
+                    f"{conflicting_sims}. Deterministic resolution requires specifying simulation_id or deactivating conflicting challengers."
+                )
+
+            sim_id, entry, filepath = candidates[0]
+
+            fname = entry.get("filename", os.path.basename(filepath))
+            if ".." in fname or os.path.isabs(fname):
+                raise ModelIntegrityError(
+                    f"Path traversal detected in manifest filename '{fname}'."
+                )
+
+            real_filepath = os.path.realpath(filepath)
+            real_storage = os.path.realpath(self.storage_dir)
+
+            if not os.path.exists(real_filepath):
+                raise ModelNotAvailableError(
+                    f"Active challenger artifact file '{filepath}' for simulation '{sim_id}' does not exist on disk."
+                )
+            if os.path.isdir(real_filepath) or not os.path.isfile(real_filepath):
+                raise ModelIntegrityError(
+                    f"Active challenger artifact path '{filepath}' is not a regular file."
+                )
+
+            try:
+                common = os.path.commonpath([real_filepath, real_storage])
+                if common != real_storage:
+                    raise ModelIntegrityError(
+                        f"Active challenger artifact path '{filepath}' (realpath: '{real_filepath}') is located outside trusted storage directory '{self.storage_dir}'."
+                    )
+            except ValueError as exc:
+                raise ModelIntegrityError(
+                    f"Path containment check failed for artifact '{filepath}': {exc}"
+                ) from exc
+
+            if os.path.islink(filepath):
+                try:
+                    symlink_target = os.path.realpath(os.readlink(filepath) if hasattr(os, "readlink") else filepath)
+                    if os.path.commonpath([symlink_target, real_storage]) != real_storage:
+                        raise ModelIntegrityError(
+                            f"Active challenger symlink '{filepath}' targets external path '{symlink_target}' outside trusted storage directory."
+                        )
+                except (OSError, ValueError) as exc:
+                    raise ModelIntegrityError(
+                        f"Symlink validation failed for '{filepath}': {exc}"
+                    ) from exc
+
+            if os.path.getsize(real_filepath) == 0:
+                raise ModelIntegrityError(
+                    f"Active challenger artifact file '{filepath}' is empty (0 bytes)."
+                )
+
+            try:
+                with open(real_filepath, "rb") as f:
+                    bytes_data = f.read()
+            except Exception as exc:
+                raise ModelIntegrityError(
+                    f"Failed to read challenger artifact '{filepath}': {exc}"
+                ) from exc
+
+            actual_sha256 = hashlib.sha256(bytes_data).hexdigest()
+            expected_sha256 = entry.get("sha256")
+            if not expected_sha256:
+                raise ModelIntegrityError(
+                    f"Challenger manifest entry for simulation '{sim_id}' v{entry.get('version')} lacks recorded sha256."
+                )
+            if not hmac.compare_digest(actual_sha256, expected_sha256):
+                raise ModelIntegrityError(
+                    f"Challenger artifact SHA-256 digest mismatch for simulation '{sim_id}' v{entry.get('version')}: "
+                    f"expected '{expected_sha256}', actual '{actual_sha256}'."
+                )
+
+            version_val = entry.get("version")
+            if version_val is None or not isinstance(version_val, int) or version_val < 1:
+                raise ModelIntegrityError("Challenger manifest entry contains invalid or missing version number.")
+
+            from app.config import get_settings
+            settings = get_settings()
+            if settings.app_env.lower() == "production":
+                validate_production_admission(entry, context="challenger_serving")
+                receipt_dict = entry.get("training_receipt")
+                if not receipt_dict:
+                    raise ModelIntegrityError(
+                        "Production admission rejected: model lacks verified cryptographic training execution receipt (challenger_serving)."
+                    )
+                verifier = self._verifier or get_default_training_verifier()
+                is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
+                    receipt_dict,
+                    candidate_artifact_sha256=actual_sha256,
+                    simulation_id=sim_id,
+                )
+                if not is_valid_rcpt:
+                    raise ModelIntegrityError(
+                        f"Production admission rejected: cryptographic training receipt verification failed ({rcpt_reason}) (challenger_serving)."
+                    )
+
+            provenance_type = entry.get("provenance_type", "UNVERIFIED")
+            is_prod_eligible = provenance_type in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED")
+
+            resolved_metadata = {
+                "version": version_val,
+                "generation": entry.get("generation", 1),
+                "filename": entry.get("filename", os.path.basename(filepath)),
+                "simulation_id": sim_id,
+                "artifact_path": filepath,
+                "sha256": actual_sha256,
+                "expected_sha256": expected_sha256,
+                "status": "challenger",
+                "is_active": False,
+                "is_verified": True,
+                "authenticity_status": entry.get("attestation_status", "RECEIPT_VERIFIED_TRAINING_AUTHORITY"),
+                "is_independent_human_authorization": False,
+                "authorization_scheme": "CRYPTOGRAPHIC_TRAINING_RECEIPT",
+                "architecture": entry.get("architecture", "FraudDetectionModel-GroupNorm"),
+                "input_dim": entry.get("input_dim", 10),
+                "feature_schema_version": entry.get("feature_schema_version"),
+                "feature_names": entry.get("feature_names"),
+                "verified_schema": entry.get("verified_schema"),
+                "training_receipt": entry.get("training_receipt"),
+                "metrics": entry.get("metrics", {}),
+                "metrics_provenance": entry.get("metrics_provenance", "CALLER_SUPPLIED_UNVERIFIED"),
+                "git_commit_hash": entry.get("git_commit_hash", "unknown"),
+                "dataset_hash": entry.get("dataset_hash", "unknown"),
+                "dp_noise_profile": entry.get("dp_noise_profile", {}),
+                "provenance_type": provenance_type,
+                "is_production_eligible": is_prod_eligible,
+                "training_run_id": entry.get("training_run_id", "unspecified"),
+                "dataset_manifest_id": entry.get("dataset_manifest_id", "unspecified"),
+                "attestation_status": entry.get("attestation_status", "NONE"),
+                "sign_offs": entry.get("sign_offs", []),
+                "created_at": entry.get("created_at"),
+            }
+
+            return filepath, bytes_data, resolved_metadata
+
+    def get_challenger_artifact_path(self, simulation_id: str | None = None) -> str | None:
+        """Resolve the active challenger model file path on disk.
+
+        Identified strictly via authoritative registry manifest.
+        Returns None if no active challenger exists in the registry.
+        """
+        with self._lock:
+            resolved = self.resolve_and_verify_challenger(simulation_id=simulation_id)
+            if resolved is not None:
+                return resolved[0]
+            return None
+
+    def get_challenger_metadata(self, simulation_id: str | None = None) -> dict[str, Any] | None:
+        """Return metadata for the currently active challenger model."""
+        with self._lock:
+            resolved = self.resolve_and_verify_challenger(simulation_id=simulation_id)
+            if resolved is not None:
+                return resolved[2]
+            return None
+
     def get_champion_artifact_path(self, simulation_id: str | None = None) -> str | None:
         """Resolve the active champion model file path on disk.
 
@@ -983,8 +1191,56 @@ class ModelRegistry:
 
             from app.config import get_settings
             settings = get_settings()
-            if target_status == "champion":
-                validate_production_admission(target_entry, context="promote_version")
+
+            admission_context = "promote_version" if target_status == "champion" else "promote_challenger"
+            validate_production_admission(target_entry, context=admission_context)
+
+            if settings.app_env.lower() == "production":
+                # Strict filename and path containment validation
+                fname = target_entry.get("filename", "")
+                if ".." in fname or os.path.isabs(fname):
+                    raise ModelIntegrityError(f"Path traversal detected in manifest filename '{fname}'.")
+                real_filepath = os.path.realpath(filepath)
+                real_storage = os.path.realpath(self.storage_dir)
+                try:
+                    common = os.path.commonpath([real_filepath, real_storage])
+                    if common != real_storage:
+                        raise ModelIntegrityError(
+                            f"Artifact path '{filepath}' is outside trusted storage directory '{self.storage_dir}'."
+                        )
+                except ValueError as exc:
+                    raise ModelIntegrityError(f"Path containment check failed for artifact '{filepath}': {exc}") from exc
+
+                if not os.path.isfile(real_filepath) or os.path.getsize(real_filepath) == 0:
+                    raise ModelIntegrityError(f"Artifact file '{filepath}' is missing, not a regular file, or empty.")
+
+                actual_sha256 = compute_file_sha256(real_filepath)
+                expected_sha256 = target_entry.get("sha256")
+                if not expected_sha256:
+                    raise ModelIntegrityError(
+                        f"Production admission rejected: model version {version} lacks recorded sha256 ({admission_context})."
+                    )
+                if not hmac.compare_digest(actual_sha256, expected_sha256):
+                    raise ModelIntegrityError(
+                        f"Production admission rejected: artifact SHA-256 digest mismatch for {simulation_id} v{version}: "
+                        f"expected '{expected_sha256}', actual '{actual_sha256}' ({admission_context})."
+                    )
+
+                receipt_dict = target_entry.get("training_receipt")
+                if not receipt_dict:
+                    raise ModelIntegrityError(
+                        f"Production admission rejected: model lacks verified cryptographic training execution receipt ({admission_context})."
+                    )
+                verifier = self._verifier or get_default_training_verifier()
+                is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
+                    receipt_dict,
+                    candidate_artifact_sha256=actual_sha256,
+                    simulation_id=simulation_id,
+                )
+                if not is_valid_rcpt:
+                    raise ModelIntegrityError(
+                        f"Production admission rejected: cryptographic training receipt verification failed ({rcpt_reason}) ({admission_context})."
+                    )
 
             max_gen = max((e.get("generation", 0) for e in manifest), default=0)
             if target_status == "champion":

@@ -975,6 +975,8 @@ def test_non_finite_feature_in_canonical_preprocess_raises_value_error():
 
 def test_development_partial_features_labeled_as_simulated():
     """Verifies that partial features in development mode are labeled with [Simulated Features]."""
+    svc = ModelService(get_settings())
+    m = svc.create_model(dp_compatible=True)
     client = TestClient(app)
     req = {
         "transaction_id": "tx_dev_simulated",
@@ -982,7 +984,10 @@ def test_development_partial_features_labeled_as_simulated():
         "merchant_category": "grocery",
         "velocity_1h": 1,
     }
-    with patch.object(get_settings(), "app_env", "development"):
+    with (
+        patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(m, False)),
+        patch.object(get_settings(), "app_env", "development"),
+    ):
         resp = client.post("/v1/inference/score", json=req)
         assert resp.status_code == 200
         assert "[Simulated Features]" in resp.json()["explanation"]
