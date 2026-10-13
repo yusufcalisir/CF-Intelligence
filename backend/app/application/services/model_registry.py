@@ -17,6 +17,7 @@ import shutil
 import tempfile
 import threading
 import time
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -464,7 +465,7 @@ class ModelRegistry:
         simulation_id: str,
         state_dict: dict[str, Any],
         metrics: dict[str, Any],
-        is_promoted: bool = True,
+        is_promoted: bool = False,
         git_commit_hash: str | None = None,
         dataset_hash: str | None = None,
         dp_noise_profile: dict[str, Any] | None = None,
@@ -482,13 +483,13 @@ class ModelRegistry:
         expected_feature_names: list[str] | tuple[str, ...] | None = None,
         model_contract: Any | None = None,
     ) -> dict[str, Any]:
-        """Save a new version of the global model weights.
+        """Save a new version of the global model weights. Defaults to inactive candidate.
 
         Args:
             simulation_id: ID of the active simulation run.
             state_dict: PyTorch model state dict.
             metrics: Dict of metrics (accuracy, f1_score, auc_roc, recall, etc.).
-            is_promoted: Whether this version is currently promoted as active.
+            is_promoted: Whether this version is promoted as active champion (defaults to False).
             git_commit_hash: Hash of the git commit.
             dataset_hash: Hash of the training dataset.
             dp_noise_profile: DP mechanism profile details.
@@ -596,6 +597,13 @@ class ModelRegistry:
         file_lock = _get_registry_file_lock(sim_dir)
 
         with self._lock, file_lock:
+            # Clean up any stale temporary files from previous crashed runs
+            if os.path.isdir(sim_dir):
+                for f_name in os.listdir(sim_dir):
+                    if f_name.startswith(".tmp_model_") and f_name.endswith(".pt"):
+                        with contextlib.suppress(OSError):
+                            os.remove(os.path.join(sim_dir, f_name))
+
             manifest = self._load_manifest(simulation_id)
             next_version = 1
             if manifest:
@@ -603,107 +611,128 @@ class ModelRegistry:
 
             filename = f"model_v{next_version}.pt"
             filepath = os.path.join(sim_dir, filename)
+            final_already_existed = os.path.exists(filepath)
+
+            tmp_filename = f".tmp_model_v{next_version}_{os.getpid()}_{threading.get_ident()}_{uuid.uuid4().hex}.pt"
+            tmp_filepath = os.path.join(sim_dir, tmp_filename)
+
+            newly_created_temp: str | None = None
+            newly_created_final: str | None = None
 
             try:
                 if artifact_bytes is not None:
-                    with open(filepath, "wb") as f:
+                    with open(tmp_filepath, "wb") as f:
                         f.write(artifact_bytes)
+                        f.flush()
+                        os.fsync(f.fileno())
                 else:
-                    torch.save(state_dict, filepath)
-                logger.info("Saved model version %d to %s", next_version, filepath)
-            except Exception as e:
-                logger.error("Failed to save model file: %s", e)
-                raise
+                    torch.save(state_dict, tmp_filepath)
+                newly_created_temp = tmp_filepath
+                logger.debug("Serialized model version %d to staging path %s", next_version, tmp_filepath)
 
-            file_sha256 = compute_file_sha256(filepath)
+                file_sha256 = compute_file_sha256(tmp_filepath)
 
-            # If receipt provided, verify artifact SHA256 binding and schema constraints
-            if receipt_dict is not None and has_valid_receipt:
-                verifier = self._verifier or get_default_training_verifier()
-                is_valid_binding, binding_reason = verifier.verify_receipt(
-                    receipt_dict,
-                    candidate_artifact_sha256=file_sha256,
-                    simulation_id=simulation_id,
-                    expected_architecture=exp_arch,
-                    expected_feature_schema_version=exp_schema_ver,
-                    expected_input_dim=exp_dim,
-                    expected_feature_names=exp_names,
-                )
-                if not is_valid_binding:
-                    has_valid_receipt = False
-                    final_provenance = "UNVERIFIED"
-                    attestation_status = f"INVALID_RECEIPT: {binding_reason}"
-                    is_prod_eligible = False
+                # If receipt provided, verify artifact SHA256 binding and schema constraints
+                if receipt_dict is not None and has_valid_receipt:
+                    verifier = self._verifier or get_default_training_verifier()
+                    is_valid_binding, binding_reason = verifier.verify_receipt(
+                        receipt_dict,
+                        candidate_artifact_sha256=file_sha256,
+                        simulation_id=simulation_id,
+                        expected_architecture=exp_arch,
+                        expected_feature_schema_version=exp_schema_ver,
+                        expected_input_dim=exp_dim,
+                        expected_feature_names=exp_names,
+                    )
+                    if not is_valid_binding:
+                        has_valid_receipt = False
+                        final_provenance = "UNVERIFIED"
+                        attestation_status = f"INVALID_RECEIPT: {binding_reason}"
+                        is_prod_eligible = False
 
-            max_gen = max((e.get("generation", 0) for e in manifest), default=0)
-            entry_gen = (max_gen + 1) if is_promoted else (max_gen if max_gen > 0 else 1)
+                max_gen = max((e.get("generation", 0) for e in manifest), default=0)
+                entry_gen = (max_gen + 1) if is_promoted else (max_gen if max_gen > 0 else 1)
 
-            verified_schema_meta = None
-            if has_valid_receipt and receipt_dict is not None:
-                verified_schema_meta = {
-                    "architecture": receipt_dict.get("architecture"),
-                    "feature_schema_version": receipt_dict.get("feature_schema_version"),
-                    "input_dim": receipt_dict.get("input_dim"),
-                    "feature_names": list(receipt_dict.get("feature_names", [])),
+                verified_schema_meta = None
+                if has_valid_receipt and receipt_dict is not None:
+                    verified_schema_meta = {
+                        "architecture": receipt_dict.get("architecture"),
+                        "feature_schema_version": receipt_dict.get("feature_schema_version"),
+                        "input_dim": receipt_dict.get("input_dim"),
+                        "feature_names": list(receipt_dict.get("feature_names", [])),
+                    }
+
+                entry: dict[str, Any] = {
+                    "version": next_version,
+                    "simulation_id": simulation_id,
+                    "generation": entry_gen,
+                    "filename": filename,
+                    "architecture": verified_schema_meta["architecture"] if verified_schema_meta else exp_arch,
+                    "feature_schema_version": verified_schema_meta["feature_schema_version"] if verified_schema_meta else exp_schema_ver,
+                    "input_dim": verified_schema_meta["input_dim"] if verified_schema_meta else exp_dim,
+                    "feature_names": verified_schema_meta["feature_names"] if verified_schema_meta else (list(exp_names) if exp_names is not None else None),
+                    "verified_schema": verified_schema_meta,
+                    "metrics": metrics,
+                    "metrics_provenance": "CALLER_SUPPLIED_UNVERIFIED",
+                    "is_active": is_promoted,
+                    "status": status if status != "inactive" or not is_promoted else "champion",
+                    "git_commit_hash": git_commit_hash or "unknown",
+                    "dataset_hash": dataset_hash or "unknown",
+                    "sha256": file_sha256,
+                    "dp_noise_profile": dp_noise_profile
+                    or {"mechanism": "none", "epsilon": 0.0, "delta": 0.0},
+                    "provenance_type": final_provenance,
+                    "is_production_eligible": is_prod_eligible,
+                    "training_run_id": training_run_id or "unspecified",
+                    "dataset_manifest_id": dataset_manifest_id or "unspecified",
+                    "training_evidence": training_evidence or {},
+                    "training_receipt": receipt_dict if has_valid_receipt else None,
+                    "attestation_status": attestation_status,
+                    "sign_offs": [],
+                    "created_at": datetime.now(UTC).isoformat(),
                 }
 
-            entry: dict[str, Any] = {
-                "version": next_version,
-                "simulation_id": simulation_id,
-                "generation": entry_gen,
-                "filename": filename,
-                "architecture": verified_schema_meta["architecture"] if verified_schema_meta else exp_arch,
-                "feature_schema_version": verified_schema_meta["feature_schema_version"] if verified_schema_meta else exp_schema_ver,
-                "input_dim": verified_schema_meta["input_dim"] if verified_schema_meta else exp_dim,
-                "feature_names": verified_schema_meta["feature_names"] if verified_schema_meta else (list(exp_names) if exp_names is not None else None),
-                "verified_schema": verified_schema_meta,
-                "metrics": metrics,
-                "metrics_provenance": "CALLER_SUPPLIED_UNVERIFIED",
-                "is_active": is_promoted,
-                "status": status if status != "inactive" or not is_promoted else "champion",
-                "git_commit_hash": git_commit_hash or "unknown",
-                "dataset_hash": dataset_hash or "unknown",
-                "sha256": file_sha256,
-                "dp_noise_profile": dp_noise_profile
-                or {"mechanism": "none", "epsilon": 0.0, "delta": 0.0},
-                "provenance_type": final_provenance,
-                "is_production_eligible": is_prod_eligible,
-                "training_run_id": training_run_id or "unspecified",
-                "dataset_manifest_id": dataset_manifest_id or "unspecified",
-                "training_evidence": training_evidence or {},
-                "training_receipt": receipt_dict if has_valid_receipt else None,
-                "attestation_status": attestation_status,
-                "sign_offs": [],
-                "created_at": datetime.now(UTC).isoformat(),
-            }
+                # Centralized production admission check on promotion (BEFORE publishing artifact)
+                if is_promoted:
+                    validate_production_admission(entry, context="save_version")
 
-            # Centralized production admission check on promotion
-            if is_promoted:
-                validate_production_admission(entry, context="save_version")
+                # Atomically promote staged artifact to authoritative filename
+                os.replace(tmp_filepath, filepath)
+                newly_created_temp = None
+                newly_created_final = filepath
+                logger.info("Saved model version %d to %s", next_version, filepath)
 
-            # If this new version is promoted, set other versions to inactive
-            if is_promoted:
-                for existing_entry in manifest:
-                    existing_entry["is_active"] = False
-                    if existing_entry.get("status") == "champion":
-                        existing_entry["status"] = "inactive"
+                # If this new version is promoted, set other versions to inactive
+                if is_promoted:
+                    for existing_entry in manifest:
+                        existing_entry["is_active"] = False
+                        if existing_entry.get("status") == "champion":
+                            existing_entry["status"] = "inactive"
 
-            manifest.append(entry)
-            # Authoritative manifest is saved FIRST (Section 9.1)
-            self._save_manifest(simulation_id, manifest)
+                manifest.append(entry)
+                # Authoritative manifest is saved FIRST (Section 9.1)
+                self._save_manifest(simulation_id, manifest)
 
-            # If promoted, update secondary link and invalidate cache
-            if is_promoted:
-                try:
-                    self._update_global_model_link(simulation_id, filepath)
-                except Exception as link_err:
-                    logger.error("Failed to update global model link: %s", link_err)
-                with contextlib.suppress(Exception):
-                    from app.application.services.model_service import ModelService
+                # If promoted, update secondary link and invalidate cache
+                if is_promoted:
+                    try:
+                        self._update_global_model_link(simulation_id, filepath)
+                    except Exception as link_err:
+                        logger.error("Failed to update global model link: %s", link_err)
+                    with contextlib.suppress(Exception):
+                        from app.application.services.model_service import ModelService
 
-                    ModelService(settings).invalidate_model_cache()
+                        ModelService(settings).invalidate_model_cache()
 
-            return entry
+                return entry
+            except Exception:
+                if newly_created_temp and os.path.exists(newly_created_temp):
+                    with contextlib.suppress(OSError):
+                        os.remove(newly_created_temp)
+                if newly_created_final and not final_already_existed and os.path.exists(newly_created_final):
+                    with contextlib.suppress(OSError):
+                        os.remove(newly_created_final)
+                raise
 
 
     def resolve_and_verify_champion(
