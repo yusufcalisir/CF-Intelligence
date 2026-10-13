@@ -465,9 +465,20 @@ def test_existing_champion_and_legitimate_challenger_inference_correct():
 
         reg = ModelRegistry(storage_dir=tmp_dir, verifier=verifier)
 
+        from app.infrastructure.security.auth_service import AuthenticationService
+        auth_svc = AuthenticationService(
+            signing_secret="production_safe_test_secret_32_bytes_len",
+            in_memory=True,
+            authority_secret="production_safe_test_auth_secret_32_bytes_len",
+            app_env="development",
+        )
+        auth_svc.register_user("eng_ml", "Pass123!", "bank_a", ["ml_engineer"], clearance_level=2)
+        auth_svc.register_user("eng_cp", "Pass123!", "bank_a", ["compliance"], clearance_level=3)
+
         with (
             patch.object(settings, "app_env", "production"),
             patch.object(prov_service, "_DEFAULT_VERIFIER", verifier),
+            patch.object(AuthenticationService, "get_instance", return_value=auth_svc),
         ):
             # Champion v1
             reg.save_version("sim_both_ok", state_dict, metrics={"auc": 0.85}, is_promoted=False, training_receipt=rcpt, artifact_bytes=raw_bytes)

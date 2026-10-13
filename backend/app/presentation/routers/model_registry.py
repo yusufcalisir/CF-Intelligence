@@ -47,6 +47,90 @@ registry = ModelRegistry()
 _eval_engine = ModelEvaluationEngine(registry)
 deployer = ZeroDowntimeDeploymentManager()
 
+# Minimal explicit role policies for governance & deployment gateways
+MODEL_PROMOTION_ROLES: set[str] = {"admin", "ml_lead", "ml_engineer"}
+MODEL_ROLLBACK_ROLES: set[str] = {"admin", "ml_lead", "compliance", "compliance_officer"}
+DEPLOYMENT_OPERATOR_ROLES: set[str] = {"admin", "ml_lead", "devops", "operator"}
+
+
+def _authenticate_and_authorize_operator(
+    authorization: str | None,
+    allowed_roles: set[str],
+    operation_name: str,
+) -> tuple[Any, dict[str, Any], str]:
+    """Authenticate Bearer JWT and verify authoritative active identity and live RBAC clearance.
+
+    Guarantees:
+    1. Rejects missing, malformed, or empty Authorization headers with 401.
+    2. Cryptographically verifies JWT signature, expiration, and durable revocation via DurableAccountStore.
+    3. Verifies principal exists, is active, and is not deactivated, suspended, or disabled.
+    4. Evaluates live effective roles from authoritative DurableAccountStore (defending against stale JWTs).
+    5. Evaluates token claims for required role as defense-in-depth against privilege elevation without re-authentication.
+    6. Refuses to use caller-supplied request fields (user, role, approved_by, actor) for authority.
+    """
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header. Expected 'Bearer <token>'.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_parts = authorization.strip().split()
+    if len(token_parts) != 2 or token_parts[0].lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header format. Expected 'Bearer <token>'.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_str = token_parts[1]
+    auth_svc = AuthenticationService.get_instance()
+    is_valid, claims, err_detail = auth_svc.verify_access_token(token_str)
+    if not is_valid or not claims:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=err_detail or "Authentication token is invalid or has expired.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    authenticated_user = (claims.get("username") or "").strip()
+    authenticated_sub = (claims.get("sub") or "").strip()
+    lookup_name = authenticated_user or authenticated_sub
+
+    authoritative_user = auth_svc.get_user(lookup_name)
+    if not authoritative_user or not authoritative_user.is_active or authoritative_user.status.lower() != "active":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Operator principal '{lookup_name}' is not an active authoritative user.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    norm_allowed = {r.lower().strip() for r in allowed_roles}
+    authoritative_roles = {r.lower().strip() for r in authoritative_user.roles}
+
+    # Live RBAC verification from DurableAccountStore (prevents stale/demoted claims)
+    if not (authoritative_roles & norm_allowed):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Authenticated principal '{authoritative_user.username}' is not authorized to execute {operation_name}. "
+                f"Requires one of: {sorted(norm_allowed)}."
+            ),
+        )
+
+    # Token claims defense-in-depth: Token must also have carried an authorized role
+    token_roles = {r.lower().strip() for r in claims.get("roles", [])}
+    if not (token_roles & norm_allowed):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Authenticated principal '{authoritative_user.username}' is not authorized to execute {operation_name}. "
+                f"Token claims do not satisfy required role."
+            ),
+        )
+
+    return authoritative_user, claims, token_str
+
 
 def _session_to_response(session: Any) -> DeploymentSessionResponse:
     """Format ZeroDowntimeDeploymentSession into Pydantic schema."""
@@ -120,8 +204,12 @@ async def list_registered_models() -> ModelInventoryResponse:
 @api_router.post("/deployment/initiate", response_model=DeploymentSessionResponse, status_code=status.HTTP_200_OK)
 @models_router.post("/deployment/initiate", response_model=DeploymentSessionResponse, status_code=status.HTTP_200_OK)
 @models_api_router.post("/deployment/initiate", response_model=DeploymentSessionResponse, status_code=status.HTTP_200_OK)
-async def initiate_deployment(payload: UpgradeInitiateRequest) -> DeploymentSessionResponse:
+async def initiate_deployment(
+    payload: UpgradeInitiateRequest,
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
+) -> DeploymentSessionResponse:
     """Initiates a zero-downtime rolling upgrade session."""
+    _authenticate_and_authorize_operator(authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment initiation")
     try:
         session = deployer.initiate_upgrade(
             target_version=payload.target_version,
@@ -182,9 +270,12 @@ async def get_deployment_status() -> DeploymentStatusResponse:
 @models_router.post("/deployment/{session_id}/drain", response_model=DrainConnectionsResponse, status_code=status.HTTP_200_OK)
 @models_api_router.post("/deployment/{session_id}/drain", response_model=DrainConnectionsResponse, status_code=status.HTTP_200_OK)
 async def drain_deployment_connections(
-    session_id: str, payload: DrainConnectionsRequest
+    session_id: str,
+    payload: DrainConnectionsRequest,
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> DrainConnectionsResponse:
     """Gracefully drains active client connections without dropping requests."""
+    _authenticate_and_authorize_operator(authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment connection draining")
     try:
         active_remaining, drained_total = deployer.drain_client_connections(
             session_id=session_id,
@@ -215,9 +306,12 @@ async def drain_deployment_connections(
 @models_router.post("/deployment/{session_id}/rolling-update", response_model=DeploymentSessionResponse, status_code=status.HTTP_200_OK)
 @models_api_router.post("/deployment/{session_id}/rolling-update", response_model=DeploymentSessionResponse, status_code=status.HTTP_200_OK)
 async def execute_deployment_rolling_update(
-    session_id: str, payload: RollingUpdateRequest
+    session_id: str,
+    payload: RollingUpdateRequest,
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> DeploymentSessionResponse:
     """Executes rolling instance updates across cluster instances."""
+    _authenticate_and_authorize_operator(authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment rolling update")
     try:
         session = deployer.execute_rolling_instance_update(
             session_id=session_id,
@@ -240,8 +334,12 @@ async def execute_deployment_rolling_update(
 @api_router.post("/deployment/{session_id}/finalize", response_model=DeploymentSessionResponse, status_code=status.HTTP_200_OK)
 @models_router.post("/deployment/{session_id}/finalize", response_model=DeploymentSessionResponse, status_code=status.HTTP_200_OK)
 @models_api_router.post("/deployment/{session_id}/finalize", response_model=DeploymentSessionResponse, status_code=status.HTTP_200_OK)
-async def finalize_deployment(session_id: str) -> DeploymentSessionResponse:
+async def finalize_deployment(
+    session_id: str,
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
+) -> DeploymentSessionResponse:
     """Finalizes deployment session and promotes target version to current."""
+    _authenticate_and_authorize_operator(authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment finalization")
     try:
         session = deployer.finalize_upgrade(session_id)
         return _session_to_response(session)
@@ -261,8 +359,13 @@ async def finalize_deployment(session_id: str) -> DeploymentSessionResponse:
 @api_router.post("/deployment/{session_id}/abort", response_model=DeploymentSessionResponse, status_code=status.HTTP_200_OK)
 @models_router.post("/deployment/{session_id}/abort", response_model=DeploymentSessionResponse, status_code=status.HTTP_200_OK)
 @models_api_router.post("/deployment/{session_id}/abort", response_model=DeploymentSessionResponse, status_code=status.HTTP_200_OK)
-async def abort_deployment(session_id: str, payload: UpgradeAbortRequest) -> DeploymentSessionResponse:
+async def abort_deployment(
+    session_id: str,
+    payload: UpgradeAbortRequest,
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
+) -> DeploymentSessionResponse:
     """Aborts deployment session on health check failure, restoring connections."""
+    _authenticate_and_authorize_operator(authorization, DEPLOYMENT_OPERATOR_ROLES, "deployment abort")
     try:
         session = deployer.abort_upgrade(session_id, reason=payload.reason)
         return _session_to_response(session)
@@ -354,9 +457,15 @@ async def get_model_version(simulation_id: str, version: int) -> ModelVersionIte
 @models_router.post("/{simulation_id}/versions/{version}/promote", response_model=ModelPromoteResponse, status_code=status.HTTP_200_OK)
 @models_api_router.post("/{simulation_id}/versions/{version}/promote", response_model=ModelPromoteResponse, status_code=status.HTTP_200_OK)
 async def promote_model_version(
-    simulation_id: str, version: int, payload: ModelPromoteRequest
+    simulation_id: str,
+    version: int,
+    payload: ModelPromoteRequest,
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> ModelPromoteResponse:
     """Promote a specific model version to champion or challenger with SR 11-7 gate validation."""
+    operator, claims, token_str = _authenticate_and_authorize_operator(
+        authorization, MODEL_PROMOTION_ROLES, "model promotion"
+    )
     entry = registry.get_version_metadata(simulation_id, version)
     if not entry:
         raise HTTPException(
@@ -449,6 +558,8 @@ async def promote_model_version(
             simulation_id=simulation_id,
             version=version,
             target_status=payload.target_status,
+            auth_token=token_str,
+            actor=operator.username,
         )
         _simulation_events.push_list(
             simulation_id,
@@ -472,7 +583,16 @@ async def promote_model_version(
             timestamp=updated_entry.get("created_at"),
         )
     except (ModelIntegrityError, ModelCompatibilityError) as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        err_msg = str(e)
+        if "authentication failed" in err_msg.lower() or "token" in err_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=err_msg,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if "lacks required role" in err_msg.lower() or "not authorized" in err_msg.lower():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=err_msg)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err_msg)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except FileNotFoundError as e:
@@ -495,8 +615,10 @@ async def promote_model_by_simulation(
     simulation_id: str,
     payload: ModelPromoteRequest,
     version: int | None = Query(None, description="Optional version to promote; defaults to latest"),
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> ModelPromoteResponse:
     """Convenience alias to promote a simulation model under /models/{model_id}/promote."""
+    _authenticate_and_authorize_operator(authorization, MODEL_PROMOTION_ROLES, "model promotion")
     manifest = registry._load_manifest(simulation_id)
     if not manifest:
         raise HTTPException(
@@ -504,17 +626,29 @@ async def promote_model_by_simulation(
             detail=f"No models found in registry for simulation '{simulation_id}'.",
         )
     target_ver = version if version is not None else max(e["version"] for e in manifest)
-    return await promote_model_version(simulation_id, target_ver, payload)
+    return await promote_model_version(simulation_id, target_ver, payload, authorization=authorization)
 
 
 @router.post("/{simulation_id}/rollback/{version}", response_model=ModelVersionItem, status_code=status.HTTP_200_OK)
 @api_router.post("/{simulation_id}/rollback/{version}", response_model=ModelVersionItem, status_code=status.HTTP_200_OK)
 @models_router.post("/{simulation_id}/rollback/{version}", response_model=ModelVersionItem, status_code=status.HTTP_200_OK)
 @models_api_router.post("/{simulation_id}/rollback/{version}", response_model=ModelVersionItem, status_code=status.HTTP_200_OK)
-async def rollback_model_version(simulation_id: str, version: int) -> ModelVersionItem:
+async def rollback_model_version(
+    simulation_id: str,
+    version: int,
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
+) -> ModelVersionItem:
     """Rollback and reinstate a specific historical model version as active champion."""
+    operator, claims, token_str = _authenticate_and_authorize_operator(
+        authorization, MODEL_ROLLBACK_ROLES, "model rollback"
+    )
     try:
-        updated_entry = registry.rollback(simulation_id, version)
+        updated_entry = registry.rollback(
+            simulation_id,
+            version,
+            auth_token=token_str,
+            actor=operator.username,
+        )
 
         _simulation_events.push_list(
             simulation_id,
@@ -528,6 +662,17 @@ async def rollback_model_version(simulation_id: str, version: int) -> ModelVersi
             },
         )
         return ModelVersionItem(**updated_entry)
+    except ModelIntegrityError as e:
+        err_msg = str(e)
+        if "authentication failed" in err_msg.lower() or "token" in err_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=err_msg,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if "lacks required role" in err_msg.lower() or "not authorized" in err_msg.lower():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=err_msg)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err_msg)
     except (ValueError, FileNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except HTTPException:

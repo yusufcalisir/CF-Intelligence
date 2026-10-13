@@ -1423,10 +1423,43 @@ class ModelRegistry:
         simulation_id: str,
         version: int,
         target_status: str = "champion",
+        auth_token: str | None = None,
+        actor: str | None = None,
     ) -> dict[str, Any]:
         """Promotes a model version to 'champion' or 'challenger' status."""
         if target_status not in ("champion", "challenger"):
             raise ValueError(f"Target status must be 'champion' or 'challenger', got '{target_status}'")
+
+        authenticated_operator: str | None = None
+        if auth_token or actor:
+            from app.infrastructure.security.auth_service import AuthenticationService
+            auth_svc = AuthenticationService.get_instance()
+
+            if auth_token:
+                is_valid, claims, err_detail = auth_svc.verify_access_token(auth_token)
+                if not is_valid or not claims:
+                    raise ModelIntegrityError(f"Operator token authentication failed: {err_detail}")
+                authenticated_operator = (claims.get("username") or claims.get("sub") or "").strip()
+                if actor and actor.lower().strip() != authenticated_operator.lower():
+                    raise ModelIntegrityError(
+                        f"Actor '{actor}' does not match authenticated token principal '{authenticated_operator}'."
+                    )
+                user_rec = auth_svc.get_user(authenticated_operator)
+                if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
+                    raise ModelIntegrityError(f"Operator '{authenticated_operator}' is not an active authoritative user.")
+                user_roles = {r.lower().strip() for r in user_rec.roles}
+                if not (user_roles & {"admin", "ml_lead", "ml_engineer"}):
+                    raise ModelIntegrityError(
+                        f"Principal '{authenticated_operator}' lacks required role authority for model promotion."
+                    )
+            elif actor:
+                user_rec = auth_svc.get_user(actor)
+                if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
+                    raise ModelIntegrityError(f"Actor '{actor}' is not an active authoritative user.")
+                user_roles = {r.lower().strip() for r in user_rec.roles}
+                if not (user_roles & {"admin", "ml_lead", "ml_engineer"}):
+                    raise ModelIntegrityError(f"Actor '{actor}' lacks required role authority for model promotion.")
+                authenticated_operator = user_rec.username
 
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
@@ -1436,6 +1469,9 @@ class ModelRegistry:
             if not target_entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
             target_entry["simulation_id"] = simulation_id
+            effective_operator = authenticated_operator or actor
+            if effective_operator:
+                target_entry["promoted_by"] = effective_operator
 
             filepath = os.path.join(sim_dir, target_entry["filename"])
             if not os.path.exists(filepath):
@@ -1553,8 +1589,45 @@ class ModelRegistry:
             logger.info("Promoted model version %d to %s for %s", version, target_status, simulation_id)
             return target_entry
 
-    def rollback(self, simulation_id: str, version: int) -> dict[str, Any]:
+    def rollback(
+        self,
+        simulation_id: str,
+        version: int,
+        auth_token: str | None = None,
+        actor: str | None = None,
+    ) -> dict[str, Any]:
         """Rollback/promote a specific historical version as the active model."""
+        authenticated_operator: str | None = None
+        if auth_token or actor:
+            from app.infrastructure.security.auth_service import AuthenticationService
+            auth_svc = AuthenticationService.get_instance()
+
+            if auth_token:
+                is_valid, claims, err_detail = auth_svc.verify_access_token(auth_token)
+                if not is_valid or not claims:
+                    raise ModelIntegrityError(f"Operator token authentication failed: {err_detail}")
+                authenticated_operator = (claims.get("username") or claims.get("sub") or "").strip()
+                if actor and actor.lower().strip() != authenticated_operator.lower():
+                    raise ModelIntegrityError(
+                        f"Actor '{actor}' does not match authenticated token principal '{authenticated_operator}'."
+                    )
+                user_rec = auth_svc.get_user(authenticated_operator)
+                if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
+                    raise ModelIntegrityError(f"Operator '{authenticated_operator}' is not an active authoritative user.")
+                user_roles = {r.lower().strip() for r in user_rec.roles}
+                if not (user_roles & {"admin", "ml_lead", "compliance", "compliance_officer"}):
+                    raise ModelIntegrityError(
+                        f"Principal '{authenticated_operator}' lacks required role authority for model rollback."
+                    )
+            elif actor:
+                user_rec = auth_svc.get_user(actor)
+                if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
+                    raise ModelIntegrityError(f"Actor '{actor}' is not an active authoritative user.")
+                user_roles = {r.lower().strip() for r in user_rec.roles}
+                if not (user_roles & {"admin", "ml_lead", "compliance", "compliance_officer"}):
+                    raise ModelIntegrityError(f"Actor '{actor}' lacks required role authority for model rollback.")
+                authenticated_operator = user_rec.username
+
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
         with self._lock, file_lock:
@@ -1563,6 +1636,9 @@ class ModelRegistry:
             if not target_entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
             target_entry["simulation_id"] = simulation_id
+            effective_operator = authenticated_operator or actor
+            if effective_operator:
+                target_entry["rolled_back_by"] = effective_operator
 
             filepath = os.path.join(sim_dir, target_entry["filename"])
             if not os.path.exists(filepath):
