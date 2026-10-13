@@ -7,6 +7,8 @@ computes risk scores, generates explainability reports, and triggers alerts.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import io
 import logging
 import math
@@ -253,6 +255,57 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
                     detail=f"Serving model for simulation '{simulation_id}' rejected: issuer key has been revoked.",
                 )
 
+        from app.config import get_settings
+        settings = get_settings()
+        if settings.app_env.lower() == "production":
+            sign_offs = active_entry.get("sign_offs", [])
+            if not isinstance(sign_offs, list) or len(sign_offs) < 2:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"Serving model for simulation '{simulation_id}' rejected: champion authorization missing sign-offs.",
+                )
+            ml_signs = [
+                s for s in sign_offs
+                if s.get("role") in ("ml_engineer", "ml_lead") and s.get("is_revoked") is not True
+            ]
+            comp_signs = [
+                s for s in sign_offs
+                if s.get("role") in ("compliance", "compliance_officer") and s.get("is_revoked") is not True
+            ]
+            if not ml_signs or not comp_signs:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"Serving model for simulation '{simulation_id}' rejected: champion authorization missing dual approvers.",
+                )
+            if ml_signs[0].get("user") == comp_signs[0].get("user"):
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"Serving model for simulation '{simulation_id}' rejected: champion authorization violates Four-Eyes principle.",
+                )
+            secret = settings.payload_signing_secret
+            if not secret or len(secret.strip()) < 16:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"Serving model for simulation '{simulation_id}' rejected: signing configuration is invalid.",
+                )
+            from app.application.services.training_provenance_service import (
+                DOMAIN_APPROVAL_SIGNOFF,
+                derive_domain_key,
+            )
+            domain_key = derive_domain_key(secret, DOMAIN_APPROVAL_SIGNOFF)
+            actual_sha = active_entry.get("sha256") or ""
+            ver_num = active_entry.get("version")
+            for s, role in ((ml_signs[0], "ml_engineer"), (comp_signs[0], "compliance")):
+                canonical_payload = f"{simulation_id}:{ver_num}:{actual_sha}:{role}:{s.get('user')}"
+                exp_dom = hmac.new(domain_key, canonical_payload.encode(), hashlib.sha256).hexdigest()
+                exp_raw = hmac.new(secret.encode(), canonical_payload.encode(), hashlib.sha256).hexdigest()
+                sig = s.get("signature", "")
+                if not sig or not (hmac.compare_digest(sig, exp_dom) or hmac.compare_digest(sig, exp_raw)):
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail=f"Serving model for simulation '{simulation_id}' rejected: champion authorization has invalid signature.",
+                    )
+
         state_dict = _registry.load_version(simulation_id, active_entry["version"])
         sim_dp = True
         for key in state_dict:
@@ -280,26 +333,58 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
         model.eval()
         return model
 
-    # Recheck issuer key of cached serving model
-    if _cached_serving_model is not None and _cached_serving_model_kid:
-        from app.application.services.training_provenance_service import (
-            get_default_training_verifier,
-        )
+    from app.config import get_settings
+    settings = get_settings()
 
-        verifier = _registry._verifier or get_default_training_verifier()
-        try:
-            if not verifier.is_key_trusted(_cached_serving_model_kid):
+    # Recheck active champion identity and issuer key of cached serving model
+    if _cached_serving_model is not None:
+        if settings.app_env.lower() == "production":
+            active_ident = _registry.get_active_champion_identity()
+            if active_ident is None:
                 logger.warning(
-                    "Evicting cached global serving model: issuer key '%s' revoked.",
-                    _cached_serving_model_kid,
+                    "Evicting cached global serving model: champion authorization is invalid or modified."
                 )
                 _cached_serving_model = None
                 _cached_serving_model_mtime = 0.0
                 _cached_serving_model_kid = None
-        except Exception:
-            _cached_serving_model = None
-            _cached_serving_model_mtime = 0.0
-            _cached_serving_model_kid = None
+            elif _cached_serving_model_kid:
+                from app.application.services.training_provenance_service import (
+                    get_default_training_verifier,
+                )
+
+                verifier = _registry._verifier or get_default_training_verifier()
+                try:
+                    if not verifier.is_key_trusted(_cached_serving_model_kid):
+                        logger.warning(
+                            "Evicting cached global serving model: issuer key '%s' revoked.",
+                            _cached_serving_model_kid,
+                        )
+                        _cached_serving_model = None
+                        _cached_serving_model_mtime = 0.0
+                        _cached_serving_model_kid = None
+                except Exception:
+                    _cached_serving_model = None
+                    _cached_serving_model_mtime = 0.0
+                    _cached_serving_model_kid = None
+        elif _cached_serving_model_kid:
+            from app.application.services.training_provenance_service import (
+                get_default_training_verifier,
+            )
+
+            verifier = _registry._verifier or get_default_training_verifier()
+            try:
+                if not verifier.is_key_trusted(_cached_serving_model_kid):
+                    logger.warning(
+                        "Evicting cached global serving model: issuer key '%s' revoked.",
+                        _cached_serving_model_kid,
+                    )
+                    _cached_serving_model = None
+                    _cached_serving_model_mtime = 0.0
+                    _cached_serving_model_kid = None
+            except Exception:
+                _cached_serving_model = None
+                _cached_serving_model_mtime = 0.0
+                _cached_serving_model_kid = None
 
     global_path = os.path.join(_registry.storage_dir, "global_model.pt")
     if not os.path.exists(global_path):
@@ -314,6 +399,13 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
 
     current_mtime = os.path.getmtime(global_path)
     if _cached_serving_model is None or current_mtime > _cached_serving_model_mtime:
+        if settings.app_env.lower() == "production":
+            active_ident = _registry.get_active_champion_identity()
+            if active_ident is None:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Serving model rejected: active champion authorization is unverified or modified in production registry.",
+                )
         state_dict = torch.load(global_path, map_location="cpu", weights_only=True)
         dp_compatible = True
         for key in state_dict:

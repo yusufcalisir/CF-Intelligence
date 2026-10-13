@@ -257,20 +257,98 @@ def validate_production_admission(
                     f"Production promotion rejected: Four-Eyes Principle violation, user '{ml_s.get('user')}' cannot approve both roles ({context})."
                 )
 
+            secret = settings.payload_signing_secret
+            if not secret or not isinstance(secret, str) or not secret.strip() or len(secret.strip()) < 16:
+                raise ModelIntegrityError(
+                    f"Production promotion rejected: authoritative signing configuration is missing or invalid ({context})."
+                )
+
+            sim_id = (
+                entry_or_provenance.get("simulation_id")
+                or (entry_or_provenance.get("training_receipt") or {}).get("simulation_id")
+            )
+            if not sim_id and isinstance(sign_offs, list):
+                for s in sign_offs:
+                    if s.get("payload_bound"):
+                        parts = s.get("payload_bound", "").split(":")
+                        if len(parts) >= 5 and parts[0]:
+                            sim_id = parts[0]
+                            break
+            if not sim_id:
+                raise ModelIntegrityError(
+                    f"Production promotion rejected: simulation identifier missing from model metadata ({context})."
+                )
+
+            version_val = entry_or_provenance.get("version")
+            if version_val is None:
+                raise ModelIntegrityError(
+                    f"Production promotion rejected: version number missing from model metadata ({context})."
+                )
+
+            if not sha256_val or not sha256_val.strip():
+                raise ModelIntegrityError(
+                    f"Production promotion rejected: model artifact digest is missing or empty ({context})."
+                )
+
+            domain_key = derive_domain_key(secret, DOMAIN_APPROVAL_SIGNOFF)
+            from app.infrastructure.security.auth_service import AuthenticationService
+            auth_svc = AuthenticationService.get_instance()
+
             SEEDED_ACCOUNTS = {"admin", "analyst_a1", "analyst_b1", "analyst_c1", "auditor"}
-            for s in (ml_s, comp_s):
+            for s, expected_role in ((ml_s, "ml_engineer"), (comp_s, "compliance")):
                 u = s.get("user", "")
+                if not u or not isinstance(u, str) or not u.strip():
+                    raise ModelIntegrityError(
+                        f"Production promotion rejected: sign-off missing approver user ({context})."
+                    )
                 if u in SEEDED_ACCOUNTS:
                     raise ModelIntegrityError(
                         f"Production promotion rejected: development seeded account '{u}' cannot authorize promotion ({context})."
                     )
-                if not s.get("is_signature_valid"):
-                    raise ModelIntegrityError(
-                        f"Production promotion rejected: sign-offs lack valid cryptographic signatures ({context})."
-                    )
                 if not s.get("is_role_verified") or not s.get("is_identity_verified"):
                     raise ModelIntegrityError(
                         f"Production promotion rejected: sign-off missing verified role authority ({context})."
+                    )
+
+                # Authoritative RBAC check against AuthenticationService
+                user_rec = auth_svc.get_user(u)
+                if user_rec is not None:
+                    user_roles = [r.lower().strip() for r in user_rec.roles]
+                    if expected_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in user_roles):
+                        raise ModelIntegrityError(
+                            f"Production promotion rejected: user '{u}' lacks authoritative ml_engineer role ({context})."
+                        )
+                    if expected_role == "compliance" and not any(r in ("compliance", "compliance_officer") for r in user_roles):
+                        raise ModelIntegrityError(
+                            f"Production promotion rejected: user '{u}' lacks authoritative compliance role ({context})."
+                        )
+
+                # Authoritative cryptographic HMAC validation
+                canonical_payload = f"{sim_id}:{version_val}:{sha256_val}:{expected_role}:{u}"
+                if s.get("payload_bound") and s.get("payload_bound") != canonical_payload:
+                    raise ModelIntegrityError(
+                        f"Production promotion rejected: sign-off payload binding mismatch for user '{u}' ({context})."
+                    )
+
+                exp_sig_domain = hmac.new(
+                    domain_key,
+                    canonical_payload.encode("utf-8"),
+                    hashlib.sha256,
+                ).hexdigest()
+                exp_sig_raw = hmac.new(
+                    secret.encode("utf-8"),
+                    canonical_payload.encode("utf-8"),
+                    hashlib.sha256,
+                ).hexdigest()
+
+                sig = s.get("signature") or ""
+                if not sig or not (
+                    hmac.compare_digest(sig, exp_sig_domain)
+                    or hmac.compare_digest(sig, exp_sig_raw)
+                ):
+                    raise ModelIntegrityError(
+                        f"Production promotion rejected: sign-off for user '{u}' ({expected_role}) "
+                        f"lacks valid cryptographic signature ({context})."
                     )
 
 
@@ -343,6 +421,9 @@ class ModelRegistry:
                         )
                     data = json.loads(content)
                     if isinstance(data, list):
+                        for item in data:
+                            if isinstance(item, dict) and "simulation_id" not in item:
+                                item["simulation_id"] = simulation_id
                         return data
                     raise ModelIntegrityError(
                         f"Registry manifest for simulation '{simulation_id}' is corrupted: expected JSON list, got {type(data).__name__}."
@@ -568,6 +649,7 @@ class ModelRegistry:
 
             entry: dict[str, Any] = {
                 "version": next_version,
+                "simulation_id": simulation_id,
                 "generation": entry_gen,
                 "filename": filename,
                 "architecture": verified_schema_meta["architecture"] if verified_schema_meta else exp_arch,
@@ -833,6 +915,11 @@ class ModelRegistry:
                     authorization_scheme = "APPLICATION_HMAC_SHA256"
                     is_independent_human = False
                 else:
+                    if settings.app_env.lower() == "production":
+                        raise ModelIntegrityError(
+                            f"Production admission rejected: active champion sign-offs failed cryptographic HMAC verification "
+                            f"for simulation '{sim_id}' v{version_val} (resolve_and_verify_champion)."
+                        )
                     authenticity_status = "SIGNOFFS_RECORDED_UNVERIFIED"
                     authorization_scheme = "UNVERIFIED"
                     is_independent_human = False
@@ -1148,6 +1235,44 @@ class ModelRegistry:
                 ):
                     return None
 
+                # Production champion requires valid cryptographic dual sign-offs
+                sign_offs = entry.get("sign_offs", [])
+                if not isinstance(sign_offs, list) or len(sign_offs) < 2:
+                    return None
+                ml_signs = [
+                    s for s in sign_offs
+                    if s.get("role") in ("ml_engineer", "ml_lead") and s.get("is_revoked") is not True
+                ]
+                comp_signs = [
+                    s for s in sign_offs
+                    if s.get("role") in ("compliance", "compliance_officer") and s.get("is_revoked") is not True
+                ]
+                if not ml_signs or not comp_signs:
+                    return None
+                ml_s, comp_s = ml_signs[0], comp_signs[0]
+                if ml_s.get("user") == comp_s.get("user"):
+                    return None
+                secret = settings.payload_signing_secret
+                if not secret or not secret.strip() or len(secret.strip()) < 16:
+                    return None
+                domain_key = derive_domain_key(secret, DOMAIN_APPROVAL_SIGNOFF)
+                actual_sha = entry.get("sha256") or ""
+                ver_val = entry.get("version")
+                for s, norm_role in ((ml_s, "ml_engineer"), (comp_s, "compliance")):
+                    u = s.get("user", "")
+                    if u in {"admin", "analyst_a1", "analyst_b1", "analyst_c1", "auditor"}:
+                        return None
+                    if not s.get("is_role_verified") or not s.get("is_identity_verified"):
+                        return None
+                    canonical_payload = f"{s_id}:{ver_val}:{actual_sha}:{norm_role}:{u}"
+                    if s.get("payload_bound") and s.get("payload_bound") != canonical_payload:
+                        return None
+                    exp_domain = hmac.new(domain_key, canonical_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+                    exp_raw = hmac.new(secret.encode("utf-8"), canonical_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+                    sig = s.get("signature") or ""
+                    if not sig or not (hmac.compare_digest(sig, exp_domain) or hmac.compare_digest(sig, exp_raw)):
+                        return None
+
             key_id = None
             rcpt = entry.get("training_receipt")
             if isinstance(rcpt, dict):
@@ -1257,6 +1382,7 @@ class ModelRegistry:
             target_entry = next((e for e in manifest if e["version"] == version), None)
             if not target_entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
+            target_entry["simulation_id"] = simulation_id
 
             filepath = os.path.join(sim_dir, target_entry["filename"])
             if not os.path.exists(filepath):
@@ -1383,6 +1509,7 @@ class ModelRegistry:
             target_entry = next((e for e in manifest if e["version"] == version), None)
             if not target_entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
+            target_entry["simulation_id"] = simulation_id
 
             filepath = os.path.join(sim_dir, target_entry["filename"])
             if not os.path.exists(filepath):
@@ -1534,6 +1661,7 @@ class ModelRegistry:
             norm_role = "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
 
             # Initialize sign_offs list if not present (backward compatibility)
+            entry["simulation_id"] = simulation_id
             if "sign_offs" not in entry:
                 entry["sign_offs"] = []
 
