@@ -7,7 +7,7 @@ import math
 import os
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Header, HTTPException, Query, status
 
 from app.application.schemas.model_registry import (
     CanaryDecisionItem,
@@ -31,6 +31,7 @@ from app.application.schemas.model_registry import (
 from app.application.services.model_registry import ModelEvaluationEngine, ModelRegistry
 from app.application.services.zero_downtime_deployer import ZeroDowntimeDeploymentManager
 from app.domain.model_serving_errors import ModelCompatibilityError, ModelIntegrityError
+from app.infrastructure.security.auth_service import AuthenticationService
 from app.presentation.routers.simulation import _simulation_events
 
 logger = logging.getLogger(__name__)
@@ -570,30 +571,108 @@ async def get_canary_history(simulation_id: str) -> list[CanaryDecisionItem]:
 @models_router.post("/{simulation_id}/versions/{version}/signoff", response_model=ModelVersionItem, status_code=status.HTTP_200_OK)
 @models_api_router.post("/{simulation_id}/versions/{version}/signoff", response_model=ModelVersionItem, status_code=status.HTTP_200_OK)
 async def sign_off_model(
-    simulation_id: str, version: int, payload: ModelSignOffRequest
+    simulation_id: str,
+    version: int,
+    payload: ModelSignOffRequest,
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
 ) -> ModelVersionItem:
     """Approve and sign off on a new global model's metrics following SR 11-7 validation."""
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header. Expected 'Bearer <token>'.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_parts = authorization.strip().split()
+    if len(token_parts) != 2 or token_parts[0].lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header format. Expected 'Bearer <token>'.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_str = token_parts[1]
+    auth_svc = AuthenticationService.get_instance()
+    is_valid, claims, err_detail = auth_svc.verify_access_token(token_str)
+    if not is_valid or not claims:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=err_detail or "Authentication token is invalid or has expired.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    authenticated_user = (claims.get("username") or "").strip()
+    authenticated_sub = (claims.get("sub") or "").strip()
+    claimed_user = payload.user.strip()
+
+    # Reject a token belonging to a different principal than the claimed approver
+    if claimed_user.lower() != authenticated_user.lower() and claimed_user != authenticated_sub:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Authenticated principal '{authenticated_user}' does not match claimed approver '{payload.user}'.",
+        )
+
+    # Validate requested role authority against token claims
+    norm_role = (
+        "compliance"
+        if payload.role in ("compliance", "compliance_officer")
+        else ("ml_engineer" if payload.role in ("ml_engineer", "ml_lead") else None)
+    )
+    if norm_role is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Role must be 'compliance' or 'ml_engineer'",
+        )
+
+    user_roles = [r.lower().strip() for r in claims.get("roles", [])]
+    if norm_role == "compliance" and not any(r in ("compliance", "compliance_officer", "admin") for r in user_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Authenticated principal '{authenticated_user}' lacks compliance role authority.",
+        )
+    if norm_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in user_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Authenticated principal '{authenticated_user}' lacks ml_engineer role authority.",
+        )
+
+    effective_user = authenticated_user or payload.user
+
     try:
         updated_entry = registry.sign_off(
             simulation_id=simulation_id,
             version=version,
             role=payload.role,
-            user=payload.user,
+            user=effective_user,
             signature=payload.signature,
+            auth_token=token_str,
             fairness_score=payload.fairness_score,
             bias_metric=payload.bias_metric,
             drift_divergence=payload.drift_divergence,
         )
         return ModelVersionItem(**updated_entry)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        err_msg = str(e)
+        if "not found in registry" in err_msg.lower():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=err_msg)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err_msg)
+    except ModelIntegrityError as e:
+        err_msg = str(e)
+        if "authentication failed" in err_msg.lower() or "authenticated session token is required" in err_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=err_msg,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=err_msg)
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to sign off on model version: %s", e)
+        logger.error("Failed to sign off on model version: %s", type(e).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to submit model sign-off: {e}",
+            detail="Failed to submit model sign-off.",
         ) from e
 
 

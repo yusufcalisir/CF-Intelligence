@@ -214,6 +214,14 @@ class TestModelVersionAndGovernanceLifecycle:
         assert champ_resp.json()["is_active"] is True
 
     def test_dual_sign_off_workflow(self):
+        from app.infrastructure.security.auth_service import AuthenticationService
+        auth_svc = AuthenticationService.get_instance()
+        u_mle2 = auth_svc.register_user("engineer_two", "Pass123!Secure", "bank_a", roles=["ml_engineer"])
+        tok_mle2 = auth_svc.create_token_bundle(u_mle2).access_token
+
+        u_comp = auth_svc.register_user("officer_jane", "Pass123!Secure", "bank_a", roles=["compliance"])
+        tok_comp = auth_svc.create_token_bundle(u_comp).access_token
+
         _seed_sample_model("sim_dual_sign", version=1)
 
         # First sign-off already added by ml_engineer in seed helper.
@@ -228,6 +236,7 @@ class TestModelVersionAndGovernanceLifecycle:
                 "bias_metric": 0.01,
                 "drift_divergence": 0.01,
             },
+            headers={"Authorization": f"Bearer {tok_mle2}"},
         )
         assert dup_resp.status_code == 400
         assert "already signed off" in dup_resp.json()["detail"].lower()
@@ -243,6 +252,7 @@ class TestModelVersionAndGovernanceLifecycle:
                 "bias_metric": 0.01,
                 "drift_divergence": 0.01,
             },
+            headers={"Authorization": f"Bearer {tok_comp}"},
         )
         assert comp_resp.status_code == 200
         data = comp_resp.json()
