@@ -22,7 +22,6 @@ import shutil
 import tempfile
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 import torch
@@ -31,7 +30,6 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from fastapi.testclient import TestClient
 
 from app.application.services.consortium_service import (
-    ConsortiumGovernanceService,
     consortium_governance_service,
 )
 from app.application.services.model_registry import (
@@ -50,7 +48,6 @@ from app.config import get_settings
 from app.domain.consortium_governance import MemberRole, ProposalAction, ProposalStatus
 from app.domain.model_serving_errors import ModelAuthorizationError, ModelIntegrityError
 from app.infrastructure.security.auth_service import AuthenticationService
-from app.infrastructure.security.durable_account_store import DurableAccountStore
 from app.main import app
 
 NUM_FEATURES = 10
@@ -118,7 +115,6 @@ def tenant_env():
         "c_mle": auth_svc.create_token_bundle(u_c_mle).access_token,
     }
 
-    from app.presentation.routers import coordinator as coord_router
     from app.presentation.routers import model_registry as mr_router
 
     old_reg = mr_router.registry
@@ -395,6 +391,7 @@ def test_tenant_04_bank_b_attempts_to_cast_bank_a_vote_rejected(tenant_env):
     )
     # Add Bank B as member
     c = consortium_governance_service.get_consortium(cid)
+    assert c is not None
     c.members["bank_b"] = ConsortiumMember(bank_id="bank_b", role=MemberRole.FULL_MEMBER, voting_power=1.0)
 
     # Bank A creates membership proposal
@@ -417,6 +414,7 @@ def test_tenant_04_bank_b_attempts_to_cast_bank_a_vote_rejected(tenant_env):
 
     # Negative test: Bank B's vote was NOT cast
     stored_prop = consortium_governance_service.get_proposal(prop.proposal_id)
+    assert stored_prop is not None
     assert "bank_b" not in stored_prop.votes_for
 
     # Direct service call also fails
@@ -465,6 +463,7 @@ def test_tenant_05_non_member_or_removed_member_rejected(tenant_env):
     from app.domain.consortium_governance import ConsortiumMember
 
     c = consortium_governance_service.get_consortium(cid)
+    assert c is not None
     c.members["bank_b"] = ConsortiumMember(bank_id="bank_b", role=MemberRole.FULL_MEMBER, voting_power=1.0)
     assert "bank_b" in c.members
     c.members.pop("bank_b", None)
@@ -507,6 +506,7 @@ def test_tenant_06_unauthorized_policy_or_membership_change_rejected(tenant_env)
         auth_token=token_a,
     )
     c = consortium_governance_service.get_consortium(cid)
+    assert c is not None
     # Bank B added as OBSERVER (no voting rights, cannot sponsor proposals)
     c.members["bank_b"] = ConsortiumMember(bank_id="bank_b", role=MemberRole.OBSERVER, voting_power=0.0)
     # Bank C added as FULL_MEMBER so total voting power is 2.0 (50% < 51% quorum)
@@ -543,7 +543,9 @@ def test_tenant_06_unauthorized_policy_or_membership_change_rejected(tenant_env)
     assert "Unauthorized proposal cancellation" in resp_cancel.json()["detail"]
 
     # Proposal remains open
-    assert consortium_governance_service.get_proposal(prop.proposal_id).status == ProposalStatus.PENDING
+    stored_prop = consortium_governance_service.get_proposal(prop.proposal_id)
+    assert stored_prop is not None
+    assert stored_prop.status == ProposalStatus.PENDING
 
 
 # ── TENANT-07: Authorized Same-Bank Governance Succeeds ─────────────────────
@@ -636,6 +638,7 @@ def test_tenant_08_authorized_multi_bank_consortium_governance_succeeds(tenant_e
 
     # Verify Bank B is now an active member
     c = consortium_governance_service.get_consortium(cid)
+    assert c is not None
     assert "bank_b" in c.members
     assert c.members["bank_b"].role == MemberRole.FULL_MEMBER
 
@@ -667,6 +670,7 @@ def test_tenant_08_authorized_multi_bank_consortium_governance_succeeds(tenant_e
 
     # Policy update is applied authoritatively to the consortium
     c_updated = consortium_governance_service.get_consortium(cid)
+    assert c_updated is not None
     assert c_updated.quorum_ratio == 0.60
 
 

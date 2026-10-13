@@ -544,16 +544,15 @@ class ModelRegistry:
 
             # Fallback probe to manifest entries
             manifest = self._load_manifest(simulation_id)
-            banks_found = {
-                e.get("owning_bank_id").strip()
-                for e in manifest
-                if isinstance(e.get("owning_bank_id"), str) and e.get("owning_bank_id").strip()
-            }
-            consortia_found = {
-                e.get("consortium_id").strip()
-                for e in manifest
-                if isinstance(e.get("consortium_id"), str) and e.get("consortium_id").strip()
-            }
+            banks_found: set[str] = set()
+            consortia_found: set[str] = set()
+            for e in manifest:
+                b_val = e.get("owning_bank_id")
+                if isinstance(b_val, str) and b_val.strip():
+                    banks_found.add(b_val.strip())
+                c_val = e.get("consortium_id")
+                if isinstance(c_val, str) and c_val.strip():
+                    consortia_found.add(c_val.strip())
             if len(banks_found) == 1 and len(consortia_found) <= 1:
                 return {
                     "simulation_id": simulation_id,
@@ -667,7 +666,9 @@ class ModelRegistry:
 
             # Check if actor belongs to an explicitly authorized consortium that includes this model
             if consortium_id:
-                from app.application.services.consortium_service import consortium_governance_service
+                from app.application.services.consortium_service import (
+                    consortium_governance_service,
+                )
 
                 c = consortium_governance_service.get_consortium(consortium_id)
                 if c and clean_actor_bank in c.members:
