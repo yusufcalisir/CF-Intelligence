@@ -472,6 +472,7 @@ def test_rev07_rollback_cannot_restore_revoked_issuer_model():
 
             # Champion remains v2
             active = reg.get_active_version(sim_id)
+            assert active is not None
             assert active["version"] == v2
 
 
