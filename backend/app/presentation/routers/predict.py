@@ -214,7 +214,7 @@ def _clear_challenger_model_cache() -> None:
         _challenger_model_cache.clear()
 
 
-_load_challenger_model.cache_clear = _clear_challenger_model_cache
+_load_challenger_model.cache_clear = _clear_challenger_model_cache  # type: ignore[attr-defined]  # pyright: ignore[reportFunctionMemberAccess]
 
 
 def clear_all_serving_caches() -> None:
