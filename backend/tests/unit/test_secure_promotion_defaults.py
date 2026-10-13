@@ -267,7 +267,9 @@ def test_save05_failed_save_does_not_modify_existing_active_champion():
             patch.object(settings, "payload_signing_secret", TEST_SIGNING_SECRET),
         ):
             reg.promote_version(sim_id, 1, target_status="champion")
-            assert reg.get_active_champion_identity(sim_id)["version"] == 1
+            v1_ident = reg.get_active_champion_identity(sim_id)
+            assert v1_ident is not None
+            assert v1_ident["version"] == 1
 
             # Attempt to save v2 with is_promoted=True but lacking valid receipt/signoffs
             svc = ModelService(settings)
