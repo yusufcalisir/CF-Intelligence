@@ -3803,19 +3803,19 @@ class ModelRegistry:
             sim_dir = self._get_sim_dir(sim_id)
             file_lock = _get_registry_file_lock(sim_dir)
 
-            try:
-                file_lock.acquire(timeout=lock_timeout_seconds)
-            except Timeout:
-                logger.warning(
-                    "Simulation '%s' lock actively held by worker; mutation '%s' remains unresolved.",
-                    sim_id,
-                    mut_id,
-                )
-                reconciled.append({"mutation_id": mut_id, "status": "INDETERMINATE_IN_PROGRESS"})
-                continue
+            with self._lock:
+                try:
+                    file_lock.acquire(timeout=lock_timeout_seconds)
+                except Timeout:
+                    logger.warning(
+                        "Simulation '%s' lock actively held by worker; mutation '%s' remains unresolved.",
+                        sim_id,
+                        mut_id,
+                    )
+                    reconciled.append({"mutation_id": mut_id, "status": "INDETERMINATE_IN_PROGRESS"})
+                    continue
 
-            try:
-                with self._lock:
+                try:
                     # Re-check pending status under lock
                     if not audit_chain.is_mutation_pending(mut_id):
                         reconciled.append({"mutation_id": mut_id, "status": "ALREADY_RESOLVED"})
@@ -3890,8 +3890,8 @@ class ModelRegistry:
                             reconciled.append({"mutation_id": mut_id, "status": "FAILED"})
                         else:
                             reconciled.append({"mutation_id": mut_id, "status": "ALREADY_RESOLVED"})
-            finally:
-                file_lock.release()
+                finally:
+                    file_lock.release()
 
         return reconciled
 

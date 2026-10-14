@@ -8,15 +8,18 @@ Validates that:
 5. Prior failed mutations are not masked by subsequent successful operations.
 6. Concurrent audit appends and multi-worker interleavings preserve tamper-evident integrity.
 7. All mutation pathways uniformly enforce durable tracking in registry.json.
+8. Concurrent mutation and reconciliation avoid lock-order inversion and deadlock.
 """
 
 from __future__ import annotations
 
-import concurrent.futures
+import contextlib
 import hashlib
 import json
+import multiprocessing
 import os
 import threading
+import time
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import patch
@@ -70,7 +73,9 @@ def reconciliation_env(tmp_path, monkeypatch):
     monkeypatch.setenv("CFI_CONSORTIUM_STORE_SECRET", consortium_secret)
     monkeypatch.setenv("CFI_JWT_SIGNING_SECRET", jwt_secret)
     monkeypatch.setenv("CFI_ACCOUNT_STORE_PATH", account_file)
+    monkeypatch.setenv("CFI_IDENTITY_STORE_PATH", account_file)
     monkeypatch.setenv("CFI_ACCOUNT_AUTHORITY_SECRET", authority_secret)
+    monkeypatch.setenv("CFI_IDENTITY_STORE_SECRET", authority_secret)
     monkeypatch.setenv("APP_ENV", "production")
 
     get_settings.cache_clear()
@@ -127,6 +132,11 @@ def reconciliation_env(tmp_path, monkeypatch):
         "tmp_path": tmp_path,
         "audit_file": audit_file,
         "audit_secret": audit_secret,
+        "jwt_secret": jwt_secret,
+        "authority_secret": authority_secret,
+        "account_file": account_file,
+        "trust_file": trust_file,
+        "admin_token": admin_token,
         "reg_dir": reg_dir,
         "registry": registry,
         "tokens": tokens,
@@ -140,6 +150,95 @@ def reconciliation_env(tmp_path, monkeypatch):
     DurableConsortiumStore._instance = None
     AuthenticationService._instance = None
     ImmutableAuditChain._instance = None
+
+
+def _worker_mutation_process(
+    reg_dir: str,
+    audit_file: str,
+    audit_secret: str,
+    jwt_secret: str,
+    authority_secret: str,
+    account_file: str,
+    trust_file: str,
+    admin_token: str,
+    payload_secret: str,
+    sim_id: str,
+    auth_token: str,
+    crash_stage: str,
+    barrier_reached_path: str,
+):
+    """Independent OS worker process executing genuine mutation and pausing at deterministic test barrier."""
+    os.environ["CFI_AUDIT_LEDGER_PATH"] = audit_file
+    os.environ["CFI_AUDIT_LEDGER_SECRET"] = audit_secret
+    os.environ["CFI_JWT_SIGNING_SECRET"] = jwt_secret
+    os.environ["CFI_IDENTITY_STORE_PATH"] = account_file
+    os.environ["CFI_ACCOUNT_STORE_PATH"] = account_file
+    os.environ["CFI_ACCOUNT_AUTHORITY_SECRET"] = authority_secret
+    os.environ["CFI_IDENTITY_STORE_SECRET"] = authority_secret
+    os.environ["CFI_TRUST_STORE_PATH"] = trust_file
+    os.environ["CFI_TRUST_STORE_ADMIN_TOKEN"] = admin_token
+    os.environ["CFI_PAYLOAD_SIGNING_SECRET"] = payload_secret
+    os.environ["CFI_MODEL_REGISTRY_DIR"] = reg_dir
+    os.environ["APP_ENV"] = "production"
+    get_settings.cache_clear()
+
+    auth_svc = AuthenticationService(
+        store_path=account_file,
+        signing_secret=jwt_secret,
+        authority_secret=authority_secret,
+        app_env="production",
+    )
+    AuthenticationService._instance = auth_svc
+
+    trust_store = DurableTrustStore(trust_file_path=trust_file, admin_token=admin_token)
+    verifier = TrainingReceiptVerifier(trust_store=trust_store)
+    reg = ModelRegistry(storage_dir=reg_dir, verifier=verifier)
+    orig_save = reg._save_manifest
+
+    if crash_stage == "BEFORE_PERSISTENCE":
+        def hooked_save(s_id, manifest):
+            with open(barrier_reached_path, "w") as f:
+                f.write("PENDING_WRITTEN")
+            while True:
+                time.sleep(0.05)
+        reg._save_manifest = hooked_save
+
+    elif crash_stage == "AFTER_PERSISTENCE":
+        def hooked_save(s_id, manifest):
+            orig_save(s_id, manifest)
+            with open(barrier_reached_path, "w") as f:
+                f.write("MANIFEST_PERSISTED")
+            while True:
+                time.sleep(0.05)
+        reg._save_manifest = hooked_save
+
+    with contextlib.suppress(BaseException):
+        reg.revoke_version(
+            simulation_id=sim_id,
+            version=1,
+            reason="Real process termination verification",
+            actor="admin_dan",
+            auth_token=auth_token,
+        )
+
+
+def _worker_reconciler_process(
+    reg_dir: str,
+    audit_file: str,
+    audit_secret: str,
+    sim_id: str,
+    out_file: str,
+):
+    """Independent OS worker process executing reconciliation."""
+    os.environ["CFI_AUDIT_LEDGER_PATH"] = audit_file
+    os.environ["CFI_AUDIT_LEDGER_SECRET"] = audit_secret
+    os.environ["APP_ENV"] = "production"
+    get_settings.cache_clear()
+
+    reg = ModelRegistry(storage_dir=reg_dir)
+    reconciled = reg.reconcile_incomplete_mutations(simulation_id=sim_id)
+    with open(out_file, "w") as f:
+        json.dump(reconciled, f)
 
 
 def _create_sample_model(env: dict, sim_id: str) -> tuple[ModelRegistry, dict]:
@@ -359,108 +458,192 @@ def test_reconciliation_waits_for_active_worker_lock_without_premature_failure(r
     assert len(chain.get_pending_mutations()) == 0
 
 
-# ── Test 3: Process Termination Prior to Persistence ───────────────────────────
+# ── Test 3: Process Termination Prior to Persistence (Real OS Process) ─────────
 
-def test_reconciliation_marks_process_terminated_before_persistence_as_failed(reconciliation_env):
-    """Mutations interrupted before business persistence completes are faithfully resolved as FAILED."""
+def test_reconciliation_recovers_process_terminated_before_manifest_persistence(reconciliation_env):
+    """Real OS worker terminated after PENDING but before manifest persistence reconciles truthfully to FAILED."""
     sim_id = "sim_recon_03"
-    reg, entry = _create_sample_model(reconciliation_env, sim_id)
-    chain = ImmutableAuditChain.get_instance()
+    _create_sample_model(reconciliation_env, sim_id)
+    tmp_path = reconciliation_env["tmp_path"]
+    barrier_path = str(tmp_path / "barrier_before.txt")
 
-    crashed_mut_id = f"mut_pre_persist_{uuid.uuid4().hex}"
-    chain.append_event(
-        event_type="MODEL_SIGNOFF_REVOCATION_PENDING",
-        actor="worker_crashed_early",
-        target_id=f"{sim_id}:v1",
-        details={
-            "mutation_id": crashed_mut_id,
-            "mutation_stage": "PENDING",
-            "mutation_committed": False,
-            "simulation_id": sim_id,
-            "version": 1,
-            "role": "compliance",
-            "action": "revoke_sign_off",
-            "decision": "PENDING",
-        },
-        action="revoke_sign_off",
-        decision="PENDING",
+    p = multiprocessing.Process(
+        target=_worker_mutation_process,
+        args=(
+            reconciliation_env["reg_dir"],
+            reconciliation_env["audit_file"],
+            reconciliation_env["audit_secret"],
+            reconciliation_env["jwt_secret"],
+            reconciliation_env["authority_secret"],
+            reconciliation_env["account_file"],
+            reconciliation_env["trust_file"],
+            reconciliation_env["admin_token"],
+            reconciliation_env["payload_secret"],
+            sim_id,
+            reconciliation_env["tokens"]["admin"],
+            "BEFORE_PERSISTENCE",
+            barrier_path,
+        ),
     )
+    p.start()
 
-    reconciled = reg.reconcile_incomplete_mutations(simulation_id=sim_id)
+    # Wait deterministically for Worker A to reach PENDING barrier
+    start_t = time.time()
+    while not os.path.exists(barrier_path) and time.time() - start_t < 15.0:
+        time.sleep(0.05)
+    assert os.path.exists(barrier_path), "Worker A failed to reach PENDING barrier!"
+
+    # Verify PENDING is recorded in audit ledger on disk
+    chain = ImmutableAuditChain(store_path=reconciliation_env["audit_file"], signing_secret=reconciliation_env["audit_secret"])
+    pending = chain.get_pending_mutations()
+    assert len(pending) == 1
+    mut_id = pending[0].details["mutation_id"]
+
+    # Terminate Worker A OS process
+    p.kill()
+    p.join(timeout=5.0)
+    assert not p.is_alive()
+    assert p.exitcode != 0
+
+    # Verify mutation is NOT persisted in manifest on disk
+    reg = reconciliation_env["registry"]
+    manifest = reg._load_manifest(sim_id)
+    assert mut_id not in manifest[0].get("applied_mutation_ids", [])
+    assert manifest[0].get("is_revoked") is not True
+
+    # Start independent Worker B process to reconcile
+    out_file = str(tmp_path / "recon_before_out.json")
+    p_b = multiprocessing.Process(
+        target=_worker_reconciler_process,
+        args=(
+            reconciliation_env["reg_dir"],
+            reconciliation_env["audit_file"],
+            reconciliation_env["audit_secret"],
+            sim_id,
+            out_file,
+        ),
+    )
+    p_b.start()
+    p_b.join(timeout=10.0)
+    assert not p_b.is_alive()
+
+    with open(out_file) as f:
+        reconciled = json.load(f)
     assert len(reconciled) == 1
-    assert reconciled[0]["mutation_id"] == crashed_mut_id
+    assert reconciled[0]["mutation_id"] == mut_id
     assert reconciled[0]["status"] == "FAILED"
 
+    # Verify audit ledger has terminal FAILED event with intact HMAC chain
     chain_fresh = ImmutableAuditChain(store_path=reconciliation_env["audit_file"], signing_secret=reconciliation_env["audit_secret"])
+    assert len(chain_fresh.get_pending_mutations()) == 0
     failed_ev = chain_fresh.chain[-1]
-    assert failed_ev.event_type == "MODEL_SIGNOFF_REVOCATION_FAILED"
+    assert failed_ev.event_type == "MODEL_VERSION_REVOCATION_FAILED"
     assert failed_ev.decision == "FAILED"
     assert failed_ev.details.get("reconciled") is True
     assert chain_fresh.verify_chain_integrity().is_valid is True
 
 
-# ── Test 4: Process Termination After Persistence ──────────────────────────────
+# ── Test 4: Process Termination After Persistence (Real OS Process) ────────────
 
-def test_reconciliation_finalizes_committed_when_persisted_before_termination(reconciliation_env):
-    """Mutations persisted to disk prior to worker termination are accurately finalized as COMMITTED."""
+def test_reconciliation_recovers_process_terminated_after_manifest_persistence(reconciliation_env):
+    """Real OS worker terminated after atomic manifest persistence reconciles truthfully to COMMITTED."""
     sim_id = "sim_recon_04"
-    reg, entry = _create_sample_model(reconciliation_env, sim_id)
-    chain = ImmutableAuditChain.get_instance()
+    _create_sample_model(reconciliation_env, sim_id)
+    tmp_path = reconciliation_env["tmp_path"]
+    barrier_path = str(tmp_path / "barrier_after.txt")
 
-    crashed_post_id = f"mut_post_persist_{uuid.uuid4().hex}"
-
-    # Worker wrote intent
-    chain.append_event(
-        event_type="MODEL_PROMOTION_PENDING",
-        actor="worker_crashed_late",
-        target_id=f"{sim_id}:v1",
-        details={
-            "mutation_id": crashed_post_id,
-            "mutation_stage": "PENDING",
-            "mutation_committed": False,
-            "simulation_id": sim_id,
-            "version": 1,
-            "target_status": "challenger",
-            "action": "promote_version",
-            "decision": "PENDING",
-        },
-        action="promote_version",
-        decision="PENDING",
+    p = multiprocessing.Process(
+        target=_worker_mutation_process,
+        args=(
+            reconciliation_env["reg_dir"],
+            reconciliation_env["audit_file"],
+            reconciliation_env["audit_secret"],
+            reconciliation_env["jwt_secret"],
+            reconciliation_env["authority_secret"],
+            reconciliation_env["account_file"],
+            reconciliation_env["trust_file"],
+            reconciliation_env["admin_token"],
+            reconciliation_env["payload_secret"],
+            sim_id,
+            reconciliation_env["tokens"]["admin"],
+            "AFTER_PERSISTENCE",
+            barrier_path,
+        ),
     )
+    p.start()
 
-    # Worker persisted business state with durable mutation evidence before crash
+    # Wait deterministically for Worker A to reach MANIFEST_PERSISTED barrier
+    start_t = time.time()
+    while not os.path.exists(barrier_path) and time.time() - start_t < 15.0:
+        time.sleep(0.05)
+    assert os.path.exists(barrier_path), "Worker A failed to reach MANIFEST_PERSISTED barrier!"
+
+    # Terminate Worker A OS process immediately after manifest persistence before audit finalization
+    p.kill()
+    p.join(timeout=5.0)
+    assert not p.is_alive()
+    assert p.exitcode != 0
+
+    # Verify mutation IS authoritatively persisted in manifest on disk
+    reg = reconciliation_env["registry"]
     manifest = reg._load_manifest(sim_id)
-    manifest[0]["status"] = "challenger"
-    manifest[0].setdefault("applied_mutation_ids", []).append(crashed_post_id)
-    manifest[0]["last_mutation_id"] = crashed_post_id
-    reg._save_manifest(sim_id, manifest)
+    mut_id = manifest[0].get("last_mutation_id")
+    assert mut_id is not None
+    assert mut_id in manifest[0].get("applied_mutation_ids", [])
+    assert manifest[0].get("is_revoked") is True
 
-    # Reconciler runs
-    reconciled = reg.reconcile_incomplete_mutations(simulation_id=sim_id)
+    # Verify audit ledger has pending mutation and NOT yet terminal COMMITTED event
+    chain = ImmutableAuditChain(store_path=reconciliation_env["audit_file"], signing_secret=reconciliation_env["audit_secret"])
+    pending = chain.get_pending_mutations()
+    assert len(pending) == 1
+    assert pending[0].details["mutation_id"] == mut_id
+    assert not any(e.event_type == "MODEL_VERSION_REVOCATION" and e.decision == "REVOKED" for e in chain.chain)
+
+    # Start independent Worker B process to reconcile
+    out_file = str(tmp_path / "recon_after_out.json")
+    p_b = multiprocessing.Process(
+        target=_worker_reconciler_process,
+        args=(
+            reconciliation_env["reg_dir"],
+            reconciliation_env["audit_file"],
+            reconciliation_env["audit_secret"],
+            sim_id,
+            out_file,
+        ),
+    )
+    p_b.start()
+    p_b.join(timeout=10.0)
+    assert not p_b.is_alive()
+
+    with open(out_file) as f:
+        reconciled = json.load(f)
     assert len(reconciled) == 1
-    assert reconciled[0]["mutation_id"] == crashed_post_id
+    assert reconciled[0]["mutation_id"] == mut_id
     assert reconciled[0]["status"] == "COMMITTED"
 
+    # Verify ledger terminal state
     chain_fresh = ImmutableAuditChain(store_path=reconciliation_env["audit_file"], signing_secret=reconciliation_env["audit_secret"])
+    assert len(chain_fresh.get_pending_mutations()) == 0
     committed_ev = chain_fresh.chain[-1]
-    assert committed_ev.event_type == "MODEL_PROMOTION"
-    assert committed_ev.decision == "PROMOTED"
+    assert committed_ev.event_type == "MODEL_VERSION_REVOCATION"
+    assert committed_ev.decision == "REVOKED"
     assert committed_ev.details.get("reconciled") is True
     assert chain_fresh.verify_chain_integrity().is_valid is True
 
 
-# ── Test 5: Racing Reconcilers Produce Exactly One Outcome ─────────────────────
+# ── Test 5: Multi-Process Racing Reconcilers ───────────────────────────────────
 
-def test_racing_reconcilers_produce_exactly_one_terminal_outcome(reconciliation_env):
-    """Multiple concurrent reconcilers execute atomically without duplicate terminal audit records."""
+def test_concurrent_multiprocess_reconciliation_produces_single_terminal_outcome(reconciliation_env):
+    """Multiple independent OS processes racing reconciliation produce exactly one terminal outcome."""
     sim_id = "sim_recon_05"
-    reg, entry = _create_sample_model(reconciliation_env, sim_id)
-    chain = ImmutableAuditChain.get_instance()
+    _create_sample_model(reconciliation_env, sim_id)
+    tmp_path = reconciliation_env["tmp_path"]
 
-    racing_mut_id = f"mut_race_{uuid.uuid4().hex}"
+    racing_mut_id = f"mut_race_proc_{uuid.uuid4().hex}"
+    chain = ImmutableAuditChain(store_path=reconciliation_env["audit_file"], signing_secret=reconciliation_env["audit_secret"])
     chain.append_event(
         event_type="MODEL_ROLLBACK_PENDING",
-        actor="crashed_rollback_worker",
+        actor="crashed_rollback_process",
         target_id=f"{sim_id}:v1",
         details={
             "mutation_id": racing_mut_id,
@@ -476,26 +659,43 @@ def test_racing_reconcilers_produce_exactly_one_terminal_outcome(reconciliation_
         decision="PENDING",
     )
 
-    num_threads = 4
+    num_processes = 3
+    out_files = [str(tmp_path / f"recon_race_out_{i}.json") for i in range(num_processes)]
+    processes = [
+        multiprocessing.Process(
+            target=_worker_reconciler_process,
+            args=(
+                reconciliation_env["reg_dir"],
+                reconciliation_env["audit_file"],
+                reconciliation_env["audit_secret"],
+                sim_id,
+                out_files[i],
+            ),
+        )
+        for i in range(num_processes)
+    ]
 
-    def run_reconciliation():
-        return reg.reconcile_incomplete_mutations(simulation_id=sim_id)
+    for p in processes:
+        p.start()
+    for p in processes:
+        p.join(timeout=15.0)
+        assert not p.is_alive()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
-        futures = [executor.submit(run_reconciliation) for _ in range(num_threads)]
-        all_results = [f.result() for f in concurrent.futures.as_completed(futures)]
+    all_results = []
+    for fpath in out_files:
+        if os.path.exists(fpath):
+            with open(fpath) as f:
+                all_results.append(json.load(f))
 
-    # Exactly one reconciler must report FAILED; others must report ALREADY_RESOLVED or empty
     statuses = []
-    for res_list in all_results:
-        for r in res_list:
-            if r["mutation_id"] == racing_mut_id:
-                statuses.append(r["status"])
+    for r_list in all_results:
+        for r in r_list:
+            if r.get("mutation_id") == racing_mut_id:
+                statuses.append(r.get("status"))
 
     assert statuses.count("FAILED") == 1, f"Expected exactly one FAILED outcome, got: {statuses}"
     assert all(s in ("FAILED", "ALREADY_RESOLVED") for s in statuses)
 
-    # Exactly one terminal event in the ledger
     chain_fresh = ImmutableAuditChain(store_path=reconciliation_env["audit_file"], signing_secret=reconciliation_env["audit_secret"])
     terminal_events = [
         e for e in chain_fresh.chain
@@ -661,3 +861,60 @@ def test_all_mutation_pathways_enforce_consistent_durable_evidence(reconciliatio
     chain = ImmutableAuditChain.get_instance()
     assert chain.verify_chain_integrity().is_valid is True
     assert len(chain.get_pending_mutations()) == 0
+
+
+# ── Test 9: Lock Order Inversion Elimination ──────────────────────────────────
+
+def test_concurrent_mutation_and_reconciliation_avoids_lock_order_inversion(reconciliation_env):
+    """Concurrent mutation operations and reconciliation do not deadlock from lock-order inversion."""
+    sim_id = "sim_recon_09"
+    reg, entry = _create_sample_model(reconciliation_env, sim_id)
+    tokens = reconciliation_env["tokens"]
+
+    iterations = 10
+    errors: list[str] = []
+
+    def mutation_worker():
+        try:
+            for i in range(iterations):
+                status = "challenger" if i % 2 == 0 else "champion"
+                reg.promote_version(
+                    simulation_id=sim_id,
+                    version=1,
+                    target_status=status,
+                    actor="admin_dan",
+                    auth_token=tokens["admin"],
+                )
+        except Exception as exc:
+            errors.append(f"mutation_worker: {exc}")
+
+    def reconciler_worker():
+        try:
+            for _ in range(iterations):
+                reg.reconcile_incomplete_mutations(simulation_id=sim_id, lock_timeout_seconds=2.0)
+                time.sleep(0.005)
+        except Exception as exc:
+            errors.append(f"reconciler_worker: {exc}")
+
+    with (
+        patch("app.presentation.routers.realtime_inference.reset_model_cache"),
+        patch("app.application.services.model_service.ModelService.invalidate_model_cache"),
+    ):
+        t_mut = threading.Thread(target=mutation_worker, name="MutationWorker")
+        t_rec = threading.Thread(target=reconciler_worker, name="ReconcilerWorker")
+        t_mut.start()
+        t_rec.start()
+
+        t_mut.join(timeout=10.0)
+        t_rec.join(timeout=10.0)
+
+        assert not t_mut.is_alive(), "Mutation worker deadlocked!"
+        assert not t_rec.is_alive(), "Reconciler worker deadlocked!"
+        assert len(errors) == 0, f"Concurrent workers encountered errors: {errors}"
+
+    chain_fresh = ImmutableAuditChain(
+        store_path=reconciliation_env["audit_file"],
+        signing_secret=reconciliation_env["audit_secret"],
+    )
+    assert chain_fresh.verify_chain_integrity().is_valid is True
+
