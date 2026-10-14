@@ -25,7 +25,6 @@ from typing import Any
 import torch
 from filelock import FileLock
 
-from app.application.services.consortium_service import consortium_governance_service
 from app.application.services.training_provenance_service import (
     DOMAIN_APPROVAL_SIGNOFF,
     TrainingExecutionReceipt,
@@ -640,6 +639,9 @@ class ModelRegistry:
                 if user_bank != clean_bank.lower():
                     return False, f"bank_mismatch: user '{uname}' belongs to '{user_bank}', cannot register for '{clean_bank}'"
 
+                from app.application.services.consortium_service import (
+                    consortium_governance_service,
+                )
                 c = consortium_governance_service.get_consortium(clean_consortium)
                 if not c:
                     return False, f"unknown_consortium: '{clean_consortium}'"
@@ -652,6 +654,9 @@ class ModelRegistry:
                     return False, f"bank_mismatch: user '{uname}' belongs to '{user_bank}', cannot register for '{clean_bank}'"
                 return True, f"user:{uname} ({clean_bank})"
             elif clean_consortium:
+                from app.application.services.consortium_service import (
+                    consortium_governance_service,
+                )
                 c = consortium_governance_service.get_consortium(clean_consortium)
                 if not c:
                     return False, f"unknown_consortium: '{clean_consortium}'"
@@ -662,33 +667,43 @@ class ModelRegistry:
 
         # 3. Cryptographically Verified Training Receipt with Signed Institutional Claims
         if training_receipt is not None:
-            receipt_dict: dict[str, Any] | None = None
+            receipt_obj: TrainingExecutionReceipt | None = None
             if isinstance(training_receipt, TrainingExecutionReceipt):
-                receipt_dict = training_receipt.to_dict()
+                receipt_obj = training_receipt
             elif isinstance(training_receipt, dict):
-                receipt_dict = dict(training_receipt)
+                try:
+                    receipt_obj = TrainingExecutionReceipt.from_dict(training_receipt)
+                except Exception as exc:
+                    return False, f"invalid_training_receipt_format: {exc}"
+            else:
+                return False, f"invalid_training_receipt_type: {type(training_receipt)}"
 
-            if receipt_dict is not None:
+            if receipt_obj is not None:
                 verifier = self._verifier or get_default_training_verifier()
                 is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
-                    receipt_dict,
+                    receipt_obj,
                     simulation_id=simulation_id,
                 )
                 if is_valid_rcpt:
-                    rcpt_bank = (
-                        receipt_dict.get("owning_bank_id")
-                        or receipt_dict.get("bank_id")
-                        or ""
+                    # ONLY read verified claims from the reconstructed TrainingExecutionReceipt object.
+                    # Fields not covered by the cryptographic signature (e.g. unauthenticated 'bank_id')
+                    # cannot establish institutional authority.
+                    clean_rcpt_bank = (
+                        str(receipt_obj.owning_bank_id).strip().lower()
+                        if receipt_obj.owning_bank_id
+                        else ""
                     )
-                    rcpt_consortium = receipt_dict.get("consortium_id") or ""
-                    clean_rcpt_bank = str(rcpt_bank).strip().lower() if rcpt_bank else ""
-                    clean_rcpt_consortium = str(rcpt_consortium).strip() if rcpt_consortium else ""
+                    clean_rcpt_consortium = (
+                        str(receipt_obj.consortium_id).strip()
+                        if receipt_obj.consortium_id
+                        else ""
+                    )
+                    rcpt_id = receipt_obj.receipt_id or "verified_receipt"
 
                     if clean_bank and clean_consortium:
                         bank_ok = clean_rcpt_bank and clean_rcpt_bank == clean_bank.lower()
                         cons_ok = clean_rcpt_consortium and clean_rcpt_consortium == clean_consortium
                         if bank_ok and cons_ok:
-                            rcpt_id = receipt_dict.get("receipt_id") or "verified_receipt"
                             return True, f"receipt:{rcpt_id} ({clean_bank}, consortium:{clean_consortium})"
                         return False, (
                             f"receipt_claim_mismatch: receipt binds bank '{clean_rcpt_bank or 'none'}' and "
@@ -696,7 +711,6 @@ class ModelRegistry:
                         )
                     elif clean_bank:
                         if clean_rcpt_bank and clean_rcpt_bank == clean_bank.lower():
-                            rcpt_id = receipt_dict.get("receipt_id") or "verified_receipt"
                             return True, f"receipt:{rcpt_id} ({clean_bank})"
                         return False, (
                             f"receipt_claim_mismatch: receipt binds bank '{clean_rcpt_bank or 'none'}', "
@@ -704,7 +718,6 @@ class ModelRegistry:
                         )
                     elif clean_consortium:
                         if clean_rcpt_consortium and clean_rcpt_consortium == clean_consortium:
-                            rcpt_id = receipt_dict.get("receipt_id") or "verified_receipt"
                             return True, f"receipt:{rcpt_id} (consortium:{clean_consortium})"
                         return False, (
                             f"receipt_claim_mismatch: receipt binds consortium '{clean_rcpt_consortium or 'none'}', "
@@ -1082,13 +1095,19 @@ class ModelRegistry:
 
         # Parse training receipt if provided
         receipt_dict: dict[str, Any] | None = None
+        receipt_obj: TrainingExecutionReceipt | None = None
         has_valid_receipt = False
         active_receipt = training_receipt or provenance_receipt
         if active_receipt is not None:
             if isinstance(active_receipt, TrainingExecutionReceipt):
+                receipt_obj = active_receipt
                 receipt_dict = active_receipt.to_dict()
             elif isinstance(active_receipt, dict):
                 receipt_dict = dict(active_receipt)
+                try:
+                    receipt_obj = TrainingExecutionReceipt.from_dict(receipt_dict)
+                except Exception:
+                    receipt_obj = None
 
         clean_prov = provenance_type.strip() if provenance_type else "UNVERIFIED"
         clean_upper = clean_prov.upper()
@@ -1096,10 +1115,10 @@ class ModelRegistry:
         has_recorded_evidence = _validate_training_evidence(training_run_id, training_evidence)
 
         attestation_status = "NONE"
-        if receipt_dict is not None:
+        if receipt_obj is not None or receipt_dict is not None:
             verifier = self._verifier or get_default_training_verifier()
             is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
-                receipt_dict,
+                receipt_obj if receipt_obj is not None else receipt_dict,
                 candidate_artifact_sha256=None,
                 simulation_id=simulation_id,
                 expected_architecture=exp_arch,
@@ -1113,6 +1132,7 @@ class ModelRegistry:
                 attestation_status = "RECEIPT_VERIFIED_TRAINING_AUTHORITY"
                 is_prod_eligible = True
             else:
+                has_valid_receipt = False
                 final_provenance = "UNVERIFIED"
                 attestation_status = f"INVALID_RECEIPT: {rcpt_reason}"
                 is_prod_eligible = False
@@ -1140,7 +1160,7 @@ class ModelRegistry:
                 clean_consortium=effective_consortium,
                 auth_token=auth_token,
                 trusted_context=trusted_context,
-                training_receipt=receipt_dict if has_valid_receipt else None,
+                training_receipt=receipt_obj if (has_valid_receipt and receipt_obj is not None) else None,
             )
             if not has_init_auth:
                 raise ModelAuthorizationError(
@@ -1279,7 +1299,7 @@ class ModelRegistry:
                         bound_by=bound_by_label,
                         auth_token=auth_token,
                         trusted_context=trusted_context,
-                        training_receipt=receipt_dict if has_valid_receipt else None,
+                        training_receipt=receipt_obj if (has_valid_receipt and receipt_obj is not None) else None,
                     )
 
                 manifest.append(entry)
