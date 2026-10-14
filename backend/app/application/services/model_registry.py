@@ -2360,6 +2360,7 @@ class ModelRegistry:
             )
 
         authenticated_operator: str | None = None
+        user_rec: Any | None = None
         if trusted_context:
             sim_ownership = self.get_simulation_ownership(simulation_id)
             owning_bank = sim_ownership.get("owning_bank_id")
@@ -2587,6 +2588,7 @@ class ModelRegistry:
             )
 
         authenticated_operator: str | None = None
+        user_rec: Any | None = None
         if trusted_context:
             sim_ownership = self.get_simulation_ownership(simulation_id)
             owning_bank = sim_ownership.get("owning_bank_id")
@@ -3152,14 +3154,21 @@ class ModelRegistry:
                 actor_institution = tok_bank or getattr(u_rec, "bank_id", "unknown")
                 authority_type = "bearer_jwt"
             elif internal_context is not None:
+                sim_ownership = self.get_simulation_ownership(simulation_id)
+                owning_bank = sim_ownership.get("owning_bank_id")
+                expected_res_id = (
+                    f"{simulation_id}:v{version}"
+                    if getattr(internal_context, "resource_id", "") == f"{simulation_id}:v{version}"
+                    else simulation_id
+                )
                 is_valid_ctx, ctx_reason = verify_trusted_internal_context(
                     internal_context,
                     expected_action="revoke_sign_off",
                     expected_service_name=internal_context.service_name,
-                    expected_resource_type="model_version",
-                    expected_resource_id=f"{simulation_id}:v{version}",
-                    expected_simulation_id=simulation_id,
-                    expected_version=version,
+                    expected_resource_type=getattr(internal_context, "resource_type", None) or "model",
+                    expected_resource_id=expected_res_id,
+                    expected_model_version=version,
+                    expected_bank_id=owning_bank,
                     consume_nonce=True,
                 )
                 if not is_valid_ctx:

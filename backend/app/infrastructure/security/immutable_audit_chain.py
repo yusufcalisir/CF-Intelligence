@@ -275,6 +275,7 @@ class ImmutableAuditChain:
                 or os.environ.get("ENVIRONMENT", "").lower() == "production"
             )
 
+        secret: str | None = None
         if signing_secret is not None:
             secret = signing_secret.strip()
             if is_prod and (not secret or len(secret) < 16 or "change_me" in secret):
@@ -305,6 +306,9 @@ class ImmutableAuditChain:
                     )
             elif not secret:
                 secret = "CFI_DEV_AUDIT_LEDGER_SECRET_2026_DEFAULT"
+
+        if not isinstance(secret, str):
+            secret = "CFI_DEV_AUDIT_LEDGER_SECRET_2026_DEFAULT"
 
         return derive_domain_key(secret.strip(), DOMAIN_AUDIT_LEDGER)
 
