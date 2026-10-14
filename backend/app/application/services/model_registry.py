@@ -207,7 +207,7 @@ def create_trusted_internal_context(
     is_prod = app_env == "production"
 
     if signing_secret is not None:
-        clean = str(signing_secret).strip()
+        clean = signing_secret.strip()
         if is_prod and (clean in FORBIDDEN_INTERNAL_SECRETS or len(clean) < 32):
             raise PermissionError(
                 "Production internal authority rejected: explicit signing_secret is missing, insecure, or using a forbidden default."
