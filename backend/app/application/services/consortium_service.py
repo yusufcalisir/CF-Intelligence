@@ -484,8 +484,13 @@ class ConsortiumGovernanceService:
                 raise ValueError(f"Bank '{clean_bank}' is not a member of consortium '{clean_id}'.")
 
             if is_prod and auth_token:
+                founder_id = consortium.founder_bank_id
+                if not founder_id:
+                    raise PermissionError(
+                        f"Consortium '{clean_id}' has no designated founder member; direct mutation rejected."
+                    )
                 self._verify_service_actor_bank(
-                    consortium.founder_bank_id,
+                    founder_id,
                     auth_token=auth_token,
                     actor=actor,
                     trusted_context=trusted_context,
@@ -550,8 +555,13 @@ class ConsortiumGovernanceService:
                 raise ValueError(f"Bank '{clean_bank}' is not a member of consortium '{clean_id}'.")
 
             if is_prod and auth_token:
+                founder_id = consortium.founder_bank_id
+                if not founder_id:
+                    raise PermissionError(
+                        f"Consortium '{clean_id}' has no designated founder member; direct mutation rejected."
+                    )
                 self._verify_service_actor_bank(
-                    consortium.founder_bank_id,
+                    founder_id,
                     auth_token=auth_token,
                     actor=actor,
                     trusted_context=trusted_context,
