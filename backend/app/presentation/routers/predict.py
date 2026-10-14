@@ -248,10 +248,15 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
     try:
         active_ident = _registry.get_active_champion_identity(simulation_id=simulation_id)
     except Exception as exc:
-        logger.error("Failed to query active champion identity for simulation %s: %s", simulation_id, exc)
+        logger.error(
+            "Failed to query active champion identity for simulation %s: %s",
+            simulation_id,
+            exc,
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Serving model unavailable: {exc}",
+            detail="Serving model unavailable: champion manifest resolution failed.",
         ) from exc
 
     if active_ident is None:
@@ -267,7 +272,7 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
                 )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"No verified active champion model artifact found in registry for simulation '{simulation_id or 'default'}'.",
+            detail="No verified active champion model artifact found in registry.",
         )
 
     # 2. Check process-local serving cache
@@ -292,9 +297,14 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
                         _serving_model_cache.pop(simulation_id, None)
                         if _cached_serving_model is cached_model:
                             _cached_serving_model = None
+                        logger.error(
+                            "Serving model rejected for simulation %s: issuer key %s revoked",
+                            simulation_id,
+                            kid,
+                        )
                         raise HTTPException(
                             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=f"Serving model rejected: issuer key '{kid}' revoked.",
+                            detail="Serving model rejected: model authority or signing key has been revoked.",
                         )
                 return cached_model
 
@@ -306,17 +316,56 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
             registry=_registry,
         )
     except ModelNotAvailableError as exc:
+        logger.error(
+            "Serving model unavailable for simulation %s: %s",
+            simulation_id,
+            exc,
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Serving model unavailable: {exc}",
+            detail="Serving model unavailable: active champion artifact is missing or inaccessible.",
         ) from exc
-    except (ModelIntegrityError, ModelCompatibilityError, ModelAuthorizationError) as exc:
+    except ModelIntegrityError as exc:
+        logger.error(
+            "Serving model rejected for simulation %s due to integrity failure: %s",
+            simulation_id,
+            exc,
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Serving model rejected: {exc}",
+            detail="Serving model rejected: artifact integrity verification failed.",
+        ) from exc
+    except ModelAuthorizationError as exc:
+        logger.error(
+            "Serving model rejected for simulation %s due to authorization failure: %s",
+            simulation_id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Serving model rejected: model authorization verification failed.",
+        ) from exc
+    except ModelCompatibilityError as exc:
+        logger.error(
+            "Serving model rejected for simulation %s due to compatibility failure: %s",
+            simulation_id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Serving model unavailable: model architecture or specification is incompatible.",
         ) from exc
     except Exception as exc:
-        logger.error("Unexpected failure loading verified champion model: %s", exc)
+        logger.error(
+            "Unexpected failure loading verified champion model for simulation %s: %s",
+            simulation_id,
+            exc,
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Serving model unavailable due to verification failure.",
@@ -518,10 +567,10 @@ async def predict_transaction(
             detail=f"Transaction feature validation error: {e}",
         )
     except Exception as e:
-        logger.error("Inference execution failed: %s", e)
+        logger.error("Inference execution failed: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Inference pipeline execution error: {e}",
+            detail="Inference pipeline execution error.",
         )
 
     # 4. Compute composite risk score
@@ -781,10 +830,10 @@ async def predict_batch(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("Batch inference execution failed: %s", exc)
+        logger.error("Batch inference execution failed: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Batch inference pipeline execution error: {exc}",
+            detail="Batch inference pipeline execution error.",
         )
 
     items: list[BatchPredictionItem] = []
@@ -954,11 +1003,13 @@ async def explain_transaction(
             counterfactual_paths=counterfactual_paths,
             latency_ms=latency_ms,
         )
+    except HTTPException:
+        raise
     except Exception as exc:
-        logger.error("Explainability pipeline execution failed: %s", exc)
+        logger.error("Explainability pipeline execution failed: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Explainability execution failed: {exc}",
+            detail="Explainability execution failed.",
         )
 
 
@@ -976,13 +1027,13 @@ async def submit_transaction_feedback(payload: TransactionFeedbackRequest) -> di
         logger.warning("Feedback transaction not found: %s", e)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Transaction not found: {e}",
+            detail="Transaction not found.",
         )
     except Exception as e:
-        logger.error("Failed to process transaction feedback: %s", e)
+        logger.error("Failed to process transaction feedback: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to record transaction feedback: {e}",
+            detail="Failed to record transaction feedback.",
         )
 
 
@@ -1136,10 +1187,10 @@ async def score_transaction(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("Serving model inference failed: %s", exc)
+        logger.error("Serving model inference failed: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Inference pipeline execution error: {exc}",
+            detail="Inference pipeline execution error.",
         )
 
     # Run composite risk scoring engine offloaded to threadpool with genuine ML confidence
