@@ -725,6 +725,96 @@ class ImmutableAuditChain:
                 if mut_id not in resolved_mutation_ids
             ]
 
+    def is_mutation_pending(self, mutation_id: str) -> bool:
+        """Return True if mutation_id has an intent (PENDING) event and no terminal event."""
+        file_lock = _get_audit_file_lock(self._lock_path) if self._lock_path else contextlib.nullcontext()
+        with self._lock, file_lock:
+            self._reload_unlocked()
+            has_pending = False
+            for entry in self.chain:
+                d = entry.details or {}
+                if d.get("mutation_id") == mutation_id:
+                    stage = d.get("mutation_stage")
+                    if (
+                        stage in ("COMMITTED", "FAILED")
+                        or entry.decision in ("REVOKED", "PROMOTED", "ROLLED_BACK", "FAILED")
+                        or entry.event_type.endswith("_FAILED")
+                    ):
+                        return False
+                    if stage == "PENDING" or entry.decision == "PENDING":
+                        has_pending = True
+            return has_pending
+
+    def finalize_pending_mutation(
+        self,
+        mutation_id: str,
+        event_type: str,
+        actor: str = "system",
+        target_id: str = "system",
+        details: dict[str, Any] | None = None,
+        actor_type: str = "human_principal",
+        actor_institution: str = "unknown",
+        target_type: str = "unknown",
+        action: str = "",
+        decision: str = "PERMITTED",
+        correlation_id: str = "",
+    ) -> AuditLogEntry | None:
+        """Atomically finalize a pending mutation if not already resolved.
+
+        Guarantees:
+        1. Reloads chain under multi-process file lock and thread lock.
+        2. Validates that no terminal event (COMMITTED or FAILED) has already been appended
+           for mutation_id.
+        3. If already resolved, returns None immediately without appending any duplicate.
+        4. If unresolved, appends the terminal record atomically and returns it.
+        """
+        file_lock = _get_audit_file_lock(self._lock_path) if self._lock_path else contextlib.nullcontext()
+        with self._lock, file_lock:
+            self._reload_unlocked()
+            if self._is_corrupted:
+                raise AuditChainTamperError(
+                    f"Cannot append to corrupted audit ledger: {self._tamper_reason}"
+                )
+            is_valid, tamper_reason = self._validate_chain_entries_unlocked(self.chain)
+            if not is_valid:
+                self._is_corrupted = True
+                self._tamper_reason = tamper_reason
+                raise AuditChainTamperError(
+                    f"Cannot append to corrupted audit ledger: {self._tamper_reason}"
+                )
+
+            # Check for existing terminal resolution for this mutation_id
+            for entry in self.chain:
+                d = entry.details or {}
+                if d.get("mutation_id") == mutation_id:
+                    stage = d.get("mutation_stage")
+                    if (
+                        stage in ("COMMITTED", "FAILED")
+                        or entry.decision in ("REVOKED", "PROMOTED", "ROLLED_BACK", "FAILED")
+                        or entry.event_type.endswith("_FAILED")
+                    ):
+                        logger.info(
+                            "Mutation '%s' is already resolved with stage=%s, decision=%s. Skipping duplicate.",
+                            mutation_id,
+                            stage,
+                            entry.decision,
+                        )
+                        return None
+
+            return self._append_event_unlocked(
+                event_type=event_type,
+                actor=actor,
+                target_id=target_id,
+                details=details,
+                actor_type=actor_type,
+                actor_institution=actor_institution,
+                target_type=target_type,
+                action=action,
+                decision=decision,
+                correlation_id=correlation_id,
+            )
+
+
     def append(
         self,
         event_type: str,

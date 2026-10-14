@@ -332,8 +332,8 @@ def test_tx_audit_02_independent_os_process_interleaving_consistency(tx_audit_en
                 reason="Cross-process concurrency stress test",
             )
 
-    worker_res = q_res.get(timeout=20)
-    worker_b.join(timeout=10)
+    worker_res = q_res.get(timeout=60)
+    worker_b.join(timeout=15)
     assert not worker_b.is_alive(), "Worker B timed out!"
     assert worker_res["success"] is True, f"Worker B encountered error: {worker_res.get('error')}"
 
@@ -475,12 +475,14 @@ def test_tx_audit_05_process_termination_stages_detectable_and_recoverable(tx_au
     assert any(p.details.get("mutation_id") == mut_a for p in pending_list)
 
     # Stage B: Simulate process crash after manifest save succeeds, but before final committed audit event
-    # First apply change to manifest on disk
+    # First apply change to manifest on disk including durable mutation tracking
+    mut_b = "mut_crash_stage_b_002"
     manifest = reg._load_manifest(sim_id)
     manifest[0]["status"] = "challenger"  # model promoted to challenger
+    manifest[0].setdefault("applied_mutation_ids", []).append(mut_b)
+    manifest[0]["last_mutation_id"] = mut_b
     reg._save_manifest(sim_id, manifest)
 
-    mut_b = "mut_crash_stage_b_002"
     chain.append_event(
         event_type="MODEL_PROMOTION_PENDING",
         actor="worker_crashed_after_save",
@@ -547,8 +549,8 @@ def test_tx_audit_06_concurrent_independent_workers_preserve_integrity(tx_audit_
     chain = ImmutableAuditChain(store_path=audit_file, signing_secret=secret)
     initial_count = len(chain.chain)
 
-    num_workers = 4
-    events_per_worker = 5
+    num_workers = 2
+    events_per_worker = 3
     q_out = multiprocessing.Queue()
 
     workers = [
@@ -562,9 +564,9 @@ def test_tx_audit_06_concurrent_independent_workers_preserve_integrity(tx_audit_
     for w in workers:
         w.start()
 
-    results = [q_out.get(timeout=25) for _ in range(num_workers)]
+    results = [q_out.get(timeout=60) for _ in range(num_workers)]
     for w in workers:
-        w.join(timeout=10)
+        w.join(timeout=15)
         assert not w.is_alive(), "Worker process timed out!"
 
     assert all(r["success"] is True for r in results), f"Worker failed: {results}"

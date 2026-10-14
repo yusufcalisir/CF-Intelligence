@@ -2554,11 +2554,19 @@ class ModelRegistry:
                 decision="PENDING",
             )
 
+            # Record durable mutation evidence on target entry before persistence
+            if "applied_mutation_ids" not in target_entry:
+                target_entry["applied_mutation_ids"] = []
+            if mutation_id not in target_entry["applied_mutation_ids"]:
+                target_entry["applied_mutation_ids"].append(mutation_id)
+            target_entry["last_mutation_id"] = mutation_id
+
             # Authoritative manifest is saved FIRST (Section 9.1)
             try:
                 self._save_manifest(simulation_id, manifest)
             except Exception as save_err:
-                audit_chain.append_event(
+                audit_chain.finalize_pending_mutation(
+                    mutation_id=mutation_id,
                     event_type="MODEL_PROMOTION_FAILED",
                     actor=effective_operator or "system",
                     target_id=f"{simulation_id}:v{version}",
@@ -2583,7 +2591,8 @@ class ModelRegistry:
 
             # Finalize committed audit event
             try:
-                audit_chain.append_event(
+                audit_chain.finalize_pending_mutation(
+                    mutation_id=mutation_id,
                     event_type="MODEL_PROMOTION",
                     actor=effective_operator or "system",
                     target_id=f"{simulation_id}:v{version}",
@@ -2607,7 +2616,7 @@ class ModelRegistry:
                     decision="PROMOTED",
                 )
             except Exception as audit_err:
-                logger.error("Failed to append final committed audit event for promotion: %s", audit_err)
+                logger.error("Failed to finalize committed audit event for promotion: %s", audit_err)
                 raise AuditLedgerSecurityError(
                     f"Critical audit failure: promotion for {simulation_id}:v{version} persisted but could not be finalized in audit ledger: {audit_err}"
                 ) from audit_err
@@ -2836,11 +2845,19 @@ class ModelRegistry:
                 decision="PENDING",
             )
 
+            # Record durable mutation evidence on target entry before persistence
+            if "applied_mutation_ids" not in target_entry:
+                target_entry["applied_mutation_ids"] = []
+            if mutation_id not in target_entry["applied_mutation_ids"]:
+                target_entry["applied_mutation_ids"].append(mutation_id)
+            target_entry["last_mutation_id"] = mutation_id
+
             # Authoritative manifest is saved FIRST (Section 9.1)
             try:
                 self._save_manifest(simulation_id, manifest)
             except Exception as save_err:
-                audit_chain.append_event(
+                audit_chain.finalize_pending_mutation(
+                    mutation_id=mutation_id,
                     event_type="MODEL_ROLLBACK_FAILED",
                     actor=effective_operator or "system",
                     target_id=f"{simulation_id}:v{version}",
@@ -2865,7 +2882,8 @@ class ModelRegistry:
 
             # Finalize committed audit event
             try:
-                audit_chain.append_event(
+                audit_chain.finalize_pending_mutation(
+                    mutation_id=mutation_id,
                     event_type="MODEL_ROLLBACK",
                     actor=effective_operator or "system",
                     target_id=f"{simulation_id}:v{version}",
@@ -2888,7 +2906,7 @@ class ModelRegistry:
                     decision="ROLLED_BACK",
                 )
             except Exception as audit_err:
-                logger.error("Failed to append final committed audit event for rollback: %s", audit_err)
+                logger.error("Failed to finalize committed audit event for rollback: %s", audit_err)
                 raise AuditLedgerSecurityError(
                     f"Critical audit failure: rollback for {simulation_id}:v{version} persisted but could not be finalized in audit ledger: {audit_err}"
                 ) from audit_err
@@ -3465,10 +3483,19 @@ class ModelRegistry:
                 decision="PENDING",
             )
 
+            # Record durable mutation evidence on sign-off and version entry before persistence
+            target_sign_off["revocation_mutation_id"] = mutation_id
+            if "applied_mutation_ids" not in entry:
+                entry["applied_mutation_ids"] = []
+            if mutation_id not in entry["applied_mutation_ids"]:
+                entry["applied_mutation_ids"].append(mutation_id)
+            entry["last_mutation_id"] = mutation_id
+
             try:
                 self._save_manifest(simulation_id, manifest)
             except Exception as save_err:
-                audit_chain.append_event(
+                audit_chain.finalize_pending_mutation(
+                    mutation_id=mutation_id,
                     event_type="MODEL_SIGNOFF_REVOCATION_FAILED",
                     actor=verified_actor,
                     target_id=f"{simulation_id}:v{version}",
@@ -3495,7 +3522,8 @@ class ModelRegistry:
 
             # Finalize committed audit event
             try:
-                audit_chain.append_event(
+                audit_chain.finalize_pending_mutation(
+                    mutation_id=mutation_id,
                     event_type="MODEL_SIGNOFF_REVOCATION",
                     actor=verified_actor,
                     target_id=f"{simulation_id}:v{version}",
@@ -3522,7 +3550,7 @@ class ModelRegistry:
                     decision="REVOKED",
                 )
             except Exception as audit_err:
-                logger.error("Failed to append final committed audit event for revocation: %s", audit_err)
+                logger.error("Failed to finalize committed audit event for sign-off revocation: %s", audit_err)
                 raise AuditLedgerSecurityError(
                     f"Critical audit failure: sign-off revocation for {simulation_id}:v{version} persisted but could not be finalized in audit ledger: {audit_err}"
                 ) from audit_err
@@ -3618,10 +3646,20 @@ class ModelRegistry:
                 decision="PENDING",
             )
 
+            # Record durable mutation evidence on version entry before persistence
+            entry["is_revoked"] = True
+            entry["revocation_mutation_id"] = mutation_id
+            if "applied_mutation_ids" not in entry:
+                entry["applied_mutation_ids"] = []
+            if mutation_id not in entry["applied_mutation_ids"]:
+                entry["applied_mutation_ids"].append(mutation_id)
+            entry["last_mutation_id"] = mutation_id
+
             try:
                 self._save_manifest(simulation_id, manifest)
             except Exception as save_err:
-                audit_chain.append_event(
+                audit_chain.finalize_pending_mutation(
+                    mutation_id=mutation_id,
                     event_type="MODEL_VERSION_REVOCATION_FAILED",
                     actor=effective_actor,
                     target_id=f"{simulation_id}:v{version}",
@@ -3646,7 +3684,8 @@ class ModelRegistry:
 
             # Finalize committed audit event
             try:
-                audit_chain.append_event(
+                audit_chain.finalize_pending_mutation(
+                    mutation_id=mutation_id,
                     event_type="MODEL_VERSION_REVOCATION",
                     actor=effective_actor,
                     target_id=f"{simulation_id}:v{version}",
@@ -3668,7 +3707,7 @@ class ModelRegistry:
                     decision="REVOKED",
                 )
             except Exception as audit_err:
-                logger.error("Failed to append final committed audit event for version revocation: %s", audit_err)
+                logger.error("Failed to finalize committed audit event for version revocation: %s", audit_err)
                 raise AuditLedgerSecurityError(
                     f"Critical audit failure: model version revocation for {simulation_id}:v{version} persisted but could not be finalized in audit ledger: {audit_err}"
                 ) from audit_err
@@ -3692,8 +3731,57 @@ class ModelRegistry:
 
             return entry
 
-    def reconcile_incomplete_mutations(self, simulation_id: str | None = None) -> list[dict[str, Any]]:
-        """Scan audit chain for interrupted mutations and resolve them truthfully based on persisted disk state."""
+    def is_mutation_committed_for_version(
+        self,
+        simulation_id: str,
+        version: int | None,
+        mutation_id: str,
+    ) -> bool:
+        """Check whether a mutation was authoritatively committed for a specific model version."""
+        manifest = self._load_manifest(simulation_id)
+        if version is not None:
+            entry = next((e for e in manifest if e.get("version") == version), None)
+            if entry:
+                if mutation_id in entry.get("applied_mutation_ids", []):
+                    return True
+                if entry.get("last_mutation_id") == mutation_id:
+                    return True
+                if entry.get("revocation_mutation_id") == mutation_id:
+                    return True
+                for s in entry.get("sign_offs", []):
+                    if s.get("revocation_mutation_id") == mutation_id:
+                        return True
+            return False
+
+        for entry in manifest:
+            if mutation_id in entry.get("applied_mutation_ids", []):
+                return True
+            if entry.get("last_mutation_id") == mutation_id:
+                return True
+            if entry.get("revocation_mutation_id") == mutation_id:
+                return True
+            for s in entry.get("sign_offs", []):
+                if s.get("revocation_mutation_id") == mutation_id:
+                    return True
+        return False
+
+    def reconcile_incomplete_mutations(
+        self,
+        simulation_id: str | None = None,
+        lock_timeout_seconds: float = 5.0,
+    ) -> list[dict[str, Any]]:
+        """Scan audit chain for interrupted mutations and resolve them truthfully based on persisted disk state.
+
+        Guarantees:
+        1. Never marks COMMITTED merely because current business state resembles desired target.
+           Strictly verifies durable mutation-specific evidence (applied_mutation_ids).
+        2. Never marks FAILED while originating worker is actively executing. Synchronizes via
+           simulation FileLock. If FileLock is held, leaves mutation in indeterminate state.
+        3. Uses atomic finalize_pending_mutation to prevent duplicate resolution across racing reconcilers.
+        4. Maintains registry-then-audit lock acquisition order to prevent deadlocks.
+        """
+        from filelock import Timeout
+
         from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 
         audit_chain = ImmutableAuditChain.get_instance()
@@ -3711,89 +3799,99 @@ class ModelRegistry:
 
             ver = details.get("version")
             action = str(details.get("action", ""))
-            manifest = self._load_manifest(sim_id)
-            target = next((e for e in manifest if e.get("version") == ver), None)
 
-            committed = False
-            if action == "revoke_sign_off" and target:
-                role = details.get("role")
-                norm_role = "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
-                matching_s = [
-                    s for s in target.get("sign_offs", [])
-                    if ("compliance" if s["role"] in ("compliance", "compliance_officer") else "ml_engineer") == norm_role
-                ]
-                if matching_s and all(s.get("is_revoked") is True for s in matching_s):
-                    committed = True
-            elif action == "promote_version" and target:
-                target_status = details.get("target_status")
-                if target.get("status") == target_status:
-                    committed = True
-            elif action == "rollback" and target:
-                if target.get("status") == "champion" and target.get("is_active") is True:
-                    committed = True
-            elif action == "revoke_version" and target:
-                if target.get("is_revoked") is True:
-                    committed = True
+            sim_dir = self._get_sim_dir(sim_id)
+            file_lock = _get_registry_file_lock(sim_dir)
 
-            if committed:
-                if action == "revoke_sign_off":
-                    event_type, decision = "MODEL_SIGNOFF_REVOCATION", "REVOKED"
-                elif action == "promote_version":
-                    event_type, decision = "MODEL_PROMOTION", "PROMOTED"
-                elif action == "rollback":
-                    event_type, decision = "MODEL_ROLLBACK", "ROLLED_BACK"
-                else:
-                    event_type, decision = "MODEL_VERSION_REVOCATION", "REVOKED"
-
-                audit_chain.append_event(
-                    event_type=event_type,
-                    actor=p.actor,
-                    target_id=p.target_id,
-                    details={
-                        **details,
-                        "mutation_stage": "COMMITTED",
-                        "mutation_committed": True,
-                        "intent_event_id": p.event_id,
-                        "reconciled": True,
-                        "decision": decision,
-                    },
-                    actor_type=p.actor_type,
-                    actor_institution=p.actor_institution,
-                    target_type=p.target_type,
-                    action=action,
-                    decision=decision,
+            try:
+                file_lock.acquire(timeout=lock_timeout_seconds)
+            except Timeout:
+                logger.warning(
+                    "Simulation '%s' lock actively held by worker; mutation '%s' remains unresolved.",
+                    sim_id,
+                    mut_id,
                 )
-                reconciled.append({"mutation_id": mut_id, "status": "COMMITTED"})
-            else:
-                if action == "revoke_sign_off":
-                    event_type = "MODEL_SIGNOFF_REVOCATION_FAILED"
-                elif action == "promote_version":
-                    event_type = "MODEL_PROMOTION_FAILED"
-                elif action == "rollback":
-                    event_type = "MODEL_ROLLBACK_FAILED"
-                else:
-                    event_type = "MODEL_VERSION_REVOCATION_FAILED"
+                reconciled.append({"mutation_id": mut_id, "status": "INDETERMINATE_IN_PROGRESS"})
+                continue
 
-                audit_chain.append_event(
-                    event_type=event_type,
-                    actor=p.actor,
-                    target_id=p.target_id,
-                    details={
-                        **details,
-                        "mutation_stage": "FAILED",
-                        "mutation_committed": False,
-                        "intent_event_id": p.event_id,
-                        "reconciled": True,
-                        "error": "Process terminated prior to business persistence completion",
-                        "decision": "FAILED",
-                    },
-                    actor_type=p.actor_type,
-                    actor_institution=p.actor_institution,
-                    target_type=p.target_type,
-                    action=action,
-                    decision="FAILED",
-                )
-                reconciled.append({"mutation_id": mut_id, "status": "FAILED"})
+            try:
+                with self._lock:
+                    # Re-check pending status under lock
+                    if not audit_chain.is_mutation_pending(mut_id):
+                        reconciled.append({"mutation_id": mut_id, "status": "ALREADY_RESOLVED"})
+                        continue
+
+                    committed = self.is_mutation_committed_for_version(sim_id, ver, mut_id)
+
+                    if committed:
+                        if action == "revoke_sign_off":
+                            event_type, decision = "MODEL_SIGNOFF_REVOCATION", "REVOKED"
+                        elif action == "promote_version":
+                            event_type, decision = "MODEL_PROMOTION", "PROMOTED"
+                        elif action == "rollback":
+                            event_type, decision = "MODEL_ROLLBACK", "ROLLED_BACK"
+                        else:
+                            event_type, decision = "MODEL_VERSION_REVOCATION", "REVOKED"
+
+                        final_entry = audit_chain.finalize_pending_mutation(
+                            mutation_id=mut_id,
+                            event_type=event_type,
+                            actor=p.actor,
+                            target_id=p.target_id,
+                            details={
+                                **details,
+                                "mutation_stage": "COMMITTED",
+                                "mutation_committed": True,
+                                "intent_event_id": p.event_id,
+                                "reconciled": True,
+                                "decision": decision,
+                            },
+                            actor_type=p.actor_type,
+                            actor_institution=p.actor_institution,
+                            target_type=p.target_type,
+                            action=action,
+                            decision=decision,
+                        )
+                        if final_entry is not None:
+                            reconciled.append({"mutation_id": mut_id, "status": "COMMITTED"})
+                        else:
+                            reconciled.append({"mutation_id": mut_id, "status": "ALREADY_RESOLVED"})
+                    else:
+                        if action == "revoke_sign_off":
+                            event_type = "MODEL_SIGNOFF_REVOCATION_FAILED"
+                        elif action == "promote_version":
+                            event_type = "MODEL_PROMOTION_FAILED"
+                        elif action == "rollback":
+                            event_type = "MODEL_ROLLBACK_FAILED"
+                        else:
+                            event_type = "MODEL_VERSION_REVOCATION_FAILED"
+
+                        final_entry = audit_chain.finalize_pending_mutation(
+                            mutation_id=mut_id,
+                            event_type=event_type,
+                            actor=p.actor,
+                            target_id=p.target_id,
+                            details={
+                                **details,
+                                "mutation_stage": "FAILED",
+                                "mutation_committed": False,
+                                "intent_event_id": p.event_id,
+                                "reconciled": True,
+                                "error": "Process terminated prior to authoritative business persistence completion",
+                                "decision": "FAILED",
+                            },
+                            actor_type=p.actor_type,
+                            actor_institution=p.actor_institution,
+                            target_type=p.target_type,
+                            action=action,
+                            decision="FAILED",
+                        )
+                        if final_entry is not None:
+                            reconciled.append({"mutation_id": mut_id, "status": "FAILED"})
+                        else:
+                            reconciled.append({"mutation_id": mut_id, "status": "ALREADY_RESOLVED"})
+            finally:
+                file_lock.release()
 
         return reconciled
 
