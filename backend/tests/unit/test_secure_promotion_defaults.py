@@ -98,8 +98,9 @@ def _create_authentic_candidate(
         architecture="FraudDetectionNN",
         feature_schema_version="v1.0",
         feature_names=FEATURE_NAMES,
+        owning_bank_id="bank_a",
     )
-    receipt = issuer.issue_receipt(evidence=evidence, model_bytes=model_bytes).to_dict()
+    receipt = issuer.issue_receipt(evidence=evidence, model_bytes=model_bytes, owning_bank_id="bank_a").to_dict()
 
     entry = reg.save_version(
         simulation_id=sim_id,
@@ -107,6 +108,7 @@ def _create_authentic_candidate(
         metrics={"loss": 0.05, "auc": 0.95},
         artifact_bytes=model_bytes,
         training_receipt=receipt,
+        owning_bank_id="bank_a",
         is_promoted=False,
     )
     return entry, model, model_bytes, sha256, receipt

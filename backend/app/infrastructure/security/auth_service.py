@@ -271,6 +271,10 @@ class AuthenticationService:
     @classmethod
     def get_instance(cls) -> AuthenticationService:
         """Singleton accessor for the authentication service."""
+        if cls._instance is not None and not getattr(cls._instance.identity_store, "_in_memory", True):
+            sp = getattr(cls._instance.identity_store, "_store_path", "")
+            if sp and not os.path.exists(sp) and getattr(cls._instance.identity_store, "_is_established", False):
+                cls._instance = None
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance

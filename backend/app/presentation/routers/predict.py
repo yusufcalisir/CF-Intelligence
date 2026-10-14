@@ -388,6 +388,11 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
 
     global_path = os.path.join(_registry.storage_dir, "global_model.pt")
     if not os.path.exists(global_path):
+        if settings.app_env.lower() == "production":
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Serving model rejected: no verified active champion model artifact exists in production registry.",
+            )
         os.makedirs(_registry.storage_dir, exist_ok=True)
         default_m = _model_service.create_model()
         torch.save(default_m.state_dict(), global_path)

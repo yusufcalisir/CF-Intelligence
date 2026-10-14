@@ -81,12 +81,68 @@ def generate_signoff_signature(
     return hmac.new(domain_key, canonical_payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+DOMAIN_INTERNAL_AUTHORITY = "cfi:internal_execution_context:v2"
+FORBIDDEN_INTERNAL_SECRETS = frozenset(
+    {
+        "",
+        "cfi_internal_trusted_context_secret_key_2026_default",
+        "cfi_dev_internal_trusted_context_secret_key_2026_development_only",
+        "cfi_local_secret_key_2026_change_me_in_production",
+        "change_me",
+        "change-me",
+        "secret",
+        "default",
+        "password",
+        "test",
+        "123456",
+    }
+)
+
+
+def _resolve_internal_context_secret(is_issuing: bool = True) -> bytes:
+    """Resolve and derive cryptographically separated internal authority signing key.
+
+    In production mode, requires independently configured high-entropy secret
+    (CFI_INTERNAL_CONTEXT_SECRET). Known defaults and placeholders fail closed.
+    """
+    from app.config import get_settings
+
+    settings = get_settings()
+    env_app_env = os.environ.get("APP_ENV", "").lower().strip()
+    is_prod_env = env_app_env == "production"
+
+    configured_secret = (
+        os.environ.get("CFI_INTERNAL_CONTEXT_SECRET")
+        or getattr(settings, "internal_context_signing_secret", None)
+    )
+
+    clean_secret = str(configured_secret).strip() if configured_secret else ""
+
+    if is_prod_env and (
+        not clean_secret
+        or clean_secret in FORBIDDEN_INTERNAL_SECRETS
+        or len(clean_secret) < 32
+    ):
+        action_desc = "issue" if is_issuing else "verify"
+        raise PermissionError(
+            f"Production internal authority rejected: Cannot {action_desc} internal authority context. "
+            "CFI_INTERNAL_CONTEXT_SECRET must be an independently provisioned, high-entropy secret "
+            "(minimum 32 characters, non-default)."
+        )
+
+    if not clean_secret or clean_secret in FORBIDDEN_INTERNAL_SECRETS:
+        clean_secret = "cfi_dev_internal_trusted_context_secret_key_2026_development_only"
+
+    return derive_domain_key(clean_secret, DOMAIN_INTERNAL_AUTHORITY)
+
+
 @dataclass(frozen=True)
 class TrustedInternalContext:
-    """Cryptographically signed and time-bounded internal execution authority context.
+    """Cryptographically signed, resource-bound, and replay-protected internal execution authority context.
 
     Used exclusively for genuine internal, non-HTTP orchestration operations (such as automated
-    canary evaluation rollbacks in ModelEvaluationEngine). Cannot be spoofed or supplied by external
+    canary evaluation rollbacks in ModelEvaluationEngine, training orchestrator ownership bindings,
+    and consortium coordinator lifecycle operations). Cannot be spoofed or supplied by external
     HTTP callers without possession of the authoritative platform signing secret.
     """
 
@@ -95,32 +151,98 @@ class TrustedInternalContext:
     nonce: str
     created_at: float
     signature: str
+    resource_type: str | None = None
+    resource_id: str | None = None
+    model_version: int | None = None
+    bank_id: str | None = None
+    target_bank_id: str | None = None
+    ttl_seconds: float = 300.0
+
+
+def _build_internal_context_payload(
+    service_name: str,
+    action: str,
+    resource_type: str | None,
+    resource_id: str | None,
+    model_version: int | None,
+    bank_id: str | None,
+    target_bank_id: str | None,
+    nonce: str,
+    created_at: float,
+    ttl_seconds: float,
+) -> bytes:
+    parts = [
+        "INTERNAL_AUTHORITY_V2",
+        service_name.strip(),
+        action.strip(),
+        (resource_type or "").strip(),
+        (resource_id or "").strip(),
+        str(model_version) if model_version is not None else "",
+        (bank_id or "").strip(),
+        (target_bank_id or "").strip(),
+        f"{created_at:.4f}",
+        f"{ttl_seconds:.1f}",
+        nonce.strip(),
+    ]
+    return ":".join(parts).encode("utf-8")
 
 
 def create_trusted_internal_context(
     service_name: str,
     action: str,
+    resource_type: str | None = None,
+    resource_id: str | None = None,
+    model_version: int | None = None,
+    bank_id: str | None = None,
+    target_bank_id: str | None = None,
     created_at: float | None = None,
+    ttl_seconds: float = 300.0,
+    signing_secret: str | None = None,
 ) -> TrustedInternalContext:
-    """Generate a signed, tamper-evident internal execution context for automated orchestrators."""
+    """Generate a signed, tamper-evident, scoped internal execution context for automated orchestrators."""
     from app.config import get_settings
 
     settings = get_settings()
-    secret = (
-        getattr(settings, "payload_signing_secret", None)
-        or getattr(settings, "oidc_jwt_signing_secret", None)
-        or "cfi_internal_trusted_context_secret_key_2026_default"
-    )
+    app_env = getattr(settings, "app_env", "development").lower()
+    is_prod = app_env == "production"
+
+    if signing_secret is not None:
+        clean = str(signing_secret).strip()
+        if is_prod and (clean in FORBIDDEN_INTERNAL_SECRETS or len(clean) < 32):
+            raise PermissionError(
+                "Production internal authority rejected: explicit signing_secret is missing, insecure, or using a forbidden default."
+            )
+        domain_key = derive_domain_key(clean, DOMAIN_INTERNAL_AUTHORITY)
+    else:
+        domain_key = _resolve_internal_context_secret(is_issuing=True)
+
     nonce = str(uuid.uuid4())
     now = time.time() if created_at is None else created_at
-    payload = f"INTERNAL_AUTHORITY:{service_name}:{action}:{nonce}:{now:.4f}".encode()
-    sig = hmac.new(str(secret).encode("utf-8"), payload, hashlib.sha256).hexdigest()
+    payload = _build_internal_context_payload(
+        service_name=service_name,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        model_version=model_version,
+        bank_id=bank_id,
+        target_bank_id=target_bank_id,
+        nonce=nonce,
+        created_at=now,
+        ttl_seconds=ttl_seconds,
+    )
+    sig = hmac.new(domain_key, payload, hashlib.sha256).hexdigest()
     return TrustedInternalContext(
         service_name=service_name,
         action=action,
         nonce=nonce,
         created_at=now,
         signature=sig,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        model_version=model_version,
+        bank_id=bank_id,
+        target_bank_id=target_bank_id,
+        ttl_seconds=ttl_seconds,
     )
 
 
@@ -128,10 +250,27 @@ def verify_trusted_internal_context(
     context: Any,
     expected_action: str,
     max_age_seconds: float = 300.0,
+    expected_service_name: str | None = None,
+    expected_resource_type: str | None = None,
+    expected_resource_id: str | None = None,
+    expected_model_version: int | None = None,
+    expected_bank_id: str | None = None,
+    expected_target_bank_id: str | None = None,
+    consume_nonce: bool = False,
+    nonce_store: Any | None = None,
 ) -> tuple[bool, str]:
-    """Cryptographically verify an internal execution context."""
-    from app.config import get_settings
+    """Cryptographically verify an internal execution context.
 
+    Enforces:
+    1. Type authenticity (isinstance TrustedInternalContext).
+    2. Authorized internal service name whitelist.
+    3. Action match against expected_action.
+    4. Time-boundary and TTL expiration.
+    5. Production secret entropy and authenticity (rejects default/placeholder secrets).
+    6. Cryptographic domain-separated HMAC signature verification.
+    7. Resource and institutional scope binding (resource_type, resource_id, version, bank_id).
+    8. Multi-process replay prevention via atomic nonce consumption (when consume_nonce=True).
+    """
     if not isinstance(context, TrustedInternalContext):
         return False, "Invalid context type: expected TrustedInternalContext instance."
 
@@ -143,24 +282,115 @@ def verify_trusted_internal_context(
     if context.service_name not in ALLOWED_SERVICES:
         return False, f"Unauthorized internal service name: '{context.service_name}'."
 
+    if expected_service_name is not None and context.service_name != expected_service_name:
+        return False, f"Context service mismatch: expected '{expected_service_name}', got '{context.service_name}'."
+
     if context.action != expected_action:
         return False, f"Context action mismatch: expected '{expected_action}', got '{context.action}'."
 
     now = time.time()
-    if abs(now - context.created_at) > max_age_seconds:
-        return False, f"Internal authority context expired or clock skew exceeded (age={now - context.created_at:.1f}s)."
+    effective_ttl = min(getattr(context, "ttl_seconds", 300.0), max_age_seconds)
+    age = now - context.created_at
+    if age < -10.0:
+        return False, f"Internal authority context created in future (clock skew: {age:.1f}s)."
+    if age > effective_ttl:
+        return False, f"Internal authority context expired or clock skew exceeded (age={age:.1f}s, ttl={effective_ttl:.1f}s)."
 
-    settings = get_settings()
-    secret = (
-        getattr(settings, "payload_signing_secret", None)
-        or getattr(settings, "oidc_jwt_signing_secret", None)
-        or "cfi_internal_trusted_context_secret_key_2026_default"
+    # Resolve domain key according to production rules
+    try:
+        domain_key = _resolve_internal_context_secret(is_issuing=False)
+    except PermissionError as exc:
+        return False, str(exc)
+
+    # Compute expected V2 signature
+    v2_payload = _build_internal_context_payload(
+        service_name=context.service_name,
+        action=context.action,
+        resource_type=getattr(context, "resource_type", None),
+        resource_id=getattr(context, "resource_id", None),
+        model_version=getattr(context, "model_version", None),
+        bank_id=getattr(context, "bank_id", None),
+        target_bank_id=getattr(context, "target_bank_id", None),
+        nonce=context.nonce,
+        created_at=context.created_at,
+        ttl_seconds=getattr(context, "ttl_seconds", 300.0),
     )
-    payload = f"INTERNAL_AUTHORITY:{context.service_name}:{context.action}:{context.nonce}:{context.created_at:.4f}".encode()
-    expected_sig = hmac.new(str(secret).encode("utf-8"), payload, hashlib.sha256).hexdigest()
+    expected_v2_sig = hmac.new(domain_key, v2_payload, hashlib.sha256).hexdigest()
 
-    if not hmac.compare_digest(context.signature, expected_sig):
-        return False, "Cryptographic signature mismatch on internal execution context."
+    v1_matched = False
+    # Backward compatibility with V1 signatures for contexts without resource attributes
+    if not hmac.compare_digest(context.signature, expected_v2_sig):
+        from app.config import get_settings
+
+        settings = get_settings()
+        secret = (
+            getattr(settings, "payload_signing_secret", None)
+            or getattr(settings, "oidc_jwt_signing_secret", None)
+            or ""
+        )
+        if secret:
+            v1_payload = f"INTERNAL_AUTHORITY:{context.service_name}:{context.action}:{context.nonce}:{context.created_at:.4f}".encode()
+            expected_v1_sig = hmac.new(str(secret).encode("utf-8"), v1_payload, hashlib.sha256).hexdigest()
+            expected_v1_domain_sig = hmac.new(domain_key, v1_payload, hashlib.sha256).hexdigest()
+            if hmac.compare_digest(context.signature, expected_v1_sig) or hmac.compare_digest(context.signature, expected_v1_domain_sig):
+                v1_matched = True
+
+        if not v1_matched:
+            return False, "Cryptographic signature mismatch on internal execution context."
+
+    # Scope validation: Resource Type
+    ctx_res_type = getattr(context, "resource_type", None)
+    if ctx_res_type and expected_resource_type and ctx_res_type != expected_resource_type:
+        return False, f"Context resource_type mismatch: expected '{expected_resource_type}', got '{ctx_res_type}'."
+
+    # Scope validation: Resource ID
+    ctx_res_id = getattr(context, "resource_id", None)
+    if ctx_res_id is not None and expected_resource_id is not None and ctx_res_id.strip() != expected_resource_id.strip():
+        return (
+            False,
+            f"Context resource_id scope mismatch: context is scoped to resource '{ctx_res_id}', cannot operate on '{expected_resource_id}'.",
+        )
+
+    # Scope validation: Model Version
+    ctx_ver = getattr(context, "model_version", None)
+    if ctx_ver is not None and expected_model_version is not None and ctx_ver != expected_model_version:
+        return (
+            False,
+            f"Context model_version scope mismatch: context is scoped to version {ctx_ver}, cannot operate on version {expected_model_version}.",
+        )
+
+    # Scope validation: Institutional Bank ID
+    ctx_bank = getattr(context, "bank_id", None)
+    if ctx_bank is not None and expected_bank_id is not None and ctx_bank.strip().lower() != expected_bank_id.strip().lower():
+        return (
+            False,
+            f"Context bank_id scope mismatch: context is scoped to institution '{ctx_bank}', cannot operate on institution '{expected_bank_id}'.",
+        )
+
+    # Scope validation: Target Bank ID
+    ctx_target_bank = getattr(context, "target_bank_id", None)
+    if ctx_target_bank is not None and expected_target_bank_id is not None and ctx_target_bank.strip().lower() != expected_target_bank_id.strip().lower():
+        return (
+            False,
+            f"Context target_bank_id scope mismatch: context is scoped to target bank '{ctx_target_bank}', cannot operate on '{expected_target_bank_id}'.",
+        )
+
+    # Replay protection: atomic nonce consumption
+    if consume_nonce:
+        from app.infrastructure.security.durable_nonce_store import get_default_nonce_store
+
+        store = nonce_store or get_default_nonce_store()
+        expires_at = context.created_at + getattr(context, "ttl_seconds", 300.0)
+        metadata = {
+            "service_name": context.service_name,
+            "action": context.action,
+            "resource_id": ctx_res_id,
+            "model_version": ctx_ver,
+            "bank_id": ctx_bank,
+        }
+        consumed_ok, reason = store.consume_nonce(context.nonce, expires_at=expires_at, metadata=metadata)
+        if not consumed_ok:
+            return False, reason
 
     return True, "Valid"
 
@@ -557,6 +787,28 @@ class ModelRegistry:
                 c_val = e.get("consortium_id")
                 if isinstance(c_val, str) and c_val.strip():
                     consortia_found.add(c_val.strip())
+
+            # Fallback probe to verified sign-offs or training receipt if entries lack explicit ownership tags
+            if not banks_found and not consortia_found and manifest:
+                from app.infrastructure.security.auth_service import AuthenticationService
+
+                auth_svc = AuthenticationService.get_instance()
+                for e in manifest:
+                    for s in e.get("sign_offs", []):
+                        if isinstance(s, dict):
+                            s_user = s.get("user")
+                            if s_user:
+                                u_rec = auth_svc.get_user(s_user)
+                                if u_rec and getattr(u_rec, "bank_id", None):
+                                    banks_found.add(u_rec.bank_id.strip())
+                    rcpt = e.get("training_receipt")
+                    if isinstance(rcpt, dict):
+                        rcpt_b = rcpt.get("owning_bank_id")
+                        if rcpt_b and isinstance(rcpt_b, str) and rcpt_b.strip():
+                            banks_found.add(rcpt_b.strip())
+                        rcpt_c = rcpt.get("consortium_id")
+                        if rcpt_c and isinstance(rcpt_c, str) and rcpt_c.strip():
+                            consortia_found.add(rcpt_c.strip())
             if len(banks_found) == 1 and len(consortia_found) <= 1:
                 return {
                     "simulation_id": simulation_id,
@@ -600,17 +852,17 @@ class ModelRegistry:
         """
         # 1. Trusted Internal Context (e.g. training orchestrator, consortium coordinator)
         if trusted_context is not None:
+            action = getattr(trusted_context, "action", "")
+            if action not in ("bind_ownership", "register_model", "save_version"):
+                return False, f"invalid_trusted_context: Action '{action}' is not permitted for initial ownership binding."
             is_valid_ctx, ctx_reason = verify_trusted_internal_context(
-                trusted_context, expected_action="bind_ownership"
+                trusted_context,
+                expected_action=action,
+                expected_resource_type="model",
+                expected_resource_id=simulation_id,
+                expected_bank_id=clean_bank,
+                consume_nonce=True,
             )
-            if not is_valid_ctx:
-                is_valid_ctx, ctx_reason = verify_trusted_internal_context(
-                    trusted_context, expected_action="register_model"
-                )
-            if not is_valid_ctx:
-                is_valid_ctx, ctx_reason = verify_trusted_internal_context(
-                    trusted_context, expected_action="save_version"
-                )
             if is_valid_ctx:
                 return True, f"internal:{trusted_context.service_name}"
             return False, f"invalid_trusted_context: {ctx_reason}"
@@ -765,7 +1017,13 @@ class ModelRegistry:
                 effective_bound_by = bound_by or "ownership_transfer"
                 if trusted_context is not None:
                     is_valid_ctx, ctx_reason = verify_trusted_internal_context(
-                        trusted_context, expected_action="transfer_ownership"
+                        trusted_context,
+                        expected_action="transfer_ownership",
+                        expected_resource_type="model",
+                        expected_resource_id=simulation_id,
+                        expected_bank_id=curr_bank,
+                        expected_target_bank_id=clean_bank,
+                        consume_nonce=True,
                     )
                     if is_valid_ctx:
                         has_transfer_authority = True
@@ -2009,7 +2267,13 @@ class ModelRegistry:
         authenticated_operator: str | None = None
         if trusted_context:
             is_valid_ctx, ctx_reason = verify_trusted_internal_context(
-                trusted_context, expected_action="promote_version"
+                trusted_context,
+                expected_action="promote_version",
+                expected_service_name=trusted_context.service_name,
+                expected_resource_type="model",
+                expected_resource_id=simulation_id,
+                expected_model_version=version,
+                consume_nonce=True,
             )
             if not is_valid_ctx:
                 raise ModelIntegrityError(f"Internal orchestration authority rejected: {ctx_reason}")
@@ -2204,7 +2468,13 @@ class ModelRegistry:
         authenticated_operator: str | None = None
         if trusted_context:
             is_valid_ctx, ctx_reason = verify_trusted_internal_context(
-                trusted_context, expected_action="rollback"
+                trusted_context,
+                expected_action="rollback",
+                expected_service_name=trusted_context.service_name,
+                expected_resource_type="model",
+                expected_resource_id=simulation_id,
+                expected_model_version=version,
+                consume_nonce=True,
             )
             if not is_valid_ctx:
                 raise ModelIntegrityError(f"Internal orchestration authority rejected: {ctx_reason}")
@@ -2887,7 +3157,11 @@ class ModelEvaluationEngine:
                 if previous_versions:
                     stable_version = max(previous_versions, key=lambda x: x["version"])
                     trusted_ctx = create_trusted_internal_context(
-                        "model_evaluation_engine", action="rollback"
+                        "model_evaluation_engine",
+                        action="rollback",
+                        resource_type="model",
+                        resource_id=simulation_id,
+                        model_version=stable_version["version"],
                     )
                     self.registry.rollback(
                         simulation_id,
@@ -2922,7 +3196,11 @@ class ModelEvaluationEngine:
                         r["challenger_version"] for r in records if r["challenger_version"] is not None
                     )
                     trusted_ctx = create_trusted_internal_context(
-                        "model_evaluation_engine", action="rollback"
+                        "model_evaluation_engine",
+                        action="rollback",
+                        resource_type="model",
+                        resource_id=simulation_id,
+                        model_version=challenger_ver_num,
                     )
                     self.registry.rollback(
                         simulation_id,

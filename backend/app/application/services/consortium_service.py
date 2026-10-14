@@ -62,7 +62,12 @@ class ConsortiumGovernanceService:
             from app.application.services.model_registry import verify_trusted_internal_context
 
             is_valid_ctx, ctx_reason = verify_trusted_internal_context(
-                trusted_context, expected_action=action_name
+                trusted_context,
+                expected_action=action_name,
+                expected_service_name="consortium_coordinator",
+                expected_resource_type="consortium",
+                expected_bank_id=expected_bank,
+                consume_nonce=True,
             )
             if not is_valid_ctx:
                 raise PermissionError(
@@ -466,7 +471,13 @@ class ConsortiumGovernanceService:
             from app.application.services.model_registry import verify_trusted_internal_context
 
             is_valid_ctx, ctx_reason = verify_trusted_internal_context(
-                trusted_context, expected_action="set_member_voting_power"
+                trusted_context,
+                expected_action="set_member_voting_power",
+                expected_service_name="consortium_coordinator",
+                expected_resource_type="consortium",
+                expected_resource_id=clean_id,
+                expected_target_bank_id=clean_bank,
+                consume_nonce=True,
             )
             if not is_valid_ctx:
                 raise PermissionError(f"Internal orchestration authority rejected for set_member_voting_power: {ctx_reason}")
@@ -493,7 +504,7 @@ class ConsortiumGovernanceService:
                     founder_id,
                     auth_token=auth_token,
                     actor=actor,
-                    trusted_context=trusted_context,
+                    trusted_context=None,
                     action_name="set_member_voting_power",
                 )
 
@@ -537,7 +548,13 @@ class ConsortiumGovernanceService:
             from app.application.services.model_registry import verify_trusted_internal_context
 
             is_valid_ctx, ctx_reason = verify_trusted_internal_context(
-                trusted_context, expected_action="set_member_role"
+                trusted_context,
+                expected_action="set_member_role",
+                expected_service_name="consortium_coordinator",
+                expected_resource_type="consortium",
+                expected_resource_id=clean_id,
+                expected_target_bank_id=clean_bank,
+                consume_nonce=True,
             )
             if not is_valid_ctx:
                 raise PermissionError(f"Internal orchestration authority rejected for set_member_role: {ctx_reason}")
@@ -564,7 +581,7 @@ class ConsortiumGovernanceService:
                     founder_id,
                     auth_token=auth_token,
                     actor=actor,
-                    trusted_context=trusted_context,
+                    trusted_context=None,
                     action_name="set_member_role",
                 )
 
@@ -746,7 +763,13 @@ class ConsortiumGovernanceService:
             from app.application.services.model_registry import verify_trusted_internal_context
 
             is_valid_ctx, ctx_reason = verify_trusted_internal_context(
-                trusted_context, expected_action="add_member"
+                trusted_context,
+                expected_action="add_member",
+                expected_service_name="consortium_coordinator",
+                expected_resource_type="consortium",
+                expected_resource_id=clean_id,
+                expected_target_bank_id=clean_bank,
+                consume_nonce=True,
             )
             if not is_valid_ctx:
                 raise PermissionError(f"Internal orchestration authority rejected for add_member: {ctx_reason}")
@@ -847,6 +870,9 @@ def init_default_consortium(
     ctx = create_trusted_internal_context(
         service_name="consortium_coordinator",
         action="create_consortium",
+        resource_type="consortium",
+        resource_id="cfi-consortium",
+        bank_id="bank_a",
     )
     c = svc.create_consortium(
         consortium_id="cfi-consortium",
@@ -857,12 +883,22 @@ def init_default_consortium(
         min_members_n=2,
         trusted_context=ctx,
     )
-    ctx_add = create_trusted_internal_context(
+    ctx_add_b = create_trusted_internal_context(
         service_name="consortium_coordinator",
         action="add_member",
+        resource_type="consortium",
+        resource_id="cfi-consortium",
+        target_bank_id="bank_b",
     )
-    svc.add_member("cfi-consortium", "bank_b", role=MemberRole.FULL_MEMBER, voting_power=1.0, trusted_context=ctx_add)
-    svc.add_member("cfi-consortium", "bank_c", role=MemberRole.FULL_MEMBER, voting_power=1.0, trusted_context=ctx_add)
+    svc.add_member("cfi-consortium", "bank_b", role=MemberRole.FULL_MEMBER, voting_power=1.0, trusted_context=ctx_add_b)
+    ctx_add_c = create_trusted_internal_context(
+        service_name="consortium_coordinator",
+        action="add_member",
+        resource_type="consortium",
+        resource_id="cfi-consortium",
+        target_bank_id="bank_c",
+    )
+    svc.add_member("cfi-consortium", "bank_c", role=MemberRole.FULL_MEMBER, voting_power=1.0, trusted_context=ctx_add_c)
     return c
 
 

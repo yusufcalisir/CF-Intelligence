@@ -122,6 +122,23 @@ class Settings(BaseSettings):
         default="cfi_local_secret_key_2026_change_me_in_production",
         validation_alias=AliasChoices("payload_signing_secret", "cfi_payload_signing_secret"),
     )
+    internal_context_signing_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "internal_context_signing_secret",
+            "cfi_internal_context_secret",
+            "cfi_internal_trusted_context_secret",
+        ),
+        description="Dedicated high-entropy secret key for internal authority execution context signing.",
+    )
+    internal_nonce_store_path: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "internal_nonce_store_path",
+            "cfi_internal_nonce_store_path",
+        ),
+        description="Filesystem path for durable cross-process nonce consumption store.",
+    )
 
     # ── Training Provenance & Verification ───
     training_receipt_public_key: str = Field(
