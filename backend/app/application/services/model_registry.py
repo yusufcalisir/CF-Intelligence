@@ -3234,7 +3234,7 @@ class ModelRegistry:
                 orig_uid = str(target_sign_off.get("user_id", "")).strip()
                 is_orig = (
                     tok_user.lower() == orig_user
-                    or (getattr(u_rec, "user_id", None) and str(u_rec.user_id) == orig_uid)
+                    or (getattr(u_rec, "user_id", None) and u_rec.user_id == orig_uid)
                 )
 
                 if is_orig:
@@ -3309,7 +3309,7 @@ class ModelRegistry:
                     orig_user = str(target_sign_off.get("user", "")).lower().strip()
                     is_orig = (
                         effective_revoker.lower() == orig_user
-                        or (getattr(u_rec, "user_id", None) and str(u_rec.user_id) == str(target_sign_off.get("user_id", "")))
+                        or (getattr(u_rec, "user_id", None) and u_rec.user_id == str(target_sign_off.get("user_id", "")))
                     )
                     if not is_orig:
                         if not (user_roles & {"admin", "compliance", "compliance_officer", "ml_lead"}):
