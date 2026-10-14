@@ -518,7 +518,14 @@ def test_boundary_10_regressions_intact(boundary_env):
     assert promoted["is_active"] is True
 
     # Trusted internal context rollback succeeds
-    ctx_rb = create_trusted_internal_context("model_evaluation_engine", action="rollback")
+    ctx_rb = create_trusted_internal_context(
+        service_name="model_evaluation_engine",
+        action="rollback",
+        resource_type="model",
+        resource_id=sim_id,
+        model_version=v,
+        bank_id="bank_a",
+    )
     rb_entry = reg.rollback(sim_id, v, trusted_context=ctx_rb)
     assert rb_entry["version"] == v
     assert rb_entry["is_active"] is True

@@ -48,6 +48,8 @@ class ConsortiumGovernanceService:
     def _verify_service_actor_bank(
         self,
         expected_bank: str,
+        consortium_id: str | None = None,
+        target_bank_id: str | None = None,
         auth_token: str | None = None,
         actor: str | None = None,
         trusted_context: Any | None = None,
@@ -66,7 +68,9 @@ class ConsortiumGovernanceService:
                 expected_action=action_name,
                 expected_service_name="consortium_coordinator",
                 expected_resource_type="consortium",
+                expected_resource_id=consortium_id,
                 expected_bank_id=expected_bank,
+                expected_target_bank_id=target_bank_id,
                 consume_nonce=True,
             )
             if not is_valid_ctx:
@@ -209,6 +213,8 @@ class ConsortiumGovernanceService:
 
         self._verify_service_actor_bank(
             clean_creator,
+            consortium_id=clean_id,
+            target_bank_id=clean_target,
             auth_token=auth_token,
             actor=actor,
             trusted_context=trusted_context,
@@ -285,6 +291,7 @@ class ConsortiumGovernanceService:
 
         self._verify_service_actor_bank(
             clean_creator,
+            consortium_id=clean_id,
             auth_token=auth_token,
             actor=actor,
             trusted_context=trusted_context,
@@ -344,8 +351,11 @@ class ConsortiumGovernanceService:
         clean_prop_id = proposal_id.strip()
         clean_bank_id = bank_id.lower().strip()
 
+        prop = self._store.get_proposal(clean_prop_id)
+        prop_consortium_id = prop.consortium_id if prop else None
         self._verify_service_actor_bank(
             clean_bank_id,
+            consortium_id=prop_consortium_id,
             auth_token=auth_token,
             actor=actor,
             trusted_context=trusted_context,
@@ -585,12 +595,13 @@ class ConsortiumGovernanceService:
                     action_name="set_member_role",
                 )
 
-            consortium.members[clean_bank].role = role
+            target_role = MemberRole(role.upper().strip()) if isinstance(role, str) else role
+            consortium.members[clean_bank].role = target_role
             logger.info(
                 "Updated role for bank %s in consortium %s to %s",
                 clean_bank,
                 clean_id,
-                role.value,
+                target_role.value,
             )
 
             # Re-evaluate all pending proposals

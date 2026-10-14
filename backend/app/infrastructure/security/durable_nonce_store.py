@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -37,6 +38,7 @@ class DurableNonceStore:
         store_path: str | None = None,
         in_memory: bool = False,
         app_env: str | None = None,
+        signing_secret: str | None = None,
     ) -> None:
         settings = get_settings()
         raw_env = (
@@ -46,8 +48,9 @@ class DurableNonceStore:
             or getattr(settings, "app_env", "")
             or ""
         )
-        self._app_env = str(raw_env).lower()
+        self._app_env = str(raw_env).lower().strip()
         self._is_prod = self._app_env == "production"
+        self._signing_secret = signing_secret
 
         if self._is_prod and in_memory:
             raise NonceStoreIntegrityError(
@@ -58,6 +61,7 @@ class DurableNonceStore:
         if self._in_memory:
             self._store_path = ""
             self._lock_path = ""
+            self._marker_path = ""
         else:
             configured_path = (
                 store_path
@@ -68,6 +72,7 @@ class DurableNonceStore:
                 configured_path = os.path.join(get_storage_dir(), "security", "consumed_internal_nonces.json")
             self._store_path = os.path.abspath(configured_path)
             self._lock_path = f"{self._store_path}.lock"
+            self._marker_path = f"{self._store_path}.established"
             os.makedirs(os.path.dirname(self._store_path), exist_ok=True)
 
         self._lock = threading.RLock()
@@ -76,6 +81,7 @@ class DurableNonceStore:
         self._last_mtime_ns: int = 0
         self._last_size: int = -1
         self._is_corrupted: bool = False
+        self._is_established: bool = False
 
         if not self._in_memory:
             self.reload()
@@ -83,6 +89,10 @@ class DurableNonceStore:
     @property
     def is_prod(self) -> bool:
         return self._is_prod
+
+    @property
+    def is_established(self) -> bool:
+        return self._is_established
 
     @contextlib.contextmanager
     def _file_lock_context(self) -> Generator[None, None, None]:
@@ -92,6 +102,41 @@ class DurableNonceStore:
         lock = FileLock(self._lock_path, timeout=15)
         with lock:
             yield
+
+    def _get_integrity_key(self) -> bytes:
+        from app.application.services.model_registry import (
+            DOMAIN_REPLAY_STORE_INTEGRITY,
+            FORBIDDEN_INTERNAL_SECRETS,
+            _resolve_internal_context_secret,
+            derive_domain_key,
+        )
+
+        settings = get_settings()
+        clean = (
+            str(self._signing_secret).strip()
+            if self._signing_secret
+            else str(
+                os.environ.get("CFI_INTERNAL_CONTEXT_SECRET")
+                or getattr(settings, "internal_context_signing_secret", None)
+                or ""
+            ).strip()
+        )
+        if self._is_prod and (not clean or clean in FORBIDDEN_INTERNAL_SECRETS or len(clean) < 32):
+            try:
+                raw_domain_key = _resolve_internal_context_secret(is_issuing=False)
+                return derive_domain_key(raw_domain_key.hex(), DOMAIN_REPLAY_STORE_INTEGRITY)
+            except Exception as e:
+                self._is_corrupted = True
+                raise NonceStoreIntegrityError(
+                    f"Production replay store integrity rejected: missing high-entropy signing secret: {e}"
+                ) from e
+        if not clean or clean in FORBIDDEN_INTERNAL_SECRETS:
+            clean = "cfi_dev_replay_store_integrity_secret_2026_dev_only"
+        return derive_domain_key(clean, DOMAIN_REPLAY_STORE_INTEGRITY)
+
+    def _compute_integrity_hmac(self, consumed_data: dict[str, Any]) -> str:
+        canonical_json = json.dumps(consumed_data, sort_keys=True, separators=(",", ":"))
+        return hmac.new(self._get_integrity_key(), canonical_json.encode("utf-8"), hashlib.sha256).hexdigest()
 
     def _compute_digest(self, consumed_data: dict[str, Any]) -> str:
         canonical_json = json.dumps(consumed_data, sort_keys=True, separators=(",", ":"))
@@ -113,7 +158,15 @@ class DurableNonceStore:
                 raise NonceStoreIntegrityError(
                     f"Durable nonce store at '{self._store_path}' is in corrupted state. Operations fail closed."
                 )
-            if os.path.exists(self._store_path):
+            if not os.path.exists(self._store_path):
+                marker = getattr(self, "_marker_path", f"{self._store_path}.established")
+                if self._is_prod and (os.path.exists(marker) or self._is_established):
+                    self._is_corrupted = True
+                    raise NonceStoreIntegrityError(
+                        f"Authoritative replay store at '{self._store_path}' disappeared: "
+                        "persistence file is missing or inaccessible in production."
+                    )
+            else:
                 stat = os.stat(self._store_path)
                 if (
                     stat.st_mtime_ns != self._last_mtime_ns
@@ -125,6 +178,21 @@ class DurableNonceStore:
 
     def _reload_unlocked(self, force: bool = False) -> None:
         if not os.path.exists(self._store_path):
+            marker = getattr(self, "_marker_path", f"{self._store_path}.established")
+            if self._is_prod and (
+                os.path.exists(marker)
+                or self._is_established
+                or self._last_mtime_ns > 0
+                or len(self._consumed) > 0
+            ):
+                self._is_corrupted = True
+                self._consumed.clear()
+                self._last_mtime_ns = 0
+                self._last_size = -1
+                raise NonceStoreIntegrityError(
+                    f"Authoritative replay store at '{self._store_path}' disappeared: "
+                    "persistence file is missing or inaccessible in production."
+                )
             self._consumed = {}
             self._last_mtime = 0.0
             self._last_mtime_ns = 0
@@ -158,23 +226,51 @@ class DurableNonceStore:
             if not isinstance(data, dict):
                 raise NonceStoreIntegrityError("Invalid root container: expected JSON object.")
 
-            consumed = data.get("consumed_nonces", {})
+            consumed = data.get("consumed_nonces")
             if not isinstance(consumed, dict):
                 raise NonceStoreIntegrityError("Invalid 'consumed_nonces' attribute: expected JSON object.")
 
+            recorded_hmac = data.get("integrity_hmac")
             recorded_digest = data.get("integrity_digest")
-            computed_digest = self._compute_digest(consumed)
-            if recorded_digest and recorded_digest != computed_digest:
-                self._is_corrupted = True
-                raise NonceStoreIntegrityError(
-                    f"Durable nonce store failed integrity check: digest mismatch (expected {recorded_digest}, got {computed_digest})."
-                )
+
+            if self._is_prod:
+                if not recorded_hmac:
+                    self._is_corrupted = True
+                    raise NonceStoreIntegrityError(
+                        "Durable nonce store rejected in production: missing mandatory authenticated integrity_hmac signature."
+                    )
+                expected_hmac = self._compute_integrity_hmac(consumed)
+                if not hmac.compare_digest(recorded_hmac, expected_hmac):
+                    self._is_corrupted = True
+                    raise NonceStoreIntegrityError(
+                        "Durable nonce store failed authenticated integrity check: HMAC signature mismatch."
+                    )
+            else:
+                if recorded_hmac:
+                    expected_hmac = self._compute_integrity_hmac(consumed)
+                    if not hmac.compare_digest(recorded_hmac, expected_hmac):
+                        self._is_corrupted = True
+                        raise NonceStoreIntegrityError(
+                            "Durable nonce store failed authenticated integrity check: HMAC signature mismatch."
+                        )
+                elif recorded_digest:
+                    expected_digest = self._compute_digest(consumed)
+                    if recorded_digest != expected_digest:
+                        self._is_corrupted = True
+                        raise NonceStoreIntegrityError(
+                            "Durable nonce store failed integrity check: digest mismatch."
+                        )
 
             self._consumed = consumed
             self._last_mtime = stat.st_mtime
             self._last_mtime_ns = stat.st_mtime_ns
             self._last_size = stat.st_size
             self._is_corrupted = False
+            self._is_established = True
+            marker = getattr(self, "_marker_path", f"{self._store_path}.established")
+            if marker and not os.path.exists(marker):
+                with open(marker, "w", encoding="utf-8") as f:
+                    f.write(f"established:{time.time()}")
         except NonceStoreIntegrityError:
             self._is_corrupted = True
             raise
@@ -188,9 +284,11 @@ class DurableNonceStore:
         if self._in_memory or not self._store_path:
             return
 
+        hmac_sig = self._compute_integrity_hmac(self._consumed)
         digest = self._compute_digest(self._consumed)
         container = {
-            "version": 1,
+            "version": 2,
+            "integrity_hmac": hmac_sig,
             "integrity_digest": digest,
             "updated_at": time.time(),
             "consumed_nonces": self._consumed,
@@ -208,6 +306,11 @@ class DurableNonceStore:
             self._last_mtime_ns = stat.st_mtime_ns
             self._last_size = stat.st_size
             self._is_corrupted = False
+            self._is_established = True
+            marker = getattr(self, "_marker_path", f"{self._store_path}.established")
+            if marker and not os.path.exists(marker):
+                with open(marker, "w", encoding="utf-8") as f:
+                    f.write(f"established:{time.time()}")
         finally:
             if os.path.exists(tmp_path):
                 with contextlib.suppress(OSError):
@@ -253,6 +356,9 @@ class DurableNonceStore:
                 logger.warning("Nonce store reload warning: %s; re-initializing", exc)
                 self._consumed = {}
 
+            if self._is_corrupted and self._is_prod:
+                return False, "Replay authority unavailable or corrupted in production."
+
             # Check existing entry
             existing = self._consumed.get(clean_nonce)
             if existing is not None:
@@ -288,6 +394,15 @@ class DurableNonceStore:
 
             return True, "Consumed"
 
+    def consume_nonce_atomic(
+        self,
+        nonce: str,
+        expires_at: float,
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[bool, str]:
+        """Alias for consume_nonce."""
+        return self.consume_nonce(nonce, expires_at, metadata)
+
 
 # Global singleton instance
 _GLOBAL_NONCE_STORE: DurableNonceStore | None = None
@@ -301,3 +416,10 @@ def get_default_nonce_store() -> DurableNonceStore:
         if _GLOBAL_NONCE_STORE is None:
             _GLOBAL_NONCE_STORE = DurableNonceStore()
         return _GLOBAL_NONCE_STORE
+
+
+def reset_default_nonce_store() -> None:
+    """Testing utility to clear singleton nonce store instance."""
+    global _GLOBAL_NONCE_STORE
+    with _NONCE_STORE_GUARD:
+        _GLOBAL_NONCE_STORE = None

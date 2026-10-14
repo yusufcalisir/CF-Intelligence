@@ -299,23 +299,39 @@ def test_authentic_eligible_candidate_promotion_succeeds():
 
         reg = ModelRegistry(storage_dir=tmp_dir, verifier=verifier)
 
-        with (
-            patch.object(settings, "app_env", "production"),
-            patch.object(prov_service, "_DEFAULT_VERIFIER", verifier),
-        ):
-            v1 = reg.save_version(
-                "sim_auth_chall",
-                state_dict,
-                metrics={"loss": 0.04, "auc": 0.88},
-                is_promoted=False,
-                training_receipt=rcpt,
-                artifact_bytes=raw_bytes,
-            )
+        from app.infrastructure.security.durable_nonce_store import reset_default_nonce_store
+
+        test_sec = "cfi_test_internal_authority_secret_key_32b!"
+        nonce_store_path = os.path.join(tmp_dir, "nonces.json")
+        reset_default_nonce_store()
+        try:
+            with (
+                patch.object(settings, "app_env", "production"),
+                patch.object(settings, "internal_context_signing_secret", test_sec),
+                patch.object(settings, "internal_nonce_store_path", nonce_store_path),
+                patch.object(settings, "oidc_jwt_signing_secret", test_sec),
+                patch.object(settings, "payload_signing_secret", test_sec),
+                patch.object(prov_service, "_DEFAULT_VERIFIER", verifier),
+            ):
+                v1 = reg.save_version(
+                    "sim_auth_chall",
+                    state_dict,
+                    metrics={"loss": 0.04, "auc": 0.88},
+                    is_promoted=False,
+                    training_receipt=rcpt,
+                    artifact_bytes=raw_bytes,
+                )
             assert v1["provenance_type"] == "TRAINING_RECORDED"
             assert v1["is_production_eligible"] is True
 
             # Promote to challenger under production environment
-            ctx_internal = create_trusted_internal_context("model_evaluation_engine", action="promote_version")
+            ctx_internal = create_trusted_internal_context(
+                service_name="model_evaluation_engine",
+                action="promote_version",
+                resource_type="model",
+                resource_id="sim_auth_chall",
+                model_version=v1["version"],
+            )
             promoted = reg.promote_version(
                 "sim_auth_chall",
                 version=v1["version"],
@@ -338,6 +354,8 @@ def test_authentic_eligible_candidate_promotion_succeeds():
             assert meta["version"] == 1
             assert meta["status"] == "challenger"
             assert meta["sha256"] == sha256
+        finally:
+            reset_default_nonce_store()
 
 
 # ── TEST 7: Production prediction cannot select unverified challenger ────────

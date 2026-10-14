@@ -485,51 +485,82 @@ def test_final_gate_08_trusted_internal_orchestration_path_functional():
         v2 = entry2["version"]
         tok2_ml, _ = _attach_dual_signoffs(reg, auth_svc, sim_id, v2, sha256_2)
 
+        from app.infrastructure.security.durable_nonce_store import reset_default_nonce_store
+
         settings = get_settings()
-        with (
-            patch.object(settings, "app_env", "production"),
-            patch.object(settings, "payload_signing_secret", TEST_SIGNING_SECRET),
-            patch.object(prov_service, "_DEFAULT_VERIFIER", verifier),
-        ):
-            # Promote v1 then v2
-            reg.promote_version(sim_id, v1, target_status="champion", auth_token=tok1_ml)
-            reg.promote_version(sim_id, v2, target_status="champion", auth_token=tok2_ml)
+        nonce_store_path = os.path.join(tmp_dir, "nonces.json")
+        reset_default_nonce_store()
+        try:
+            with (
+                patch.object(settings, "app_env", "production"),
+                patch.object(settings, "payload_signing_secret", TEST_SIGNING_SECRET),
+                patch.object(settings, "internal_context_signing_secret", TEST_SIGNING_SECRET),
+                patch.object(settings, "internal_nonce_store_path", nonce_store_path),
+                patch.object(prov_service, "_DEFAULT_VERIFIER", verifier),
+            ):
+                # Promote v1 then v2
+                reg.promote_version(sim_id, v1, target_status="champion", auth_token=tok1_ml)
+                reg.promote_version(sim_id, v2, target_status="champion", auth_token=tok2_ml)
 
-            # 1. Valid internal trusted context rollback succeeds
-            ctx_rollback = create_trusted_internal_context("model_evaluation_engine", action="rollback")
-            rolled_back = reg.rollback(sim_id, v1, trusted_context=ctx_rollback)
-            assert rolled_back["is_active"] is True
-            assert rolled_back["version"] == v1
+                # 1. Valid internal trusted context rollback succeeds
+                ctx_rollback = create_trusted_internal_context(
+                    service_name="model_evaluation_engine",
+                    action="rollback",
+                    resource_type="model",
+                    resource_id=sim_id,
+                    model_version=v1,
+                    bank_id="bank_a",
+                )
+                rolled_back = reg.rollback(sim_id, v1, trusted_context=ctx_rollback)
+                assert rolled_back["is_active"] is True
+                assert rolled_back["version"] == v1
 
-            # 2. Forged internal context (bad signature) is rejected
-            ctx_forged = TrustedInternalContext(
-                service_name="model_evaluation_engine",
-                action="rollback",
-                nonce="fake_nonce",
-                created_at=time.time(),
-                signature="invalid_signature_hex_12345",
-            )
-            with pytest.raises(ModelIntegrityError, match="Cryptographic signature mismatch"):
-                reg.rollback(sim_id, v2, trusted_context=ctx_forged)
+                # 2. Forged internal context (bad signature) is rejected
+                ctx_forged = TrustedInternalContext(
+                    service_name="model_evaluation_engine",
+                    action="rollback",
+                    resource_type="model",
+                    resource_id=sim_id,
+                    model_version=v2,
+                    bank_id="bank_a",
+                    nonce="fake_nonce",
+                    created_at=time.time(),
+                    signature="invalid_signature_hex_12345",
+                )
+                with pytest.raises(ModelIntegrityError, match="Cryptographic signature mismatch"):
+                    reg.rollback(sim_id, v2, trusted_context=ctx_forged)
 
-            # 3. Action mismatch context is rejected
-            ctx_mismatch = create_trusted_internal_context("model_evaluation_engine", action="promote_champion")
-            with pytest.raises(ModelIntegrityError, match="Context action mismatch"):
-                reg.rollback(sim_id, v2, trusted_context=ctx_mismatch)
+                # 3. Action mismatch context is rejected
+                ctx_mismatch = create_trusted_internal_context(
+                    service_name="model_evaluation_engine",
+                    action="promote_champion",
+                    resource_type="model",
+                    resource_id=sim_id,
+                    model_version=v2,
+                    bank_id="bank_a",
+                )
+                with pytest.raises(ModelIntegrityError, match="Context action mismatch"):
+                    reg.rollback(sim_id, v2, trusted_context=ctx_mismatch)
 
-            # 4. Expired context is rejected
-            ctx_expired = create_trusted_internal_context(
-                "model_evaluation_engine",
-                action="rollback",
-                created_at=time.time() - 600.0,
-            )
-            with pytest.raises(ModelIntegrityError, match="Internal authority context expired"):
-                reg.rollback(sim_id, v2, trusted_context=ctx_expired)
+                # 4. Expired context is rejected
+                ctx_expired = create_trusted_internal_context(
+                    service_name="model_evaluation_engine",
+                    action="rollback",
+                    resource_type="model",
+                    resource_id=sim_id,
+                    model_version=v2,
+                    bank_id="bank_a",
+                    created_at=time.time() - 600.0,
+                )
+                with pytest.raises(ModelIntegrityError, match="Internal authority context expired"):
+                    reg.rollback(sim_id, v2, trusted_context=ctx_expired)
 
-            # 5. REST endpoints do not accept trusted_context (public callers cannot supply it)
-            # Anonymous REST rollback must fail with 401
-            resp = client.post(f"/api/v1/models/{sim_id}/rollback/{v2}")
-            assert resp.status_code == 401
+                # 5. REST endpoints do not accept trusted_context (public callers cannot supply it)
+                # Anonymous REST rollback must fail with 401
+                resp = client.post(f"/api/v1/models/{sim_id}/rollback/{v2}")
+                assert resp.status_code == 401
+        finally:
+            reset_default_nonce_store()
 
 
 # ── FINAL-GATE-09: Four REST alias prefixes remain protected ──────────────────

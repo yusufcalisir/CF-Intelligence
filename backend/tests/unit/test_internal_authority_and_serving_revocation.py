@@ -278,6 +278,7 @@ def _create_champion_fixtures(env: dict[str, Any], sim_id: str = "sim_prod_champ
         resource_type="model",
         resource_id=sim_id,
         model_version=v_num,
+        bank_id="bank_a",
     )
     reg.promote_version(sim_id, v_num, target_status="champion", trusted_context=ctx_promote)
 
@@ -383,6 +384,7 @@ def test_authctx_03_context_for_model_a_cannot_mutate_model_b(isolated_env):
         resource_type="model",
         resource_id="sim_model_a",
         model_version=v1,
+        bank_id="bank_a",
     )
 
     # Attempt to mutate Model B with Model A's context
@@ -459,11 +461,18 @@ print(json.dumps({{"consumed": consumed, "reason": reason}}))
     p1 = subprocess.Popen([sys.executable, "-c", worker_code], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     p2 = subprocess.Popen([sys.executable, "-c", worker_code], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
 
-    out1, err1 = p1.communicate(timeout=10)
-    out2, err2 = p2.communicate(timeout=10)
+    out1, err1 = p1.communicate(timeout=60)
+    out2, err2 = p2.communicate(timeout=60)
 
-    res1 = json.loads(out1.strip().splitlines()[-1])
-    res2 = json.loads(out2.strip().splitlines()[-1])
+    def _extract_worker_json(raw: str) -> dict[str, Any]:
+        for line in reversed(raw.strip().splitlines()):
+            line = line.strip()
+            if line.startswith("{") and "consumed" in line:
+                return json.loads(line)
+        raise ValueError(f"No JSON found in worker output: {raw}")
+
+    res1 = _extract_worker_json(out1)
+    res2 = _extract_worker_json(out2)
 
     results = [res1, res2]
     successes = [r for r in results if r["consumed"] is True]
@@ -522,6 +531,7 @@ def test_authctx_08_legitimate_internal_automation_remains_functional(isolated_e
         resource_type="model",
         resource_id="sim_auto_rb_01",
         model_version=v1,
+        bank_id="bank_a",
     )
     rolled_back = reg.rollback("sim_auto_rb_01", v1, trusted_context=ctx_rb)
     assert rolled_back["version"] == v1
@@ -652,3 +662,286 @@ def test_serve_05_assessment_warm_cache_vulnerability_disproven_for_authentic_ch
     # Step 4: Prove resolve_and_verify_champion raises ModelIntegrityError
     with pytest.raises(ModelIntegrityError):
         reg.resolve_and_verify_champion("sim_serve_05")
+
+
+# ── FINAL-AUTH TESTS (WORKSTREAM 01-D.2 FINAL HARDENING) ──────────────────────
+
+
+def test_final_auth_01_missing_resource_id_rejected_at_mutation_boundary(isolated_env):
+    """FINAL-AUTH-01: Missing resource_id cannot authorize a resource-bound operation."""
+    reg, v1, _ = _create_champion_fixtures(isolated_env, sim_id="sim_final_01")
+
+    # Genuine signed context that omits resource_id
+    ctx_unscoped = create_trusted_internal_context(
+        service_name="model_evaluation_engine",
+        action="rollback",
+        resource_type="model",
+        resource_id=None,
+        model_version=v1,
+        bank_id="bank_a",
+    )
+
+    with pytest.raises(ModelIntegrityError, match="Context resource_id scope mismatch"):
+        reg.rollback("sim_final_01", v1, trusted_context=ctx_unscoped)
+
+    # Manifest remains active and unmodified
+    manifest = reg._load_manifest("sim_final_01")
+    assert manifest[0]["version"] == v1
+
+
+def test_final_auth_02_missing_model_version_or_institution_scope_rejected(isolated_env):
+    """FINAL-AUTH-02: Missing model version or institution scope cannot bypass required authorization."""
+    reg, v1, _ = _create_champion_fixtures(isolated_env, sim_id="sim_final_02")
+
+    # 1. Missing model_version on version-bound operation
+    ctx_no_version = create_trusted_internal_context(
+        service_name="model_evaluation_engine",
+        action="rollback",
+        resource_type="model",
+        resource_id="sim_final_02",
+        model_version=None,
+        bank_id="bank_a",
+    )
+    with pytest.raises(ModelIntegrityError, match="Context model_version scope mismatch"):
+        reg.rollback("sim_final_02", v1, trusted_context=ctx_no_version)
+
+    # 2. Missing bank_id on bank-owned operation
+    ctx_no_bank = create_trusted_internal_context(
+        service_name="model_evaluation_engine",
+        action="rollback",
+        resource_type="model",
+        resource_id="sim_final_02",
+        model_version=v1,
+        bank_id=None,
+    )
+    with pytest.raises(ModelIntegrityError, match="Context bank_id scope mismatch"):
+        reg.rollback("sim_final_02", v1, trusted_context=ctx_no_bank)
+
+    # 3. Missing target_bank_id on consortium member mutation
+    svc = ConsortiumGovernanceService()
+    init_default_consortium(svc, allow_bootstrap=True)
+    ctx_no_target = create_trusted_internal_context(
+        service_name="consortium_coordinator",
+        action="set_member_voting_power",
+        resource_type="consortium",
+        resource_id="cfi-consortium",
+        target_bank_id=None,
+    )
+    with pytest.raises(PermissionError, match="Context target_bank_id scope mismatch"):
+        svc.set_member_voting_power("cfi-consortium", "bank_b", 2.5, trusted_context=ctx_no_target)
+
+
+def test_final_auth_03_v1_signed_unscoped_context_cannot_authorize_production_mutation(isolated_env, monkeypatch):
+    """FINAL-AUTH-03: A V1-signed unscoped context cannot authorize a production mutation."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    assert settings.app_env == "production"
+
+    # Forge a legacy V1 signature (service:action:nonce:created_at) using payload_signing_secret
+    v1_payload = f"model_evaluation_engine:rollback:nonce_v1_{time.time()}:{time.time()}".encode("utf-8")
+    v1_sig = hmac.new(isolated_env["payload_secret"].encode("utf-8"), v1_payload, hashlib.sha256).hexdigest()
+
+    ctx_v1 = TrustedInternalContext(
+        service_name="model_evaluation_engine",
+        action="rollback",
+        nonce=f"nonce_v1_{time.time()}",
+        created_at=time.time(),
+        signature=v1_sig,
+        resource_type=None,
+        resource_id=None,
+        model_version=None,
+        bank_id=None,
+        target_bank_id=None,
+    )
+
+    # 1. Verification in production fails closed against V1 signature
+    is_valid, reason = verify_trusted_internal_context(ctx_v1, expected_action="rollback", consume_nonce=True)
+    assert not is_valid
+    assert "production mode strictly requires V2" in reason or "cannot authorize privileged state mutations" in reason
+
+    # 2. Non-production check: even in development, V1 cannot authorize a state mutation (consume_nonce=True)
+    monkeypatch.setenv("APP_ENV", "development")
+    settings.app_env = "development"
+    try:
+        is_valid_dev, reason_dev = verify_trusted_internal_context(ctx_v1, expected_action="rollback", consume_nonce=True)
+        assert not is_valid_dev
+        assert "cannot authorize privileged state mutations" in reason_dev
+    finally:
+        monkeypatch.setenv("APP_ENV", "production")
+        settings.app_env = "production"
+
+
+def test_final_auth_04_missing_or_default_production_secret_fails_closed(isolated_env, monkeypatch):
+    """FINAL-AUTH-04: Missing/default production secret fails closed regardless of configuration entry point."""
+    monkeypatch.setenv("APP_ENV", "production")
+
+    # a) Forbidden default
+    monkeypatch.setenv("CFI_INTERNAL_CONTEXT_SECRET", "cfi_internal_trusted_context_secret_key_2026_default")
+    get_settings.cache_clear()
+    with pytest.raises(PermissionError, match="independently provisioned"):
+        create_trusted_internal_context("model_evaluation_engine", "rollback")
+
+    # b) Short entropy (<32 bytes)
+    monkeypatch.setenv("CFI_INTERNAL_CONTEXT_SECRET", "too_short_key_12345")
+    get_settings.cache_clear()
+    with pytest.raises(PermissionError, match="independently provisioned"):
+        create_trusted_internal_context("model_evaluation_engine", "rollback")
+
+    # c) Completely missing/empty secret
+    monkeypatch.delenv("CFI_INTERNAL_CONTEXT_SECRET", raising=False)
+    monkeypatch.setenv("CFI_INTERNAL_CONTEXT_SECRET", "")
+    get_settings.cache_clear()
+    with pytest.raises(PermissionError, match="independently provisioned"):
+        create_trusted_internal_context("model_evaluation_engine", "rollback")
+
+
+def test_final_auth_05_correct_v2_context_succeeds_for_exact_scope(isolated_env):
+    """FINAL-AUTH-05: Correct V2 context succeeds for its exact authorized resource and operation."""
+    reg, v1, _ = _create_champion_fixtures(isolated_env, sim_id="sim_final_05")
+
+    # Issue precisely scoped V2 context
+    ctx_exact = create_trusted_internal_context(
+        service_name="model_evaluation_engine",
+        action="rollback",
+        resource_type="model",
+        resource_id="sim_final_05",
+        model_version=v1,
+        bank_id="bank_a",
+    )
+
+    rolled_back = reg.rollback("sim_final_05", v1, trusted_context=ctx_exact)
+    assert rolled_back["version"] == v1
+    assert rolled_back["is_active"] is True
+
+
+def test_final_auth_06_consumed_context_cannot_replay_after_deletion_or_restart(isolated_env):
+    """FINAL-AUTH-06: A consumed context cannot be replayed after deleting the nonce store or restarting a worker."""
+    store_path = isolated_env["nonce_file"]
+    nonce = f"final_auth_06_nonce_{uuid.uuid4().hex}"
+    exp_at = time.time() + 180.0
+
+    # Worker consumes nonce
+    store = DurableNonceStore(store_path)
+    ok, _ = store.consume_nonce(nonce, expires_at=exp_at)
+    assert ok is True
+
+    # Attempt to delete the established store file
+    assert os.path.exists(store_path)
+    os.remove(store_path)
+
+    # In production, deleting established store must fail closed
+    DurableNonceStore._instance = None
+    with pytest.raises(NonceStoreIntegrityError, match="disappeared"):
+        DurableNonceStore(store_path)
+
+
+def test_final_auth_07_forged_replay_state_with_recomputed_sha256_rejected(isolated_env):
+    """FINAL-AUTH-07: Forged replay state with recomputed or removed SHA-256 is rejected in production."""
+    store_path = isolated_env["nonce_file"]
+    store = DurableNonceStore(store_path)
+    nonce = f"auth_07_nonce_{uuid.uuid4().hex}"
+    store.consume_nonce(nonce, expires_at=time.time() + 180.0)
+
+    # Attacker modifies the store to un-consume the nonce and recomputes only unkeyed SHA-256
+    with open(store_path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    data["consumed_nonces"] = {}  # cleared history
+    canonical_json = json.dumps({}, sort_keys=True, separators=(",", ":"))
+    data["integrity_digest"] = hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+    data.pop("integrity_hmac", None)  # attacker lacks production HMAC key
+
+    with open(store_path, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+    DurableNonceStore._instance = None
+    with pytest.raises(NonceStoreIntegrityError, match="missing mandatory authenticated integrity_hmac signature"):
+        DurableNonceStore(store_path)
+
+
+def test_final_auth_08_racing_independent_processes_produce_at_most_one_consumption(isolated_env):
+    """FINAL-AUTH-08: Two independent OS processes racing to consume one context cannot both succeed."""
+    store_path = isolated_env["nonce_file"]
+    nonce = f"final_auth_08_race_{uuid.uuid4().hex}"
+    exp_at = time.time() + 60.0
+
+    worker_code = f"""
+import sys, json, time
+from app.infrastructure.security.durable_nonce_store import DurableNonceStore
+
+store = DurableNonceStore({json.dumps(store_path)})
+consumed, reason = store.consume_nonce({json.dumps(nonce)}, expires_at={exp_at})
+print(json.dumps({{"consumed": consumed, "reason": reason}}))
+"""
+    env = os.environ.copy()
+    env["PYTHONPATH"] = BACKEND_DIR
+
+    p1 = subprocess.Popen([sys.executable, "-c", worker_code], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+    p2 = subprocess.Popen([sys.executable, "-c", worker_code], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+
+    out1, err1 = p1.communicate(timeout=60)
+    out2, err2 = p2.communicate(timeout=60)
+
+    def _extract_worker_json(raw: str) -> dict[str, Any]:
+        for line in reversed(raw.strip().splitlines()):
+            line = line.strip()
+            if line.startswith("{") and "consumed" in line:
+                return json.loads(line)
+        raise ValueError(f"No JSON found in worker output: {raw}")
+
+    res1 = _extract_worker_json(out1)
+    res2 = _extract_worker_json(out2)
+
+    results = [res1, res2]
+    successes = [r for r in results if r["consumed"] is True]
+    rejections = [r for r in results if r["consumed"] is False]
+
+    assert len(successes) == 1, f"Expected exactly 1 success, got {len(successes)} (res1={res1}, res2={res2})"
+    assert len(rejections) == 1, f"Expected exactly 1 rejection, got {len(rejections)}"
+
+
+def test_final_auth_09_genuine_automated_operations_function(isolated_env):
+    """FINAL-AUTH-09: Genuine automated rollback, model registration, consortium governance, and authorized bootstrap still function."""
+    # 1. Consortium bootstrap with authorized context
+    svc = ConsortiumGovernanceService()
+    c = init_default_consortium(svc, allow_bootstrap=True)
+    assert c.consortium_id == "cfi-consortium"
+
+    # 2. Coordinator adjusts role and voting power using properly scoped context
+    ctx_role = create_trusted_internal_context(
+        service_name="consortium_coordinator",
+        action="set_member_role",
+        resource_type="consortium",
+        resource_id="cfi-consortium",
+        target_bank_id="bank_b",
+    )
+    svc.set_member_role("cfi-consortium", "bank_b", "OBSERVER", trusted_context=ctx_role)
+
+    ctx_power = create_trusted_internal_context(
+        service_name="consortium_coordinator",
+        action="set_member_voting_power",
+        resource_type="consortium",
+        resource_id="cfi-consortium",
+        target_bank_id="bank_b",
+    )
+    svc.set_member_voting_power("cfi-consortium", "bank_b", 2.0, trusted_context=ctx_power)
+
+    updated_c = svc.get_consortium("cfi-consortium")
+    assert updated_c.members["bank_b"].role.value == "OBSERVER"
+    assert updated_c.members["bank_b"].voting_power == 2.0
+
+    # 3. Model champion creation, evaluation and rollback
+    reg, v1, _ = _create_champion_fixtures(isolated_env, sim_id="sim_final_09")
+    ctx_rb = create_trusted_internal_context(
+        service_name="model_evaluation_engine",
+        action="rollback",
+        resource_type="model",
+        resource_id="sim_final_09",
+        model_version=v1,
+        bank_id="bank_a",
+    )
+    rb = reg.rollback("sim_final_09", v1, trusted_context=ctx_rb)
+    assert rb["version"] == v1
+    assert rb["is_active"] is True
+

@@ -32,6 +32,7 @@ from fastapi.testclient import TestClient
 from app.application.services.consortium_service import (
     consortium_governance_service,
 )
+from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 from app.application.services.model_registry import (
     ModelRegistry,
     create_trusted_internal_context,
@@ -78,6 +79,17 @@ def tenant_env():
     verifier = TrainingReceiptVerifier(trust_store=trust_store)
 
     registry = ModelRegistry(storage_dir=reg_dir, verifier=verifier)
+
+    consortium_store_path = os.path.join(temp_dir, "consortium_store.json")
+    test_consortium_store = DurableConsortiumStore(
+        store_path=consortium_store_path,
+        authority_secret="cfi_test_consortium_store_secret_32b_key!",
+        app_env="production",
+    )
+    old_consortium_store = DurableConsortiumStore._instance
+    old_service_store = consortium_governance_service._store
+    DurableConsortiumStore.set_instance(test_consortium_store)
+    consortium_governance_service._store = test_consortium_store
 
     auth_svc = AuthenticationService(
         signing_secret=TEST_SIGNING_SECRET,
@@ -145,6 +157,8 @@ def tenant_env():
 
     mr_router.registry = old_reg
     AuthenticationService.reset_instance()
+    DurableConsortiumStore.set_instance(old_consortium_store)
+    consortium_governance_service._store = old_service_store
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -782,7 +796,14 @@ def test_tenant_10_regressions_intact(tenant_env):
     assert reg.get_active_version(sim_id)["version"] == v1
 
     # 4. Trusted internal orchestration context rollback succeeds
-    ctx_rb = create_trusted_internal_context("model_evaluation_engine", action="rollback")
+    ctx_rb = create_trusted_internal_context(
+        service_name="model_evaluation_engine",
+        action="rollback",
+        resource_type="model",
+        resource_id=sim_id,
+        model_version=v1,
+        bank_id="bank_a",
+    )
     rb_entry = reg.rollback(sim_id, v1, trusted_context=ctx_rb)
     assert rb_entry["version"] == v1
     assert rb_entry["is_active"] is True

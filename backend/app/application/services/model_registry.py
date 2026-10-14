@@ -82,11 +82,13 @@ def generate_signoff_signature(
 
 
 DOMAIN_INTERNAL_AUTHORITY = "cfi:internal_execution_context:v2"
+DOMAIN_REPLAY_STORE_INTEGRITY = "cfi:replay_nonce_store:v1"
 FORBIDDEN_INTERNAL_SECRETS = frozenset(
     {
         "",
         "cfi_internal_trusted_context_secret_key_2026_default",
         "cfi_dev_internal_trusted_context_secret_key_2026_development_only",
+        "cfi_dev_replay_store_integrity_secret_2026_dev_only",
         "cfi_local_secret_key_2026_change_me_in_production",
         "change_me",
         "change-me",
@@ -108,8 +110,14 @@ def _resolve_internal_context_secret(is_issuing: bool = True) -> bytes:
     from app.config import get_settings
 
     settings = get_settings()
+    setting_app_env = getattr(settings, "app_env", "development").lower().strip()
     env_app_env = os.environ.get("APP_ENV", "").lower().strip()
-    is_prod_env = env_app_env == "production"
+    generic_env = os.environ.get("ENVIRONMENT", "").lower().strip()
+    is_prod_env = (
+        setting_app_env == "production"
+        or env_app_env == "production"
+        or generic_env == "production"
+    )
 
     configured_secret = (
         os.environ.get("CFI_INTERNAL_CONTEXT_SECRET")
@@ -318,11 +326,25 @@ def verify_trusted_internal_context(
     expected_v2_sig = hmac.new(domain_key, v2_payload, hashlib.sha256).hexdigest()
 
     v1_matched = False
-    # Backward compatibility with V1 signatures for contexts without resource attributes
+    # Backward compatibility with V1 signatures for inspection in non-production only
     if not hmac.compare_digest(context.signature, expected_v2_sig):
         from app.config import get_settings
 
         settings = get_settings()
+        setting_app_env = getattr(settings, "app_env", "development").lower().strip()
+        env_app_env = os.environ.get("APP_ENV", "").lower().strip()
+        generic_env = os.environ.get("ENVIRONMENT", "").lower().strip()
+        is_prod = (
+            setting_app_env == "production"
+            or env_app_env == "production"
+            or generic_env == "production"
+        )
+        if is_prod:
+            return False, "Cryptographic signature mismatch: production mode strictly requires V2 domain-separated authority signatures."
+
+        if consume_nonce:
+            return False, "Legacy V1 internal authority signature cannot authorize privileged state mutations; V2 scoped context required."
+
         secret = (
             getattr(settings, "payload_signing_secret", None)
             or getattr(settings, "oidc_jwt_signing_secret", None)
@@ -338,41 +360,51 @@ def verify_trusted_internal_context(
         if not v1_matched:
             return False, "Cryptographic signature mismatch on internal execution context."
 
-    # Scope validation: Resource Type
+    # Scope validation: Resource Type (mandatory if expected)
     ctx_res_type = getattr(context, "resource_type", None)
-    if ctx_res_type and expected_resource_type and ctx_res_type != expected_resource_type:
-        return False, f"Context resource_type mismatch: expected '{expected_resource_type}', got '{ctx_res_type}'."
+    if expected_resource_type is not None and (
+        not ctx_res_type or ctx_res_type.strip() != expected_resource_type.strip()
+    ):
+        return False, f"Context resource_type scope mismatch: expected '{expected_resource_type}', got '{ctx_res_type}'."
 
-    # Scope validation: Resource ID
+    # Scope validation: Resource ID (mandatory if expected)
     ctx_res_id = getattr(context, "resource_id", None)
-    if ctx_res_id is not None and expected_resource_id is not None and ctx_res_id.strip() != expected_resource_id.strip():
+    if expected_resource_id is not None and (
+        not ctx_res_id or ctx_res_id.strip() != expected_resource_id.strip()
+    ):
         return (
             False,
-            f"Context resource_id scope mismatch: context is scoped to resource '{ctx_res_id}', cannot operate on '{expected_resource_id}'.",
+            f"Context resource_id scope mismatch: expected '{expected_resource_id}', got '{ctx_res_id}'.",
         )
 
-    # Scope validation: Model Version
+    # Scope validation: Model Version (mandatory if expected)
     ctx_ver = getattr(context, "model_version", None)
-    if ctx_ver is not None and expected_model_version is not None and ctx_ver != expected_model_version:
+    if expected_model_version is not None and (
+        ctx_ver is None or ctx_ver != expected_model_version
+    ):
         return (
             False,
-            f"Context model_version scope mismatch: context is scoped to version {ctx_ver}, cannot operate on version {expected_model_version}.",
+            f"Context model_version scope mismatch: expected {expected_model_version}, got {ctx_ver}.",
         )
 
-    # Scope validation: Institutional Bank ID
+    # Scope validation: Institutional Bank ID (mandatory if expected)
     ctx_bank = getattr(context, "bank_id", None)
-    if ctx_bank is not None and expected_bank_id is not None and ctx_bank.strip().lower() != expected_bank_id.strip().lower():
+    if expected_bank_id is not None and (
+        not ctx_bank or ctx_bank.strip().lower() != expected_bank_id.strip().lower()
+    ):
         return (
             False,
-            f"Context bank_id scope mismatch: context is scoped to institution '{ctx_bank}', cannot operate on institution '{expected_bank_id}'.",
+            f"Context bank_id scope mismatch: expected '{expected_bank_id}', got '{ctx_bank}'.",
         )
 
-    # Scope validation: Target Bank ID
+    # Scope validation: Target Bank ID (mandatory if expected)
     ctx_target_bank = getattr(context, "target_bank_id", None)
-    if ctx_target_bank is not None and expected_target_bank_id is not None and ctx_target_bank.strip().lower() != expected_target_bank_id.strip().lower():
+    if expected_target_bank_id is not None and (
+        not ctx_target_bank or ctx_target_bank.strip().lower() != expected_target_bank_id.strip().lower()
+    ):
         return (
             False,
-            f"Context target_bank_id scope mismatch: context is scoped to target bank '{ctx_target_bank}', cannot operate on '{expected_target_bank_id}'.",
+            f"Context target_bank_id scope mismatch: expected '{expected_target_bank_id}', got '{ctx_target_bank}'.",
         )
 
     # Replay protection: atomic nonce consumption
@@ -790,17 +822,24 @@ class ModelRegistry:
 
             # Fallback probe to verified sign-offs or training receipt if entries lack explicit ownership tags
             if not banks_found and not consortia_found and manifest:
-                from app.infrastructure.security.auth_service import AuthenticationService
+                has_signoff_users = any(
+                    isinstance(s, dict) and bool(s.get("user"))
+                    for e in manifest
+                    for s in e.get("sign_offs", [])
+                )
+                if has_signoff_users:
+                    from app.infrastructure.security.auth_service import AuthenticationService
 
-                auth_svc = AuthenticationService.get_instance()
+                    auth_svc = AuthenticationService.get_instance()
+                    for e in manifest:
+                        for s in e.get("sign_offs", []):
+                            if isinstance(s, dict):
+                                s_user = s.get("user")
+                                if s_user:
+                                    u_rec = auth_svc.get_user(s_user)
+                                    if u_rec and getattr(u_rec, "bank_id", None):
+                                        banks_found.add(u_rec.bank_id.strip())
                 for e in manifest:
-                    for s in e.get("sign_offs", []):
-                        if isinstance(s, dict):
-                            s_user = s.get("user")
-                            if s_user:
-                                u_rec = auth_svc.get_user(s_user)
-                                if u_rec and getattr(u_rec, "bank_id", None):
-                                    banks_found.add(u_rec.bank_id.strip())
                     rcpt = e.get("training_receipt")
                     if isinstance(rcpt, dict):
                         rcpt_b = rcpt.get("owning_bank_id")
@@ -2266,6 +2305,8 @@ class ModelRegistry:
 
         authenticated_operator: str | None = None
         if trusted_context:
+            sim_ownership = self.get_simulation_ownership(simulation_id)
+            owning_bank = sim_ownership.get("owning_bank_id")
             is_valid_ctx, ctx_reason = verify_trusted_internal_context(
                 trusted_context,
                 expected_action="promote_version",
@@ -2273,6 +2314,7 @@ class ModelRegistry:
                 expected_resource_type="model",
                 expected_resource_id=simulation_id,
                 expected_model_version=version,
+                expected_bank_id=owning_bank,
                 consume_nonce=True,
             )
             if not is_valid_ctx:
@@ -2467,6 +2509,8 @@ class ModelRegistry:
 
         authenticated_operator: str | None = None
         if trusted_context:
+            sim_ownership = self.get_simulation_ownership(simulation_id)
+            owning_bank = sim_ownership.get("owning_bank_id")
             is_valid_ctx, ctx_reason = verify_trusted_internal_context(
                 trusted_context,
                 expected_action="rollback",
@@ -2474,6 +2518,7 @@ class ModelRegistry:
                 expected_resource_type="model",
                 expected_resource_id=simulation_id,
                 expected_model_version=version,
+                expected_bank_id=owning_bank,
                 consume_nonce=True,
             )
             if not is_valid_ctx:
@@ -3156,12 +3201,15 @@ class ModelEvaluationEngine:
                 previous_versions = [v for v in manifest if v["version"] < active_ver_num]
                 if previous_versions:
                     stable_version = max(previous_versions, key=lambda x: x["version"])
+                    ownership = self.registry.get_simulation_ownership(simulation_id)
+                    owning_bank = ownership.get("owning_bank_id")
                     trusted_ctx = create_trusted_internal_context(
                         "model_evaluation_engine",
                         action="rollback",
                         resource_type="model",
                         resource_id=simulation_id,
                         model_version=stable_version["version"],
+                        bank_id=owning_bank,
                     )
                     self.registry.rollback(
                         simulation_id,
