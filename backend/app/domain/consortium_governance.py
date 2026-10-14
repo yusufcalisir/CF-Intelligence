@@ -49,6 +49,10 @@ class ProposalAction(str, Enum):
     UPDATE_POLICY = "UPDATE_POLICY"
 
 
+class ConsortiumSecurityError(Exception):
+    """Raised when consortium governance integrity or authorization boundary fails."""
+
+
 @dataclass
 class ConsortiumMember:
     """Represents a member institution participating in a consortium."""
@@ -62,6 +66,12 @@ class ConsortiumMember:
         self.bank_id = self.bank_id.lower().strip()
         if not self.bank_id:
             raise ValueError("ConsortiumMember bank_id cannot be empty or whitespace.")
+        if isinstance(self.role, str):
+            self.role = MemberRole(self.role)
+        if isinstance(self.joined_at, str):
+            self.joined_at = datetime.datetime.fromisoformat(self.joined_at)
+            if self.joined_at.tzinfo is None:
+                self.joined_at = self.joined_at.replace(tzinfo=UTC)
         if not math.isfinite(self.voting_power) or self.voting_power < 0.0:
             raise ValueError(
                 f"ConsortiumMember voting_power must be non-negative finite number, got {self.voting_power}"
@@ -99,6 +109,29 @@ class MembershipProposal:
         self.creator_bank_id = self.creator_bank_id.lower().strip()
         self.target_bank_id = self.target_bank_id.lower().strip()
 
+        if isinstance(self.action, str):
+            self.action = ProposalAction(self.action)
+        if isinstance(self.status, str):
+            self.status = ProposalStatus(self.status)
+
+        if isinstance(self.created_at, str):
+            self.created_at = datetime.datetime.fromisoformat(self.created_at)
+            if self.created_at.tzinfo is None:
+                self.created_at = self.created_at.replace(tzinfo=UTC)
+        if isinstance(self.expires_at, str):
+            self.expires_at = datetime.datetime.fromisoformat(self.expires_at)
+            if self.expires_at.tzinfo is None:
+                self.expires_at = self.expires_at.replace(tzinfo=UTC)
+        if isinstance(self.cancelled_at, str):
+            self.cancelled_at = datetime.datetime.fromisoformat(self.cancelled_at)
+            if self.cancelled_at.tzinfo is None:
+                self.cancelled_at = self.cancelled_at.replace(tzinfo=UTC)
+
+        if isinstance(self.votes_for, (list, tuple)):
+            self.votes_for = set(self.votes_for)
+        if isinstance(self.votes_against, (list, tuple)):
+            self.votes_against = set(self.votes_against)
+
         if not self.proposal_id:
             raise ValueError("MembershipProposal proposal_id cannot be empty.")
         if not self.consortium_id:
@@ -135,11 +168,19 @@ class Consortium:
     max_epsilon: float = 5.0
     status: ConsortiumStatus = ConsortiumStatus.DRAFT
     members: dict[str, ConsortiumMember] = field(default_factory=dict)
+    removed_members: dict[str, dict[str, Any]] = field(default_factory=dict)
     created_at: datetime.datetime = field(default_factory=lambda: datetime.datetime.now(UTC))
 
     def __post_init__(self) -> None:
         self.consortium_id = self.consortium_id.lower().strip()
         self.name = self.name.strip()
+        if isinstance(self.status, str):
+            self.status = ConsortiumStatus(self.status)
+        if isinstance(self.created_at, str):
+            self.created_at = datetime.datetime.fromisoformat(self.created_at)
+            if self.created_at.tzinfo is None:
+                self.created_at = self.created_at.replace(tzinfo=UTC)
+
         if not self.consortium_id:
             raise ValueError("Consortium consortium_id cannot be empty.")
         if not self.name:
@@ -152,3 +193,11 @@ class Consortium:
             raise ValueError(f"min_members_n must be >= 1, got {self.min_members_n}")
         if not math.isfinite(self.max_epsilon) or self.max_epsilon <= 0.0:
             raise ValueError(f"max_epsilon must be positive finite number, got {self.max_epsilon}")
+
+    @property
+    def founder_bank_id(self) -> str | None:
+        """Returns the bank_id of the founder member if present."""
+        for b_id, m in self.members.items():
+            if m.role == MemberRole.FOUNDER:
+                return b_id
+        return None

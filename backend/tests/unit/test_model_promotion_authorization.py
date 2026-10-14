@@ -57,6 +57,7 @@ def _create_verified_model(
         feature_names=["f1", "f2"],
         simulation_id=simulation_id,
         metrics={"loss": 0.01},
+        owning_bank_id=owning_bank_id,
     )
 
     metadata = registry.save_version(
