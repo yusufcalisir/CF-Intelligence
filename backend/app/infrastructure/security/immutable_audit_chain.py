@@ -315,6 +315,67 @@ class ImmutableAuditChain:
     def _established_marker_path(self) -> str:
         return f"{self._store_path}.established"
 
+    def _validate_chain_entries_unlocked(
+        self, entries: list[AuditLogEntry]
+    ) -> tuple[bool, str | None]:
+        """Validate all required chain invariants: monotonic indices, predecessor links, and HMAC digests."""
+        if not entries:
+            return True, None
+
+        expected_prev = GENESIS_HASH
+        for i, entry in enumerate(entries):
+            # 1. Monotonic index continuity check
+            if entry.index != i:
+                return (
+                    False,
+                    f"Index mismatch at position {i}: expected {i}, got {entry.index} (sequence deletion or insertion detected).",
+                )
+
+            # 2. Previous hash link check
+            if entry.prev_hash != expected_prev:
+                return (
+                    False,
+                    f"Chain broken at entry #{i}: prev_hash '{entry.prev_hash[:8]}' does not match expected '{expected_prev[:8]}'.",
+                )
+
+            # 3. Cryptographic authentication re-verification
+            recomputed = self.compute_entry_hash(
+                index=entry.index,
+                event_type=entry.event_type,
+                actor=entry.actor,
+                target_id=entry.target_id,
+                timestamp=entry.timestamp,
+                details=entry.details,
+                prev_hash=entry.prev_hash,
+                event_id=entry.event_id,
+                actor_type=entry.actor_type,
+                actor_institution=entry.actor_institution,
+                target_type=entry.target_type,
+                action=entry.action,
+                decision=entry.decision,
+                correlation_id=entry.correlation_id,
+            )
+            if not hmac.compare_digest(recomputed, entry.curr_hash):
+                # Also test legacy un-extended hash format for backward compatibility
+                legacy_recomputed = self.compute_entry_hash(
+                    index=entry.index,
+                    event_type=entry.event_type,
+                    actor=entry.actor,
+                    target_id=entry.target_id,
+                    timestamp=entry.timestamp,
+                    details=entry.details,
+                    prev_hash=entry.prev_hash,
+                )
+                if not hmac.compare_digest(legacy_recomputed, entry.curr_hash):
+                    return (
+                        False,
+                        f"Tampering detected at entry #{i} ({entry.event_type}): signature verification failed (recomputed HMAC '{recomputed[:8]}' != stored '{entry.curr_hash[:8]}').",
+                    )
+
+            expected_prev = entry.curr_hash
+
+        return True, None
+
     def _reload_unlocked(self, force: bool = False) -> None:
         """Reload ledger entries from disk if changed by another worker."""
         if self._in_memory or not self._store_path:
@@ -355,6 +416,15 @@ class ImmutableAuditChain:
             container = json.loads(content)
             entries_raw = container.get("entries", [])
             entries = [AuditLogEntry.from_dict(e) for e in entries_raw]
+
+            # Invariant validation before accepting loaded ledger as authoritative
+            is_valid, tamper_reason = self._validate_chain_entries_unlocked(entries)
+            if not is_valid:
+                self.chain = entries
+                self._is_corrupted = True
+                self._tamper_reason = tamper_reason
+                logger.error("Authoritative audit ledger failed chain validation: %s", self._tamper_reason)
+                return
 
             self.chain = entries
             self._last_mtime = stat.st_mtime
@@ -579,6 +649,13 @@ class ImmutableAuditChain:
                 raise AuditChainTamperError(
                     f"Cannot append to corrupted audit ledger: {self._tamper_reason}"
                 )
+            is_valid, tamper_reason = self._validate_chain_entries_unlocked(self.chain)
+            if not is_valid:
+                self._is_corrupted = True
+                self._tamper_reason = tamper_reason
+                raise AuditChainTamperError(
+                    f"Cannot append to corrupted audit ledger: {self._tamper_reason}"
+                )
             return self._append_event_unlocked(
                 event_type=event_type,
                 actor=actor,
@@ -595,6 +672,30 @@ class ImmutableAuditChain:
                 actor_id=actor_id,
                 resource_id=resource_id,
             )
+
+    def rollback_last_event(self, expected_curr_hash: str | None = None) -> bool:
+        """Atomically roll back the tail audit event if the associated business write failed."""
+        file_lock = _get_audit_file_lock(self._lock_path) if self._lock_path else contextlib.nullcontext()
+        with self._lock, file_lock:
+            self._reload_unlocked()
+            if not self.chain:
+                return False
+            if expected_curr_hash and self.chain[-1].curr_hash != expected_curr_hash:
+                logger.warning(
+                    "Rollback aborted: expected tail hash '%s', found '%s'",
+                    expected_curr_hash,
+                    self.chain[-1].curr_hash,
+                )
+                return False
+            popped = self.chain.pop()
+            self._save_unlocked()
+            logger.info(
+                "Rolled back premature audit event #%d [%s, %s] following business write failure",
+                popped.index,
+                popped.event_type,
+                popped.curr_hash[:12],
+            )
+            return True
 
     def append(
         self,
@@ -671,67 +772,21 @@ class ImmutableAuditChain:
                 last_hash=GENESIS_HASH,
             )
 
-        expected_prev = GENESIS_HASH
+        is_valid, tamper_reason = self._validate_chain_entries_unlocked(snapshot)
+        if not is_valid:
+            broken_idx: int | None = None
+            if tamper_reason:
+                match = re.search(r"(?:at entry #|at position )(\d+)", tamper_reason)
+                if match:
+                    broken_idx = int(match.group(1))
 
-        for i, entry in enumerate(snapshot):
-            # 1. Index sequence continuity check
-            if entry.index != i:
-                return ChainVerificationReport(
-                    is_valid=False,
-                    total_records=len(snapshot),
-                    broken_index=i,
-                    tamper_reason=f"Index mismatch at position {i}: expected {i}, got {entry.index} (sequence deletion or insertion detected).",
-                    last_hash=entry.curr_hash,
-                )
-
-            # 2. Previous hash link check
-            if entry.prev_hash != expected_prev:
-                return ChainVerificationReport(
-                    is_valid=False,
-                    total_records=len(snapshot),
-                    broken_index=i,
-                    tamper_reason=f"Chain broken at entry #{i}: prev_hash '{entry.prev_hash[:8]}' does not match expected '{expected_prev[:8]}'.",
-                    last_hash=entry.curr_hash,
-                )
-
-            # 3. Cryptographic authentication re-verification
-            recomputed = self.compute_entry_hash(
-                index=entry.index,
-                event_type=entry.event_type,
-                actor=entry.actor,
-                target_id=entry.target_id,
-                timestamp=entry.timestamp,
-                details=entry.details,
-                prev_hash=entry.prev_hash,
-                event_id=entry.event_id,
-                actor_type=entry.actor_type,
-                actor_institution=entry.actor_institution,
-                target_type=entry.target_type,
-                action=entry.action,
-                decision=entry.decision,
-                correlation_id=entry.correlation_id,
+            return ChainVerificationReport(
+                is_valid=False,
+                total_records=len(snapshot),
+                broken_index=broken_idx,
+                tamper_reason=tamper_reason,
+                last_hash=snapshot[-1].curr_hash,
             )
-            if not hmac.compare_digest(recomputed, entry.curr_hash):
-                # Also test legacy un-extended hash format for backward compatibility
-                legacy_recomputed = self.compute_entry_hash(
-                    index=entry.index,
-                    event_type=entry.event_type,
-                    actor=entry.actor,
-                    target_id=entry.target_id,
-                    timestamp=entry.timestamp,
-                    details=entry.details,
-                    prev_hash=entry.prev_hash,
-                )
-                if not hmac.compare_digest(legacy_recomputed, entry.curr_hash):
-                    return ChainVerificationReport(
-                        is_valid=False,
-                        total_records=len(snapshot),
-                        broken_index=i,
-                        tamper_reason=f"Tampering detected at entry #{i} ({entry.event_type}): signature verification failed (recomputed HMAC '{recomputed[:8]}' != stored '{entry.curr_hash[:8]}').",
-                        last_hash=entry.curr_hash,
-                    )
-
-            expected_prev = entry.curr_hash
 
         return ChainVerificationReport(
             is_valid=True,

@@ -2526,7 +2526,8 @@ class ModelRegistry:
             # Emit audit log event BEFORE saving manifest (fail-closed)
             from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 
-            ImmutableAuditChain.get_instance().append_event(
+            audit_chain = ImmutableAuditChain.get_instance()
+            audit_entry = audit_chain.append_event(
                 event_type="MODEL_PROMOTION",
                 actor=effective_operator or "system",
                 target_id=f"{simulation_id}:v{version}",
@@ -2547,7 +2548,29 @@ class ModelRegistry:
             )
 
             # Authoritative manifest is saved FIRST (Section 9.1)
-            self._save_manifest(simulation_id, manifest)
+            try:
+                self._save_manifest(simulation_id, manifest)
+            except Exception as save_err:
+                audit_chain.rollback_last_event(audit_entry.curr_hash)
+                audit_chain.append_event(
+                    event_type="MODEL_PROMOTION_FAILED",
+                    actor=effective_operator or "system",
+                    target_id=f"{simulation_id}:v{version}",
+                    details={
+                        "simulation_id": simulation_id,
+                        "version": version,
+                        "error": str(save_err),
+                        "action": "promote_version",
+                        "decision": "FAILED",
+                        "mutation_committed": False,
+                    },
+                    actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
+                    actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
+                    target_type="model_version",
+                    action="promote_version",
+                    decision="FAILED",
+                )
+                raise
 
             # Secondary global model link updated SECOND
             if target_status == "champion":
@@ -2746,7 +2769,8 @@ class ModelRegistry:
             # Emit audit log event BEFORE saving manifest (fail-closed)
             from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 
-            ImmutableAuditChain.get_instance().append_event(
+            audit_chain = ImmutableAuditChain.get_instance()
+            audit_entry = audit_chain.append_event(
                 event_type="MODEL_ROLLBACK",
                 actor=effective_operator or "system",
                 target_id=f"{simulation_id}:v{version}",
@@ -2766,7 +2790,29 @@ class ModelRegistry:
             )
 
             # Authoritative manifest is saved FIRST (Section 9.1)
-            self._save_manifest(simulation_id, manifest)
+            try:
+                self._save_manifest(simulation_id, manifest)
+            except Exception as save_err:
+                audit_chain.rollback_last_event(audit_entry.curr_hash)
+                audit_chain.append_event(
+                    event_type="MODEL_ROLLBACK_FAILED",
+                    actor=effective_operator or "system",
+                    target_id=f"{simulation_id}:v{version}",
+                    details={
+                        "simulation_id": simulation_id,
+                        "version": version,
+                        "error": str(save_err),
+                        "action": "rollback",
+                        "decision": "FAILED",
+                        "mutation_committed": False,
+                    },
+                    actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
+                    actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
+                    target_type="model_version",
+                    action="rollback",
+                    decision="FAILED",
+                )
+                raise
 
             # Secondary global model link updated SECOND
             try:
@@ -3127,6 +3173,22 @@ class ModelRegistry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
 
             norm_role = "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
+            effective_user = user or (revoked_by if not auth_token else "") or ""
+
+            target_sign_off = None
+            for s in entry.get("sign_offs", []):
+                s_role = "compliance" if s.get("role") in ("compliance", "compliance_officer") else "ml_engineer"
+                if (
+                    s_role == norm_role
+                    and not s.get("is_revoked", False)
+                    and s.get("status", "active") != "revoked"
+                    and (not effective_user or s.get("user") == effective_user or effective_user in (s.get("user_id"), ""))
+                ):
+                    target_sign_off = s
+                    break
+
+            if target_sign_off is None:
+                raise ValueError(f"No sign-off found for role '{role}' on version {version}")
 
             from app.config import get_settings
 
@@ -3145,13 +3207,60 @@ class ModelRegistry:
                 if not is_valid_tok or not tok_payload:
                     raise ModelIntegrityError(f"Sign-off revocation authentication failed: {tok_err}")
                 tok_user = (tok_payload.get("username") or tok_payload.get("sub") or "").strip()
-                tok_bank = (tok_payload.get("bank_id") or "").strip()
+                tok_bank = (tok_payload.get("bank_id") or "").lower().strip()
                 u_rec = auth_svc.get_user(tok_user)
-                if not u_rec or not u_rec.is_active:
+                if not u_rec or not u_rec.is_active or getattr(u_rec, "status", "active").lower() != "active":
                     raise ModelIntegrityError(f"Revoking user '{tok_user}' is not an active authoritative user.")
+
+                user_bank = (getattr(u_rec, "bank_id", "") or "").lower().strip()
+                if tok_bank and user_bank and tok_bank != user_bank:
+                    raise ModelAuthorizationError(
+                        f"Revocation token bank claim '{tok_bank}' does not match authoritative institution '{user_bank}'."
+                    )
+
+                # Authoritative institutional ownership authorization (DEFECT 1)
+                self._verify_institutional_governance_authority(simulation_id, u_rec, "model sign-off revocation")
+
+                user_roles = {r.lower().strip() for r in getattr(u_rec, "roles", [])}
+                user_clearance = getattr(u_rec, "clearance_level", 1)
+
+                if "observer" in user_roles and not (user_roles - {"observer"}):
+                    raise ModelAuthorizationError(
+                        f"Principal '{tok_user}' with observer role is not authorized to revoke model sign-offs."
+                    )
+
+                # Distinguish original signatory vs supervisory compliance/governance intervention
+                orig_user = str(target_sign_off.get("user", "")).lower().strip()
+                orig_uid = str(target_sign_off.get("user_id", "")).strip()
+                is_orig = (
+                    tok_user.lower() == orig_user
+                    or (getattr(u_rec, "user_id", None) and str(u_rec.user_id) == orig_uid)
+                )
+
+                if is_orig:
+                    if user_clearance < 1:
+                        raise ModelAuthorizationError(
+                            f"Principal '{tok_user}' clearance level {user_clearance} is insufficient to self-revoke sign-off."
+                        )
+                    allowed_roles = {"admin", "ml_lead", "ml_engineer", "compliance", "compliance_officer"}
+                    if not (user_roles & allowed_roles):
+                        raise ModelAuthorizationError(
+                            f"Principal '{tok_user}' lacks authorized role to self-revoke sign-off."
+                        )
+                else:
+                    supervisory_roles = {"admin", "compliance", "compliance_officer", "ml_lead"}
+                    if not (user_roles & supervisory_roles):
+                        raise ModelAuthorizationError(
+                            f"Principal '{tok_user}' lacking compliance or lead role authority cannot revoke another user's sign-off."
+                        )
+                    if user_clearance < 2:
+                        raise ModelAuthorizationError(
+                            f"Principal '{tok_user}' clearance level {user_clearance} is insufficient for supervisory sign-off revocation (minimum clearance level 2 required)."
+                        )
+
                 verified_actor = tok_user
                 actor_type = "human_principal"
-                actor_institution = tok_bank or getattr(u_rec, "bank_id", "unknown")
+                actor_institution = user_bank or tok_bank or "unknown"
                 authority_type = "bearer_jwt"
             elif internal_context is not None:
                 sim_ownership = self.get_simulation_ownership(simulation_id)
@@ -3161,11 +3270,16 @@ class ModelRegistry:
                     if getattr(internal_context, "resource_id", "") == f"{simulation_id}:v{version}"
                     else simulation_id
                 )
+                expected_res_type = (
+                    "model_version"
+                    if getattr(internal_context, "resource_type", "") == "model_version"
+                    else "model"
+                )
                 is_valid_ctx, ctx_reason = verify_trusted_internal_context(
                     internal_context,
                     expected_action="revoke_sign_off",
                     expected_service_name=internal_context.service_name,
-                    expected_resource_type=getattr(internal_context, "resource_type", None) or "model",
+                    expected_resource_type=expected_res_type,
                     expected_resource_id=expected_res_id,
                     expected_model_version=version,
                     expected_bank_id=owning_bank,
@@ -3184,41 +3298,50 @@ class ModelRegistry:
             else:
                 effective_revoker = revoked_by or user or "unverified_operator"
                 u_rec = auth_svc.get_user(effective_revoker)
+                if u_rec is not None:
+                    self._verify_institutional_governance_authority(simulation_id, u_rec, "model sign-off revocation")
+                    user_roles = {r.lower().strip() for r in getattr(u_rec, "roles", [])}
+                    user_clearance = getattr(u_rec, "clearance_level", 1)
+                    if "observer" in user_roles and not (user_roles - {"observer"}):
+                        raise ModelAuthorizationError(
+                            f"Principal '{effective_revoker}' with observer role is not authorized."
+                        )
+                    orig_user = str(target_sign_off.get("user", "")).lower().strip()
+                    is_orig = (
+                        effective_revoker.lower() == orig_user
+                        or (getattr(u_rec, "user_id", None) and str(u_rec.user_id) == str(target_sign_off.get("user_id", "")))
+                    )
+                    if not is_orig:
+                        if not (user_roles & {"admin", "compliance", "compliance_officer", "ml_lead"}):
+                            raise ModelAuthorizationError(
+                                f"Principal '{effective_revoker}' lacks supervisory role authority to revoke another user's sign-off."
+                            )
+                        if user_clearance < 2:
+                            raise ModelAuthorizationError(
+                                f"Principal '{effective_revoker}' clearance {user_clearance} is insufficient for supervisory revocation."
+                            )
                 verified_actor = effective_revoker
                 actor_type = "unverified_operator"
                 actor_institution = getattr(u_rec, "bank_id", "unknown") if u_rec else "unknown"
                 authority_type = "unauthenticated_caller"
 
-            effective_user = user or (revoked_by if not auth_token else "") or ""
-            found = False
-            for s in entry.get("sign_offs", []):
-                s_role = "compliance" if s["role"] in ("compliance", "compliance_officer") else "ml_engineer"
-                # Only revoke currently active matching sign-offs
-                if (
-                    s_role == norm_role
-                    and not s.get("is_revoked", False)
-                    and s.get("status", "active") != "revoked"
-                    and (not effective_user or s.get("user") == effective_user or effective_user in (s.get("user_id"), ""))
-                ):
-                    s["is_revoked"] = True
-                    s["status"] = "revoked"
-                    s["is_active"] = False
-                    s["revoked_at"] = datetime.now(UTC).isoformat()
-                    s["revoked_by"] = verified_actor
-                    s["revocation_reason"] = reason
-                    s["revocation_evidence"] = {
-                        "actor_type": actor_type,
-                        "actor_institution": actor_institution,
-                        "authority_type": authority_type,
-                        "timestamp": datetime.now(UTC).isoformat(),
-                    }
-                    found = True
-
-            if not found:
-                raise ValueError(f"No sign-off found for role '{role}' on version {version}")
-
             # HISTORICAL PRESERVATION: Do NOT delete revoked sign-offs from entry["sign_offs"]!
-            # The historical evidence remains permanently recorded with is_revoked=True and status="revoked".
+            target_sign_off["is_revoked"] = True
+            target_sign_off["status"] = "revoked"
+            target_sign_off["is_active"] = False
+            target_sign_off["revoked_at"] = datetime.now(UTC).isoformat()
+            target_sign_off["revoked_by"] = verified_actor
+            target_sign_off["revocation_reason"] = reason
+            evidence_dict = {
+                "actor_type": actor_type,
+                "actor_institution": actor_institution,
+                "authority_type": authority_type,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+            if internal_context is not None:
+                evidence_dict["service_name"] = internal_context.service_name
+                evidence_dict["nonce"] = internal_context.nonce
+            target_sign_off["revocation_evidence"] = evidence_dict
 
             # ALWAYS bump generation upon revocation to invalidate caches
             max_gen = max((e.get("generation", 0) for e in manifest), default=0)
@@ -3229,10 +3352,11 @@ class ModelRegistry:
                 entry["is_active"] = False
                 entry["status"] = "inactive"
 
-            # Emit audit log event BEFORE persisting manifest (fail-closed)
+            # Emit audit log event with rollback protection if business persistence fails
             from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 
-            ImmutableAuditChain.get_instance().append_event(
+            audit_chain = ImmutableAuditChain.get_instance()
+            audit_entry = audit_chain.append_event(
                 event_type="MODEL_SIGNOFF_REVOCATION",
                 actor=verified_actor,
                 target_id=f"{simulation_id}:v{version}",
@@ -3255,7 +3379,31 @@ class ModelRegistry:
                 decision="REVOKED",
             )
 
-            self._save_manifest(simulation_id, manifest)
+            try:
+                self._save_manifest(simulation_id, manifest)
+            except Exception as save_err:
+                audit_chain.rollback_last_event(audit_entry.curr_hash)
+                audit_chain.append_event(
+                    event_type="MODEL_SIGNOFF_REVOCATION_FAILED",
+                    actor=verified_actor,
+                    target_id=f"{simulation_id}:v{version}",
+                    details={
+                        "simulation_id": simulation_id,
+                        "version": version,
+                        "role": norm_role,
+                        "revoked_by": verified_actor,
+                        "error": str(save_err),
+                        "action": "revoke_sign_off",
+                        "decision": "FAILED",
+                        "mutation_committed": False,
+                    },
+                    actor_type=actor_type,
+                    actor_institution=actor_institution,
+                    target_type="model_version",
+                    action="revoke_sign_off",
+                    decision="FAILED",
+                )
+                raise
 
             # Invalidate caches
             with contextlib.suppress(Exception):
