@@ -2523,46 +2523,55 @@ class ModelRegistry:
                     elif entry.get("status") == "challenger":
                         entry["status"] = "inactive"
 
-            # Emit audit log event BEFORE saving manifest (fail-closed)
-            from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+            # Emit audit log event BEFORE saving manifest (Intent stage: PENDING)
+            mutation_id = f"mut_prom_{uuid.uuid4().hex}"
+            from app.infrastructure.security.immutable_audit_chain import (
+                AuditLedgerSecurityError,
+                ImmutableAuditChain,
+            )
 
             audit_chain = ImmutableAuditChain.get_instance()
-            audit_entry = audit_chain.append_event(
-                event_type="MODEL_PROMOTION",
+            intent_entry = audit_chain.append_event(
+                event_type="MODEL_PROMOTION_PENDING",
                 actor=effective_operator or "system",
                 target_id=f"{simulation_id}:v{version}",
                 details={
+                    "mutation_id": mutation_id,
+                    "mutation_stage": "PENDING",
+                    "mutation_committed": False,
                     "simulation_id": simulation_id,
                     "version": version,
                     "target_status": target_status,
                     "promoted_by": effective_operator,
                     "generation": target_entry.get("generation"),
                     "action": "promote_version",
-                    "decision": "PROMOTED",
+                    "decision": "PENDING",
                 },
                 actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
                 actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
                 target_type="model_version",
                 action="promote_version",
-                decision="PROMOTED",
+                decision="PENDING",
             )
 
             # Authoritative manifest is saved FIRST (Section 9.1)
             try:
                 self._save_manifest(simulation_id, manifest)
             except Exception as save_err:
-                audit_chain.rollback_last_event(audit_entry.curr_hash)
                 audit_chain.append_event(
                     event_type="MODEL_PROMOTION_FAILED",
                     actor=effective_operator or "system",
                     target_id=f"{simulation_id}:v{version}",
                     details={
+                        "mutation_id": mutation_id,
+                        "mutation_stage": "FAILED",
+                        "mutation_committed": False,
+                        "intent_event_id": intent_entry.event_id,
                         "simulation_id": simulation_id,
                         "version": version,
                         "error": str(save_err),
                         "action": "promote_version",
                         "decision": "FAILED",
-                        "mutation_committed": False,
                     },
                     actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
                     actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
@@ -2571,6 +2580,37 @@ class ModelRegistry:
                     decision="FAILED",
                 )
                 raise
+
+            # Finalize committed audit event
+            try:
+                audit_chain.append_event(
+                    event_type="MODEL_PROMOTION",
+                    actor=effective_operator or "system",
+                    target_id=f"{simulation_id}:v{version}",
+                    details={
+                        "mutation_id": mutation_id,
+                        "mutation_stage": "COMMITTED",
+                        "mutation_committed": True,
+                        "intent_event_id": intent_entry.event_id,
+                        "simulation_id": simulation_id,
+                        "version": version,
+                        "target_status": target_status,
+                        "promoted_by": effective_operator,
+                        "generation": target_entry.get("generation"),
+                        "action": "promote_version",
+                        "decision": "PROMOTED",
+                    },
+                    actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
+                    actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
+                    target_type="model_version",
+                    action="promote_version",
+                    decision="PROMOTED",
+                )
+            except Exception as audit_err:
+                logger.error("Failed to append final committed audit event for promotion: %s", audit_err)
+                raise AuditLedgerSecurityError(
+                    f"Critical audit failure: promotion for {simulation_id}:v{version} persisted but could not be finalized in audit ledger: {audit_err}"
+                ) from audit_err
 
             # Secondary global model link updated SECOND
             if target_status == "champion":
@@ -2766,45 +2806,54 @@ class ModelRegistry:
                 elif entry.get("status") == "champion":
                     entry["status"] = "inactive"
 
-            # Emit audit log event BEFORE saving manifest (fail-closed)
-            from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+            # Emit audit log event BEFORE saving manifest (Intent stage: PENDING)
+            mutation_id = f"mut_rb_{uuid.uuid4().hex}"
+            from app.infrastructure.security.immutable_audit_chain import (
+                AuditLedgerSecurityError,
+                ImmutableAuditChain,
+            )
 
             audit_chain = ImmutableAuditChain.get_instance()
-            audit_entry = audit_chain.append_event(
-                event_type="MODEL_ROLLBACK",
+            intent_entry = audit_chain.append_event(
+                event_type="MODEL_ROLLBACK_PENDING",
                 actor=effective_operator or "system",
                 target_id=f"{simulation_id}:v{version}",
                 details={
+                    "mutation_id": mutation_id,
+                    "mutation_stage": "PENDING",
+                    "mutation_committed": False,
                     "simulation_id": simulation_id,
                     "version": version,
                     "rolled_back_by": effective_operator,
                     "generation": target_entry.get("generation"),
                     "action": "rollback",
-                    "decision": "ROLLED_BACK",
+                    "decision": "PENDING",
                 },
                 actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
                 actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
                 target_type="model_version",
                 action="rollback",
-                decision="ROLLED_BACK",
+                decision="PENDING",
             )
 
             # Authoritative manifest is saved FIRST (Section 9.1)
             try:
                 self._save_manifest(simulation_id, manifest)
             except Exception as save_err:
-                audit_chain.rollback_last_event(audit_entry.curr_hash)
                 audit_chain.append_event(
                     event_type="MODEL_ROLLBACK_FAILED",
                     actor=effective_operator or "system",
                     target_id=f"{simulation_id}:v{version}",
                     details={
+                        "mutation_id": mutation_id,
+                        "mutation_stage": "FAILED",
+                        "mutation_committed": False,
+                        "intent_event_id": intent_entry.event_id,
                         "simulation_id": simulation_id,
                         "version": version,
                         "error": str(save_err),
                         "action": "rollback",
                         "decision": "FAILED",
-                        "mutation_committed": False,
                     },
                     actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
                     actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
@@ -2813,6 +2862,36 @@ class ModelRegistry:
                     decision="FAILED",
                 )
                 raise
+
+            # Finalize committed audit event
+            try:
+                audit_chain.append_event(
+                    event_type="MODEL_ROLLBACK",
+                    actor=effective_operator or "system",
+                    target_id=f"{simulation_id}:v{version}",
+                    details={
+                        "mutation_id": mutation_id,
+                        "mutation_stage": "COMMITTED",
+                        "mutation_committed": True,
+                        "intent_event_id": intent_entry.event_id,
+                        "simulation_id": simulation_id,
+                        "version": version,
+                        "rolled_back_by": effective_operator,
+                        "generation": target_entry.get("generation"),
+                        "action": "rollback",
+                        "decision": "ROLLED_BACK",
+                    },
+                    actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
+                    actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
+                    target_type="model_version",
+                    action="rollback",
+                    decision="ROLLED_BACK",
+                )
+            except Exception as audit_err:
+                logger.error("Failed to append final committed audit event for rollback: %s", audit_err)
+                raise AuditLedgerSecurityError(
+                    f"Critical audit failure: rollback for {simulation_id}:v{version} persisted but could not be finalized in audit ledger: {audit_err}"
+                ) from audit_err
 
             # Secondary global model link updated SECOND
             try:
@@ -3352,15 +3431,22 @@ class ModelRegistry:
                 entry["is_active"] = False
                 entry["status"] = "inactive"
 
-            # Emit audit log event with rollback protection if business persistence fails
-            from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+            # Emit audit log event BEFORE persisting manifest (Intent stage: PENDING)
+            mutation_id = f"mut_rev_{uuid.uuid4().hex}"
+            from app.infrastructure.security.immutable_audit_chain import (
+                AuditLedgerSecurityError,
+                ImmutableAuditChain,
+            )
 
             audit_chain = ImmutableAuditChain.get_instance()
-            audit_entry = audit_chain.append_event(
-                event_type="MODEL_SIGNOFF_REVOCATION",
+            intent_entry = audit_chain.append_event(
+                event_type="MODEL_SIGNOFF_REVOCATION_PENDING",
                 actor=verified_actor,
                 target_id=f"{simulation_id}:v{version}",
                 details={
+                    "mutation_id": mutation_id,
+                    "mutation_stage": "PENDING",
+                    "mutation_committed": False,
                     "simulation_id": simulation_id,
                     "version": version,
                     "role": norm_role,
@@ -3370,24 +3456,27 @@ class ModelRegistry:
                     "actor_institution": actor_institution,
                     "authority_type": authority_type,
                     "action": "revoke_sign_off",
-                    "decision": "REVOKED",
+                    "decision": "PENDING",
                 },
                 actor_type=actor_type,
                 actor_institution=actor_institution,
                 target_type="model_version",
                 action="revoke_sign_off",
-                decision="REVOKED",
+                decision="PENDING",
             )
 
             try:
                 self._save_manifest(simulation_id, manifest)
             except Exception as save_err:
-                audit_chain.rollback_last_event(audit_entry.curr_hash)
                 audit_chain.append_event(
                     event_type="MODEL_SIGNOFF_REVOCATION_FAILED",
                     actor=verified_actor,
                     target_id=f"{simulation_id}:v{version}",
                     details={
+                        "mutation_id": mutation_id,
+                        "mutation_stage": "FAILED",
+                        "mutation_committed": False,
+                        "intent_event_id": intent_entry.event_id,
                         "simulation_id": simulation_id,
                         "version": version,
                         "role": norm_role,
@@ -3395,7 +3484,6 @@ class ModelRegistry:
                         "error": str(save_err),
                         "action": "revoke_sign_off",
                         "decision": "FAILED",
-                        "mutation_committed": False,
                     },
                     actor_type=actor_type,
                     actor_institution=actor_institution,
@@ -3404,6 +3492,40 @@ class ModelRegistry:
                     decision="FAILED",
                 )
                 raise
+
+            # Finalize committed audit event
+            try:
+                audit_chain.append_event(
+                    event_type="MODEL_SIGNOFF_REVOCATION",
+                    actor=verified_actor,
+                    target_id=f"{simulation_id}:v{version}",
+                    details={
+                        "mutation_id": mutation_id,
+                        "mutation_stage": "COMMITTED",
+                        "mutation_committed": True,
+                        "intent_event_id": intent_entry.event_id,
+                        "simulation_id": simulation_id,
+                        "version": version,
+                        "role": norm_role,
+                        "revoked_by": verified_actor,
+                        "reason": reason,
+                        "actor_type": actor_type,
+                        "actor_institution": actor_institution,
+                        "authority_type": authority_type,
+                        "action": "revoke_sign_off",
+                        "decision": "REVOKED",
+                    },
+                    actor_type=actor_type,
+                    actor_institution=actor_institution,
+                    target_type="model_version",
+                    action="revoke_sign_off",
+                    decision="REVOKED",
+                )
+            except Exception as audit_err:
+                logger.error("Failed to append final committed audit event for revocation: %s", audit_err)
+                raise AuditLedgerSecurityError(
+                    f"Critical audit failure: sign-off revocation for {simulation_id}:v{version} persisted but could not be finalized in audit ledger: {audit_err}"
+                ) from audit_err
 
             # Invalidate caches
             with contextlib.suppress(Exception):
@@ -3467,28 +3589,89 @@ class ModelRegistry:
                 max_gen = max((e.get("generation", 0) for e in manifest), default=0)
                 entry["generation"] = max_gen + 1
 
-            # Emit audit event BEFORE saving manifest (fail-closed)
-            from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+            # Emit audit event BEFORE saving manifest (Intent stage: PENDING)
+            mutation_id = f"mut_vrev_{uuid.uuid4().hex}"
+            from app.infrastructure.security.immutable_audit_chain import (
+                AuditLedgerSecurityError,
+                ImmutableAuditChain,
+            )
 
-            ImmutableAuditChain.get_instance().append_event(
-                event_type="MODEL_VERSION_REVOCATION",
+            audit_chain = ImmutableAuditChain.get_instance()
+            intent_entry = audit_chain.append_event(
+                event_type="MODEL_VERSION_REVOCATION_PENDING",
                 actor=effective_actor,
                 target_id=f"{simulation_id}:v{version}",
                 details={
+                    "mutation_id": mutation_id,
+                    "mutation_stage": "PENDING",
+                    "mutation_committed": False,
                     "simulation_id": simulation_id,
                     "version": version,
                     "reason": reason,
                     "action": "revoke_version",
-                    "decision": "REVOKED",
+                    "decision": "PENDING",
                 },
                 actor_type=actor_type,
                 actor_institution=actor_inst,
                 target_type="model_version",
                 action="revoke_version",
-                decision="REVOKED",
+                decision="PENDING",
             )
 
-            self._save_manifest(simulation_id, manifest)
+            try:
+                self._save_manifest(simulation_id, manifest)
+            except Exception as save_err:
+                audit_chain.append_event(
+                    event_type="MODEL_VERSION_REVOCATION_FAILED",
+                    actor=effective_actor,
+                    target_id=f"{simulation_id}:v{version}",
+                    details={
+                        "mutation_id": mutation_id,
+                        "mutation_stage": "FAILED",
+                        "mutation_committed": False,
+                        "intent_event_id": intent_entry.event_id,
+                        "simulation_id": simulation_id,
+                        "version": version,
+                        "error": str(save_err),
+                        "action": "revoke_version",
+                        "decision": "FAILED",
+                    },
+                    actor_type=actor_type,
+                    actor_institution=actor_inst,
+                    target_type="model_version",
+                    action="revoke_version",
+                    decision="FAILED",
+                )
+                raise
+
+            # Finalize committed audit event
+            try:
+                audit_chain.append_event(
+                    event_type="MODEL_VERSION_REVOCATION",
+                    actor=effective_actor,
+                    target_id=f"{simulation_id}:v{version}",
+                    details={
+                        "mutation_id": mutation_id,
+                        "mutation_stage": "COMMITTED",
+                        "mutation_committed": True,
+                        "intent_event_id": intent_entry.event_id,
+                        "simulation_id": simulation_id,
+                        "version": version,
+                        "reason": reason,
+                        "action": "revoke_version",
+                        "decision": "REVOKED",
+                    },
+                    actor_type=actor_type,
+                    actor_institution=actor_inst,
+                    target_type="model_version",
+                    action="revoke_version",
+                    decision="REVOKED",
+                )
+            except Exception as audit_err:
+                logger.error("Failed to append final committed audit event for version revocation: %s", audit_err)
+                raise AuditLedgerSecurityError(
+                    f"Critical audit failure: model version revocation for {simulation_id}:v{version} persisted but could not be finalized in audit ledger: {audit_err}"
+                ) from audit_err
 
             from app.config import get_settings
 
@@ -3508,6 +3691,111 @@ class ModelRegistry:
                 clear_all_serving_caches()
 
             return entry
+
+    def reconcile_incomplete_mutations(self, simulation_id: str | None = None) -> list[dict[str, Any]]:
+        """Scan audit chain for interrupted mutations and resolve them truthfully based on persisted disk state."""
+        from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+        audit_chain = ImmutableAuditChain.get_instance()
+        pending = audit_chain.get_pending_mutations()
+        reconciled = []
+
+        for p in pending:
+            details = p.details or {}
+            mut_id = details.get("mutation_id")
+            sim_id = details.get("simulation_id")
+            if not mut_id or not isinstance(mut_id, str) or not sim_id:
+                continue
+            if simulation_id and sim_id != simulation_id:
+                continue
+
+            ver = details.get("version")
+            action = str(details.get("action", ""))
+            manifest = self._load_manifest(sim_id)
+            target = next((e for e in manifest if e.get("version") == ver), None)
+
+            committed = False
+            if action == "revoke_sign_off" and target:
+                role = details.get("role")
+                norm_role = "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
+                matching_s = [
+                    s for s in target.get("sign_offs", [])
+                    if ("compliance" if s["role"] in ("compliance", "compliance_officer") else "ml_engineer") == norm_role
+                ]
+                if matching_s and all(s.get("is_revoked") is True for s in matching_s):
+                    committed = True
+            elif action == "promote_version" and target:
+                target_status = details.get("target_status")
+                if target.get("status") == target_status:
+                    committed = True
+            elif action == "rollback" and target:
+                if target.get("status") == "champion" and target.get("is_active") is True:
+                    committed = True
+            elif action == "revoke_version" and target:
+                if target.get("is_revoked") is True:
+                    committed = True
+
+            if committed:
+                if action == "revoke_sign_off":
+                    event_type, decision = "MODEL_SIGNOFF_REVOCATION", "REVOKED"
+                elif action == "promote_version":
+                    event_type, decision = "MODEL_PROMOTION", "PROMOTED"
+                elif action == "rollback":
+                    event_type, decision = "MODEL_ROLLBACK", "ROLLED_BACK"
+                else:
+                    event_type, decision = "MODEL_VERSION_REVOCATION", "REVOKED"
+
+                audit_chain.append_event(
+                    event_type=event_type,
+                    actor=p.actor,
+                    target_id=p.target_id,
+                    details={
+                        **details,
+                        "mutation_stage": "COMMITTED",
+                        "mutation_committed": True,
+                        "intent_event_id": p.event_id,
+                        "reconciled": True,
+                        "decision": decision,
+                    },
+                    actor_type=p.actor_type,
+                    actor_institution=p.actor_institution,
+                    target_type=p.target_type,
+                    action=action,
+                    decision=decision,
+                )
+                reconciled.append({"mutation_id": mut_id, "status": "COMMITTED"})
+            else:
+                if action == "revoke_sign_off":
+                    event_type = "MODEL_SIGNOFF_REVOCATION_FAILED"
+                elif action == "promote_version":
+                    event_type = "MODEL_PROMOTION_FAILED"
+                elif action == "rollback":
+                    event_type = "MODEL_ROLLBACK_FAILED"
+                else:
+                    event_type = "MODEL_VERSION_REVOCATION_FAILED"
+
+                audit_chain.append_event(
+                    event_type=event_type,
+                    actor=p.actor,
+                    target_id=p.target_id,
+                    details={
+                        **details,
+                        "mutation_stage": "FAILED",
+                        "mutation_committed": False,
+                        "intent_event_id": p.event_id,
+                        "reconciled": True,
+                        "error": "Process terminated prior to business persistence completion",
+                        "decision": "FAILED",
+                    },
+                    actor_type=p.actor_type,
+                    actor_institution=p.actor_institution,
+                    target_type=p.target_type,
+                    action=action,
+                    decision="FAILED",
+                )
+                reconciled.append({"mutation_id": mut_id, "status": "FAILED"})
+
+        return reconciled
 
 
 class ModelEvaluationEngine:

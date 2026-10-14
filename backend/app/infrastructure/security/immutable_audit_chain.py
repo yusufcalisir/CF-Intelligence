@@ -697,6 +697,34 @@ class ImmutableAuditChain:
             )
             return True
 
+    def get_pending_mutations(self) -> list[AuditLogEntry]:
+        """Return all audit events for mutations that began (PENDING) but never finalized (COMMITTED or FAILED)."""
+        file_lock = _get_audit_file_lock(self._lock_path) if self._lock_path else contextlib.nullcontext()
+        with self._lock, file_lock:
+            self._reload_unlocked()
+            resolved_mutation_ids: set[str] = set()
+            pending_entries: dict[str, AuditLogEntry] = {}
+
+            for entry in self.chain:
+                details = entry.details or {}
+                mut_id = details.get("mutation_id")
+                if not mut_id or not isinstance(mut_id, str):
+                    continue
+                stage = details.get("mutation_stage")
+                if stage == "PENDING" or entry.decision == "PENDING":
+                    pending_entries[mut_id] = entry
+                elif (
+                    stage in ("COMMITTED", "FAILED")
+                    or entry.decision in ("REVOKED", "PROMOTED", "ROLLED_BACK", "FAILED")
+                    or entry.event_type.endswith("_FAILED")
+                ):
+                    resolved_mutation_ids.add(mut_id)
+
+            return [
+                entry for mut_id, entry in pending_entries.items()
+                if mut_id not in resolved_mutation_ids
+            ]
+
     def append(
         self,
         event_type: str,
