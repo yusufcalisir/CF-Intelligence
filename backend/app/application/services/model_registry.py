@@ -689,12 +689,12 @@ class ModelRegistry:
                     # Fields not covered by the cryptographic signature (e.g. unauthenticated 'bank_id')
                     # cannot establish institutional authority.
                     clean_rcpt_bank = (
-                        str(receipt_obj.owning_bank_id).strip().lower()
+                        receipt_obj.owning_bank_id.strip().lower()
                         if receipt_obj.owning_bank_id
                         else ""
                     )
                     clean_rcpt_consortium = (
-                        str(receipt_obj.consortium_id).strip()
+                        receipt_obj.consortium_id.strip()
                         if receipt_obj.consortium_id
                         else ""
                     )
@@ -1115,10 +1115,11 @@ class ModelRegistry:
         has_recorded_evidence = _validate_training_evidence(training_run_id, training_evidence)
 
         attestation_status = "NONE"
-        if receipt_obj is not None or receipt_dict is not None:
+        target_rcpt = receipt_obj if receipt_obj is not None else receipt_dict
+        if target_rcpt is not None:
             verifier = self._verifier or get_default_training_verifier()
             is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
-                receipt_obj if receipt_obj is not None else receipt_dict,
+                target_rcpt,
                 candidate_artifact_sha256=None,
                 simulation_id=simulation_id,
                 expected_architecture=exp_arch,
