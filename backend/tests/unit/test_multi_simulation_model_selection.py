@@ -11,7 +11,8 @@ Verifies:
 
 from __future__ import annotations
 
-import os
+from pathlib import Path
+
 import pytest
 import torch
 from fastapi.testclient import TestClient
@@ -25,7 +26,7 @@ from app.presentation.routers.predict import clear_all_serving_caches
 
 
 @pytest.fixture
-def clean_registry(tmp_path: os.PathLike[str]) -> ModelRegistry:
+def clean_registry(tmp_path: Path) -> ModelRegistry:
     storage_dir = str(tmp_path / "storage")
     reg = ModelRegistry(storage_dir=storage_dir)
     return reg
@@ -224,7 +225,7 @@ class TestMultiSimulationServingEndpoint:
 
     @pytest.fixture(autouse=True)
     def setup_serving_env(
-        self, tmp_path: os.PathLike[str], monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         clear_all_serving_caches()
         storage_dir = str(tmp_path / "storage")

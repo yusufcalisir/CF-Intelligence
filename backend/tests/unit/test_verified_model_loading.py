@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
+
 import pytest
 import torch
 
@@ -22,7 +24,7 @@ from app.domain.model_serving_errors import ModelIntegrityError
 
 
 @pytest.fixture
-def clean_registry(tmp_path: os.PathLike[str]) -> ModelRegistry:
+def clean_registry(tmp_path: Path) -> ModelRegistry:
     storage_dir = str(tmp_path / "storage")
     return ModelRegistry(storage_dir=storage_dir)
 

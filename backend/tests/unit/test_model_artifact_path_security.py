@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import os
 import stat
-import tempfile
+from pathlib import Path
+
 import pytest
 
 from app.application.services.model_registry import (
@@ -72,7 +73,7 @@ class TestSimulationIdentifierValidation:
 class TestRegistryPathContainment:
     """Verifies filesystem path containment under authoritative registry root."""
 
-    def test_get_sim_dir_containment_under_registry_root(self, tmp_path: os.PathLike[str]) -> None:
+    def test_get_sim_dir_containment_under_registry_root(self, tmp_path: Path) -> None:
         storage_dir = str(tmp_path / "storage")
         reg = ModelRegistry(storage_dir=storage_dir)
 
@@ -84,14 +85,14 @@ class TestRegistryPathContainment:
         canonical_root = os.path.realpath(reg.registry_root)
         assert os.path.commonpath([canonical_sim_dir, canonical_root]) == canonical_root
 
-    def test_traversal_attempt_in_get_sim_dir_raises_value_error(self, tmp_path: os.PathLike[str]) -> None:
+    def test_traversal_attempt_in_get_sim_dir_raises_value_error(self, tmp_path: Path) -> None:
         storage_dir = str(tmp_path / "storage")
         reg = ModelRegistry(storage_dir=storage_dir)
 
         with pytest.raises(ValueError):
             reg._get_sim_dir("../escaped_dir")
 
-    def test_symlink_pointing_outside_registry_root_rejected(self, tmp_path: os.PathLike[str]) -> None:
+    def test_symlink_pointing_outside_registry_root_rejected(self, tmp_path: Path) -> None:
         storage_dir = str(tmp_path / "storage")
         external_dir = str(tmp_path / "external_target")
         os.makedirs(external_dir, exist_ok=True)
@@ -109,7 +110,7 @@ class TestRegistryPathContainment:
             reg._get_sim_dir(sim_id, create=False)
 
     def test_read_only_lookups_do_not_create_directories_as_side_effect(
-        self, tmp_path: os.PathLike[str]
+        self, tmp_path: Path
     ) -> None:
         storage_dir = str(tmp_path / "storage")
         reg = ModelRegistry(storage_dir=storage_dir)
@@ -143,7 +144,7 @@ class TestRegistryPathContainment:
 class TestSecureStoragePermissions:
     """Verifies storage permissions and production fail-closed behavior."""
 
-    def test_registry_directory_permissions_least_privilege(self, tmp_path: os.PathLike[str]) -> None:
+    def test_registry_directory_permissions_least_privilege(self, tmp_path: Path) -> None:
         storage_dir = str(tmp_path / "storage")
         reg = ModelRegistry(storage_dir=storage_dir)
         sim_dir = reg._get_sim_dir("sim_perms_test", create=True)
@@ -155,7 +156,7 @@ class TestSecureStoragePermissions:
             assert mode == 0o700, f"Expected 0o700 least-privilege mode, got {oct(mode)}"
 
     def test_production_fails_closed_when_storage_unwritable(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: os.PathLike[str]
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         monkeypatch.setenv("APP_ENV", "production")
         unwritable_path = str(tmp_path / "read_only_storage" / "does_not_exist" / "deep")

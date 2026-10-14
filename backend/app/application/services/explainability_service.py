@@ -257,7 +257,6 @@ class ExplainabilityService:
                     except ValueError as str_err:
                         raise ValueError(f"Invalid numeric value for feature '{k_feat}': {v_feat}") from str_err
 
-        import os
 
         import torch
 

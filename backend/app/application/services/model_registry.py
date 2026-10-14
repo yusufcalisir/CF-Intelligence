@@ -9,10 +9,10 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import hmac
+import io
 import json
 import logging
 import math
-import io
 import os
 import re
 import shutil

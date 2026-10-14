@@ -7,12 +7,9 @@ computes risk scores, generates explainability reports, and triggers alerts.
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import hmac
 import io
 import logging
 import math
-import os
 import random
 import threading
 import time
