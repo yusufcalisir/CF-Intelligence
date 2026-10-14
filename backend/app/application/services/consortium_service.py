@@ -13,7 +13,6 @@ from typing import Any
 from app.domain.consortium_governance import (
     Consortium,
     ConsortiumMember,
-    ConsortiumSecurityError,
     ConsortiumStatus,
     MemberRole,
     MembershipProposal,

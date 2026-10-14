@@ -19,16 +19,15 @@ from __future__ import annotations
 
 import contextlib
 import datetime
-from datetime import UTC
 import hashlib
 import json
 import logging
 import os
-import shutil
-import tempfile
 import threading
-from typing import Any, Callable, Generator, TypeVar
 import uuid
+from collections.abc import Callable, Generator
+from datetime import UTC
+from typing import Any, TypeVar
 
 from filelock import FileLock
 
@@ -174,7 +173,7 @@ class DurableConsortiumStore:
             "consortium_id": c.consortium_id,
             "name": c.name,
             "quorum_ratio": float(c.quorum_ratio),
-            "min_members_n": int(c.min_members_n),
+            "min_members_n": c.min_members_n,
             "max_epsilon": float(c.max_epsilon),
             "status": c.status.value if hasattr(c.status, "value") else str(c.status),
             "members": members_dict,
@@ -219,7 +218,7 @@ class DurableConsortiumStore:
             "votes_against": sorted(list(p.votes_against)),
             "status": p.status.value if hasattr(p.status, "value") else str(p.status),
             "created_at": p.created_at.isoformat() if hasattr(p.created_at, "isoformat") else str(p.created_at),
-            "ttl_seconds": int(p.ttl_seconds),
+            "ttl_seconds": p.ttl_seconds,
             "expires_at": p.expires_at.isoformat() if p.expires_at else None,
             "cancelled_at": p.cancelled_at.isoformat() if p.cancelled_at else None,
             "rejection_reason": p.rejection_reason,
