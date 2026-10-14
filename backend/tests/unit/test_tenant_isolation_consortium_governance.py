@@ -95,8 +95,8 @@ def tenant_env():
 
     settings = get_settings()
     nonce_path = os.path.join(temp_dir, "nonces.json")
-    old_nonce_path = getattr(settings, "internal_nonce_store_path", None)
-    old_internal_secret = getattr(settings, "internal_context_signing_secret", None)
+    old_nonce_path = settings.internal_nonce_store_path
+    old_internal_secret = settings.internal_context_signing_secret
     settings.internal_nonce_store_path = nonce_path
     settings.internal_context_signing_secret = TEST_SIGNING_SECRET
     reset_default_nonce_store()
