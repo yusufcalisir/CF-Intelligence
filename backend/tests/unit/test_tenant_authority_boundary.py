@@ -162,8 +162,15 @@ def _create_verified_candidate(
         architecture="FraudDetectionNN",
         feature_schema_version="v1.0",
         feature_names=FEATURE_NAMES,
+        owning_bank_id=owning_bank_id,
+        consortium_id=consortium_id,
     )
-    receipt = issuer.issue_receipt(evidence=evidence, model_bytes=raw_bytes).to_dict()
+    receipt = issuer.issue_receipt(
+        evidence=evidence,
+        model_bytes=raw_bytes,
+        owning_bank_id=owning_bank_id,
+        consortium_id=consortium_id,
+    ).to_dict()
 
     entry = registry.save_version(
         simulation_id=sim_id,

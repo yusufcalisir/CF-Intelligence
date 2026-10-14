@@ -178,8 +178,13 @@ def _create_candidate_model(env: dict[str, Any], sim_id: str, version: int = 1) 
             architecture="FraudDetectionNN",
             feature_schema_version="v1.0",
             feature_names=FEATURE_NAMES,
+            owning_bank_id="bank_a",
         )
-        receipt = issuer.issue_receipt(evidence=evidence, model_bytes=model_bytes).to_dict()
+        receipt = issuer.issue_receipt(
+            evidence=evidence,
+            model_bytes=model_bytes,
+            owning_bank_id="bank_a",
+        ).to_dict()
 
         entry = reg.save_version(
             simulation_id=sim_id,
@@ -188,6 +193,7 @@ def _create_candidate_model(env: dict[str, Any], sim_id: str, version: int = 1) 
             artifact_bytes=model_bytes,
             training_receipt=receipt,
             is_promoted=False,
+            owning_bank_id="bank_a",
         )
         model_path = os.path.join(reg._get_sim_dir(sim_id), entry["filename"])
         return sha256, model_path

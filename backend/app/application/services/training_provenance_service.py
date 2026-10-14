@@ -90,6 +90,8 @@ class TrainingExecutionEvidence:
     status: str = "COMPLETED"
     git_commit_hash: str | None = None
     dataset_manifest_id: str | None = None
+    owning_bank_id: str | None = None
+    consortium_id: str | None = None
 
     def __post_init__(self) -> None:
         """Enforce strict immutability on nested collections."""
@@ -1941,10 +1943,12 @@ class TrainingExecutionReceipt:
     signature_scheme: str = "Ed25519"
     git_commit_hash: str | None = None
     dataset_manifest_id: str | None = None
+    owning_bank_id: str | None = None
+    consortium_id: str | None = None
 
     def canonical_dict(self) -> dict[str, Any]:
         """Return dict of signed fields without signature."""
-        return {
+        d = {
             "receipt_id": self.receipt_id,
             "training_run_id": self.training_run_id,
             "job_id": self.job_id,
@@ -1966,6 +1970,11 @@ class TrainingExecutionReceipt:
             "dataset_manifest_id": self.dataset_manifest_id,
             "key_id": self.key_id,
         }
+        if self.owning_bank_id is not None:
+            d["owning_bank_id"] = self.owning_bank_id
+        if self.consortium_id is not None:
+            d["consortium_id"] = self.consortium_id
+        return d
 
     def canonical_bytes(self) -> bytes:
         return json.dumps(self.canonical_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -2049,6 +2058,8 @@ class TrainingExecutionReceipt:
             signature_scheme=str(data.get("signature_scheme", "Ed25519")),
             git_commit_hash=data.get("git_commit_hash"),
             dataset_manifest_id=data.get("dataset_manifest_id"),
+            owning_bank_id=data.get("owning_bank_id"),
+            consortium_id=data.get("consortium_id"),
         )
 
 
@@ -2178,13 +2189,22 @@ class TrainingReceiptIssuer:
         dp_noise_profile: Any = None,
         evidence: TrainingExecutionEvidence | None = None,
         status: str = "COMPLETED",
+        owning_bank_id: str | None = None,
+        consortium_id: str | None = None,
     ) -> TrainingExecutionReceipt:
         """Issue an authenticated training execution receipt signed with Ed25519 private key."""
         settings = get_settings()
         is_prod = settings.app_env.lower() == "production"
 
+        target_owning_bank = owning_bank_id
+        target_consortium = consortium_id
+
         if evidence is not None:
             evidence.validate()
+            if getattr(evidence, "owning_bank_id", None) and target_owning_bank is None:
+                target_owning_bank = evidence.owning_bank_id
+            if getattr(evidence, "consortium_id", None) and target_consortium is None:
+                target_consortium = evidence.consortium_id
             target_run_id = evidence.training_run_id
             target_job_id = evidence.job_id
             target_sim_id = evidence.simulation_id
@@ -2443,6 +2463,10 @@ class TrainingReceiptIssuer:
             "dataset_manifest_id": target_manifest,
             "key_id": self.key_id,
         }
+        if target_owning_bank is not None:
+            receipt_data["owning_bank_id"] = target_owning_bank
+        if target_consortium is not None:
+            receipt_data["consortium_id"] = target_consortium
         canonical_bytes = json.dumps(receipt_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
         sig_bytes = self._private_key.sign(canonical_bytes)
         signature = sig_bytes.hex()
@@ -2470,6 +2494,8 @@ class TrainingReceiptIssuer:
             key_id=self.key_id,
             signature=signature,
             signature_scheme="Ed25519",
+            owning_bank_id=target_owning_bank,
+            consortium_id=target_consortium,
         )
 
 

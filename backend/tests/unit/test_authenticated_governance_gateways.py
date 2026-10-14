@@ -51,6 +51,7 @@ def auth_gateway_env():
             access_token_expire_minutes=15,
             refresh_token_expire_days=7,
         )
+        AuthenticationService._instance = auth_svc
         store = auth_svc.identity_store
 
         test_registry = ModelRegistry(storage_dir=reg_dir)
@@ -85,7 +86,7 @@ def auth_gateway_env():
         demoted_rec.roles = ["analyst"]
         store.save_user(demoted_rec)
 
-        # Seed models in registry
+        # Seed models in registry with authentic Bank A authority
         sim_id = "sim_gate_test"
         v1 = test_registry.save_version(
             simulation_id=sim_id,
@@ -93,6 +94,7 @@ def auth_gateway_env():
             metrics={"auc_roc": 0.85, "auc": 0.85, "f1_score": 0.80},
             is_promoted=False,
             owning_bank_id="bank_a",
+            auth_token=tokens["admin"],
         )
         v2 = test_registry.save_version(
             simulation_id=sim_id,
@@ -100,6 +102,7 @@ def auth_gateway_env():
             metrics={"auc_roc": 0.90, "auc": 0.90, "f1_score": 0.85},
             is_promoted=False,
             owning_bank_id="bank_a",
+            auth_token=tokens["admin"],
         )
 
         # Patch application singletons

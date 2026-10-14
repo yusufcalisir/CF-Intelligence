@@ -25,6 +25,7 @@ from typing import Any
 import torch
 from filelock import FileLock
 
+from app.application.services.consortium_service import consortium_governance_service
 from app.application.services.training_provenance_service import (
     DOMAIN_APPROVAL_SIGNOFF,
     TrainingExecutionReceipt,
@@ -584,6 +585,136 @@ class ModelRegistry:
                 "is_unbound": True,
             }
 
+    def _verify_initial_ownership_authority(
+        self,
+        simulation_id: str,
+        clean_bank: str | None,
+        clean_consortium: str | None,
+        auth_token: str | None = None,
+        trusted_context: TrustedInternalContext | None = None,
+        training_receipt: dict[str, Any] | TrainingExecutionReceipt | None = None,
+    ) -> tuple[bool, str]:
+        """Verify that genuine institutional authority exists to initially bind ownership.
+
+        Returns:
+            (has_authority, effective_bound_by_or_reason)
+        """
+        # 1. Trusted Internal Context (e.g. training orchestrator, consortium coordinator)
+        if trusted_context is not None:
+            is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                trusted_context, expected_action="bind_ownership"
+            )
+            if not is_valid_ctx:
+                is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                    trusted_context, expected_action="register_model"
+                )
+            if not is_valid_ctx:
+                is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                    trusted_context, expected_action="save_version"
+                )
+            if is_valid_ctx:
+                return True, f"internal:{trusted_context.service_name}"
+            return False, f"invalid_trusted_context: {ctx_reason}"
+
+        # 2. Authenticated Principal Identity (DurableAccountStore Bearer JWT)
+        if auth_token is not None:
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            auth_svc = AuthenticationService.get_instance()
+            is_valid, claims, err = auth_svc.verify_access_token(auth_token)
+            if not is_valid or not claims:
+                return False, f"invalid_token: {err}"
+
+            uname = (claims.get("username") or claims.get("sub") or "").strip()
+            user_rec = auth_svc.get_user(uname)
+            if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
+                return False, f"inactive_user: {uname}"
+
+            user_bank = (getattr(user_rec, "bank_id", "") or "").lower().strip()
+            user_roles = {r.lower().strip() for r in getattr(user_rec, "roles", [])}
+            allowed_roles = {"admin", "ml_lead", "ml_engineer"}
+            if not (user_roles & allowed_roles):
+                return False, f"insufficient_role: user '{uname}' lacks registration role ({user_roles})"
+
+            if clean_bank and clean_consortium:
+                if user_bank != clean_bank.lower():
+                    return False, f"bank_mismatch: user '{uname}' belongs to '{user_bank}', cannot register for '{clean_bank}'"
+
+                c = consortium_governance_service.get_consortium(clean_consortium)
+                if not c:
+                    return False, f"unknown_consortium: '{clean_consortium}'"
+                member_banks = [m.lower().strip() for m in c.members]
+                if user_bank not in member_banks:
+                    return False, f"consortium_membership_required: user bank '{user_bank}' not in consortium '{clean_consortium}'"
+                return True, f"user:{uname} ({clean_bank}, consortium:{clean_consortium})"
+            elif clean_bank:
+                if user_bank != clean_bank.lower():
+                    return False, f"bank_mismatch: user '{uname}' belongs to '{user_bank}', cannot register for '{clean_bank}'"
+                return True, f"user:{uname} ({clean_bank})"
+            elif clean_consortium:
+                c = consortium_governance_service.get_consortium(clean_consortium)
+                if not c:
+                    return False, f"unknown_consortium: '{clean_consortium}'"
+                member_banks = [m.lower().strip() for m in c.members]
+                if user_bank not in member_banks:
+                    return False, f"consortium_membership_required: user bank '{user_bank}' not in consortium '{clean_consortium}'"
+                return True, f"consortium_member:{uname} ({user_bank})"
+
+        # 3. Cryptographically Verified Training Receipt with Signed Institutional Claims
+        if training_receipt is not None:
+            receipt_dict: dict[str, Any] | None = None
+            if isinstance(training_receipt, TrainingExecutionReceipt):
+                receipt_dict = training_receipt.to_dict()
+            elif isinstance(training_receipt, dict):
+                receipt_dict = dict(training_receipt)
+
+            if receipt_dict is not None:
+                verifier = self._verifier or get_default_training_verifier()
+                is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
+                    receipt_dict,
+                    simulation_id=simulation_id,
+                )
+                if is_valid_rcpt:
+                    rcpt_bank = (
+                        receipt_dict.get("owning_bank_id")
+                        or receipt_dict.get("bank_id")
+                        or ""
+                    )
+                    rcpt_consortium = receipt_dict.get("consortium_id") or ""
+                    clean_rcpt_bank = str(rcpt_bank).strip().lower() if rcpt_bank else ""
+                    clean_rcpt_consortium = str(rcpt_consortium).strip() if rcpt_consortium else ""
+
+                    if clean_bank and clean_consortium:
+                        bank_ok = clean_rcpt_bank and clean_rcpt_bank == clean_bank.lower()
+                        cons_ok = clean_rcpt_consortium and clean_rcpt_consortium == clean_consortium
+                        if bank_ok and cons_ok:
+                            rcpt_id = receipt_dict.get("receipt_id") or "verified_receipt"
+                            return True, f"receipt:{rcpt_id} ({clean_bank}, consortium:{clean_consortium})"
+                        return False, (
+                            f"receipt_claim_mismatch: receipt binds bank '{clean_rcpt_bank or 'none'}' and "
+                            f"consortium '{clean_rcpt_consortium or 'none'}', cannot authenticate claimed '{clean_bank}' / '{clean_consortium}'"
+                        )
+                    elif clean_bank:
+                        if clean_rcpt_bank and clean_rcpt_bank == clean_bank.lower():
+                            rcpt_id = receipt_dict.get("receipt_id") or "verified_receipt"
+                            return True, f"receipt:{rcpt_id} ({clean_bank})"
+                        return False, (
+                            f"receipt_claim_mismatch: receipt binds bank '{clean_rcpt_bank or 'none'}', "
+                            f"cannot authenticate claimed bank '{clean_bank}'"
+                        )
+                    elif clean_consortium:
+                        if clean_rcpt_consortium and clean_rcpt_consortium == clean_consortium:
+                            rcpt_id = receipt_dict.get("receipt_id") or "verified_receipt"
+                            return True, f"receipt:{rcpt_id} (consortium:{clean_consortium})"
+                        return False, (
+                            f"receipt_claim_mismatch: receipt binds consortium '{clean_rcpt_consortium or 'none'}', "
+                            f"cannot authenticate claimed consortium '{clean_consortium}'"
+                        )
+                else:
+                    return False, f"invalid_training_receipt: {rcpt_reason}"
+
+        return False, "no verifiable institutional authority provided (auth_token, trusted_context, or authenticating receipt)"
+
     def bind_simulation_ownership(
         self,
         simulation_id: str,
@@ -592,7 +723,8 @@ class ModelRegistry:
         bound_by: str | None = None,
         auth_token: str | None = None,
         trusted_context: TrustedInternalContext | None = None,
-        _from_save_version: bool = False,
+        training_receipt: dict[str, Any] | TrainingExecutionReceipt | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Authoritatively bind simulation model artifacts to an owning bank or consortium."""
         clean_bank = owning_bank_id.strip() if isinstance(owning_bank_id, str) and owning_bank_id.strip() else None
@@ -647,55 +779,21 @@ class ModelRegistry:
                     )
             else:
                 # First-time ownership binding requires verifiable institutional evidence
-                has_init_authority = False
-                effective_bound_by = bound_by or "initial_binding"
-                if trusted_context is not None:
-                    is_valid_ctx, _ = verify_trusted_internal_context(
-                        trusted_context, expected_action="bind_ownership"
-                    )
-                    if not is_valid_ctx:
-                        is_valid_ctx, _ = verify_trusted_internal_context(
-                            trusted_context, expected_action="register_model"
-                        )
-                    if is_valid_ctx:
-                        has_init_authority = True
-                        effective_bound_by = f"internal:{trusted_context.service_name}"
-                elif auth_token is not None:
-                    from app.infrastructure.security.auth_service import AuthenticationService
-
-                    auth_svc = AuthenticationService.get_instance()
-                    is_valid, claims, _ = auth_svc.verify_access_token(auth_token)
-                    if is_valid and claims:
-                        uname = (claims.get("username") or claims.get("sub") or "").strip()
-                        user_rec = auth_svc.get_user(uname)
-                        if user_rec and user_rec.is_active and user_rec.status.lower() == "active":
-                            user_bank = (getattr(user_rec, "bank_id", "") or "").lower().strip()
-                            user_roles = {r.lower().strip() for r in getattr(user_rec, "roles", [])}
-                            if clean_bank and user_bank == clean_bank.lower() and (user_roles & {"admin", "ml_lead", "ml_engineer"}):
-                                has_init_authority = True
-                                effective_bound_by = f"user:{uname} ({clean_bank})"
-                            elif clean_consortium and (user_roles & {"admin", "ml_lead", "ml_engineer"}):
-                                from app.application.services.consortium_service import (
-                                    consortium_governance_service,
-                                )
-
-                                c = consortium_governance_service.get_consortium(clean_consortium)
-                                if c and user_bank in c.members:
-                                    has_init_authority = True
-                                    effective_bound_by = f"consortium_member:{uname} ({user_bank})"
-                elif _from_save_version or bound_by in ("save_version", "save_version_with_verified_receipt"):
-                    has_init_authority = True
-                    effective_bound_by = (
-                        "verified_training_receipt"
-                        if bound_by == "save_version_with_verified_receipt"
-                        else "save_version_registration"
-                    )
+                has_init_authority, auth_bound_by = self._verify_initial_ownership_authority(
+                    simulation_id=simulation_id,
+                    clean_bank=clean_bank,
+                    clean_consortium=clean_consortium,
+                    auth_token=auth_token,
+                    trusted_context=trusted_context,
+                    training_receipt=training_receipt,
+                )
 
                 if not has_init_authority:
                     raise ModelAuthorizationError(
                         f"Initial institutional ownership binding for model '{simulation_id}' rejected: "
-                        f"Requires verifiable institutional evidence (authenticated token, cryptographic training receipt, or trusted internal context)."
+                        f"Requires verifiable institutional authority ({auth_bound_by})."
                     )
+                effective_bound_by = auth_bound_by
 
             record = {
                 "simulation_id": simulation_id,
@@ -1035,6 +1133,21 @@ class ModelRegistry:
             )
             is_prod_eligible = False
 
+        if should_bind_initial:
+            has_init_auth, init_auth_reason = self._verify_initial_ownership_authority(
+                simulation_id=simulation_id,
+                clean_bank=effective_owning_bank,
+                clean_consortium=effective_consortium,
+                auth_token=auth_token,
+                trusted_context=trusted_context,
+                training_receipt=receipt_dict if has_valid_receipt else None,
+            )
+            if not has_init_auth:
+                raise ModelAuthorizationError(
+                    f"Initial institutional ownership binding for model '{simulation_id}' rejected: "
+                    f"Requires verifiable institutional authority ({init_auth_reason})."
+                )
+
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
 
@@ -1166,7 +1279,7 @@ class ModelRegistry:
                         bound_by=bound_by_label,
                         auth_token=auth_token,
                         trusted_context=trusted_context,
-                        _from_save_version=True,
+                        training_receipt=receipt_dict if has_valid_receipt else None,
                     )
 
                 manifest.append(entry)

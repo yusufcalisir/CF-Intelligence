@@ -177,8 +177,13 @@ def _seed_valid_candidate(ctx: dict[str, Any], sim_id: str) -> tuple[dict[str, A
             architecture="FraudDetectionNN",
             feature_schema_version="v1.0",
             feature_names=FEATURE_NAMES,
+            owning_bank_id="bank_a",
         )
-        receipt = issuer.issue_receipt(evidence=evidence, model_bytes=model_bytes).to_dict()
+        receipt = issuer.issue_receipt(
+            evidence=evidence,
+            model_bytes=model_bytes,
+            owning_bank_id="bank_a",
+        ).to_dict()
 
         entry = registry.save_version(
             simulation_id=sim_id,
