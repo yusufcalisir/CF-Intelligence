@@ -97,6 +97,11 @@ class Settings(BaseSettings):
     fedopt_beta1: float = 0.9
     fedopt_beta2: float = 0.999
     fedopt_tau: float = 1e-3
+    default_simulation_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("default_simulation_id", "cfi_default_simulation_id"),
+        description="Explicit platform-default simulation identifier for unscoped model serving and champion resolution.",
+    )
 
     # ── Candidate Model Evaluation & Quality Gate ─────────
     holdout_manifest_path: str = Field(

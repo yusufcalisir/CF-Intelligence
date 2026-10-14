@@ -22,6 +22,7 @@ import threading
 import time
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -196,21 +197,23 @@ def _worker_mutation_process(
     orig_save = reg._save_manifest
 
     if crash_stage == "BEFORE_PERSISTENCE":
-        def hooked_save(s_id, manifest):
+        def hooked_save_before(simulation_id: str, manifest: list[dict[str, Any]]) -> None:
             with open(barrier_reached_path, "w") as f:
                 f.write("PENDING_WRITTEN")
-            while True:
+            while not os.path.exists(barrier_reached_path + ".done"):
                 time.sleep(0.05)
-        reg._save_manifest = hooked_save
+
+        reg._save_manifest = hooked_save_before
 
     elif crash_stage == "AFTER_PERSISTENCE":
-        def hooked_save(s_id, manifest):
-            orig_save(s_id, manifest)
+        def hooked_save_after(simulation_id: str, manifest: list[dict[str, Any]]) -> None:
+            orig_save(simulation_id, manifest)
             with open(barrier_reached_path, "w") as f:
                 f.write("MANIFEST_PERSISTED")
-            while True:
+            while not os.path.exists(barrier_reached_path + ".done"):
                 time.sleep(0.05)
-        reg._save_manifest = hooked_save
+
+        reg._save_manifest = hooked_save_after
 
     with contextlib.suppress(BaseException):
         reg.revoke_version(

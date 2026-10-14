@@ -90,7 +90,8 @@ def _resolve_database_url(tenant: str | None) -> str:
         storage_dir = get_storage_dir()
         with contextlib.suppress(OSError):
             os.makedirs(storage_dir, exist_ok=True)
-            os.chmod(storage_dir, 0o777)  # nosec B103
+            if os.name != "nt":
+                os.chmod(storage_dir, 0o700)  # nosec B103
         db_name = f"cfi_{clean_tenant}.db" if clean_tenant else "cfi_central.db"
         db_path = os.path.abspath(os.path.join(storage_dir, db_name)).replace("\\", "/")
         return f"sqlite+aiosqlite:///{db_path}"

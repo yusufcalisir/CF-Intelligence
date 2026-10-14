@@ -262,46 +262,22 @@ class ExplainabilityService:
         import torch
 
         if model is None:
-            from app.infrastructure.storage.storage_utils import get_storage_dir
+            try:
+                from app.application.services.model_service import ModelService
+                from app.config import get_settings
 
-            model_dir = get_storage_dir()
-            model_path = os.path.join(model_dir, "global_model.pt")
+                svc = ModelService(get_settings())
+                model = svc.get_champion(dp_compatible=True)
+            except Exception as e:
+                logger.warning("No verified champion model available for SHAP: %s", e)
+                model = None
 
-            if os.path.exists(model_path):
-                try:
-                    from app.application.services.model_service import (
-                        NUM_FEATURES,
-                        FraudDetectionModel,
-                    )
+            if model is None:
+                from app.domain.model_serving_errors import ModelNotAvailableError
 
-                    state_dict = torch.load(
-                        model_path, map_location=torch.device("cpu"), weights_only=True
-                    )
-                    input_dim = NUM_FEATURES
-                    for weight_key in ("network.0.weight", "module.network.0.weight"):
-                        if (
-                            weight_key in state_dict
-                            and hasattr(state_dict[weight_key], "shape")
-                            and len(state_dict[weight_key].shape) >= 2
-                        ):
-                            input_dim = int(state_dict[weight_key].shape[1])
-                            break
-                    loaded_model = FraudDetectionModel(input_dim=input_dim)
-                    loaded_model.load_state_dict(state_dict)
-                    loaded_model.eval()
-                    model = loaded_model
-                except Exception as e:
-                    logger.warning("Failed to load saved model for SHAP: %s.", e)
-                    model = None
-
-            if not model:
-                try:
-                    from app.application.services.model_service import FraudDetectionModel
-
-                    model = FraudDetectionModel()
-                    model.eval()
-                except Exception as e:
-                    logger.warning("Failed to initialize FraudDetectionModel for SHAP: %s.", e)
+                raise ModelNotAvailableError(
+                    "Explainability service requires a verified active model. Untrained fallback models are prohibited."
+                )
 
         if model:
             try:
@@ -569,39 +545,22 @@ class ExplainabilityService:
 
         # 3. Model predict function
         if model is None:
-            import os
+            try:
+                from app.application.services.model_service import ModelService
+                from app.config import get_settings
 
-            import torch
+                svc = ModelService(get_settings())
+                model = svc.get_champion(dp_compatible=True)
+            except Exception as e:
+                logger.warning("No verified champion model available for LIME: %s", e)
+                model = None
 
-            from app.infrastructure.storage.storage_utils import get_storage_dir
+            if model is None:
+                from app.domain.model_serving_errors import ModelNotAvailableError
 
-            model_dir = get_storage_dir()
-            model_path = os.path.join(model_dir, "global_model.pt")
-            if os.path.exists(model_path):
-                try:
-                    from app.application.services.model_service import (
-                        NUM_FEATURES,
-                        FraudDetectionModel,
-                    )
-
-                    state_dict = torch.load(
-                        model_path, map_location=torch.device("cpu"), weights_only=True
-                    )
-                    input_dim = NUM_FEATURES
-                    for weight_key in ("network.0.weight", "module.network.0.weight"):
-                        if (
-                            weight_key in state_dict
-                            and hasattr(state_dict[weight_key], "shape")
-                            and len(state_dict[weight_key].shape) >= 2
-                        ):
-                            input_dim = int(state_dict[weight_key].shape[1])
-                            break
-                    model = FraudDetectionModel(input_dim=input_dim)
-                    model.load_state_dict(state_dict)
-                    model.eval()
-                except Exception as e:
-                    logger.warning("Failed to load saved model for LIME: %s", e)
-                    model = None
+                raise ModelNotAvailableError(
+                    "Explainability service requires a verified active model. Untrained fallback models are prohibited."
+                )
 
         def predict_fn(X_mat: np.ndarray) -> np.ndarray:
             if model is not None:

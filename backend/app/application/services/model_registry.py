@@ -12,7 +12,9 @@ import hmac
 import json
 import logging
 import math
+import io
 import os
+import re
 import shutil
 import tempfile
 import threading
@@ -40,6 +42,30 @@ from app.domain.model_serving_errors import (
 )
 
 logger = logging.getLogger(__name__)
+
+SIMULATION_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-]+$")
+
+
+def validate_simulation_id(simulation_id: str) -> str:
+    """Validate and sanitize a simulation identifier at the service boundary.
+
+    Enforces:
+    - Non-empty string, length 1-128 characters.
+    - Strictly alphanumeric characters, hyphens, and underscores.
+    - Explicit rejection of traversal segments (..), path separators (/ and \\),
+      null bytes, whitespace, and reserved filenames.
+    """
+    if not isinstance(simulation_id, str):
+        raise ValueError("Simulation identifier must be a string.")
+    clean = simulation_id.strip()
+    if not clean or len(clean) > 128 or not SIMULATION_ID_PATTERN.match(clean):
+        raise ValueError(
+            f"Invalid simulation identifier: '{simulation_id}'. Must be 1-128 characters matching [a-zA-Z0-9_\\-]."
+        )
+    if clean in (".", ".."):
+        raise ValueError(f"Unsafe simulation identifier: '{simulation_id}'.")
+    return clean
+
 
 _REGISTRY_FILE_LOCKS: dict[str, FileLock] = {}
 _REGISTRY_LOCKS_GUARD = threading.Lock()
@@ -759,16 +785,33 @@ class ModelRegistry:
                         "storage",
                     )
                 )
-                # 3. Fall back to OS temp dir if the default path is not writable (read-only containers)
+                from app.config import get_settings
+
+                settings = get_settings()
+                app_env = getattr(settings, "app_env", "development").lower().strip()
+                is_prod = (
+                    app_env == "production"
+                    or os.environ.get("APP_ENV", "").lower().strip() == "production"
+                    or os.environ.get("ENVIRONMENT", "").lower().strip() == "production"
+                )
+                # 3. Fall back to OS temp dir if the default path is not writable (read-only containers in dev only)
                 try:
                     os.makedirs(default_dir, exist_ok=True)
+                    if os.name != "nt":
+                        with contextlib.suppress(OSError):
+                            os.chmod(default_dir, 0o700)
                     # quick writability probe
                     test_file = os.path.join(default_dir, ".write_test")
                     with open(test_file, "w") as _f:
                         pass
                     os.remove(test_file)
                     self.storage_dir = default_dir
-                except OSError:
+                except OSError as exc:
+                    if is_prod:
+                        raise PermissionError(
+                            f"Production storage directory '{default_dir}' is not writable. "
+                            "Ephemeral fallback is prohibited in production."
+                        ) from exc
                     self.storage_dir = os.path.join(tempfile.gettempdir(), "cfi_storage")
                     logger.info(
                         "Default storage path not writable; using fallback: %s",
@@ -779,21 +822,78 @@ class ModelRegistry:
 
         self.registry_root = os.path.join(self.storage_dir, "registry")
         os.makedirs(self.registry_root, exist_ok=True)
+        if os.name != "nt":
+            with contextlib.suppress(OSError):
+                os.chmod(self.registry_root, 0o700)
 
-    def _get_sim_dir(self, simulation_id: str) -> str:
-        sim_dir = os.path.join(self.registry_root, simulation_id)
-        os.makedirs(sim_dir, exist_ok=True)
+    def _get_sim_dir(self, simulation_id: str, create: bool = True) -> str:
+        """Resolve canonical simulation directory contained within the registry root.
+
+        Enforces:
+        - Strict identifier pattern validation (no traversal, separators, or aliases).
+        - Canonical containment check against realpath(self.registry_root).
+        - Symlink target containment check (rejects links pointing outside registry root).
+        - Prevent read-only callers from creating directories as an unintended side effect.
+        """
+        clean_id = validate_simulation_id(simulation_id)
+        canonical_root = os.path.realpath(self.registry_root)
+        sim_dir = os.path.abspath(os.path.join(self.registry_root, clean_id))
+        real_sim_dir = os.path.realpath(sim_dir)
+
+        # Enforce canonical path containment
+        try:
+            if (
+                os.path.commonpath([real_sim_dir, canonical_root]) != canonical_root
+                or real_sim_dir == canonical_root
+            ):
+                raise ModelIntegrityError(
+                    f"Simulation directory '{clean_id}' escapes authoritative registry root."
+                )
+        except ValueError as exc:
+            raise ModelIntegrityError(
+                f"Path containment check failed for simulation '{clean_id}': {exc}"
+            ) from exc
+
+        # Check for unsafe symlinks pointing outside registry root
+        if os.path.islink(sim_dir):
+            target = os.path.realpath(sim_dir)
+            if os.path.commonpath([target, canonical_root]) != canonical_root:
+                raise ModelIntegrityError(
+                    f"Simulation symlink '{clean_id}' targets external path '{target}' outside registry root."
+                )
+
+        if create:
+            os.makedirs(sim_dir, exist_ok=True)
+            if os.name != "nt":
+                with contextlib.suppress(OSError):
+                    os.chmod(sim_dir, 0o700)
         return sim_dir
 
-    def _get_ownership_path(self, simulation_id: str) -> str:
-        return os.path.join(self._get_sim_dir(simulation_id), "ownership.json")
+    def _get_ownership_path(self, simulation_id: str, create: bool = False) -> str:
+        return os.path.join(self._get_sim_dir(simulation_id, create=create), "ownership.json")
 
     def get_simulation_ownership(self, simulation_id: str) -> dict[str, Any]:
         """Retrieve authoritative institutional or consortium ownership record for a simulation."""
-        sim_dir = self._get_sim_dir(simulation_id)
+        try:
+            clean_sim_id = validate_simulation_id(simulation_id)
+        except ValueError:
+            return {
+                "simulation_id": simulation_id,
+                "owning_bank_id": None,
+                "consortium_id": None,
+                "is_unbound": True,
+            }
+        sim_dir = self._get_sim_dir(clean_sim_id, create=False)
+        if not os.path.isdir(sim_dir):
+            return {
+                "simulation_id": clean_sim_id,
+                "owning_bank_id": None,
+                "consortium_id": None,
+                "is_unbound": True,
+            }
         file_lock = _get_registry_file_lock(sim_dir)
         with self._lock, file_lock:
-            own_path = self._get_ownership_path(simulation_id)
+            own_path = self._get_ownership_path(clean_sim_id, create=False)
             if os.path.exists(own_path):
                 try:
                     with open(own_path, encoding="utf-8") as f:
@@ -1239,7 +1339,13 @@ class ModelRegistry:
 
 
     def _load_manifest(self, simulation_id: str) -> list[dict[str, Any]]:
-        sim_dir = self._get_sim_dir(simulation_id)
+        try:
+            clean_sim_id = validate_simulation_id(simulation_id)
+        except ValueError:
+            return []
+        sim_dir = self._get_sim_dir(clean_sim_id, create=False)
+        if not os.path.isdir(sim_dir):
+            return []
         file_lock = _get_registry_file_lock(sim_dir)
         with self._lock, file_lock:
             manifest_path = os.path.join(sim_dir, "registry.json")
@@ -1250,27 +1356,28 @@ class ModelRegistry:
                     content = f.read()
                     if not content.strip():
                         raise ModelIntegrityError(
-                            f"Registry manifest for simulation '{simulation_id}' is empty (0 bytes)."
+                            f"Registry manifest for simulation '{clean_sim_id}' is empty (0 bytes)."
                         )
                     data = json.loads(content)
                     if isinstance(data, list):
                         for item in data:
                             if isinstance(item, dict) and "simulation_id" not in item:
-                                item["simulation_id"] = simulation_id
+                                item["simulation_id"] = clean_sim_id
                         return data
                     raise ModelIntegrityError(
-                        f"Registry manifest for simulation '{simulation_id}' is corrupted: expected JSON list, got {type(data).__name__}."
+                        f"Registry manifest for simulation '{clean_sim_id}' is corrupted: expected JSON list, got {type(data).__name__}."
                     )
             except ModelIntegrityError:
                 raise
             except Exception as e:
-                logger.error("Failed to load registry manifest for %s: %s", simulation_id, e)
+                logger.error("Failed to load registry manifest for %s: %s", clean_sim_id, e)
                 raise ModelIntegrityError(
-                    f"Registry manifest for simulation '{simulation_id}' is corrupted or unreadable: {e}"
+                    f"Registry manifest for simulation '{clean_sim_id}' is corrupted or unreadable: {e}"
                 ) from e
 
     def _save_manifest(self, simulation_id: str, manifest: list[dict[str, Any]]) -> None:
-        sim_dir = self._get_sim_dir(simulation_id)
+        clean_sim_id = validate_simulation_id(simulation_id)
+        sim_dir = self._get_sim_dir(clean_sim_id, create=True)
         file_lock = _get_registry_file_lock(sim_dir)
         with self._lock, file_lock:
             manifest_path = os.path.join(sim_dir, "registry.json")
@@ -1693,7 +1800,32 @@ class ModelRegistry:
 
             candidates: list[tuple[str, dict[str, Any], str]] = []
 
-            sim_dirs = [simulation_id] if simulation_id else sorted(os.listdir(self.registry_root))
+            target_sim_id: str | None = None
+            if simulation_id is not None:
+                target_sim_id = validate_simulation_id(simulation_id)
+            else:
+                from app.config import get_settings
+
+                settings = get_settings()
+                configured_default = os.environ.get("CFI_DEFAULT_SIMULATION_ID") or getattr(
+                    settings, "default_simulation_id", ""
+                )
+                if configured_default and str(configured_default).strip():
+                    target_sim_id = validate_simulation_id(str(configured_default).strip())
+
+            if target_sim_id is not None:
+                sim_dirs = [target_sim_id]
+            else:
+                sim_dirs = []
+                for entry_name in sorted(os.listdir(self.registry_root)):
+                    try:
+                        clean_name = validate_simulation_id(entry_name)
+                        candidate_dir = os.path.join(self.registry_root, clean_name)
+                        if os.path.isdir(candidate_dir):
+                            sim_dirs.append(clean_name)
+                    except ValueError:
+                        continue
+
             for s_id in sim_dirs:
                 sim_path = os.path.join(self.registry_root, s_id)
                 if not os.path.isdir(sim_path):
@@ -1719,16 +1851,23 @@ class ModelRegistry:
             if len(candidates) > 1:
                 conflicting_sims = [c[0] for c in candidates]
                 raise ModelCompatibilityError(
-                    f"Ambiguous champion state: multiple conflicting active champions exist across simulations: "
-                    f"{conflicting_sims}. Deterministic resolution requires specifying simulation_id or deactivating conflicting champions."
+                    f"Ambiguous unscoped champion resolution: multiple active champions exist across simulations: "
+                    f"{conflicting_sims}. An explicit simulation_id scope or CFI_DEFAULT_SIMULATION_ID configuration is required."
                 )
 
             sim_id, entry, filepath = candidates[0]
 
-            fname = entry.get("filename", os.path.basename(filepath))
-            if ".." in fname or os.path.isabs(fname):
+            raw_fname = entry.get("filename", os.path.basename(filepath))
+            fname = os.path.basename(raw_fname.strip()) if isinstance(raw_fname, str) else ""
+            if (
+                not fname
+                or fname != raw_fname.strip()
+                or ".." in raw_fname
+                or os.path.isabs(raw_fname)
+                or raw_fname in (".", "..")
+            ):
                 raise ModelIntegrityError(
-                    f"Path traversal detected in manifest filename '{fname}'."
+                    f"Path traversal detected in manifest filename '{raw_fname}'."
                 )
 
             # Resolve real filesystem paths to eliminate symlink traversal and escapes (Defect E)
@@ -1951,7 +2090,32 @@ class ModelRegistry:
 
             candidates: list[tuple[str, dict[str, Any], str]] = []
 
-            sim_dirs = [simulation_id] if simulation_id else sorted(os.listdir(self.registry_root))
+            target_sim_id: str | None = None
+            if simulation_id is not None:
+                target_sim_id = validate_simulation_id(simulation_id)
+            else:
+                from app.config import get_settings
+
+                settings = get_settings()
+                configured_default = os.environ.get("CFI_DEFAULT_SIMULATION_ID") or getattr(
+                    settings, "default_simulation_id", ""
+                )
+                if configured_default and str(configured_default).strip():
+                    target_sim_id = validate_simulation_id(str(configured_default).strip())
+
+            if target_sim_id is not None:
+                sim_dirs = [target_sim_id]
+            else:
+                sim_dirs = []
+                for entry_name in sorted(os.listdir(self.registry_root)):
+                    try:
+                        clean_name = validate_simulation_id(entry_name)
+                        candidate_dir = os.path.join(self.registry_root, clean_name)
+                        if os.path.isdir(candidate_dir):
+                            sim_dirs.append(clean_name)
+                    except ValueError:
+                        continue
+
             for s_id in sim_dirs:
                 sim_path = os.path.join(self.registry_root, s_id)
                 if not os.path.isdir(sim_path):
@@ -1977,16 +2141,23 @@ class ModelRegistry:
             if len(candidates) > 1:
                 conflicting_sims = [c[0] for c in candidates]
                 raise ModelCompatibilityError(
-                    f"Ambiguous challenger state: multiple conflicting active challengers exist across simulations: "
-                    f"{conflicting_sims}. Deterministic resolution requires specifying simulation_id or deactivating conflicting challengers."
+                    f"Ambiguous unscoped challenger resolution: multiple active challengers exist across simulations: "
+                    f"{conflicting_sims}. An explicit simulation_id scope or CFI_DEFAULT_SIMULATION_ID configuration is required."
                 )
 
             sim_id, entry, filepath = candidates[0]
 
-            fname = entry.get("filename", os.path.basename(filepath))
-            if ".." in fname or os.path.isabs(fname):
+            raw_fname = entry.get("filename", os.path.basename(filepath))
+            fname = os.path.basename(raw_fname.strip()) if isinstance(raw_fname, str) else ""
+            if (
+                not fname
+                or fname != raw_fname.strip()
+                or ".." in raw_fname
+                or os.path.isabs(raw_fname)
+                or raw_fname in (".", "..")
+            ):
                 raise ModelIntegrityError(
-                    f"Path traversal detected in manifest filename '{fname}'."
+                    f"Path traversal detected in manifest filename '{raw_fname}'."
                 )
 
             real_filepath = os.path.realpath(filepath)
@@ -2177,7 +2348,38 @@ class ModelRegistry:
                 return None
 
             candidates = []
-            sim_dirs = [simulation_id] if simulation_id else sorted(os.listdir(self.registry_root))
+            target_sim_id: str | None = None
+            if simulation_id is not None:
+                try:
+                    target_sim_id = validate_simulation_id(simulation_id)
+                except ValueError:
+                    return None
+            else:
+                from app.config import get_settings
+
+                settings = get_settings()
+                configured_default = os.environ.get("CFI_DEFAULT_SIMULATION_ID") or getattr(
+                    settings, "default_simulation_id", ""
+                )
+                if configured_default and str(configured_default).strip():
+                    try:
+                        target_sim_id = validate_simulation_id(str(configured_default).strip())
+                    except ValueError:
+                        return None
+
+            if target_sim_id is not None:
+                sim_dirs = [target_sim_id]
+            else:
+                sim_dirs = []
+                for entry_name in sorted(os.listdir(self.registry_root)):
+                    try:
+                        clean_name = validate_simulation_id(entry_name)
+                        candidate_dir = os.path.join(self.registry_root, clean_name)
+                        if os.path.isdir(candidate_dir):
+                            sim_dirs.append(clean_name)
+                    except ValueError:
+                        continue
+
             for s_id in sim_dirs:
                 sim_path = os.path.join(self.registry_root, s_id)
                 if not os.path.isdir(sim_path):
@@ -2312,23 +2514,142 @@ class ModelRegistry:
         """List all model versions tracked in this simulation registry."""
         return self._load_manifest(simulation_id)
 
-    def load_version(self, simulation_id: str, version: int) -> dict[str, Any]:
-        """Load state dict of a specific model version from the registry."""
-        with self._lock:
-            manifest = self._load_manifest(simulation_id)
-            entry = next((e for e in manifest if e["version"] == version), None)
-            if not entry:
-                raise ValueError(f"Version {version} not found in registry for {simulation_id}")
+    def load_version(
+        self,
+        simulation_id: str,
+        version: int,
+        allow_revoked: bool = False,
+    ) -> dict[str, Any]:
+        """Load state dict of a specific model version from the registry.
 
-            sim_dir = self._get_sim_dir(simulation_id)
-            filepath = os.path.join(sim_dir, entry["filename"])
-            if not os.path.exists(filepath):
+        Enforces:
+        1. Identifier validation and containment under registry root.
+        2. Correct lock ordering: self._lock -> _get_registry_file_lock(sim_dir).
+        3. Model revocation validation: rejects revoked versions unless allow_revoked=True for offline analysis.
+        4. Manifest filename validation: strict basename, no path traversal or absolute paths.
+        5. Path containment within sim_dir, regular file check, non-emptiness.
+        6. In-memory snapshot to prevent time-of-check/time-of-use (TOCTOU) substitution.
+        7. SHA-256 cryptographic verification of the exact bytes being loaded.
+        8. Safe deserialization via io.BytesIO(snapshot_bytes) with weights_only=True.
+        """
+        clean_sim_id = validate_simulation_id(simulation_id)
+        sim_dir = self._get_sim_dir(clean_sim_id, create=False)
+        if not os.path.isdir(sim_dir):
+            raise ValueError(f"Simulation '{clean_sim_id}' not found in registry.")
+
+        file_lock = _get_registry_file_lock(sim_dir)
+        with self._lock, file_lock:
+            manifest = self._load_manifest(clean_sim_id)
+            entry = next((e for e in manifest if e.get("version") == version), None)
+            if not entry:
+                raise ValueError(f"Version {version} not found in registry for {clean_sim_id}")
+
+            # Revocation validation
+            is_revoked = bool(entry.get("is_revoked")) or entry.get("status") == "revoked"
+            if is_revoked and not allow_revoked:
+                raise ModelIntegrityError(
+                    f"Model version {version} for simulation '{clean_sim_id}' has been revoked."
+                )
+
+            # Check training receipt key revocation
+            rcpt = entry.get("training_receipt")
+            if isinstance(rcpt, dict) and rcpt.get("key_id"):
+                from app.application.services.training_provenance_service import (
+                    get_default_training_verifier,
+                )
+
+                verifier = self._verifier or get_default_training_verifier()
+                if not verifier.is_key_trusted(rcpt["key_id"]) and not allow_revoked:
+                    raise ModelIntegrityError(
+                        f"Model version {version} for simulation '{clean_sim_id}' rejected: "
+                        f"training receipt key '{rcpt['key_id']}' has been revoked."
+                    )
+
+            # Validate manifest filename shape
+            raw_filename = entry.get("filename")
+            if not raw_filename or not isinstance(raw_filename, str):
+                raise ModelIntegrityError(
+                    f"Manifest entry for simulation '{clean_sim_id}' v{version} lacks valid filename."
+                )
+
+            clean_filename = os.path.basename(raw_filename.strip())
+            if (
+                clean_filename != raw_filename.strip()
+                or ".." in raw_filename
+                or os.path.isabs(raw_filename)
+                or raw_filename in (".", "..")
+            ):
+                raise ModelIntegrityError(
+                    f"Path traversal detected in manifest filename '{raw_filename}'."
+                )
+
+            filepath = os.path.join(sim_dir, clean_filename)
+            real_filepath = os.path.realpath(filepath)
+            real_sim_dir = os.path.realpath(sim_dir)
+
+            if not os.path.exists(real_filepath):
                 raise FileNotFoundError(f"Model file {filepath} not found on disk")
 
+            if not os.path.isfile(real_filepath):
+                raise ModelIntegrityError(
+                    f"Model artifact path '{filepath}' is not a regular file."
+                )
+
+            # Enforce canonical containment within simulation directory
             try:
-                return torch.load(filepath, map_location="cpu", weights_only=True)
+                if os.path.commonpath([real_filepath, real_sim_dir]) != real_sim_dir:
+                    raise ModelIntegrityError(
+                        f"Model artifact '{filepath}' escapes simulation directory '{sim_dir}'."
+                    )
+            except ValueError as exc:
+                raise ModelIntegrityError(
+                    f"Path containment check failed for artifact '{filepath}': {exc}"
+                ) from exc
+
+            # Validate symlink target if artifact is a symlink
+            if os.path.islink(filepath):
+                symlink_target = os.path.realpath(filepath)
+                if os.path.commonpath([symlink_target, real_sim_dir]) != real_sim_dir:
+                    raise ModelIntegrityError(
+                        f"Model symlink '{filepath}' targets external path '{symlink_target}' outside simulation directory."
+                    )
+
+            # Non-empty check
+            if os.path.getsize(real_filepath) == 0:
+                raise ModelIntegrityError(
+                    f"Model artifact file '{filepath}' is empty (0 bytes)."
+                )
+
+            # Read snapshot bytes into memory to eliminate TOCTOU races
+            try:
+                with open(real_filepath, "rb") as f:
+                    snapshot_bytes = f.read()
+            except Exception as exc:
+                raise ModelIntegrityError(
+                    f"Failed to read model artifact '{filepath}': {exc}"
+                ) from exc
+
+            # Cryptographic SHA-256 verification of the in-memory snapshot
+            actual_sha256 = hashlib.sha256(snapshot_bytes).hexdigest()
+            expected_sha256 = entry.get("sha256")
+            if expected_sha256:
+                if not hmac.compare_digest(actual_sha256, expected_sha256):
+                    raise ModelIntegrityError(
+                        f"Model artifact SHA-256 digest mismatch for simulation '{clean_sim_id}' v{version}: "
+                        f"expected '{expected_sha256}', actual '{actual_sha256}'."
+                    )
+            else:
+                from app.config import get_settings
+
+                if get_settings().app_env.lower() == "production":
+                    raise ModelIntegrityError(
+                        f"Model manifest entry for simulation '{clean_sim_id}' v{version} lacks recorded SHA-256 digest in production."
+                    )
+
+            try:
+                return torch.load(io.BytesIO(snapshot_bytes), map_location="cpu", weights_only=True)
             except Exception as e:
-                logger.error("Failed to load model file: %s", e)
+                logger.error("Failed to deserialize model file %s: %s", filepath, e)
                 raise
 
     def get_active_version(self, simulation_id: str) -> dict[str, Any] | None:
