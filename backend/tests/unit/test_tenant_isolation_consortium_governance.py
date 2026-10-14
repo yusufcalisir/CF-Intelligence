@@ -32,7 +32,6 @@ from fastapi.testclient import TestClient
 from app.application.services.consortium_service import (
     consortium_governance_service,
 )
-from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 from app.application.services.model_registry import (
     ModelRegistry,
     create_trusted_internal_context,
@@ -49,6 +48,7 @@ from app.config import get_settings
 from app.domain.consortium_governance import MemberRole, ProposalAction, ProposalStatus
 from app.domain.model_serving_errors import ModelAuthorizationError, ModelIntegrityError
 from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 from app.main import app
 
 NUM_FEATURES = 10
@@ -90,6 +90,16 @@ def tenant_env():
     old_service_store = consortium_governance_service._store
     DurableConsortiumStore.set_instance(test_consortium_store)
     consortium_governance_service._store = test_consortium_store
+
+    from app.infrastructure.security.durable_nonce_store import reset_default_nonce_store
+
+    settings = get_settings()
+    nonce_path = os.path.join(temp_dir, "nonces.json")
+    old_nonce_path = getattr(settings, "internal_nonce_store_path", None)
+    old_internal_secret = getattr(settings, "internal_context_signing_secret", None)
+    settings.internal_nonce_store_path = nonce_path
+    settings.internal_context_signing_secret = TEST_SIGNING_SECRET
+    reset_default_nonce_store()
 
     auth_svc = AuthenticationService(
         signing_secret=TEST_SIGNING_SECRET,
@@ -159,6 +169,9 @@ def tenant_env():
     AuthenticationService.reset_instance()
     DurableConsortiumStore.set_instance(old_consortium_store)
     consortium_governance_service._store = old_service_store
+    settings.internal_nonce_store_path = old_nonce_path
+    settings.internal_context_signing_secret = old_internal_secret
+    reset_default_nonce_store()
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 

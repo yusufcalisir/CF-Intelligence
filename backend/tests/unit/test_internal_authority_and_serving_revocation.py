@@ -739,7 +739,7 @@ def test_final_auth_03_v1_signed_unscoped_context_cannot_authorize_production_mu
     assert settings.app_env == "production"
 
     # Forge a legacy V1 signature (service:action:nonce:created_at) using payload_signing_secret
-    v1_payload = f"model_evaluation_engine:rollback:nonce_v1_{time.time()}:{time.time()}".encode("utf-8")
+    v1_payload = f"model_evaluation_engine:rollback:nonce_v1_{time.time()}:{time.time()}".encode()
     v1_sig = hmac.new(isolated_env["payload_secret"].encode("utf-8"), v1_payload, hashlib.sha256).hexdigest()
 
     ctx_v1 = TrustedInternalContext(

@@ -113,7 +113,7 @@ class DurableNonceStore:
 
         settings = get_settings()
         clean = (
-            str(self._signing_secret).strip()
+            self._signing_secret.strip()
             if self._signing_secret
             else str(
                 os.environ.get("CFI_INTERNAL_CONTEXT_SECRET")
