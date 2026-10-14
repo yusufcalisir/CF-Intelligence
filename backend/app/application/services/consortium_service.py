@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import logging
 import math
+import os
 import threading
 import uuid
 from datetime import UTC
@@ -13,6 +14,7 @@ from typing import Any
 from app.domain.consortium_governance import (
     Consortium,
     ConsortiumMember,
+    ConsortiumSecurityError,
     ConsortiumStatus,
     MemberRole,
     MembershipProposal,
@@ -439,7 +441,13 @@ class ConsortiumGovernanceService:
         return self._store.atomic_mutate(_mutate)
 
     def set_member_voting_power(
-        self, consortium_id: str, bank_id: str, voting_power: float
+        self,
+        consortium_id: str,
+        bank_id: str,
+        voting_power: float,
+        auth_token: str | None = None,
+        actor: str | None = None,
+        trusted_context: Any | None = None,
     ) -> ConsortiumMember:
         """Updates a member institution's voting weight in the consortium."""
         clean_id = consortium_id.lower().strip()
@@ -448,6 +456,25 @@ class ConsortiumGovernanceService:
         if not math.isfinite(voting_power) or voting_power < 0.0:
             raise ValueError(f"voting_power must be non-negative finite number, got {voting_power}")
 
+        is_prod = getattr(self._store, "_is_prod", False)
+        if is_prod and not auth_token and trusted_context is None:
+            raise PermissionError(
+                "Authentication required: Direct service operation 'set_member_voting_power' requires a valid Bearer auth_token or trusted internal context."
+            )
+
+        if trusted_context is not None:
+            from app.application.services.model_registry import verify_trusted_internal_context
+
+            is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                trusted_context, expected_action="set_member_voting_power"
+            )
+            if not is_valid_ctx:
+                raise PermissionError(f"Internal orchestration authority rejected for set_member_voting_power: {ctx_reason}")
+            if getattr(trusted_context, "service_name", "") != "consortium_coordinator":
+                raise PermissionError(
+                    f"Internal service '{getattr(trusted_context, 'service_name', '')}' is not authorized for set_member_voting_power."
+                )
+
         def _mutate(consortia: dict[str, Consortium], proposals: dict[str, MembershipProposal]) -> ConsortiumMember:
             if clean_id not in consortia:
                 raise KeyError(f"Consortium '{clean_id}' does not exist.")
@@ -455,6 +482,15 @@ class ConsortiumGovernanceService:
             consortium = consortia[clean_id]
             if clean_bank not in consortium.members:
                 raise ValueError(f"Bank '{clean_bank}' is not a member of consortium '{clean_id}'.")
+
+            if is_prod and auth_token:
+                self._verify_service_actor_bank(
+                    consortium.founder_bank_id,
+                    auth_token=auth_token,
+                    actor=actor,
+                    trusted_context=trusted_context,
+                    action_name="set_member_voting_power",
+                )
 
             consortium.members[clean_bank].voting_power = voting_power
             logger.info(
@@ -474,11 +510,36 @@ class ConsortiumGovernanceService:
         return self._store.atomic_mutate(_mutate)
 
     def set_member_role(
-        self, consortium_id: str, bank_id: str, role: MemberRole
+        self,
+        consortium_id: str,
+        bank_id: str,
+        role: MemberRole,
+        auth_token: str | None = None,
+        actor: str | None = None,
+        trusted_context: Any | None = None,
     ) -> ConsortiumMember:
         """Updates a member institution's governance role in the consortium."""
         clean_id = consortium_id.lower().strip()
         clean_bank = bank_id.lower().strip()
+
+        is_prod = getattr(self._store, "_is_prod", False)
+        if is_prod and not auth_token and trusted_context is None:
+            raise PermissionError(
+                "Authentication required: Direct service operation 'set_member_role' requires a valid Bearer auth_token or trusted internal context."
+            )
+
+        if trusted_context is not None:
+            from app.application.services.model_registry import verify_trusted_internal_context
+
+            is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                trusted_context, expected_action="set_member_role"
+            )
+            if not is_valid_ctx:
+                raise PermissionError(f"Internal orchestration authority rejected for set_member_role: {ctx_reason}")
+            if getattr(trusted_context, "service_name", "") != "consortium_coordinator":
+                raise PermissionError(
+                    f"Internal service '{getattr(trusted_context, 'service_name', '')}' is not authorized for set_member_role."
+                )
 
         def _mutate(consortia: dict[str, Consortium], proposals: dict[str, MembershipProposal]) -> ConsortiumMember:
             if clean_id not in consortia:
@@ -487,6 +548,15 @@ class ConsortiumGovernanceService:
             consortium = consortia[clean_id]
             if clean_bank not in consortium.members:
                 raise ValueError(f"Bank '{clean_bank}' is not a member of consortium '{clean_id}'.")
+
+            if is_prod and auth_token:
+                self._verify_service_actor_bank(
+                    consortium.founder_bank_id,
+                    auth_token=auth_token,
+                    actor=actor,
+                    trusted_context=trusted_context,
+                    action_name="set_member_role",
+                )
 
             consortium.members[clean_bank].role = role
             logger.info(
@@ -652,17 +722,33 @@ class ConsortiumGovernanceService:
         """Registers a member institution into a consortium.
 
         Guarantees:
-        - In production, requires authentic institutional authorization.
+        - In production, requires verified coordinator context or legitimate founder provisioning.
+        - Ordinary institutional credentials cannot unilaterally bypass proposal voting.
+        - Rejects unverified internal context objects.
         - Rejects direct readmission of an expelled member without governance approval.
         """
         clean_id = consortium_id.lower().strip()
         clean_bank = bank_id.lower().strip()
 
         is_prod = getattr(self._store, "_is_prod", False)
-        if is_prod and not auth_token and trusted_context is None:
-            raise PermissionError(
-                "Authentication required: Direct service operation 'add_member' requires a valid Bearer auth_token or trusted internal context."
+
+        if trusted_context is not None:
+            from app.application.services.model_registry import verify_trusted_internal_context
+
+            is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                trusted_context, expected_action="add_member"
             )
+            if not is_valid_ctx:
+                raise PermissionError(f"Internal orchestration authority rejected for add_member: {ctx_reason}")
+            if getattr(trusted_context, "service_name", "") != "consortium_coordinator":
+                raise PermissionError(
+                    f"Internal service '{getattr(trusted_context, 'service_name', '')}' is not authorized for add_member."
+                )
+        elif is_prod:
+            if not auth_token:
+                raise PermissionError(
+                    "Authentication required: Direct service operation 'add_member' requires a valid Bearer auth_token or trusted internal context."
+                )
 
         def _mutate(consortia: dict[str, Consortium], proposals: dict[str, MembershipProposal]) -> ConsortiumMember:
             if clean_id not in consortia:
@@ -670,19 +756,31 @@ class ConsortiumGovernanceService:
 
             consortium = consortia[clean_id]
 
-            # In production with auth_token, verify institutional authority
-            if is_prod and auth_token:
-                founder_or_admin = next(
-                    (m.bank_id for m in consortium.members.values() if m.role in (MemberRole.FOUNDER, MemberRole.FULL_MEMBER) and m.can_vote),
-                    clean_bank
-                )
-                self._verify_service_actor_bank(
-                    founder_or_admin,
-                    auth_token=auth_token,
-                    actor=actor,
-                    trusted_context=trusted_context,
-                    action_name="add_member",
-                )
+            # In production without trusted coordinator context, verify if caller has founder provisioning authority
+            if is_prod and trusted_context is None and auth_token:
+                from app.infrastructure.security.auth_service import AuthenticationService
+
+                auth_svc = AuthenticationService.get_instance()
+                is_valid, claims, err = auth_svc.verify_access_token(auth_token)
+                if not is_valid or not claims:
+                    raise PermissionError(f"Direct service authentication failed: {err}")
+                username = (claims.get("username") or claims.get("sub") or "").strip()
+                if actor and actor.lower().strip() != username.lower():
+                    raise PermissionError(f"Actor '{actor}' does not match authenticated token principal '{username}'.")
+                user_rec = auth_svc.get_user(username)
+                if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
+                    raise PermissionError(f"Direct service actor '{username}' is not a valid authoritative principal.")
+                user_bank = (getattr(user_rec, "bank_id", "") or "").lower().strip()
+                user_roles = {r.lower().strip() for r in getattr(user_rec, "roles", [])}
+                if not (user_roles & {"admin", "ml_lead", "compliance"}):
+                    raise PermissionError(f"Principal '{username}' lacks required governance role for add_member.")
+
+                # If the caller bank is not the founder, ordinary members cannot unilaterally bypass quorum
+                if user_bank != consortium.founder_bank_id:
+                    raise PermissionError(
+                        "Direct admission rejected: Ordinary institutional credentials cannot bypass "
+                        "consortium membership proposal and voting quorum requirements."
+                    )
 
             # Prevent silent readmission of an expelled member
             if clean_bank in consortium.removed_members:
@@ -704,17 +802,35 @@ class ConsortiumGovernanceService:
             init_default_consortium(self)
 
 
-def init_default_consortium(service: ConsortiumGovernanceService | None = None) -> Consortium:
+def init_default_consortium(
+    service: ConsortiumGovernanceService | None = None,
+    allow_bootstrap: bool = False,
+) -> Consortium:
     """Initializes canonical consortium with founding and participant institutions.
 
     Guarantees:
+    - In production, requires explicit bootstrap authorization (allow_bootstrap=True or CFI_ALLOW_CONSORTIUM_BOOTSTRAP="1").
+    - Never silently fabricates institutional memberships in fresh production environments.
     - Never recreates or overwrites an established consortium.
     - Never readmits previously removed/expelled members upon worker startup.
     """
     svc = service or consortium_governance_service
+    is_prod = getattr(svc._store, "_is_prod", False)
+
     existing = svc.get_consortium("cfi-consortium")
     if existing is not None:
         return existing
+
+    explicit_bootstrap_allowed = (
+        allow_bootstrap
+        or os.environ.get("CFI_ALLOW_CONSORTIUM_BOOTSTRAP") == "1"
+    )
+    if is_prod and not explicit_bootstrap_allowed:
+        raise ConsortiumSecurityError(
+            "Production consortium bootstrap rejected: unprovisioned production environment "
+            "cannot automatically fabricate default institutional memberships. Explicit bootstrap "
+            "authorization (CFI_ALLOW_CONSORTIUM_BOOTSTRAP=1) is required."
+        )
 
     from app.application.services.model_registry import create_trusted_internal_context
 
@@ -742,6 +858,7 @@ def init_default_consortium(service: ConsortiumGovernanceService | None = None) 
 
 # Global singleton instance
 consortium_governance_service = ConsortiumGovernanceService()
-init_default_consortium(consortium_governance_service)
+if not getattr(consortium_governance_service._store, "_is_prod", False):
+    init_default_consortium(consortium_governance_service)
 
 

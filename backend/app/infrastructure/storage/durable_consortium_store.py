@@ -20,6 +20,7 @@ from __future__ import annotations
 import contextlib
 import datetime
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -48,6 +49,16 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
+FORBIDDEN_AUTHORITY_SECRETS = {
+    "",
+    "secret",
+    "change_me",
+    "default",
+    "password",
+    "cfi_dev_consortium_store_authority_secret_2026_default",
+    "cfi_dev_identity_store_authority_secret_2026_default",
+}
+
 _CONSORTIUM_FILE_LOCKS: dict[str, FileLock] = {}
 _CONSORTIUM_LOCKS_GUARD = threading.Lock()
 
@@ -70,6 +81,7 @@ class DurableConsortiumStore:
         self,
         store_path: str | None = None,
         in_memory: bool = False,
+        authority_secret: str | None = None,
         app_env: str | None = None,
     ) -> None:
         settings = get_settings()
@@ -101,6 +113,33 @@ class DurableConsortiumStore:
                 configured_path = os.path.join(get_storage_dir(), "consortium_governance_store.json")
             self._store_path = os.path.abspath(configured_path)
             os.makedirs(os.path.dirname(self._store_path), exist_ok=True)
+
+        # Authenticated integrity secret
+        self._authority_secret = (
+            authority_secret
+            or os.environ.get("CFI_CONSORTIUM_STORE_SECRET")
+            or os.environ.get("CFI_CONSORTIUM_STORE_HMAC_SECRET")
+            or os.environ.get("CFI_IDENTITY_STORE_SECRET")
+            or getattr(settings, "consortium_store_secret", None)
+            or (None if is_prod else "cfi_dev_consortium_store_authority_secret_2026_default")
+        )
+
+        if is_prod and (
+            not self._authority_secret
+            or self._authority_secret in FORBIDDEN_AUTHORITY_SECRETS
+            or "change_me" in self._authority_secret
+        ):
+            raise ConsortiumSecurityError(
+                "Production consortium store requires independently configured authority secret "
+                "(CFI_CONSORTIUM_STORE_SECRET) and rejects empty, default, or placeholder secrets."
+            )
+
+        if self._authority_secret:
+            self._hmac_key: bytes | None = hashlib.sha256(
+                b"CFI-CONSORTIUM-STORE-HMAC-KEY-V1:" + self._authority_secret.encode("utf-8")
+            ).digest()
+        else:
+            self._hmac_key = None
 
         self._lock = threading.RLock()
         self._consortia: dict[str, Consortium] = {}
@@ -257,7 +296,8 @@ class DurableConsortiumStore:
             return
 
         if not os.path.exists(self._store_path):
-            if self._is_prod and (self._is_established or self._last_mtime_ns > 0 or len(self._consortia) > 0):
+            marker = self._store_path + ".established"
+            if self._is_prod and (os.path.exists(marker) or self._is_established or self._last_mtime_ns > 0 or len(self._consortia) > 0):
                 self._is_corrupted = True
                 self._consortia.clear()
                 self._proposals.clear()
@@ -315,15 +355,50 @@ class DurableConsortiumStore:
                     f"Durable consortium store at '{self._store_path}' is malformed: consortia or proposals schema invalid."
                 )
 
-            # Check integrity digest
-            stored_sha = container.get("sha256")
-            if stored_sha:
-                computed_sha = self._compute_digest(data)
-                if not stored_sha or stored_sha.lower() != computed_sha.lower():
+            canonical_bytes = json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            computed_sha = hashlib.sha256(canonical_bytes).hexdigest()
+
+            # Layer 1: Check SHA-256 digest
+            stored_sha = container.get("integrity_sha256") or container.get("sha256")
+            if self._is_prod and not stored_sha:
+                self._is_corrupted = True
+                raise ConsortiumSecurityError(
+                    f"Durable consortium store at '{self._store_path}' rejected: missing required integrity digest in production."
+                )
+            if stored_sha and not hmac.compare_digest(stored_sha.lower(), computed_sha.lower()):
+                self._is_corrupted = True
+                raise ConsortiumSecurityError(
+                    f"Durable consortium store at '{self._store_path}' checksum verification failed: "
+                    f"expected {computed_sha}, got {stored_sha}."
+                )
+
+            # Layer 2: Cryptographic Authenticated Integrity Verification (HMAC-SHA256)
+            stored_hmac = container.get("integrity_hmac_sha256")
+            if self._is_prod:
+                if not stored_hmac:
                     self._is_corrupted = True
                     raise ConsortiumSecurityError(
-                        f"Durable consortium store at '{self._store_path}' checksum verification failed: "
-                        f"expected {computed_sha}, got {stored_sha}."
+                        f"Durable consortium store at '{self._store_path}' rejected: unauthenticated persistence format "
+                        f"lacking required 'integrity_hmac_sha256' cryptographic authentication in production."
+                    )
+                if not self._hmac_key:
+                    self._is_corrupted = True
+                    raise ConsortiumSecurityError(
+                        f"Durable consortium store at '{self._store_path}' cannot authenticate persistence: missing authority HMAC key."
+                    )
+                actual_hmac = hmac.new(self._hmac_key, canonical_bytes, hashlib.sha256).hexdigest()
+                if not hmac.compare_digest(stored_hmac.lower(), actual_hmac.lower()):
+                    self._is_corrupted = True
+                    raise ConsortiumSecurityError(
+                        f"Durable consortium store at '{self._store_path}' failed cryptographic HMAC authentication: "
+                        f"authentication tag mismatch."
+                    )
+            elif self._hmac_key and stored_hmac:
+                actual_hmac = hmac.new(self._hmac_key, canonical_bytes, hashlib.sha256).hexdigest()
+                if not hmac.compare_digest(stored_hmac.lower(), actual_hmac.lower()):
+                    self._is_corrupted = True
+                    raise ConsortiumSecurityError(
+                        f"Durable consortium store at '{self._store_path}' failed cryptographic HMAC authentication: tag mismatch."
                     )
 
             # Reconstruct domain models in place where existing, preserving object references
@@ -381,6 +456,11 @@ class DurableConsortiumStore:
             self._is_corrupted = False
             self._is_established = True
 
+            marker = self._store_path + ".established"
+            if not os.path.exists(marker):
+                with open(marker, "w", encoding="utf-8") as mf:
+                    mf.write("established\n")
+
         except ConsortiumSecurityError:
             raise
         except Exception as e:
@@ -408,12 +488,18 @@ class DurableConsortiumStore:
             "proposals": serialized_proposals,
         }
 
-        digest = self._compute_digest(data)
-        container = {
+        canonical_bytes = json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        digest = hashlib.sha256(canonical_bytes).hexdigest()
+        container: dict[str, Any] = {
             "version": 1,
             "data": data,
             "sha256": digest,
+            "integrity_sha256": digest,
         }
+        if self._hmac_key:
+            container["integrity_hmac_sha256"] = hmac.new(
+                self._hmac_key, canonical_bytes, hashlib.sha256
+            ).hexdigest()
 
         raw_bytes = json.dumps(container, indent=2, sort_keys=True).encode("utf-8")
         tmp_path = self._store_path + f".tmp.{uuid.uuid4().hex}"
@@ -429,6 +515,11 @@ class DurableConsortiumStore:
             self._last_size = stat.st_size
             self._is_established = True
             self._is_corrupted = False
+
+            marker = self._store_path + ".established"
+            if not os.path.exists(marker):
+                with open(marker, "w", encoding="utf-8") as mf:
+                    mf.write("established\n")
         finally:
             if os.path.exists(tmp_path):
                 with contextlib.suppress(Exception):
@@ -495,9 +586,14 @@ class DurableConsortiumStore:
         with self._lock, self._file_lock_context():
             self._consortia.clear()
             self._proposals.clear()
-            if not self._in_memory and os.path.exists(self._store_path):
-                with contextlib.suppress(Exception):
-                    os.remove(self._store_path)
+            if not self._in_memory and self._store_path:
+                if os.path.exists(self._store_path):
+                    with contextlib.suppress(Exception):
+                        os.remove(self._store_path)
+                marker = self._store_path + ".established"
+                if os.path.exists(marker):
+                    with contextlib.suppress(Exception):
+                        os.remove(marker)
             self._last_mtime_ns = 0
             self._last_size = -1
             self._is_established = False
