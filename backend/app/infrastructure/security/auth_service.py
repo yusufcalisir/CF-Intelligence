@@ -310,6 +310,18 @@ class AuthenticationService:
                 clearance_level=clearance,
             )
 
+    def _resolve_actor(self, actor_token: str | None = None, actor: str | None = None) -> tuple[str, str]:
+        """Resolve verified operator identity from JWT or fallback truthfully."""
+        if actor_token:
+            is_valid, claims, _ = self.verify_access_token(actor_token)
+            if is_valid and claims:
+                u = claims.get("username") or claims.get("sub")
+                b = claims.get("bank_id", "unknown")
+                return f"user:{u}@{b}", "authenticated_operator"
+        if actor:
+            return actor, "caller_specified"
+        return "system", "internal"
+
     def register_user(
         self,
         username: str,
@@ -317,6 +329,8 @@ class AuthenticationService:
         bank_id: str = "bank_a",
         roles: list[str] | None = None,
         clearance_level: int = 1,
+        actor_token: str | None = None,
+        actor: str | None = None,
     ) -> UserRecord:
         """Register or update a user with a bcrypt-hashed password (never plaintext)."""
         uname = username.lower().strip()
@@ -331,6 +345,22 @@ class AuthenticationService:
             is_active=True,
             status="active",
         )
+        actor_id, actor_type = self._resolve_actor(actor_token, actor)
+        from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+        ImmutableAuditChain.get_instance().append_event(
+            event_type="USER_REGISTERED",
+            actor_id=actor_id,
+            action=f"register_user:{uname}",
+            resource_id=f"user:{uname}",
+            details={
+                "username": uname,
+                "bank_id": bank_id,
+                "roles": roles or ["analyst"],
+                "clearance_level": clearance_level,
+                "actor_type": actor_type,
+            },
+        )
         self.identity_store.save_user(user)
         return user
 
@@ -339,21 +369,101 @@ class AuthenticationService:
         uname = username.lower().strip()
         return self.identity_store.get_user(uname, include_inactive=include_inactive)
 
-    def deactivate_user(self, username: str) -> bool:
-        """Deactivate account across all processes."""
-        return self.identity_store.deactivate_user(username)
+    def deactivate_user(
+        self,
+        username: str,
+        actor_token: str | None = None,
+        actor: str | None = None,
+        reason: str = "administrative_deactivation",
+    ) -> bool:
+        """Deactivate account across all processes and record audit event."""
+        uname = username.lower().strip()
+        actor_id, actor_type = self._resolve_actor(actor_token, actor)
+        from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 
-    def activate_user(self, username: str) -> bool:
-        """Activate account across all processes."""
-        return self.identity_store.activate_user(username)
+        ImmutableAuditChain.get_instance().append_event(
+            event_type="USER_DEACTIVATED",
+            actor_id=actor_id,
+            action=f"deactivate_user:{uname}",
+            resource_id=f"user:{uname}",
+            details={
+                "username": uname,
+                "reason": reason,
+                "actor_type": actor_type,
+            },
+        )
+        return self.identity_store.deactivate_user(uname)
 
-    def suspend_user(self, username: str) -> bool:
-        """Suspend account across all processes."""
-        return self.identity_store.suspend_user(username)
+    def activate_user(
+        self,
+        username: str,
+        actor_token: str | None = None,
+        actor: str | None = None,
+    ) -> bool:
+        """Activate account across all processes and record audit event."""
+        uname = username.lower().strip()
+        actor_id, actor_type = self._resolve_actor(actor_token, actor)
+        from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 
-    def delete_user(self, username: str) -> bool:
-        """Permanently delete account across all processes."""
-        return self.identity_store.delete_user(username)
+        ImmutableAuditChain.get_instance().append_event(
+            event_type="USER_ACTIVATED",
+            actor_id=actor_id,
+            action=f"activate_user:{uname}",
+            resource_id=f"user:{uname}",
+            details={
+                "username": uname,
+                "actor_type": actor_type,
+            },
+        )
+        return self.identity_store.activate_user(uname)
+
+    def suspend_user(
+        self,
+        username: str,
+        actor_token: str | None = None,
+        actor: str | None = None,
+        reason: str = "security_suspension",
+    ) -> bool:
+        """Suspend account across all processes and record audit event."""
+        uname = username.lower().strip()
+        actor_id, actor_type = self._resolve_actor(actor_token, actor)
+        from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+        ImmutableAuditChain.get_instance().append_event(
+            event_type="USER_SUSPENDED",
+            actor_id=actor_id,
+            action=f"suspend_user:{uname}",
+            resource_id=f"user:{uname}",
+            details={
+                "username": uname,
+                "reason": reason,
+                "actor_type": actor_type,
+            },
+        )
+        return self.identity_store.suspend_user(uname)
+
+    def delete_user(
+        self,
+        username: str,
+        actor_token: str | None = None,
+        actor: str | None = None,
+    ) -> bool:
+        """Permanently delete account across all processes and record audit event."""
+        uname = username.lower().strip()
+        actor_id, actor_type = self._resolve_actor(actor_token, actor)
+        from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+        ImmutableAuditChain.get_instance().append_event(
+            event_type="USER_DELETED",
+            actor_id=actor_id,
+            action=f"delete_user:{uname}",
+            resource_id=f"user:{uname}",
+            details={
+                "username": uname,
+                "actor_type": actor_type,
+            },
+        )
+        return self.identity_store.delete_user(uname)
 
     def authenticate(
         self,
@@ -609,14 +719,35 @@ class AuthenticationService:
 
         return True, payload, "Token is valid."
 
-    def revoke_token(self, token_str: str) -> bool:
-        """Revoke a token across all workers by adding its JTI to the durable store."""
+    def revoke_token(
+        self,
+        token_str: str,
+        actor_token: str | None = None,
+        actor: str | None = None,
+        reason: str = "explicit_revocation",
+    ) -> bool:
+        """Revoke a token across all workers by adding its JTI to the durable store and emitting an audit event."""
         try:
-            # Decode without signature verification just to get JTI if expired
             unverified = jwt.decode(token_str, options={"verify_signature": False})
             jti = unverified.get("jti")
+            sub = unverified.get("sub") or unverified.get("username")
             if jti:
-                self.identity_store.revoke_token(jti, reason="explicit_revocation")
+                actor_id, actor_type = self._resolve_actor(actor_token, actor)
+                from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+                ImmutableAuditChain.get_instance().append_event(
+                    event_type="TOKEN_REVOCATION",
+                    actor_id=actor_id,
+                    action=f"revoke_token:{jti}",
+                    resource_id=f"token:{jti}",
+                    details={
+                        "jti": jti,
+                        "token_subject": sub,
+                        "reason": reason,
+                        "actor_type": actor_type,
+                    },
+                )
+                self.identity_store.revoke_token(jti, reason=reason)
                 return True
         except Exception as exc:
             logger.warning("Failed to revoke token: %s", exc)

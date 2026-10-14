@@ -108,6 +108,10 @@ class DualSignoffGate:
 
         valid_signoffs: dict[str, str] = {}
         for sign in sign_offs:
+            if not isinstance(sign, dict):
+                continue
+            if sign.get("is_revoked") is True or sign.get("is_active") is False or sign.get("status") == "revoked":
+                continue
             role = str(sign.get("role", "")).lower().strip()
             user = str(sign.get("user", "")).strip()
             signature = str(sign.get("signature", "")).strip()

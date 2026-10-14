@@ -54,11 +54,12 @@ class ConsortiumGovernanceService:
         actor: str | None = None,
         trusted_context: Any | None = None,
         action_name: str = "consortium_mutation",
-    ) -> None:
+    ) -> dict[str, Any]:
         """Validate that direct service mutations enforce authentic institutional authority.
 
         Rejects unauthenticated calls, caller-supplied actor identity without authentication,
         and cross-bank institutional impersonation.
+        Returns authentic attribution metadata.
         """
         if trusted_context is not None:
             from app.application.services.model_registry import verify_trusted_internal_context
@@ -77,11 +78,20 @@ class ConsortiumGovernanceService:
                 raise PermissionError(
                     f"Internal orchestration authority rejected for {action_name}: {ctx_reason}"
                 )
-            if getattr(trusted_context, "service_name", "") != "consortium_coordinator":
+            svc_name = getattr(trusted_context, "service_name", "") or (
+                trusted_context.get("service_name", "") if isinstance(trusted_context, dict) else ""
+            )
+            if svc_name != "consortium_coordinator":
                 raise PermissionError(
-                    f"Internal service '{getattr(trusted_context, 'service_name', '')}' is not authorized for {action_name}."
+                    f"Internal service '{svc_name}' is not authorized for {action_name}."
                 )
-            return
+            return {
+                "actor_id": f"service:{svc_name}",
+                "actor_type": "trusted_internal_service",
+                "actor_institution": expected_bank,
+                "effective_role": ["consortium_coordinator"],
+                "attribution_limitation": None,
+            }
 
         if actor and not auth_token:
             raise PermissionError(
@@ -121,6 +131,13 @@ class ConsortiumGovernanceService:
             raise PermissionError(
                 f"Principal '{username}' lacks required governance role for {action_name}."
             )
+        return {
+            "actor_id": f"user:{username}@{user_bank}",
+            "actor_type": "authenticated_operator",
+            "actor_institution": user_bank,
+            "effective_role": list(user_roles),
+            "attribution_limitation": None,
+        }
 
     def create_consortium(
         self,
@@ -152,7 +169,7 @@ class ConsortiumGovernanceService:
         if min_members_n < 1:
             raise ValueError(f"min_members_n must be >= 1, got {min_members_n}")
 
-        self._verify_service_actor_bank(
+        attr = self._verify_service_actor_bank(
             clean_founder,
             auth_token=auth_token,
             actor=actor,
@@ -167,6 +184,25 @@ class ConsortiumGovernanceService:
                 if is_prod:
                     raise ValueError(f"Consortium '{clean_id}' already exists in production.")
                 return consortia[clean_id]
+
+            from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+            ImmutableAuditChain.get_instance().append_event(
+                event_type="CONSORTIUM_CREATED",
+                actor_id=attr["actor_id"],
+                action=f"create_consortium:{clean_id}",
+                resource_id=f"consortium:{clean_id}",
+                details={
+                    "consortium_id": clean_id,
+                    "name": clean_name,
+                    "founder_bank_id": clean_founder,
+                    "quorum_ratio": quorum_ratio,
+                    "max_epsilon": max_epsilon,
+                    "min_members_n": min_members_n,
+                    "actor_type": attr["actor_type"],
+                    "actor_institution": attr["actor_institution"],
+                },
+            )
 
             founder = ConsortiumMember(
                 bank_id=clean_founder,
@@ -211,7 +247,7 @@ class ConsortiumGovernanceService:
         clean_creator = creator_bank_id.lower().strip()
         clean_target = target_bank_id.lower().strip()
 
-        self._verify_service_actor_bank(
+        attr = self._verify_service_actor_bank(
             clean_creator,
             consortium_id=clean_id,
             target_bank_id=clean_target,
@@ -257,6 +293,24 @@ class ConsortiumGovernanceService:
                 required_quorum_ratio=consortium.quorum_ratio,
                 ttl_seconds=ttl_seconds,
                 metadata=metadata or {},
+            )
+
+            from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+            ImmutableAuditChain.get_instance().append_event(
+                event_type="CONSORTIUM_PROPOSAL_CREATED",
+                actor_id=attr["actor_id"],
+                action=f"propose_membership_change:{proposal_id}:{action.value}",
+                resource_id=f"consortium:{clean_id}:proposal:{proposal_id}",
+                details={
+                    "proposal_id": proposal_id,
+                    "consortium_id": clean_id,
+                    "creator_bank_id": clean_creator,
+                    "target_bank_id": clean_target,
+                    "action": action.value,
+                    "actor_type": attr["actor_type"],
+                    "actor_institution": attr["actor_institution"],
+                },
             )
 
             # Creator automatically votes FOR the proposal
@@ -353,7 +407,7 @@ class ConsortiumGovernanceService:
 
         prop = self._store.get_proposal(clean_prop_id)
         prop_consortium_id = prop.consortium_id if prop else None
-        self._verify_service_actor_bank(
+        attr = self._verify_service_actor_bank(
             clean_bank_id,
             consortium_id=prop_consortium_id,
             auth_token=auth_token,
@@ -396,6 +450,24 @@ class ConsortiumGovernanceService:
             else:
                 proposal.votes_against.add(clean_bank_id)
                 proposal.votes_for.discard(clean_bank_id)
+
+            from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+            ImmutableAuditChain.get_instance().append_event(
+                event_type="CONSORTIUM_VOTE_CAST",
+                actor_id=attr["actor_id"],
+                action=f"cast_vote:{clean_prop_id}:{'FOR' if approve else 'AGAINST'}",
+                resource_id=f"consortium:{proposal.consortium_id}:proposal:{clean_prop_id}",
+                details={
+                    "proposal_id": clean_prop_id,
+                    "consortium_id": proposal.consortium_id,
+                    "bank_id": clean_bank_id,
+                    "approve": approve,
+                    "voting_power": member.voting_power,
+                    "actor_type": attr["actor_type"],
+                    "actor_institution": attr["actor_institution"],
+                },
+            )
 
             logger.info(
                 "Bank %s voted %s on proposal %s (voting_power=%.2f)",
@@ -676,12 +748,28 @@ class ConsortiumGovernanceService:
     def _execute_proposal_action_in_memory(self, consortium: Consortium, proposal: MembershipProposal) -> None:
         """Applies approved proposal actions to consortium state (called within mutation lock)."""
         target = proposal.target_bank_id
+        from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 
         if proposal.action == ProposalAction.ADD_MEMBER and target not in consortium.members:
             assigned_role = proposal.metadata.get("role", MemberRole.FULL_MEMBER)
             if isinstance(assigned_role, str):
                 assigned_role = MemberRole(assigned_role)
             assigned_power = float(proposal.metadata.get("voting_power", 1.0))
+
+            ImmutableAuditChain.get_instance().append_event(
+                event_type="CONSORTIUM_MEMBER_ADMITTED",
+                actor_id=f"governance:proposal:{proposal.proposal_id}",
+                action=f"admit_member:{target}",
+                resource_id=f"consortium:{consortium.consortium_id}:member:{target}",
+                details={
+                    "consortium_id": consortium.consortium_id,
+                    "target_bank_id": target,
+                    "proposal_id": proposal.proposal_id,
+                    "assigned_role": assigned_role.value if hasattr(assigned_role, "value") else str(assigned_role),
+                    "voting_power": assigned_power,
+                    "approved_by_votes": sorted(proposal.votes_for),
+                },
+            )
 
             consortium.members[target] = ConsortiumMember(
                 bank_id=target,
@@ -692,12 +780,29 @@ class ConsortiumGovernanceService:
             logger.info("Bank %s joined consortium %s (role=%s, power=%.2f)", target, consortium.consortium_id, assigned_role.value, assigned_power)
 
         elif proposal.action == ProposalAction.REMOVE_MEMBER and target in consortium.members:
+            reason_text = f"Expelled via approved governance proposal {proposal.proposal_id}"
+
+            ImmutableAuditChain.get_instance().append_event(
+                event_type="CONSORTIUM_MEMBER_EXPELLED",
+                actor_id=f"governance:proposal:{proposal.proposal_id}",
+                action=f"expel_member:{target}",
+                resource_id=f"consortium:{consortium.consortium_id}:member:{target}",
+                details={
+                    "consortium_id": consortium.consortium_id,
+                    "target_bank_id": target,
+                    "proposal_id": proposal.proposal_id,
+                    "reason": reason_text,
+                    "approved_by_votes": sorted(proposal.votes_for),
+                    "opposed_by_votes": sorted(proposal.votes_against),
+                },
+            )
+
             del consortium.members[target]
             consortium.removed_members[target] = {
                 "bank_id": target,
                 "removed_at": datetime.datetime.now(UTC).isoformat(),
                 "proposal_id": proposal.proposal_id,
-                "reason": f"Expelled via approved governance proposal {proposal.proposal_id}",
+                "reason": reason_text,
             }
             logger.info("Bank %s evicted from consortium %s", target, consortium.consortium_id)
 
@@ -718,6 +823,19 @@ class ConsortiumGovernanceService:
                     new_st = ConsortiumStatus(new_st)
                 consortium.status = new_st
                 logger.info("Consortium %s status updated to %s", consortium.consortium_id, consortium.status.value)
+
+            ImmutableAuditChain.get_instance().append_event(
+                event_type="CONSORTIUM_POLICY_UPDATED",
+                actor_id=f"governance:proposal:{proposal.proposal_id}",
+                action=f"update_policy:{consortium.consortium_id}",
+                resource_id=f"consortium:{consortium.consortium_id}",
+                details={
+                    "consortium_id": consortium.consortium_id,
+                    "proposal_id": proposal.proposal_id,
+                    "policy_updates": proposal.metadata,
+                    "approved_by_votes": sorted(proposal.votes_for),
+                },
+            )
 
     def get_consortium(self, consortium_id: str) -> Consortium | None:
         """Retrieves consortium by ID after validating disk freshness."""

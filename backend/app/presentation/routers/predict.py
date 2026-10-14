@@ -259,18 +259,25 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
         settings = get_settings()
         if settings.app_env.lower() == "production":
             sign_offs = active_entry.get("sign_offs", [])
-            if not isinstance(sign_offs, list) or len(sign_offs) < 2:
+            active_sign_offs = [
+                s for s in sign_offs
+                if isinstance(s, dict)
+                and s.get("is_revoked") is not True
+                and s.get("is_active", True) is not False
+                and s.get("status", "active") != "revoked"
+            ]
+            if len(active_sign_offs) < 2:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail=f"Serving model for simulation '{simulation_id}' rejected: champion authorization missing sign-offs.",
                 )
             ml_signs = [
-                s for s in sign_offs
-                if s.get("role") in ("ml_engineer", "ml_lead") and s.get("is_revoked") is not True
+                s for s in active_sign_offs
+                if s.get("role") in ("ml_engineer", "ml_lead")
             ]
             comp_signs = [
-                s for s in sign_offs
-                if s.get("role") in ("compliance", "compliance_officer") and s.get("is_revoked") is not True
+                s for s in active_sign_offs
+                if s.get("role") in ("compliance", "compliance_officer")
             ]
             if not ml_signs or not comp_signs:
                 raise HTTPException(

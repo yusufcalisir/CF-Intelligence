@@ -69,6 +69,12 @@ def test_model_registry_concurrent_dual_signoff(tmp_path: Any) -> None:
     registry = ModelRegistry(storage_dir=str(tmp_path))
     sim_id = "test_concurrent_signoff_sim"
 
+    from app.infrastructure.security.auth_service import AuthenticationService
+    auth_svc = AuthenticationService.get_instance()
+    u_ml = auth_svc.register_user("user_ml_engineer", "Pass1234!", "bank_a", ["ml_engineer"])
+    auth_svc.register_user("user_compliance", "Pass1234!", "bank_a", ["compliance"])
+    bundle = auth_svc.create_token_bundle(u_ml)
+
     for i in range(1, 4):
         registry.save_version(
             simulation_id=sim_id,
@@ -76,6 +82,8 @@ def test_model_registry_concurrent_dual_signoff(tmp_path: Any) -> None:
             metrics={"auc_roc": 0.85},
             is_promoted=(i == 1),
             status="champion" if i == 1 else "candidate",
+            owning_bank_id="bank_a",
+            auth_token=bundle.access_token,
         )
 
     def do_signoff(ver: int, role: str) -> None:

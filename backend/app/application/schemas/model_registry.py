@@ -19,6 +19,15 @@ class SignOffRecord(BaseModel):
     fairness_score: float = Field(1.0, ge=0.0, le=1.0, description="Evaluated disparate impact ratio")
     bias_metric: float = Field(0.0, ge=0.0, description="Evaluated demographic disparity metric")
     drift_divergence: float = Field(0.0, ge=0.0, description="Concept drift divergence index")
+    status: str = Field("active", description="Status of sign-off ('active' or 'revoked')")
+    is_active: bool = Field(True, description="Whether sign-off is actively granting authority")
+    is_revoked: bool = Field(False, description="Whether sign-off was revoked")
+    revoked_at: str | None = Field(None, description="ISO timestamp of revocation")
+    revoked_by: str | None = Field(None, description="Verified actor who revoked approval")
+    revocation_reason: str | None = Field(None, description="Reason for revocation")
+    revocation_evidence: dict[str, Any] | None = Field(None, description="Attribution evidence of revoker")
+    payload_bound: str | None = None
+    user_id: str | None = None
 
 
 class ModelSignOffRequest(BaseModel):

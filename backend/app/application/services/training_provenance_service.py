@@ -1295,19 +1295,54 @@ class DurableTrustStore:
         hmac_key = hashlib.sha256(b"CFI-TRUST-STORE-HMAC-KEY-V2:" + self._admin_token.encode("utf-8")).digest()
         return priv, pub_hex, hmac_key
 
-    def _verify_admin_authorization(self, token: str | None = None) -> None:
+    def _verify_admin_authorization(
+        self,
+        token: str | None = None,
+        operator_token: str | None = None,
+        internal_context: Any | None = None,
+        action_name: str = "administrative_mutation",
+    ) -> dict[str, Any]:
         """Verify administrative credentials for mutating trust operations.
 
         Enforces strict fail-closed authorization:
         - Any disk-backed store or production environment MUST have an independently provisioned admin credential.
         - Missing or unconfigured administrator authority strictly disables mutations (fail-closed).
         - Caller-supplied tokens must match the authoritative credential via timing-safe comparison.
+        - When an operator_token (JWT) is provided, it must be cryptographically valid, not revoked, and have an admin role.
+        - When internal_context is provided, it must be verified as a trusted internal context.
         - Arbitrary caller-controlled parameters cannot establish administrative authority.
+        - Returns structured attribution metadata without fabricating an operator username.
         """
         is_prod = (
             (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or get_settings().app_env).lower()
             == "production"
         )
+
+        if internal_context is not None:
+            from app.application.services.model_registry import verify_trusted_internal_context
+
+            is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                internal_context,
+                expected_action=action_name,
+                expected_service_name="trust_store_operator",
+                expected_resource_type="trust_store",
+                consume_nonce=True,
+            )
+            if not is_valid_ctx:
+                raise TrainingProvenanceSecurityError(
+                    f"Internal orchestration authority rejected for {action_name}: {ctx_reason}"
+                )
+            svc_name = getattr(internal_context, "service_name", None) or (
+                internal_context.get("service_name") if isinstance(internal_context, dict) else ""
+            )
+            return {
+                "actor_id": f"service:{svc_name}",
+                "actor_type": "trusted_internal_service",
+                "actor_institution": "system",
+                "effective_role": "internal_service",
+                "attribution_limitation": None,
+            }
+
         if not self._in_memory or is_prod:
             if not self._admin_token:
                 raise TrainingProvenanceSecurityError(
@@ -1322,6 +1357,41 @@ class DurableTrustStore:
             raise TrainingProvenanceSecurityError(
                 "Unauthorized administrative operation: invalid or missing admin token for DurableTrustStore."
             )
+
+        if operator_token:
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            auth_svc = AuthenticationService.get_instance()
+            is_valid, claims, err = auth_svc.verify_access_token(operator_token)
+            if not is_valid or not claims:
+                raise TrainingProvenanceSecurityError(f"Operator token verification failed: {err}")
+
+            raw_roles = claims.get("roles") or []
+            if isinstance(raw_roles, str):
+                raw_roles = [raw_roles]
+            user_roles = {r.lower().strip() for r in raw_roles}
+            if not (user_roles & {"admin", "security_officer", "compliance_officer"}):
+                raise TrainingProvenanceSecurityError(
+                    f"Operator '{claims.get('sub')}' lacks required administrative role for trust store mutation."
+                )
+
+            uname = claims.get("username") or claims.get("sub") or "unknown_user"
+            bank = claims.get("bank_id") or "system"
+            return {
+                "actor_id": f"user:{uname}@{bank}",
+                "actor_type": "authenticated_operator",
+                "actor_institution": bank,
+                "effective_role": list(user_roles),
+                "attribution_limitation": None,
+            }
+
+        return {
+            "actor_id": "unattributed_shared_admin_secret",
+            "actor_type": "shared_secret",
+            "actor_institution": "system",
+            "effective_role": "admin_secret_holder",
+            "attribution_limitation": "AUTHENTICATION_SECRET_PRESENT_BUT_INDIVIDUAL_OPERATOR_UNATTRIBUTED",
+        }
 
     def _reload_unlocked(self, force: bool = False) -> None:
         """Internal reload without acquiring locks (must be called with self._lock and file lock held)."""
@@ -1621,9 +1691,16 @@ class DurableTrustStore:
         public_key_hex: str,
         authorized_replacement: bool = False,
         admin_token: str | None = None,
+        operator_token: str | None = None,
+        internal_context: Any | None = None,
     ) -> None:
         """Register an approved key ID and public key."""
-        self._verify_admin_authorization(admin_token)
+        attribution = self._verify_admin_authorization(
+            token=admin_token,
+            operator_token=operator_token,
+            internal_context=internal_context,
+            action_name="register_approved_key",
+        )
         with self._lock, self._file_lock_context():
             self._reload_unlocked(force=True)
             clean_kid = key_id.strip()
@@ -1642,9 +1719,32 @@ class DurableTrustStore:
                         f"registered with a different public key."
                     )
 
+            from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+            ImmutableAuditChain.get_instance().append_event(
+                event_type="TRUST_STORE_KEY_REGISTRATION",
+                actor_id=attribution["actor_id"],
+                action=f"register_approved_key:{clean_kid}",
+                resource_id=f"trust_store:key:{clean_kid}",
+                details={
+                    "key_id": clean_kid,
+                    "public_key_hex": clean_hex,
+                    "authorized_replacement": authorized_replacement,
+                    "actor_type": attribution["actor_type"],
+                    "actor_institution": attribution["actor_institution"],
+                    "effective_role": attribution["effective_role"],
+                    "attribution_limitation": attribution["attribution_limitation"],
+                    "store_path": self._trust_file_path or ":memory:",
+                },
+            )
+
             self._approved_keys[clean_kid] = {
                 "public_key_hex": clean_hex,
                 "registered_at": datetime.now(UTC).isoformat(),
+                "registered_by": attribution["actor_id"],
+                "actor_type": attribution["actor_type"],
+                "actor_institution": attribution["actor_institution"],
+                "attribution_limitation": attribution["attribution_limitation"],
             }
             self._persist_unlocked()
 
@@ -1653,16 +1753,46 @@ class DurableTrustStore:
         key_id: str,
         reason: str = "compromise",
         admin_token: str | None = None,
+        operator_token: str | None = None,
+        internal_context: Any | None = None,
     ) -> None:
         """Revoke key due to compromise (all receipts signed by this key are rejected)."""
-        self._verify_admin_authorization(admin_token)
+        attribution = self._verify_admin_authorization(
+            token=admin_token,
+            operator_token=operator_token,
+            internal_context=internal_context,
+            action_name="revoke_key",
+        )
         with self._lock, self._file_lock_context():
             self._reload_unlocked(force=True)
             clean_kid = key_id.strip()
+
+            from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+            ImmutableAuditChain.get_instance().append_event(
+                event_type="TRUST_STORE_KEY_REVOCATION",
+                actor_id=attribution["actor_id"],
+                action=f"revoke_key:{clean_kid}",
+                resource_id=f"trust_store:key:{clean_kid}",
+                details={
+                    "key_id": clean_kid,
+                    "reason": reason,
+                    "actor_type": attribution["actor_type"],
+                    "actor_institution": attribution["actor_institution"],
+                    "effective_role": attribution["effective_role"],
+                    "attribution_limitation": attribution["attribution_limitation"],
+                    "store_path": self._trust_file_path or ":memory:",
+                },
+            )
+
             self._revoked_keys[clean_kid] = {
                 "reason": reason,
                 "revoked_at": datetime.now(UTC).isoformat(),
-                "revoked_by": "admin",
+                "revoked_by": attribution["actor_id"],
+                "actor_type": attribution["actor_type"],
+                "actor_institution": attribution["actor_institution"],
+                "effective_role": attribution["effective_role"],
+                "attribution_limitation": attribution["attribution_limitation"],
             }
             self._approved_keys.pop(clean_kid, None)
             self._persist_unlocked()
@@ -1672,15 +1802,46 @@ class DurableTrustStore:
         key_id: str,
         reason: str = "lifecycle_rotation",
         admin_token: str | None = None,
+        operator_token: str | None = None,
+        internal_context: Any | None = None,
     ) -> None:
         """Retire key from active issuance; existing receipts created before retirement remain valid."""
-        self._verify_admin_authorization(admin_token)
+        attribution = self._verify_admin_authorization(
+            token=admin_token,
+            operator_token=operator_token,
+            internal_context=internal_context,
+            action_name="retire_key",
+        )
         with self._lock, self._file_lock_context():
             self._reload_unlocked(force=True)
             clean_kid = key_id.strip()
+
+            from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+            ImmutableAuditChain.get_instance().append_event(
+                event_type="TRUST_STORE_KEY_RETIREMENT",
+                actor_id=attribution["actor_id"],
+                action=f"retire_key:{clean_kid}",
+                resource_id=f"trust_store:key:{clean_kid}",
+                details={
+                    "key_id": clean_kid,
+                    "reason": reason,
+                    "actor_type": attribution["actor_type"],
+                    "actor_institution": attribution["actor_institution"],
+                    "effective_role": attribution["effective_role"],
+                    "attribution_limitation": attribution["attribution_limitation"],
+                    "store_path": self._trust_file_path or ":memory:",
+                },
+            )
+
             self._retired_keys[clean_kid] = {
                 "reason": reason,
                 "retired_at": datetime.now(UTC).isoformat(),
+                "retired_by": attribution["actor_id"],
+                "actor_type": attribution["actor_type"],
+                "actor_institution": attribution["actor_institution"],
+                "effective_role": attribution["effective_role"],
+                "attribution_limitation": attribution["attribution_limitation"],
             }
             self._persist_unlocked()
 
@@ -1691,9 +1852,16 @@ class DurableTrustStore:
         new_public_key_hex: str,
         reason: str = "lifecycle_rotation",
         admin_token: str | None = None,
+        operator_token: str | None = None,
+        internal_context: Any | None = None,
     ) -> None:
         """Atomically rotate trusted keys by retiring old key and registering new key."""
-        self._verify_admin_authorization(admin_token)
+        attribution = self._verify_admin_authorization(
+            token=admin_token,
+            operator_token=operator_token,
+            internal_context=internal_context,
+            action_name="rotate_key",
+        )
         with self._lock, self._file_lock_context():
             self._reload_unlocked(force=True)
             clean_old = old_key_id.strip()
@@ -1705,13 +1873,42 @@ class DurableTrustStore:
                     f"Cannot rotate to key_id '{clean_new}' because it has been revoked due to compromise."
                 )
 
+            from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+            ImmutableAuditChain.get_instance().append_event(
+                event_type="TRUST_STORE_KEY_ROTATION",
+                actor_id=attribution["actor_id"],
+                action=f"rotate_key:{clean_old}->{clean_new}",
+                resource_id=f"trust_store:key:{clean_new}",
+                details={
+                    "old_key_id": clean_old,
+                    "new_key_id": clean_new,
+                    "new_public_key_hex": clean_hex,
+                    "reason": reason,
+                    "actor_type": attribution["actor_type"],
+                    "actor_institution": attribution["actor_institution"],
+                    "effective_role": attribution["effective_role"],
+                    "attribution_limitation": attribution["attribution_limitation"],
+                    "store_path": self._trust_file_path or ":memory:",
+                },
+            )
+
             self._retired_keys[clean_old] = {
                 "reason": reason,
                 "retired_at": datetime.now(UTC).isoformat(),
+                "retired_by": attribution["actor_id"],
+                "actor_type": attribution["actor_type"],
+                "actor_institution": attribution["actor_institution"],
+                "effective_role": attribution["effective_role"],
+                "attribution_limitation": attribution["attribution_limitation"],
             }
             self._approved_keys[clean_new] = {
                 "public_key_hex": clean_hex,
                 "registered_at": datetime.now(UTC).isoformat(),
+                "registered_by": attribution["actor_id"],
+                "actor_type": attribution["actor_type"],
+                "actor_institution": attribution["actor_institution"],
+                "attribution_limitation": attribution["attribution_limitation"],
             }
             self._persist_unlocked()
 

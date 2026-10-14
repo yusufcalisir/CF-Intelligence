@@ -59,6 +59,7 @@ from app.config import get_settings
 from app.infrastructure.security.durable_nonce_store import (
     DurableNonceStore,
     NonceStoreIntegrityError,
+    reset_default_nonce_store,
 )
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 
@@ -81,6 +82,7 @@ def isolated_env(tmp_path, monkeypatch):
     consortium_secret = "consortium_store_secret_entropy_high_32_bytes_min_xyz_1234"
     jwt_secret = "jwt_signing_secret_high_entropy_min_32_bytes_value_123456789"
     account_file = str(tmp_path / "test_accounts.json")
+    audit_file = str(tmp_path / "test_audit.json")
     admin_token = "admin-secret-token-test-12345"
 
     monkeypatch.setenv("CFI_INTERNAL_CONTEXT_SECRET", prod_secret)
@@ -97,13 +99,18 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setenv("OIDC_JWT_SIGNING_SECRET", jwt_secret)
     monkeypatch.setenv("CFI_ACCOUNT_STORE_PATH", account_file)
     monkeypatch.setenv("CFI_ACCOUNT_AUTHORITY_SECRET", "authoritative_signing_master_secret_key_64_bytes_test")
+    monkeypatch.setenv("CFI_AUDIT_LEDGER_PATH", audit_file)
+    monkeypatch.setenv("CFI_AUDIT_LEDGER_SECRET", payload_secret)
     monkeypatch.setenv("APP_ENV", "production")
 
     get_settings.cache_clear()
+    reset_default_nonce_store()
     DurableNonceStore._instance = None
     DurableConsortiumStore._instance = None
     from app.infrastructure.security.auth_service import AuthenticationService
+    from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
     AuthenticationService._instance = None
+    ImmutableAuditChain.reset_instance()
 
     yield {
         "tmp_path": tmp_path,
@@ -112,6 +119,7 @@ def isolated_env(tmp_path, monkeypatch):
         "reg_dir": reg_dir,
         "consortium_file": consortium_file,
         "account_file": account_file,
+        "audit_file": audit_file,
         "prod_secret": prod_secret,
         "payload_secret": payload_secret,
         "consortium_secret": consortium_secret,
@@ -120,9 +128,11 @@ def isolated_env(tmp_path, monkeypatch):
     }
 
     get_settings.cache_clear()
+    reset_default_nonce_store()
     DurableNonceStore._instance = None
     DurableConsortiumStore._instance = None
     AuthenticationService._instance = None
+    ImmutableAuditChain.reset_instance()
 
 
 def _create_champion_fixtures(env: dict[str, Any], sim_id: str = "sim_prod_champ_01") -> tuple[ModelRegistry, int, str]:
