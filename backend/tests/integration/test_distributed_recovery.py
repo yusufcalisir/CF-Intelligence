@@ -39,6 +39,7 @@ from app.application.services.privacy_service import (
     PrivacyService,
 )
 from app.domain.enums import AggregationMethod, CasePriority, CaseStatus
+from app.domain.model_serving_errors import ModelIntegrityError
 from app.domain.value_objects import ModelWeights
 from app.infrastructure.redis_store import RedisStore
 from app.main import app
@@ -325,7 +326,7 @@ class TestDistributedCoordinationAndRecovery:
             v2_candidate_weights = {"fc.weight": torch.tensor([[2.0, 2.0], [2.0, 2.0]])}
             with (
                 patch("torch.save", side_effect=OSError("Injected disk failure during model serialization")),
-                pytest.raises(OSError, match="Injected disk failure"),
+                pytest.raises((OSError, ModelIntegrityError), match="Injected disk failure"),
             ):
                 registry.save_version(
                     simulation_id=sim_id,

@@ -5814,8 +5814,7 @@ class ModelEvaluationEngine:
                 timestamp = existing_rec.get("timestamp") or datetime.now(UTC).isoformat()
             else:
                 seq_key = f"{simulation_id}:prediction_seq"
-                pred_seq = int(self._store.get(seq_key) or 0) + 1
-                self._store.set(seq_key, pred_seq)
+                pred_seq = self._store.incr(seq_key)
                 timestamp = datetime.now(UTC).isoformat()
 
             record = {
@@ -5836,11 +5835,12 @@ class ModelEvaluationEngine:
             list_key = f"{simulation_id}:prediction_keys"
             existing_val = self._store.get(list_key)
             existing = existing_val if isinstance(existing_val, list) else []
-            existing.append(key)
-            if len(existing) > 1000:
-                oldest = existing.pop(0)
-                self._store.delete(oldest)
-            self._store.set(list_key, existing)
+            if key not in existing:
+                existing.append(key)
+                if len(existing) > 1000:
+                    oldest = existing.pop(0)
+                    self._store.delete(oldest)
+                self._store.set(list_key, existing)
 
     def log_feedback(
         self,
@@ -6239,26 +6239,42 @@ class ModelEvaluationEngine:
                             )
                             logger.info(promotion_message)
                         elif traffic_share == 0.0 and chall_pr_auc > paired_champ_pr_auc:
-                            traffic_share = 0.1
-                            self._store.set(share_key, 0.1)
-                            self._store.set(traffic_version_key, eval_challenger_ver)
-                            current_seq = int(self._store.get(seq_key) or 0)
-                            new_canary_state = {
-                                "activation_id": uuid.uuid4().hex,
-                                "challenger_version": eval_challenger_ver,
-                                "champion_version": active_ver_num,
-                                "activation_seq": current_seq,
-                                "activation_time": datetime.now(UTC).isoformat(),
-                            }
-                            self._store.set(canary_state_key, new_canary_state)
-                            self._store.set(canary_start_key, current_seq)
-                            promotion_message = (
-                                f"Challenger v{eval_challenger_ver} (PR-AUC: {chall_pr_auc:.4f}) outperformed "
-                                f"Champion v{active_ver_num} (PR-AUC: {paired_champ_pr_auc:.4f}) on matched cohort. "
-                                f"Routed 10% traffic to Challenger v{eval_challenger_ver}."
+                            from app.config import get_settings
+
+                            _settings = get_settings()
+                            is_prod_eval = (
+                                getattr(_settings, "app_env", "development").lower().strip()
+                                == "production"
                             )
-                            logger.info(promotion_message)
-                            promotion_triggered = True
+                            if is_prod_eval and self._store.client is None:
+                                promotion_message = (
+                                    f"Challenger v{eval_challenger_ver} canary activation deferred: "
+                                    "shared authoritative evaluation storage (Redis) is unavailable in production. "
+                                    "Canary traffic cannot be routed using isolated worker-local evidence."
+                                )
+                                logger.warning(promotion_message)
+                                promotion_triggered = False
+                            else:
+                                traffic_share = 0.1
+                                self._store.set(share_key, 0.1)
+                                self._store.set(traffic_version_key, eval_challenger_ver)
+                                current_seq = int(self._store.get(seq_key) or 0)
+                                new_canary_state = {
+                                    "activation_id": uuid.uuid4().hex,
+                                    "challenger_version": eval_challenger_ver,
+                                    "champion_version": active_ver_num,
+                                    "activation_seq": current_seq,
+                                    "activation_time": datetime.now(UTC).isoformat(),
+                                }
+                                self._store.set(canary_state_key, new_canary_state)
+                                self._store.set(canary_start_key, current_seq)
+                                promotion_message = (
+                                    f"Challenger v{eval_challenger_ver} (PR-AUC: {chall_pr_auc:.4f}) outperformed "
+                                    f"Champion v{active_ver_num} (PR-AUC: {paired_champ_pr_auc:.4f}) on matched cohort. "
+                                    f"Routed 10% traffic to Challenger v{eval_challenger_ver}."
+                                )
+                                logger.info(promotion_message)
+                                promotion_triggered = True
                         elif traffic_share == 0.1:
                             if (
                                 not isinstance(canary_state, dict)
@@ -6339,10 +6355,26 @@ class ModelEvaluationEngine:
                                     logger.info(promotion_message)
                                     promotion_triggered = False
                                 else:
-                                    # Promotion Target is unambiguously eval_challenger_ver after full canary validation
-                                    ownership = self.registry.get_simulation_ownership(
-                                        simulation_id
+                                    from app.config import get_settings
+
+                                    _settings = get_settings()
+                                    is_prod_eval = (
+                                        getattr(_settings, "app_env", "development").lower().strip()
+                                        == "production"
                                     )
+                                    if is_prod_eval and self._store.client is None:
+                                        promotion_message = (
+                                            f"Challenger version {eval_challenger_ver} promotion rejected: "
+                                            "shared authoritative evaluation storage (Redis) is unavailable in production. "
+                                            "Promotion cannot occur using evidence assembled from inconsistent worker-local stores."
+                                        )
+                                        logger.error(promotion_message)
+                                        promotion_triggered = False
+                                    else:
+                                        # Promotion Target is unambiguously eval_challenger_ver after full canary validation
+                                        ownership = self.registry.get_simulation_ownership(
+                                            simulation_id
+                                        )
                                     owning_bank = ownership.get("owning_bank_id")
                                     trusted_ctx = create_trusted_internal_context(
                                         "model_evaluation_engine",

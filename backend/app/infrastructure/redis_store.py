@@ -175,6 +175,23 @@ class RedisStore:
         with RedisStore._lock:
             self._fallback_store[key] = value
 
+    def incr(self, key: str) -> int:
+        """Atomically increment the integer value of a key by one.
+
+        In production Redis, this invokes the atomic INCR command across distributed workers.
+        In fallback mode, it executes under RedisStore._lock for thread safety within the process.
+        """
+        c = self.client
+        if c:
+            try:
+                return int(c.incr(self._make_key(key)))
+            except Exception as e:
+                logger.error(f"Redis incr failed for {key}: {e}")
+        with RedisStore._lock:
+            val = int(self._fallback_store.get(key) or 0) + 1
+            self._fallback_store[key] = val
+            return val
+
     def update_conditional(
         self,
         key: str,
