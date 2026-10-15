@@ -227,7 +227,7 @@ class IdempotencyService:
         if self._redis_client is not None:
             try:
                 if not owner_id:
-                    self._redis_client.setex(redis_key, int(ttl_seconds), serialized)
+                    self._redis_client.setex(redis_key, ttl_seconds, serialized)
                     return True
                 elif hasattr(self._redis_client, "eval"):
                     lua_complete = """
@@ -247,7 +247,7 @@ class IdempotencyService:
 
                     return 0
                     """
-                    res = self._redis_client.eval(lua_complete, 1, redis_key, owner_id, serialized, int(ttl_seconds))
+                    res = self._redis_client.eval(lua_complete, 1, redis_key, owner_id, serialized, ttl_seconds)
                     return bool(res)
                 else:
                     raw = self._redis_client.get(redis_key)
