@@ -30,6 +30,7 @@ from app.application.schemas.event_schemas import (
     DLQEnvelope,
     PublishReceipt,
 )
+from app.config import get_settings
 from app.infrastructure.connectors.base_connector import (
     BaseBankConnector,
     NormalizedTransaction,
@@ -169,7 +170,6 @@ class IdempotencyEngine:
         acquired_redis = False
         try:
             from app.application.services.idempotency import IdempotencyService
-            from app.config import get_settings
 
             idem_svc = IdempotencyService.get()
             raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
@@ -219,7 +219,6 @@ class IdempotencyEngine:
         """Check if an event key has already been processed within the TTL window."""
         try:
             from app.application.services.idempotency import IdempotencyService
-            from app.config import get_settings
 
             idem_svc = IdempotencyService.get()
             raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")

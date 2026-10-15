@@ -279,7 +279,7 @@ def verify_authority_tables_detailed_schema(engine: Any) -> list[str]:
 
             # Primary key check
             act_pk = bool(act_col.get("primary_key"))
-            exp_pk = bool(exp_col.primary_key)
+            exp_pk = exp_col.primary_key
             if act_pk != exp_pk:
                 drift.append(
                     f"{table_name}.{col_name} primary_key mismatch: expected {exp_pk}, found {act_pk}"
