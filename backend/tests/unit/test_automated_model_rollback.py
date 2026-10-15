@@ -52,6 +52,22 @@ class TestAutomatedModelRollback(unittest.TestCase):
     """Verifies safe candidate selection and authorization invariants for rollback."""
 
     def setUp(self) -> None:
+        self.env_keys = [
+            "CFI_INTERNAL_CONTEXT_SECRET",
+            "CFI_INTERNAL_NONCE_STORE_PATH",
+            "CFI_TRAINING_RECEIPT_TRUST_STORE",
+            "CFI_TRUST_STORE_PATH",
+            "CFI_TRUST_STORE_ADMIN_TOKEN",
+            "CFI_MODEL_REGISTRY_DIR",
+            "CFI_PAYLOAD_SIGNING_SECRET",
+            "CFI_JWT_SIGNING_SECRET",
+            "CFI_ACCOUNT_STORE_PATH",
+            "CFI_ACCOUNT_AUTHORITY_SECRET",
+            "CFI_AUDIT_LEDGER_PATH",
+            "CFI_AUDIT_LEDGER_SECRET",
+            "APP_ENV",
+        ]
+        self._orig_env = {k: os.environ.get(k) for k in self.env_keys}
         self.test_dir = tempfile.mkdtemp()
         self.nonce_file = os.path.join(self.test_dir, "nonces.json")
         self.trust_file = os.path.join(self.test_dir, "trust.json")
@@ -134,6 +150,11 @@ class TestAutomatedModelRollback(unittest.TestCase):
         self.model_state = torch.nn.Linear(2, 1).state_dict()
 
     def tearDown(self) -> None:
+        for k, v in self._orig_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
         shutil.rmtree(self.test_dir, ignore_errors=True)
         get_settings.cache_clear()
         reset_default_nonce_store()
@@ -186,7 +207,10 @@ class TestAutomatedModelRollback(unittest.TestCase):
             is_promoted=True,
             status="champion",
         )
-        self.assertEqual(self.registry.get_active_version(self.simulation_id)["version"], 3)
+        active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
+        self.assertEqual(active["version"], 3)
 
         # Feed degraded predictions (high latency > 200ms) for v3
         for i in range(5):
@@ -208,6 +232,7 @@ class TestAutomatedModelRollback(unittest.TestCase):
         self.assertTrue(feedback["rollback_triggered"])
         active = self.registry.get_active_version(self.simulation_id)
         self.assertIsNotNone(active)
+        assert active is not None
         self.assertEqual(active["version"], 1)
 
     def test_automated_rollback_fails_closed_when_no_eligible_candidate(self) -> None:
@@ -235,7 +260,10 @@ class TestAutomatedModelRollback(unittest.TestCase):
             is_promoted=True,
             status="champion",
         )
-        self.assertEqual(self.registry.get_active_version(self.simulation_id)["version"], 2)
+        active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
+        self.assertEqual(active["version"], 2)
 
         # Feed degraded predictions
         for i in range(5):
@@ -258,6 +286,8 @@ class TestAutomatedModelRollback(unittest.TestCase):
         self.assertEqual(feedback["traffic_share"], 0.0)
         # v2 remains in place (no unsafe reversion to revoked v1)
         active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
         self.assertEqual(active["version"], 2)
 
     def test_rollback_rejected_if_candidate_training_issuer_revoked(self) -> None:
@@ -426,7 +456,10 @@ class TestAutomatedModelRollback(unittest.TestCase):
         )
         self.assertEqual(rolled["version"], 1)
         self.assertTrue(rolled["is_active"])
-        self.assertEqual(self.registry.get_active_version(self.simulation_id)["version"], 1)
+        active_ver = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active_ver)
+        assert active_ver is not None
+        self.assertEqual(active_ver["version"], 1)
 
 
 if __name__ == "__main__":

@@ -434,7 +434,10 @@ class TestModelPromotionGovernance(unittest.TestCase):
         )
         self.assertEqual(promoted["status"], "champion")
         self.assertTrue(promoted["is_active"])
-        self.assertEqual(self.registry.get_active_version(self.simulation_id)["version"], ver)
+        active_ver = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active_ver)
+        assert active_ver is not None
+        self.assertEqual(active_ver["version"], ver)
 
 
 if __name__ == "__main__":

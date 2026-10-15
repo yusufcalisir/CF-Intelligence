@@ -329,7 +329,9 @@ def test_tenant_02_bank_b_attempts_bank_a_promotion_or_rollback_rejected(tenant_
         reg.rollback(sim_id, v1, auth_token=tenant_env["tokens"]["b_comp"])
 
     # Active model state unchanged
-    assert reg.get_active_version(sim_id)["version"] == v1
+    active_now = reg.get_active_version(sim_id)
+    assert active_now is not None
+    assert active_now["version"] == v1
 
 
 # ── TENANT-03: Forged Identifiers Rejected ──────────────────────────────────
@@ -806,7 +808,9 @@ def test_tenant_10_regressions_intact(tenant_env):
 
     # 3. Legitimate promotion with clearance level >= 2 succeeds
     reg.promote_version(sim_id, v1, target_status="champion", auth_token=tenant_env["tokens"]["a_lead"])
-    assert reg.get_active_version(sim_id)["version"] == v1
+    active_prom = reg.get_active_version(sim_id)
+    assert active_prom is not None
+    assert active_prom["version"] == v1
 
     # 4. Trusted internal orchestration context rollback succeeds
     ctx_rb = create_trusted_internal_context(
