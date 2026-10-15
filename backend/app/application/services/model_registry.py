@@ -145,17 +145,14 @@ def _resolve_internal_context_secret(is_issuing: bool = True) -> bytes:
         or generic_env == "production"
     )
 
-    configured_secret = (
-        os.environ.get("CFI_INTERNAL_CONTEXT_SECRET")
-        or getattr(settings, "internal_context_signing_secret", None)
+    configured_secret = os.environ.get("CFI_INTERNAL_CONTEXT_SECRET") or getattr(
+        settings, "internal_context_signing_secret", None
     )
 
     clean_secret = str(configured_secret).strip() if configured_secret else ""
 
     if is_prod_env and (
-        not clean_secret
-        or clean_secret in FORBIDDEN_INTERNAL_SECRETS
-        or len(clean_secret) < 32
+        not clean_secret or clean_secret in FORBIDDEN_INTERNAL_SECRETS or len(clean_secret) < 32
     ):
         action_desc = "issue" if is_issuing else "verify"
         raise PermissionError(
@@ -317,10 +314,16 @@ def verify_trusted_internal_context(
         return False, f"Unauthorized internal service name: '{context.service_name}'."
 
     if expected_service_name is not None and context.service_name != expected_service_name:
-        return False, f"Context service mismatch: expected '{expected_service_name}', got '{context.service_name}'."
+        return (
+            False,
+            f"Context service mismatch: expected '{expected_service_name}', got '{context.service_name}'.",
+        )
 
     if context.action != expected_action:
-        return False, f"Context action mismatch: expected '{expected_action}', got '{context.action}'."
+        return (
+            False,
+            f"Context action mismatch: expected '{expected_action}', got '{context.action}'.",
+        )
 
     now = time.time()
     effective_ttl = min(getattr(context, "ttl_seconds", 300.0), max_age_seconds)
@@ -328,7 +331,10 @@ def verify_trusted_internal_context(
     if age < -10.0:
         return False, f"Internal authority context created in future (clock skew: {age:.1f}s)."
     if age > effective_ttl:
-        return False, f"Internal authority context expired or clock skew exceeded (age={age:.1f}s, ttl={effective_ttl:.1f}s)."
+        return (
+            False,
+            f"Internal authority context expired or clock skew exceeded (age={age:.1f}s, ttl={effective_ttl:.1f}s).",
+        )
 
     # Resolve domain key according to production rules
     try:
@@ -366,10 +372,16 @@ def verify_trusted_internal_context(
             or generic_env == "production"
         )
         if is_prod:
-            return False, "Cryptographic signature mismatch: production mode strictly requires V2 domain-separated authority signatures."
+            return (
+                False,
+                "Cryptographic signature mismatch: production mode strictly requires V2 domain-separated authority signatures.",
+            )
 
         if consume_nonce:
-            return False, "Legacy V1 internal authority signature cannot authorize privileged state mutations; V2 scoped context required."
+            return (
+                False,
+                "Legacy V1 internal authority signature cannot authorize privileged state mutations; V2 scoped context required.",
+            )
 
         secret = (
             getattr(settings, "payload_signing_secret", None)
@@ -378,9 +390,13 @@ def verify_trusted_internal_context(
         )
         if secret:
             v1_payload = f"INTERNAL_AUTHORITY:{context.service_name}:{context.action}:{context.nonce}:{context.created_at:.4f}".encode()
-            expected_v1_sig = hmac.new(str(secret).encode("utf-8"), v1_payload, hashlib.sha256).hexdigest()
+            expected_v1_sig = hmac.new(
+                str(secret).encode("utf-8"), v1_payload, hashlib.sha256
+            ).hexdigest()
             expected_v1_domain_sig = hmac.new(domain_key, v1_payload, hashlib.sha256).hexdigest()
-            if hmac.compare_digest(context.signature, expected_v1_sig) or hmac.compare_digest(context.signature, expected_v1_domain_sig):
+            if hmac.compare_digest(context.signature, expected_v1_sig) or hmac.compare_digest(
+                context.signature, expected_v1_domain_sig
+            ):
                 v1_matched = True
 
         if not v1_matched:
@@ -391,7 +407,10 @@ def verify_trusted_internal_context(
     if expected_resource_type is not None and (
         not ctx_res_type or ctx_res_type.strip() != expected_resource_type.strip()
     ):
-        return False, f"Context resource_type scope mismatch: expected '{expected_resource_type}', got '{ctx_res_type}'."
+        return (
+            False,
+            f"Context resource_type scope mismatch: expected '{expected_resource_type}', got '{ctx_res_type}'.",
+        )
 
     # Scope validation: Resource ID (mandatory if expected)
     ctx_res_id = getattr(context, "resource_id", None)
@@ -426,7 +445,8 @@ def verify_trusted_internal_context(
     # Scope validation: Target Bank ID (mandatory if expected)
     ctx_target_bank = getattr(context, "target_bank_id", None)
     if expected_target_bank_id is not None and (
-        not ctx_target_bank or ctx_target_bank.strip().lower() != expected_target_bank_id.strip().lower()
+        not ctx_target_bank
+        or ctx_target_bank.strip().lower() != expected_target_bank_id.strip().lower()
     ):
         return (
             False,
@@ -446,7 +466,9 @@ def verify_trusted_internal_context(
             "model_version": ctx_ver,
             "bank_id": ctx_bank,
         }
-        consumed_ok, reason = store.consume_nonce(context.nonce, expires_at=expires_at, metadata=metadata)
+        consumed_ok, reason = store.consume_nonce(
+            context.nonce, expires_at=expires_at, metadata=metadata
+        )
         if not consumed_ok:
             return False, reason
 
@@ -497,7 +519,14 @@ def _validate_training_evidence(
                 break
 
     has_samples = False
-    for k in ("samples", "sample_count", "batch_size", "dataset_samples", "num_samples", "participants"):
+    for k in (
+        "samples",
+        "sample_count",
+        "batch_size",
+        "dataset_samples",
+        "num_samples",
+        "participants",
+    ):
         if k in training_evidence:
             val = training_evidence[k]
             if isinstance(val, int) and val > 0:
@@ -545,7 +574,8 @@ def validate_production_admission(
       (Four-Eyes Principle: ml_engineer and compliance) signed by non-development accounts.
     """
     if isinstance(entry_or_provenance, dict) and (
-        entry_or_provenance.get("is_revoked") is True or entry_or_provenance.get("status") == "revoked"
+        entry_or_provenance.get("is_revoked") is True
+        or entry_or_provenance.get("status") == "revoked"
     ):
         raise ModelIntegrityError(
             f"Production admission rejected: model version has been revoked ({context})."
@@ -582,8 +612,14 @@ def validate_production_admission(
     status = entry_or_provenance.get("status", "") if isinstance(entry_or_provenance, dict) else ""
     target_role = (
         "champion"
-        if (context in CHAMPION_CONTEXTS or "champion" in context or status in ("champion", "active"))
-        else ("challenger" if ("challenger" in context or status == "challenger") else "operational")
+        if (
+            context in CHAMPION_CONTEXTS
+            or "champion" in context
+            or status in ("champion", "active")
+        )
+        else (
+            "challenger" if ("challenger" in context or status == "challenger") else "operational"
+        )
     )
 
     if prov == "STRUCTURAL_FIXTURE":
@@ -623,7 +659,8 @@ def validate_production_admission(
         if context in CHAMPION_CONTEXTS:
             sign_offs = entry_or_provenance.get("sign_offs", [])
             active_sign_offs = [
-                s for s in sign_offs
+                s
+                for s in sign_offs
                 if isinstance(s, dict)
                 and s.get("is_revoked") is not True
                 and s.get("is_active", True) is not False
@@ -634,13 +671,9 @@ def validate_production_admission(
                     f"Production promotion rejected: Missing required sign-offs: model requires two authorized institutional sign-offs ({context})."
                 )
 
-            ml_signs = [
-                s for s in active_sign_offs
-                if s.get("role") in ("ml_engineer", "ml_lead")
-            ]
+            ml_signs = [s for s in active_sign_offs if s.get("role") in ("ml_engineer", "ml_lead")]
             comp_signs = [
-                s for s in active_sign_offs
-                if s.get("role") in ("compliance", "compliance_officer")
+                s for s in active_sign_offs if s.get("role") in ("compliance", "compliance_officer")
             ]
 
             if not ml_signs:
@@ -667,15 +700,19 @@ def validate_production_admission(
                 )
 
             secret = settings.payload_signing_secret
-            if not secret or not isinstance(secret, str) or not secret.strip() or len(secret.strip()) < 16:
+            if (
+                not secret
+                or not isinstance(secret, str)
+                or not secret.strip()
+                or len(secret.strip()) < 16
+            ):
                 raise ModelIntegrityError(
                     f"Production promotion rejected: authoritative signing configuration is missing or invalid ({context})."
                 )
 
-            sim_id = (
-                entry_or_provenance.get("simulation_id")
-                or (entry_or_provenance.get("training_receipt") or {}).get("simulation_id")
-            )
+            sim_id = entry_or_provenance.get("simulation_id") or (
+                entry_or_provenance.get("training_receipt") or {}
+            ).get("simulation_id")
             if not sim_id and isinstance(sign_offs, list):
                 for s in sign_offs:
                     if s.get("payload_bound"):
@@ -748,6 +785,7 @@ def validate_production_admission(
 
             # Phase 2: Live Authoritative RBAC check and cross-principal Four-Eyes validation
             from app.infrastructure.security.auth_service import AuthenticationService
+
             auth_svc = AuthenticationService.get_instance()
 
             for s, expected_role in ((ml_s, "ml_engineer"), (comp_s, "compliance")):
@@ -759,11 +797,15 @@ def validate_production_admission(
                             f"Production promotion rejected: approver '{u}' is deactivated ({context})."
                         )
                     user_roles = [r.lower().strip() for r in user_rec.roles]
-                    if expected_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in user_roles):
+                    if expected_role == "ml_engineer" and not any(
+                        r in ("ml_engineer", "ml_lead") for r in user_roles
+                    ):
                         raise ModelIntegrityError(
                             f"Production promotion rejected: user '{u}' lacks authoritative ml_engineer role ({context})."
                         )
-                    if expected_role == "compliance" and not any(r in ("compliance", "compliance_officer") for r in user_roles):
+                    if expected_role == "compliance" and not any(
+                        r in ("compliance", "compliance_officer") for r in user_roles
+                    ):
                         raise ModelIntegrityError(
                             f"Production promotion rejected: user '{u}' lacks authoritative compliance role ({context})."
                         )
@@ -1035,7 +1077,10 @@ class ModelRegistry:
         if trusted_context is not None:
             action = getattr(trusted_context, "action", "")
             if action not in ("bind_ownership", "register_model", "save_version"):
-                return False, f"invalid_trusted_context: Action '{action}' is not permitted for initial ownership binding."
+                return (
+                    False,
+                    f"invalid_trusted_context: Action '{action}' is not permitted for initial ownership binding.",
+                )
             is_valid_ctx, ctx_reason = verify_trusted_internal_context(
                 trusted_context,
                 expected_action=action,
@@ -1066,36 +1111,53 @@ class ModelRegistry:
             user_roles = {r.lower().strip() for r in getattr(user_rec, "roles", [])}
             allowed_roles = {"admin", "ml_lead", "ml_engineer"}
             if not (user_roles & allowed_roles):
-                return False, f"insufficient_role: user '{uname}' lacks registration role ({user_roles})"
+                return (
+                    False,
+                    f"insufficient_role: user '{uname}' lacks registration role ({user_roles})",
+                )
 
             if clean_bank and clean_consortium:
                 if user_bank != clean_bank.lower():
-                    return False, f"bank_mismatch: user '{uname}' belongs to '{user_bank}', cannot register for '{clean_bank}'"
+                    return (
+                        False,
+                        f"bank_mismatch: user '{uname}' belongs to '{user_bank}', cannot register for '{clean_bank}'",
+                    )
 
                 from app.application.services.consortium_service import (
                     consortium_governance_service,
                 )
+
                 c = consortium_governance_service.get_consortium(clean_consortium)
                 if not c:
                     return False, f"unknown_consortium: '{clean_consortium}'"
                 member_banks = [m.lower().strip() for m in c.members]
                 if user_bank not in member_banks:
-                    return False, f"consortium_membership_required: user bank '{user_bank}' not in consortium '{clean_consortium}'"
+                    return (
+                        False,
+                        f"consortium_membership_required: user bank '{user_bank}' not in consortium '{clean_consortium}'",
+                    )
                 return True, f"user:{uname} ({clean_bank}, consortium:{clean_consortium})"
             elif clean_bank:
                 if user_bank != clean_bank.lower():
-                    return False, f"bank_mismatch: user '{uname}' belongs to '{user_bank}', cannot register for '{clean_bank}'"
+                    return (
+                        False,
+                        f"bank_mismatch: user '{uname}' belongs to '{user_bank}', cannot register for '{clean_bank}'",
+                    )
                 return True, f"user:{uname} ({clean_bank})"
             elif clean_consortium:
                 from app.application.services.consortium_service import (
                     consortium_governance_service,
                 )
+
                 c = consortium_governance_service.get_consortium(clean_consortium)
                 if not c:
                     return False, f"unknown_consortium: '{clean_consortium}'"
                 member_banks = [m.lower().strip() for m in c.members]
                 if user_bank not in member_banks:
-                    return False, f"consortium_membership_required: user bank '{user_bank}' not in consortium '{clean_consortium}'"
+                    return (
+                        False,
+                        f"consortium_membership_required: user bank '{user_bank}' not in consortium '{clean_consortium}'",
+                    )
                 return True, f"consortium_member:{uname} ({user_bank})"
 
         # 3. Cryptographically Verified Training Receipt with Signed Institutional Claims
@@ -1127,17 +1189,20 @@ class ModelRegistry:
                         else ""
                     )
                     clean_rcpt_consortium = (
-                        receipt_obj.consortium_id.strip()
-                        if receipt_obj.consortium_id
-                        else ""
+                        receipt_obj.consortium_id.strip() if receipt_obj.consortium_id else ""
                     )
                     rcpt_id = receipt_obj.receipt_id or "verified_receipt"
 
                     if clean_bank and clean_consortium:
                         bank_ok = clean_rcpt_bank and clean_rcpt_bank == clean_bank.lower()
-                        cons_ok = clean_rcpt_consortium and clean_rcpt_consortium == clean_consortium
+                        cons_ok = (
+                            clean_rcpt_consortium and clean_rcpt_consortium == clean_consortium
+                        )
                         if bank_ok and cons_ok:
-                            return True, f"receipt:{rcpt_id} ({clean_bank}, consortium:{clean_consortium})"
+                            return (
+                                True,
+                                f"receipt:{rcpt_id} ({clean_bank}, consortium:{clean_consortium})",
+                            )
                         return False, (
                             f"receipt_claim_mismatch: receipt binds bank '{clean_rcpt_bank or 'none'}' and "
                             f"consortium '{clean_rcpt_consortium or 'none'}', cannot authenticate claimed '{clean_bank}' / '{clean_consortium}'"
@@ -1159,7 +1224,10 @@ class ModelRegistry:
                 else:
                     return False, f"invalid_training_receipt: {rcpt_reason}"
 
-        return False, "no verifiable institutional authority provided (auth_token, trusted_context, or authenticating receipt)"
+        return (
+            False,
+            "no verifiable institutional authority provided (auth_token, trusted_context, or authenticating receipt)",
+        )
 
     def bind_simulation_ownership(
         self,
@@ -1175,10 +1243,16 @@ class ModelRegistry:
         """Authoritatively bind simulation model artifacts to an owning bank or consortium."""
         bank_arg = owning_bank_id or kwargs.get("bank_id")
         clean_bank = bank_arg.strip() if isinstance(bank_arg, str) and bank_arg.strip() else None
-        clean_consortium = consortium_id.strip() if isinstance(consortium_id, str) and consortium_id.strip() else None
+        clean_consortium = (
+            consortium_id.strip()
+            if isinstance(consortium_id, str) and consortium_id.strip()
+            else None
+        )
 
         if not clean_bank and not clean_consortium:
-            raise ValueError("bind_simulation_ownership requires non-empty owning_bank_id or consortium_id.")
+            raise ValueError(
+                "bind_simulation_ownership requires non-empty owning_bank_id or consortium_id."
+            )
 
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
@@ -1221,7 +1295,11 @@ class ModelRegistry:
                         if user_rec and user_rec.is_active and user_rec.status.lower() == "active":
                             user_bank = (getattr(user_rec, "bank_id", "") or "").lower().strip()
                             user_roles = {r.lower().strip() for r in getattr(user_rec, "roles", [])}
-                            if curr_bank and user_bank == curr_bank.lower() and (user_roles & {"admin", "ml_lead"}):
+                            if (
+                                curr_bank
+                                and user_bank == curr_bank.lower()
+                                and (user_roles & {"admin", "ml_lead"})
+                            ):
                                 has_transfer_authority = True
                                 effective_bound_by = f"user:{uname} ({curr_bank})"
 
@@ -1260,9 +1338,7 @@ class ModelRegistry:
             )
             intent_action = "transfer_ownership" if is_transfer else "bind_simulation_ownership"
             terminal_event_type = (
-                "MODEL_OWNERSHIP_TRANSFER"
-                if is_transfer
-                else "MODEL_OWNERSHIP_ASSIGNMENT"
+                "MODEL_OWNERSHIP_TRANSFER" if is_transfer else "MODEL_OWNERSHIP_ASSIGNMENT"
             )
             terminal_failed_event_type = (
                 "MODEL_OWNERSHIP_TRANSFER_FAILED"
@@ -1288,7 +1364,9 @@ class ModelRegistry:
                     "action": intent_action,
                     "decision": "PENDING",
                 },
-                actor_type="internal_service" if (effective_bound_by or "").startswith("internal:") else "human_principal",
+                actor_type="internal_service"
+                if (effective_bound_by or "").startswith("internal:")
+                else "human_principal",
                 actor_institution=clean_bank or "unknown",
                 target_type="model",
                 action=intent_action,
@@ -1331,7 +1409,9 @@ class ModelRegistry:
                         "action": intent_action,
                         "decision": "FAILED",
                     },
-                    actor_type="internal_service" if (effective_bound_by or "").startswith("internal:") else "human_principal",
+                    actor_type="internal_service"
+                    if (effective_bound_by or "").startswith("internal:")
+                    else "human_principal",
                     actor_institution=clean_bank or "unknown",
                     target_type="model",
                     action=intent_action,
@@ -1345,7 +1425,10 @@ class ModelRegistry:
                 if manifest:
                     updated = False
                     for entry in manifest:
-                        if entry.get("owning_bank_id") != clean_bank or entry.get("consortium_id") != clean_consortium:
+                        if (
+                            entry.get("owning_bank_id") != clean_bank
+                            or entry.get("consortium_id") != clean_consortium
+                        ):
                             entry["owning_bank_id"] = clean_bank
                             entry["consortium_id"] = clean_consortium
                             updated = True
@@ -1376,7 +1459,9 @@ class ModelRegistry:
                     "action": intent_action,
                     "decision": decision,
                 },
-                actor_type="internal_service" if (effective_bound_by or "").startswith("internal:") else "human_principal",
+                actor_type="internal_service"
+                if (effective_bound_by or "").startswith("internal:")
+                else "human_principal",
                 actor_institution=clean_bank or "unknown",
                 target_type="model",
                 action=intent_action,
@@ -1408,7 +1493,9 @@ class ModelRegistry:
         ownership = self.get_simulation_ownership(simulation_id)
 
         # TENANT-09: Unbound or ambiguous model ownership fails closed
-        if ownership.get("is_unbound") or (not ownership.get("owning_bank_id") and not ownership.get("consortium_id")):
+        if ownership.get("is_unbound") or (
+            not ownership.get("owning_bank_id") and not ownership.get("consortium_id")
+        ):
             raise ModelAuthorizationError(
                 f"Institutional authorization rejected: Model '{simulation_id}' lacks authoritative institutional "
                 f"ownership binding. Governance operation '{action_name}' rejected fail-closed."
@@ -1459,7 +1546,6 @@ class ModelRegistry:
                     f"Consortium governance rejected: Institution '{actor_bank}' has non-voting role ({member.role.value}) in consortium '{consortium_id}'."
                 )
             return
-
 
     def _load_manifest(self, simulation_id: str) -> list[dict[str, Any]]:
         try:
@@ -1512,12 +1598,9 @@ class ModelRegistry:
                         auth_consortium = own_data.get("consortium_id")
                         manifest_changed = False
                         for item in data:
-                            if (
-                                isinstance(item, dict)
-                                and (
-                                    item.get("owning_bank_id") != auth_bank
-                                    or item.get("consortium_id") != auth_consortium
-                                )
+                            if isinstance(item, dict) and (
+                                item.get("owning_bank_id") != auth_bank
+                                or item.get("consortium_id") != auth_consortium
                             ):
                                 item["owning_bank_id"] = auth_bank
                                 item["consortium_id"] = auth_consortium
@@ -1556,7 +1639,8 @@ class ModelRegistry:
         with self._lock, file_lock:
             own_path = self._get_ownership_path(clean_sim_id, create=True)
             tmp_own_path = os.path.join(
-                sim_dir, f"ownership_{os.getpid()}_{threading.get_ident()}_{int(time.time() * 1000)}_{uuid.uuid4().hex}.tmp"
+                sim_dir,
+                f"ownership_{os.getpid()}_{threading.get_ident()}_{int(time.time() * 1000)}_{uuid.uuid4().hex}.tmp",
             )
             try:
                 with open(tmp_own_path, "w", encoding="utf-8") as f:
@@ -1566,7 +1650,9 @@ class ModelRegistry:
                 os.replace(tmp_own_path, own_path)
                 _sync_dir(sim_dir)
             except Exception as e:
-                logger.error("Authoritative ownership persistence failed for %s: %s", clean_sim_id, e)
+                logger.error(
+                    "Authoritative ownership persistence failed for %s: %s", clean_sim_id, e
+                )
                 if os.path.exists(tmp_own_path):
                     with contextlib.suppress(OSError):
                         os.remove(tmp_own_path)
@@ -1581,7 +1667,8 @@ class ModelRegistry:
         with self._lock, file_lock:
             manifest_path = os.path.join(sim_dir, "registry.json")
             tmp_manifest_path = os.path.join(
-                sim_dir, f"registry_{os.getpid()}_{threading.get_ident()}_{int(time.time() * 1000)}_{uuid.uuid4().hex}.tmp"
+                sim_dir,
+                f"registry_{os.getpid()}_{threading.get_ident()}_{int(time.time() * 1000)}_{uuid.uuid4().hex}.tmp",
             )
             try:
                 with open(tmp_manifest_path, "w", encoding="utf-8") as f:
@@ -1591,7 +1678,9 @@ class ModelRegistry:
                 os.replace(tmp_manifest_path, manifest_path)
                 _sync_dir(sim_dir)
             except Exception as e:
-                logger.error("Authoritative manifest persistence failed for %s: %s", simulation_id, e)
+                logger.error(
+                    "Authoritative manifest persistence failed for %s: %s", simulation_id, e
+                )
                 if os.path.exists(tmp_manifest_path):
                     with contextlib.suppress(OSError):
                         os.remove(tmp_manifest_path)
@@ -1663,6 +1752,7 @@ class ModelRegistry:
             The created version entry metadata.
         """
         from app.config import get_settings
+
         settings = get_settings()
 
         if training_receipt is None and receipt is not None:
@@ -1672,14 +1762,20 @@ class ModelRegistry:
         source_bytes: bytes | None = None
         if source_model_path is not None:
             if not os.path.isfile(source_model_path):
-                raise ModelIntegrityError(f"Source model file '{source_model_path}' not found on disk.")
+                raise ModelIntegrityError(
+                    f"Source model file '{source_model_path}' not found on disk."
+                )
             with open(source_model_path, "rb") as sf:
                 source_bytes = sf.read()
             if state_dict is None:
                 try:
-                    state_dict = torch.load(source_model_path, map_location="cpu", weights_only=True)
+                    state_dict = torch.load(
+                        source_model_path, map_location="cpu", weights_only=True
+                    )
                 except Exception as e:
-                    raise ModelIntegrityError(f"Failed to load state dict from {source_model_path}: {e}") from e
+                    raise ModelIntegrityError(
+                        f"Failed to load state dict from {source_model_path}: {e}"
+                    ) from e
 
         # Authoritative institutional or consortium ownership handling
         existing_ownership = self.get_simulation_ownership(simulation_id)
@@ -1711,8 +1807,12 @@ class ModelRegistry:
             effective_consortium = est_consortium
         else:
             if owning_bank_id is not None or consortium_id is not None:
-                effective_owning_bank = owning_bank_id.strip() if owning_bank_id and owning_bank_id.strip() else None
-                effective_consortium = consortium_id.strip() if consortium_id and consortium_id.strip() else None
+                effective_owning_bank = (
+                    owning_bank_id.strip() if owning_bank_id and owning_bank_id.strip() else None
+                )
+                effective_consortium = (
+                    consortium_id.strip() if consortium_id and consortium_id.strip() else None
+                )
                 should_bind_initial = bool(effective_owning_bank or effective_consortium)
             else:
                 effective_owning_bank = None
@@ -1727,22 +1827,38 @@ class ModelRegistry:
         if model_contract is not None:
             if isinstance(model_contract, dict):
                 if exp_arch is None:
-                    exp_arch = model_contract.get("architecture") or model_contract.get("expected_architecture")
+                    exp_arch = model_contract.get("architecture") or model_contract.get(
+                        "expected_architecture"
+                    )
                 if exp_schema_ver is None:
-                    exp_schema_ver = model_contract.get("feature_schema_version") or model_contract.get("expected_feature_schema_version")
+                    exp_schema_ver = model_contract.get(
+                        "feature_schema_version"
+                    ) or model_contract.get("expected_feature_schema_version")
                 if exp_dim is None:
-                    exp_dim = model_contract.get("input_dim") or model_contract.get("expected_input_dim")
+                    exp_dim = model_contract.get("input_dim") or model_contract.get(
+                        "expected_input_dim"
+                    )
                 if exp_names is None:
-                    exp_names = model_contract.get("feature_names") or model_contract.get("expected_feature_names")
+                    exp_names = model_contract.get("feature_names") or model_contract.get(
+                        "expected_feature_names"
+                    )
             else:
                 if exp_arch is None:
-                    exp_arch = getattr(model_contract, "architecture", None) or getattr(model_contract, "expected_architecture", None)
+                    exp_arch = getattr(model_contract, "architecture", None) or getattr(
+                        model_contract, "expected_architecture", None
+                    )
                 if exp_schema_ver is None:
-                    exp_schema_ver = getattr(model_contract, "feature_schema_version", None) or getattr(model_contract, "expected_feature_schema_version", None)
+                    exp_schema_ver = getattr(
+                        model_contract, "feature_schema_version", None
+                    ) or getattr(model_contract, "expected_feature_schema_version", None)
                 if exp_dim is None:
-                    exp_dim = getattr(model_contract, "input_dim", None) or getattr(model_contract, "expected_input_dim", None)
+                    exp_dim = getattr(model_contract, "input_dim", None) or getattr(
+                        model_contract, "expected_input_dim", None
+                    )
                 if exp_names is None:
-                    exp_names = getattr(model_contract, "feature_names", None) or getattr(model_contract, "expected_feature_names", None)
+                    exp_names = getattr(model_contract, "feature_names", None) or getattr(
+                        model_contract, "expected_feature_names", None
+                    )
 
         # Parse training receipt if provided
         receipt_dict: dict[str, Any] | None = None
@@ -1799,9 +1915,7 @@ class ModelRegistry:
                 final_provenance = "UNVERIFIED"
 
             attestation_status = (
-                "CALLER_NUMERIC_EVIDENCE_UNAUTHENTICATED"
-                if has_recorded_evidence
-                else "NONE"
+                "CALLER_NUMERIC_EVIDENCE_UNAUTHENTICATED" if has_recorded_evidence else "NONE"
             )
             is_prod_eligible = False
 
@@ -1812,7 +1926,9 @@ class ModelRegistry:
                 clean_consortium=effective_consortium,
                 auth_token=auth_token,
                 trusted_context=trusted_context,
-                training_receipt=receipt_obj if (has_valid_receipt and receipt_obj is not None) else None,
+                training_receipt=receipt_obj
+                if (has_valid_receipt and receipt_obj is not None)
+                else None,
             )
             if not has_init_auth:
                 raise ModelAuthorizationError(
@@ -1862,17 +1978,25 @@ class ModelRegistry:
                         uname = (claims.get("username") or claims.get("sub") or "").strip()
                         user_rec = auth_svc.get_user(uname)
                         if user_rec is not None:
-                            self._verify_institutional_governance_authority(simulation_id, user_rec, "save_version")
+                            self._verify_institutional_governance_authority(
+                                simulation_id, user_rec, "save_version"
+                            )
                 elif actor is not None:
                     from app.infrastructure.security.auth_service import AuthenticationService
 
                     auth_svc = AuthenticationService.get_instance()
                     user_rec = auth_svc.get_user(actor)
                     if user_rec is not None:
-                        self._verify_institutional_governance_authority(simulation_id, user_rec, "save_version")
+                        self._verify_institutional_governance_authority(
+                            simulation_id, user_rec, "save_version"
+                        )
             elif owning_bank_id is not None or consortium_id is not None:
-                effective_owning_bank = owning_bank_id.strip() if owning_bank_id and owning_bank_id.strip() else None
-                effective_consortium = consortium_id.strip() if consortium_id and consortium_id.strip() else None
+                effective_owning_bank = (
+                    owning_bank_id.strip() if owning_bank_id and owning_bank_id.strip() else None
+                )
+                effective_consortium = (
+                    consortium_id.strip() if consortium_id and consortium_id.strip() else None
+                )
                 should_bind_initial = bool(effective_owning_bank or effective_consortium)
 
             # Clean up any stale temporary files from previous crashed runs
@@ -1944,7 +2068,9 @@ class ModelRegistry:
                         torch.save(state_dict, f)
                         f.flush()
                         os.fsync(f.fileno())
-                logger.debug("Serialized model version %d to staging path %s", next_version, tmp_filepath)
+                logger.debug(
+                    "Serialized model version %d to staging path %s", next_version, tmp_filepath
+                )
 
                 file_sha256 = compute_file_sha256(tmp_filepath)
 
@@ -1982,10 +2108,18 @@ class ModelRegistry:
                     "simulation_id": simulation_id,
                     "generation": entry_gen,
                     "filename": filename,
-                    "architecture": verified_schema_meta["architecture"] if verified_schema_meta else exp_arch,
-                    "feature_schema_version": verified_schema_meta["feature_schema_version"] if verified_schema_meta else exp_schema_ver,
-                    "input_dim": verified_schema_meta["input_dim"] if verified_schema_meta else exp_dim,
-                    "feature_names": verified_schema_meta["feature_names"] if verified_schema_meta else (list(exp_names) if exp_names is not None else None),
+                    "architecture": verified_schema_meta["architecture"]
+                    if verified_schema_meta
+                    else exp_arch,
+                    "feature_schema_version": verified_schema_meta["feature_schema_version"]
+                    if verified_schema_meta
+                    else exp_schema_ver,
+                    "input_dim": verified_schema_meta["input_dim"]
+                    if verified_schema_meta
+                    else exp_dim,
+                    "feature_names": verified_schema_meta["feature_names"]
+                    if verified_schema_meta
+                    else (list(exp_names) if exp_names is not None else None),
                     "verified_schema": verified_schema_meta,
                     "metrics": metrics,
                     "metrics_provenance": "CALLER_SUPPLIED_UNVERIFIED",
@@ -2043,7 +2177,9 @@ class ModelRegistry:
                         bound_by=bound_by_label,
                         auth_token=auth_token,
                         trusted_context=trusted_context,
-                        training_receipt=receipt_obj if (has_valid_receipt and receipt_obj is not None) else None,
+                        training_receipt=receipt_obj
+                        if (has_valid_receipt and receipt_obj is not None)
+                        else None,
                     )
 
                 manifest.append(entry)
@@ -2144,12 +2280,17 @@ class ModelRegistry:
                 else:
                     # Authoritative state is readable and positively proves the mutation was NOT committed (FAILED).
                     # Only remove newly_created_final if it is conclusively NOT referenced in any committed manifest.
-                    if newly_created_final and not final_already_existed and os.path.exists(newly_created_final):
+                    if (
+                        newly_created_final
+                        and not final_already_existed
+                        and os.path.exists(newly_created_final)
+                    ):
                         is_referenced = False
                         try:
                             cur_manifest = self._load_manifest(simulation_id)
                             is_referenced = any(
-                                e.get("filename") == filename or mutation_id in e.get("applied_mutation_ids", [])
+                                e.get("filename") == filename
+                                or mutation_id in e.get("applied_mutation_ids", [])
                                 for e in cur_manifest
                             )
                         except Exception:
@@ -2177,7 +2318,9 @@ class ModelRegistry:
                                 "action": "save_version",
                                 "decision": "FAILED",
                             },
-                            actor_type="institutional_authority" if effective_owning_bank else "system",
+                            actor_type="institutional_authority"
+                            if effective_owning_bank
+                            else "system",
                             actor_institution=effective_owning_bank or "unknown",
                             target_type="model_version",
                             action="save_version",
@@ -2186,7 +2329,6 @@ class ModelRegistry:
                 if not isinstance(exc, (ModelIntegrityError, ModelAuthorizationError)):
                     raise ModelIntegrityError(f"Artifact serialization failed: {exc}") from exc
                 raise
-
 
     def resolve_and_verify_champion(
         self, simulation_id: str | None = None
@@ -2305,7 +2447,9 @@ class ModelRegistry:
             # Explicit check if filepath is a symlink: reject if symlink targets outside storage root
             if os.path.islink(filepath):
                 try:
-                    symlink_target = os.path.realpath(os.readlink(filepath) if hasattr(os, "readlink") else filepath)
+                    symlink_target = os.path.realpath(
+                        os.readlink(filepath) if hasattr(os, "readlink") else filepath
+                    )
                     if os.path.commonpath([symlink_target, real_storage]) != real_storage:
                         raise ModelIntegrityError(
                             f"Active champion symlink '{filepath}' targets external path '{symlink_target}' outside trusted storage directory."
@@ -2344,11 +2488,14 @@ class ModelRegistry:
 
             version_val = entry.get("version")
             if version_val is None or not isinstance(version_val, int) or version_val < 1:
-                raise ModelIntegrityError("Champion manifest entry contains invalid or missing version number.")
+                raise ModelIntegrityError(
+                    "Champion manifest entry contains invalid or missing version number."
+                )
 
             # Provenance checks via centralized production admission policy
             provenance_type = entry.get("provenance_type", "UNVERIFIED")
             from app.config import get_settings
+
             settings = get_settings()
             if settings.app_env.lower() == "production":
                 validate_production_admission(entry, context="resolve_and_verify_champion")
@@ -2389,7 +2536,9 @@ class ModelRegistry:
 
             if isinstance(sign_offs, list) and len(sign_offs) > 0:
                 ml_signs = [s for s in sign_offs if s.get("role") in ("ml_engineer", "ml_lead")]
-                comp_signs = [s for s in sign_offs if s.get("role") in ("compliance", "compliance_officer")]
+                comp_signs = [
+                    s for s in sign_offs if s.get("role") in ("compliance", "compliance_officer")
+                ]
 
                 hmac_valid = False
                 if ml_signs and comp_signs:
@@ -2397,7 +2546,9 @@ class ModelRegistry:
                     comp_s = comp_signs[0]
                     # Four-Eyes Principle check: distinct individuals
                     if ml_s.get("user") != comp_s.get("user"):
-                        domain_key = derive_domain_key(settings.payload_signing_secret, DOMAIN_APPROVAL_SIGNOFF)
+                        domain_key = derive_domain_key(
+                            settings.payload_signing_secret, DOMAIN_APPROVAL_SIGNOFF
+                        )
                         expected_ml_sig_domain = hmac.new(
                             domain_key,
                             f"{sim_id}:{version_val}:{actual_sha256}:ml_engineer:{ml_s.get('user')}".encode(),
@@ -2419,8 +2570,12 @@ class ModelRegistry:
                             hashlib.sha256,
                         ).hexdigest()
 
-                        ml_ok = hmac.compare_digest(ml_s.get("signature", ""), expected_ml_sig_domain) or hmac.compare_digest(ml_s.get("signature", ""), expected_ml_sig_raw)
-                        comp_ok = hmac.compare_digest(comp_s.get("signature", ""), expected_comp_sig_domain) or hmac.compare_digest(comp_s.get("signature", ""), expected_comp_sig_raw)
+                        ml_ok = hmac.compare_digest(
+                            ml_s.get("signature", ""), expected_ml_sig_domain
+                        ) or hmac.compare_digest(ml_s.get("signature", ""), expected_ml_sig_raw)
+                        comp_ok = hmac.compare_digest(
+                            comp_s.get("signature", ""), expected_comp_sig_domain
+                        ) or hmac.compare_digest(comp_s.get("signature", ""), expected_comp_sig_raw)
                         if ml_ok and comp_ok:
                             hmac_valid = True
 
@@ -2438,7 +2593,10 @@ class ModelRegistry:
                     authorization_scheme = "UNVERIFIED"
                     is_independent_human = False
 
-            is_prod_eligible = provenance_type in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED")
+            is_prod_eligible = provenance_type in (
+                "TRAINING_RECORDED",
+                "TRAINING_EVIDENCE_VERIFIED",
+            )
 
             resolved_metadata = {
                 "version": version_val,
@@ -2527,9 +2685,7 @@ class ModelRegistry:
                 if not os.path.isdir(sim_path):
                     continue
                 manifest = self._load_manifest(s_id)
-                challenger_entries = [
-                    e for e in manifest if e.get("status") == "challenger"
-                ]
+                challenger_entries = [e for e in manifest if e.get("status") == "challenger"]
                 if len(challenger_entries) > 1:
                     raise ModelIntegrityError(
                         f"Corrupt manifest in simulation '{s_id}': multiple active challenger entries found "
@@ -2591,7 +2747,9 @@ class ModelRegistry:
 
             if os.path.islink(filepath):
                 try:
-                    symlink_target = os.path.realpath(os.readlink(filepath) if hasattr(os, "readlink") else filepath)
+                    symlink_target = os.path.realpath(
+                        os.readlink(filepath) if hasattr(os, "readlink") else filepath
+                    )
                     if os.path.commonpath([symlink_target, real_storage]) != real_storage:
                         raise ModelIntegrityError(
                             f"Active challenger symlink '{filepath}' targets external path '{symlink_target}' outside trusted storage directory."
@@ -2628,9 +2786,12 @@ class ModelRegistry:
 
             version_val = entry.get("version")
             if version_val is None or not isinstance(version_val, int) or version_val < 1:
-                raise ModelIntegrityError("Challenger manifest entry contains invalid or missing version number.")
+                raise ModelIntegrityError(
+                    "Challenger manifest entry contains invalid or missing version number."
+                )
 
             from app.config import get_settings
+
             settings = get_settings()
             if settings.app_env.lower() == "production":
                 validate_production_admission(entry, context="challenger_serving")
@@ -2664,7 +2825,10 @@ class ModelRegistry:
                         )
 
             provenance_type = entry.get("provenance_type", "UNVERIFIED")
-            is_prod_eligible = provenance_type in ("TRAINING_RECORDED", "TRAINING_EVIDENCE_VERIFIED")
+            is_prod_eligible = provenance_type in (
+                "TRAINING_RECORDED",
+                "TRAINING_EVIDENCE_VERIFIED",
+            )
 
             resolved_metadata = {
                 "version": version_val,
@@ -2677,7 +2841,9 @@ class ModelRegistry:
                 "status": "challenger",
                 "is_active": False,
                 "is_verified": True,
-                "authenticity_status": entry.get("attestation_status", "RECEIPT_VERIFIED_TRAINING_AUTHORITY"),
+                "authenticity_status": entry.get(
+                    "attestation_status", "RECEIPT_VERIFIED_TRAINING_AUTHORITY"
+                ),
                 "is_independent_human_authorization": False,
                 "authorization_scheme": "CRYPTOGRAPHIC_TRAINING_RECEIPT",
                 "architecture": entry.get("architecture", "FraudDetectionModel-GroupNorm"),
@@ -2742,7 +2908,9 @@ class ModelRegistry:
                 return resolved[2]
             return None
 
-    def get_active_champion_identity(self, simulation_id: str | None = None) -> dict[str, Any] | None:
+    def get_active_champion_identity(
+        self, simulation_id: str | None = None
+    ) -> dict[str, Any] | None:
         """Lightweight resolution of current active champion identity.
 
         Reads only manifest metadata without opening the model artifact file or computing SHA-256.
@@ -2803,10 +2971,15 @@ class ModelRegistry:
 
             s_id, entry = candidates[0]
             from app.config import get_settings
+
             settings = get_settings()
             if settings.app_env.lower() == "production":
                 prov = str(entry.get("provenance_type", "UNVERIFIED")).strip().upper()
-                if prov in ("UNVERIFIED", "STRUCTURAL_FIXTURE", "LEGACY_UNVERIFIED") or prov not in (
+                if prov in (
+                    "UNVERIFIED",
+                    "STRUCTURAL_FIXTURE",
+                    "LEGACY_UNVERIFIED",
+                ) or prov not in (
                     "TRAINING_RECORDED",
                     "TRAINING_EVIDENCE_VERIFIED",
                 ):
@@ -2815,7 +2988,8 @@ class ModelRegistry:
                 # Production champion requires valid cryptographic dual sign-offs
                 sign_offs = entry.get("sign_offs", [])
                 active_sign_offs = [
-                    s for s in sign_offs
+                    s
+                    for s in sign_offs
                     if isinstance(s, dict)
                     and s.get("is_revoked") is not True
                     and s.get("is_active", True) is not False
@@ -2824,11 +2998,11 @@ class ModelRegistry:
                 if len(active_sign_offs) < 2:
                     return None
                 ml_signs = [
-                    s for s in active_sign_offs
-                    if s.get("role") in ("ml_engineer", "ml_lead")
+                    s for s in active_sign_offs if s.get("role") in ("ml_engineer", "ml_lead")
                 ]
                 comp_signs = [
-                    s for s in active_sign_offs
+                    s
+                    for s in active_sign_offs
                     if s.get("role") in ("compliance", "compliance_officer")
                 ]
                 if not ml_signs or not comp_signs:
@@ -2851,10 +3025,16 @@ class ModelRegistry:
                     canonical_payload = f"{s_id}:{ver_val}:{actual_sha}:{norm_role}:{u}"
                     if s.get("payload_bound") and s.get("payload_bound") != canonical_payload:
                         return None
-                    exp_domain = hmac.new(domain_key, canonical_payload.encode("utf-8"), hashlib.sha256).hexdigest()
-                    exp_raw = hmac.new(secret.encode("utf-8"), canonical_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+                    exp_domain = hmac.new(
+                        domain_key, canonical_payload.encode("utf-8"), hashlib.sha256
+                    ).hexdigest()
+                    exp_raw = hmac.new(
+                        secret.encode("utf-8"), canonical_payload.encode("utf-8"), hashlib.sha256
+                    ).hexdigest()
                     sig = s.get("signature") or ""
-                    if not sig or not (hmac.compare_digest(sig, exp_domain) or hmac.compare_digest(sig, exp_raw)):
+                    if not sig or not (
+                        hmac.compare_digest(sig, exp_domain) or hmac.compare_digest(sig, exp_raw)
+                    ):
                         return None
 
             key_id = None
@@ -2865,6 +3045,7 @@ class ModelRegistry:
                 from app.application.services.training_provenance_service import (
                     get_default_training_verifier,
                 )
+
                 verifier = self._verifier or get_default_training_verifier()
                 try:
                     if not verifier.is_key_trusted(key_id):
@@ -3024,9 +3205,7 @@ class ModelRegistry:
 
             # Non-empty check
             if os.path.getsize(real_filepath) == 0:
-                raise ModelIntegrityError(
-                    f"Model artifact file '{filepath}' is empty (0 bytes)."
-                )
+                raise ModelIntegrityError(f"Model artifact file '{filepath}' is empty (0 bytes).")
 
             # Read snapshot bytes into memory to eliminate TOCTOU races
             try:
@@ -3055,7 +3234,9 @@ class ModelRegistry:
                     )
 
             try:
-                loaded = torch.load(io.BytesIO(snapshot_bytes), map_location="cpu", weights_only=True)
+                loaded = torch.load(
+                    io.BytesIO(snapshot_bytes), map_location="cpu", weights_only=True
+                )
                 if target_class is not None and model is None:
                     model = target_class()
                 if model is not None:
@@ -3090,7 +3271,9 @@ class ModelRegistry:
     ) -> dict[str, Any]:
         """Promotes a model version to 'champion' or 'challenger' status."""
         if target_status not in ("champion", "challenger"):
-            raise ValueError(f"Target status must be 'champion' or 'challenger', got '{target_status}'")
+            raise ValueError(
+                f"Target status must be 'champion' or 'challenger', got '{target_status}'"
+            )
 
         if actor and not auth_token and not trusted_context:
             raise ModelIntegrityError(
@@ -3114,7 +3297,9 @@ class ModelRegistry:
                 consume_nonce=True,
             )
             if not is_valid_ctx:
-                raise ModelIntegrityError(f"Internal orchestration authority rejected: {ctx_reason}")
+                raise ModelIntegrityError(
+                    f"Internal orchestration authority rejected: {ctx_reason}"
+                )
             authenticated_operator = f"internal:{trusted_context.service_name}"
             authenticated_institution = trusted_context.bank_id or owning_bank
         elif auth_token:
@@ -3131,7 +3316,9 @@ class ModelRegistry:
                 )
             user_rec = auth_svc.get_user(authenticated_operator)
             if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
-                raise ModelIntegrityError(f"Operator '{authenticated_operator}' is not an active authoritative user.")
+                raise ModelIntegrityError(
+                    f"Operator '{authenticated_operator}' is not an active authoritative user."
+                )
             user_roles = {r.lower().strip() for r in user_rec.roles}
             if not (user_roles & {"admin", "ml_lead", "ml_engineer"}):
                 raise ModelIntegrityError(
@@ -3147,7 +3334,9 @@ class ModelRegistry:
                 )
             authenticated_operator = user_rec.username
             authenticated_institution = getattr(user_rec, "bank_id", None)
-            self._verify_institutional_governance_authority(simulation_id, user_rec, "model promotion")
+            self._verify_institutional_governance_authority(
+                simulation_id, user_rec, "model promotion"
+            )
         elif actor:
             from app.infrastructure.security.auth_service import AuthenticationService
 
@@ -3155,7 +3344,9 @@ class ModelRegistry:
             user_rec = auth_svc.get_user(actor)
             if user_rec is not None:
                 authenticated_institution = getattr(user_rec, "bank_id", None)
-                self._verify_institutional_governance_authority(simulation_id, user_rec, "model promotion")
+                self._verify_institutional_governance_authority(
+                    simulation_id, user_rec, "model promotion"
+                )
 
         effective_institution = authenticated_institution or "unknown"
 
@@ -3167,11 +3358,17 @@ class ModelRegistry:
             if not target_entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
             if target_entry.get("is_revoked") is True or target_entry.get("status") == "revoked":
-                raise ModelIntegrityError(f"Cannot promote revoked model version {version} for {simulation_id}.")
+                raise ModelIntegrityError(
+                    f"Cannot promote revoked model version {version} for {simulation_id}."
+                )
             from app.config import get_settings
+
             settings = get_settings()
 
-            if settings.app_env.lower() == "production" and target_entry.get("is_production_eligible") is False:
+            if (
+                settings.app_env.lower() == "production"
+                and target_entry.get("is_production_eligible") is False
+            ):
                 raise ModelIntegrityError(
                     f"Cannot promote model version {version} for {simulation_id}: explicitly marked not production eligible."
                 )
@@ -3191,14 +3388,18 @@ class ModelRegistry:
                         f"recorded digest does not match file on disk."
                     )
 
-            admission_context = "promote_version" if target_status == "champion" else "promote_challenger"
+            admission_context = (
+                "promote_version" if target_status == "champion" else "promote_challenger"
+            )
             validate_production_admission(target_entry, context=admission_context)
 
             if settings.app_env.lower() == "production":
                 # Strict filename and path containment validation
                 fname = target_entry.get("filename", "")
                 if ".." in fname or os.path.isabs(fname):
-                    raise ModelIntegrityError(f"Path traversal detected in manifest filename '{fname}'.")
+                    raise ModelIntegrityError(
+                        f"Path traversal detected in manifest filename '{fname}'."
+                    )
                 real_filepath = os.path.realpath(filepath)
                 real_storage = os.path.realpath(self.storage_dir)
                 try:
@@ -3208,10 +3409,14 @@ class ModelRegistry:
                             f"Artifact path '{filepath}' is outside trusted storage directory '{self.storage_dir}'."
                         )
                 except ValueError as exc:
-                    raise ModelIntegrityError(f"Path containment check failed for artifact '{filepath}': {exc}") from exc
+                    raise ModelIntegrityError(
+                        f"Path containment check failed for artifact '{filepath}': {exc}"
+                    ) from exc
 
                 if not os.path.isfile(real_filepath) or os.path.getsize(real_filepath) == 0:
-                    raise ModelIntegrityError(f"Artifact file '{filepath}' is missing, not a regular file, or empty.")
+                    raise ModelIntegrityError(
+                        f"Artifact file '{filepath}' is missing, not a regular file, or empty."
+                    )
 
                 actual_sha256 = compute_file_sha256(real_filepath)
                 expected_sha256 = target_entry.get("sha256")
@@ -3305,7 +3510,9 @@ class ModelRegistry:
                     "action": "promote_version",
                     "decision": "PENDING",
                 },
-                actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
+                actor_type="internal_service"
+                if (effective_operator or "").startswith("internal:")
+                else "human_principal",
                 actor_institution=effective_institution,
                 target_type="model_version",
                 action="promote_version",
@@ -3373,7 +3580,9 @@ class ModelRegistry:
                             "actor_institution": effective_institution,
                             "decision": "FAILED",
                         },
-                        actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
+                        actor_type="internal_service"
+                        if (effective_operator or "").startswith("internal:")
+                        else "human_principal",
                         actor_institution=effective_institution,
                         target_type="model_version",
                         action="promote_version",
@@ -3402,14 +3611,18 @@ class ModelRegistry:
                         "action": "promote_version",
                         "decision": "PROMOTED",
                     },
-                    actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
+                    actor_type="internal_service"
+                    if (effective_operator or "").startswith("internal:")
+                    else "human_principal",
                     actor_institution=effective_institution,
                     target_type="model_version",
                     action="promote_version",
                     decision="PROMOTED",
                 )
             except Exception as audit_err:
-                logger.error("Failed to finalize committed audit event for promotion: %s", audit_err)
+                logger.error(
+                    "Failed to finalize committed audit event for promotion: %s", audit_err
+                )
                 raise AuditLedgerSecurityError(
                     f"Critical audit failure: promotion for {simulation_id}:v{version} persisted but could not be finalized in audit ledger: {audit_err}"
                 ) from audit_err
@@ -3435,7 +3648,9 @@ class ModelRegistry:
 
                 clear_all_serving_caches()
 
-            logger.info("Promoted model version %d to %s for %s", version, target_status, simulation_id)
+            logger.info(
+                "Promoted model version %d to %s for %s", version, target_status, simulation_id
+            )
             return target_entry
 
     def rollback(
@@ -3469,7 +3684,9 @@ class ModelRegistry:
                 consume_nonce=True,
             )
             if not is_valid_ctx:
-                raise ModelIntegrityError(f"Internal orchestration authority rejected: {ctx_reason}")
+                raise ModelIntegrityError(
+                    f"Internal orchestration authority rejected: {ctx_reason}"
+                )
             authenticated_operator = f"internal:{trusted_context.service_name}"
             authenticated_institution = trusted_context.bank_id or owning_bank
         elif auth_token:
@@ -3486,7 +3703,9 @@ class ModelRegistry:
                 )
             user_rec = auth_svc.get_user(authenticated_operator)
             if not user_rec or not user_rec.is_active or user_rec.status.lower() != "active":
-                raise ModelIntegrityError(f"Operator '{authenticated_operator}' is not an active authoritative user.")
+                raise ModelIntegrityError(
+                    f"Operator '{authenticated_operator}' is not an active authoritative user."
+                )
             user_roles = {r.lower().strip() for r in user_rec.roles}
             if not (user_roles & {"admin", "ml_lead", "compliance", "compliance_officer"}):
                 raise ModelIntegrityError(
@@ -3502,7 +3721,9 @@ class ModelRegistry:
                 )
             authenticated_operator = user_rec.username
             authenticated_institution = getattr(user_rec, "bank_id", None)
-            self._verify_institutional_governance_authority(simulation_id, user_rec, "model rollback")
+            self._verify_institutional_governance_authority(
+                simulation_id, user_rec, "model rollback"
+            )
         elif actor:
             from app.infrastructure.security.auth_service import AuthenticationService
 
@@ -3510,7 +3731,9 @@ class ModelRegistry:
             user_rec = auth_svc.get_user(actor)
             if user_rec is not None:
                 authenticated_institution = getattr(user_rec, "bank_id", None)
-                self._verify_institutional_governance_authority(simulation_id, user_rec, "model rollback")
+                self._verify_institutional_governance_authority(
+                    simulation_id, user_rec, "model rollback"
+                )
 
         effective_institution = authenticated_institution or "unknown"
 
@@ -3522,11 +3745,17 @@ class ModelRegistry:
             if not target_entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
             if target_entry.get("is_revoked") is True or target_entry.get("status") == "revoked":
-                raise ModelIntegrityError(f"Cannot roll back to revoked model version {version} for {simulation_id}.")
+                raise ModelIntegrityError(
+                    f"Cannot roll back to revoked model version {version} for {simulation_id}."
+                )
             from app.config import get_settings
+
             settings = get_settings()
 
-            if settings.app_env.lower() == "production" and target_entry.get("is_production_eligible") is False:
+            if (
+                settings.app_env.lower() == "production"
+                and target_entry.get("is_production_eligible") is False
+            ):
                 raise ModelIntegrityError(
                     f"Cannot roll back to model version {version} for {simulation_id}: explicitly marked not production eligible."
                 )
@@ -3552,7 +3781,9 @@ class ModelRegistry:
             if settings.app_env.lower() == "production":
                 fname = target_entry.get("filename", "")
                 if ".." in fname or os.path.isabs(fname):
-                    raise ModelIntegrityError(f"Path traversal detected in manifest filename '{fname}'.")
+                    raise ModelIntegrityError(
+                        f"Path traversal detected in manifest filename '{fname}'."
+                    )
                 real_filepath = os.path.realpath(filepath)
                 real_storage = os.path.realpath(self.storage_dir)
                 try:
@@ -3562,10 +3793,14 @@ class ModelRegistry:
                             f"Artifact path '{filepath}' is outside trusted storage directory '{self.storage_dir}'."
                         )
                 except ValueError as exc:
-                    raise ModelIntegrityError(f"Path containment check failed for artifact '{filepath}': {exc}") from exc
+                    raise ModelIntegrityError(
+                        f"Path containment check failed for artifact '{filepath}': {exc}"
+                    ) from exc
 
                 if not os.path.isfile(real_filepath) or os.path.getsize(real_filepath) == 0:
-                    raise ModelIntegrityError(f"Artifact file '{filepath}' is missing, not a regular file, or empty.")
+                    raise ModelIntegrityError(
+                        f"Artifact file '{filepath}' is missing, not a regular file, or empty."
+                    )
 
                 actual_sha256 = compute_file_sha256(real_filepath)
                 expected_sha256 = target_entry.get("sha256")
@@ -3652,7 +3887,9 @@ class ModelRegistry:
                     "action": "rollback",
                     "decision": "PENDING",
                 },
-                actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
+                actor_type="internal_service"
+                if (effective_operator or "").startswith("internal:")
+                else "human_principal",
                 actor_institution=effective_institution,
                 target_type="model_version",
                 action="rollback",
@@ -3720,7 +3957,9 @@ class ModelRegistry:
                             "actor_institution": effective_institution,
                             "decision": "FAILED",
                         },
-                        actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
+                        actor_type="internal_service"
+                        if (effective_operator or "").startswith("internal:")
+                        else "human_principal",
                         actor_institution=effective_institution,
                         target_type="model_version",
                         action="rollback",
@@ -3748,7 +3987,9 @@ class ModelRegistry:
                         "action": "rollback",
                         "decision": "ROLLED_BACK",
                     },
-                    actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
+                    actor_type="internal_service"
+                    if (effective_operator or "").startswith("internal:")
+                    else "human_principal",
                     actor_institution=effective_institution,
                     target_type="model_version",
                     action="rollback",
@@ -3781,7 +4022,12 @@ class ModelRegistry:
 
                 clear_all_serving_caches()
 
-            logger.info("Rolled back registry of %s to version %d (generation %d)", simulation_id, version, target_entry["generation"])
+            logger.info(
+                "Rolled back registry of %s to version %d (generation %d)",
+                simulation_id,
+                version,
+                target_entry["generation"],
+            )
             return target_entry
 
     def sign_off(
@@ -3812,12 +4058,15 @@ class ModelRegistry:
             if not entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
             if entry.get("is_revoked") is True or entry.get("status") == "revoked":
-                raise ModelIntegrityError(f"Cannot sign off on revoked model version {version} for {simulation_id}.")
+                raise ModelIntegrityError(
+                    f"Cannot sign off on revoked model version {version} for {simulation_id}."
+                )
 
             if role not in ("compliance", "compliance_officer", "ml_engineer"):
                 raise ValueError("Role must be 'compliance' or 'ml_engineer'")
 
             from app.config import get_settings
+
             settings = get_settings()
 
             # Prevent development seeded accounts from signing off in production
@@ -3827,7 +4076,9 @@ class ModelRegistry:
                     f"Production promotion rejected: development seeded account '{user}' cannot authorize promotion."
                 )
 
-            norm_role = "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
+            norm_role = (
+                "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
+            )
 
             # Initialize sign_offs list if not present (backward compatibility)
             entry["simulation_id"] = simulation_id
@@ -3836,15 +4087,22 @@ class ModelRegistry:
 
             # Prevent duplicate sign-offs for the same role (only active sign-offs block new sign-offs)
             existing_roles = [
-                ("compliance" if s["role"] in ("compliance", "compliance_officer") else "ml_engineer")
+                (
+                    "compliance"
+                    if s["role"] in ("compliance", "compliance_officer")
+                    else "ml_engineer"
+                )
                 for s in entry["sign_offs"]
-                if s.get("is_revoked") is not True and s.get("is_active", True) is not False and s.get("status", "active") != "revoked"
+                if s.get("is_revoked") is not True
+                and s.get("is_active", True) is not False
+                and s.get("status", "active") != "revoked"
             ]
             if norm_role in existing_roles:
                 raise ValueError(f"Role '{role}' has already signed off on this version")
 
             # Verify identity and role membership against AuthenticationService
             from app.infrastructure.security.auth_service import AuthenticationService
+
             auth_svc = AuthenticationService.get_instance()
 
             # Retrieve authoritative user record first for stable identity and live RBAC checks
@@ -3852,11 +4110,17 @@ class ModelRegistry:
 
             # Four-Eyes Principle: Prevent same user from approving multiple roles on the same version
             # Defend against aliases, casing differences, and token identifier variations
-            user_canonical = authoritative_user.username.lower() if authoritative_user else user.lower().strip()
+            user_canonical = (
+                authoritative_user.username.lower() if authoritative_user else user.lower().strip()
+            )
             user_id_canonical = authoritative_user.user_id if authoritative_user else None
 
             for s in entry["sign_offs"]:
-                if s.get("is_revoked") is True or s.get("is_active", True) is False or s.get("status", "active") == "revoked":
+                if (
+                    s.get("is_revoked") is True
+                    or s.get("is_active", True) is False
+                    or s.get("status", "active") == "revoked"
+                ):
                     continue
                 existing_u = (s.get("user") or "").lower().strip()
                 existing_uid = (s.get("user_id") or "").strip()
@@ -3890,10 +4154,18 @@ class ModelRegistry:
                         f"Production promotion rejected: token user '{tok_user}' does not match sign-off user '{user}'."
                     )
                 tok_roles = [r.lower().strip() for r in tok_payload.get("roles", [])]
-                if norm_role == "compliance" and not any(r in ("compliance", "compliance_officer", "admin") for r in tok_roles):
-                    raise ModelIntegrityError("Production promotion rejected: token claims lack compliance role authority.")
-                if norm_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in tok_roles):
-                    raise ModelIntegrityError("Production promotion rejected: token claims lack ml_engineer role authority.")
+                if norm_role == "compliance" and not any(
+                    r in ("compliance", "compliance_officer", "admin") for r in tok_roles
+                ):
+                    raise ModelIntegrityError(
+                        "Production promotion rejected: token claims lack compliance role authority."
+                    )
+                if norm_role == "ml_engineer" and not any(
+                    r in ("ml_engineer", "ml_lead") for r in tok_roles
+                ):
+                    raise ModelIntegrityError(
+                        "Production promotion rejected: token claims lack ml_engineer role authority."
+                    )
 
                 if not authoritative_user or not authoritative_user.is_active:
                     raise ModelIntegrityError(
@@ -3902,11 +4174,15 @@ class ModelRegistry:
 
                 # Live Authoritative RBAC check: Must currently possess the required role in DurableAccountStore
                 auth_roles = [r.lower().strip() for r in authoritative_user.roles]
-                if norm_role == "compliance" and not any(r in ("compliance", "compliance_officer", "admin") for r in auth_roles):
+                if norm_role == "compliance" and not any(
+                    r in ("compliance", "compliance_officer", "admin") for r in auth_roles
+                ):
                     raise ModelIntegrityError(
                         f"Production promotion rejected: user '{user}' lacks authoritative compliance role permissions."
                     )
-                if norm_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in auth_roles):
+                if norm_role == "ml_engineer" and not any(
+                    r in ("ml_engineer", "ml_lead") for r in auth_roles
+                ):
                     raise ModelIntegrityError(
                         f"Production promotion rejected: user '{user}' lacks authoritative ml_engineer role permissions."
                     )
@@ -3928,11 +4204,15 @@ class ModelRegistry:
                         f"Sign-off rejected: user '{user}' is not an active authoritative user."
                     )
                 auth_roles = [r.lower().strip() for r in authoritative_user.roles]
-                if norm_role == "compliance" and not any(r in ("compliance", "compliance_officer", "admin") for r in auth_roles):
+                if norm_role == "compliance" and not any(
+                    r in ("compliance", "compliance_officer", "admin") for r in auth_roles
+                ):
                     raise ModelIntegrityError(
                         f"Sign-off rejected: user '{user}' lacks authoritative compliance role permissions."
                     )
-                if norm_role == "ml_engineer" and not any(r in ("ml_engineer", "ml_lead") for r in auth_roles):
+                if norm_role == "ml_engineer" and not any(
+                    r in ("ml_engineer", "ml_lead") for r in auth_roles
+                ):
                     raise ModelIntegrityError(
                         f"Sign-off rejected: user '{user}' lacks authoritative ml_engineer role permissions."
                     )
@@ -3940,10 +4220,14 @@ class ModelRegistry:
                 is_role_verified = True
 
             # Authoritative institutional tenant check
-            self._verify_institutional_governance_authority(simulation_id, authoritative_user, "model sign-off")
+            self._verify_institutional_governance_authority(
+                simulation_id, authoritative_user, "model sign-off"
+            )
 
             # Cryptographic signature verification over canonical payload
-            artifact_sha = entry.get("sha256") or compute_file_sha256(os.path.join(sim_dir, entry["filename"]))
+            artifact_sha = entry.get("sha256") or compute_file_sha256(
+                os.path.join(sim_dir, entry["filename"])
+            )
             canonical_payload = f"{simulation_id}:{version}:{artifact_sha}:{norm_role}:{user}"
 
             domain_key = derive_domain_key(settings.payload_signing_secret, DOMAIN_APPROVAL_SIGNOFF)
@@ -3959,7 +4243,8 @@ class ModelRegistry:
             ).hexdigest()
 
             is_signature_valid = bool(
-                signature and (
+                signature
+                and (
                     hmac.compare_digest(signature, expected_sig_domain)
                     or hmac.compare_digest(signature, expected_sig_raw)
                 )
@@ -3990,7 +4275,9 @@ class ModelRegistry:
                     "decision": "PENDING",
                 },
                 actor_type="human_principal" if is_identity_verified else "unverified_operator",
-                actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
+                actor_institution=getattr(authoritative_user, "bank_id", "unknown")
+                if authoritative_user
+                else "unknown",
                 target_type="model_version",
                 action="sign_off",
                 decision="PENDING",
@@ -4016,8 +4303,12 @@ class ModelRegistry:
                             "action": "sign_off",
                             "decision": "REJECTED_INVALID_SIGNATURE",
                         },
-                        actor_type="human_principal" if is_identity_verified else "unverified_operator",
-                        actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
+                        actor_type="human_principal"
+                        if is_identity_verified
+                        else "unverified_operator",
+                        actor_institution=getattr(authoritative_user, "bank_id", "unknown")
+                        if authoritative_user
+                        else "unknown",
                         target_type="model_version",
                         action="sign_off",
                         decision="FAILED",
@@ -4044,8 +4335,12 @@ class ModelRegistry:
                             "action": "sign_off",
                             "decision": "REJECTED_UNAUTHORIZED_ROLE",
                         },
-                        actor_type="human_principal" if is_identity_verified else "unverified_operator",
-                        actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
+                        actor_type="human_principal"
+                        if is_identity_verified
+                        else "unverified_operator",
+                        actor_institution=getattr(authoritative_user, "bank_id", "unknown")
+                        if authoritative_user
+                        else "unknown",
                         target_type="model_version",
                         action="sign_off",
                         decision="FAILED",
@@ -4065,7 +4360,9 @@ class ModelRegistry:
                     "is_signature_valid": is_signature_valid,
                     "is_identity_verified": is_identity_verified,
                     "is_role_verified": is_role_verified,
-                    "is_independent_human_authorization": is_identity_verified and is_role_verified and user not in SEEDED_ACCOUNTS,
+                    "is_independent_human_authorization": is_identity_verified
+                    and is_role_verified
+                    and user not in SEEDED_ACCOUNTS,
                     "payload_bound": canonical_payload,
                     "timestamp": datetime.now(UTC).isoformat(),
                     "fairness_score": fairness_score,
@@ -4087,11 +4384,18 @@ class ModelRegistry:
 
             # Check if both compliance and ml_engineer have active sign-offs
             active_signoffs = [
-                s for s in entry["sign_offs"]
-                if s.get("is_revoked") is not True and s.get("is_active", True) is not False and s.get("status", "active") != "revoked"
+                s
+                for s in entry["sign_offs"]
+                if s.get("is_revoked") is not True
+                and s.get("is_active", True) is not False
+                and s.get("status", "active") != "revoked"
             ]
             signed_roles = [
-                ("compliance" if s["role"] in ("compliance", "compliance_officer") else "ml_engineer")
+                (
+                    "compliance"
+                    if s["role"] in ("compliance", "compliance_officer")
+                    else "ml_engineer"
+                )
                 for s in active_signoffs
             ]
 
@@ -4100,7 +4404,9 @@ class ModelRegistry:
 
             if "compliance" in signed_roles and "ml_engineer" in signed_roles:
                 if settings.app_env.lower() == "production":
-                    all_sigs_valid = all(s.get("is_signature_valid", False) for s in active_signoffs)
+                    all_sigs_valid = all(
+                        s.get("is_signature_valid", False) for s in active_signoffs
+                    )
                     all_roles_valid = all(s.get("is_role_verified", False) for s in active_signoffs)
                     if not all_sigs_valid:
                         audit_chain.finalize_pending_mutation(
@@ -4119,8 +4425,12 @@ class ModelRegistry:
                                 "action": "sign_off",
                                 "decision": "FAILED",
                             },
-                            actor_type="human_principal" if is_identity_verified else "unverified_operator",
-                            actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
+                            actor_type="human_principal"
+                            if is_identity_verified
+                            else "unverified_operator",
+                            actor_institution=getattr(authoritative_user, "bank_id", "unknown")
+                            if authoritative_user
+                            else "unknown",
                             target_type="model_version",
                             action="sign_off",
                             decision="FAILED",
@@ -4145,8 +4455,12 @@ class ModelRegistry:
                                 "action": "sign_off",
                                 "decision": "FAILED",
                             },
-                            actor_type="human_principal" if is_identity_verified else "unverified_operator",
-                            actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
+                            actor_type="human_principal"
+                            if is_identity_verified
+                            else "unverified_operator",
+                            actor_institution=getattr(authoritative_user, "bank_id", "unknown")
+                            if authoritative_user
+                            else "unknown",
                             target_type="model_version",
                             action="sign_off",
                             decision="FAILED",
@@ -4224,8 +4538,12 @@ class ModelRegistry:
                             "action": "sign_off",
                             "decision": "FAILED",
                         },
-                        actor_type="human_principal" if is_identity_verified else "unverified_operator",
-                        actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
+                        actor_type="human_principal"
+                        if is_identity_verified
+                        else "unverified_operator",
+                        actor_institution=getattr(authoritative_user, "bank_id", "unknown")
+                        if authoritative_user
+                        else "unknown",
                         target_type="model_version",
                         action="sign_off",
                         decision="FAILED",
@@ -4255,7 +4573,9 @@ class ModelRegistry:
                     "promoted_to_champion": promoted_to_champion,
                 },
                 actor_type="human_principal" if is_identity_verified else "unverified_operator",
-                actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
+                actor_institution=getattr(authoritative_user, "bank_id", "unknown")
+                if authoritative_user
+                else "unknown",
                 target_type="model_version",
                 action="sign_off",
                 decision="APPROVED",
@@ -4298,17 +4618,27 @@ class ModelRegistry:
             if not entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
 
-            norm_role = "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
+            norm_role = (
+                "compliance" if role in ("compliance", "compliance_officer") else "ml_engineer"
+            )
             effective_user = user or (revoked_by if not auth_token else "") or ""
 
             target_sign_off = None
             for s in entry.get("sign_offs", []):
-                s_role = "compliance" if s.get("role") in ("compliance", "compliance_officer") else "ml_engineer"
+                s_role = (
+                    "compliance"
+                    if s.get("role") in ("compliance", "compliance_officer")
+                    else "ml_engineer"
+                )
                 if (
                     s_role == norm_role
                     and not s.get("is_revoked", False)
                     and s.get("status", "active") != "revoked"
-                    and (not effective_user or s.get("user") == effective_user or effective_user in (s.get("user_id"), ""))
+                    and (
+                        not effective_user
+                        or s.get("user") == effective_user
+                        or effective_user in (s.get("user_id"), "")
+                    )
                 ):
                     target_sign_off = s
                     break
@@ -4331,12 +4661,20 @@ class ModelRegistry:
             if auth_token:
                 is_valid_tok, tok_payload, tok_err = auth_svc.verify_access_token(auth_token)
                 if not is_valid_tok or not tok_payload:
-                    raise ModelIntegrityError(f"Sign-off revocation authentication failed: {tok_err}")
+                    raise ModelIntegrityError(
+                        f"Sign-off revocation authentication failed: {tok_err}"
+                    )
                 tok_user = (tok_payload.get("username") or tok_payload.get("sub") or "").strip()
                 tok_bank = (tok_payload.get("bank_id") or "").lower().strip()
                 u_rec = auth_svc.get_user(tok_user)
-                if not u_rec or not u_rec.is_active or getattr(u_rec, "status", "active").lower() != "active":
-                    raise ModelIntegrityError(f"Revoking user '{tok_user}' is not an active authoritative user.")
+                if (
+                    not u_rec
+                    or not u_rec.is_active
+                    or getattr(u_rec, "status", "active").lower() != "active"
+                ):
+                    raise ModelIntegrityError(
+                        f"Revoking user '{tok_user}' is not an active authoritative user."
+                    )
 
                 user_bank = (getattr(u_rec, "bank_id", "") or "").lower().strip()
                 if tok_bank and user_bank and tok_bank != user_bank:
@@ -4345,7 +4683,9 @@ class ModelRegistry:
                     )
 
                 # Authoritative institutional ownership authorization (DEFECT 1)
-                self._verify_institutional_governance_authority(simulation_id, u_rec, "model sign-off revocation")
+                self._verify_institutional_governance_authority(
+                    simulation_id, u_rec, "model sign-off revocation"
+                )
 
                 user_roles = {r.lower().strip() for r in getattr(u_rec, "roles", [])}
                 user_clearance = getattr(u_rec, "clearance_level", 1)
@@ -4358,9 +4698,8 @@ class ModelRegistry:
                 # Distinguish original signatory vs supervisory compliance/governance intervention
                 orig_user = str(target_sign_off.get("user", "")).lower().strip()
                 orig_uid = str(target_sign_off.get("user_id", "")).strip()
-                is_orig = (
-                    tok_user.lower() == orig_user
-                    or (getattr(u_rec, "user_id", None) and u_rec.user_id == orig_uid)
+                is_orig = tok_user.lower() == orig_user or (
+                    getattr(u_rec, "user_id", None) and u_rec.user_id == orig_uid
                 )
 
                 if is_orig:
@@ -4368,7 +4707,13 @@ class ModelRegistry:
                         raise ModelAuthorizationError(
                             f"Principal '{tok_user}' clearance level {user_clearance} is insufficient to self-revoke sign-off."
                         )
-                    allowed_roles = {"admin", "ml_lead", "ml_engineer", "compliance", "compliance_officer"}
+                    allowed_roles = {
+                        "admin",
+                        "ml_lead",
+                        "ml_engineer",
+                        "compliance",
+                        "compliance_officer",
+                    }
                     if not (user_roles & allowed_roles):
                         raise ModelAuthorizationError(
                             f"Principal '{tok_user}' lacks authorized role to self-revoke sign-off."
@@ -4412,7 +4757,9 @@ class ModelRegistry:
                     consume_nonce=True,
                 )
                 if not is_valid_ctx:
-                    raise ModelIntegrityError(f"Internal context verification failed for revoke_sign_off: {ctx_reason}")
+                    raise ModelIntegrityError(
+                        f"Internal context verification failed for revoke_sign_off: {ctx_reason}"
+                    )
                 verified_actor = f"internal:{internal_context.service_name}"
                 actor_type = "internal_service"
                 actor_institution = getattr(internal_context, "bank_id", "system") or "system"
@@ -4425,7 +4772,9 @@ class ModelRegistry:
                 effective_revoker = revoked_by or user or "unverified_operator"
                 u_rec = auth_svc.get_user(effective_revoker)
                 if u_rec is not None:
-                    self._verify_institutional_governance_authority(simulation_id, u_rec, "model sign-off revocation")
+                    self._verify_institutional_governance_authority(
+                        simulation_id, u_rec, "model sign-off revocation"
+                    )
                     user_roles = {r.lower().strip() for r in getattr(u_rec, "roles", [])}
                     user_clearance = getattr(u_rec, "clearance_level", 1)
                     if "observer" in user_roles and not (user_roles - {"observer"}):
@@ -4433,12 +4782,14 @@ class ModelRegistry:
                             f"Principal '{effective_revoker}' with observer role is not authorized."
                         )
                     orig_user = str(target_sign_off.get("user", "")).lower().strip()
-                    is_orig = (
-                        effective_revoker.lower() == orig_user
-                        or (getattr(u_rec, "user_id", None) and u_rec.user_id == str(target_sign_off.get("user_id", "")))
+                    is_orig = effective_revoker.lower() == orig_user or (
+                        getattr(u_rec, "user_id", None)
+                        and u_rec.user_id == str(target_sign_off.get("user_id", ""))
                     )
                     if not is_orig:
-                        if not (user_roles & {"admin", "compliance", "compliance_officer", "ml_lead"}):
+                        if not (
+                            user_roles & {"admin", "compliance", "compliance_officer", "ml_lead"}
+                        ):
                             raise ModelAuthorizationError(
                                 f"Principal '{effective_revoker}' lacks supervisory role authority to revoke another user's sign-off."
                             )
@@ -4475,11 +4826,18 @@ class ModelRegistry:
 
             # If dual approval is broken by this revocation, demote approval and eligibility
             remaining_active = [
-                s for s in entry.get("sign_offs", [])
-                if not s.get("is_revoked") and s.get("status", "active") != "revoked" and s.get("is_active", True) is not False
+                s
+                for s in entry.get("sign_offs", [])
+                if not s.get("is_revoked")
+                and s.get("status", "active") != "revoked"
+                and s.get("is_active", True) is not False
             ]
-            has_remaining_ml = any(s.get("role") in ("ml_engineer", "ml_lead") for s in remaining_active)
-            has_remaining_comp = any(s.get("role") in ("compliance", "compliance_officer") for s in remaining_active)
+            has_remaining_ml = any(
+                s.get("role") in ("ml_engineer", "ml_lead") for s in remaining_active
+            )
+            has_remaining_comp = any(
+                s.get("role") in ("compliance", "compliance_officer") for s in remaining_active
+            )
             if not (has_remaining_ml and has_remaining_comp):
                 entry["is_approved"] = False
                 entry["is_production_eligible"] = False
@@ -4625,7 +4983,10 @@ class ModelRegistry:
                     decision="REVOKED",
                 )
             except Exception as audit_err:
-                logger.error("Failed to finalize committed audit event for sign-off revocation: %s", audit_err)
+                logger.error(
+                    "Failed to finalize committed audit event for sign-off revocation: %s",
+                    audit_err,
+                )
                 raise AuditLedgerSecurityError(
                     f"Critical audit failure: sign-off revocation for {simulation_id}:v{version} persisted but could not be finalized in audit ledger: {audit_err}"
                 ) from audit_err
@@ -4676,7 +5037,9 @@ class ModelRegistry:
             elif auth_token:
                 from app.infrastructure.security.auth_service import AuthenticationService
 
-                is_valid, claims, _ = AuthenticationService.get_instance().verify_access_token(auth_token)
+                is_valid, claims, _ = AuthenticationService.get_instance().verify_access_token(
+                    auth_token
+                )
                 if is_valid and claims:
                     effective_actor = claims.get("username") or claims.get("sub") or effective_actor
                     actor_inst = claims.get("bank_id") or "unknown"
@@ -4815,7 +5178,9 @@ class ModelRegistry:
                     decision="REVOKED",
                 )
             except Exception as audit_err:
-                logger.error("Failed to finalize committed audit event for version revocation: %s", audit_err)
+                logger.error(
+                    "Failed to finalize committed audit event for version revocation: %s", audit_err
+                )
                 raise AuditLedgerSecurityError(
                     f"Critical audit failure: model version revocation for {simulation_id}:v{version} persisted but could not be finalized in audit ledger: {audit_err}"
                 ) from audit_err
@@ -4854,10 +5219,18 @@ class ModelRegistry:
         try:
             ownership = self.get_simulation_ownership(simulation_id)
         except ModelIntegrityError as mie:
-            logger.warning("Ownership for '%s' is corrupted or unreadable (%s); status is INDETERMINATE.", simulation_id, mie)
+            logger.warning(
+                "Ownership for '%s' is corrupted or unreadable (%s); status is INDETERMINATE.",
+                simulation_id,
+                mie,
+            )
             return "INDETERMINATE"
         except Exception as exc:
-            logger.warning("Failed to load ownership for '%s' (%s); status is INDETERMINATE.", simulation_id, exc)
+            logger.warning(
+                "Failed to load ownership for '%s' (%s); status is INDETERMINATE.",
+                simulation_id,
+                exc,
+            )
             return "INDETERMINATE"
 
         if ownership.get("last_mutation_id") == mutation_id:
@@ -4891,10 +5264,18 @@ class ModelRegistry:
         try:
             manifest = self._load_manifest(simulation_id)
         except ModelIntegrityError as mie:
-            logger.warning("Registry manifest for '%s' is corrupted or unreadable (%s); status is INDETERMINATE.", simulation_id, mie)
+            logger.warning(
+                "Registry manifest for '%s' is corrupted or unreadable (%s); status is INDETERMINATE.",
+                simulation_id,
+                mie,
+            )
             return "INDETERMINATE"
         except Exception as exc:
-            logger.warning("Failed to load manifest for '%s' (%s); status is INDETERMINATE.", simulation_id, exc)
+            logger.warning(
+                "Failed to load manifest for '%s' (%s); status is INDETERMINATE.",
+                simulation_id,
+                exc,
+            )
             return "INDETERMINATE"
 
         def _is_entry_matching(entry: dict[str, Any]) -> bool:
@@ -4937,7 +5318,9 @@ class ModelRegistry:
         mutation_id: str,
     ) -> bool:
         """Check whether a mutation was authoritatively committed for a specific model version."""
-        return self.check_version_mutation_status(simulation_id, version, mutation_id) == "COMMITTED"
+        return (
+            self.check_version_mutation_status(simulation_id, version, mutation_id) == "COMMITTED"
+        )
 
     def reconcile_incomplete_mutations(
         self,
@@ -4972,7 +5355,8 @@ class ModelRegistry:
         if not target_sims and os.path.isdir(self.registry_root):
             with contextlib.suppress(OSError):
                 target_sims = [
-                    d for d in os.listdir(self.registry_root)
+                    d
+                    for d in os.listdir(self.registry_root)
                     if os.path.isdir(os.path.join(self.registry_root, d))
                 ]
         for s_id in target_sims:
@@ -5019,7 +5403,9 @@ class ModelRegistry:
                         sim_id,
                         mut_id,
                     )
-                    reconciled.append({"mutation_id": mut_id, "status": "INDETERMINATE_IN_PROGRESS"})
+                    reconciled.append(
+                        {"mutation_id": mut_id, "status": "INDETERMINATE_IN_PROGRESS"}
+                    )
                     continue
 
                 try:
@@ -5036,10 +5422,10 @@ class ModelRegistry:
                                     os.remove(os.path.join(sim_dir, f_name))
 
                     # 1. Ownership mutations
-                    if (
-                        action in ("bind_simulation_ownership", "transfer_ownership")
-                        or p.event_type.startswith("MODEL_OWNERSHIP_")
-                    ):
+                    if action in (
+                        "bind_simulation_ownership",
+                        "transfer_ownership",
+                    ) or p.event_type.startswith("MODEL_OWNERSHIP_"):
                         own_status = self.check_ownership_mutation_status(sim_id, mut_id)
                         if own_status == "INDETERMINATE":
                             logger.warning(
@@ -5077,8 +5463,14 @@ class ModelRegistry:
                                             target_consortium,
                                         )
                             except Exception as sync_err:
-                                logger.error("Failed to sync manifest ownership during reconciliation for %s: %s", sim_id, sync_err)
-                                reconciled.append({"mutation_id": mut_id, "status": "INDETERMINATE"})
+                                logger.error(
+                                    "Failed to sync manifest ownership during reconciliation for %s: %s",
+                                    sim_id,
+                                    sync_err,
+                                )
+                                reconciled.append(
+                                    {"mutation_id": mut_id, "status": "INDETERMINATE"}
+                                )
                                 continue
 
                             event_type = (
@@ -5086,11 +5478,7 @@ class ModelRegistry:
                                 if is_transfer
                                 else "MODEL_OWNERSHIP_ASSIGNMENT"
                             )
-                            decision = (
-                                "OWNERSHIP_TRANSFERRED"
-                                if is_transfer
-                                else "OWNERSHIP_BOUND"
-                            )
+                            decision = "OWNERSHIP_TRANSFERRED" if is_transfer else "OWNERSHIP_BOUND"
                             final_entry = audit_chain.finalize_pending_mutation(
                                 mutation_id=mut_id,
                                 event_type=event_type,
@@ -5113,7 +5501,9 @@ class ModelRegistry:
                             if final_entry is not None:
                                 reconciled.append({"mutation_id": mut_id, "status": "COMMITTED"})
                             else:
-                                reconciled.append({"mutation_id": mut_id, "status": "ALREADY_RESOLVED"})
+                                reconciled.append(
+                                    {"mutation_id": mut_id, "status": "ALREADY_RESOLVED"}
+                                )
                         else:
                             event_type = (
                                 "MODEL_OWNERSHIP_TRANSFER_FAILED"
@@ -5143,13 +5533,14 @@ class ModelRegistry:
                             if final_entry is not None:
                                 reconciled.append({"mutation_id": mut_id, "status": "FAILED"})
                             else:
-                                reconciled.append({"mutation_id": mut_id, "status": "ALREADY_RESOLVED"})
+                                reconciled.append(
+                                    {"mutation_id": mut_id, "status": "ALREADY_RESOLVED"}
+                                )
                         continue
 
                     # 2. Registration mutations
-                    if (
-                        action in ("save_version", "register_version")
-                        or p.event_type.startswith("MODEL_REGISTRATION_")
+                    if action in ("save_version", "register_version") or p.event_type.startswith(
+                        "MODEL_REGISTRATION_"
                     ):
                         reg_status = self.check_version_mutation_status(sim_id, ver, mut_id)
                         if reg_status == "INDETERMINATE":
@@ -5188,7 +5579,9 @@ class ModelRegistry:
                             if final_entry is not None:
                                 reconciled.append({"mutation_id": mut_id, "status": "COMMITTED"})
                             else:
-                                reconciled.append({"mutation_id": mut_id, "status": "ALREADY_RESOLVED"})
+                                reconciled.append(
+                                    {"mutation_id": mut_id, "status": "ALREADY_RESOLVED"}
+                                )
                         else:
                             # Registration was NOT committed to manifest!
                             # Clean up abandoned published-but-unregistered artifact file if present on disk
@@ -5197,7 +5590,9 @@ class ModelRegistry:
                                 manifest = self._load_manifest(sim_id)
                             except Exception:
                                 manifest = []
-                            committed_filenames = {e.get("filename") for e in manifest if e.get("filename")}
+                            committed_filenames = {
+                                e.get("filename") for e in manifest if e.get("filename")
+                            }
                             candidate_fname = f"model_v{ver}.pt" if ver else None
                             if candidate_fname and candidate_fname not in committed_filenames:
                                 candidate_path = os.path.join(sim_dir, candidate_fname)
@@ -5232,7 +5627,9 @@ class ModelRegistry:
                             if final_entry is not None:
                                 reconciled.append({"mutation_id": mut_id, "status": "FAILED"})
                             else:
-                                reconciled.append({"mutation_id": mut_id, "status": "ALREADY_RESOLVED"})
+                                reconciled.append(
+                                    {"mutation_id": mut_id, "status": "ALREADY_RESOLVED"}
+                                )
                         continue
 
                     # 3. Sign-off mutations
@@ -5270,7 +5667,9 @@ class ModelRegistry:
                             if final_entry is not None:
                                 reconciled.append({"mutation_id": mut_id, "status": "COMMITTED"})
                             else:
-                                reconciled.append({"mutation_id": mut_id, "status": "ALREADY_RESOLVED"})
+                                reconciled.append(
+                                    {"mutation_id": mut_id, "status": "ALREADY_RESOLVED"}
+                                )
                         else:
                             final_entry = audit_chain.finalize_pending_mutation(
                                 mutation_id=mut_id,
@@ -5295,7 +5694,9 @@ class ModelRegistry:
                             if final_entry is not None:
                                 reconciled.append({"mutation_id": mut_id, "status": "FAILED"})
                             else:
-                                reconciled.append({"mutation_id": mut_id, "status": "ALREADY_RESOLVED"})
+                                reconciled.append(
+                                    {"mutation_id": mut_id, "status": "ALREADY_RESOLVED"}
+                                )
                         continue
 
                     # 4. Promotion, Rollback, Revocation
@@ -5407,17 +5808,28 @@ class ModelEvaluationEngine:
         """Log scoring details for a transaction."""
         with self._lock:
             key = f"{simulation_id}:prediction:{transaction_id}"
+            existing_rec = self._store.get(key)
+            if existing_rec and "pred_seq" in existing_rec:
+                pred_seq = existing_rec["pred_seq"]
+                timestamp = existing_rec.get("timestamp") or datetime.now(UTC).isoformat()
+            else:
+                seq_key = f"{simulation_id}:prediction_seq"
+                pred_seq = int(self._store.get(seq_key) or 0) + 1
+                self._store.set(seq_key, pred_seq)
+                timestamp = datetime.now(UTC).isoformat()
+
             record = {
                 "transaction_id": transaction_id,
+                "pred_seq": pred_seq,
                 "champion_version": champion_version,
                 "champion_prob": champion_prob,
                 "champion_latency_ms": champion_latency_ms,
                 "challenger_version": challenger_version,
                 "challenger_prob": challenger_prob,
                 "challenger_latency_ms": challenger_latency_ms,
-                "actual_label": None,
+                "actual_label": existing_rec.get("actual_label") if existing_rec else None,
                 "routed_to": routed_to,
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": timestamp,
             }
             self._store.set(key, record)
 
@@ -5502,20 +5914,30 @@ class ModelEvaluationEngine:
 
             # Global descriptive champion metrics (for fleet monitoring & health)
             champ_records = [
-                r for r in records
+                r
+                for r in records
                 if r.get("champion_prob") is not None
-                and (r.get("champion_version") == active_ver_num or r.get("champion_version") is None)
+                and (
+                    r.get("champion_version") == active_ver_num or r.get("champion_version") is None
+                )
             ]
             y_true_champ = [r["actual_label"] for r in champ_records]
             y_pred_champ = [r["champion_prob"] for r in champ_records]
             champ_latencies = [
-                r["champion_latency_ms"] for r in champ_records
+                r["champion_latency_ms"]
+                for r in champ_records
                 if r.get("champion_latency_ms") is not None
             ]
-            avg_champ_latency = sum(champ_latencies) / len(champ_latencies) if champ_latencies else 0.0
+            avg_champ_latency = (
+                sum(champ_latencies) / len(champ_latencies) if champ_latencies else 0.0
+            )
 
-            champ_auc = safe_roc_auc_score(y_true_champ, y_pred_champ) if len(champ_records) >= 5 else None
-            champ_pr_auc = safe_pr_auc_score(y_true_champ, y_pred_champ) if len(champ_records) >= 5 else None
+            champ_auc = (
+                safe_roc_auc_score(y_true_champ, y_pred_champ) if len(champ_records) >= 5 else None
+            )
+            champ_pr_auc = (
+                safe_pr_auc_score(y_true_champ, y_pred_champ) if len(champ_records) >= 5 else None
+            )
 
             champ_fp = 0
             champ_tn = 0
@@ -5531,8 +5953,13 @@ class ModelEvaluationEngine:
             rollback_triggered = False
             rollback_message = ""
             has_both_classes = len(set(y_true_champ)) >= 2
-            if (has_both_classes and champ_auc is not None and champ_auc < 0.65) or avg_champ_latency > 200.0 or champ_fpr > 0.05:
+            if (
+                (has_both_classes and champ_auc is not None and champ_auc < 0.65)
+                or avg_champ_latency > 200.0
+                or champ_fpr > 0.05
+            ):
                 from app.config import get_settings
+
                 settings = get_settings()
                 sim_dir = self.registry._get_sim_dir(simulation_id)
                 verifier = self.registry._verifier
@@ -5540,7 +5967,9 @@ class ModelEvaluationEngine:
                     try:
                         verifier = get_default_training_verifier()
                     except Exception as verifier_err:
-                        logger.warning("Could not initialize default training verifier: %s", verifier_err)
+                        logger.warning(
+                            "Could not initialize default training verifier: %s", verifier_err
+                        )
                         verifier = None
                 manifest = self.registry._load_manifest(simulation_id)
 
@@ -5551,7 +5980,10 @@ class ModelEvaluationEngine:
                         continue
                     if v.get("is_revoked") is True or v.get("status") == "revoked":
                         continue
-                    if settings.app_env.lower() == "production" and v.get("is_production_eligible") is False:
+                    if (
+                        settings.app_env.lower() == "production"
+                        and v.get("is_production_eligible") is False
+                    ):
                         continue
                     fname = v.get("filename")
                     if not fname:
@@ -5575,17 +6007,23 @@ class ModelEvaluationEngine:
                         continue
                     if settings.app_env.lower() == "production":
                         sign_offs = [
-                            s for s in v.get("sign_offs", [])
-                            if isinstance(s, dict) and not s.get("is_revoked") and s.get("status", "active") != "revoked"
+                            s
+                            for s in v.get("sign_offs", [])
+                            if isinstance(s, dict)
+                            and not s.get("is_revoked")
+                            and s.get("status", "active") != "revoked"
                         ]
                         has_ml = any(s.get("role") in ("ml_engineer", "ml_lead") for s in sign_offs)
-                        has_comp = any(s.get("role") in ("compliance", "compliance_officer") for s in sign_offs)
+                        has_comp = any(
+                            s.get("role") in ("compliance", "compliance_officer") for s in sign_offs
+                        )
                         if not (has_ml and has_comp):
                             continue
                     eligible_versions.append(v)
 
                 if eligible_versions:
                     stable_version = max(eligible_versions, key=lambda x: x["version"])
+                    target_ver = stable_version["version"]
                     ownership = self.registry.get_simulation_ownership(simulation_id)
                     owning_bank = ownership.get("owning_bank_id")
                     trusted_ctx = create_trusted_internal_context(
@@ -5593,39 +6031,75 @@ class ModelEvaluationEngine:
                         action="rollback",
                         resource_type="model",
                         resource_id=simulation_id,
-                        model_version=stable_version["version"],
+                        model_version=target_ver,
                         bank_id=owning_bank,
                     )
+                    rollback_committed = False
                     try:
                         self.registry.rollback(
                             simulation_id,
-                            stable_version["version"],
+                            target_ver,
                             trusted_context=trusted_ctx,
                         )
+                        # Authoritative verification of post-rollback state
+                        active_after_rb = self.registry.get_active_version(simulation_id)
+                        if active_after_rb and active_after_rb.get("version") == target_ver:
+                            rollback_committed = True
+                            active_ver_num = target_ver
+                        else:
+                            rollback_committed = False
+                            rollback_triggered = False
+                            rollback_message = (
+                                f"Rollback execution completed but authoritative champion version is "
+                                f"{active_after_rb.get('version') if active_after_rb else 'None'}, expected {target_ver}."
+                            )
+                            logger.error(rollback_message)
+                    except Exception as rb_err:
+                        rollback_committed = False
+                        rollback_triggered = False
+                        rollback_message = f"Rollback to candidate version {target_ver} failed admission/execution: {rb_err}"
+                        logger.error(rollback_message)
+
+                    if rollback_committed:
+                        rollback_triggered = True
                         traffic_share = 0.0
                         self._store.set(share_key, 0.0)
                         self._store.delete(traffic_version_key)
-                        rollback_triggered = True
-                        rollback_message = f"Auto-rollback triggered to version {stable_version['version']} due to performance degradation (AUC: {champ_auc:.4f}, FPR: {champ_fpr:.4f}, Latency: {avg_champ_latency:.1f}ms)."
-                        logger.warning(rollback_message)
-                    except Exception as rb_err:
-                        rollback_message = f"Rollback to candidate version {stable_version['version']} failed admission/execution: {rb_err}"
-                        logger.error(rollback_message)
-                        rollback_triggered = False
+                        self._store.delete(f"{simulation_id}:canary_start_samples")
+                        self._store.delete(f"{simulation_id}:canary_state")
+
+                        auc_str = f"{champ_auc:.4f}" if champ_auc is not None else "None"
+                        fpr_str = f"{champ_fpr:.4f}" if champ_fpr is not None else "None"
+                        lat_str = f"{avg_champ_latency:.1f}ms"
+                        try:
+                            rollback_message = (
+                                f"Auto-rollback triggered to version {target_ver} due to performance degradation "
+                                f"(AUC: {auc_str}, FPR: {fpr_str}, Latency: {lat_str})."
+                            )
+                            logger.warning(rollback_message)
+                        except Exception as fmt_err:
+                            rollback_message = f"Auto-rollback committed to version {target_ver} (diagnostics formatting: {fmt_err})."
+                            logger.warning(rollback_message)
                 else:
                     traffic_share = 0.0
                     self._store.set(share_key, 0.0)
                     self._store.delete(traffic_version_key)
-                    rollback_message = (
-                        f"Performance degradation detected on champion v{active_ver_num}, but no safe eligible rollback candidate exists in registry."
-                    )
+                    self._store.delete(f"{simulation_id}:canary_start_samples")
+                    self._store.delete(f"{simulation_id}:canary_state")
+                    rollback_message = f"Performance degradation detected on champion v{active_ver_num}, but no safe eligible rollback candidate exists in registry."
                     logger.warning(rollback_message)
                     rollback_triggered = False
 
             # Challenger Version Resolution & Cohort Isolation
-            challenger_versions_present = sorted(list({
-                r["challenger_version"] for r in records if r.get("challenger_version") is not None
-            }))
+            challenger_versions_present = sorted(
+                list(
+                    {
+                        r["challenger_version"]
+                        for r in records
+                        if r.get("challenger_version") is not None
+                    }
+                )
+            )
 
             eval_challenger_ver: int | None = None
             is_ambiguous_window = False
@@ -5635,7 +6109,10 @@ class ModelEvaluationEngine:
             elif len(challenger_versions_present) == 1:
                 eval_challenger_ver = challenger_versions_present[0]
             elif len(challenger_versions_present) > 1:
-                if canary_target_version is not None and canary_target_version in challenger_versions_present:
+                if (
+                    canary_target_version is not None
+                    and canary_target_version in challenger_versions_present
+                ):
                     eval_challenger_ver = canary_target_version
                 else:
                     is_ambiguous_window = True
@@ -5652,7 +6129,8 @@ class ModelEvaluationEngine:
 
             if not is_ambiguous_window and eval_challenger_ver is not None:
                 matched_cohort = [
-                    r for r in records
+                    r
+                    for r in records
                     if r.get("champion_version") == active_ver_num
                     and r.get("challenger_version") == eval_challenger_ver
                     and r.get("champion_prob") is not None
@@ -5666,7 +6144,8 @@ class ModelEvaluationEngine:
                     y_pred_chall_matched = [r["challenger_prob"] for r in matched_cohort]
                     y_pred_champ_matched = [r["champion_prob"] for r in matched_cohort]
                     chall_latencies = [
-                        r["challenger_latency_ms"] for r in matched_cohort
+                        r["challenger_latency_ms"]
+                        for r in matched_cohort
                         if r.get("challenger_latency_ms") is not None
                     ]
                     avg_chall_latency = (
@@ -5676,7 +6155,9 @@ class ModelEvaluationEngine:
                     if len(matched_cohort) >= 5:
                         chall_auc = safe_roc_auc_score(y_true_matched, y_pred_chall_matched)
                         chall_pr_auc = safe_pr_auc_score(y_true_matched, y_pred_chall_matched)
-                        paired_champ_pr_auc = safe_pr_auc_score(y_true_matched, y_pred_champ_matched)
+                        paired_champ_pr_auc = safe_pr_auc_score(
+                            y_true_matched, y_pred_champ_matched
+                        )
 
                     # Correct Challenger False-Positive Rate calculation:
                     # Uses challenger-specific false positives and true negatives on matched cohort
@@ -5695,112 +6176,216 @@ class ModelEvaluationEngine:
             promotion_triggered = False
             promotion_message = ""
             canary_start_key = f"{simulation_id}:canary_start_samples"
+            canary_state_key = f"{simulation_id}:canary_state"
+            seq_key = f"{simulation_id}:prediction_seq"
+
             if not rollback_triggered:
                 if is_ambiguous_window:
-                    promotion_message = (
-                        f"Challenger promotion deferred: ambiguous mixed challenger versions in evaluation window ({challenger_versions_present})."
-                    )
+                    promotion_message = f"Challenger promotion deferred: ambiguous mixed challenger versions in evaluation window ({challenger_versions_present})."
                     logger.info(promotion_message)
                 elif eval_challenger_ver is not None:
-                    # Check for version change occurring during canary evaluation
-                    if (
-                        traffic_share == 0.1
-                        and canary_target_version is not None
-                        and canary_target_version != eval_challenger_ver
-                    ):
-                        traffic_share = 0.0
-                        self._store.set(share_key, 0.0)
-                        self._store.delete(traffic_version_key)
-                        self._store.delete(canary_start_key)
-                        promotion_message = (
-                            f"Challenger version changed from v{canary_target_version} to v{eval_challenger_ver} "
-                            "during canary evaluation. Resetting canary traffic share to 0.0 and deferring promotion."
-                        )
-                        logger.warning(promotion_message)
-                        promotion_triggered = False
-                    elif len(matched_cohort) < 5:
-                        promotion_message = (
-                            f"Challenger v{eval_challenger_ver} promotion evaluation deferred: "
-                            f"insufficient matched observations ({len(matched_cohort)} < 5 minimum)."
-                        )
-                        logger.info(promotion_message)
-                    elif chall_pr_auc is None or paired_champ_pr_auc is None:
-                        promotion_message = (
-                            f"Challenger v{eval_challenger_ver} promotion evaluation deferred: "
-                            "PR-AUC undefined on matched cohort (single class or degenerate window)."
-                        )
-                        logger.info(promotion_message)
-                    elif traffic_share == 0.0 and chall_pr_auc > paired_champ_pr_auc:
-                        traffic_share = 0.1
-                        self._store.set(share_key, 0.1)
-                        self._store.set(traffic_version_key, eval_challenger_ver)
-                        self._store.set(canary_start_key, len(matched_cohort))
-                        promotion_message = (
-                            f"Challenger v{eval_challenger_ver} (PR-AUC: {chall_pr_auc:.4f}) outperformed "
-                            f"Champion v{active_ver_num} (PR-AUC: {paired_champ_pr_auc:.4f}) on matched cohort. "
-                            f"Routed 10% traffic to Challenger v{eval_challenger_ver}."
-                        )
-                        logger.info(promotion_message)
-                        promotion_triggered = True
-                    elif traffic_share == 0.1:
-                        canary_start = int(self._store.get(canary_start_key) or 0)
-                        canary_samples = len(matched_cohort) - canary_start
+                    canary_state = self._store.get(canary_state_key)
 
-                        if chall_pr_auc > paired_champ_pr_auc:
-                            if canary_samples < 5:
-                                promotion_message = (
-                                    f"Challenger v{eval_challenger_ver} canary evaluation in progress "
-                                    f"({canary_samples}/5 canary samples). PR-AUC: {chall_pr_auc:.4f} vs {paired_champ_pr_auc:.4f}."
-                                )
-                                logger.info(promotion_message)
-                                promotion_triggered = False
-                            else:
-                                # Promotion Target is unambiguously eval_challenger_ver after full canary validation
-                                ownership = self.registry.get_simulation_ownership(simulation_id)
-                                owning_bank = ownership.get("owning_bank_id")
-                                trusted_ctx = create_trusted_internal_context(
-                                    "model_evaluation_engine",
-                                    action="promote_version",
-                                    resource_type="model",
-                                    resource_id=simulation_id,
-                                    model_version=eval_challenger_ver,
-                                    bank_id=owning_bank,
-                                )
-                                try:
-                                    self.registry.promote_version(
-                                        simulation_id,
-                                        eval_challenger_ver,
-                                        target_status="champion",
-                                        trusted_context=trusted_ctx,
-                                    )
-                                    traffic_share = 0.0
-                                    self._store.set(share_key, 0.0)
-                                    self._store.delete(traffic_version_key)
-                                    self._store.delete(canary_start_key)
-                                    promotion_message = (
-                                        f"Challenger version {eval_challenger_ver} promoted to Champion after continued "
-                                        f"outperformance on matched cohort ({canary_samples} canary samples, PR-AUC: {chall_pr_auc:.4f} vs {paired_champ_pr_auc:.4f})."
-                                    )
-                                    logger.info(promotion_message)
-                                    promotion_triggered = True
-                                except Exception as prom_err:
-                                    promotion_message = (
-                                        f"Challenger version {eval_challenger_ver} promotion failed admission checks: {prom_err}"
-                                    )
-                                    logger.error(promotion_message)
-                                    promotion_triggered = False
-                        else:
+                    # Check for version change occurring during canary evaluation
+                    if traffic_share == 0.1:
+                        target_mismatch = (
+                            canary_target_version is not None
+                            and canary_target_version != eval_challenger_ver
+                        )
+                        state_mismatch = (
+                            isinstance(canary_state, dict)
+                            and canary_state.get("challenger_version") != eval_challenger_ver
+                        )
+                        champ_mismatch = (
+                            isinstance(canary_state, dict)
+                            and canary_state.get("champion_version") != active_ver_num
+                        )
+                        if target_mismatch or state_mismatch:
                             traffic_share = 0.0
                             self._store.set(share_key, 0.0)
                             self._store.delete(traffic_version_key)
                             self._store.delete(canary_start_key)
+                            self._store.delete(canary_state_key)
                             promotion_message = (
-                                f"Challenger v{eval_challenger_ver} failed canary evaluation "
-                                f"(PR-AUC: {chall_pr_auc:.4f} <= {paired_champ_pr_auc:.4f}). Resetting canary traffic share to 0.0."
+                                f"Challenger version changed from v{canary_target_version} to v{eval_challenger_ver} "
+                                "during canary evaluation. Resetting canary traffic share to 0.0 and deferring promotion."
+                            )
+                            logger.warning(promotion_message)
+                            promotion_triggered = False
+                        elif champ_mismatch:
+                            traffic_share = 0.0
+                            self._store.set(share_key, 0.0)
+                            self._store.delete(traffic_version_key)
+                            self._store.delete(canary_start_key)
+                            self._store.delete(canary_state_key)
+                            promotion_message = (
+                                f"Champion version changed from v{canary_state.get('champion_version')} to v{active_ver_num} "
+                                "during canary evaluation. Resetting canary traffic share to 0.0 and deferring promotion."
                             )
                             logger.warning(promotion_message)
                             promotion_triggered = False
 
+                    if not promotion_message:
+                        if len(matched_cohort) < 5:
+                            promotion_message = (
+                                f"Challenger v{eval_challenger_ver} promotion evaluation deferred: "
+                                f"insufficient matched observations ({len(matched_cohort)} < 5 minimum)."
+                            )
+                            logger.info(promotion_message)
+                        elif chall_pr_auc is None or paired_champ_pr_auc is None:
+                            promotion_message = (
+                                f"Challenger v{eval_challenger_ver} promotion evaluation deferred: "
+                                "PR-AUC undefined on matched cohort (single class or degenerate window)."
+                            )
+                            logger.info(promotion_message)
+                        elif traffic_share == 0.0 and chall_pr_auc > paired_champ_pr_auc:
+                            traffic_share = 0.1
+                            self._store.set(share_key, 0.1)
+                            self._store.set(traffic_version_key, eval_challenger_ver)
+                            current_seq = int(self._store.get(seq_key) or 0)
+                            new_canary_state = {
+                                "activation_id": uuid.uuid4().hex,
+                                "challenger_version": eval_challenger_ver,
+                                "champion_version": active_ver_num,
+                                "activation_seq": current_seq,
+                                "activation_time": datetime.now(UTC).isoformat(),
+                            }
+                            self._store.set(canary_state_key, new_canary_state)
+                            self._store.set(canary_start_key, current_seq)
+                            promotion_message = (
+                                f"Challenger v{eval_challenger_ver} (PR-AUC: {chall_pr_auc:.4f}) outperformed "
+                                f"Champion v{active_ver_num} (PR-AUC: {paired_champ_pr_auc:.4f}) on matched cohort. "
+                                f"Routed 10% traffic to Challenger v{eval_challenger_ver}."
+                            )
+                            logger.info(promotion_message)
+                            promotion_triggered = True
+                        elif traffic_share == 0.1:
+                            if (
+                                not isinstance(canary_state, dict)
+                                or "activation_seq" not in canary_state
+                            ):
+                                traffic_share = 0.0
+                                self._store.set(share_key, 0.0)
+                                self._store.delete(traffic_version_key)
+                                self._store.delete(canary_start_key)
+                                self._store.delete(canary_state_key)
+                                promotion_message = (
+                                    f"Challenger v{eval_challenger_ver} canary evaluation deferred: "
+                                    "canary activation boundary unavailable or ambiguous."
+                                )
+                                logger.warning(promotion_message)
+                                promotion_triggered = False
+                            elif chall_pr_auc > paired_champ_pr_auc:
+                                activation_seq = int(canary_state["activation_seq"])
+
+                                # Filter genuine, correctly versioned observations scored strictly post-activation
+                                canary_records_by_tx = {}
+                                for r in matched_cohort:
+                                    tx_id = r.get("transaction_id")
+                                    pred_seq = r.get("pred_seq")
+                                    if (
+                                        tx_id
+                                        and pred_seq is not None
+                                        and pred_seq > activation_seq
+                                        and r.get("champion_version") == active_ver_num
+                                        and r.get("challenger_version") == eval_challenger_ver
+                                        and r.get("actual_label") in (0, 1)
+                                    ):
+                                        canary_records_by_tx[tx_id] = r
+
+                                canary_samples = len(canary_records_by_tx)
+
+                                # Inspect canary policy for required real challenger routing
+                                policy = self._store.get(f"{simulation_id}:canary_policy") or {}
+                                require_challenger_routing = False
+                                min_challenger_routed = 1
+                                if isinstance(policy, dict):
+                                    require_challenger_routing = bool(
+                                        policy.get("require_challenger_routing", False)
+                                    )
+                                    min_challenger_routed = int(
+                                        policy.get("min_challenger_routed_samples", 1)
+                                    )
+                                elif isinstance(policy, bool):
+                                    require_challenger_routing = policy
+                                if not require_challenger_routing:
+                                    raw_rcr = self._store.get(
+                                        f"{simulation_id}:require_challenger_routing"
+                                    )
+                                    if raw_rcr:
+                                        require_challenger_routing = True
+
+                                routed_challenger_count = sum(
+                                    1
+                                    for r in canary_records_by_tx.values()
+                                    if r.get("routed_to") == "challenger"
+                                )
+
+                                if canary_samples < 5:
+                                    promotion_message = (
+                                        f"Challenger v{eval_challenger_ver} canary evaluation in progress "
+                                        f"({canary_samples}/5 canary samples). PR-AUC: {chall_pr_auc:.4f} vs {paired_champ_pr_auc:.4f}."
+                                    )
+                                    logger.info(promotion_message)
+                                    promotion_triggered = False
+                                elif (
+                                    require_challenger_routing
+                                    and routed_challenger_count < min_challenger_routed
+                                ):
+                                    promotion_message = (
+                                        f"Challenger v{eval_challenger_ver} canary evaluation in progress: waiting for real challenger-routed traffic "
+                                        f"({routed_challenger_count}/{min_challenger_routed} required routed samples, {canary_samples}/5 total canary samples)."
+                                    )
+                                    logger.info(promotion_message)
+                                    promotion_triggered = False
+                                else:
+                                    # Promotion Target is unambiguously eval_challenger_ver after full canary validation
+                                    ownership = self.registry.get_simulation_ownership(
+                                        simulation_id
+                                    )
+                                    owning_bank = ownership.get("owning_bank_id")
+                                    trusted_ctx = create_trusted_internal_context(
+                                        "model_evaluation_engine",
+                                        action="promote_version",
+                                        resource_type="model",
+                                        resource_id=simulation_id,
+                                        model_version=eval_challenger_ver,
+                                        bank_id=owning_bank,
+                                    )
+                                    try:
+                                        self.registry.promote_version(
+                                            simulation_id,
+                                            eval_challenger_ver,
+                                            target_status="champion",
+                                            trusted_context=trusted_ctx,
+                                        )
+                                        traffic_share = 0.0
+                                        self._store.set(share_key, 0.0)
+                                        self._store.delete(traffic_version_key)
+                                        self._store.delete(canary_start_key)
+                                        self._store.delete(canary_state_key)
+                                        promotion_message = (
+                                            f"Challenger version {eval_challenger_ver} promoted to Champion after continued "
+                                            f"outperformance on matched cohort ({canary_samples} canary samples, PR-AUC: {chall_pr_auc:.4f} vs {paired_champ_pr_auc:.4f})."
+                                        )
+                                        logger.info(promotion_message)
+                                        promotion_triggered = True
+                                    except Exception as prom_err:
+                                        promotion_message = f"Challenger version {eval_challenger_ver} promotion failed admission checks: {prom_err}"
+                                        logger.error(promotion_message)
+                                        promotion_triggered = False
+                            else:
+                                traffic_share = 0.0
+                                self._store.set(share_key, 0.0)
+                                self._store.delete(traffic_version_key)
+                                self._store.delete(canary_start_key)
+                                self._store.delete(canary_state_key)
+                                promotion_message = (
+                                    f"Challenger v{eval_challenger_ver} failed canary evaluation "
+                                    f"(PR-AUC: {chall_pr_auc:.4f} <= {paired_champ_pr_auc:.4f}). Resetting canary traffic share to 0.0."
+                                )
+                                logger.warning(promotion_message)
+                                promotion_triggered = False
 
             metrics = {
                 "champion_version": active_ver_num,
@@ -5829,27 +6414,33 @@ class ModelEvaluationEngine:
             from app.presentation.routers.simulation import _simulation_events
 
             if rollback_triggered:
-                _simulation_events.push_list(
-                    simulation_id,
-                    {
-                        "event_type": "rollback",
-                        "data": {
-                            "message": rollback_message,
-                            "timestamp": datetime.now(UTC).isoformat(),
+                try:
+                    _simulation_events.push_list(
+                        simulation_id,
+                        {
+                            "event_type": "rollback",
+                            "data": {
+                                "message": rollback_message,
+                                "timestamp": datetime.now(UTC).isoformat(),
+                            },
                         },
-                    },
-                )
+                    )
+                except Exception as evt_err:
+                    logger.warning("Failed to publish rollback simulation event: %s", evt_err)
             elif promotion_triggered:
-                _simulation_events.push_list(
-                    simulation_id,
-                    {
-                        "event_type": "canary",
-                        "data": {
-                            "message": promotion_message,
-                            "timestamp": datetime.now(UTC).isoformat(),
+                try:
+                    _simulation_events.push_list(
+                        simulation_id,
+                        {
+                            "event_type": "canary",
+                            "data": {
+                                "message": promotion_message,
+                                "timestamp": datetime.now(UTC).isoformat(),
+                            },
                         },
-                    },
-                )
+                    )
+                except Exception as evt_err:
+                    logger.warning("Failed to publish canary simulation event: %s", evt_err)
 
             return metrics
 
