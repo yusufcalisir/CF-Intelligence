@@ -242,38 +242,44 @@ def _worker_register_process(
     if crash_stage == "BEFORE_PUBLISH":
         orig_replace = os.replace
 
-        def hooked_replace(src: str, dst: str):
-            if "model_v" in dst and not os.path.basename(dst).startswith(".tmp_"):
+        def hooked_replace(
+            src: os.PathLike[str] | str | bytes,
+            dst: os.PathLike[str] | str | bytes,
+            *,
+            src_dir_fd: int | None = None,
+            dst_dir_fd: int | None = None,
+        ) -> None:
+            dst_str = os.fspath(dst) if not isinstance(dst, bytes) else dst.decode("utf-8", "ignore")
+            if "model_v" in dst_str and not os.path.basename(dst_str).startswith(".tmp_"):
                 with open(barrier_path, "w") as f:
                     f.write("BEFORE_PUBLISH_REACHED")
                 while not os.path.exists(barrier_path + ".done"):
                     time.sleep(0.05)
-            return orig_replace(src, dst)
+            orig_replace(src, dst, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd)
 
         os.replace = hooked_replace
 
     elif crash_stage == "BEFORE_MANIFEST":
         orig_save_manifest = reg._save_manifest
 
-        def hooked_save_manifest(s_id: str, m: list[dict[str, Any]]):
+        def hooked_save_manifest(simulation_id: str, manifest: list[dict[str, Any]]) -> None:
             with open(barrier_path, "w") as f:
                 f.write("BEFORE_MANIFEST_REACHED")
             while not os.path.exists(barrier_path + ".done"):
                 time.sleep(0.05)
-            return orig_save_manifest(s_id, m)
+            orig_save_manifest(simulation_id, manifest)
 
         reg._save_manifest = hooked_save_manifest
 
     elif crash_stage == "AFTER_MANIFEST":
         orig_save_manifest = reg._save_manifest
 
-        def hooked_save_manifest_after(s_id: str, m: list[dict[str, Any]]):
-            res = orig_save_manifest(s_id, m)
+        def hooked_save_manifest_after(simulation_id: str, manifest: list[dict[str, Any]]) -> None:
+            orig_save_manifest(simulation_id, manifest)
             with open(barrier_path, "w") as f:
                 f.write("AFTER_MANIFEST_REACHED")
             while not os.path.exists(barrier_path + ".done"):
                 time.sleep(0.05)
-            return res
 
         reg._save_manifest = hooked_save_manifest_after
 

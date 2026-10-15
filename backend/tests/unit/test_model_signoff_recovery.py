@@ -263,25 +263,24 @@ def _worker_signoff_process(
     if crash_stage == "BEFORE_PERSISTENCE":
         orig_save = reg._save_manifest
 
-        def hooked_save_before(s_id: str, m: list[dict[str, Any]]):
+        def hooked_save_before(simulation_id: str, manifest: list[dict[str, Any]]) -> None:
             with open(barrier_path, "w") as f:
                 f.write("BEFORE_SIGNOFF_PERSIST_REACHED")
             while not os.path.exists(barrier_path + ".done"):
                 time.sleep(0.05)
-            return orig_save(s_id, m)
+            orig_save(simulation_id, manifest)
 
         reg._save_manifest = hooked_save_before
 
     elif crash_stage == "AFTER_PERSISTENCE":
         orig_save = reg._save_manifest
 
-        def hooked_save_after(s_id: str, m: list[dict[str, Any]]):
-            res = orig_save(s_id, m)
+        def hooked_save_after(simulation_id: str, manifest: list[dict[str, Any]]) -> None:
+            orig_save(simulation_id, manifest)
             with open(barrier_path, "w") as f:
                 f.write("AFTER_SIGNOFF_PERSIST_REACHED")
             while not os.path.exists(barrier_path + ".done"):
                 time.sleep(0.05)
-            return res
 
         reg._save_manifest = hooked_save_after
 

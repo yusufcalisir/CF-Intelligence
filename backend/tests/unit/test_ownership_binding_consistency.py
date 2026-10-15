@@ -125,25 +125,24 @@ def _worker_bind_process(
     if crash_stage == "BEFORE_PERSISTENCE" and barrier_path:
         orig_save = reg._save_ownership
 
-        def hooked_save_before(s_id: str, record: dict[str, Any]):
+        def hooked_save_before(simulation_id: str, record: dict[str, Any]) -> None:
             with open(barrier_path, "w") as f:
                 f.write("BEFORE_OWNERSHIP_PERSIST_REACHED")
             while not os.path.exists(barrier_path + ".done"):
                 time.sleep(0.05)
-            return orig_save(s_id, record)
+            orig_save(simulation_id, record)
 
         reg._save_ownership = hooked_save_before
 
     elif crash_stage == "AFTER_PERSISTENCE" and barrier_path:
         orig_save = reg._save_ownership
 
-        def hooked_save_after(s_id: str, record: dict[str, Any]):
-            res = orig_save(s_id, record)
+        def hooked_save_after(simulation_id: str, record: dict[str, Any]) -> None:
+            orig_save(simulation_id, record)
             with open(barrier_path, "w") as f:
                 f.write("AFTER_OWNERSHIP_PERSIST_REACHED")
             while not os.path.exists(barrier_path + ".done"):
                 time.sleep(0.05)
-            return res
 
         reg._save_ownership = hooked_save_after
 
