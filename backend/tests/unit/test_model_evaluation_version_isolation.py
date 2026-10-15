@@ -166,6 +166,8 @@ class TestModelEvaluationVersionIsolation(unittest.TestCase):
 
         # Invariant 2: Active version must remain champion v1 (neither v2 nor v3 promoted)
         active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
         self.assertEqual(active["version"], 1)
         self.assertEqual(active["status"], "champion")
 
@@ -231,6 +233,8 @@ class TestModelEvaluationVersionIsolation(unittest.TestCase):
         # The engine must safely detect ambiguous window and NOT promote v2 simply because v2 was first
         self.assertFalse(fb["promotion_triggered"])
         active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
         self.assertEqual(active["version"], 1)
 
     def test_explicit_target_version_isolates_candidate_metrics(self) -> None:
@@ -383,6 +387,8 @@ class TestModelEvaluationVersionIsolation(unittest.TestCase):
 
         # Champion must remain v1
         active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
         self.assertEqual(active["version"], 1)
 
     def test_stale_historical_predictions_cannot_justify_new_candidate_promotion(self) -> None:
@@ -449,7 +455,10 @@ class TestModelEvaluationVersionIsolation(unittest.TestCase):
         self.assertFalse(fb_new["promotion_triggered"])
         self.assertEqual(fb_new["traffic_share"], 0.0)
         self.assertIn("insufficient matched observations", fb_new["promotion_message"].lower())
-        self.assertEqual(self.registry.get_active_version(self.simulation_id)["version"], 1)
+        active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
+        self.assertEqual(active["version"], 1)
 
     def test_single_challenger_legitimate_promotion_preserved(self) -> None:
         """VERS-07: Legitimate single-challenger evaluation seamlessly progresses from shadow -> canary -> champion."""
@@ -516,5 +525,7 @@ class TestModelEvaluationVersionIsolation(unittest.TestCase):
         self.assertEqual(fb_phase2["traffic_share"], 0.0)
         self.assertTrue(fb_phase2["promotion_triggered"])
         active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
         self.assertEqual(active["version"], 2)
         self.assertEqual(active["status"], "champion")

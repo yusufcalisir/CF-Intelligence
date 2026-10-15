@@ -13,6 +13,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from typing import Any
 
 import torch
 
@@ -268,6 +269,7 @@ class TestModelEvaluationMetrics(unittest.TestCase):
             (1, 0.7, 0.40),  # 1: champ TP, chall FN
         ]
 
+        fb: dict[str, Any] | None = None
         for idx, (label, champ_p, chall_p) in enumerate(samples):
             self.eval_engine.log_prediction(
                 simulation_id=self.simulation_id,
@@ -287,6 +289,8 @@ class TestModelEvaluationMetrics(unittest.TestCase):
 
         # Manual independent assertion:
         # Challenger FP = 1, TN = 3 -> 1 / (1 + 3) = 0.25
+        self.assertIsNotNone(fb)
+        assert fb is not None
         self.assertEqual(fb["challenger_fpr"], 0.25)
         # Champion FP = 1 (sample 2), TN = 3 (samples 1, 3, 4) -> 1 / 4 = 0.25
         self.assertEqual(fb["champion_fpr"], 0.25)

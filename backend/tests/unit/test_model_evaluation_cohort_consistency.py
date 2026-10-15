@@ -151,7 +151,10 @@ class TestModelEvaluationCohortConsistency(unittest.TestCase):
         self.assertEqual(fb["traffic_share"], 0.0)
         self.assertEqual(fb["paired_sample_count"], 0)
         self.assertIn("insufficient matched observations", fb["promotion_message"].lower())
-        self.assertEqual(self.registry.get_active_version(self.simulation_id)["version"], 1)
+        active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
+        self.assertEqual(active["version"], 1)
 
     def test_missing_ground_truth_labels_excluded_from_matched_cohort(self) -> None:
         """COHORT-02: Records without confirmed ground truth labels are excluded from paired promotion."""
@@ -388,5 +391,7 @@ class TestModelEvaluationCohortConsistency(unittest.TestCase):
         self.assertEqual(fb_canary["traffic_share"], 0.0)
         self.assertTrue(fb_canary["promotion_triggered"])
         active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
         self.assertEqual(active["version"], 2)
         self.assertEqual(active["status"], "champion")
