@@ -156,7 +156,9 @@ class DurableAccountStore:
             configured_path = (
                 store_path
                 or os.environ.get("CFI_IDENTITY_STORE_PATH")
+                or os.environ.get("CFI_ACCOUNT_STORE_PATH")
                 or getattr(settings, "identity_store_path", None)
+                or getattr(settings, "account_store_path", None)
             )
             if not configured_path:
                 configured_path = os.path.join(get_storage_dir(), "auth_identity_store.json")
@@ -172,6 +174,7 @@ class DurableAccountStore:
             self._authority_secret = (
                 authority_secret
                 or os.environ.get("CFI_IDENTITY_STORE_SECRET")
+                or os.environ.get("CFI_ACCOUNT_AUTHORITY_SECRET")
                 or os.environ.get("CFI_IDENTITY_STORE_HMAC_SECRET")
                 or getattr(settings, "identity_store_secret", None)
                 or (None if is_prod else "cfi_dev_identity_store_authority_secret_2026_default")

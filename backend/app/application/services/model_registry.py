@@ -3098,6 +3098,7 @@ class ModelRegistry:
             )
 
         authenticated_operator: str | None = None
+        authenticated_institution: str | None = None
         user_rec: Any | None = None
         if trusted_context:
             sim_ownership = self.get_simulation_ownership(simulation_id)
@@ -3115,6 +3116,7 @@ class ModelRegistry:
             if not is_valid_ctx:
                 raise ModelIntegrityError(f"Internal orchestration authority rejected: {ctx_reason}")
             authenticated_operator = f"internal:{trusted_context.service_name}"
+            authenticated_institution = trusted_context.bank_id or owning_bank
         elif auth_token:
             from app.infrastructure.security.auth_service import AuthenticationService
 
@@ -3144,6 +3146,7 @@ class ModelRegistry:
                     f"for model promotion (minimum clearance level 2 required)."
                 )
             authenticated_operator = user_rec.username
+            authenticated_institution = getattr(user_rec, "bank_id", None)
             self._verify_institutional_governance_authority(simulation_id, user_rec, "model promotion")
         elif actor:
             from app.infrastructure.security.auth_service import AuthenticationService
@@ -3151,7 +3154,10 @@ class ModelRegistry:
             auth_svc = AuthenticationService.get_instance()
             user_rec = auth_svc.get_user(actor)
             if user_rec is not None:
+                authenticated_institution = getattr(user_rec, "bank_id", None)
                 self._verify_institutional_governance_authority(simulation_id, user_rec, "model promotion")
+
+        effective_institution = authenticated_institution or "unknown"
 
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
@@ -3294,12 +3300,13 @@ class ModelRegistry:
                     "version": version,
                     "target_status": target_status,
                     "promoted_by": effective_operator,
+                    "actor_institution": effective_institution,
                     "generation": target_entry.get("generation"),
                     "action": "promote_version",
                     "decision": "PENDING",
                 },
                 actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
-                actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
+                actor_institution=effective_institution,
                 target_type="model_version",
                 action="promote_version",
                 decision="PENDING",
@@ -3363,10 +3370,11 @@ class ModelRegistry:
                             "version": version,
                             "error": str(save_err),
                             "action": "promote_version",
+                            "actor_institution": effective_institution,
                             "decision": "FAILED",
                         },
                         actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
-                        actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
+                        actor_institution=effective_institution,
                         target_type="model_version",
                         action="promote_version",
                         decision="FAILED",
@@ -3389,12 +3397,13 @@ class ModelRegistry:
                         "version": version,
                         "target_status": target_status,
                         "promoted_by": effective_operator,
+                        "actor_institution": effective_institution,
                         "generation": target_entry.get("generation"),
                         "action": "promote_version",
                         "decision": "PROMOTED",
                     },
                     actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
-                    actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
+                    actor_institution=effective_institution,
                     target_type="model_version",
                     action="promote_version",
                     decision="PROMOTED",
@@ -3444,6 +3453,7 @@ class ModelRegistry:
             )
 
         authenticated_operator: str | None = None
+        authenticated_institution: str | None = None
         user_rec: Any | None = None
         if trusted_context:
             sim_ownership = self.get_simulation_ownership(simulation_id)
@@ -3461,6 +3471,7 @@ class ModelRegistry:
             if not is_valid_ctx:
                 raise ModelIntegrityError(f"Internal orchestration authority rejected: {ctx_reason}")
             authenticated_operator = f"internal:{trusted_context.service_name}"
+            authenticated_institution = trusted_context.bank_id or owning_bank
         elif auth_token:
             from app.infrastructure.security.auth_service import AuthenticationService
 
@@ -3490,6 +3501,7 @@ class ModelRegistry:
                     f"for model rollback (minimum clearance level 3 required)."
                 )
             authenticated_operator = user_rec.username
+            authenticated_institution = getattr(user_rec, "bank_id", None)
             self._verify_institutional_governance_authority(simulation_id, user_rec, "model rollback")
         elif actor:
             from app.infrastructure.security.auth_service import AuthenticationService
@@ -3497,7 +3509,10 @@ class ModelRegistry:
             auth_svc = AuthenticationService.get_instance()
             user_rec = auth_svc.get_user(actor)
             if user_rec is not None:
+                authenticated_institution = getattr(user_rec, "bank_id", None)
                 self._verify_institutional_governance_authority(simulation_id, user_rec, "model rollback")
+
+        effective_institution = authenticated_institution or "unknown"
 
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
@@ -3632,12 +3647,13 @@ class ModelRegistry:
                     "simulation_id": simulation_id,
                     "version": version,
                     "rolled_back_by": effective_operator,
+                    "actor_institution": effective_institution,
                     "generation": target_entry.get("generation"),
                     "action": "rollback",
                     "decision": "PENDING",
                 },
                 actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
-                actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
+                actor_institution=effective_institution,
                 target_type="model_version",
                 action="rollback",
                 decision="PENDING",
@@ -3701,10 +3717,11 @@ class ModelRegistry:
                             "version": version,
                             "error": str(save_err),
                             "action": "rollback",
+                            "actor_institution": effective_institution,
                             "decision": "FAILED",
                         },
                         actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
-                        actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
+                        actor_institution=effective_institution,
                         target_type="model_version",
                         action="rollback",
                         decision="FAILED",
@@ -3726,12 +3743,13 @@ class ModelRegistry:
                         "simulation_id": simulation_id,
                         "version": version,
                         "rolled_back_by": effective_operator,
+                        "actor_institution": effective_institution,
                         "generation": target_entry.get("generation"),
                         "action": "rollback",
                         "decision": "ROLLED_BACK",
                     },
                     actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
-                    actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
+                    actor_institution=effective_institution,
                     target_type="model_version",
                     action="rollback",
                     decision="ROLLED_BACK",
@@ -5413,7 +5431,11 @@ class ModelEvaluationEngine:
             self._store.set(list_key, existing)
 
     def log_feedback(
-        self, simulation_id: str, transaction_id: str, actual_label: int
+        self,
+        simulation_id: str,
+        transaction_id: str,
+        actual_label: int,
+        target_challenger_version: int | None = None,
     ) -> dict[str, Any]:
         """Record the ground truth label for a transaction and evaluate performance.
 
@@ -5432,9 +5454,15 @@ class ModelEvaluationEngine:
             record["actual_label"] = actual_label
             self._store.set(key, record)
 
-            return self.evaluate_performance(simulation_id)
+            return self.evaluate_performance(
+                simulation_id, target_challenger_version=target_challenger_version
+            )
 
-    def evaluate_performance(self, simulation_id: str) -> dict[str, Any]:
+    def evaluate_performance(
+        self,
+        simulation_id: str,
+        target_challenger_version: int | None = None,
+    ) -> dict[str, Any]:
         """Compute metrics over logged predictions with labels and check routing rules."""
         with self._lock:
             list_key = f"{simulation_id}:prediction_keys"
@@ -5448,9 +5476,13 @@ class ModelEvaluationEngine:
                 if rec and rec.get("actual_label") is not None:
                     records.append(rec)
 
-            # Retrieve traffic share
+            # Retrieve traffic share and active canary target version
             share_key = f"{simulation_id}:challenger_traffic_share"
-            traffic_share = self._store.get(share_key) or 0.0
+            traffic_version_key = f"{simulation_id}:challenger_traffic_version"
+            raw_share = self._store.get(share_key)
+            traffic_share = float(raw_share) if raw_share is not None else 0.0
+            raw_canary_ver = self._store.get(traffic_version_key)
+            canary_target_version = int(raw_canary_ver) if raw_canary_ver is not None else None
 
             # Get active/champion version
             active_version = self.registry.get_active_version(simulation_id)
@@ -5462,32 +5494,32 @@ class ModelEvaluationEngine:
                     "sample_count": len(records),
                     "champion_version": active_ver_num,
                     "traffic_share": traffic_share,
+                    "promotion_triggered": False,
+                    "promotion_message": "Evaluation warmup in progress (< 5 samples).",
                 }
-
-            y_true = [r["actual_label"] for r in records]
-
-            # Champion metrics
-            y_pred_champ = [r["champion_prob"] for r in records]
-            champ_latencies = [r["champion_latency_ms"] for r in records]
-            avg_champ_latency = sum(champ_latencies) / len(champ_latencies)
-
-            # Challenger metrics
-            y_pred_chall = [
-                r["challenger_prob"] for r in records if r["challenger_version"] is not None
-            ]
-            chall_latencies = [
-                r["challenger_latency_ms"] for r in records if r["challenger_version"] is not None
-            ]
-            avg_chall_latency = sum(chall_latencies) / len(chall_latencies) if chall_latencies else 0.0
 
             from app.domain.metrics_service import safe_pr_auc_score, safe_roc_auc_score
 
-            champ_auc = safe_roc_auc_score(y_true, y_pred_champ)
-            champ_pr_auc = safe_pr_auc_score(y_true, y_pred_champ)
+            # Global descriptive champion metrics (for fleet monitoring & health)
+            champ_records = [
+                r for r in records
+                if r.get("champion_prob") is not None
+                and (r.get("champion_version") == active_ver_num or r.get("champion_version") is None)
+            ]
+            y_true_champ = [r["actual_label"] for r in champ_records]
+            y_pred_champ = [r["champion_prob"] for r in champ_records]
+            champ_latencies = [
+                r["champion_latency_ms"] for r in champ_records
+                if r.get("champion_latency_ms") is not None
+            ]
+            avg_champ_latency = sum(champ_latencies) / len(champ_latencies) if champ_latencies else 0.0
+
+            champ_auc = safe_roc_auc_score(y_true_champ, y_pred_champ) if len(champ_records) >= 5 else None
+            champ_pr_auc = safe_pr_auc_score(y_true_champ, y_pred_champ) if len(champ_records) >= 5 else None
 
             champ_fp = 0
             champ_tn = 0
-            for r in records:
+            for r in champ_records:
                 if r["actual_label"] == 0:
                     if r["champion_prob"] >= 0.5:
                         champ_fp += 1
@@ -5495,30 +5527,10 @@ class ModelEvaluationEngine:
                         champ_tn += 1
             champ_fpr = champ_fp / (champ_fp + champ_tn) if (champ_fp + champ_tn) > 0 else 0.0
 
-            chall_auc: float | None = None
-            chall_pr_auc: float | None = None
-            chall_fpr = 0.0
-            if y_pred_chall:
-                y_true_chall = [
-                    r["actual_label"] for r in records if r["challenger_version"] is not None
-                ]
-                chall_auc = safe_roc_auc_score(y_true_chall, y_pred_chall)
-                chall_pr_auc = safe_pr_auc_score(y_true_chall, y_pred_chall)
-
-                chall_fp = 0
-                chall_tn = 0
-                for r in records:
-                    if r["challenger_version"] is not None and r["actual_label"] == 0:
-                        if r["challenger_prob"] >= 0.5:
-                            chall_fp += 1
-                        else:
-                            chall_tn += 1
-                chall_fpr = chall_fp / (chall_fp + champ_tn) if (chall_fp + champ_tn) > 0 else 0.0
-
             # Rollback Gating:
             rollback_triggered = False
             rollback_message = ""
-            has_both_classes = len(set(y_true)) >= 2
+            has_both_classes = len(set(y_true_champ)) >= 2
             if (has_both_classes and champ_auc is not None and champ_auc < 0.65) or avg_champ_latency > 200.0 or champ_fpr > 0.05:
                 from app.config import get_settings
                 settings = get_settings()
@@ -5592,6 +5604,7 @@ class ModelEvaluationEngine:
                         )
                         traffic_share = 0.0
                         self._store.set(share_key, 0.0)
+                        self._store.delete(traffic_version_key)
                         rollback_triggered = True
                         rollback_message = f"Auto-rollback triggered to version {stable_version['version']} due to performance degradation (AUC: {champ_auc:.4f}, FPR: {champ_fpr:.4f}, Latency: {avg_champ_latency:.1f}ms)."
                         logger.warning(rollback_message)
@@ -5602,55 +5615,192 @@ class ModelEvaluationEngine:
                 else:
                     traffic_share = 0.0
                     self._store.set(share_key, 0.0)
+                    self._store.delete(traffic_version_key)
                     rollback_message = (
                         f"Performance degradation detected on champion v{active_ver_num}, but no safe eligible rollback candidate exists in registry."
                     )
                     logger.warning(rollback_message)
                     rollback_triggered = False
 
+            # Challenger Version Resolution & Cohort Isolation
+            challenger_versions_present = sorted(list({
+                r["challenger_version"] for r in records if r.get("challenger_version") is not None
+            }))
+
+            eval_challenger_ver: int | None = None
+            is_ambiguous_window = False
+
+            if target_challenger_version is not None:
+                eval_challenger_ver = target_challenger_version
+            elif len(challenger_versions_present) == 1:
+                eval_challenger_ver = challenger_versions_present[0]
+            elif len(challenger_versions_present) > 1:
+                if canary_target_version is not None and canary_target_version in challenger_versions_present:
+                    eval_challenger_ver = canary_target_version
+                else:
+                    is_ambiguous_window = True
+
+            if eval_challenger_ver == active_ver_num:
+                eval_challenger_ver = None
+
+            matched_cohort: list[dict[str, Any]] = []
+            chall_auc: float | None = None
+            chall_pr_auc: float | None = None
+            chall_fpr: float | None = None
+            paired_champ_pr_auc: float | None = None
+            avg_chall_latency: float = 0.0
+
+            if not is_ambiguous_window and eval_challenger_ver is not None:
+                matched_cohort = [
+                    r for r in records
+                    if r.get("champion_version") == active_ver_num
+                    and r.get("challenger_version") == eval_challenger_ver
+                    and r.get("champion_prob") is not None
+                    and r.get("challenger_prob") is not None
+                    and r.get("actual_label") is not None
+                    and r.get("actual_label") in (0, 1)
+                ]
+
+                if matched_cohort:
+                    y_true_matched = [r["actual_label"] for r in matched_cohort]
+                    y_pred_chall_matched = [r["challenger_prob"] for r in matched_cohort]
+                    y_pred_champ_matched = [r["champion_prob"] for r in matched_cohort]
+                    chall_latencies = [
+                        r["challenger_latency_ms"] for r in matched_cohort
+                        if r.get("challenger_latency_ms") is not None
+                    ]
+                    avg_chall_latency = (
+                        sum(chall_latencies) / len(chall_latencies) if chall_latencies else 0.0
+                    )
+
+                    if len(matched_cohort) >= 5:
+                        chall_auc = safe_roc_auc_score(y_true_matched, y_pred_chall_matched)
+                        chall_pr_auc = safe_pr_auc_score(y_true_matched, y_pred_chall_matched)
+                        paired_champ_pr_auc = safe_pr_auc_score(y_true_matched, y_pred_champ_matched)
+
+                    # Correct Challenger False-Positive Rate calculation:
+                    # Uses challenger-specific false positives and true negatives on matched cohort
+                    chall_fp = 0
+                    chall_tn = 0
+                    for r in matched_cohort:
+                        if r["actual_label"] == 0:
+                            if r["challenger_prob"] >= 0.5:
+                                chall_fp += 1
+                            else:
+                                chall_tn += 1
+                    chall_negatives = chall_fp + chall_tn
+                    chall_fpr = chall_fp / chall_negatives if chall_negatives > 0 else None
+
             # Promotion Gating (Fail-closed on undefined/missing PR-AUC):
             promotion_triggered = False
             promotion_message = ""
-            if not rollback_triggered and y_pred_chall and len(y_pred_chall) >= 5:
-                if champ_pr_auc is None or chall_pr_auc is None:
-                    promotion_message = "Challenger promotion evaluation deferred: PR-AUC undefined (single class or empty evaluation window)."
-                    logger.info(promotion_message)
-                elif traffic_share == 0.0 and chall_pr_auc > champ_pr_auc:
-                    traffic_share = 0.1
-                    self._store.set(share_key, 0.1)
-                    promotion_message = f"Challenger (PR-AUC: {chall_pr_auc:.4f}) outperformed Champion (PR-AUC: {champ_pr_auc:.4f}). Routed 10% traffic to Challenger."
-                    logger.info(promotion_message)
-                    promotion_triggered = True
-                elif traffic_share == 0.1 and chall_pr_auc > champ_pr_auc:
-                    challenger_ver_num = next(
-                        r["challenger_version"] for r in records if r["challenger_version"] is not None
+            canary_start_key = f"{simulation_id}:canary_start_samples"
+            if not rollback_triggered:
+                if is_ambiguous_window:
+                    promotion_message = (
+                        f"Challenger promotion deferred: ambiguous mixed challenger versions in evaluation window ({challenger_versions_present})."
                     )
-                    ownership = self.registry.get_simulation_ownership(simulation_id)
-                    owning_bank = ownership.get("owning_bank_id")
-                    trusted_ctx = create_trusted_internal_context(
-                        "model_evaluation_engine",
-                        action="promote_version",
-                        resource_type="model",
-                        resource_id=simulation_id,
-                        model_version=challenger_ver_num,
-                        bank_id=owning_bank,
-                    )
-                    try:
-                        self.registry.promote_version(
-                            simulation_id,
-                            challenger_ver_num,
-                            target_status="champion",
-                            trusted_context=trusted_ctx,
-                        )
+                    logger.info(promotion_message)
+                elif eval_challenger_ver is not None:
+                    # Check for version change occurring during canary evaluation
+                    if (
+                        traffic_share == 0.1
+                        and canary_target_version is not None
+                        and canary_target_version != eval_challenger_ver
+                    ):
                         traffic_share = 0.0
                         self._store.set(share_key, 0.0)
-                        promotion_message = f"Challenger version {challenger_ver_num} promoted to Champion after continued outperformance (PR-AUC: {chall_pr_auc:.4f} vs {champ_pr_auc:.4f})."
+                        self._store.delete(traffic_version_key)
+                        self._store.delete(canary_start_key)
+                        promotion_message = (
+                            f"Challenger version changed from v{canary_target_version} to v{eval_challenger_ver} "
+                            "during canary evaluation. Resetting canary traffic share to 0.0 and deferring promotion."
+                        )
+                        logger.warning(promotion_message)
+                        promotion_triggered = False
+                    elif len(matched_cohort) < 5:
+                        promotion_message = (
+                            f"Challenger v{eval_challenger_ver} promotion evaluation deferred: "
+                            f"insufficient matched observations ({len(matched_cohort)} < 5 minimum)."
+                        )
+                        logger.info(promotion_message)
+                    elif chall_pr_auc is None or paired_champ_pr_auc is None:
+                        promotion_message = (
+                            f"Challenger v{eval_challenger_ver} promotion evaluation deferred: "
+                            "PR-AUC undefined on matched cohort (single class or degenerate window)."
+                        )
+                        logger.info(promotion_message)
+                    elif traffic_share == 0.0 and chall_pr_auc > paired_champ_pr_auc:
+                        traffic_share = 0.1
+                        self._store.set(share_key, 0.1)
+                        self._store.set(traffic_version_key, eval_challenger_ver)
+                        self._store.set(canary_start_key, len(matched_cohort))
+                        promotion_message = (
+                            f"Challenger v{eval_challenger_ver} (PR-AUC: {chall_pr_auc:.4f}) outperformed "
+                            f"Champion v{active_ver_num} (PR-AUC: {paired_champ_pr_auc:.4f}) on matched cohort. "
+                            f"Routed 10% traffic to Challenger v{eval_challenger_ver}."
+                        )
                         logger.info(promotion_message)
                         promotion_triggered = True
-                    except Exception as prom_err:
-                        promotion_message = f"Challenger version {challenger_ver_num} promotion failed admission checks: {prom_err}"
-                        logger.error(promotion_message)
-                        promotion_triggered = False
+                    elif traffic_share == 0.1:
+                        canary_start = int(self._store.get(canary_start_key) or 0)
+                        canary_samples = len(matched_cohort) - canary_start
+
+                        if chall_pr_auc > paired_champ_pr_auc:
+                            if canary_samples < 5:
+                                promotion_message = (
+                                    f"Challenger v{eval_challenger_ver} canary evaluation in progress "
+                                    f"({canary_samples}/5 canary samples). PR-AUC: {chall_pr_auc:.4f} vs {paired_champ_pr_auc:.4f}."
+                                )
+                                logger.info(promotion_message)
+                                promotion_triggered = False
+                            else:
+                                # Promotion Target is unambiguously eval_challenger_ver after full canary validation
+                                ownership = self.registry.get_simulation_ownership(simulation_id)
+                                owning_bank = ownership.get("owning_bank_id")
+                                trusted_ctx = create_trusted_internal_context(
+                                    "model_evaluation_engine",
+                                    action="promote_version",
+                                    resource_type="model",
+                                    resource_id=simulation_id,
+                                    model_version=eval_challenger_ver,
+                                    bank_id=owning_bank,
+                                )
+                                try:
+                                    self.registry.promote_version(
+                                        simulation_id,
+                                        eval_challenger_ver,
+                                        target_status="champion",
+                                        trusted_context=trusted_ctx,
+                                    )
+                                    traffic_share = 0.0
+                                    self._store.set(share_key, 0.0)
+                                    self._store.delete(traffic_version_key)
+                                    self._store.delete(canary_start_key)
+                                    promotion_message = (
+                                        f"Challenger version {eval_challenger_ver} promoted to Champion after continued "
+                                        f"outperformance on matched cohort ({canary_samples} canary samples, PR-AUC: {chall_pr_auc:.4f} vs {paired_champ_pr_auc:.4f})."
+                                    )
+                                    logger.info(promotion_message)
+                                    promotion_triggered = True
+                                except Exception as prom_err:
+                                    promotion_message = (
+                                        f"Challenger version {eval_challenger_ver} promotion failed admission checks: {prom_err}"
+                                    )
+                                    logger.error(promotion_message)
+                                    promotion_triggered = False
+                        else:
+                            traffic_share = 0.0
+                            self._store.set(share_key, 0.0)
+                            self._store.delete(traffic_version_key)
+                            self._store.delete(canary_start_key)
+                            promotion_message = (
+                                f"Challenger v{eval_challenger_ver} failed canary evaluation "
+                                f"(PR-AUC: {chall_pr_auc:.4f} <= {paired_champ_pr_auc:.4f}). Resetting canary traffic share to 0.0."
+                            )
+                            logger.warning(promotion_message)
+                            promotion_triggered = False
+
 
             metrics = {
                 "champion_version": active_ver_num,
@@ -5658,10 +5808,13 @@ class ModelEvaluationEngine:
                 "champion_pr_auc": champ_pr_auc,
                 "champion_fpr": champ_fpr,
                 "champion_latency_ms": avg_champ_latency,
+                "challenger_version": eval_challenger_ver,
                 "challenger_auc": chall_auc,
                 "challenger_pr_auc": chall_pr_auc,
                 "challenger_fpr": chall_fpr,
                 "challenger_latency_ms": avg_chall_latency,
+                "paired_champion_pr_auc": paired_champ_pr_auc,
+                "paired_sample_count": len(matched_cohort),
                 "traffic_share": traffic_share,
                 "sample_count": len(records),
                 "rollback_triggered": rollback_triggered,
@@ -5709,10 +5862,13 @@ class ModelEvaluationEngine:
             "champion_pr_auc": 0.0,
             "champion_fpr": 0.0,
             "champion_latency_ms": 0.0,
+            "challenger_version": None,
             "challenger_auc": 0.0,
             "challenger_pr_auc": 0.0,
-            "challenger_fpr": 0.0,
+            "challenger_fpr": None,
             "challenger_latency_ms": 0.0,
+            "paired_champion_pr_auc": None,
+            "paired_sample_count": 0,
             "traffic_share": 0.0,
             "sample_count": 0,
         }

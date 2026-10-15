@@ -232,10 +232,13 @@ class ShadowMetricsResponse(BaseModel):
     champion_pr_auc: float | None = None
     champion_fpr: float | None = None
     champion_latency_ms: float | None = None
+    challenger_version: int | None = None
     challenger_auc: float | None = None
     challenger_pr_auc: float | None = None
     challenger_fpr: float | None = None
     challenger_latency_ms: float | None = None
+    paired_champion_pr_auc: float | None = None
+    paired_sample_count: int | None = None
     traffic_share: float | None = None
     sample_count: int | None = None
     rollback_triggered: bool | None = None

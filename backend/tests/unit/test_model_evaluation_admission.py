@@ -78,6 +78,8 @@ class TestModelEvaluationAdmission(unittest.TestCase):
         reset_default_nonce_store()
         DurableNonceStore._instance = None
         ImmutableAuditChain.reset_instance()
+        from app.infrastructure.security.auth_service import AuthenticationService
+        AuthenticationService._instance = None
         from app.infrastructure.redis_store import RedisStore
         RedisStore._shared_fallback_stores.clear()
         from app.application.services.training_provenance_service import (
