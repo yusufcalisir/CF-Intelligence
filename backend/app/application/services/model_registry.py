@@ -6375,37 +6375,37 @@ class ModelEvaluationEngine:
                                         ownership = self.registry.get_simulation_ownership(
                                             simulation_id
                                         )
-                                    owning_bank = ownership.get("owning_bank_id")
-                                    trusted_ctx = create_trusted_internal_context(
-                                        "model_evaluation_engine",
-                                        action="promote_version",
-                                        resource_type="model",
-                                        resource_id=simulation_id,
-                                        model_version=eval_challenger_ver,
-                                        bank_id=owning_bank,
-                                    )
-                                    try:
-                                        self.registry.promote_version(
-                                            simulation_id,
-                                            eval_challenger_ver,
-                                            target_status="champion",
-                                            trusted_context=trusted_ctx,
+                                        owning_bank = ownership.get("owning_bank_id")
+                                        trusted_ctx = create_trusted_internal_context(
+                                            "model_evaluation_engine",
+                                            action="promote_version",
+                                            resource_type="model",
+                                            resource_id=simulation_id,
+                                            model_version=eval_challenger_ver,
+                                            bank_id=owning_bank,
                                         )
-                                        traffic_share = 0.0
-                                        self._store.set(share_key, 0.0)
-                                        self._store.delete(traffic_version_key)
-                                        self._store.delete(canary_start_key)
-                                        self._store.delete(canary_state_key)
-                                        promotion_message = (
-                                            f"Challenger version {eval_challenger_ver} promoted to Champion after continued "
-                                            f"outperformance on matched cohort ({canary_samples} canary samples, PR-AUC: {chall_pr_auc:.4f} vs {paired_champ_pr_auc:.4f})."
-                                        )
-                                        logger.info(promotion_message)
-                                        promotion_triggered = True
-                                    except Exception as prom_err:
-                                        promotion_message = f"Challenger version {eval_challenger_ver} promotion failed admission checks: {prom_err}"
-                                        logger.error(promotion_message)
-                                        promotion_triggered = False
+                                        try:
+                                            self.registry.promote_version(
+                                                simulation_id,
+                                                eval_challenger_ver,
+                                                target_status="champion",
+                                                trusted_context=trusted_ctx,
+                                            )
+                                            traffic_share = 0.0
+                                            self._store.set(share_key, 0.0)
+                                            self._store.delete(traffic_version_key)
+                                            self._store.delete(canary_start_key)
+                                            self._store.delete(canary_state_key)
+                                            promotion_message = (
+                                                f"Challenger version {eval_challenger_ver} promoted to Champion after continued "
+                                                f"outperformance on matched cohort ({canary_samples} canary samples, PR-AUC: {chall_pr_auc:.4f} vs {paired_champ_pr_auc:.4f})."
+                                            )
+                                            logger.info(promotion_message)
+                                            promotion_triggered = True
+                                        except Exception as prom_err:
+                                            promotion_message = f"Challenger version {eval_challenger_ver} promotion failed admission checks: {prom_err}"
+                                            logger.error(promotion_message)
+                                            promotion_triggered = False
                             else:
                                 traffic_share = 0.0
                                 self._store.set(share_key, 0.0)

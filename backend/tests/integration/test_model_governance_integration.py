@@ -73,7 +73,8 @@ def _worker_register_model(
         # Build genuine model bytes
         model = FraudDetectionModel(input_dim=NUM_FEATURES, dp_compatible=True)
         with torch.no_grad():
-            model.network[8].bias.fill_(float(worker_idx) * 0.1)
+            for param in model.parameters():
+                param.fill_(float(worker_idx) * 0.1)
         buf = io.BytesIO()
         torch.save(model.state_dict(), buf)
         artifact_bytes = buf.getvalue()
@@ -457,6 +458,7 @@ class TestModelGovernanceIntegration:
         # Sign-off by ML and Compliance
         registry: ModelRegistry = gov_env["registry"]
         v1_meta = registry.get_version_metadata(sim_id, 1)
+        assert v1_meta is not None
         sha = v1_meta["sha256"]
 
         sig_ml = generate_signoff_signature(
@@ -532,6 +534,7 @@ class TestModelGovernanceIntegration:
         registry: ModelRegistry = gov_env["registry"]
         for v in (1, 2):
             meta = registry.get_version_metadata(sim_id, v)
+            assert meta is not None
             sha = meta["sha256"]
             sig_ml = generate_signoff_signature(
                 sim_id, v, sha, "ml_engineer", "alice_ml_bank_a", jwt_secret

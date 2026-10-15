@@ -183,7 +183,8 @@ def _create_serialized_model_and_receipt(
 
     model = FraudDetectionModel(input_dim=NUM_FEATURES, dp_compatible=True)
     with torch.no_grad():
-        model.network[8].bias.fill_(weight_bias)
+        for param in model.parameters():
+            param.fill_(weight_bias)
     buf = io.BytesIO()
     torch.save(model.state_dict(), buf)
     artifact_bytes = buf.getvalue()
@@ -485,4 +486,6 @@ class TestRegistryMultiWorkerLifecycle:
         # Serving worker now reloads and serves eligible champion v1
         serving_model_rb = _get_cached_serving_model(simulation_id=sim_alpha)
         assert serving_model_rb is not None
-        assert registry.get_active_version(sim_alpha)["version"] == 1
+        active_ver = registry.get_active_version(sim_alpha)
+        assert active_ver is not None
+        assert active_ver["version"] == 1
