@@ -544,6 +544,13 @@ def validate_production_admission(
     - Every production champion activation path requires two verified, distinct institutional sign-offs
       (Four-Eyes Principle: ml_engineer and compliance) signed by non-development accounts.
     """
+    if isinstance(entry_or_provenance, dict) and (
+        entry_or_provenance.get("is_revoked") is True or entry_or_provenance.get("status") == "revoked"
+    ):
+        raise ModelIntegrityError(
+            f"Production admission rejected: model version has been revoked ({context})."
+        )
+
     from app.config import get_settings
 
     settings = get_settings()
@@ -566,10 +573,6 @@ def validate_production_admission(
     sha256_val: str | None = None
 
     if isinstance(entry_or_provenance, dict):
-        if entry_or_provenance.get("is_revoked") is True:
-            raise ModelIntegrityError(
-                f"Production admission rejected: model version has been revoked ({context})."
-            )
         prov = str(entry_or_provenance.get("provenance_type", "UNVERIFIED")).strip().upper()
         is_eligible = entry_or_provenance.get("is_production_eligible")
         sha256_val = entry_or_provenance.get("sha256")
@@ -3157,6 +3160,15 @@ class ModelRegistry:
             target_entry = next((e for e in manifest if e["version"] == version), None)
             if not target_entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
+            if target_entry.get("is_revoked") is True or target_entry.get("status") == "revoked":
+                raise ModelIntegrityError(f"Cannot promote revoked model version {version} for {simulation_id}.")
+            from app.config import get_settings
+            settings = get_settings()
+
+            if settings.app_env.lower() == "production" and target_entry.get("is_production_eligible") is False:
+                raise ModelIntegrityError(
+                    f"Cannot promote model version {version} for {simulation_id}: explicitly marked not production eligible."
+                )
             target_entry["simulation_id"] = simulation_id
             effective_operator = authenticated_operator or actor
             if effective_operator:
@@ -3165,9 +3177,13 @@ class ModelRegistry:
             filepath = os.path.join(sim_dir, target_entry["filename"])
             if not os.path.exists(filepath):
                 raise FileNotFoundError(f"Model file {filepath} not found on disk")
-
-            from app.config import get_settings
-            settings = get_settings()
+            if target_entry.get("sha256"):
+                actual_sha = compute_file_sha256(filepath)
+                if not hmac.compare_digest(actual_sha, target_entry["sha256"]):
+                    raise ModelIntegrityError(
+                        f"Artifact integrity verification failed for {simulation_id} v{version}: "
+                        f"recorded digest does not match file on disk."
+                    )
 
             admission_context = "promote_version" if target_status == "champion" else "promote_challenger"
             validate_production_admission(target_entry, context=admission_context)
@@ -3300,28 +3316,61 @@ class ModelRegistry:
             try:
                 self._save_manifest(simulation_id, manifest)
             except Exception as save_err:
-                audit_chain.finalize_pending_mutation(
-                    mutation_id=mutation_id,
-                    event_type="MODEL_PROMOTION_FAILED",
-                    actor=effective_operator or "system",
-                    target_id=f"{simulation_id}:v{version}",
-                    details={
-                        "mutation_id": mutation_id,
-                        "mutation_stage": "FAILED",
-                        "mutation_committed": False,
-                        "intent_event_id": intent_entry.event_id,
-                        "simulation_id": simulation_id,
-                        "version": version,
-                        "error": str(save_err),
-                        "action": "promote_version",
-                        "decision": "FAILED",
-                    },
-                    actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
-                    actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
-                    target_type="model_version",
-                    action="promote_version",
-                    decision="FAILED",
-                )
+                actual_status = "FAILED"
+                if "mutation_id" in locals() and mutation_id:
+                    try:
+                        actual_status = self.check_version_mutation_status(
+                            simulation_id, version, mutation_id
+                        )
+                    except Exception as check_err:
+                        logger.warning(
+                            "Could not reliably determine mutation status for '%s' (%s); treating as INDETERMINATE.",
+                            mutation_id,
+                            check_err,
+                        )
+                        actual_status = "INDETERMINATE"
+
+                if actual_status == "COMMITTED":
+                    logger.critical(
+                        "Promotion mutation '%s' for '%s:v%d' was durably committed to manifest, "
+                        "but post-commit operation failed: %s. Leaving audit mutation PENDING for reconciliation.",
+                        mutation_id,
+                        simulation_id,
+                        version,
+                        save_err,
+                    )
+                elif actual_status == "INDETERMINATE":
+                    logger.warning(
+                        "Outcome for promotion mutation '%s' ('%s:v%d') is INDETERMINATE after exception: %s. "
+                        "Preserving audit intent without recording a terminal event.",
+                        mutation_id,
+                        simulation_id,
+                        version,
+                        save_err,
+                    )
+                else:
+                    audit_chain.finalize_pending_mutation(
+                        mutation_id=mutation_id,
+                        event_type="MODEL_PROMOTION_FAILED",
+                        actor=effective_operator or "system",
+                        target_id=f"{simulation_id}:v{version}",
+                        details={
+                            "mutation_id": mutation_id,
+                            "mutation_stage": "FAILED",
+                            "mutation_committed": False,
+                            "intent_event_id": intent_entry.event_id,
+                            "simulation_id": simulation_id,
+                            "version": version,
+                            "error": str(save_err),
+                            "action": "promote_version",
+                            "decision": "FAILED",
+                        },
+                        actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
+                        actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
+                        target_type="model_version",
+                        action="promote_version",
+                        decision="FAILED",
+                    )
                 raise
 
             # Finalize committed audit event
@@ -3457,6 +3506,15 @@ class ModelRegistry:
             target_entry = next((e for e in manifest if e["version"] == version), None)
             if not target_entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
+            if target_entry.get("is_revoked") is True or target_entry.get("status") == "revoked":
+                raise ModelIntegrityError(f"Cannot roll back to revoked model version {version} for {simulation_id}.")
+            from app.config import get_settings
+            settings = get_settings()
+
+            if settings.app_env.lower() == "production" and target_entry.get("is_production_eligible") is False:
+                raise ModelIntegrityError(
+                    f"Cannot roll back to model version {version} for {simulation_id}: explicitly marked not production eligible."
+                )
             target_entry["simulation_id"] = simulation_id
             effective_operator = authenticated_operator or actor
             if effective_operator:
@@ -3465,9 +3523,14 @@ class ModelRegistry:
             filepath = os.path.join(sim_dir, target_entry["filename"])
             if not os.path.exists(filepath):
                 raise FileNotFoundError(f"Model file {filepath} not found on disk")
+            if target_entry.get("sha256"):
+                actual_sha = compute_file_sha256(filepath)
+                if not hmac.compare_digest(actual_sha, target_entry["sha256"]):
+                    raise ModelIntegrityError(
+                        f"Artifact integrity verification failed for {simulation_id} v{version}: "
+                        f"recorded digest does not match file on disk."
+                    )
 
-            from app.config import get_settings
-            settings = get_settings()
             admission_context = "rollback"
             validate_production_admission(target_entry, context=admission_context)
 
@@ -3591,28 +3654,61 @@ class ModelRegistry:
             try:
                 self._save_manifest(simulation_id, manifest)
             except Exception as save_err:
-                audit_chain.finalize_pending_mutation(
-                    mutation_id=mutation_id,
-                    event_type="MODEL_ROLLBACK_FAILED",
-                    actor=effective_operator or "system",
-                    target_id=f"{simulation_id}:v{version}",
-                    details={
-                        "mutation_id": mutation_id,
-                        "mutation_stage": "FAILED",
-                        "mutation_committed": False,
-                        "intent_event_id": intent_entry.event_id,
-                        "simulation_id": simulation_id,
-                        "version": version,
-                        "error": str(save_err),
-                        "action": "rollback",
-                        "decision": "FAILED",
-                    },
-                    actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
-                    actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
-                    target_type="model_version",
-                    action="rollback",
-                    decision="FAILED",
-                )
+                actual_status = "FAILED"
+                if "mutation_id" in locals() and mutation_id:
+                    try:
+                        actual_status = self.check_version_mutation_status(
+                            simulation_id, version, mutation_id
+                        )
+                    except Exception as check_err:
+                        logger.warning(
+                            "Could not reliably determine mutation status for '%s' (%s); treating as INDETERMINATE.",
+                            mutation_id,
+                            check_err,
+                        )
+                        actual_status = "INDETERMINATE"
+
+                if actual_status == "COMMITTED":
+                    logger.critical(
+                        "Rollback mutation '%s' for '%s:v%d' was durably committed to manifest, "
+                        "but post-commit operation failed: %s. Leaving audit mutation PENDING for reconciliation.",
+                        mutation_id,
+                        simulation_id,
+                        version,
+                        save_err,
+                    )
+                elif actual_status == "INDETERMINATE":
+                    logger.warning(
+                        "Outcome for rollback mutation '%s' ('%s:v%d') is INDETERMINATE after exception: %s. "
+                        "Preserving audit intent without recording a terminal event.",
+                        mutation_id,
+                        simulation_id,
+                        version,
+                        save_err,
+                    )
+                else:
+                    audit_chain.finalize_pending_mutation(
+                        mutation_id=mutation_id,
+                        event_type="MODEL_ROLLBACK_FAILED",
+                        actor=effective_operator or "system",
+                        target_id=f"{simulation_id}:v{version}",
+                        details={
+                            "mutation_id": mutation_id,
+                            "mutation_stage": "FAILED",
+                            "mutation_committed": False,
+                            "intent_event_id": intent_entry.event_id,
+                            "simulation_id": simulation_id,
+                            "version": version,
+                            "error": str(save_err),
+                            "action": "rollback",
+                            "decision": "FAILED",
+                        },
+                        actor_type="internal_service" if (effective_operator or "").startswith("internal:") else "human_principal",
+                        actor_institution=getattr(user_rec, "bank_id", "unknown") if "user_rec" in locals() and user_rec else "unknown",
+                        target_type="model_version",
+                        action="rollback",
+                        decision="FAILED",
+                    )
                 raise
 
             # Finalize committed audit event
@@ -3681,12 +3777,14 @@ class ModelRegistry:
         fairness_score: float = 1.0,
         bias_metric: float = 0.0,
         drift_divergence: float = 0.0,
+        auto_promote: bool = False,
     ) -> dict[str, Any]:
-        """Approve a model version by adding an authenticated sign-off.
+        """Approve a model version by adding an authenticated institutional sign-off.
 
-        Promotes version to challenger/champion if ML engineer and compliance officer have signed off.
-        Enforces Four-Eyes principle (distinct individuals), authenticated principal validation,
-        and binds cryptographic signature to canonical payload.
+        Institutional approval records and cryptographically authenticates dual sign-offs
+        (Four-Eyes Principle: compliance and ml_engineer), establishing 'approved' status
+        and production eligibility. Operational promotion is separated and requires
+        separately authorized promote_version() (or explicit auto_promote=True).
         """
         sim_dir = self._get_sim_dir(simulation_id)
         file_lock = _get_registry_file_lock(sim_dir)
@@ -3695,6 +3793,8 @@ class ModelRegistry:
             entry = next((e for e in manifest if e["version"] == version), None)
             if not entry:
                 raise ValueError(f"Version {version} not found in registry for {simulation_id}")
+            if entry.get("is_revoked") is True or entry.get("status") == "revoked":
+                raise ModelIntegrityError(f"Cannot sign off on revoked model version {version} for {simulation_id}.")
 
             if role not in ("compliance", "compliance_officer", "ml_engineer"):
                 raise ValueError("Role must be 'compliance' or 'ml_engineer'")
@@ -4038,61 +4138,80 @@ class ModelRegistry:
                         )
                     validate_production_admission(entry, context="sign_off")
 
-                # Check if there is another active champion model in the manifest
-                has_other_champion = any(
-                    e.get("status") == "champion" and e.get("is_active") and e.get("version") != version
-                    for e in manifest
-                )
+                # Separation of Approval from Production Activation:
+                # Institutional sign-offs record compliance and ML review, establishing
+                # approved status and production eligibility, but do NOT directly activate
+                # operational champion status or route live traffic.
+                # Operational promotion requires separately authorized promote_version().
+                entry["is_approved"] = True
+                entry["is_production_eligible"] = True
+                if entry.get("status") in ("inactive", "candidate"):
+                    entry["status"] = "approved"
 
-                if not has_other_champion:
-                    # Promote directly to champion
-                    entry["status"] = "champion"
-                    entry["is_active"] = True
-                    max_gen = max((e.get("generation", 0) for e in manifest), default=0)
-                    entry["generation"] = max_gen + 1
-                    promoted_to_champion = True
-
-                    # Deactivate all other entries
-                    for e in manifest:
-                        if e["version"] != version:
-                            e["is_active"] = False
-                            if e.get("status") == "champion":
-                                e["status"] = "inactive"
-
-                    filepath = os.path.join(sim_dir, entry["filename"])
-                else:
-                    # Set as challenger
-                    entry["status"] = "challenger"
-                    entry["is_active"] = False
+                promoted_to_champion = False
+                filepath = None
 
             # Authoritative manifest is saved FIRST (Section 9.1)
             try:
                 self._save_manifest(simulation_id, manifest)
             except Exception as save_err:
-                audit_chain.finalize_pending_mutation(
-                    mutation_id=mutation_id,
-                    event_type="MODEL_SIGNOFF_FAILED",
-                    actor=user,
-                    target_id=f"{simulation_id}:v{version}",
-                    details={
-                        "mutation_id": mutation_id,
-                        "mutation_stage": "FAILED",
-                        "mutation_committed": False,
-                        "intent_event_id": intent_entry.event_id,
-                        "simulation_id": simulation_id,
-                        "version": version,
-                        "role": norm_role,
-                        "user": user,
-                        "error": str(save_err),
-                        "action": "sign_off",
-                        "decision": "FAILED",
-                    },
-                    actor_type="human_principal" if is_identity_verified else "unverified_operator",
-                    actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
-                    target_type="model_version",
-                    action="sign_off",
-                    decision="FAILED",
-                )
+                actual_status = "FAILED"
+                if "mutation_id" in locals() and mutation_id:
+                    try:
+                        actual_status = self.check_version_mutation_status(
+                            simulation_id, version, mutation_id
+                        )
+                    except Exception as check_err:
+                        logger.warning(
+                            "Could not reliably determine mutation status for '%s' (%s); treating as INDETERMINATE.",
+                            mutation_id,
+                            check_err,
+                        )
+                        actual_status = "INDETERMINATE"
+
+                if actual_status == "COMMITTED":
+                    logger.critical(
+                        "Sign-off mutation '%s' for '%s:v%d' was durably committed to manifest, "
+                        "but post-commit operation failed: %s. Leaving audit mutation PENDING for reconciliation.",
+                        mutation_id,
+                        simulation_id,
+                        version,
+                        save_err,
+                    )
+                elif actual_status == "INDETERMINATE":
+                    logger.warning(
+                        "Outcome for sign-off mutation '%s' ('%s:v%d') is INDETERMINATE after exception: %s. "
+                        "Preserving audit intent without recording a terminal event.",
+                        mutation_id,
+                        simulation_id,
+                        version,
+                        save_err,
+                    )
+                else:
+                    audit_chain.finalize_pending_mutation(
+                        mutation_id=mutation_id,
+                        event_type="MODEL_SIGNOFF_FAILED",
+                        actor=user,
+                        target_id=f"{simulation_id}:v{version}",
+                        details={
+                            "mutation_id": mutation_id,
+                            "mutation_stage": "FAILED",
+                            "mutation_committed": False,
+                            "intent_event_id": intent_entry.event_id,
+                            "simulation_id": simulation_id,
+                            "version": version,
+                            "role": norm_role,
+                            "user": user,
+                            "error": str(save_err),
+                            "action": "sign_off",
+                            "decision": "FAILED",
+                        },
+                        actor_type="human_principal" if is_identity_verified else "unverified_operator",
+                        actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
+                        target_type="model_version",
+                        action="sign_off",
+                        decision="FAILED",
+                    )
                 raise
 
             # Finalize sign-off audit event as COMMITTED
@@ -4129,6 +4248,15 @@ class ModelRegistry:
                     self._update_global_model_link(simulation_id, filepath)
                 except Exception as err:
                     logger.error("Failed to update global link after signoff: %s", err)
+
+            if auto_promote and entry.get("is_approved"):
+                return self.promote_version(
+                    simulation_id=simulation_id,
+                    version=version,
+                    target_status="champion",
+                    auth_token=auth_token,
+                    actor=user,
+                )
 
             return entry
 
@@ -4327,6 +4455,19 @@ class ModelRegistry:
             max_gen = max((e.get("generation", 0) for e in manifest), default=0)
             entry["generation"] = max_gen + 1
 
+            # If dual approval is broken by this revocation, demote approval and eligibility
+            remaining_active = [
+                s for s in entry.get("sign_offs", [])
+                if not s.get("is_revoked") and s.get("status", "active") != "revoked" and s.get("is_active", True) is not False
+            ]
+            has_remaining_ml = any(s.get("role") in ("ml_engineer", "ml_lead") for s in remaining_active)
+            has_remaining_comp = any(s.get("role") in ("compliance", "compliance_officer") for s in remaining_active)
+            if not (has_remaining_ml and has_remaining_comp):
+                entry["is_approved"] = False
+                entry["is_production_eligible"] = False
+                if entry.get("status") in ("approved", "champion", "challenger"):
+                    entry["status"] = "candidate"
+
             # If this version is champion or active, demote it
             if entry.get("is_active") or entry.get("status") == "champion":
                 entry["is_active"] = False
@@ -4377,30 +4518,63 @@ class ModelRegistry:
             try:
                 self._save_manifest(simulation_id, manifest)
             except Exception as save_err:
-                audit_chain.finalize_pending_mutation(
-                    mutation_id=mutation_id,
-                    event_type="MODEL_SIGNOFF_REVOCATION_FAILED",
-                    actor=verified_actor,
-                    target_id=f"{simulation_id}:v{version}",
-                    details={
-                        "mutation_id": mutation_id,
-                        "mutation_stage": "FAILED",
-                        "mutation_committed": False,
-                        "intent_event_id": intent_entry.event_id,
-                        "simulation_id": simulation_id,
-                        "version": version,
-                        "role": norm_role,
-                        "revoked_by": verified_actor,
-                        "error": str(save_err),
-                        "action": "revoke_sign_off",
-                        "decision": "FAILED",
-                    },
-                    actor_type=actor_type,
-                    actor_institution=actor_institution,
-                    target_type="model_version",
-                    action="revoke_sign_off",
-                    decision="FAILED",
-                )
+                actual_status = "FAILED"
+                if "mutation_id" in locals() and mutation_id:
+                    try:
+                        actual_status = self.check_version_mutation_status(
+                            simulation_id, version, mutation_id
+                        )
+                    except Exception as check_err:
+                        logger.warning(
+                            "Could not reliably determine mutation status for '%s' (%s); treating as INDETERMINATE.",
+                            mutation_id,
+                            check_err,
+                        )
+                        actual_status = "INDETERMINATE"
+
+                if actual_status == "COMMITTED":
+                    logger.critical(
+                        "Sign-off revocation mutation '%s' for '%s:v%d' was durably committed to manifest, "
+                        "but post-commit operation failed: %s. Leaving audit mutation PENDING for reconciliation.",
+                        mutation_id,
+                        simulation_id,
+                        version,
+                        save_err,
+                    )
+                elif actual_status == "INDETERMINATE":
+                    logger.warning(
+                        "Outcome for sign-off revocation mutation '%s' ('%s:v%d') is INDETERMINATE after exception: %s. "
+                        "Preserving audit intent without recording a terminal event.",
+                        mutation_id,
+                        simulation_id,
+                        version,
+                        save_err,
+                    )
+                else:
+                    audit_chain.finalize_pending_mutation(
+                        mutation_id=mutation_id,
+                        event_type="MODEL_SIGNOFF_REVOCATION_FAILED",
+                        actor=verified_actor,
+                        target_id=f"{simulation_id}:v{version}",
+                        details={
+                            "mutation_id": mutation_id,
+                            "mutation_stage": "FAILED",
+                            "mutation_committed": False,
+                            "intent_event_id": intent_entry.event_id,
+                            "simulation_id": simulation_id,
+                            "version": version,
+                            "role": norm_role,
+                            "revoked_by": verified_actor,
+                            "error": str(save_err),
+                            "action": "revoke_sign_off",
+                            "decision": "FAILED",
+                        },
+                        actor_type=actor_type,
+                        actor_institution=actor_institution,
+                        target_type="model_version",
+                        action="revoke_sign_off",
+                        decision="FAILED",
+                    )
                 raise
 
             # Finalize committed audit event
@@ -4541,28 +4715,61 @@ class ModelRegistry:
             try:
                 self._save_manifest(simulation_id, manifest)
             except Exception as save_err:
-                audit_chain.finalize_pending_mutation(
-                    mutation_id=mutation_id,
-                    event_type="MODEL_VERSION_REVOCATION_FAILED",
-                    actor=effective_actor,
-                    target_id=f"{simulation_id}:v{version}",
-                    details={
-                        "mutation_id": mutation_id,
-                        "mutation_stage": "FAILED",
-                        "mutation_committed": False,
-                        "intent_event_id": intent_entry.event_id,
-                        "simulation_id": simulation_id,
-                        "version": version,
-                        "error": str(save_err),
-                        "action": "revoke_version",
-                        "decision": "FAILED",
-                    },
-                    actor_type=actor_type,
-                    actor_institution=actor_inst,
-                    target_type="model_version",
-                    action="revoke_version",
-                    decision="FAILED",
-                )
+                actual_status = "FAILED"
+                if "mutation_id" in locals() and mutation_id:
+                    try:
+                        actual_status = self.check_version_mutation_status(
+                            simulation_id, version, mutation_id
+                        )
+                    except Exception as check_err:
+                        logger.warning(
+                            "Could not reliably determine mutation status for '%s' (%s); treating as INDETERMINATE.",
+                            mutation_id,
+                            check_err,
+                        )
+                        actual_status = "INDETERMINATE"
+
+                if actual_status == "COMMITTED":
+                    logger.critical(
+                        "Version revocation mutation '%s' for '%s:v%d' was durably committed to manifest, "
+                        "but post-commit operation failed: %s. Leaving audit mutation PENDING for reconciliation.",
+                        mutation_id,
+                        simulation_id,
+                        version,
+                        save_err,
+                    )
+                elif actual_status == "INDETERMINATE":
+                    logger.warning(
+                        "Outcome for version revocation mutation '%s' ('%s:v%d') is INDETERMINATE after exception: %s. "
+                        "Preserving audit intent without recording a terminal event.",
+                        mutation_id,
+                        simulation_id,
+                        version,
+                        save_err,
+                    )
+                else:
+                    audit_chain.finalize_pending_mutation(
+                        mutation_id=mutation_id,
+                        event_type="MODEL_VERSION_REVOCATION_FAILED",
+                        actor=effective_actor,
+                        target_id=f"{simulation_id}:v{version}",
+                        details={
+                            "mutation_id": mutation_id,
+                            "mutation_stage": "FAILED",
+                            "mutation_committed": False,
+                            "intent_event_id": intent_entry.event_id,
+                            "simulation_id": simulation_id,
+                            "version": version,
+                            "error": str(save_err),
+                            "action": "revoke_version",
+                            "decision": "FAILED",
+                        },
+                        actor_type=actor_type,
+                        actor_institution=actor_inst,
+                        target_type="model_version",
+                        action="revoke_version",
+                        decision="FAILED",
+                    )
                 raise
 
             # Finalize committed audit event
@@ -5313,11 +5520,60 @@ class ModelEvaluationEngine:
             rollback_message = ""
             has_both_classes = len(set(y_true)) >= 2
             if (has_both_classes and champ_auc is not None and champ_auc < 0.65) or avg_champ_latency > 200.0 or champ_fpr > 0.05:
-                rollback_triggered = True
+                from app.config import get_settings
+                settings = get_settings()
+                sim_dir = self.registry._get_sim_dir(simulation_id)
+                verifier = self.registry._verifier
+                if verifier is None:
+                    try:
+                        verifier = get_default_training_verifier()
+                    except Exception as verifier_err:
+                        logger.warning("Could not initialize default training verifier: %s", verifier_err)
+                        verifier = None
                 manifest = self.registry._load_manifest(simulation_id)
-                previous_versions = [v for v in manifest if v["version"] < active_ver_num]
-                if previous_versions:
-                    stable_version = max(previous_versions, key=lambda x: x["version"])
+
+                eligible_versions = []
+                for v in manifest:
+                    ver_num = v.get("version", 0)
+                    if ver_num >= active_ver_num:
+                        continue
+                    if v.get("is_revoked") is True or v.get("status") == "revoked":
+                        continue
+                    if settings.app_env.lower() == "production" and v.get("is_production_eligible") is False:
+                        continue
+                    fname = v.get("filename")
+                    if not fname:
+                        continue
+                    filepath = os.path.join(sim_dir, fname)
+                    if not (os.path.isfile(filepath) and os.path.getsize(filepath) > 0):
+                        continue
+                    if v.get("sha256"):
+                        actual_sha = compute_file_sha256(filepath)
+                        if not hmac.compare_digest(actual_sha, v["sha256"]):
+                            continue
+                    rcpt = v.get("training_receipt")
+                    if isinstance(rcpt, dict) and rcpt.get("key_id"):
+                        try:
+                            if not verifier or not verifier.is_key_trusted(rcpt["key_id"]):
+                                continue
+                        except Exception:
+                            continue
+                    elif settings.app_env.lower() == "production":
+                        # In production, receipt is strictly mandatory
+                        continue
+                    if settings.app_env.lower() == "production":
+                        sign_offs = [
+                            s for s in v.get("sign_offs", [])
+                            if isinstance(s, dict) and not s.get("is_revoked") and s.get("status", "active") != "revoked"
+                        ]
+                        has_ml = any(s.get("role") in ("ml_engineer", "ml_lead") for s in sign_offs)
+                        has_comp = any(s.get("role") in ("compliance", "compliance_officer") for s in sign_offs)
+                        if not (has_ml and has_comp):
+                            continue
+                    eligible_versions.append(v)
+
+                if eligible_versions:
+                    stable_version = max(eligible_versions, key=lambda x: x["version"])
                     ownership = self.registry.get_simulation_ownership(simulation_id)
                     owning_bank = ownership.get("owning_bank_id")
                     trusted_ctx = create_trusted_internal_context(
@@ -5328,20 +5584,29 @@ class ModelEvaluationEngine:
                         model_version=stable_version["version"],
                         bank_id=owning_bank,
                     )
-                    self.registry.rollback(
-                        simulation_id,
-                        stable_version["version"],
-                        trusted_context=trusted_ctx,
-                    )
+                    try:
+                        self.registry.rollback(
+                            simulation_id,
+                            stable_version["version"],
+                            trusted_context=trusted_ctx,
+                        )
+                        traffic_share = 0.0
+                        self._store.set(share_key, 0.0)
+                        rollback_triggered = True
+                        rollback_message = f"Auto-rollback triggered to version {stable_version['version']} due to performance degradation (AUC: {champ_auc:.4f}, FPR: {champ_fpr:.4f}, Latency: {avg_champ_latency:.1f}ms)."
+                        logger.warning(rollback_message)
+                    except Exception as rb_err:
+                        rollback_message = f"Rollback to candidate version {stable_version['version']} failed admission/execution: {rb_err}"
+                        logger.error(rollback_message)
+                        rollback_triggered = False
+                else:
                     traffic_share = 0.0
                     self._store.set(share_key, 0.0)
-                    rollback_message = f"Auto-rollback triggered to version {stable_version['version']} due to performance degradation (AUC: {champ_auc:.4f}, FPR: {champ_fpr:.4f}, Latency: {avg_champ_latency:.1f}ms)."
-                    logger.warning(rollback_message)
-                else:
                     rollback_message = (
-                        "Performance degradation detected, but no stable rollback candidate exists."
+                        f"Performance degradation detected on champion v{active_ver_num}, but no safe eligible rollback candidate exists in registry."
                     )
                     logger.warning(rollback_message)
+                    rollback_triggered = False
 
             # Promotion Gating (Fail-closed on undefined/missing PR-AUC):
             promotion_triggered = False
@@ -5360,23 +5625,32 @@ class ModelEvaluationEngine:
                     challenger_ver_num = next(
                         r["challenger_version"] for r in records if r["challenger_version"] is not None
                     )
+                    ownership = self.registry.get_simulation_ownership(simulation_id)
+                    owning_bank = ownership.get("owning_bank_id")
                     trusted_ctx = create_trusted_internal_context(
                         "model_evaluation_engine",
-                        action="rollback",
+                        action="promote_version",
                         resource_type="model",
                         resource_id=simulation_id,
                         model_version=challenger_ver_num,
+                        bank_id=owning_bank,
                     )
-                    self.registry.rollback(
-                        simulation_id,
-                        challenger_ver_num,
-                        trusted_context=trusted_ctx,
-                    )
-                    traffic_share = 0.0
-                    self._store.set(share_key, 0.0)
-                    promotion_message = f"Challenger version {challenger_ver_num} promoted to Champion after continued outperformance (PR-AUC: {chall_pr_auc:.4f} vs {champ_pr_auc:.4f})."
-                    logger.info(promotion_message)
-                    promotion_triggered = True
+                    try:
+                        self.registry.promote_version(
+                            simulation_id,
+                            challenger_ver_num,
+                            target_status="champion",
+                            trusted_context=trusted_ctx,
+                        )
+                        traffic_share = 0.0
+                        self._store.set(share_key, 0.0)
+                        promotion_message = f"Challenger version {challenger_ver_num} promoted to Champion after continued outperformance (PR-AUC: {chall_pr_auc:.4f} vs {champ_pr_auc:.4f})."
+                        logger.info(promotion_message)
+                        promotion_triggered = True
+                    except Exception as prom_err:
+                        promotion_message = f"Challenger version {challenger_ver_num} promotion failed admission checks: {prom_err}"
+                        logger.error(promotion_message)
+                        promotion_triggered = False
 
             metrics = {
                 "champion_version": active_ver_num,

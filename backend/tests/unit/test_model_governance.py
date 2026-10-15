@@ -19,6 +19,23 @@ class TestModelGovernance(unittest.TestCase):
         self.registry = ModelRegistry(storage_dir=self.test_dir)
         self.evaluation_engine = ModelEvaluationEngine(self.registry)
         self.simulation_id = "gov_sim_123"
+        from app.application.services.model_registry import create_trusted_internal_context
+        ctx = create_trusted_internal_context(
+            service_name="training_orchestrator",
+            action="bind_ownership",
+            resource_type="model",
+            resource_id=self.simulation_id,
+            bank_id="bank_test",
+        )
+        self.registry.bind_simulation_ownership(self.simulation_id, owning_bank_id="bank_test", trusted_context=ctx)
+
+        # Register authoritative test users
+        from app.infrastructure.security.auth_service import AuthenticationService
+        auth_svc = AuthenticationService.get_instance()
+        auth_svc.register_user("officer_alice", "StrongPass123!", "bank_test", roles=["compliance"], clearance_level=2)
+        auth_svc.register_user("engineer_charlie", "StrongPass123!", "bank_test", roles=["ml_engineer"], clearance_level=2)
+        auth_svc.register_user("alice", "StrongPass123!", "bank_test", roles=["compliance"], clearance_level=2)
+        auth_svc.register_user("bob", "StrongPass123!", "bank_test", roles=["ml_engineer"], clearance_level=2)
 
         # PyTorch model state mock
         self.mock_state_dict = {
@@ -26,9 +43,29 @@ class TestModelGovernance(unittest.TestCase):
             "bias": torch.FloatTensor([0.5]),
         }
         self.mock_metrics = {"auc_roc": 0.85, "f1_score": 0.82, "loss": 0.15}
+        from app.infrastructure.redis_store import RedisStore
+        RedisStore._shared_fallback_stores.clear()
 
     def tearDown(self) -> None:
         shutil.rmtree(self.test_dir, ignore_errors=True)
+        from app.config import get_settings
+        get_settings.cache_clear()
+        from app.infrastructure.security.durable_nonce_store import (
+            DurableNonceStore,
+            reset_default_nonce_store,
+        )
+        reset_default_nonce_store()
+        DurableNonceStore._instance = None
+        from app.infrastructure.security.auth_service import AuthenticationService
+        AuthenticationService._instance = None
+        from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+        ImmutableAuditChain.reset_instance()
+        from app.infrastructure.redis_store import RedisStore
+        RedisStore._shared_fallback_stores.clear()
+        from app.application.services.training_provenance_service import (
+            reset_default_training_verifier,
+        )
+        reset_default_training_verifier()
 
     def test_lineage_metadata_on_save(self) -> None:
         """Verify model lineage details are correctly captured on version registry save."""
@@ -108,12 +145,22 @@ class TestModelGovernance(unittest.TestCase):
             fairness_score=0.96,
         )
         self.assertEqual(len(final_entry["sign_offs"]), 2)
-        # Since there is no other active champion version in the empty registry, it should auto-promote directly to champion
-        self.assertEqual(final_entry["status"], "champion")
-        self.assertTrue(final_entry["is_active"])
+        # Dual signoff approves model for promotion, but does not auto-activate champion
+        self.assertEqual(final_entry["status"], "approved")
+        self.assertTrue(final_entry["is_approved"])
+        self.assertFalse(final_entry["is_active"])
+
+        # Explicit promotion promotes the approved model to operational champion
+        promoted = self.registry.promote_version(
+            simulation_id=self.simulation_id,
+            version=version,
+            target_status="champion",
+        )
+        self.assertEqual(promoted["status"], "champion")
+        self.assertTrue(promoted["is_active"])
 
     def test_challenger_promotion_gating(self) -> None:
-        """Verify model becomes challenger if an active champion already exists in the manifest."""
+        """Verify model becomes challenger via authorized promotion after institutional approval."""
         # Save version 1 as active Champion
         self.registry.save_version(
             simulation_id=self.simulation_id,
@@ -139,10 +186,17 @@ class TestModelGovernance(unittest.TestCase):
         v2_updated = self.registry.sign_off(
             self.simulation_id, v2_entry["version"], "ml_engineer", "bob", "sig2"
         )
+        self.assertEqual(v2_updated["status"], "approved")
+        self.assertTrue(v2_updated["is_approved"])
 
-        # Since version 1 is currently active Champion, version 2 should be promoted to Challenger status (not Champion)
-        self.assertEqual(v2_updated["status"], "challenger")
-        self.assertFalse(v2_updated["is_active"])
+        # Explicitly promote approved version 2 to Challenger status
+        v2_promoted = self.registry.promote_version(
+            self.simulation_id,
+            v2_entry["version"],
+            target_status="challenger",
+        )
+        self.assertEqual(v2_promoted["status"], "challenger")
+        self.assertFalse(v2_promoted["is_active"])
 
     def test_shadow_routing_metrics_log(self) -> None:
         """Verify shadow latency metrics and prediction outcomes are logged correctly."""
