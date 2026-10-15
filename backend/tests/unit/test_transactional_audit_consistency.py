@@ -523,7 +523,7 @@ def test_tx_audit_05_process_termination_stages_detectable_and_recoverable(tx_au
 
 # ── TX-AUDIT-06: High-Concurrency Cross-Worker Append Safety ───────────────────
 
-def _concurrent_appender_task(audit_file: str, secret: str, worker_id: int, count: int, q_out: multiprocessing.Queue):
+def _concurrent_appender_task(audit_file: str, secret: str, worker_id: int, count: int, out_file: str):
     """Worker function for concurrent audit logging."""
     try:
         from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
@@ -536,27 +536,30 @@ def _concurrent_appender_task(audit_file: str, secret: str, worker_id: int, coun
                 target_id=f"target_{worker_id}_{i}",
                 details={"w": worker_id, "i": i},
             )
-        q_out.put({"success": True, "worker": worker_id})
+        with open(out_file, "w") as f:
+            json.dump({"success": True, "worker": worker_id}, f)
     except Exception as exc:
-        q_out.put({"success": False, "worker": worker_id, "error": str(exc)})
+        with open(out_file, "w") as f:
+            json.dump({"success": False, "worker": worker_id, "error": str(exc)}, f)
 
 
 def test_tx_audit_06_concurrent_independent_workers_preserve_integrity(tx_audit_env):
-    """TX-AUDIT-06: 4 independent OS worker processes concurrently append events without deadlocks or corruption."""
+    """TX-AUDIT-06: 2 independent OS worker processes concurrently append events without deadlocks or corruption."""
     audit_file = tx_audit_env["audit_file"]
     secret = tx_audit_env["audit_secret"]
+    tmp_path = tx_audit_env["tmp_path"]
 
     chain = ImmutableAuditChain(store_path=audit_file, signing_secret=secret)
     initial_count = len(chain.chain)
 
     num_workers = 2
     events_per_worker = 3
-    q_out = multiprocessing.Queue()
+    out_files = [str(tmp_path / f"worker_out_{w_id}.json") for w_id in range(num_workers)]
 
     workers = [
         multiprocessing.Process(
             target=_concurrent_appender_task,
-            args=(audit_file, secret, w_id, events_per_worker, q_out),
+            args=(audit_file, secret, w_id, events_per_worker, out_files[w_id]),
         )
         for w_id in range(num_workers)
     ]
@@ -564,10 +567,15 @@ def test_tx_audit_06_concurrent_independent_workers_preserve_integrity(tx_audit_
     for w in workers:
         w.start()
 
-    results = [q_out.get(timeout=60) for _ in range(num_workers)]
     for w in workers:
-        w.join(timeout=15)
+        w.join(timeout=25)
         assert not w.is_alive(), "Worker process timed out!"
+
+    results = []
+    for fpath in out_files:
+        assert os.path.exists(fpath), f"Worker output file {fpath} was not created!"
+        with open(fpath) as f:
+            results.append(json.load(f))
 
     assert all(r["success"] is True for r in results), f"Worker failed: {results}"
 

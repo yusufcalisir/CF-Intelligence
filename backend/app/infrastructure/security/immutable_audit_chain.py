@@ -195,6 +195,41 @@ class ChainVerificationReport:
     )
 
 
+TERMINAL_MUTATION_DECISIONS = {
+    "REVOKED",
+    "PROMOTED",
+    "ROLLED_BACK",
+    "FAILED",
+    "VERSION_CREATED",
+    "APPROVED",
+    "OWNERSHIP_BOUND",
+    "OWNERSHIP_TRANSFERRED",
+}
+
+TERMINAL_MUTATION_EVENTS = {
+    "MODEL_VERSION_CREATED",
+    "MODEL_SIGNOFF_RECORDED",
+    "MODEL_OWNERSHIP_ASSIGNMENT",
+    "MODEL_OWNERSHIP_TRANSFER",
+    "MODEL_PROMOTION",
+    "MODEL_ROLLBACK",
+    "MODEL_VERSION_REVOCATION",
+    "MODEL_SIGNOFF_REVOCATION",
+}
+
+
+def _is_mutation_entry_terminal(entry: AuditLogEntry) -> bool:
+    details = entry.details or {}
+    stage = details.get("mutation_stage")
+    if stage in ("COMMITTED", "FAILED"):
+        return True
+    if entry.decision in TERMINAL_MUTATION_DECISIONS:
+        return True
+    if entry.event_type in TERMINAL_MUTATION_EVENTS:
+        return True
+    return bool(entry.event_type.endswith("_FAILED"))
+
+
 class ImmutableAuditChain:
     """Cryptographic ledger managing durable, tamper-evident audit log entries."""
 
@@ -713,11 +748,7 @@ class ImmutableAuditChain:
                 stage = details.get("mutation_stage")
                 if stage == "PENDING" or entry.decision == "PENDING":
                     pending_entries[mut_id] = entry
-                elif (
-                    stage in ("COMMITTED", "FAILED")
-                    or entry.decision in ("REVOKED", "PROMOTED", "ROLLED_BACK", "FAILED")
-                    or entry.event_type.endswith("_FAILED")
-                ):
+                elif _is_mutation_entry_terminal(entry):
                     resolved_mutation_ids.add(mut_id)
 
             return [
@@ -734,13 +765,9 @@ class ImmutableAuditChain:
             for entry in self.chain:
                 d = entry.details or {}
                 if d.get("mutation_id") == mutation_id:
-                    stage = d.get("mutation_stage")
-                    if (
-                        stage in ("COMMITTED", "FAILED")
-                        or entry.decision in ("REVOKED", "PROMOTED", "ROLLED_BACK", "FAILED")
-                        or entry.event_type.endswith("_FAILED")
-                    ):
+                    if _is_mutation_entry_terminal(entry):
                         return False
+                    stage = d.get("mutation_stage")
                     if stage == "PENDING" or entry.decision == "PENDING":
                         has_pending = True
             return has_pending
@@ -786,20 +813,14 @@ class ImmutableAuditChain:
             # Check for existing terminal resolution for this mutation_id
             for entry in self.chain:
                 d = entry.details or {}
-                if d.get("mutation_id") == mutation_id:
-                    stage = d.get("mutation_stage")
-                    if (
-                        stage in ("COMMITTED", "FAILED")
-                        or entry.decision in ("REVOKED", "PROMOTED", "ROLLED_BACK", "FAILED")
-                        or entry.event_type.endswith("_FAILED")
-                    ):
-                        logger.info(
-                            "Mutation '%s' is already resolved with stage=%s, decision=%s. Skipping duplicate.",
-                            mutation_id,
-                            stage,
-                            entry.decision,
-                        )
-                        return None
+                if d.get("mutation_id") == mutation_id and _is_mutation_entry_terminal(entry):
+                    logger.info(
+                        "Mutation '%s' is already resolved with stage=%s, decision=%s. Skipping duplicate.",
+                        mutation_id,
+                        d.get("mutation_stage"),
+                        entry.decision,
+                    )
+                    return None
 
             return self._append_event_unlocked(
                 event_type=event_type,

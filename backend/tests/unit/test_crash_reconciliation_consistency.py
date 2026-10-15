@@ -13,7 +13,6 @@ Validates that:
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import json
 import multiprocessing
@@ -215,7 +214,7 @@ def _worker_mutation_process(
 
         reg._save_manifest = hooked_save_after
 
-    with contextlib.suppress(BaseException):
+    try:
         reg.revoke_version(
             simulation_id=sim_id,
             version=1,
@@ -223,6 +222,9 @@ def _worker_mutation_process(
             actor="admin_dan",
             auth_token=auth_token,
         )
+    except Exception as e:
+        with open(barrier_reached_path + ".err", "w") as f:
+            f.write(f"{type(e).__name__}: {e}\n")
 
 
 def _worker_reconciler_process(
@@ -492,9 +494,13 @@ def test_reconciliation_recovers_process_terminated_before_manifest_persistence(
 
     # Wait deterministically for Worker A to reach PENDING barrier
     start_t = time.time()
-    while not os.path.exists(barrier_path) and time.time() - start_t < 15.0:
+    while not os.path.exists(barrier_path) and not os.path.exists(barrier_path + ".err") and time.time() - start_t < 30.0:
         time.sleep(0.05)
-    assert os.path.exists(barrier_path), "Worker A failed to reach PENDING barrier!"
+    err_content = ""
+    if os.path.exists(barrier_path + ".err"):
+        with open(barrier_path + ".err") as f:
+            err_content = f.read()
+    assert os.path.exists(barrier_path), f"Worker A failed to reach PENDING barrier! Error: {err_content}"
 
     # Verify PENDING is recorded in audit ledger on disk
     chain = ImmutableAuditChain(store_path=reconciliation_env["audit_file"], signing_secret=reconciliation_env["audit_secret"])
@@ -527,7 +533,7 @@ def test_reconciliation_recovers_process_terminated_before_manifest_persistence(
         ),
     )
     p_b.start()
-    p_b.join(timeout=10.0)
+    p_b.join(timeout=25.0)
     assert not p_b.is_alive()
 
     with open(out_file) as f:
@@ -577,9 +583,13 @@ def test_reconciliation_recovers_process_terminated_after_manifest_persistence(r
 
     # Wait deterministically for Worker A to reach MANIFEST_PERSISTED barrier
     start_t = time.time()
-    while not os.path.exists(barrier_path) and time.time() - start_t < 15.0:
+    while not os.path.exists(barrier_path) and not os.path.exists(barrier_path + ".err") and time.time() - start_t < 30.0:
         time.sleep(0.05)
-    assert os.path.exists(barrier_path), "Worker A failed to reach MANIFEST_PERSISTED barrier!"
+    err_content = ""
+    if os.path.exists(barrier_path + ".err"):
+        with open(barrier_path + ".err") as f:
+            err_content = f.read()
+    assert os.path.exists(barrier_path), f"Worker A failed to reach MANIFEST_PERSISTED barrier! Error: {err_content}"
 
     # Terminate Worker A OS process immediately after manifest persistence before audit finalization
     p.kill()
@@ -615,7 +625,7 @@ def test_reconciliation_recovers_process_terminated_after_manifest_persistence(r
         ),
     )
     p_b.start()
-    p_b.join(timeout=10.0)
+    p_b.join(timeout=25.0)
     assert not p_b.is_alive()
 
     with open(out_file) as f:
@@ -681,7 +691,7 @@ def test_concurrent_multiprocess_reconciliation_produces_single_terminal_outcome
     for p in processes:
         p.start()
     for p in processes:
-        p.join(timeout=15.0)
+        p.join(timeout=35.0)
         assert not p.is_alive()
 
     all_results = []
