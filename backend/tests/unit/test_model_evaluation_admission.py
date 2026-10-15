@@ -111,6 +111,8 @@ class TestModelEvaluationAdmission(unittest.TestCase):
         val = self.eval_engine._store.get(traffic_key)
         self.assertEqual(float(val) if val is not None else 0.0, 0.0)
         active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
         self.assertEqual(active["version"], 1)
 
     def test_evaluation_warmup_and_single_class_safeguard(self) -> None:
@@ -225,6 +227,8 @@ class TestModelEvaluationAdmission(unittest.TestCase):
         self.assertEqual(fb_full["traffic_share"], 0.0)
         self.assertTrue(fb_full["promotion_triggered"])
         active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
         self.assertEqual(active["version"], 2)
         self.assertEqual(active["status"], "champion")
 
@@ -347,8 +351,12 @@ class TestModelEvaluationAdmission(unittest.TestCase):
             )
 
         # Invariant: promotion failed closed, champion remains v1
+        self.assertIsNotNone(fb_next)
+        assert fb_next is not None
         self.assertFalse(fb_next["promotion_triggered"])
         active = self.registry.get_active_version(self.simulation_id)
+        self.assertIsNotNone(active)
+        assert active is not None
         self.assertEqual(active["version"], 1)
 
 
