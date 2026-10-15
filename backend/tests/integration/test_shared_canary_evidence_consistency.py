@@ -364,9 +364,9 @@ class TestSharedCanaryEvidenceConsistency:
             )
 
         # If live Redis is detected, perform real TCP roundtrip multi-worker test
-        store = RedisStore()
+        store = RedisStore("cfi_integration_live")
         assert store.client is not None, "Expected live Redis client connection"
-        test_key = "cfi:integration:live_test_counter"
+        test_key = "live_test_counter"
         store.delete(test_key)
         val = store.incr(test_key)
         assert val == 1

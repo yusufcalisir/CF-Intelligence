@@ -34,11 +34,38 @@ class RedisStore:
     _shared_fallback_stores: dict[str, dict] = {}
     _lock: threading.RLock = threading.RLock()
 
-    def __init__(self, prefix: str):
+    def __init__(self, prefix: str, strict_production: bool = False):
         self.prefix: str = prefix
+        self.strict_production: bool = strict_production
         self.settings = get_settings()
         self._redis_client: Any = None
         self._redis_failed: bool = False
+        self._had_command_failure: bool = False
+
+    @property
+    def is_production(self) -> bool:
+        return getattr(self.settings, "app_env", "development").lower().strip() == "production"
+
+    def is_live(self) -> bool:
+        """Check if the Redis client is operational and responding to PING."""
+        if self._redis_failed or RedisStore._global_redis_unavailable:
+            return False
+        c = self.client
+        if not c:
+            return False
+        try:
+            return bool(c.ping())
+        except Exception as e:
+            logger.warning("Redis ping failed for prefix '%s': %s", self.prefix, e)
+            self._redis_failed = True
+            self._had_command_failure = True
+            return False
+
+    def has_active_shared_storage(self) -> bool:
+        """Verify that genuine shared authoritative Redis storage is actively reachable and healthy."""
+        if self._redis_failed or self._had_command_failure or RedisStore._global_redis_unavailable:
+            return False
+        return self.is_live()
 
     @property
     def _fallback_store(self) -> dict:
@@ -159,8 +186,15 @@ class RedisStore:
                 val = c.get(self._make_key(key))
                 if val:
                     return json.loads(val)
+                return None
             except Exception as e:
                 logger.error(f"Redis get failed for {key}: {e}")
+                self._had_command_failure = True
+                self._redis_failed = True
+                if self.strict_production and self.is_production:
+                    raise RuntimeError(f"Redis get failed in production for '{key}': {e}") from e
+        if self.strict_production and self.is_production:
+            raise RuntimeError(f"Redis store unavailable in production for get('{key}')")
         with RedisStore._lock:
             return self._fallback_store.get(key)
 
@@ -172,6 +206,12 @@ class RedisStore:
                 return
             except Exception as e:
                 logger.error(f"Redis set failed for {key}: {e}")
+                self._had_command_failure = True
+                self._redis_failed = True
+                if self.strict_production and self.is_production:
+                    raise RuntimeError(f"Redis set failed in production for '{key}': {e}") from e
+        if self.strict_production and self.is_production:
+            raise RuntimeError(f"Redis store unavailable in production for set('{key}')")
         with RedisStore._lock:
             self._fallback_store[key] = value
 
@@ -187,10 +227,228 @@ class RedisStore:
                 return int(c.incr(self._make_key(key)))
             except Exception as e:
                 logger.error(f"Redis incr failed for {key}: {e}")
+                self._had_command_failure = True
+                self._redis_failed = True
+                if self.strict_production and self.is_production:
+                    raise RuntimeError(f"Redis incr failed in production for '{key}': {e}") from e
+        if self.strict_production and self.is_production:
+            raise RuntimeError(f"Redis store unavailable in production for incr('{key}')")
         with RedisStore._lock:
             val = int(self._fallback_store.get(key) or 0) + 1
             self._fallback_store[key] = val
             return val
+
+    def record_prediction_evidence(
+        self,
+        simulation_id: str,
+        transaction_id: str,
+        payload: dict[str, Any],
+        max_window_size: int = 1000,
+    ) -> dict[str, Any]:
+        """Atomically record prediction evidence and maintain bounded prediction index.
+
+        In production Redis, executes via atomic Lua script:
+        - Allocates monotonic sequence number via INCR on first appearance.
+        - Preserves existing sequence, timestamp, and feedback on duplicate/retry.
+        - Atomically inserts key into prediction_keys list and evicts oldest items if exceeding max_window_size.
+        - Deletes evicted prediction records from Redis.
+        - In production with strict_production, fails closed (raises RuntimeError) if Redis write fails.
+        """
+        rel_key = f"{simulation_id}:prediction:{transaction_id}"
+        pred_key = self._make_key(rel_key)
+        seq_key = self._make_key(f"{simulation_id}:prediction_seq")
+        list_key = self._make_key(f"{simulation_id}:prediction_keys")
+
+        c = self.client
+        if c:
+            try:
+                lua_script = """
+                local pred_key = KEYS[1]
+                local seq_key = KEYS[2]
+                local list_key = KEYS[3]
+
+                local tx_id = ARGV[1]
+                local max_window = tonumber(ARGV[2])
+                local payload = cjson.decode(ARGV[3])
+                local rel_key = ARGV[4]
+                local prefix = ARGV[5]
+
+                local existing_raw = redis.call('GET', pred_key)
+                local pred_seq
+                local timestamp
+                local actual_label = nil
+                local is_retry = 0
+
+                if existing_raw then
+                    local existing = cjson.decode(existing_raw)
+                    pred_seq = existing["pred_seq"]
+                    timestamp = existing["timestamp"]
+                    actual_label = existing["actual_label"]
+                    is_retry = 1
+                else
+                    pred_seq = redis.call('INCR', seq_key)
+                    timestamp = payload["timestamp"]
+                    actual_label = payload["actual_label"]
+                end
+
+                payload["transaction_id"] = tx_id
+                payload["pred_seq"] = pred_seq
+                payload["timestamp"] = timestamp
+                payload["actual_label"] = actual_label
+
+                redis.call('SET', pred_key, cjson.encode(payload))
+
+                local list_raw = redis.call('GET', list_key)
+                local keys = {}
+                if list_raw then
+                    keys = cjson.decode(list_raw)
+                end
+
+                local found = false
+                for i, k in ipairs(keys) do
+                    if k == rel_key then
+                        found = true
+                        break
+                    end
+                end
+
+                if not found then
+                    table.insert(keys, rel_key)
+                    while #keys > max_window do
+                        local oldest_rel = table.remove(keys, 1)
+                        local oldest_full = prefix .. ":" .. oldest_rel
+                        redis.call('DEL', oldest_full)
+                    end
+                    redis.call('SET', list_key, cjson.encode(keys))
+                end
+
+                return cjson.encode({
+                    pred_seq = pred_seq,
+                    is_retry = (is_retry == 1),
+                    record = payload,
+                    retained_count = #keys
+                })
+                """
+                res_raw = c.eval(
+                    lua_script,
+                    3,
+                    pred_key,
+                    seq_key,
+                    list_key,
+                    transaction_id,
+                    str(max_window_size),
+                    json.dumps(payload),
+                    rel_key,
+                    self.prefix,
+                )
+                if res_raw:
+                    return json.loads(res_raw)
+            except Exception as e:
+                logger.error("Redis record_prediction_evidence failed for %s: %s", rel_key, e)
+                self._had_command_failure = True
+                self._redis_failed = True
+                if self.strict_production and self.is_production:
+                    raise RuntimeError(
+                        f"Production evaluation storage failure: failed to record prediction evidence for '{transaction_id}' in Redis: {e}"
+                    ) from e
+
+        if self.is_production and (
+            self._had_command_failure or self._redis_failed or self.strict_production
+        ):
+            raise RuntimeError(
+                f"Production evaluation storage failure: shared Redis store is unavailable for transaction '{transaction_id}'."
+            )
+
+        with RedisStore._lock:
+            existing = self._fallback_store.get(rel_key)
+            if existing and "pred_seq" in existing:
+                pred_seq = existing["pred_seq"]
+                timestamp = existing.get("timestamp") or payload.get("timestamp")
+                actual_label = existing.get("actual_label")
+                is_retry = True
+            else:
+                seq_val = int(self._fallback_store.get(f"{simulation_id}:prediction_seq") or 0) + 1
+                self._fallback_store[f"{simulation_id}:prediction_seq"] = seq_val
+                pred_seq = seq_val
+                timestamp = payload.get("timestamp")
+                actual_label = payload.get("actual_label")
+                is_retry = False
+
+            payload["transaction_id"] = transaction_id
+            payload["pred_seq"] = pred_seq
+            payload["timestamp"] = timestamp
+            payload["actual_label"] = actual_label
+            self._fallback_store[rel_key] = payload
+
+            list_val = self._fallback_store.get(f"{simulation_id}:prediction_keys")
+            keys = list(list_val) if isinstance(list_val, list) else []
+            if rel_key not in keys:
+                keys.append(rel_key)
+                while len(keys) > max_window_size:
+                    oldest_rel = keys.pop(0)
+                    self._fallback_store.pop(oldest_rel, None)
+                self._fallback_store[f"{simulation_id}:prediction_keys"] = keys
+
+            return {
+                "pred_seq": pred_seq,
+                "is_retry": is_retry,
+                "record": payload,
+                "retained_count": len(keys),
+            }
+
+    def record_feedback(
+        self,
+        simulation_id: str,
+        transaction_id: str,
+        actual_label: int,
+    ) -> dict[str, Any]:
+        """Atomically record ground truth label for an existing prediction record."""
+        rel_key = f"{simulation_id}:prediction:{transaction_id}"
+        pred_key = self._make_key(rel_key)
+
+        c = self.client
+        if c:
+            try:
+                lua_script = """
+                local pred_key = KEYS[1]
+                local label = tonumber(ARGV[1])
+
+                local raw = redis.call('GET', pred_key)
+                if not raw then
+                    return cjson.encode({found = false})
+                end
+
+                local rec = cjson.decode(raw)
+                rec["actual_label"] = label
+                redis.call('SET', pred_key, cjson.encode(rec))
+                return cjson.encode({found = true, record = rec})
+                """
+                res_raw = c.eval(lua_script, 1, pred_key, str(actual_label))
+                if res_raw:
+                    return json.loads(res_raw)
+            except Exception as e:
+                logger.error("Redis record_feedback failed for %s: %s", rel_key, e)
+                self._had_command_failure = True
+                self._redis_failed = True
+                if self.is_production:
+                    raise RuntimeError(
+                        f"Production evaluation storage failure: failed to record feedback for '{transaction_id}' in Redis: {e}"
+                    ) from e
+
+        if self.is_production and (
+            self._had_command_failure or self._redis_failed or self.strict_production
+        ):
+            raise RuntimeError(
+                f"Production evaluation storage failure: shared Redis store is unavailable for feedback on '{transaction_id}'."
+            )
+
+        with RedisStore._lock:
+            rec = self._fallback_store.get(rel_key)
+            if not rec or not isinstance(rec, dict):
+                return {"found": False}
+            rec["actual_label"] = actual_label
+            self._fallback_store[rel_key] = rec
+            return {"found": True, "record": rec}
 
     def update_conditional(
         self,
@@ -249,6 +507,17 @@ class RedisStore:
                 return bool(res == 1)
             except Exception as e:
                 logger.error(f"Redis update_conditional failed for {key}: {e}")
+                self._had_command_failure = True
+                self._redis_failed = True
+                if self.strict_production and self.is_production:
+                    raise RuntimeError(
+                        f"Redis update_conditional failed in production for '{key}': {e}"
+                    ) from e
+
+        if self.strict_production and self.is_production:
+            raise RuntimeError(
+                f"Redis store unavailable in production for update_conditional('{key}')"
+            )
 
         with RedisStore._lock:
             cur = self._fallback_store.get(key)
@@ -277,6 +546,12 @@ class RedisStore:
                 return
             except Exception as e:
                 logger.error(f"Redis delete failed for {key}: {e}")
+                self._had_command_failure = True
+                self._redis_failed = True
+                if self.strict_production and self.is_production:
+                    raise RuntimeError(f"Redis delete failed in production for '{key}': {e}") from e
+        if self.strict_production and self.is_production:
+            raise RuntimeError(f"Redis store unavailable in production for delete('{key}')")
         with RedisStore._lock:
             self._fallback_store.pop(key, None)
 

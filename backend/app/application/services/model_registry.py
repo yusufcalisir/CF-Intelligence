@@ -639,7 +639,7 @@ def validate_production_admission(
             f"Production admission rejected: model provenance '{prov}' is not production-eligible ({context})."
         )
 
-    if is_eligible is False:
+    if is_eligible is False and context != "sign_off":
         raise ModelIntegrityError(
             f"Production admission rejected: model is explicitly marked as not production-eligible ({context})."
         )
@@ -5805,42 +5805,30 @@ class ModelEvaluationEngine:
         challenger_latency_ms: float | None = None,
         routed_to: str = "champion",
     ) -> None:
-        """Log scoring details for a transaction."""
+        """Log scoring details for a transaction.
+
+        Thread-safe and process-safe: executes via atomic Redis Lua script across workers,
+        and thread-safe in-memory store in local development mode.
+        Fails closed in production if shared Redis publication fails.
+        """
+        payload = {
+            "champion_version": champion_version,
+            "champion_prob": champion_prob,
+            "champion_latency_ms": champion_latency_ms,
+            "challenger_version": challenger_version,
+            "challenger_prob": challenger_prob,
+            "challenger_latency_ms": challenger_latency_ms,
+            "actual_label": None,
+            "routed_to": routed_to,
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
         with self._lock:
-            key = f"{simulation_id}:prediction:{transaction_id}"
-            existing_rec = self._store.get(key)
-            if existing_rec and "pred_seq" in existing_rec:
-                pred_seq = existing_rec["pred_seq"]
-                timestamp = existing_rec.get("timestamp") or datetime.now(UTC).isoformat()
-            else:
-                seq_key = f"{simulation_id}:prediction_seq"
-                pred_seq = self._store.incr(seq_key)
-                timestamp = datetime.now(UTC).isoformat()
-
-            record = {
-                "transaction_id": transaction_id,
-                "pred_seq": pred_seq,
-                "champion_version": champion_version,
-                "champion_prob": champion_prob,
-                "champion_latency_ms": champion_latency_ms,
-                "challenger_version": challenger_version,
-                "challenger_prob": challenger_prob,
-                "challenger_latency_ms": challenger_latency_ms,
-                "actual_label": existing_rec.get("actual_label") if existing_rec else None,
-                "routed_to": routed_to,
-                "timestamp": timestamp,
-            }
-            self._store.set(key, record)
-
-            list_key = f"{simulation_id}:prediction_keys"
-            existing_val = self._store.get(list_key)
-            existing = existing_val if isinstance(existing_val, list) else []
-            if key not in existing:
-                existing.append(key)
-                if len(existing) > 1000:
-                    oldest = existing.pop(0)
-                    self._store.delete(oldest)
-                self._store.set(list_key, existing)
+            self._store.record_prediction_evidence(
+                simulation_id=simulation_id,
+                transaction_id=transaction_id,
+                payload=payload,
+                max_window_size=1000,
+            )
 
     def log_feedback(
         self,
@@ -5855,16 +5843,16 @@ class ModelEvaluationEngine:
             KeyError: If transaction prediction was not previously logged (Zero-Mock Invariant).
         """
         with self._lock:
-            key = f"{simulation_id}:prediction:{transaction_id}"
-            record = self._store.get(key)
-            if not record:
+            res = self._store.record_feedback(
+                simulation_id=simulation_id,
+                transaction_id=transaction_id,
+                actual_label=actual_label,
+            )
+            if not res.get("found"):
                 raise KeyError(
                     f"Prediction for transaction '{transaction_id}' not found in evaluation store. "
                     "Cannot log feedback for unscored transactions (Zero-Mock Invariant)."
                 )
-
-            record["actual_label"] = actual_label
-            self._store.set(key, record)
 
             return self.evaluate_performance(
                 simulation_id, target_challenger_version=target_challenger_version
@@ -5877,6 +5865,26 @@ class ModelEvaluationEngine:
     ) -> dict[str, Any]:
         """Compute metrics over logged predictions with labels and check routing rules."""
         with self._lock:
+            from app.config import get_settings
+
+            _settings = get_settings()
+            is_prod_eval = (
+                getattr(_settings, "app_env", "development").lower().strip() == "production"
+            )
+            if is_prod_eval and not self._store.has_active_shared_storage():
+                active_v = self.registry.get_active_version(simulation_id)
+                active_num = active_v["version"] if active_v else 1
+                return {
+                    "status": "unavailable",
+                    "sample_count": 0,
+                    "champion_version": active_num,
+                    "traffic_share": 0.0,
+                    "promotion_triggered": False,
+                    "promotion_message": "Evaluation unavailable: shared authoritative evaluation storage (Redis) is degraded or unreachable in production.",
+                    "rollback_triggered": False,
+                    "rollback_message": "",
+                }
+
             list_key = f"{simulation_id}:prediction_keys"
             keys = self._store.get(list_key) or []
             if not keys:
@@ -6246,7 +6254,7 @@ class ModelEvaluationEngine:
                                 getattr(_settings, "app_env", "development").lower().strip()
                                 == "production"
                             )
-                            if is_prod_eval and self._store.client is None:
+                            if is_prod_eval and not self._store.has_active_shared_storage():
                                 promotion_message = (
                                     f"Challenger v{eval_challenger_ver} canary activation deferred: "
                                     "shared authoritative evaluation storage (Redis) is unavailable in production. "
@@ -6362,7 +6370,7 @@ class ModelEvaluationEngine:
                                         getattr(_settings, "app_env", "development").lower().strip()
                                         == "production"
                                     )
-                                    if is_prod_eval and self._store.client is None:
+                                    if is_prod_eval and not self._store.has_active_shared_storage():
                                         promotion_message = (
                                             f"Challenger version {eval_challenger_ver} promotion rejected: "
                                             "shared authoritative evaluation storage (Redis) is unavailable in production. "
@@ -6371,41 +6379,55 @@ class ModelEvaluationEngine:
                                         logger.error(promotion_message)
                                         promotion_triggered = False
                                     else:
-                                        # Promotion Target is unambiguously eval_challenger_ver after full canary validation
-                                        ownership = self.registry.get_simulation_ownership(
-                                            simulation_id
-                                        )
-                                        owning_bank = ownership.get("owning_bank_id")
-                                        trusted_ctx = create_trusted_internal_context(
-                                            "model_evaluation_engine",
-                                            action="promote_version",
-                                            resource_type="model",
-                                            resource_id=simulation_id,
-                                            model_version=eval_challenger_ver,
-                                            bank_id=owning_bank,
-                                        )
-                                        try:
-                                            self.registry.promote_version(
-                                                simulation_id,
-                                                eval_challenger_ver,
-                                                target_status="champion",
-                                                trusted_context=trusted_ctx,
-                                            )
+                                        active_now = self.registry.get_active_version(simulation_id)
+                                        if (
+                                            active_now
+                                            and active_now.get("version") == eval_challenger_ver
+                                        ):
                                             traffic_share = 0.0
                                             self._store.set(share_key, 0.0)
                                             self._store.delete(traffic_version_key)
                                             self._store.delete(canary_start_key)
                                             self._store.delete(canary_state_key)
-                                            promotion_message = (
-                                                f"Challenger version {eval_challenger_ver} promoted to Champion after continued "
-                                                f"outperformance on matched cohort ({canary_samples} canary samples, PR-AUC: {chall_pr_auc:.4f} vs {paired_champ_pr_auc:.4f})."
-                                            )
+                                            promotion_message = f"Challenger version {eval_challenger_ver} is already promoted to Champion."
                                             logger.info(promotion_message)
                                             promotion_triggered = True
-                                        except Exception as prom_err:
-                                            promotion_message = f"Challenger version {eval_challenger_ver} promotion failed admission checks: {prom_err}"
-                                            logger.error(promotion_message)
-                                            promotion_triggered = False
+                                        else:
+                                            # Promotion Target is unambiguously eval_challenger_ver after full canary validation
+                                            ownership = self.registry.get_simulation_ownership(
+                                                simulation_id
+                                            )
+                                            owning_bank = ownership.get("owning_bank_id")
+                                            trusted_ctx = create_trusted_internal_context(
+                                                "model_evaluation_engine",
+                                                action="promote_version",
+                                                resource_type="model",
+                                                resource_id=simulation_id,
+                                                model_version=eval_challenger_ver,
+                                                bank_id=owning_bank,
+                                            )
+                                            try:
+                                                self.registry.promote_version(
+                                                    simulation_id,
+                                                    eval_challenger_ver,
+                                                    target_status="champion",
+                                                    trusted_context=trusted_ctx,
+                                                )
+                                                traffic_share = 0.0
+                                                self._store.set(share_key, 0.0)
+                                                self._store.delete(traffic_version_key)
+                                                self._store.delete(canary_start_key)
+                                                self._store.delete(canary_state_key)
+                                                promotion_message = (
+                                                    f"Challenger version {eval_challenger_ver} promoted to Champion after continued "
+                                                    f"outperformance on matched cohort ({canary_samples} canary samples, PR-AUC: {chall_pr_auc:.4f} vs {paired_champ_pr_auc:.4f})."
+                                                )
+                                                logger.info(promotion_message)
+                                                promotion_triggered = True
+                                            except Exception as prom_err:
+                                                promotion_message = f"Challenger version {eval_challenger_ver} promotion failed admission checks: {prom_err}"
+                                                logger.error(promotion_message)
+                                                promotion_triggered = False
                             else:
                                 traffic_share = 0.0
                                 self._store.set(share_key, 0.0)
