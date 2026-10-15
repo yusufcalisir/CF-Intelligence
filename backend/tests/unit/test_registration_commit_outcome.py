@@ -201,13 +201,13 @@ def test_manifest_committed_before_persistence_helper_raises(commit_outcome_env)
     # then raise before returning to simulate failure in post-replace directory sync or network ACK.
     orig_save_manifest = reg._save_manifest
 
-    def injected_save_manifest(s_id: str, m_list: list[dict[str, Any]]) -> None:
-        orig_save_manifest(s_id, m_list)
+    def injected_save_manifest(simulation_id: str, manifest: list[dict[str, Any]]) -> None:
+        orig_save_manifest(simulation_id, manifest)
         raise RuntimeError("Injected transient I/O failure immediately after manifest os.replace")
 
     reg._save_manifest = injected_save_manifest
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ModelIntegrityError):
         reg.save_version(
             simulation_id=sim_id,
             source_model_path=cand_path,
@@ -297,19 +297,19 @@ def test_unreadable_manifest_during_post_commit_exception_handling(commit_outcom
     orig_save_manifest = reg._save_manifest
 
     # Induce an exception in save_version and simulate unreadable authoritative manifest during cleanup
-    def unreadable_load_manifest(s_id: str) -> list[dict[str, Any]]:
-        raise ModelIntegrityError(f"Registry manifest for '{s_id}' cannot be read: storage I/O error")
+    def unreadable_load_manifest(simulation_id: str) -> list[dict[str, Any]]:
+        raise ModelIntegrityError(f"Registry manifest for '{simulation_id}' cannot be read: storage I/O error")
 
-    def failing_save_manifest(s_id: str, m_list: list[dict[str, Any]]) -> None:
+    def failing_save_manifest(simulation_id: str, manifest: list[dict[str, Any]]) -> None:
         # Commit the manifest file to disk first
-        orig_save_manifest(s_id, m_list)
+        orig_save_manifest(simulation_id, manifest)
         # Then make manifest unreadable to simulate concurrent storage corruption
         reg._load_manifest = unreadable_load_manifest
         raise RuntimeError("Injected crash while storage medium degraded")
 
     reg._save_manifest = failing_save_manifest
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ModelIntegrityError):
         reg.save_version(
             simulation_id=sim_id,
             source_model_path=cand_path,

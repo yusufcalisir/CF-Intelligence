@@ -27,9 +27,14 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
+      - name: Set up uv Package Manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
       - name: Install Linting & Security Tools (uv)
         run: |
-          pip install uv
+          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv && break || sleep 5; done
           uv pip install --system ruff mypy bandit pydantic pydantic-settings types-PyYAML
 
       - name: Ruff Lint Check
@@ -52,8 +57,15 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up uv Package Manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
       - name: Install pip-audit & uv
-        run: pip install pip-audit uv
+        run: |
+          for i in 1 2 3; do pip install --retries 5 --timeout 60 pip-audit && break || sleep 5; done
+          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv && break || sleep 5; done
 
       - name: Run pip-audit Dependency Vulnerability Scan
         working-directory: backend
@@ -219,9 +231,14 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
+      - name: Set up uv Package Manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
       - name: Install dependencies (uv)
         run: |
-          pip install uv
+          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv && break || sleep 5; done
           uv pip install --system -r requirements.txt
 
       - name: Run Full Pytest Suite across Security, Governance & Compliance

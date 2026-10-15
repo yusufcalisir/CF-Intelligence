@@ -45,9 +45,15 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up uv Package Manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
       - name: Install uv and System Dependencies
         run: |
-          pip install uv kaggle
+          for i in 1 2 3; do pip install --retries 5 --timeout 60 kaggle && break || sleep 5; done
+          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv && break || sleep 5; done
           uv pip install --system -r backend/requirements.txt pytest pytest-cov pytest-asyncio
 
       - name: Restore Dataset Cache (if available)

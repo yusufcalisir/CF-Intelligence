@@ -313,8 +313,8 @@ def test_ownership_repair_persistence_failure(ownership_repair_env):
     # Step 3: Inject failure when persisting repaired manifest
     orig_save_manifest = reg._save_manifest
 
-    def failing_save_manifest(s_id: str, m_list: list[dict[str, Any]]) -> None:
-        raise ModelIntegrityError(f"Simulated storage failure persisting manifest repair for '{s_id}'")
+    def failing_save_manifest(simulation_id: str, manifest: list[dict[str, Any]]) -> None:
+        raise ModelIntegrityError(f"Simulated storage failure persisting manifest repair for '{simulation_id}'")
 
     reg._save_manifest = failing_save_manifest
 

@@ -33,8 +33,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install uv Package Manager
-        run: pip install uv
+      - name: Set up uv Package Manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
 
       - name: Install Linting & Security Tools
         run: uv pip install --system ruff bandit mypy pip-audit pydantic pydantic-settings types-PyYAML
@@ -101,9 +103,14 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Set up uv Package Manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
       - name: Install Backend Dependencies
         run: |
-          pip install uv
+          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv && break || sleep 5; done
           uv pip install --system -r backend/requirements.txt pytest pytest-cov pytest-asyncio
 
       - name: Run Deterministic ML & Pipeline Smoke Gates (Dataloaders, Serialization, Schemas)
@@ -168,9 +175,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package.json
 
+      - name: Set up uv Package Manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
       - name: Install Dependencies
         run: |
-          pip install uv
+          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv && break || sleep 5; done
           uv pip install --system -r backend/requirements.txt pytest pytest-asyncio
           cd frontend && npm install
 
@@ -203,9 +215,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package.json
 
+      - name: Set up uv Package Manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
       - name: Install Dependencies
         run: |
-          pip install uv
+          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv && break || sleep 5; done
           uv pip install --system -r backend/requirements.txt pytest
           cd frontend && npm install
 
@@ -238,9 +255,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package.json
 
+      - name: Set up uv Package Manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
       - name: Install Dependencies
         run: |
-          pip install uv
+          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv && break || sleep 5; done
           uv pip install --system -r backend/requirements.txt pytest pytest-cov pytest-asyncio
           cd frontend && npm install
 
@@ -357,9 +379,14 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Set up uv Package Manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
       - name: Install Verification Dependencies
         run: |
-          pip install uv
+          command -v uv >/dev/null 2>&1 || for i in 1 2 3; do pip install --retries 5 --timeout 60 uv && break || sleep 5; done
           uv pip install --system -r backend/requirements.txt pytest hypothesis scipy torch
 
       - name: Run Subsystem Scientific Verification Audits
