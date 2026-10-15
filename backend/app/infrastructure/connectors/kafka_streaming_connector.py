@@ -156,8 +156,9 @@ _GLOBAL_IN_MEMORY_BROKER = InMemoryKafkaBroker()
 class IdempotencyEngine:
     """Guarantees at-least-once delivery with exactly-once processing semantics."""
 
-    def __init__(self, ttl_seconds: int = 86400) -> None:
+    def __init__(self, ttl_seconds: int = 86400, key_prefix: str = "kafka") -> None:
         self._ttl_seconds = ttl_seconds
+        self._key_prefix = key_prefix
         self._processed_keys: dict[str, float] = {}
         self._registered_keys: set[str] = set()
         self._lock = threading.Lock()
@@ -168,16 +169,27 @@ class IdempotencyEngine:
         acquired_redis = False
         try:
             from app.application.services.idempotency import IdempotencyService
+            from app.config import get_settings
 
             idem_svc = IdempotencyService.get()
+            raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
+            is_prod = str(raw_env).lower().strip() == "production"
+
             if idem_svc._redis_client is not None:
                 status, _ = idem_svc.acquire(
-                    f"kafka:{idempotency_key}", in_progress_timeout=float(self._ttl_seconds)
+                    f"{self._key_prefix}:{idempotency_key}", in_progress_timeout=float(self._ttl_seconds)
                 )
                 if status != "ACQUIRED":
                     return False
                 acquired_redis = True
+            elif is_prod:
+                logger.error("Authoritative Redis unavailable for distributed idempotency in production mode")
+                return False
         except Exception as exc:
+            raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
+            if str(raw_env).lower().strip() == "production":
+                logger.error("Authoritative Redis failed during idempotency acquisition in production mode: %s", exc)
+                return False
             logger.debug("IdempotencyEngine Redis check skipped (%s), using local engine", exc)
 
         with self._lock:
@@ -195,7 +207,7 @@ class IdempotencyEngine:
 
             idem_svc = IdempotencyService.get()
             if idem_svc._redis_client is not None:
-                idem_svc.release(f"kafka:{idempotency_key}")
+                idem_svc.release(f"{self._key_prefix}:{idempotency_key}")
         except Exception:
             pass
 
@@ -207,18 +219,26 @@ class IdempotencyEngine:
         """Check if an event key has already been processed within the TTL window."""
         try:
             from app.application.services.idempotency import IdempotencyService
+            from app.config import get_settings
 
             idem_svc = IdempotencyService.get()
+            raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
+            is_prod = str(raw_env).lower().strip() == "production"
+
             if idem_svc._redis_client is not None:
-                cached = idem_svc.get_cached(f"kafka:{idempotency_key}")
+                cached = idem_svc.get_cached(f"{self._key_prefix}:{idempotency_key}")
                 if cached is not None:
                     return True
-                redis_key = idem_svc._build_redis_key(f"kafka:{idempotency_key}")
+                redis_key = idem_svc._build_redis_key(f"{self._key_prefix}:{idempotency_key}")
                 raw = idem_svc._redis_client.get(redis_key)
                 if raw is not None:
                     return True
+            elif is_prod:
+                return True
         except Exception:
-            pass
+            raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
+            if str(raw_env).lower().strip() == "production":
+                return True
 
         with self._lock:
             self._evict_expired()
@@ -231,7 +251,7 @@ class IdempotencyEngine:
 
             idem_svc = IdempotencyService.get()
             if idem_svc._redis_client is not None:
-                idem_svc.complete(f"kafka:{idempotency_key}", "COMMITTED")
+                idem_svc.complete(f"{self._key_prefix}:{idempotency_key}", "COMMITTED")
         except Exception:
             pass
 
@@ -248,24 +268,27 @@ class IdempotencyEngine:
             self._registered_keys.discard(k)
 
     def clear(self) -> None:
+        """Clear only explicitly owned keys registered by this engine instance."""
         try:
             from app.application.services.idempotency import IdempotencyService
 
             idem_svc = IdempotencyService.get()
-            if idem_svc._redis_client is not None:
-                for k in list(self._registered_keys):
-                    redis_key = idem_svc._build_redis_key(f"kafka:{k}")
-                    idem_svc._redis_client.delete(redis_key)
+            with self._lock:
+                keys_to_clear = list(self._registered_keys)
+                self._processed_keys.clear()
+                self._registered_keys.clear()
+
+            if idem_svc._redis_client is not None and keys_to_clear:
+                redis_keys = [idem_svc._build_redis_key(f"{self._key_prefix}:{k}") for k in keys_to_clear]
+                idem_svc._redis_client.delete(*redis_keys)
             with idem_svc._fallback_lock:
-                for k in list(self._registered_keys):
-                    redis_key = idem_svc._build_redis_key(f"kafka:{k}")
+                for k in keys_to_clear:
+                    redis_key = idem_svc._build_redis_key(f"{self._key_prefix}:{k}")
                     idem_svc._fallback.pop(redis_key, None)
         except Exception:
-            pass
-
-        with self._lock:
-            self._processed_keys.clear()
-            self._registered_keys.clear()
+            with self._lock:
+                self._processed_keys.clear()
+                self._registered_keys.clear()
 
 
 
@@ -297,6 +320,7 @@ class KafkaStreamingConnector(BaseBankConnector):
         enable_idempotency: bool = True,
         idempotency_ttl: int = 86400,
         in_memory_broker: InMemoryKafkaBroker | None = None,
+        idempotency_prefix: str = "kafka",
     ) -> None:
         super().__init__()
         self.bootstrap_servers = bootstrap_servers
@@ -322,7 +346,7 @@ class KafkaStreamingConnector(BaseBankConnector):
                 "In-memory loopback broker is strictly forbidden in production (APP_ENV=production)."
             )
 
-        self._idempotency = IdempotencyEngine(ttl_seconds=idempotency_ttl)
+        self._idempotency = IdempotencyEngine(ttl_seconds=idempotency_ttl, key_prefix=idempotency_prefix)
         self._broker = in_memory_broker or _GLOBAL_IN_MEMORY_BROKER
         self._buffered_transactions: list[NormalizedTransaction] = []
 

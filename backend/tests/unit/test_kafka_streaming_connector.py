@@ -229,12 +229,15 @@ class TestKafkaStreamingConnectorPublishing:
         return InMemoryKafkaBroker()
 
     @pytest.fixture
-    def connector(self, broker: InMemoryKafkaBroker) -> KafkaStreamingConnector:
-        return KafkaStreamingConnector(
+    def connector(self, broker: InMemoryKafkaBroker):
+        c = KafkaStreamingConnector(
             bootstrap_servers="localhost:9092",
             in_memory_broker=broker,
             enable_idempotency=True,
+            idempotency_prefix=f"test_pub_{uuid.uuid4().hex[:8]}",
         )
+        yield c
+        c.clear_idempotency()
 
     @pytest.mark.asyncio
     async def test_publish_cloudevent_success(self, connector: KafkaStreamingConnector) -> None:
@@ -359,8 +362,13 @@ class TestKafkaStreamingConsumer:
         return InMemoryKafkaBroker()
 
     @pytest.fixture
-    def connector(self, broker: InMemoryKafkaBroker) -> KafkaStreamingConnector:
-        return KafkaStreamingConnector(in_memory_broker=broker)
+    def connector(self, broker: InMemoryKafkaBroker):
+        c = KafkaStreamingConnector(
+            in_memory_broker=broker,
+            idempotency_prefix=f"test_cons_{uuid.uuid4().hex[:8]}",
+        )
+        yield c
+        c.clear_idempotency()
 
     @pytest.mark.asyncio
     async def test_consume_batch_success(self, connector: KafkaStreamingConnector) -> None:
@@ -471,39 +479,45 @@ class TestHealthAndTelemetryMetrics:
 
     def test_idempotency_engine_manual_eviction(self) -> None:
         """Verify IdempotencyEngine clear and key lifecycle."""
-        engine = IdempotencyEngine(ttl_seconds=3600)
-        assert engine.is_duplicate("key-1") is False
-        engine.mark_processed("key-1")
-        assert engine.is_duplicate("key-1") is True
-        engine.clear()
-        assert engine.is_duplicate("key-1") is False
+        engine = IdempotencyEngine(ttl_seconds=3600, key_prefix=f"test_evict_{uuid.uuid4().hex[:8]}")
+        try:
+            assert engine.is_duplicate("key-1") is False
+            engine.mark_processed("key-1")
+            assert engine.is_duplicate("key-1") is True
+            engine.clear()
+            assert engine.is_duplicate("key-1") is False
+        finally:
+            engine.clear()
 
     @pytest.mark.asyncio
     async def test_reset_consumer_offsets(self) -> None:
         """Verify consumer offset reset allows re-reading committed messages."""
-        connector = KafkaStreamingConnector()
-        topic = "cfi.finint.replayed.v1"
-        ev = CloudEvent(
-            id="replay-01",
-            source="urn:cfi:bank:ALPHA",
-            type=EVENT_TYPE_TRANSACTION,
-            data={"counter": 1},
-        )
-        await connector.publish(ev, topic=topic)
+        connector = KafkaStreamingConnector(idempotency_prefix=f"test_reset_{uuid.uuid4().hex[:8]}")
+        try:
+            topic = "cfi.finint.replayed.v1"
+            ev = CloudEvent(
+                id="replay-01",
+                source="urn:cfi:bank:ALPHA",
+                type=EVENT_TYPE_TRANSACTION,
+                data={"counter": 1},
+            )
+            await connector.publish(ev, topic=topic)
 
-        # First read
-        batch1 = await connector.consume_batch(topic, max_messages=5)
-        assert len(batch1) == 1
+            # First read
+            batch1 = await connector.consume_batch(topic, max_messages=5)
+            assert len(batch1) == 1
 
-        # Second read without reset is empty
-        batch2 = await connector.consume_batch(topic, max_messages=5)
-        assert len(batch2) == 0
+            # Second read without reset is empty
+            batch2 = await connector.consume_batch(topic, max_messages=5)
+            assert len(batch2) == 0
 
-        # Reset offsets and re-read
-        connector.reset_offsets(topic)
-        batch3 = await connector.consume_batch(topic, max_messages=5)
-        assert len(batch3) == 1
-        assert batch3[0].id == "replay-01"
+            # Reset offsets and re-read
+            connector.reset_offsets(topic)
+            batch3 = await connector.consume_batch(topic, max_messages=5)
+            assert len(batch3) == 1
+            assert batch3[0].id == "replay-01"
+        finally:
+            connector.clear_idempotency()
 
 
 # ── 9. Production Reality & Zero-Mock Invariant Tests ─────────────────────────
@@ -521,17 +535,20 @@ class TestKafkaStreamingZeroMockInvariants:
     async def test_publish_receipt_contains_truthful_durability(self) -> None:
         """PublishReceipt must truthfully declare IN_MEMORY_LOOPBACK and VOLATILE_PROCESS_MEMORY."""
         broker = InMemoryKafkaBroker()
-        connector = KafkaStreamingConnector(in_memory_broker=broker)
-        ev = CloudEvent(
-            id="truth-evt-01",
-            source="urn:cfi:bank:ALPHA",
-            type=EVENT_TYPE_TRANSACTION,
-            data={"amount": 100.0, "currency": "EUR"},
-        )
-        receipt = await connector.publish(ev)
-        assert receipt.status == "COMMITTED"
-        assert receipt.delivery_mode == "IN_MEMORY_LOOPBACK"
-        assert receipt.durability == "VOLATILE_PROCESS_MEMORY"
+        connector = KafkaStreamingConnector(in_memory_broker=broker, idempotency_prefix=f"test_truth_{uuid.uuid4().hex[:8]}")
+        try:
+            ev = CloudEvent(
+                id="truth-evt-01",
+                source="urn:cfi:bank:ALPHA",
+                type=EVENT_TYPE_TRANSACTION,
+                data={"amount": 100.0, "currency": "EUR"},
+            )
+            receipt = await connector.publish(ev)
+            assert receipt.status == "COMMITTED"
+            assert receipt.delivery_mode == "IN_MEMORY_LOOPBACK"
+            assert receipt.durability == "VOLATILE_PROCESS_MEMORY"
+        finally:
+            connector.clear_idempotency()
 
     def test_parse_batch_rejects_missing_fields_without_fake_defaults(self) -> None:
         """Batch parsing strictly rejects missing account_id or amount without substituting fake 1.0."""
@@ -552,3 +569,112 @@ class TestKafkaStreamingZeroMockInvariants:
         # Non-positive amount
         with pytest.raises(ValueError, match="amount must be positive and finite"):
             connector.parse_batch([{"account_id": "acc1", "counterparty_account_id": "cpty1", "amount": -10.0}])
+
+
+# ── 10. Distributed Redis Idempotency Multi-Worker Safety & Sentinel Preservation ─
+
+class TestKafkaDistributedIdempotencyRedis:
+    """Verifies multi-worker Redis idempotency, sentinel survival, and production fail-closed safety."""
+
+    def test_in_progress_reservation_recognized_as_duplicate(self) -> None:
+        """An acquired in-progress key must be immediately recognized as a duplicate by other checks."""
+        key = f"test-in-prog-{uuid.uuid4().hex}"
+        engine = IdempotencyEngine(ttl_seconds=60)
+        try:
+            acquired = engine.try_acquire(key)
+            assert acquired is True
+            assert engine.is_duplicate(key) is True
+        finally:
+            engine.clear()
+
+    def test_second_independent_worker_cannot_acquire_same_reservation(self) -> None:
+        """A second independent worker process/engine cannot acquire an already reserved key."""
+        key = f"test-race-{uuid.uuid4().hex}"
+        worker_1 = IdempotencyEngine(ttl_seconds=60)
+        worker_2 = IdempotencyEngine(ttl_seconds=60)
+        try:
+            assert worker_1.try_acquire(key) is True
+            # Worker 2 must be rejected
+            assert worker_2.try_acquire(key) is False
+            assert worker_2.is_duplicate(key) is True
+        finally:
+            worker_1.clear()
+            worker_2.clear()
+
+    def test_completion_release_and_retry_behavior(self) -> None:
+        """Releasing an in-progress reservation allows retry; completing prevents duplicate acquisition."""
+        key = f"test-release-{uuid.uuid4().hex}"
+        worker_1 = IdempotencyEngine(ttl_seconds=60)
+        worker_2 = IdempotencyEngine(ttl_seconds=60)
+        try:
+            # 1. Worker 1 acquires and then releases on failure
+            assert worker_1.try_acquire(key) is True
+            worker_1.release(key)
+
+            # 2. Worker 2 can now acquire the released key
+            assert worker_2.try_acquire(key) is True
+
+            # 3. Worker 2 marks it processed (COMMITTED)
+            worker_2.mark_processed(key)
+
+            # 4. Worker 1 cannot acquire it now
+            assert worker_1.try_acquire(key) is False
+            assert worker_1.is_duplicate(key) is True
+        finally:
+            worker_1.clear()
+            worker_2.clear()
+
+    def test_clear_only_evicts_own_registered_keys_and_preserves_other_workers(self) -> None:
+        """Worker 1 clear() must NOT erase Worker 2's valid idempotency reservations or unrelated keys."""
+        from app.application.services.idempotency import IdempotencyService
+
+        key_w1 = f"test-clear-w1-{uuid.uuid4().hex}"
+        key_w2 = f"test-clear-w2-{uuid.uuid4().hex}"
+        sentinel_key = "unrelated_system:sentinel_marker_survives"
+
+        worker_1 = IdempotencyEngine(ttl_seconds=60)
+        worker_2 = IdempotencyEngine(ttl_seconds=60)
+        idem_svc = IdempotencyService.get()
+
+        if idem_svc._redis_client is not None:
+            idem_svc._redis_client.set(sentinel_key, "sentinel_value_active")
+
+        try:
+            assert worker_1.try_acquire(key_w1) is True
+            assert worker_2.try_acquire(key_w2) is True
+
+            # Worker 1 clears its state
+            worker_1.clear()
+
+            # Worker 1's key is evicted; Worker 2's reservation remains strictly preserved
+            assert worker_2.is_duplicate(key_w2) is True
+            assert worker_1.try_acquire(key_w2) is False
+
+            # Sentinel key in unrelated namespace survived unharmed
+            if idem_svc._redis_client is not None:
+                sentinel_val = idem_svc._redis_client.get(sentinel_key)
+                assert sentinel_val in (b"sentinel_value_active", "sentinel_value_active")
+        finally:
+            worker_1.clear()
+            worker_2.clear()
+            if idem_svc._redis_client is not None:
+                idem_svc._redis_client.delete(sentinel_key)
+
+    def test_production_mode_fails_closed_without_redis(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Under production mode, when Redis authority is unavailable, try_acquire fails closed."""
+        from app.application.services.idempotency import IdempotencyService
+
+        monkeypatch.setenv("APP_ENV", "production")
+        idem_svc = IdempotencyService.get()
+        orig_client = idem_svc._redis_client
+        try:
+            idem_svc._redis_client = None  # Simulate Redis authority outage in production
+            engine = IdempotencyEngine(ttl_seconds=60)
+            key = f"test-prod-failclosed-{uuid.uuid4().hex}"
+
+            # Must fail closed — returning False rather than silently executing process-locally
+            assert engine.try_acquire(key) is False
+            assert engine.is_duplicate(key) is True
+        finally:
+            idem_svc._redis_client = orig_client
+

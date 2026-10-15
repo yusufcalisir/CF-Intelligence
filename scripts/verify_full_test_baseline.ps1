@@ -93,16 +93,29 @@ Write-Log "Log File: $MasterLogFile"
 # ── 2. Environment & Dependency Detection ──────────────────────────────────────
 Write-Banner "1. ENVIRONMENT & TOOLCHAIN DETECTION"
 
-# Detect Python
+# Detect Python (inspect active virtualenv, workspace venvs, then PATH)
 $PythonExe = $null
-if (Get-Command "python" -ErrorAction SilentlyContinue) {
+if ($env:VIRTUAL_ENV -and (Test-Path (Join-Path $env:VIRTUAL_ENV "Scripts\python.exe"))) {
+    $PythonExe = (Join-Path $env:VIRTUAL_ENV "Scripts\python.exe")
+    $PyVersion = & $PythonExe --version 2>&1
+    Write-Log "Using active VIRTUAL_ENV Python: $PythonExe ($PyVersion)"
+} elseif (Test-Path "$RepoRoot\.venv\Scripts\python.exe") {
+    $PythonExe = "$RepoRoot\.venv\Scripts\python.exe"
+    $PyVersion = & $PythonExe --version 2>&1
+    Write-Log "Using repo .venv Python: $PythonExe ($PyVersion)"
+} elseif (Test-Path "$RepoRoot\venv\Scripts\python.exe") {
+    $PythonExe = "$RepoRoot\venv\Scripts\python.exe"
+    $PyVersion = & $PythonExe --version 2>&1
+    Write-Log "Using repo venv Python: $PythonExe ($PyVersion)"
+} elseif (Get-Command "python" -ErrorAction SilentlyContinue) {
     $PythonExe = (Get-Command "python").Source
-    $PyVersion = python --version 2>&1
-    Write-Log "Detected Python: $PythonExe ($PyVersion)"
+    $PyVersion = & $PythonExe --version 2>&1
+    Write-Log "Detected Python on PATH: $PythonExe ($PyVersion)"
 } else {
-    Write-Log "Python executable was not found on PATH!" "ERROR"
+    Write-Log "Python executable was not found on PATH or in a virtual environment!" "ERROR"
     exit 1
 }
+$PythonCmd = "`"$PythonExe`""
 
 # Detect Git
 $GitBranch = "unknown"
@@ -167,41 +180,18 @@ function Execute-Suite {
 
     # Execute command, stream output to both console and log file
     $ExitCode = 0
+    $pushed = $false
     try {
-        $ProcessInfo = New-Object System.Diagnostics.ProcessStartInfo
-        $ProcessInfo.FileName = "cmd.exe"
-        $ProcessInfo.Arguments = "/c `"$CommandStr`""
-        $ProcessInfo.WorkingDirectory = $WorkingDir
-        $ProcessInfo.RedirectStandardOutput = $true
-        $ProcessInfo.RedirectStandardError = $true
-        $ProcessInfo.UseShellExecute = $false
-        $ProcessInfo.CreateNoWindow = $true
-
-        $Process = New-Object System.Diagnostics.Process
-        $Process.StartInfo = $ProcessInfo
-
+        Push-Location $WorkingDir
+        $pushed = $true
         $OutputBuilder = [System.Text.StringBuilder]::new()
 
-        $Process.OutputDataReceived += [System.Diagnostics.DataReceivedEventHandler]{
-            param($sender, $e)
-            if ($e.Data -ne $null) {
-                Write-Host $e.Data
-                $null = $OutputBuilder.AppendLine($e.Data)
-            }
+        & cmd.exe /c "$CommandStr" 2>&1 | ForEach-Object {
+            $line = $_.ToString()
+            Write-Host $line
+            $null = $OutputBuilder.AppendLine($line)
         }
-        $Process.ErrorDataReceived += [System.Diagnostics.DataReceivedEventHandler]{
-            param($sender, $e)
-            if ($e.Data -ne $null) {
-                Write-Host $e.Data -ForegroundColor Yellow
-                $null = $OutputBuilder.AppendLine($e.Data)
-            }
-        }
-
-        $Process.Start() | Out-Null
-        $Process.BeginOutputReadLine()
-        $Process.BeginErrorReadLine()
-        $Process.WaitForExit()
-        $ExitCode = $Process.ExitCode
+        $ExitCode = $LASTEXITCODE
 
         $FullOutput = $OutputBuilder.ToString()
         [System.IO.File]::WriteAllText($SuiteLogFile, $FullOutput, [System.Text.Encoding]::UTF8)
@@ -210,6 +200,10 @@ function Execute-Suite {
         Write-Log "Execution exception occurred: $_" "ERROR"
         $ExitCode = 1
         $FullOutput = $_.ToString()
+    } finally {
+        if ($pushed) {
+            Pop-Location
+        }
     }
 
     $Stopwatch.Stop()
@@ -257,19 +251,19 @@ if ($Suite -in @("backend", "all")) {
     if ($IncludeRealData) {
         $BackendArgs += " --include-real-data"
     }
-    $BackendCmd = "python -m pytest $BackendArgs"
+    $BackendCmd = "$PythonCmd -m pytest $BackendArgs"
     $rc = Execute-Suite -Name "Backend Test Suite" -CommandStr $BackendCmd -SuiteLogName "backend_suite"
     if ($rc -ne 0) { $OverallExitCode = $rc }
 }
 
 if ($Suite -in @("verification", "all")) {
-    $VerifCmd = "python -m pytest verification/ -v --tb=short"
+    $VerifCmd = "$PythonCmd -m pytest verification/ -v --tb=short"
     $rc = Execute-Suite -Name "Scientific Verification Suite" -CommandStr $VerifCmd -SuiteLogName "verification_suite"
     if ($rc -ne 0) { $OverallExitCode = $rc }
 }
 
 if ($Suite -in @("sdk", "all")) {
-    $SdkCmd = "python -m pytest sdk/tests/ -v --tb=short"
+    $SdkCmd = "$PythonCmd -m pytest sdk/python/tests/ -v --tb=short"
     $rc = Execute-Suite -Name "Python SDK Suite" -CommandStr $SdkCmd -SuiteLogName "sdk_suite"
     if ($rc -ne 0) { $OverallExitCode = $rc }
 }

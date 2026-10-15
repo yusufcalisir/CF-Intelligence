@@ -18,9 +18,11 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import os
 import shutil
 import tempfile
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -60,14 +62,66 @@ TEST_SECRET = "cfi_test_boundary_secret_key_32b_strict!"
 
 @pytest.fixture
 def boundary_env():
-    """Isolated multi-bank test environment with authentic DurableAccountStore accounts."""
+    """Isolated multi-bank test environment with authentic DurableAccountStore, nonce store, and audit ledger."""
     temp_dir = tempfile.mkdtemp(prefix="cfi_boundary_test_")
     store_path = os.path.join(temp_dir, "accounts.json")
     trust_path = os.path.join(temp_dir, "trust.json")
     reg_dir = os.path.join(temp_dir, "models")
+    nonce_path = os.path.join(temp_dir, "durable_nonces.json")
+    audit_path = os.path.join(temp_dir, "audit_ledger.json")
+    consortium_path = os.path.join(temp_dir, "consortium.json")
     os.makedirs(reg_dir, exist_ok=True)
 
+    saved_env = {
+        k: os.environ.get(k)
+        for k in (
+            "CFI_INTERNAL_NONCE_STORE_PATH",
+            "CFI_AUDIT_LEDGER_PATH",
+            "CFI_CONSORTIUM_STORE_PATH",
+            "CFI_INTERNAL_CONTEXT_SECRET",
+            "CFI_INTERNAL_NONCE_SECRET",
+            "CFI_PAYLOAD_SIGNING_SECRET",
+            "CFI_CONSORTIUM_STORE_SECRET",
+            "CFI_ACCOUNT_STORE_PATH",
+            "CFI_ACCOUNT_STORE_SECRET",
+            "CFI_TRAINING_RECEIPT_TRUST_STORE",
+            "CFI_TRUST_STORE_PATH",
+            "CFI_TRUST_STORE_ADMIN_TOKEN",
+            "CFI_MODEL_REGISTRY_DIR",
+        )
+    }
+
+    os.environ["CFI_INTERNAL_NONCE_STORE_PATH"] = nonce_path
+    os.environ["CFI_AUDIT_LEDGER_PATH"] = audit_path
+    os.environ["CFI_CONSORTIUM_STORE_PATH"] = consortium_path
+    os.environ["CFI_INTERNAL_CONTEXT_SECRET"] = TEST_SECRET
+    os.environ["CFI_INTERNAL_NONCE_SECRET"] = TEST_SECRET
+    os.environ["CFI_PAYLOAD_SIGNING_SECRET"] = TEST_SECRET
+    os.environ["CFI_CONSORTIUM_STORE_SECRET"] = TEST_SECRET
+    os.environ["CFI_ACCOUNT_STORE_PATH"] = store_path
+    os.environ["CFI_ACCOUNT_STORE_SECRET"] = "cfi_auth_sec_2026_boundary_authority"
+    os.environ["CFI_TRAINING_RECEIPT_TRUST_STORE"] = trust_path
+    os.environ["CFI_TRUST_STORE_PATH"] = trust_path
+    os.environ["CFI_MODEL_REGISTRY_DIR"] = reg_dir
+
+    settings = get_settings()
+    saved_settings = {
+        "payload_signing_secret": settings.payload_signing_secret,
+        "internal_context_signing_secret": getattr(settings, "internal_context_signing_secret", None),
+    }
+    settings.payload_signing_secret = TEST_SECRET
+    if hasattr(settings, "internal_context_signing_secret"):
+        settings.internal_context_signing_secret = TEST_SECRET
+
+    from app.infrastructure.security.durable_nonce_store import reset_default_nonce_store
+    from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+    from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
+
+    reset_default_nonce_store()
+    ImmutableAuditChain.reset_instance()
+    DurableConsortiumStore._instance = None
     AuthenticationService.reset_instance()
+
     auth_svc = AuthenticationService(
         signing_secret=TEST_SECRET,
         store_path=store_path,
@@ -108,6 +162,7 @@ def boundary_env():
     ).hex()
     kid = "boundary_test_issuer_key"
     admin_token = "adm_bound_sec_12345"
+    os.environ["CFI_TRUST_STORE_ADMIN_TOKEN"] = admin_token
 
     trust_store = DurableTrustStore(trust_file_path=trust_path, admin_token=admin_token)
     trust_store.register_approved_key(kid, pub_hex, admin_token=admin_token)
@@ -124,11 +179,27 @@ def boundary_env():
         "kid": kid,
         "registry": registry,
         "consortium_service": consortium_service,
+        "nonce_path": nonce_path,
+        "audit_path": audit_path,
+        "consortium_path": consortium_path,
     }
 
+    for k, v in saved_env.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+    for k, v in saved_settings.items():
+        if hasattr(settings, k):
+            setattr(settings, k, v)
+    get_settings.cache_clear()
+
+    reset_default_nonce_store()
+    ImmutableAuditChain.reset_instance()
+    DurableConsortiumStore._instance = None
+    AuthenticationService.reset_instance()
     consortium_governance_service.reset()
     init_default_consortium(consortium_governance_service)
-    AuthenticationService.reset_instance()
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -529,3 +600,75 @@ def test_boundary_10_regressions_intact(boundary_env):
     rb_entry = reg.rollback(sim_id, v, trusted_context=ctx_rb)
     assert rb_entry["version"] == v
     assert rb_entry["is_active"] is True
+
+
+# ── BOUNDARY-11: Tamper and Corruption Fail-Closed Verification ──────────────
+
+
+def test_boundary_11_corrupted_nonce_store_fails_closed(boundary_env):
+    """BOUNDARY-11: Tampered or corrupted nonce store fails closed and rejects operations."""
+    from app.infrastructure.security.durable_nonce_store import (
+        DurableNonceStore,
+        NonceStoreIntegrityError,
+    )
+
+    nonce_path = boundary_env["nonce_path"]
+    store = DurableNonceStore(store_path=nonce_path, signing_secret=TEST_SECRET)
+
+    ok, _ = store.consume_nonce("test_nonce_1", expires_at=time.time() + 300)
+    assert ok is True
+
+    # Tamper with file contents on disk
+    with open(nonce_path, encoding="utf-8") as f:
+        data = json.load(f)
+    data["consumed_nonces"]["test_nonce_injected"] = {"consumed_at": time.time(), "expires_at": time.time() + 600}
+    with open(nonce_path, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+    # Reloading with corrupted HMAC must fail closed with NonceStoreIntegrityError
+    with pytest.raises(NonceStoreIntegrityError, match="failed authenticated integrity check|HMAC signature mismatch"):
+        store.reload()
+
+
+def test_boundary_12_wrong_signing_secret_fails_closed(boundary_env):
+    """BOUNDARY-12: Opening durable nonce store with mismatched signing secret fails closed."""
+    from app.infrastructure.security.durable_nonce_store import (
+        DurableNonceStore,
+        NonceStoreIntegrityError,
+    )
+
+    nonce_path = boundary_env["nonce_path"]
+    store = DurableNonceStore(store_path=nonce_path, signing_secret=TEST_SECRET)
+    ok, _ = store.consume_nonce("valid_nonce_secret_test", expires_at=time.time() + 300)
+    assert ok is True
+
+    # Loading with bad secret fails closed
+    with pytest.raises(NonceStoreIntegrityError, match="failed authenticated integrity check|HMAC signature mismatch"):
+        DurableNonceStore(store_path=nonce_path, signing_secret="wrong_secret_32b_character_array!")
+
+
+def test_boundary_13_tampered_audit_ledger_fails_closed(boundary_env):
+    """BOUNDARY-13: Tampered audit ledger is detected and fails closed, refusing further event writes."""
+    from app.infrastructure.security.immutable_audit_chain import (
+        AuditChainTamperError,
+        ImmutableAuditChain,
+    )
+
+    audit_path = boundary_env["audit_path"]
+    chain = ImmutableAuditChain(store_path=audit_path, signing_secret=TEST_SECRET)
+    chain.append_event(event_type="TEST_EVENT_VALID", actor="secops", target_id="target_1")
+
+    # Tamper with the audit file on disk
+    with open(audit_path, encoding="utf-8") as f:
+        raw_ledger = json.load(f)
+
+    # Alter the last entry's actor field
+    raw_ledger["entries"][-1]["actor"] = "attacker_impersonator"
+    with open(audit_path, "w", encoding="utf-8") as f:
+        json.dump(raw_ledger, f)
+
+    # Attempting to append to the tampered audit ledger must fail closed with AuditChainTamperError
+    corrupted_chain = ImmutableAuditChain(store_path=audit_path, signing_secret=TEST_SECRET)
+    with pytest.raises(AuditChainTamperError, match="Cannot append to corrupted audit ledger|Tampering detected"):
+        corrupted_chain.append_event(event_type="UNAUTHORIZED_APPEND", actor="admin", target_id="target_2")
+

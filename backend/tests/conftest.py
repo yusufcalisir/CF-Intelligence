@@ -243,39 +243,24 @@ def _restore_settings_and_security_singletons():
 
 @pytest.fixture(autouse=True)
 def clear_fallback_stores():
-    """Clear shared in-memory fallback stores and dedup caches between tests."""
+    """Clear shared in-memory fallback stores and dedup caches between tests.
+
+    CRITICAL REPOSITORY INVARIANT: Never delete live Redis keys globally across
+    shared application prefixes or wipe out unowned idempotency keys. Live Redis
+    data must only be touched within dedicated, test-owned namespaces.
+    """
     from app.infrastructure.redis_store import RedisStore
 
-    _TEST_PREFIXES = (
-        "intelligence",
-        "alert",
-        "entity",
-        "relationship",
-        "psi",
-        "alerts",
-        "cases",
-        "graph",
-        "session",
-        "ratelimit",
-    )
-    for pfx in _TEST_PREFIXES:
-        with contextlib.suppress(Exception):
-            RedisStore(pfx).clear()
-
+    RedisStore._shared_fallback_stores.clear()
     try:
         from app.application.services.idempotency import IdempotencyService
 
         idem_svc = IdempotencyService.get()
-        if idem_svc._redis_client is not None:
-            keys = list(idem_svc._redis_client.scan_iter("idem:*"))
-            if keys:
-                idem_svc._redis_client.delete(*keys)
         with idem_svc._fallback_lock:
             idem_svc._fallback.clear()
     except Exception:
         pass
 
-    RedisStore._shared_fallback_stores.clear()
     try:
         from app.presentation.routers.predict import _alert_service as p_svc
 
@@ -293,24 +278,16 @@ def clear_fallback_stores():
         if val and (val.startswith(("test", "mock")) or val == "mock_key"):
             os.environ.pop(k, None)
     yield
-    for pfx in _TEST_PREFIXES:
-        with contextlib.suppress(Exception):
-            RedisStore(pfx).clear()
-
+    RedisStore._shared_fallback_stores.clear()
     try:
         from app.application.services.idempotency import IdempotencyService
 
         idem_svc = IdempotencyService.get()
-        if idem_svc._redis_client is not None:
-            keys = list(idem_svc._redis_client.scan_iter("idem:*"))
-            if keys:
-                idem_svc._redis_client.delete(*keys)
         with idem_svc._fallback_lock:
             idem_svc._fallback.clear()
     except Exception:
         pass
 
-    RedisStore._shared_fallback_stores.clear()
     try:
         from app.presentation.routers.predict import _alert_service as p_svc
 
@@ -327,6 +304,45 @@ def clear_fallback_stores():
         val = os.environ.get(k)
         if val and (val.startswith(("test", "mock")) or val == "mock_key"):
             os.environ.pop(k, None)
+
+
+@pytest.fixture
+def isolated_redis_namespace():
+    """Provides a dedicated, test-scoped Redis namespace that cleans up only its own keys."""
+    import uuid
+
+    import redis
+
+    from app.config import get_settings
+
+    settings = get_settings()
+    url = getattr(settings, "redis_url", None) or "redis://localhost:6379/0"
+    client: Any | None = None
+    try:
+        client = redis.Redis.from_url(url, socket_connect_timeout=1, decode_responses=True)
+        client.ping()
+    except Exception:
+        client = None
+
+    test_uid = uuid.uuid4().hex[:12]
+    scoped_prefix = f"test_isolated_{test_uid}"
+    tracked_keys: set[str] = set()
+
+    class ScopedNamespace:
+        def __init__(self, prefix: str, redis_client: Any | None) -> None:
+            self.prefix = prefix
+            self.client = redis_client
+
+        def make_key(self, suffix: str) -> str:
+            k = f"{self.prefix}:{suffix}"
+            tracked_keys.add(k)
+            return k
+
+    yield ScopedNamespace(scoped_prefix, client)
+
+    if client is not None and tracked_keys:
+        with contextlib.suppress(Exception):
+            client.delete(*tracked_keys)
 
 
 
