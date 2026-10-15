@@ -14,11 +14,16 @@ Validates:
 from __future__ import annotations
 
 import asyncio
+import multiprocessing
+import os
+import sys
+import time
 import uuid
 from decimal import Decimal
 from typing import Any
 
 import pytest
+import redis
 
 from app.application.schemas.event_schemas import (
     EVENT_TYPE_ALERT,
@@ -39,6 +44,93 @@ from app.infrastructure.connectors.kafka_streaming_connector import (
     InMemoryKafkaBroker,
     KafkaStreamingConnector,
 )
+
+_backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _backend_dir not in sys.path:
+    sys.path.insert(0, _backend_dir)
+if "PYTHONPATH" in os.environ:
+    if _backend_dir not in os.environ["PYTHONPATH"]:
+        os.environ["PYTHONPATH"] = f"{_backend_dir};{os.environ['PYTHONPATH']}"
+else:
+    os.environ["PYTHONPATH"] = _backend_dir
+
+
+def _mp_worker_race_entry(
+    worker_idx: int,
+    key: str,
+    ttl: int,
+    barrier: Any,
+    out_q: Any,
+) -> None:
+    """Independent spawned OS worker competing for an idempotency key."""
+    import os
+
+    from app.application.services.idempotency import IdempotencyService
+    from app.infrastructure.connectors.kafka_streaming_connector import IdempotencyEngine
+
+    os.environ["APP_ENV"] = "production"
+    IdempotencyService._instance = None
+    engine = IdempotencyEngine(ttl_seconds=ttl, engine_id=f"worker_race_{worker_idx}_{os.getpid()}")
+    try:
+        barrier.wait(timeout=10.0)
+        acquired = engine.try_acquire(key)
+        out_q.put((worker_idx, os.getpid(), engine._engine_id, acquired))
+    except Exception as exc:
+        out_q.put((worker_idx, os.getpid(), "error", str(exc)))
+
+
+def _mp_worker_process_controller(
+    in_q: Any,
+    out_q: Any,
+) -> None:
+    """Controllable spawned OS worker process executing sequential idempotency operations."""
+    import os
+
+    from app.application.services.idempotency import IdempotencyService
+    from app.infrastructure.connectors.kafka_streaming_connector import IdempotencyEngine
+
+    engine: IdempotencyEngine | None = None
+
+    while True:
+        try:
+            msg = in_q.get(timeout=20.0)
+        except Exception:
+            break
+
+        cmd = msg[0]
+        if cmd == "init":
+            _, ttl, engine_id, env = msg
+            os.environ["APP_ENV"] = env
+            IdempotencyService._instance = None
+            engine = IdempotencyEngine(ttl_seconds=ttl, engine_id=engine_id)
+            out_q.put(("init_ok", os.getpid(), engine._engine_id))
+        elif cmd == "acquire":
+            _, key = msg
+            assert engine is not None
+            res = engine.try_acquire(key)
+            out_q.put(("acquire_res", res))
+        elif cmd == "release":
+            _, key = msg
+            assert engine is not None
+            engine.release(key)
+            out_q.put(("release_ok", True))
+        elif cmd == "mark_processed":
+            _, key = msg
+            assert engine is not None
+            engine.mark_processed(key)
+            out_q.put(("mark_processed_ok", True))
+        elif cmd == "is_duplicate":
+            _, key = msg
+            assert engine is not None
+            res = engine.is_duplicate(key)
+            out_q.put(("is_duplicate_res", res))
+        elif cmd == "clear":
+            assert engine is not None
+            engine.clear()
+            out_q.put(("clear_ok", True))
+        elif cmd == "stop":
+            out_q.put(("stopped", True))
+            break
 
 # ── 1. CloudEvents 1.0 Schemas Test Suite ─────────────────────────────────────
 
@@ -574,7 +666,21 @@ class TestKafkaStreamingZeroMockInvariants:
 # ── 10. Distributed Redis Idempotency Multi-Worker Safety & Sentinel Preservation ─
 
 class TestKafkaDistributedIdempotencyRedis:
-    """Verifies multi-worker Redis idempotency, sentinel survival, and production fail-closed safety."""
+    """Verifies multi-worker Redis idempotency, genuine OS process exclusivity, and stale worker safety."""
+
+    @pytest.fixture(autouse=True)
+    def ensure_genuine_redis(self) -> None:
+        from app.application.services.idempotency import IdempotencyService
+
+        idem_svc = IdempotencyService.get()
+        if idem_svc._redis_client is None:
+            idem_svc._init_redis()
+        if idem_svc._redis_client is None:
+            pytest.fail("Genuine Redis is required for distributed multi-process idempotency tests")
+        try:
+            idem_svc._redis_client.ping()
+        except Exception as exc:
+            pytest.fail(f"Genuine Redis is unreachable: {exc}")
 
     def test_in_progress_reservation_recognized_as_duplicate(self) -> None:
         """An acquired in-progress key must be immediately recognized as a duplicate by other checks."""
@@ -587,19 +693,257 @@ class TestKafkaDistributedIdempotencyRedis:
         finally:
             engine.clear()
 
-    def test_second_independent_worker_cannot_acquire_same_reservation(self) -> None:
-        """A second independent worker process/engine cannot acquire an already reserved key."""
-        key = f"test-race-{uuid.uuid4().hex}"
-        worker_1 = IdempotencyEngine(ttl_seconds=60)
-        worker_2 = IdempotencyEngine(ttl_seconds=60)
+    def test_concurrent_spawned_os_workers_competing_for_single_key_exactly_one_winner(self) -> None:
+        """Genuine spawned OS worker processes with distinct Redis connections race: exactly one wins."""
+        ctx = multiprocessing.get_context("spawn")
+        key = f"mp-race-{uuid.uuid4().hex}"
+        num_workers = 5
+        barrier = ctx.Barrier(num_workers)
+        out_q = ctx.Queue()
+
+        workers = [
+            ctx.Process(target=_mp_worker_race_entry, args=(i, key, 60, barrier, out_q))
+            for i in range(num_workers)
+        ]
+        for w in workers:
+            w.start()
+
+        results = [out_q.get(timeout=25.0) for _ in range(num_workers)]
+        for w in workers:
+            w.join(timeout=5.0)
+
+        # Validate that no worker encountered an error
+        for r in results:
+            assert r[2] != "error", f"Worker encountered exception: {r}"
+
+        # Exactly 1 worker acquired the reservation; exactly 4 failed
+        winners = [r for r in results if r[3] is True]
+        losers = [r for r in results if r[3] is False]
+
+        assert len(winners) == 1, f"Expected exactly 1 winner, got {len(winners)}: {results}"
+        assert len(losers) == num_workers - 1
+
+        # Clean up key from Redis
+        from app.application.services.idempotency import IdempotencyService
+
+        idem_svc = IdempotencyService.get()
+        redis_key = idem_svc._build_redis_key(f"kafka:{key}")
+        idem_svc._redis_client.delete(redis_key)
+
+    def test_connection_loss_after_initially_successful_redis_fails_closed_in_production(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """In production, when Redis connection drops mid-flight, acquisition fails closed (no local fallback)."""
+        from app.application.services.idempotency import IdempotencyService
+
+        monkeypatch.setenv("APP_ENV", "production")
+        idem_svc = IdempotencyService.get()
+        assert idem_svc._redis_client is not None
+        orig_client = idem_svc._redis_client
+
+        engine = IdempotencyEngine(ttl_seconds=60)
+        key = f"test-conn-loss-{uuid.uuid4().hex}"
+
+        # Inject simulated connection drop into live client
+        original_set = orig_client.set
+
+        def failing_set(*args: Any, **kwargs: Any) -> Any:
+            raise redis.ConnectionError("Simulated socket connection loss to Redis cluster")
+
+        monkeypatch.setattr(orig_client, "set", failing_set)
+
         try:
-            assert worker_1.try_acquire(key) is True
-            # Worker 2 must be rejected
-            assert worker_2.try_acquire(key) is False
-            assert worker_2.is_duplicate(key) is True
+            # Must return False (fail closed), NEVER falling back to local memory and returning True
+            acquired = engine.try_acquire(key)
+            assert acquired is False, "Production acquisition must fail closed on Redis connection loss"
+
+            # Must not be stored in local process memory
+            assert key not in engine._processed_keys
+
+            # is_duplicate must fail closed (treat as unsafe/duplicate in production)
+            assert engine.is_duplicate(key) is True
         finally:
-            worker_1.clear()
-            worker_2.clear()
+            idem_svc._redis_client = orig_client
+            monkeypatch.setattr(orig_client, "set", original_set)
+            engine.clear()
+
+    def test_timeout_with_uncertain_redis_outcome_retry_cannot_create_competing_owners(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Redis command timeout with uncertain outcome fails closed and prevents split-brain ownership."""
+        from app.application.services.idempotency import IdempotencyService
+
+        monkeypatch.setenv("APP_ENV", "production")
+        idem_svc = IdempotencyService.get()
+        orig_client = idem_svc._redis_client
+        assert orig_client is not None
+
+        engine_1 = IdempotencyEngine(ttl_seconds=60, engine_id="worker_timeout_1")
+        engine_2 = IdempotencyEngine(ttl_seconds=60, engine_id="worker_timeout_2")
+        key = f"test-timeout-race-{uuid.uuid4().hex}"
+
+        # Case A: Redis operation times out before completing
+        original_set = orig_client.set
+
+        def timeout_set(*args: Any, **kwargs: Any) -> Any:
+            raise redis.TimeoutError("Redis command timed out waiting for master ACK")
+
+        monkeypatch.setattr(orig_client, "set", timeout_set)
+        try:
+            acquired_1 = engine_1.try_acquire(key)
+            assert acquired_1 is False, "Timed-out operation must not be reported as acquired"
+        finally:
+            idem_svc._redis_client = orig_client
+            monkeypatch.setattr(orig_client, "set", original_set)
+
+        # Case B: If key was partially registered in Redis before timeout response failed,
+        # a competing worker's retry cannot create a second owner
+        idem_svc._redis_client.set(
+            idem_svc._build_redis_key(f"kafka:{key}"),
+            "IN_PROGRESS:worker_timeout_1_partial",
+            ex=60,
+        )
+        acquired_2 = engine_2.try_acquire(key)
+        assert acquired_2 is False, "Competing worker cannot acquire key already held in Redis"
+
+        # Cleanup
+        idem_svc._redis_client.delete(idem_svc._build_redis_key(f"kafka:{key}"))
+        engine_1.clear()
+        engine_2.clear()
+
+    def test_worker_a_expires_worker_b_acquires_worker_a_release_and_clear_survives(self) -> None:
+        """Worker A reservation expires; Worker B acquires; Worker A release and clear cannot erase Worker B."""
+        ctx = multiprocessing.get_context("spawn")
+        key = f"test-expiry-race-{uuid.uuid4().hex}"
+
+        in_a, out_a = ctx.Queue(), ctx.Queue()
+        in_b, out_b = ctx.Queue(), ctx.Queue()
+
+        proc_a = ctx.Process(target=_mp_worker_process_controller, args=(in_a, out_a))
+        proc_b = ctx.Process(target=_mp_worker_process_controller, args=(in_b, out_b))
+        proc_a.start()
+        proc_b.start()
+
+        try:
+            # 1. Initialize Worker A with short TTL (1 second) and Worker B with standard TTL (60 seconds)
+            in_a.put(("init", 1, "worker_proc_A", "production"))
+            assert out_a.get(timeout=10.0)[0] == "init_ok"
+
+            in_b.put(("init", 60, "worker_proc_B", "production"))
+            assert out_b.get(timeout=10.0)[0] == "init_ok"
+
+            # 2. Worker A acquires key with 1-second TTL
+            in_a.put(("acquire", key))
+            assert out_a.get(timeout=10.0)[1] is True
+
+            # 3. Wait 1.8 seconds for Worker A's reservation to expire in Redis
+            time.sleep(1.8)
+
+            # 4. Worker B acquires the expired key
+            in_b.put(("acquire", key))
+            assert out_b.get(timeout=10.0)[1] is True, "Worker B must acquire key after Worker A expired"
+
+            # 5. Stale Worker A attempts release and clear on the key it no longer owns
+            in_a.put(("release", key))
+            assert out_a.get(timeout=10.0)[0] == "release_ok"
+
+            in_a.put(("clear",))
+            assert out_a.get(timeout=10.0)[0] == "clear_ok"
+
+            # 6. Verify Worker B's reservation in Redis survived Worker A's release and clear!
+            from app.application.services.idempotency import IdempotencyService
+
+            idem_svc = IdempotencyService.get()
+            raw_val = idem_svc._redis_client.get(idem_svc._build_redis_key(f"kafka:{key}"))
+            assert raw_val is not None, "Worker B's reservation must not be deleted by stale Worker A"
+            val_str = raw_val.decode("utf-8") if isinstance(raw_val, bytes) else str(raw_val)
+            assert "worker_proc_B" in val_str, f"Worker B must still own the reservation, found: {val_str}"
+
+            # 7. Worker B successfully marks it processed (COMMITTED)
+            in_b.put(("mark_processed", key))
+            assert out_b.get(timeout=10.0)[0] == "mark_processed_ok"
+
+            # Verify in Redis that Worker B successfully committed
+            raw_after = idem_svc._redis_client.get(idem_svc._build_redis_key(f"kafka:{key}"))
+            val_after = raw_after.decode("utf-8") if isinstance(raw_after, bytes) else str(raw_after)
+            assert "COMMITTED" in val_after
+            assert "worker_proc_B" in val_after
+        finally:
+            in_a.put(("stop",))
+            in_b.put(("stop",))
+            proc_a.join(timeout=5.0)
+            proc_b.join(timeout=5.0)
+            from app.application.services.idempotency import IdempotencyService
+
+            IdempotencyService.get()._redis_client.delete(
+                IdempotencyService.get()._build_redis_key(f"kafka:{key}")
+            )
+
+    def test_worker_a_stale_completion_rejected_after_worker_b_takes_ownership(self) -> None:
+        """Worker A attempts stale completion after Worker B takes ownership: rejected, no overwrite."""
+        ctx = multiprocessing.get_context("spawn")
+        key = f"test-stale-complete-{uuid.uuid4().hex}"
+
+        in_a, out_a = ctx.Queue(), ctx.Queue()
+        in_b, out_b = ctx.Queue(), ctx.Queue()
+
+        proc_a = ctx.Process(target=_mp_worker_process_controller, args=(in_a, out_a))
+        proc_b = ctx.Process(target=_mp_worker_process_controller, args=(in_b, out_b))
+        proc_a.start()
+        proc_b.start()
+
+        try:
+            # 1. Initialize Worker A with 1-second TTL, Worker B with 60-second TTL
+            in_a.put(("init", 1, "worker_stale_A", "production"))
+            assert out_a.get(timeout=10.0)[0] == "init_ok"
+
+            in_b.put(("init", 60, "worker_stale_B", "production"))
+            assert out_b.get(timeout=10.0)[0] == "init_ok"
+
+            # 2. Worker A acquires key
+            in_a.put(("acquire", key))
+            assert out_a.get(timeout=10.0)[1] is True
+
+            # 3. Wait for Worker A's reservation to expire
+            time.sleep(1.8)
+
+            # 4. Worker B acquires key
+            in_b.put(("acquire", key))
+            assert out_b.get(timeout=10.0)[1] is True
+
+            # 5. Worker A attempts stale completion
+            in_a.put(("mark_processed", key))
+            assert out_a.get(timeout=10.0)[0] == "mark_processed_ok"
+
+            # 6. Verify in Redis: Worker B's reservation was NOT overwritten!
+            from app.application.services.idempotency import IdempotencyService
+
+            idem_svc = IdempotencyService.get()
+            raw_val = idem_svc._redis_client.get(idem_svc._build_redis_key(f"kafka:{key}"))
+            assert raw_val is not None
+            val_str = raw_val.decode("utf-8") if isinstance(raw_val, bytes) else str(raw_val)
+            assert "worker_stale_B" in val_str, f"Worker B must remain owner; Worker A must not overwrite: {val_str}"
+            assert val_str.startswith("IN_PROGRESS:"), f"Reservation must still be in progress for Worker B: {val_str}"
+
+            # 7. Worker B marks it processed
+            in_b.put(("mark_processed", key))
+            assert out_b.get(timeout=10.0)[0] == "mark_processed_ok"
+
+            # Now Worker B's committed envelope is in Redis
+            raw_final = idem_svc._redis_client.get(idem_svc._build_redis_key(f"kafka:{key}"))
+            val_final = raw_final.decode("utf-8") if isinstance(raw_final, bytes) else str(raw_final)
+            assert "COMMITTED" in val_final
+            assert "worker_stale_B" in val_final
+        finally:
+            in_a.put(("stop",))
+            in_b.put(("stop",))
+            proc_a.join(timeout=5.0)
+            proc_b.join(timeout=5.0)
+            from app.application.services.idempotency import IdempotencyService
+
+            IdempotencyService.get()._redis_client.delete(
+                IdempotencyService.get()._build_redis_key(f"kafka:{key}")
+            )
 
     def test_completion_release_and_retry_behavior(self) -> None:
         """Releasing an in-progress reservation allows retry; completing prevents duplicate acquisition."""
@@ -636,8 +980,7 @@ class TestKafkaDistributedIdempotencyRedis:
         worker_2 = IdempotencyEngine(ttl_seconds=60)
         idem_svc = IdempotencyService.get()
 
-        if idem_svc._redis_client is not None:
-            idem_svc._redis_client.set(sentinel_key, "sentinel_value_active")
+        idem_svc._redis_client.set(sentinel_key, "sentinel_value_active")
 
         try:
             assert worker_1.try_acquire(key_w1) is True
@@ -651,14 +994,36 @@ class TestKafkaDistributedIdempotencyRedis:
             assert worker_1.try_acquire(key_w2) is False
 
             # Sentinel key in unrelated namespace survived unharmed
-            if idem_svc._redis_client is not None:
-                sentinel_val = idem_svc._redis_client.get(sentinel_key)
-                assert sentinel_val in (b"sentinel_value_active", "sentinel_value_active")
+            sentinel_val = idem_svc._redis_client.get(sentinel_key)
+            assert sentinel_val in (b"sentinel_value_active", "sentinel_value_active")
         finally:
             worker_1.clear()
             worker_2.clear()
-            if idem_svc._redis_client is not None:
-                idem_svc._redis_client.delete(sentinel_key)
+            idem_svc._redis_client.delete(sentinel_key)
+
+    def test_unrelated_redis_sentinel_survives_all_cleanup(self) -> None:
+        """An unrelated production Redis sentinel key strictly survives all engine operations and clear()."""
+        from app.application.services.idempotency import IdempotencyService
+
+        sentinel_key = f"unrelated_prod_sentinel:key_{uuid.uuid4().hex}"
+        idem_svc = IdempotencyService.get()
+        idem_svc._redis_client.set(sentinel_key, "sentinel_marker_value_unaltered")
+
+        engine = IdempotencyEngine(ttl_seconds=60)
+        key = f"test-sentinel-survival-{uuid.uuid4().hex}"
+
+        try:
+            assert engine.try_acquire(key) is True
+            assert engine.is_duplicate(key) is True
+            engine.mark_processed(key)
+            engine.clear()
+
+            # Sentinel must remain completely untouched
+            sentinel_val = idem_svc._redis_client.get(sentinel_key)
+            assert sentinel_val in (b"sentinel_marker_value_unaltered", "sentinel_marker_value_unaltered")
+        finally:
+            engine.clear()
+            idem_svc._redis_client.delete(sentinel_key)
 
     def test_production_mode_fails_closed_without_redis(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Under production mode, when Redis authority is unavailable, try_acquire fails closed."""

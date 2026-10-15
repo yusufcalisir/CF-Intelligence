@@ -94,6 +94,8 @@ class IdempotencyService:
         in_progress_timeout: float = 30.0,
         tenant_id: str | None = None,
         payload_hash: str | None = None,
+        owner_id: str | None = None,
+        require_redis: bool = False,
     ) -> tuple[str, Any | None]:
         """Atomically tests whether an idempotency key is already cached, in-progress, or acquires it.
 
@@ -102,16 +104,22 @@ class IdempotencyService:
             ("MISMATCH", None): completed with a different payload; conflicting mutation.
             ("IN_PROGRESS", None): another concurrent request is currently processing this key.
             ("ACQUIRED", None): lock acquired; proceed to create resource, then call complete().
+            ("UNAVAILABLE", None): authoritative Redis unavailable under require_redis=True.
         """
         if not idempotency_key:
             return ("ACQUIRED", None)
 
         redis_key = self._build_redis_key(idempotency_key, tenant_id=tenant_id)
 
+        if require_redis and self._redis_client is None:
+            logger.error("IdempotencyService: Redis required but client is None")
+            return ("UNAVAILABLE", None)
+
         if self._redis_client is not None:
             try:
+                reservation_val = f"IN_PROGRESS:{owner_id}" if owner_id else _IN_PROGRESS_SENTINEL
                 acquired = self._redis_client.set(
-                    redis_key, _IN_PROGRESS_SENTINEL, nx=True, ex=int(in_progress_timeout)
+                    redis_key, reservation_val, nx=True, ex=int(in_progress_timeout)
                 )
                 if acquired:
                     return ("ACQUIRED", None)
@@ -119,7 +127,7 @@ class IdempotencyService:
                 raw = self._redis_client.get(redis_key)
                 if raw:
                     val_str = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
-                    if val_str == _IN_PROGRESS_SENTINEL:
+                    if val_str == _IN_PROGRESS_SENTINEL or val_str.startswith("IN_PROGRESS:"):
                         return ("IN_PROGRESS", None)
                     try:
                         parsed = json.loads(val_str)
@@ -127,6 +135,8 @@ class IdempotencyService:
                         parsed = val_str
 
                     if isinstance(parsed, dict) and parsed.get("__idempotency_envelope__"):
+                        if parsed.get("status") == "IN_PROGRESS":
+                            return ("IN_PROGRESS", None)
                         stored_hash = parsed.get("payload_hash")
                         if payload_hash and stored_hash and stored_hash != payload_hash:
                             return ("MISMATCH", None)
@@ -136,6 +146,9 @@ class IdempotencyService:
             except Exception as exc:
                 logger.warning("IdempotencyService Redis acquire failed: %s -- falling back", exc)
                 self._redis_client = None
+                if require_redis:
+                    logger.error("Authoritative Redis failed under require_redis=True: %s", exc)
+                    return ("UNAVAILABLE", None)
 
         with self._fallback_lock:
             now = time.monotonic()
@@ -154,7 +167,7 @@ class IdempotencyService:
                 else:
                     del self._fallback[redis_key]
 
-            # Acquire reservation
+            # Acquire reservation in process-local fallback
             self._fallback[redis_key] = (None, now + in_progress_timeout, True)
             self._evict_expired()
             return ("ACQUIRED", None)
@@ -196,54 +209,166 @@ class IdempotencyService:
         response_body: Any,
         tenant_id: str | None = None,
         payload_hash: str | None = None,
-    ) -> None:
+        owner_id: str | None = None,
+        ttl_seconds: int = _IDEMPOTENCY_TTL_SECONDS,
+    ) -> bool:
         """Persist final response_body under idempotency_key, clearing in-progress state."""
         if not idempotency_key:
-            return
+            return False
         redis_key = self._build_redis_key(idempotency_key, tenant_id=tenant_id)
         envelope = {
             "__idempotency_envelope__": True,
             "payload_hash": payload_hash,
             "response": response_body,
+            "owner": owner_id,
         }
         serialized = json.dumps(envelope, default=str)
 
         if self._redis_client is not None:
             try:
-                self._redis_client.setex(redis_key, _IDEMPOTENCY_TTL_SECONDS, serialized)
-                return
+                if not owner_id:
+                    self._redis_client.setex(redis_key, int(ttl_seconds), serialized)
+                    return True
+                elif hasattr(self._redis_client, "eval"):
+                    lua_complete = """
+                    local current = redis.call("get", KEYS[1])
+                    local expected_owner = ARGV[1]
+                    local serialized_payload = ARGV[2]
+                    local ttl = tonumber(ARGV[3])
+
+                    if not current then
+                        return 0
+                    end
+
+                    if current == ("IN_PROGRESS:" .. expected_owner) or current == expected_owner then
+                        redis.call("setex", KEYS[1], ttl, serialized_payload)
+                        return 1
+                    end
+
+                    return 0
+                    """
+                    res = self._redis_client.eval(lua_complete, 1, redis_key, owner_id, serialized, int(ttl_seconds))
+                    return bool(res)
+                else:
+                    raw = self._redis_client.get(redis_key)
+                    if raw:
+                        val_str = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+                        if val_str == f"IN_PROGRESS:{owner_id}" or val_str == owner_id:
+                            self._redis_client.setex(redis_key, ttl_seconds, serialized)
+                            return True
+                    return False
             except Exception as exc:
-                logger.warning("IdempotencyService Redis SET failed: %s -- falling back", exc)
+                logger.warning("IdempotencyService Redis complete failed: %s", exc)
                 self._redis_client = None
 
         with self._fallback_lock:
-            expires_at = time.monotonic() + _IDEMPOTENCY_TTL_SECONDS
+            expires_at = time.monotonic() + ttl_seconds
             self._fallback[redis_key] = (envelope, expires_at, False)
             self._evict_expired()
+            return True
 
-    def release(self, idempotency_key: str | None, tenant_id: str | None = None) -> None:
+    def release(
+        self,
+        idempotency_key: str | None,
+        tenant_id: str | None = None,
+        owner_id: str | None = None,
+    ) -> bool:
         """Release in-progress reservation on error or cancellation."""
         if not idempotency_key:
-            return
+            return False
         redis_key = self._build_redis_key(idempotency_key, tenant_id=tenant_id)
         if self._redis_client is not None:
             try:
-                raw = self._redis_client.get(redis_key)
-                if raw:
-                    val_str = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
-                    if val_str == _IN_PROGRESS_SENTINEL:
-                        self._redis_client.delete(redis_key)
-                return
+                if hasattr(self._redis_client, "eval"):
+                    lua_release = """
+                    local current = redis.call("get", KEYS[1])
+                    if not current then
+                        return 0
+                    end
+                    local expected_owner = ARGV[1]
+                    if expected_owner == "" then
+                        if current == "__IDEMPOTENCY_IN_PROGRESS__" then
+                            return redis.call("del", KEYS[1])
+                        end
+                    else
+                        if current == ("IN_PROGRESS:" .. expected_owner) or current == expected_owner then
+                            return redis.call("del", KEYS[1])
+                        end
+                    end
+                    return 0
+                    """
+                    res = self._redis_client.eval(lua_release, 1, redis_key, owner_id or "")
+                    return bool(res)
+                else:
+                    raw = self._redis_client.get(redis_key)
+                    if raw:
+                        val_str = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+                        if not owner_id:
+                            if val_str == _IN_PROGRESS_SENTINEL:
+                                self._redis_client.delete(redis_key)
+                                return True
+                        elif val_str == f"IN_PROGRESS:{owner_id}" or val_str == owner_id:
+                            self._redis_client.delete(redis_key)
+                            return True
+                    return False
             except Exception as exc:
-                logger.warning("IdempotencyService Redis release failed: %s -- falling back", exc)
+                logger.warning("IdempotencyService Redis release failed: %s", exc)
                 self._redis_client = None
 
         with self._fallback_lock:
             entry = self._fallback.get(redis_key)
             if entry:
                 in_prog = entry[2] if len(entry) > 2 else False
-                if in_prog:  # only delete if in_progress
+                if in_prog:
                     del self._fallback[redis_key]
+                    return True
+        return False
+
+    def delete_owned(
+        self,
+        idempotency_key: str,
+        owner_id: str,
+        tenant_id: str | None = None,
+    ) -> bool:
+        """Atomically delete key from Redis if and only if it is still owned by owner_id."""
+        if not idempotency_key or not owner_id:
+            return False
+        redis_key = self._build_redis_key(idempotency_key, tenant_id=tenant_id)
+        if self._redis_client is not None:
+            try:
+                if hasattr(self._redis_client, "eval"):
+                    lua_del = """
+                    local current = redis.call("get", KEYS[1])
+                    if not current then
+                        return 0
+                    end
+                    local expected_owner = ARGV[1]
+                    if current == ("IN_PROGRESS:" .. expected_owner) or current == expected_owner then
+                        return redis.call("del", KEYS[1])
+                    end
+                    if string.find(current, '"owner": "' .. expected_owner .. '"', 1, true) or string.find(current, '"owner":"' .. expected_owner .. '"', 1, true) then
+                        return redis.call("del", KEYS[1])
+                    end
+                    return 0
+                    """
+                    res = self._redis_client.eval(lua_del, 1, redis_key, owner_id)
+                    return bool(res)
+                else:
+                    raw = self._redis_client.get(redis_key)
+                    if raw:
+                        val_str = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+                        if (
+                            val_str == f"IN_PROGRESS:{owner_id}"
+                            or val_str == owner_id
+                            or f'"owner": "{owner_id}"' in val_str
+                            or f'"owner":"{owner_id}"' in val_str
+                        ):
+                            self._redis_client.delete(redis_key)
+                            return True
+                    return False
+            except Exception as exc:
+                logger.warning("IdempotencyService delete_owned failed: %s", exc)
+        return False
 
     def get_cached(self, idempotency_key: str | None, tenant_id: str | None = None) -> Any | None:
         """Return previously stored response for idempotency_key, or None if in-progress/absent."""

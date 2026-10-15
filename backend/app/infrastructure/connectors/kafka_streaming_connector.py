@@ -18,6 +18,7 @@ import math
 import os
 import threading
 import time
+import uuid
 from collections import defaultdict
 from collections.abc import Generator
 from datetime import UTC, datetime
@@ -157,37 +158,38 @@ _GLOBAL_IN_MEMORY_BROKER = InMemoryKafkaBroker()
 class IdempotencyEngine:
     """Guarantees at-least-once delivery with exactly-once processing semantics."""
 
-    def __init__(self, ttl_seconds: int = 86400, key_prefix: str = "kafka") -> None:
+    def __init__(self, ttl_seconds: int = 86400, key_prefix: str = "kafka", engine_id: str | None = None) -> None:
         self._ttl_seconds = ttl_seconds
         self._key_prefix = key_prefix
+        self._engine_id = engine_id or f"worker_{os.getpid()}_{uuid.uuid4().hex[:8]}"
         self._processed_keys: dict[str, float] = {}
         self._registered_keys: set[str] = set()
+        self._owned_reservations: dict[str, str] = {}  # idempotency_key -> owner_id
         self._lock = threading.Lock()
 
     def try_acquire(self, idempotency_key: str) -> bool:
         """Atomically test and reserve an idempotency key if not already processed."""
-        # Multi-worker distributed Redis coordination when available
+        raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
+        is_prod = str(raw_env).lower().strip() == "production"
+        owner_id = f"{self._engine_id}_{uuid.uuid4().hex[:8]}"
+
         acquired_redis = False
         try:
             from app.application.services.idempotency import IdempotencyService
 
             idem_svc = IdempotencyService.get()
-            raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
-            is_prod = str(raw_env).lower().strip() == "production"
-
-            if idem_svc._redis_client is not None:
+            if idem_svc._redis_client is not None or is_prod:
                 status, _ = idem_svc.acquire(
-                    f"{self._key_prefix}:{idempotency_key}", in_progress_timeout=float(self._ttl_seconds)
+                    f"{self._key_prefix}:{idempotency_key}",
+                    in_progress_timeout=float(self._ttl_seconds),
+                    owner_id=owner_id,
+                    require_redis=is_prod,
                 )
                 if status != "ACQUIRED":
                     return False
                 acquired_redis = True
-            elif is_prod:
-                logger.error("Authoritative Redis unavailable for distributed idempotency in production mode")
-                return False
         except Exception as exc:
-            raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
-            if str(raw_env).lower().strip() == "production":
+            if is_prod:
                 logger.error("Authoritative Redis failed during idempotency acquisition in production mode: %s", exc)
                 return False
             logger.debug("IdempotencyEngine Redis check skipped (%s), using local engine", exc)
@@ -198,32 +200,37 @@ class IdempotencyEngine:
                 return False
             self._processed_keys[idempotency_key] = time.time() + self._ttl_seconds
             self._registered_keys.add(idempotency_key)
+            self._owned_reservations[idempotency_key] = owner_id
             return True
 
     def release(self, idempotency_key: str) -> None:
         """Release key on publish failure so it may be retried."""
+        with self._lock:
+            owner_id = self._owned_reservations.pop(idempotency_key, None)
+            self._processed_keys.pop(idempotency_key, None)
+            self._registered_keys.discard(idempotency_key)
+
+        if not owner_id:
+            return
+
         try:
             from app.application.services.idempotency import IdempotencyService
 
             idem_svc = IdempotencyService.get()
             if idem_svc._redis_client is not None:
-                idem_svc.release(f"{self._key_prefix}:{idempotency_key}")
+                idem_svc.release(f"{self._key_prefix}:{idempotency_key}", owner_id=owner_id)
         except Exception:
             pass
 
-        with self._lock:
-            self._processed_keys.pop(idempotency_key, None)
-            self._registered_keys.discard(idempotency_key)
-
     def is_duplicate(self, idempotency_key: str) -> bool:
         """Check if an event key has already been processed within the TTL window."""
+        raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
+        is_prod = str(raw_env).lower().strip() == "production"
+
         try:
             from app.application.services.idempotency import IdempotencyService
 
             idem_svc = IdempotencyService.get()
-            raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
-            is_prod = str(raw_env).lower().strip() == "production"
-
             if idem_svc._redis_client is not None:
                 cached = idem_svc.get_cached(f"{self._key_prefix}:{idempotency_key}")
                 if cached is not None:
@@ -235,8 +242,7 @@ class IdempotencyEngine:
             elif is_prod:
                 return True
         except Exception:
-            raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
-            if str(raw_env).lower().strip() == "production":
+            if is_prod:
                 return True
 
         with self._lock:
@@ -245,19 +251,26 @@ class IdempotencyEngine:
 
     def mark_processed(self, idempotency_key: str) -> None:
         """Record an event key as successfully processed."""
+        with self._lock:
+            owner_id = self._owned_reservations.get(idempotency_key) or f"{self._engine_id}_{uuid.uuid4().hex[:8]}"
+            self._owned_reservations[idempotency_key] = owner_id
+            self._evict_expired()
+            self._processed_keys[idempotency_key] = time.time() + self._ttl_seconds
+            self._registered_keys.add(idempotency_key)
+
         try:
             from app.application.services.idempotency import IdempotencyService
 
             idem_svc = IdempotencyService.get()
             if idem_svc._redis_client is not None:
-                idem_svc.complete(f"{self._key_prefix}:{idempotency_key}", "COMMITTED")
+                idem_svc.complete(
+                    f"{self._key_prefix}:{idempotency_key}",
+                    "COMMITTED",
+                    owner_id=owner_id,
+                    ttl_seconds=self._ttl_seconds,
+                )
         except Exception:
             pass
-
-        with self._lock:
-            self._evict_expired()
-            self._processed_keys[idempotency_key] = time.time() + self._ttl_seconds
-            self._registered_keys.add(idempotency_key)
 
     def _evict_expired(self) -> None:
         now = time.time()
@@ -265,21 +278,25 @@ class IdempotencyEngine:
         for k in expired:
             self._processed_keys.pop(k, None)
             self._registered_keys.discard(k)
+            self._owned_reservations.pop(k, None)
 
     def clear(self) -> None:
-        """Clear only explicitly owned keys registered by this engine instance."""
+        """Clear only explicitly owned in-progress reservations registered by this engine instance."""
         try:
             from app.application.services.idempotency import IdempotencyService
 
             idem_svc = IdempotencyService.get()
             with self._lock:
+                owned_items = list(self._owned_reservations.items())
                 keys_to_clear = list(self._registered_keys)
                 self._processed_keys.clear()
                 self._registered_keys.clear()
+                self._owned_reservations.clear()
 
-            if idem_svc._redis_client is not None and keys_to_clear:
-                redis_keys = [idem_svc._build_redis_key(f"{self._key_prefix}:{k}") for k in keys_to_clear]
-                idem_svc._redis_client.delete(*redis_keys)
+            if idem_svc._redis_client is not None and owned_items:
+                for k, owner_id in owned_items:
+                    idem_svc.delete_owned(f"{self._key_prefix}:{k}", owner_id=owner_id)
+
             with idem_svc._fallback_lock:
                 for k in keys_to_clear:
                     redis_key = idem_svc._build_redis_key(f"{self._key_prefix}:{k}")
@@ -288,6 +305,7 @@ class IdempotencyEngine:
             with self._lock:
                 self._processed_keys.clear()
                 self._registered_keys.clear()
+                self._owned_reservations.clear()
 
 
 
