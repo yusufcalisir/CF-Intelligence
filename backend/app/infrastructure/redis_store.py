@@ -67,6 +67,14 @@ class RedisStore:
             return False
         return self.is_live()
 
+    def reconnect(self) -> bool:
+        """Attempt to re-establish connection to authoritative Redis after an outage."""
+        self._redis_failed = False
+        self._had_command_failure = False
+        RedisStore._global_redis_unavailable = False
+        self._redis_client = None
+        return self.is_live()
+
     @property
     def _fallback_store(self) -> dict:
         with RedisStore._lock:

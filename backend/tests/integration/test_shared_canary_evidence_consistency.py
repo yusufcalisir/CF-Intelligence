@@ -283,8 +283,9 @@ class TestSharedCanaryEvidenceConsistency:
             owning_bank_id="bank_a",
         )
 
-        # Ensure store has client=None (in-memory fallback)
-        eval_engine._store._client = None
+        # Ensure store has in-memory fallback (simulate Redis unavailable)
+        eval_engine._store._redis_failed = True
+        eval_engine._store._redis_client = None
 
         # Set production environment for evaluation safety gating
         monkeypatch.setenv("APP_ENV", "production")

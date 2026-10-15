@@ -5790,7 +5790,7 @@ class ModelEvaluationEngine:
         from app.infrastructure.redis_store import RedisStore
 
         self.registry = registry
-        self._store = RedisStore("model_evaluation")
+        self._store = RedisStore("model_evaluation", strict_production=True)
         self._lock = threading.RLock()
 
     def log_prediction(

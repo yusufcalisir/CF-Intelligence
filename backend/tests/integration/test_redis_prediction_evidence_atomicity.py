@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import socket
+import subprocess
+import time
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -338,3 +340,151 @@ class TestRedisPredictionEvidenceAtomicity:
 
         metrics = engine.evaluate_performance(sim_id)
         assert metrics.get("sample_count") == 5
+
+    def test_live_redis_outage_and_reconnection_lifecycle(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verifies fail-closed behavior during actual container pause outage and recovery after unpause."""
+        if not _is_redis_live():
+            pytest.skip(
+                "Environment blocked: Live Redis service is not reachable on 127.0.0.1:6379."
+            )
+
+        # Confirm dedicated test container is running
+        try:
+            res = subprocess.run(
+                [
+                    "docker",
+                    "ps",
+                    "--filter",
+                    "name=cf-intelligence-redis-test",
+                    "--format",
+                    "{{.Names}}",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            if "cf-intelligence-redis-test" not in res.stdout:
+                pytest.skip("Docker container cf-intelligence-redis-test is not running.")
+        except Exception as exc:
+            pytest.skip(f"Docker is not available to exercise container outage: {exc}")
+
+        monkeypatch.setenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+        monkeypatch.setenv("APP_ENV", "production")
+        get_settings.cache_clear()
+        RedisStore._global_redis_unavailable = False
+
+        storage_dir = str(tmp_path / "storage")
+        sim_id = "sim_live_outage_recovery"
+        prefix = "cfi_test_live_outage"
+
+        clean_store = RedisStore(prefix, strict_production=True)
+        clean_store.clear()
+
+        registry = ModelRegistry(storage_dir=storage_dir)
+        engine = ModelEvaluationEngine(registry)
+        engine._store.prefix = prefix
+        engine._store.strict_production = True
+
+        # Phase 1: Normal operation on live Redis
+        assert engine._store.has_active_shared_storage() is True
+        engine.log_prediction(
+            simulation_id=sim_id,
+            transaction_id="tx_before_outage",
+            champion_version=1,
+            champion_prob=0.88,
+        )
+
+        initial_rec = engine._store.get(f"{sim_id}:prediction:tx_before_outage")
+        assert initial_rec is not None
+        assert initial_rec["pred_seq"] == 1
+
+        # Phase 2: Live container outage induced via Docker pause
+        container_paused = False
+        try:
+            subprocess.run(["docker", "pause", "cf-intelligence-redis-test"], check=True)
+            container_paused = True
+
+            # Invariant A: Write during outage fails closed (raises RuntimeError)
+            with pytest.raises(RuntimeError) as exc_info:
+                engine.log_prediction(
+                    simulation_id=sim_id,
+                    transaction_id="tx_during_outage",
+                    champion_version=1,
+                    champion_prob=0.5,
+                )
+            assert "Production evaluation storage failure" in str(exc_info.value)
+
+            # Invariant B: Store marks itself unhealthy
+            assert engine._store.has_active_shared_storage() is False
+            assert engine._store.is_live() is False
+
+            # Invariant C: Evaluation fails closed (status unavailable, no promotions, no rollbacks)
+            eval_metrics = engine.evaluate_performance(sim_id, target_challenger_version=2)
+            assert eval_metrics.get("status") == "unavailable"
+            assert eval_metrics.get("promotion_triggered") is False
+            assert eval_metrics.get("rollback_triggered") is False
+
+        finally:
+            if container_paused:
+                subprocess.run(["docker", "unpause", "cf-intelligence-redis-test"], check=True)
+                # Wait briefly for socket to accept connections again
+                time.sleep(0.5)
+
+        # Phase 3: Post-recovery reconnection and outcome indeterminacy inspection
+        assert engine._store.reconnect() is True
+        assert engine._store.has_active_shared_storage() is True
+
+        # Invariant D: Distinguish a failed write from an outcome that may have committed
+        # During the pause, the client timed out on socket read. We inspect whether the command
+        # buffered in the OS socket was processed by the Redis server upon unpause.
+        outage_rec = engine._store.get(f"{sim_id}:prediction:tx_during_outage")
+        if outage_rec is not None:
+            # The write committed on the server despite the client receiving TimeoutError
+            assert outage_rec["pred_seq"] == 2
+            expected_post_recovery_seq = 3
+
+            # Client retry of the timed-out transaction must resolve idempotently without allocating a new sequence
+            res_retry_outage = engine._store.record_prediction_evidence(
+                simulation_id=sim_id,
+                transaction_id="tx_during_outage",
+                payload={"champion_prob": 0.5},
+            )
+            assert res_retry_outage["is_retry"] is True
+            assert res_retry_outage["pred_seq"] == 2
+        else:
+            # The write was cleanly aborted before Redis execution
+            expected_post_recovery_seq = 2
+
+        # Invariant E: Replay of tx_before_outage resolves idempotently without inflating sequence
+        res_retry = engine._store.record_prediction_evidence(
+            simulation_id=sim_id,
+            transaction_id="tx_before_outage",
+            payload={"champion_prob": 0.88},
+        )
+        assert res_retry["is_retry"] is True
+        assert res_retry["pred_seq"] == 1
+
+        # Invariant F: New prediction after recovery monotonically advances sequence
+        engine.log_prediction(
+            simulation_id=sim_id,
+            transaction_id="tx_after_recovery",
+            champion_version=1,
+            champion_prob=0.92,
+        )
+        post_rec = engine._store.get(f"{sim_id}:prediction:tx_after_recovery")
+        assert post_rec is not None
+        assert post_rec["pred_seq"] == expected_post_recovery_seq
+
+        # Invariant G: Prediction keys index is strictly consistent with committed transactions
+        keys = engine._store.get(f"{sim_id}:prediction_keys") or []
+        assert f"{sim_id}:prediction:tx_before_outage" in keys
+        assert f"{sim_id}:prediction:tx_after_recovery" in keys
+        if outage_rec is not None:
+            assert len(keys) == 3
+            assert f"{sim_id}:prediction:tx_during_outage" in keys
+        else:
+            assert len(keys) == 2
+
+        clean_store.clear()

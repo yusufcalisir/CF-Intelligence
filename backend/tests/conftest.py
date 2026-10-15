@@ -41,8 +41,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Gate tests marked with @pytest.mark.real_data so standard CI runs dataset-independent tests."""
-    require_real = config.getoption("--require-real-data", default=False) or os.environ.get("CFI_REQUIRE_REAL_DATA") == "1"
-    include_real = config.getoption("--include-real-data", default=False) or os.environ.get("CFI_INCLUDE_REAL_DATA") == "1"
+    require_real = (
+        config.getoption("--require-real-data", default=False)
+        or os.environ.get("CFI_REQUIRE_REAL_DATA") == "1"
+    )
+    include_real = (
+        config.getoption("--include-real-data", default=False)
+        or os.environ.get("CFI_INCLUDE_REAL_DATA") == "1"
+    )
 
     if not require_real and not include_real:
         skip_real = pytest.mark.skip(
@@ -69,12 +75,56 @@ def require_real_data(request: pytest.FixtureRequest) -> bool:
 os.environ.setdefault("TESTING", "1")
 
 
+def _is_local_redis_live(host: str = "127.0.0.1", port: int = 6379) -> bool:
+    import socket
+
+    try:
+        with socket.create_connection((host, port), timeout=0.5):
+            return True
+    except (OSError, ConnectionRefusedError):
+        return False
+
+
+# Configure backend tests to use the actual Redis endpoint through REDIS_URL
+if _is_local_redis_live():
+    current_redis_url = os.environ.get("REDIS_URL", "")
+    if (
+        not current_redis_url
+        or "@redis:6379" in current_redis_url
+        or "redis://redis:" in current_redis_url
+    ):
+        os.environ["REDIS_URL"] = "redis://127.0.0.1:6379/0"
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _set_testing_env():
-    """Ensure TESTING=1 is present for the entire pytest session."""
+    """Ensure TESTING=1 and verified REDIS_URL are present for the entire pytest session."""
     os.environ["TESTING"] = "1"
+    if _is_local_redis_live():
+        current_redis_url = os.environ.get("REDIS_URL", "")
+        if (
+            not current_redis_url
+            or "@redis:6379" in current_redis_url
+            or "redis://redis:" in current_redis_url
+        ):
+            os.environ["REDIS_URL"] = "redis://127.0.0.1:6379/0"
+    from app.config import get_settings
+
+    get_settings.cache_clear()
     yield
     os.environ.pop("TESTING", None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_redis_store_state():
+    """Reset RedisStore global unavailability and settings cache between tests."""
+    from app.config import get_settings
+    from app.infrastructure.redis_store import RedisStore
+
+    RedisStore._global_redis_unavailable = False
+    yield
+    RedisStore._global_redis_unavailable = False
+    get_settings.cache_clear()
 
 
 @pytest.fixture(autouse=True)
@@ -218,4 +268,3 @@ def pytest_unconfigure(config: pytest.Config) -> None:
         sys.stdout.flush()
         sys.stderr.flush()
         os._exit(_session_exitstatus)
-
