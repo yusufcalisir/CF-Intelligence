@@ -1495,33 +1495,47 @@ class ModelRegistry:
                 if os.path.exists(own_path):
                     try:
                         with open(own_path, encoding="utf-8") as of:
-                            raw_own = of.read().strip()
-                        if raw_own:
-                            own_data = json.loads(raw_own)
-                            if isinstance(own_data, dict):
-                                auth_bank = own_data.get("owning_bank_id")
-                                auth_consortium = own_data.get("consortium_id")
-                                manifest_changed = False
-                                for item in data:
-                                    if (
-                                        isinstance(item, dict)
-                                        and (
-                                            item.get("owning_bank_id") != auth_bank
-                                            or item.get("consortium_id") != auth_consortium
-                                        )
-                                    ):
-                                        item["owning_bank_id"] = auth_bank
-                                        item["consortium_id"] = auth_consortium
-                                        manifest_changed = True
-                                if manifest_changed:
-                                    with contextlib.suppress(Exception):
-                                        self._save_manifest(clean_sim_id, data)
-                                        logger.info(
-                                            "Synchronized and repaired manifest ownership for simulation '%s' to match authoritative ownership.json",
-                                            clean_sim_id,
-                                        )
+                            raw_own = of.read()
+                        if not raw_own.strip():
+                            raise ModelIntegrityError(
+                                f"Ownership record for simulation '{clean_sim_id}' is empty (0 bytes)."
+                            )
+                        own_data = json.loads(raw_own)
+                        if not isinstance(own_data, dict):
+                            raise ModelIntegrityError(
+                                f"Ownership record for simulation '{clean_sim_id}' is corrupted: expected JSON dict, got {type(own_data).__name__}."
+                            )
+                        auth_bank = own_data.get("owning_bank_id")
+                        auth_consortium = own_data.get("consortium_id")
+                        manifest_changed = False
+                        for item in data:
+                            if (
+                                isinstance(item, dict)
+                                and (
+                                    item.get("owning_bank_id") != auth_bank
+                                    or item.get("consortium_id") != auth_consortium
+                                )
+                            ):
+                                item["owning_bank_id"] = auth_bank
+                                item["consortium_id"] = auth_consortium
+                                manifest_changed = True
+                        if manifest_changed:
+                            self._save_manifest(clean_sim_id, data)
+                            logger.info(
+                                "Synchronized and repaired manifest ownership for simulation '%s' to match authoritative ownership.json",
+                                clean_sim_id,
+                            )
+                    except ModelIntegrityError:
+                        raise
                     except Exception as sync_err:
-                        logger.debug("Could not synchronize manifest ownership from ownership.json: %s", sync_err)
+                        logger.error(
+                            "Authoritative ownership record for simulation '%s' is corrupted or unreadable: %s",
+                            clean_sim_id,
+                            sync_err,
+                        )
+                        raise ModelIntegrityError(
+                            f"Authoritative ownership record for simulation '{clean_sim_id}' is corrupted or unreadable: {sync_err}"
+                        ) from sync_err
 
                 return data
             except ModelIntegrityError:
@@ -1834,6 +1848,25 @@ class ModelRegistry:
                 effective_owning_bank = est_bank
                 effective_consortium = est_consortium
                 should_bind_initial = False
+
+                # Enforce institutional governance authority for already-bound models
+                if auth_token is not None:
+                    from app.infrastructure.security.auth_service import AuthenticationService
+
+                    auth_svc = AuthenticationService.get_instance()
+                    is_valid, claims, _ = auth_svc.verify_access_token(auth_token)
+                    if is_valid and claims:
+                        uname = (claims.get("username") or claims.get("sub") or "").strip()
+                        user_rec = auth_svc.get_user(uname)
+                        if user_rec is not None:
+                            self._verify_institutional_governance_authority(simulation_id, user_rec, "save_version")
+                elif actor is not None:
+                    from app.infrastructure.security.auth_service import AuthenticationService
+
+                    auth_svc = AuthenticationService.get_instance()
+                    user_rec = auth_svc.get_user(actor)
+                    if user_rec is not None:
+                        self._verify_institutional_governance_authority(simulation_id, user_rec, "save_version")
             elif owning_bank_id is not None or consortium_id is not None:
                 effective_owning_bank = owning_bank_id.strip() if owning_bank_id and owning_bank_id.strip() else None
                 effective_consortium = consortium_id.strip() if consortium_id and consortium_id.strip() else None
@@ -2012,9 +2045,7 @@ class ModelRegistry:
 
                 manifest.append(entry)
                 # Authoritative manifest is saved FIRST (Section 9.1)
-                manifest_persisted = False
                 self._save_manifest(simulation_id, manifest)
-                manifest_persisted = True
 
                 # Finalize pending registration mutation only after authoritative persistence
                 audit_chain.finalize_pending_mutation(
@@ -2061,22 +2092,31 @@ class ModelRegistry:
                     with contextlib.suppress(OSError):
                         os.remove(newly_created_temp)
 
-                is_durably_committed = False
-                if locals().get("manifest_persisted", False):
-                    with contextlib.suppress(Exception):
-                        is_durably_committed = (
-                            self.check_version_mutation_status(simulation_id, next_version, mutation_id)
-                            == "COMMITTED"
+                # Authoritative transaction outcome verification:
+                # Determine outcome from durable mutation-specific evidence on disk,
+                # NOT merely whether a helper returned successfully or a local flag was set.
+                actual_status = "FAILED"
+                if "mutation_id" in locals() and mutation_id:
+                    try:
+                        actual_status = self.check_version_mutation_status(
+                            simulation_id, next_version, mutation_id
                         )
+                    except Exception as check_err:
+                        logger.warning(
+                            "Could not reliably determine mutation status for '%s' (%s); treating as INDETERMINATE.",
+                            mutation_id,
+                            check_err,
+                        )
+                        actual_status = "INDETERMINATE"
 
-                if is_durably_committed:
-                    # Business commit succeeded: artifact is referenced in authoritative manifest.
+                if actual_status == "COMMITTED":
+                    # Business commit succeeded: artifact and mutation ID are recorded in authoritative manifest.
                     # NEVER delete newly_created_final!
                     # NEVER mark mutation FAILED in audit chain!
                     # Preserve PENDING audit record so deterministic reconciliation can finalize it to COMMITTED.
                     logger.critical(
                         "Registration mutation '%s' for '%s:v%d' was durably committed to manifest, "
-                        "but post-commit finalization failed: %s. Preserving committed artifact '%s' "
+                        "but post-commit operation failed: %s. Preserving committed artifact '%s' "
                         "and leaving audit mutation PENDING for deterministic reconciliation.",
                         mutation_id,
                         simulation_id,
@@ -2084,8 +2124,22 @@ class ModelRegistry:
                         exc,
                         newly_created_final,
                     )
+                elif actual_status == "INDETERMINATE":
+                    # Authoritative state is corrupt, unreadable, locked, or ambiguous.
+                    # NEVER delete potentially committed artifact!
+                    # NEVER finalize audit mutation as FAILED or COMMITTED!
+                    # Preserve PENDING audit record for later recovery or investigation.
+                    logger.warning(
+                        "Registration outcome for mutation '%s' ('%s:v%d') is INDETERMINATE after exception: %s. "
+                        "Preserving artifact '%s' and audit intent without recording a terminal event.",
+                        mutation_id,
+                        simulation_id,
+                        next_version,
+                        exc,
+                        newly_created_final,
+                    )
                 else:
-                    # Business commit did NOT complete.
+                    # Authoritative state is readable and positively proves the mutation was NOT committed (FAILED).
                     # Only remove newly_created_final if it is conclusively NOT referenced in any committed manifest.
                     if newly_created_final and not final_already_existed and os.path.exists(newly_created_final):
                         is_referenced = False
@@ -4799,6 +4853,8 @@ class ModelRegistry:
                                         )
                             except Exception as sync_err:
                                 logger.error("Failed to sync manifest ownership during reconciliation for %s: %s", sim_id, sync_err)
+                                reconciled.append({"mutation_id": mut_id, "status": "INDETERMINATE"})
+                                continue
 
                             event_type = (
                                 "MODEL_OWNERSHIP_TRANSFER"
