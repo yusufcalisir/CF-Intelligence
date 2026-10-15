@@ -1337,16 +1337,24 @@ class ModelRegistry:
                 raise
 
             # Update existing manifest entries if present (derived state)
-            manifest = self._load_manifest(simulation_id)
-            if manifest:
-                updated = False
-                for entry in manifest:
-                    if entry.get("owning_bank_id") != clean_bank or entry.get("consortium_id") != clean_consortium:
-                        entry["owning_bank_id"] = clean_bank
-                        entry["consortium_id"] = clean_consortium
-                        updated = True
-                if updated:
-                    self._save_manifest(simulation_id, manifest)
+            try:
+                manifest = self._load_manifest(simulation_id)
+                if manifest:
+                    updated = False
+                    for entry in manifest:
+                        if entry.get("owning_bank_id") != clean_bank or entry.get("consortium_id") != clean_consortium:
+                            entry["owning_bank_id"] = clean_bank
+                            entry["consortium_id"] = clean_consortium
+                            updated = True
+                    if updated:
+                        self._save_manifest(simulation_id, manifest)
+            except Exception as manifest_err:
+                logger.warning(
+                    "Ownership for '%s' committed to ownership.json, but derived manifest update failed: %s. "
+                    "Derived state will be repaired automatically by reconciliation or subsequent manifest reads.",
+                    simulation_id,
+                    manifest_err,
+                )
 
             audit_chain.finalize_pending_mutation(
                 mutation_id=mutation_id,
@@ -1466,19 +1474,56 @@ class ModelRegistry:
             try:
                 with open(manifest_path, encoding="utf-8") as f:
                     content = f.read()
-                    if not content.strip():
-                        raise ModelIntegrityError(
-                            f"Registry manifest for simulation '{clean_sim_id}' is empty (0 bytes)."
-                        )
-                    data = json.loads(content)
-                    if isinstance(data, list):
-                        for item in data:
-                            if isinstance(item, dict) and "simulation_id" not in item:
-                                item["simulation_id"] = clean_sim_id
-                        return data
+                if not content.strip():
+                    raise ModelIntegrityError(
+                        f"Registry manifest for simulation '{clean_sim_id}' is empty (0 bytes)."
+                    )
+                data = json.loads(content)
+                if not isinstance(data, list):
                     raise ModelIntegrityError(
                         f"Registry manifest for simulation '{clean_sim_id}' is corrupted: expected JSON list, got {type(data).__name__}."
                     )
+
+                for item in data:
+                    if isinstance(item, dict) and "simulation_id" not in item:
+                        item["simulation_id"] = clean_sim_id
+
+                # Authoritative Ownership Synchronization:
+                # ownership.json is the single authoritative source of truth for institutional ownership.
+                # Synchronize derived manifest ownership fields if ownership.json exists and differs.
+                own_path = self._get_ownership_path(clean_sim_id, create=False)
+                if os.path.exists(own_path):
+                    try:
+                        with open(own_path, encoding="utf-8") as of:
+                            raw_own = of.read().strip()
+                        if raw_own:
+                            own_data = json.loads(raw_own)
+                            if isinstance(own_data, dict):
+                                auth_bank = own_data.get("owning_bank_id")
+                                auth_consortium = own_data.get("consortium_id")
+                                manifest_changed = False
+                                for item in data:
+                                    if (
+                                        isinstance(item, dict)
+                                        and (
+                                            item.get("owning_bank_id") != auth_bank
+                                            or item.get("consortium_id") != auth_consortium
+                                        )
+                                    ):
+                                        item["owning_bank_id"] = auth_bank
+                                        item["consortium_id"] = auth_consortium
+                                        manifest_changed = True
+                                if manifest_changed:
+                                    with contextlib.suppress(Exception):
+                                        self._save_manifest(clean_sim_id, data)
+                                        logger.info(
+                                            "Synchronized and repaired manifest ownership for simulation '%s' to match authoritative ownership.json",
+                                            clean_sim_id,
+                                        )
+                    except Exception as sync_err:
+                        logger.debug("Could not synchronize manifest ownership from ownership.json: %s", sync_err)
+
+                return data
             except ModelIntegrityError:
                 raise
             except Exception as e:
@@ -1967,7 +2012,9 @@ class ModelRegistry:
 
                 manifest.append(entry)
                 # Authoritative manifest is saved FIRST (Section 9.1)
+                manifest_persisted = False
                 self._save_manifest(simulation_id, manifest)
+                manifest_persisted = True
 
                 # Finalize pending registration mutation only after authoritative persistence
                 audit_chain.finalize_pending_mutation(
@@ -2013,32 +2060,72 @@ class ModelRegistry:
                 if newly_created_temp and os.path.exists(newly_created_temp):
                     with contextlib.suppress(OSError):
                         os.remove(newly_created_temp)
-                if newly_created_final and not final_already_existed and os.path.exists(newly_created_final):
-                    with contextlib.suppress(OSError):
-                        os.remove(newly_created_final)
-                if "intent_entry" in locals() and intent_entry is not None:
-                    audit_chain.finalize_pending_mutation(
-                        mutation_id=mutation_id,
-                        event_type="MODEL_REGISTRATION_FAILED",
-                        actor=str(effective_owning_bank or "system"),
-                        target_id=f"{simulation_id}:v{next_version}",
-                        details={
-                            "mutation_id": mutation_id,
-                            "mutation_stage": "FAILED",
-                            "mutation_committed": False,
-                            "intent_event_id": intent_entry.event_id,
-                            "simulation_id": simulation_id,
-                            "version": next_version,
-                            "error": str(exc),
-                            "action": "save_version",
-                            "decision": "FAILED",
-                        },
-                        actor_type="institutional_authority" if effective_owning_bank else "system",
-                        actor_institution=effective_owning_bank or "unknown",
-                        target_type="model_version",
-                        action="save_version",
-                        decision="FAILED",
+
+                is_durably_committed = False
+                if locals().get("manifest_persisted", False):
+                    with contextlib.suppress(Exception):
+                        is_durably_committed = (
+                            self.check_version_mutation_status(simulation_id, next_version, mutation_id)
+                            == "COMMITTED"
+                        )
+
+                if is_durably_committed:
+                    # Business commit succeeded: artifact is referenced in authoritative manifest.
+                    # NEVER delete newly_created_final!
+                    # NEVER mark mutation FAILED in audit chain!
+                    # Preserve PENDING audit record so deterministic reconciliation can finalize it to COMMITTED.
+                    logger.critical(
+                        "Registration mutation '%s' for '%s:v%d' was durably committed to manifest, "
+                        "but post-commit finalization failed: %s. Preserving committed artifact '%s' "
+                        "and leaving audit mutation PENDING for deterministic reconciliation.",
+                        mutation_id,
+                        simulation_id,
+                        next_version,
+                        exc,
+                        newly_created_final,
                     )
+                else:
+                    # Business commit did NOT complete.
+                    # Only remove newly_created_final if it is conclusively NOT referenced in any committed manifest.
+                    if newly_created_final and not final_already_existed and os.path.exists(newly_created_final):
+                        is_referenced = False
+                        try:
+                            cur_manifest = self._load_manifest(simulation_id)
+                            is_referenced = any(
+                                e.get("filename") == filename or mutation_id in e.get("applied_mutation_ids", [])
+                                for e in cur_manifest
+                            )
+                        except Exception:
+                            # Manifest unreadable: do NOT delete potentially committed artifact!
+                            is_referenced = True
+
+                        if not is_referenced:
+                            with contextlib.suppress(OSError):
+                                os.remove(newly_created_final)
+
+                    if "intent_entry" in locals() and intent_entry is not None:
+                        audit_chain.finalize_pending_mutation(
+                            mutation_id=mutation_id,
+                            event_type="MODEL_REGISTRATION_FAILED",
+                            actor=str(effective_owning_bank or "system"),
+                            target_id=f"{simulation_id}:v{next_version}",
+                            details={
+                                "mutation_id": mutation_id,
+                                "mutation_stage": "FAILED",
+                                "mutation_committed": False,
+                                "intent_event_id": intent_entry.event_id,
+                                "simulation_id": simulation_id,
+                                "version": next_version,
+                                "error": str(exc),
+                                "action": "save_version",
+                                "decision": "FAILED",
+                            },
+                            actor_type="institutional_authority" if effective_owning_bank else "system",
+                            actor_institution=effective_owning_bank or "unknown",
+                            target_type="model_version",
+                            action="save_version",
+                            decision="FAILED",
+                        )
                 if not isinstance(exc, (ModelIntegrityError, ModelAuthorizationError)):
                     raise ModelIntegrityError(f"Artifact serialization failed: {exc}") from exc
                 raise
@@ -3737,6 +3824,64 @@ class ModelRegistry:
                 decision="PENDING",
             )
 
+            if settings.app_env.lower() == "production":
+                if not is_signature_valid:
+                    audit_chain.finalize_pending_mutation(
+                        mutation_id=mutation_id,
+                        event_type="MODEL_SIGNOFF_FAILED",
+                        actor=user,
+                        target_id=f"{simulation_id}:v{version}",
+                        details={
+                            "mutation_id": mutation_id,
+                            "mutation_stage": "FAILED",
+                            "mutation_committed": False,
+                            "intent_event_id": intent_entry.event_id,
+                            "simulation_id": simulation_id,
+                            "version": version,
+                            "role": norm_role,
+                            "user": user,
+                            "error": "Production promotion rejected: sign-offs lack valid cryptographic signatures.",
+                            "action": "sign_off",
+                            "decision": "REJECTED_INVALID_SIGNATURE",
+                        },
+                        actor_type="human_principal" if is_identity_verified else "unverified_operator",
+                        actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
+                        target_type="model_version",
+                        action="sign_off",
+                        decision="FAILED",
+                    )
+                    raise ModelIntegrityError(
+                        "Production promotion rejected: sign-offs lack valid cryptographic signatures."
+                    )
+                if not is_role_verified:
+                    audit_chain.finalize_pending_mutation(
+                        mutation_id=mutation_id,
+                        event_type="MODEL_SIGNOFF_FAILED",
+                        actor=user,
+                        target_id=f"{simulation_id}:v{version}",
+                        details={
+                            "mutation_id": mutation_id,
+                            "mutation_stage": "FAILED",
+                            "mutation_committed": False,
+                            "intent_event_id": intent_entry.event_id,
+                            "simulation_id": simulation_id,
+                            "version": version,
+                            "role": norm_role,
+                            "user": user,
+                            "error": "Production promotion rejected: sign-off missing verified role authority.",
+                            "action": "sign_off",
+                            "decision": "REJECTED_UNAUTHORIZED_ROLE",
+                        },
+                        actor_type="human_principal" if is_identity_verified else "unverified_operator",
+                        actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
+                        target_type="model_version",
+                        action="sign_off",
+                        decision="FAILED",
+                    )
+                    raise ModelIntegrityError(
+                        "Production promotion rejected: sign-off missing verified role authority."
+                    )
+
             # Append new sign-off details with mutation ID tracking
             entry["sign_offs"].append(
                 {
@@ -3761,11 +3906,12 @@ class ModelRegistry:
                 }
             )
 
-            if "applied_mutation_ids" not in entry:
-                entry["applied_mutation_ids"] = []
-            if mutation_id not in entry["applied_mutation_ids"]:
-                entry["applied_mutation_ids"].append(mutation_id)
-            entry["last_mutation_id"] = mutation_id
+            if is_signature_valid:
+                if "applied_mutation_ids" not in entry:
+                    entry["applied_mutation_ids"] = []
+                if mutation_id not in entry["applied_mutation_ids"]:
+                    entry["applied_mutation_ids"].append(mutation_id)
+                entry["last_mutation_id"] = mutation_id
 
             # Check if both compliance and ml_engineer have active sign-offs
             active_signoffs = [
@@ -3785,12 +3931,54 @@ class ModelRegistry:
                     all_sigs_valid = all(s.get("is_signature_valid", False) for s in active_signoffs)
                     all_roles_valid = all(s.get("is_role_verified", False) for s in active_signoffs)
                     if not all_sigs_valid:
-                        self._save_manifest(simulation_id, manifest)
+                        audit_chain.finalize_pending_mutation(
+                            mutation_id=mutation_id,
+                            event_type="MODEL_SIGNOFF_FAILED",
+                            actor=user,
+                            target_id=f"{simulation_id}:v{version}",
+                            details={
+                                "mutation_id": mutation_id,
+                                "mutation_stage": "FAILED",
+                                "mutation_committed": False,
+                                "intent_event_id": intent_entry.event_id,
+                                "simulation_id": simulation_id,
+                                "version": version,
+                                "error": "Production promotion rejected: sign-offs lack valid cryptographic signatures.",
+                                "action": "sign_off",
+                                "decision": "FAILED",
+                            },
+                            actor_type="human_principal" if is_identity_verified else "unverified_operator",
+                            actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
+                            target_type="model_version",
+                            action="sign_off",
+                            decision="FAILED",
+                        )
                         raise ModelIntegrityError(
                             "Production promotion rejected: sign-offs lack valid cryptographic signatures."
                         )
                     if not all_roles_valid:
-                        self._save_manifest(simulation_id, manifest)
+                        audit_chain.finalize_pending_mutation(
+                            mutation_id=mutation_id,
+                            event_type="MODEL_SIGNOFF_FAILED",
+                            actor=user,
+                            target_id=f"{simulation_id}:v{version}",
+                            details={
+                                "mutation_id": mutation_id,
+                                "mutation_stage": "FAILED",
+                                "mutation_committed": False,
+                                "intent_event_id": intent_entry.event_id,
+                                "simulation_id": simulation_id,
+                                "version": version,
+                                "error": "Production promotion rejected: sign-off missing verified role authority.",
+                                "action": "sign_off",
+                                "decision": "FAILED",
+                            },
+                            actor_type="human_principal" if is_identity_verified else "unverified_operator",
+                            actor_institution=getattr(authoritative_user, "bank_id", "unknown") if authoritative_user else "unknown",
+                            target_type="model_version",
+                            action="sign_off",
+                            decision="FAILED",
+                        )
                         raise ModelIntegrityError(
                             "Production promotion rejected: sign-off missing verified role authority."
                         )
@@ -4372,51 +4560,65 @@ class ModelRegistry:
 
             return entry
 
+    def check_ownership_mutation_status(
+        self,
+        simulation_id: str,
+        mutation_id: str,
+    ) -> str:
+        """Evaluate authoritative persistence status of an ownership mutation.
+
+        Returns:
+            - 'COMMITTED': positively proven present in valid ownership record.
+            - 'FAILED': ownership record is valid, readable, and mutation is absent.
+            - 'INDETERMINATE': ownership record is corrupt, unreadable, or storage state is ambiguous.
+        """
+        try:
+            ownership = self.get_simulation_ownership(simulation_id)
+        except ModelIntegrityError as mie:
+            logger.warning("Ownership for '%s' is corrupted or unreadable (%s); status is INDETERMINATE.", simulation_id, mie)
+            return "INDETERMINATE"
+        except Exception as exc:
+            logger.warning("Failed to load ownership for '%s' (%s); status is INDETERMINATE.", simulation_id, exc)
+            return "INDETERMINATE"
+
+        if ownership.get("last_mutation_id") == mutation_id:
+            return "COMMITTED"
+        applied = ownership.get("applied_mutation_ids", [])
+        if isinstance(applied, list) and mutation_id in applied:
+            return "COMMITTED"
+        return "FAILED"
+
     def is_mutation_committed_for_ownership(
         self,
         simulation_id: str,
         mutation_id: str,
     ) -> bool:
         """Check whether an ownership mutation was authoritatively committed to disk."""
-        try:
-            ownership = self.get_simulation_ownership(simulation_id)
-        except Exception:
-            return False
-        if ownership.get("last_mutation_id") == mutation_id:
-            return True
-        applied = ownership.get("applied_mutation_ids", [])
-        return bool(isinstance(applied, list) and mutation_id in applied)
+        return self.check_ownership_mutation_status(simulation_id, mutation_id) == "COMMITTED"
 
-    def is_mutation_committed_for_version(
+    def check_version_mutation_status(
         self,
         simulation_id: str,
         version: int | None,
         mutation_id: str,
-    ) -> bool:
-        """Check whether a mutation was authoritatively committed for a specific model version."""
+    ) -> str:
+        """Evaluate authoritative persistence status of a version mutation.
+
+        Returns:
+            - 'COMMITTED': positively proven present in valid authoritative manifest.
+            - 'FAILED': authoritative manifest is valid, readable, and mutation is absent.
+            - 'INDETERMINATE': manifest is corrupt, unreadable, or storage state is ambiguous.
+        """
         try:
             manifest = self._load_manifest(simulation_id)
-        except Exception:
-            return False
-        if version is not None:
-            entry = next((e for e in manifest if e.get("version") == version), None)
-            if entry:
-                if mutation_id in entry.get("applied_mutation_ids", []):
-                    return True
-                if entry.get("last_mutation_id") == mutation_id:
-                    return True
-                if entry.get("registration_mutation_id") == mutation_id:
-                    return True
-                if entry.get("revocation_mutation_id") == mutation_id:
-                    return True
-                for s in entry.get("sign_offs", []):
-                    if s.get("mutation_id") == mutation_id:
-                        return True
-                    if s.get("revocation_mutation_id") == mutation_id:
-                        return True
-            return False
+        except ModelIntegrityError as mie:
+            logger.warning("Registry manifest for '%s' is corrupted or unreadable (%s); status is INDETERMINATE.", simulation_id, mie)
+            return "INDETERMINATE"
+        except Exception as exc:
+            logger.warning("Failed to load manifest for '%s' (%s); status is INDETERMINATE.", simulation_id, exc)
+            return "INDETERMINATE"
 
-        for entry in manifest:
+        def _is_entry_matching(entry: dict[str, Any]) -> bool:
             if mutation_id in entry.get("applied_mutation_ids", []):
                 return True
             if entry.get("last_mutation_id") == mutation_id:
@@ -4426,11 +4628,37 @@ class ModelRegistry:
             if entry.get("revocation_mutation_id") == mutation_id:
                 return True
             for s in entry.get("sign_offs", []):
-                if s.get("mutation_id") == mutation_id:
+                # An invalid or rejected signature NEVER proves an active, authorized approval!
+                if (
+                    s.get("mutation_id") == mutation_id
+                    and s.get("is_signature_valid") is True
+                    and s.get("is_active", True) is not False
+                    and s.get("is_revoked") is not True
+                ):
                     return True
                 if s.get("revocation_mutation_id") == mutation_id:
                     return True
-        return False
+            return False
+
+        if version is not None:
+            entry = next((e for e in manifest if e.get("version") == version), None)
+            if entry and _is_entry_matching(entry):
+                return "COMMITTED"
+            return "FAILED"
+
+        for entry in manifest:
+            if _is_entry_matching(entry):
+                return "COMMITTED"
+        return "FAILED"
+
+    def is_mutation_committed_for_version(
+        self,
+        simulation_id: str,
+        version: int | None,
+        mutation_id: str,
+    ) -> bool:
+        """Check whether a mutation was authoritatively committed for a specific model version."""
+        return self.check_version_mutation_status(simulation_id, version, mutation_id) == "COMMITTED"
 
     def reconcile_incomplete_mutations(
         self,
@@ -4446,8 +4674,11 @@ class ModelRegistry:
            simulation FileLock. If FileLock is held, leaves mutation in indeterminate state.
         3. Recovers abandoned staged or published-but-unregistered artifacts after process termination.
            Never deletes a committed model artifact while cleaning abandoned files.
-        4. Uses atomic finalize_pending_mutation to prevent duplicate resolution across racing reconcilers.
-        5. Maintains registry-then-audit lock acquisition order to prevent deadlocks.
+        4. Distinguishes INDETERMINATE (corrupt or unreadable state) from proven transaction failure (FAILED).
+           Never deletes artifacts or appends fabricated terminal events when state is INDETERMINATE.
+        5. Synchronizes and repairs derived manifest ownership metadata from authoritative ownership.json.
+        6. Uses atomic finalize_pending_mutation to prevent duplicate resolution across racing reconcilers.
+        7. Maintains registry-then-audit lock acquisition order to prevent deadlocks.
         """
         from filelock import Timeout
 
@@ -4530,9 +4761,45 @@ class ModelRegistry:
                         action in ("bind_simulation_ownership", "transfer_ownership")
                         or p.event_type.startswith("MODEL_OWNERSHIP_")
                     ):
-                        committed = self.is_mutation_committed_for_ownership(sim_id, mut_id)
+                        own_status = self.check_ownership_mutation_status(sim_id, mut_id)
+                        if own_status == "INDETERMINATE":
+                            logger.warning(
+                                "Ownership state for '%s' (mutation '%s') is INDETERMINATE; skipping reconciliation.",
+                                sim_id,
+                                mut_id,
+                            )
+                            reconciled.append({"mutation_id": mut_id, "status": "INDETERMINATE"})
+                            continue
+
                         is_transfer = "transfer" in action or "TRANSFER" in p.event_type
-                        if committed:
+                        if own_status == "COMMITTED":
+                            # Defect 4: Ensure derived manifest ownership metadata matches authoritative ownership.json!
+                            try:
+                                ownership_record = self.get_simulation_ownership(sim_id)
+                                target_bank = ownership_record.get("owning_bank_id")
+                                target_consortium = ownership_record.get("consortium_id")
+                                cur_manifest = self._load_manifest(sim_id)
+                                if cur_manifest:
+                                    needs_manifest_sync = False
+                                    for m_entry in cur_manifest:
+                                        if (
+                                            m_entry.get("owning_bank_id") != target_bank
+                                            or m_entry.get("consortium_id") != target_consortium
+                                        ):
+                                            m_entry["owning_bank_id"] = target_bank
+                                            m_entry["consortium_id"] = target_consortium
+                                            needs_manifest_sync = True
+                                    if needs_manifest_sync:
+                                        self._save_manifest(sim_id, cur_manifest)
+                                        logger.info(
+                                            "Repaired derived manifest ownership metadata for '%s' to match authoritative ownership (bank=%s, consortium=%s)",
+                                            sim_id,
+                                            target_bank,
+                                            target_consortium,
+                                        )
+                            except Exception as sync_err:
+                                logger.error("Failed to sync manifest ownership during reconciliation for %s: %s", sim_id, sync_err)
+
                             event_type = (
                                 "MODEL_OWNERSHIP_TRANSFER"
                                 if is_transfer
@@ -4603,8 +4870,21 @@ class ModelRegistry:
                         action in ("save_version", "register_version")
                         or p.event_type.startswith("MODEL_REGISTRATION_")
                     ):
-                        committed = self.is_mutation_committed_for_version(sim_id, ver, mut_id)
-                        if committed:
+                        reg_status = self.check_version_mutation_status(sim_id, ver, mut_id)
+                        if reg_status == "INDETERMINATE":
+                            # Defect 3: Indeterminate state!
+                            # NEVER delete candidate artifact!
+                            # NEVER append a fabricated terminal event!
+                            logger.warning(
+                                "Authoritative manifest state for '%s' (mutation '%s') is INDETERMINATE. "
+                                "Preserving candidate artifacts and audit evidence for future investigation.",
+                                sim_id,
+                                mut_id,
+                            )
+                            reconciled.append({"mutation_id": mut_id, "status": "INDETERMINATE"})
+                            continue
+
+                        if reg_status == "COMMITTED":
                             final_entry = audit_chain.finalize_pending_mutation(
                                 mutation_id=mut_id,
                                 event_type="MODEL_VERSION_CREATED",
@@ -4676,8 +4956,17 @@ class ModelRegistry:
 
                     # 3. Sign-off mutations
                     if action == "sign_off" or p.event_type.startswith("MODEL_SIGNOFF_PENDING"):
-                        committed = self.is_mutation_committed_for_version(sim_id, ver, mut_id)
-                        if committed:
+                        sign_status = self.check_version_mutation_status(sim_id, ver, mut_id)
+                        if sign_status == "INDETERMINATE":
+                            logger.warning(
+                                "Authoritative manifest state for '%s' (mutation '%s') is INDETERMINATE; skipping sign-off reconciliation.",
+                                sim_id,
+                                mut_id,
+                            )
+                            reconciled.append({"mutation_id": mut_id, "status": "INDETERMINATE"})
+                            continue
+
+                        if sign_status == "COMMITTED":
                             final_entry = audit_chain.finalize_pending_mutation(
                                 mutation_id=mut_id,
                                 event_type="MODEL_SIGNOFF_RECORDED",
@@ -4729,9 +5018,17 @@ class ModelRegistry:
                         continue
 
                     # 4. Promotion, Rollback, Revocation
-                    committed = self.is_mutation_committed_for_version(sim_id, ver, mut_id)
+                    other_status = self.check_version_mutation_status(sim_id, ver, mut_id)
+                    if other_status == "INDETERMINATE":
+                        logger.warning(
+                            "Authoritative manifest state for '%s' (mutation '%s') is INDETERMINATE; skipping reconciliation.",
+                            sim_id,
+                            mut_id,
+                        )
+                        reconciled.append({"mutation_id": mut_id, "status": "INDETERMINATE"})
+                        continue
 
-                    if committed:
+                    if other_status == "COMMITTED":
                         if action == "revoke_sign_off":
                             event_type, decision = "MODEL_SIGNOFF_REVOCATION", "REVOKED"
                         elif action == "promote_version":
