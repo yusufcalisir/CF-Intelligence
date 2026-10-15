@@ -253,10 +253,21 @@ class PublishReceipt(BaseModel):
     partition: int = Field(default=0, description="Assigned broker partition", ge=0)
     offset: int = Field(default=0, description="Committed log offset", ge=0)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Broker timestamp UTC")
-    status: Literal["COMMITTED", "DUPLICATE_IGNORED", "DLQ_ROUTED", "FAILED"] = Field(
+    status: Literal[
+        "COMMITTED",
+        "DUPLICATE_IGNORED",
+        "DLQ_ROUTED",
+        "FAILED",
+        "COMMITTED_IDEMPOTENCY_UNCERTAIN",
+        "COMMITTED_IDEMPOTENCY_DEGRADED",
+    ] = Field(
         default="COMMITTED", description="Publish status"
     )
     idempotent_duplicate: bool = Field(default=False, description="True if skipped due to distributed deduplication")
+    idempotency_committed: bool = Field(
+        default=True,
+        description="Whether idempotency completion was durably recorded",
+    )
     latency_ms: float = Field(default=0.0, description="Publish latency in milliseconds", ge=0.0)
     delivery_mode: str = Field(
         default="IN_MEMORY_LOOPBACK",

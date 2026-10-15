@@ -14,6 +14,7 @@ Validates:
 from __future__ import annotations
 
 import asyncio
+import json
 import multiprocessing
 import os
 import sys
@@ -1042,4 +1043,276 @@ class TestKafkaDistributedIdempotencyRedis:
             assert engine.is_duplicate(key) is True
         finally:
             idem_svc._redis_client = orig_client
+
+    @pytest.mark.asyncio
+    async def test_successful_broker_publish_transitions_reservation_to_committed_state(self) -> None:
+        """Successful broker publish transitions the owned reservation into a committed state with full TTL."""
+        from app.application.services.idempotency import IdempotencyService
+
+        prefix = f"test_pub_commit_{uuid.uuid4().hex[:8]}"
+        topic = f"cfi.test.commit.{uuid.uuid4().hex[:8]}"
+        connector = KafkaStreamingConnector(idempotency_prefix=prefix, idempotency_ttl=3600)
+        idem_svc = IdempotencyService.get()
+        ev_id = f"pub-commit-{uuid.uuid4().hex[:8]}"
+        ev = CloudEvent(
+            id=ev_id,
+            source="urn:cfi:bank:ALPHA",
+            type=EVENT_TYPE_TRANSACTION,
+            ce_tenant_id="ALPHA",
+            data={"amount": "250.00", "currency": "EUR"},
+        )
+
+        try:
+            receipt = await connector.publish(ev, topic=topic)
+            assert receipt.status == "COMMITTED"
+            assert receipt.idempotency_committed is True
+            assert receipt.partition == 0
+            assert receipt.offset == 0
+
+            # Verify in Redis: key must be committed envelope, not in-progress reservation
+            dedup_key = f"{prefix}:ALPHA:{ev_id}"
+            redis_key = idem_svc._build_redis_key(dedup_key)
+            raw = idem_svc._redis_client.get(redis_key)
+            assert raw is not None
+            val_str = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+            assert not val_str.startswith("IN_PROGRESS:")
+            parsed = json.loads(val_str)
+            assert parsed.get("__idempotency_envelope__") is True
+            assert parsed.get("response") == "COMMITTED"
+
+            # Check that TTL reflects the committed window (~3600s), not the temporary 30s timeout
+            ttl = idem_svc._redis_client.ttl(redis_key)
+            assert ttl > 3000
+        finally:
+            connector._idempotency.clear()
+
+    @pytest.mark.asyncio
+    async def test_ordinary_duplicate_after_reservation_ttl_rejected_in_dedup_window(self) -> None:
+        """An ordinary duplicate after original reservation TTL cannot be published again within deduplication window."""
+        prefix = f"test_dedup_win_{uuid.uuid4().hex[:8]}"
+        topic = f"cfi.test.dedup.{uuid.uuid4().hex[:8]}"
+        connector = KafkaStreamingConnector(idempotency_prefix=prefix, idempotency_ttl=3600)
+        ev_id = f"dup-window-{uuid.uuid4().hex[:8]}"
+        ev = CloudEvent(
+            id=ev_id,
+            source="urn:cfi:bank:BETA",
+            type=EVENT_TYPE_TRANSACTION,
+            ce_tenant_id="BETA",
+            data={"amount": "500.00"},
+        )
+
+        try:
+            # 1. Initial publish succeeds and commits
+            receipt1 = await connector.publish(ev, topic=topic)
+            assert receipt1.status == "COMMITTED"
+            assert receipt1.offset == 0
+
+            # 2. Subsequent publish within dedup window is rejected even after reservation phase
+            receipt2 = await connector.publish(ev, topic=topic)
+            assert receipt2.status == "DUPLICATE_IGNORED"
+            assert receipt2.idempotent_duplicate is True
+
+            # 3. Verify broker only received the single genuine message
+            broker_msgs = await connector._broker.fetch_messages(
+                topic,
+                group_id="verify-dedup-group",
+                max_messages=10,
+            )
+            assert len(broker_msgs) == 1
+        finally:
+            connector._idempotency.clear()
+
+    @pytest.mark.asyncio
+    async def test_broker_failure_before_ack_permits_retry(self) -> None:
+        """Broker failure before acknowledgment releases reservation and permits a legitimate retry."""
+        from app.application.services.idempotency import IdempotencyService
+
+        prefix = f"test_retry_fail_{uuid.uuid4().hex[:8]}"
+        topic = f"cfi.test.retry.{uuid.uuid4().hex[:8]}"
+        connector = KafkaStreamingConnector(idempotency_prefix=prefix, idempotency_ttl=3600)
+        idem_svc = IdempotencyService.get()
+        ev_id = f"retry-fail-{uuid.uuid4().hex[:8]}"
+        ev = CloudEvent(
+            id=ev_id,
+            source="urn:cfi:bank:GAMMA",
+            type=EVENT_TYPE_TRANSACTION,
+            ce_tenant_id="GAMMA",
+            data={"amount": "1200.00"},
+        )
+
+        class FailingBroker:
+            def __init__(self, real_broker: Any) -> None:
+                self._real = real_broker
+                self.fail_next = True
+
+            async def publish(self, topic: str, message: bytes, partition: int = 0) -> tuple[int, int]:
+                if self.fail_next:
+                    self.fail_next = False
+                    raise RuntimeError("Simulated broker transport failure before acknowledgment")
+                return await self._real.publish(topic, message, partition)
+
+        orig_broker = connector._broker
+        connector._broker = FailingBroker(orig_broker)  # type: ignore[assignment]
+        dedup_key = f"{prefix}:GAMMA:{ev_id}"
+        redis_key = idem_svc._build_redis_key(dedup_key)
+
+        try:
+            # 1. First publish fails at broker level
+            with pytest.raises(RuntimeError, match="Simulated broker transport failure"):
+                await connector.publish(ev, topic=topic)
+
+            # 2. Reservation must be released from Redis, allowing retry
+            raw_after_failure = idem_svc._redis_client.get(redis_key)
+            assert raw_after_failure is None, "Reservation was not released after broker failure!"
+
+            # 3. Legitimate retry must succeed now that broker is operational
+            retry_receipt = await connector.publish(ev, topic=topic)
+            assert retry_receipt.status == "COMMITTED"
+            assert retry_receipt.idempotency_committed is True
+
+            # 4. Redis is now committed
+            raw_after_retry = idem_svc._redis_client.get(redis_key)
+            assert raw_after_retry is not None
+            assert b"COMMITTED" in raw_after_retry
+        finally:
+            connector._broker = orig_broker
+            connector._idempotency.clear()
+
+    @pytest.mark.asyncio
+    async def test_redis_completion_outage_after_broker_ack_reports_uncertainty_truthfully(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Redis completion outage after broker ACK cannot be silently reported as a successful distributed commit."""
+        from app.application.services.idempotency import IdempotencyService
+
+        prefix = f"test_ack_degraded_{uuid.uuid4().hex[:8]}"
+        topic = f"cfi.test.degraded.{uuid.uuid4().hex[:8]}"
+        connector = KafkaStreamingConnector(idempotency_prefix=prefix, idempotency_ttl=3600)
+        monkeypatch.setenv("APP_ENV", "production")
+        idem_svc = IdempotencyService.get()
+        ev_id = f"degraded-ack-{uuid.uuid4().hex[:8]}"
+        ev = CloudEvent(
+            id=ev_id,
+            source="urn:cfi:bank:DELTA",
+            type=EVENT_TYPE_TRANSACTION,
+            ce_tenant_id="DELTA",
+            data={"amount": "3000.00"},
+        )
+
+        orig_complete = idem_svc.complete
+
+        def failing_complete(*args: Any, **kwargs: Any) -> bool:
+            return False
+
+        monkeypatch.setattr(idem_svc, "complete", failing_complete)
+
+        try:
+            receipt = await connector.publish(ev, topic=topic)
+            # Must NOT report as clean COMMITTED
+            assert receipt.status != "COMMITTED"
+            assert receipt.status == "COMMITTED_IDEMPOTENCY_UNCERTAIN"
+            assert receipt.idempotency_committed is False
+
+            # Must NOT pretend broker publication was rolled back (broker acknowledged)
+            assert receipt.status != "FAILED"
+            assert receipt.partition == 0
+            assert receipt.offset == 0
+        finally:
+            monkeypatch.setattr(idem_svc, "complete", orig_complete)
+            connector._idempotency.clear()
+
+    def test_stale_worker_cannot_complete_another_worker_reservation(self) -> None:
+        """Stale worker whose reservation expired cannot complete another worker's newer reservation."""
+        from app.application.services.idempotency import IdempotencyService
+
+        key = f"test-stale-complete-{uuid.uuid4().hex}"
+        worker_1 = IdempotencyEngine(ttl_seconds=60, engine_id="worker_stale_1")
+        worker_2 = IdempotencyEngine(ttl_seconds=60, engine_id="worker_stale_2")
+        idem_svc = IdempotencyService.get()
+        redis_key = idem_svc._build_redis_key(f"kafka:{key}")
+
+        try:
+            # 1. Worker 1 acquires reservation
+            assert worker_1.try_acquire(key) is True
+            owner_1 = worker_1._owned_reservations[key]
+
+            # 2. Simulate Worker 1 expiration: Redis key is deleted
+            idem_svc._redis_client.delete(redis_key)
+
+            # 3. Worker 2 acquires the freed reservation
+            assert worker_2.try_acquire(key) is True
+            owner_2 = worker_2._owned_reservations[key]
+            assert owner_1 != owner_2
+
+            # 4. Stale Worker 1 attempts completion: must be rejected atomically by Lua
+            completed_w1 = worker_1.mark_processed(key)
+            assert completed_w1 is False
+
+            # 5. Active Worker 2 reservation in Redis is intact and untouched
+            val = idem_svc._redis_client.get(redis_key)
+            val_str = val.decode("utf-8") if isinstance(val, bytes) else str(val)
+            assert f"IN_PROGRESS:{owner_2}" in val_str
+
+            # 6. Worker 2 completes successfully
+            completed_w2 = worker_2.mark_processed(key)
+            assert completed_w2 is True
+
+            # 7. Stale Worker 1 attempts completion again: still rejected
+            assert worker_1.mark_processed(key) is False
+        finally:
+            worker_1.clear()
+            worker_2.clear()
+
+    def test_setnx_failure_followed_by_key_disappearance_retries_safely_without_phantom_ownership(self) -> None:
+        """SET NX failure followed by key disappearance cannot produce ownership without a successful new acquisition."""
+        from app.application.services.idempotency import IdempotencyService
+
+        idem_svc = IdempotencyService.get()
+        key = f"test-disappear-{uuid.uuid4().hex}"
+
+        call_count = 0
+        orig_set = idem_svc._redis_client.set
+        orig_get = idem_svc._redis_client.get
+
+        def mock_set_flaky(k: str, v: Any, **kwargs: Any) -> bool:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return False  # First SET NX fails
+            return orig_set(k, v, **kwargs)  # Second SET NX succeeds
+
+        def mock_get_flaky(k: str) -> Any:
+            if call_count == 1:
+                return None  # Key disappeared before GET
+            return orig_get(k)
+
+        idem_svc._redis_client.set = mock_set_flaky
+        idem_svc._redis_client.get = mock_get_flaky
+
+        try:
+            status, _ = idem_svc.acquire(key, owner_id="test_worker_flaky", require_redis=True)
+            assert status == "ACQUIRED"
+            assert call_count == 2, f"Expected 2 attempts for safe retry, got {call_count}"
+        finally:
+            idem_svc._redis_client.set = orig_set
+            idem_svc._redis_client.get = orig_get
+            idem_svc.release(key, owner_id="test_worker_flaky")
+
+        def mock_set_always_fail(k: str, v: Any, **kwargs: Any) -> bool:
+            return False
+
+        def mock_get_always_none(k: str) -> Any:
+            return None
+
+        idem_svc._redis_client.set = mock_set_always_fail
+        idem_svc._redis_client.get = mock_get_always_none
+
+        try:
+            key_fail = f"test-always-fail-{uuid.uuid4().hex}"
+            status_fail, _ = idem_svc.acquire(key_fail, owner_id="test_worker_fail", require_redis=True)
+            assert status_fail != "ACQUIRED", "Phantom ACQUIRED returned without successful reservation!"
+            assert status_fail == "UNAVAILABLE"
+        finally:
+            idem_svc._redis_client.set = orig_set
+            idem_svc._redis_client.get = orig_get
 

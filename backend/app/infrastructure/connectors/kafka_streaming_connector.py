@@ -156,7 +156,7 @@ _GLOBAL_IN_MEMORY_BROKER = InMemoryKafkaBroker()
 # ── Idempotency Store ─────────────────────────────────────────────────────────
 
 class IdempotencyEngine:
-    """Guarantees at-least-once delivery with exactly-once processing semantics."""
+    """Guarantees at-least-once delivery with distributed deduplication and ownership-bound reservation lifecycle."""
 
     def __init__(self, ttl_seconds: int = 86400, key_prefix: str = "kafka", engine_id: str | None = None) -> None:
         self._ttl_seconds = ttl_seconds
@@ -249,28 +249,60 @@ class IdempotencyEngine:
             self._evict_expired()
             return idempotency_key in self._processed_keys
 
-    def mark_processed(self, idempotency_key: str) -> None:
-        """Record an event key as successfully processed."""
-        with self._lock:
-            owner_id = self._owned_reservations.get(idempotency_key) or f"{self._engine_id}_{uuid.uuid4().hex[:8]}"
-            self._owned_reservations[idempotency_key] = owner_id
-            self._evict_expired()
-            self._processed_keys[idempotency_key] = time.time() + self._ttl_seconds
-            self._registered_keys.add(idempotency_key)
+    def mark_processed(self, idempotency_key: str) -> bool:
+        """Record an event key as successfully processed.
 
+        Returns True if completion was successfully persisted, False otherwise.
+        """
+        raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
+        is_prod = str(raw_env).lower().strip() == "production"
+
+        with self._lock:
+            owner_id = self._owned_reservations.get(idempotency_key)
+            if not owner_id:
+                if is_prod:
+                    logger.warning(
+                        "IdempotencyEngine: mark_processed called without an owned reservation for key %s in production",
+                        idempotency_key,
+                    )
+                    return False
+                owner_id = None
+
+        # Attempt authoritative Redis completion
         try:
             from app.application.services.idempotency import IdempotencyService
 
             idem_svc = IdempotencyService.get()
             if idem_svc._redis_client is not None:
-                idem_svc.complete(
+                completed = idem_svc.complete(
                     f"{self._key_prefix}:{idempotency_key}",
                     "COMMITTED",
                     owner_id=owner_id,
                     ttl_seconds=self._ttl_seconds,
+                    require_redis=is_prod,
                 )
-        except Exception:
-            pass
+                if not completed:
+                    logger.warning(
+                        "IdempotencyEngine: Redis completion rejected or failed for key %s (owner: %s)",
+                        idempotency_key,
+                        owner_id,
+                    )
+                    return False
+            elif is_prod:
+                logger.error("IdempotencyEngine: Redis unavailable for mark_processed in production")
+                return False
+        except Exception as exc:
+            logger.warning("IdempotencyEngine mark_processed Redis error: %s", exc)
+            if is_prod or owner_id:
+                return False
+
+        with self._lock:
+            self._evict_expired()
+            self._processed_keys[idempotency_key] = time.time() + self._ttl_seconds
+            self._registered_keys.add(idempotency_key)
+            if owner_id:
+                self._owned_reservations[idempotency_key] = owner_id
+        return True
 
     def _evict_expired(self) -> None:
         now = time.time()
@@ -282,6 +314,9 @@ class IdempotencyEngine:
 
     def clear(self) -> None:
         """Clear only explicitly owned in-progress reservations registered by this engine instance."""
+        raw_env = os.environ.get("APP_ENV") or getattr(get_settings(), "app_env", "development")
+        is_prod = str(raw_env).lower().strip() == "production"
+
         try:
             from app.application.services.idempotency import IdempotencyService
 
@@ -293,9 +328,16 @@ class IdempotencyEngine:
                 self._registered_keys.clear()
                 self._owned_reservations.clear()
 
-            if idem_svc._redis_client is not None and owned_items:
-                for k, owner_id in owned_items:
-                    idem_svc.delete_owned(f"{self._key_prefix}:{k}", owner_id=owner_id)
+            if idem_svc._redis_client is not None:
+                if owned_items:
+                    for k, owner_id in owned_items:
+                        idem_svc.delete_owned(f"{self._key_prefix}:{k}", owner_id=owner_id)
+                if not is_prod and keys_to_clear:
+                    owned_dict = dict(owned_items)
+                    for k in keys_to_clear:
+                        if k not in owned_dict:
+                            redis_key = idem_svc._build_redis_key(f"{self._key_prefix}:{k}")
+                            idem_svc._redis_client.delete(redis_key)
 
             with idem_svc._fallback_lock:
                 for k in keys_to_clear:
@@ -447,16 +489,33 @@ class KafkaStreamingConnector(BaseBankConnector):
 
         logger.debug("Committed CloudEvent %s to %s [p=%d, off=%d]", ce.id, target_topic, partition, offset)
 
+        # 4. Integrate broker delivery with the idempotency completion lifecycle
+        idempotency_committed = True
+        if self.enable_idempotency:
+            idempotency_committed = self._idempotency.mark_processed(dedup_key)
+
+        receipt_status = "COMMITTED" if idempotency_committed else "COMMITTED_IDEMPOTENCY_UNCERTAIN"
+        if not idempotency_committed:
+            logger.warning(
+                "Kafka event %s acknowledged by broker on %s [p=%d, off=%d], but idempotency completion "
+                "could not be recorded in Redis. Receipt reported as COMMITTED_IDEMPOTENCY_UNCERTAIN.",
+                ce.id,
+                target_topic,
+                partition,
+                offset,
+            )
+
         return PublishReceipt(
             event_id=ce.id,
             topic=target_topic,
             partition=partition,
             offset=offset,
-            status="COMMITTED",
+            status=receipt_status,
             idempotent_duplicate=False,
             latency_ms=round(latency, 3),
             delivery_mode=delivery_mode,
             durability=durability,
+            idempotency_committed=idempotency_committed,
         )
 
     async def publish_batch(
