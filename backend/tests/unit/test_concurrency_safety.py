@@ -108,9 +108,11 @@ def test_model_registry_concurrent_dual_signoff(tmp_path: Any) -> None:
     v2 = next(e for e in manifest if e["version"] == 2)
     v3 = next(e for e in manifest if e["version"] == 3)
     assert len(v2["sign_offs"]) == 2
-    assert v2["status"] == "challenger"
+    assert v2["status"] == "approved"
+    assert v2["is_approved"] is True
     assert len(v3["sign_offs"]) == 2
-    assert v3["status"] == "challenger"
+    assert v3["status"] == "approved"
+    assert v3["is_approved"] is True
 
 
 def test_immutable_audit_chain_concurrent_writers_and_readers() -> None:

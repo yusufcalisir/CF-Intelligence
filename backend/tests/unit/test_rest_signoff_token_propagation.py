@@ -71,6 +71,16 @@ def isolated_production_env():
     settings.identity_store_secret = "test-prod-identity-authority-secret-32-chars-long!"
     settings.identity_store_path = store_file
 
+    audit_ledger_file = os.path.join(temp_dir, "isolated_audit_ledger.json")
+    nonce_store_file = os.path.join(temp_dir, "isolated_nonces.json")
+    os.environ["CFI_AUDIT_LEDGER_PATH"] = audit_ledger_file
+    os.environ["CFI_INTERNAL_NONCE_STORE_PATH"] = nonce_store_file
+    from app.infrastructure.security.durable_nonce_store import reset_default_nonce_store
+    from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+    reset_default_nonce_store()
+    ImmutableAuditChain.reset_instance()
+
     old_storage = registry.storage_dir
     old_root = registry.registry_root
     old_verifier = getattr(registry, "_verifier", None)
@@ -135,6 +145,10 @@ def isolated_production_env():
 
     # Teardown
     AuthenticationService.reset_instance()
+    os.environ.pop("CFI_AUDIT_LEDGER_PATH", None)
+    os.environ.pop("CFI_INTERNAL_NONCE_STORE_PATH", None)
+    reset_default_nonce_store()
+    ImmutableAuditChain.reset_instance()
     settings.app_env = orig_env
     settings.payload_signing_secret = orig_secret
     settings.oidc_jwt_signing_secret = orig_jwt
@@ -505,14 +519,22 @@ class TestRestSignOffTokenPropagation:
         assert resp2.status_code == 200
         data2 = resp2.json()
         assert len(data2["sign_offs"]) == 2
-        assert data2["status"] == "champion"
-        assert data2["is_active"] is True
+        assert data2["status"] == "approved"
+
+        # Explicit promotion to champion
+        promoted_resp = registry.promote_version(
+            sim_id, version, target_status="champion", auth_token=ctx["tok_mle"]
+        )
+        assert promoted_resp["status"] == "champion"
+        assert promoted_resp["is_active"] is True
 
         # Verify persisted manifest invariants
         manifest = registry._load_manifest(sim_id)
         promoted = manifest[0]
         assert promoted["status"] == "champion"
         assert promoted["is_active"] is True
+        assert promoted.get("is_approved") is True
+        assert promoted.get("is_production_eligible") is True
         assert len(promoted["sign_offs"]) == 2
         for s in promoted["sign_offs"]:
             assert s["is_signature_valid"] is True
@@ -645,7 +667,10 @@ class TestRestSignOffTokenPropagation:
             json={"role": "compliance", "user": ctx["u_comp"].username, "signature": sig_comp},
         )
         assert resp_p2.status_code == 200
-        assert resp_p2.json()["status"] == "champion"
+        assert resp_p2.json()["status"] == "approved"
+
+        # Explicit promotion to champion
+        registry.promote_version(sim_id, version, target_status="champion", auth_token=ctx["tok_mle"])
 
         # ModelService resolves active champion
         model_svc = ModelService(get_settings())

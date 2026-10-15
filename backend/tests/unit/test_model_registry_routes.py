@@ -15,9 +15,31 @@ from app.presentation.routers.model_registry import registry
 client = TestClient(app)
 
 
+def _admin_headers() -> dict[str, str]:
+    """Helper providing authoritative admin operator bearer token headers."""
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    auth_svc = AuthenticationService.get_instance()
+    admin_user = auth_svc.get_user("admin")
+    token = auth_svc.create_token_bundle(admin_user).access_token
+    return {"Authorization": f"Bearer {token}"}
+
+
 @pytest.fixture(autouse=True)
 def clean_registry_and_deployer():
     """Ensure isolated clean temporary storage for model registry and deployment sessions."""
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    auth_svc = AuthenticationService.get_instance()
+    if not auth_svc.get_user("test_ml_engineer"):
+        auth_svc.register_user(
+            username="test_ml_engineer",
+            plain_password="Password123!",
+            bank_id="bank_a",
+            roles=["ml_engineer"],
+            clearance_level=2,
+        )
+
     temp_dir = tempfile.mkdtemp()
     old_storage = registry.storage_dir
     old_root = registry.registry_root
@@ -25,6 +47,7 @@ def clean_registry_and_deployer():
     registry.storage_dir = temp_dir
     registry.registry_root = f"{temp_dir}/registry"
     import os
+
     os.makedirs(registry.registry_root, exist_ok=True)
 
     yield
@@ -38,12 +61,15 @@ def _seed_sample_model(sim_id: str, version: int = 1, auc: float = 0.92, fairnes
     """Helper to seed a test model version directly in the isolated test registry."""
     dummy_state = {"linear.weight": torch.randn(5, 5), "linear.bias": torch.randn(5)}
     metrics = {"auc_roc": auc, "pr_auc": auc - 0.05, "f1_score": 0.88, "latency_ms": 12.0}
+    admin_tok = _admin_headers()["Authorization"].split(" ")[1]
     entry = registry.save_version(
         simulation_id=sim_id,
         state_dict=dummy_state,
         metrics=metrics,
         is_promoted=(version == 1),
         status="champion" if version == 1 else "challenger",
+        owning_bank_id="bank_a",
+        auth_token=admin_tok,
     )
     # Add initial sign-off
     registry.sign_off(
@@ -134,6 +160,7 @@ class TestZeroDowntimeDeploymentLifecycle:
                 "compatibility_window_hours": 48,
                 "initial_connections": 100,
             },
+            headers=_admin_headers(),
         )
         assert init_resp.status_code == 200
         session_data = init_resp.json()
@@ -150,6 +177,7 @@ class TestZeroDowntimeDeploymentLifecycle:
         drain_resp = client.post(
             f"/api/v1/registry/deployment/{session_id}/drain",
             json={"batch_size": 40},
+            headers=_admin_headers(),
         )
         assert drain_resp.status_code == 200
         drain_data = drain_resp.json()
@@ -160,12 +188,16 @@ class TestZeroDowntimeDeploymentLifecycle:
         roll_resp = client.post(
             f"/api/v1/registry/deployment/{session_id}/rolling-update",
             json={"instance_ids": ["inst_node_1", "inst_node_2"]},
+            headers=_admin_headers(),
         )
         assert roll_resp.status_code == 200
         assert "inst_node_1" in roll_resp.json()["updated_instances"]
 
         # 5. Finalize upgrade session
-        fin_resp = client.post(f"/api/v1/registry/deployment/{session_id}/finalize")
+        fin_resp = client.post(
+            f"/api/v1/registry/deployment/{session_id}/finalize",
+            headers=_admin_headers(),
+        )
         assert fin_resp.status_code == 200
         assert fin_resp.json()["stage"] == "UPGRADE_COMPLETED"
 
@@ -174,12 +206,14 @@ class TestZeroDowntimeDeploymentLifecycle:
         init_resp = client.post(
             "/api/v1/registry/deployment/initiate",
             json={"target_version": "v2.3.0_canary"},
+            headers=_admin_headers(),
         )
         session_id = init_resp.json()["session_id"]
 
         abort_resp = client.post(
             f"/api/v1/registry/deployment/{session_id}/abort",
             json={"reason": "Canary error rate spike detected in bank node C"},
+            headers=_admin_headers(),
         )
         assert abort_resp.status_code == 200
         assert abort_resp.json()["stage"] == "ABORTED"
@@ -270,6 +304,7 @@ class TestModelVersionAndGovernanceLifecycle:
                 "min_auc": 0.65,
                 "min_fairness_score": 0.80,
             },
+            headers=_admin_headers(),
         )
         assert promo_resp.status_code == 200
         data = promo_resp.json()
@@ -289,6 +324,7 @@ class TestModelVersionAndGovernanceLifecycle:
                 "enforce_sr11_7": True,
                 "min_auc": 0.75,  # Model has 0.60 -> must be rejected
             },
+            headers=_admin_headers(),
         )
         assert promo_resp.status_code == 422
         detail = promo_resp.json()["detail"]
@@ -307,6 +343,7 @@ class TestModelVersionAndGovernanceLifecycle:
                 "min_auc": 0.65,
                 "min_fairness_score": 0.80,  # Model has 0.72 -> must be rejected
             },
+            headers=_admin_headers(),
         )
         assert promo_resp.status_code == 422
         detail = promo_resp.json()["detail"]
@@ -320,6 +357,7 @@ class TestModelVersionAndGovernanceLifecycle:
         resp = client.post(
             "/api/v1/models/sim_alias_test/promote",
             json={"target_status": "champion", "enforce_sr11_7": False},
+            headers=_admin_headers(),
         )
         assert resp.status_code == 200
         assert resp.json()["target_status"] == "champion"
@@ -333,7 +371,10 @@ class TestRollbackCanaryAndShadowMetrics:
         _seed_sample_model("sim_rollback", version=2, auc=0.95)
 
         # Rollback to v1
-        rb_resp = client.post("/api/v1/registry/sim_rollback/rollback/1")
+        rb_resp = client.post(
+            "/api/v1/registry/sim_rollback/rollback/1",
+            headers=_admin_headers(),
+        )
         assert rb_resp.status_code == 200
         data = rb_resp.json()
         assert data["version"] == 1
@@ -347,6 +388,9 @@ class TestRollbackCanaryAndShadowMetrics:
 
     def test_canary_history_endpoint(self):
         from app.presentation.routers.simulation import _simulation_events
+
+        _simulation_events.delete("sim_canary_test")
+        _simulation_events.delete("sim_canary_test:list_data")
 
         # Push mock canary event
         _simulation_events.push_list(
@@ -391,6 +435,17 @@ class TestRollbackCanaryAndShadowMetrics:
         assert resp.status_code == 404
         assert "no active champion" in resp.json()["detail"].lower()
 
-        # Rollback missing version
-        resp = client.post("/api/v1/registry/missing_simulation_id_999/rollback/99")
-        assert resp.status_code == 404
+        # Rollback missing simulation fails closed with 403 (unbound institutional ownership) or 404
+        resp = client.post(
+            "/api/v1/registry/missing_simulation_id_999/rollback/99",
+            headers=_admin_headers(),
+        )
+        assert resp.status_code in (403, 404)
+
+        # Rollback missing version on registered simulation returns 404
+        _seed_sample_model("sim_missing_v_test", version=1)
+        resp_v = client.post(
+            "/api/v1/registry/sim_missing_v_test/rollback/99",
+            headers=_admin_headers(),
+        )
+        assert resp_v.status_code == 404

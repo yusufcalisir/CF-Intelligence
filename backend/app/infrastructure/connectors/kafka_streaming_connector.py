@@ -159,11 +159,13 @@ class IdempotencyEngine:
     def __init__(self, ttl_seconds: int = 86400) -> None:
         self._ttl_seconds = ttl_seconds
         self._processed_keys: dict[str, float] = {}
+        self._registered_keys: set[str] = set()
         self._lock = threading.Lock()
 
     def try_acquire(self, idempotency_key: str) -> bool:
         """Atomically test and reserve an idempotency key if not already processed."""
         # Multi-worker distributed Redis coordination when available
+        acquired_redis = False
         try:
             from app.application.services.idempotency import IdempotencyService
 
@@ -172,15 +174,18 @@ class IdempotencyEngine:
                 status, _ = idem_svc.acquire(
                     f"kafka:{idempotency_key}", in_progress_timeout=float(self._ttl_seconds)
                 )
-                return status == "ACQUIRED"
+                if status != "ACQUIRED":
+                    return False
+                acquired_redis = True
         except Exception as exc:
             logger.debug("IdempotencyEngine Redis check skipped (%s), using local engine", exc)
 
         with self._lock:
             self._evict_expired()
-            if idempotency_key in self._processed_keys:
+            if not acquired_redis and idempotency_key in self._processed_keys:
                 return False
             self._processed_keys[idempotency_key] = time.time() + self._ttl_seconds
+            self._registered_keys.add(idempotency_key)
             return True
 
     def release(self, idempotency_key: str) -> None:
@@ -196,6 +201,7 @@ class IdempotencyEngine:
 
         with self._lock:
             self._processed_keys.pop(idempotency_key, None)
+            self._registered_keys.discard(idempotency_key)
 
     def is_duplicate(self, idempotency_key: str) -> bool:
         """Check if an event key has already been processed within the TTL window."""
@@ -206,6 +212,10 @@ class IdempotencyEngine:
             if idem_svc._redis_client is not None:
                 cached = idem_svc.get_cached(f"kafka:{idempotency_key}")
                 if cached is not None:
+                    return True
+                redis_key = idem_svc._build_redis_key(f"kafka:{idempotency_key}")
+                raw = idem_svc._redis_client.get(redis_key)
+                if raw is not None:
                     return True
         except Exception:
             pass
@@ -228,16 +238,35 @@ class IdempotencyEngine:
         with self._lock:
             self._evict_expired()
             self._processed_keys[idempotency_key] = time.time() + self._ttl_seconds
+            self._registered_keys.add(idempotency_key)
 
     def _evict_expired(self) -> None:
         now = time.time()
         expired = [k for k, exp in self._processed_keys.items() if now > exp]
         for k in expired:
             self._processed_keys.pop(k, None)
+            self._registered_keys.discard(k)
 
     def clear(self) -> None:
+        try:
+            from app.application.services.idempotency import IdempotencyService
+
+            idem_svc = IdempotencyService.get()
+            if idem_svc._redis_client is not None:
+                for k in list(self._registered_keys):
+                    redis_key = idem_svc._build_redis_key(f"kafka:{k}")
+                    idem_svc._redis_client.delete(redis_key)
+            with idem_svc._fallback_lock:
+                for k in list(self._registered_keys):
+                    redis_key = idem_svc._build_redis_key(f"kafka:{k}")
+                    idem_svc._fallback.pop(redis_key, None)
+        except Exception:
+            pass
+
         with self._lock:
             self._processed_keys.clear()
+            self._registered_keys.clear()
+
 
 
 # ── Enterprise Kafka Streaming Connector ──────────────────────────────────────

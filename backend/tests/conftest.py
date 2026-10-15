@@ -200,9 +200,80 @@ def canonical_alert() -> dict[str, Any]:
 
 
 @pytest.fixture(autouse=True)
+def _restore_settings_and_security_singletons():
+    """Snapshot settings and security singletons before each test and restore cleanly after."""
+    from app.config import get_settings
+    from app.infrastructure.security.auth_service import AuthenticationService
+    from app.infrastructure.security.durable_nonce_store import reset_default_nonce_store
+    from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+    from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
+
+    settings = get_settings()
+    saved_env = {
+        "app_env": settings.app_env,
+        "payload_signing_secret": settings.payload_signing_secret,
+        "oidc_jwt_signing_secret": settings.oidc_jwt_signing_secret,
+        "identity_store_path": settings.identity_store_path,
+        "identity_store_secret": settings.identity_store_secret,
+    }
+    saved_os_env = {
+        k: os.environ.get(k)
+        for k in (
+            "APP_ENV",
+            "CFI_AUDIT_LEDGER_PATH",
+            "CFI_INTERNAL_NONCE_STORE_PATH",
+            "CFI_CONSORTIUM_STORE_PATH",
+            "CFI_IDENTITY_STORE_PATH",
+        )
+    }
+    yield
+    for k, v in saved_env.items():
+        setattr(settings, k, v)
+    for k, v in saved_os_env.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+    get_settings.cache_clear()
+    AuthenticationService.reset_instance()
+    reset_default_nonce_store()
+    ImmutableAuditChain.reset_instance()
+    DurableConsortiumStore._instance = None
+
+
+@pytest.fixture(autouse=True)
 def clear_fallback_stores():
     """Clear shared in-memory fallback stores and dedup caches between tests."""
     from app.infrastructure.redis_store import RedisStore
+
+    _TEST_PREFIXES = (
+        "intelligence",
+        "alert",
+        "entity",
+        "relationship",
+        "psi",
+        "alerts",
+        "cases",
+        "graph",
+        "session",
+        "ratelimit",
+    )
+    for pfx in _TEST_PREFIXES:
+        with contextlib.suppress(Exception):
+            RedisStore(pfx).clear()
+
+    try:
+        from app.application.services.idempotency import IdempotencyService
+
+        idem_svc = IdempotencyService.get()
+        if idem_svc._redis_client is not None:
+            keys = list(idem_svc._redis_client.scan_iter("idem:*"))
+            if keys:
+                idem_svc._redis_client.delete(*keys)
+        with idem_svc._fallback_lock:
+            idem_svc._fallback.clear()
+    except Exception:
+        pass
 
     RedisStore._shared_fallback_stores.clear()
     try:
@@ -222,6 +293,23 @@ def clear_fallback_stores():
         if val and (val.startswith(("test", "mock")) or val == "mock_key"):
             os.environ.pop(k, None)
     yield
+    for pfx in _TEST_PREFIXES:
+        with contextlib.suppress(Exception):
+            RedisStore(pfx).clear()
+
+    try:
+        from app.application.services.idempotency import IdempotencyService
+
+        idem_svc = IdempotencyService.get()
+        if idem_svc._redis_client is not None:
+            keys = list(idem_svc._redis_client.scan_iter("idem:*"))
+            if keys:
+                idem_svc._redis_client.delete(*keys)
+        with idem_svc._fallback_lock:
+            idem_svc._fallback.clear()
+    except Exception:
+        pass
+
     RedisStore._shared_fallback_stores.clear()
     try:
         from app.presentation.routers.predict import _alert_service as p_svc
@@ -239,6 +327,7 @@ def clear_fallback_stores():
         val = os.environ.get(k)
         if val and (val.startswith(("test", "mock")) or val == "mock_key"):
             os.environ.pop(k, None)
+
 
 
 # ── Clean C++ Extension Interpreter Teardown ──────────────────────────────────

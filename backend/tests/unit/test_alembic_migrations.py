@@ -59,7 +59,7 @@ def test_alembic_heads_is_single_linear_branch() -> None:
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
     assert len(heads) == 1, f"Expected exactly 1 migration head, found {len(heads)}: {heads}"
-    assert heads[0] == "003_alerts_unique_constraint"
+    assert heads[0] == "004_training_authority_tables"
 
 
 def test_alembic_migrations_upgrade_head_and_downgrade_base_cleanly(temp_alembic_db: str) -> None:
@@ -75,11 +75,22 @@ def test_alembic_migrations_upgrade_head_and_downgrade_base_cleanly(temp_alembic
     tables_after_upgrade = {r[0] for r in cur.fetchall()}
     conn.close()
 
-    # Must contain alembic_version plus all 17 domain tables
+    AUTHORITY_TABLES = {
+        "cfi_scheduled_jobs",
+        "cfi_started_jobs",
+        "cfi_round_observations",
+        "cfi_global_aggregations",
+        "cfi_model_evaluations",
+        "cfi_completed_jobs",
+    }
+
+    # Must contain alembic_version plus all domain and authority tables
     assert "alembic_version" in tables_after_upgrade
     for expected_table in Base.metadata.tables:
         assert expected_table in tables_after_upgrade, f"Missing table: {expected_table}"
-    assert len(tables_after_upgrade) == 18  # 17 domain tables + 1 alembic_version
+    for auth_table in AUTHORITY_TABLES:
+        assert auth_table in tables_after_upgrade, f"Missing authority table: {auth_table}"
+    assert len(tables_after_upgrade) == len(Base.metadata.tables) + len(AUTHORITY_TABLES) + 1
 
     # 2. Rollback completely to base
     command.downgrade(cfg, "base")
@@ -103,9 +114,11 @@ def test_alembic_migrations_upgrade_head_and_downgrade_base_cleanly(temp_alembic
     tables_after_reupgrade = {r[0] for r in cur.fetchall()}
     conn.close()
 
-    assert len(tables_after_reupgrade) == 18
+    assert len(tables_after_reupgrade) == len(Base.metadata.tables) + len(AUTHORITY_TABLES) + 1
     for expected_table in Base.metadata.tables:
         assert expected_table in tables_after_reupgrade
+    for auth_table in AUTHORITY_TABLES:
+        assert auth_table in tables_after_reupgrade
 
 
 def test_alembic_schema_parity_zero_drift(temp_alembic_db: str) -> None:
@@ -116,7 +129,10 @@ def test_alembic_schema_parity_zero_drift(temp_alembic_db: str) -> None:
     sync_engine = create_engine(f"sqlite:///{temp_alembic_db}")
     try:
         with sync_engine.connect() as conn:
-            ctx = MigrationContext.configure(conn)
+            ctx = MigrationContext.configure(
+                conn,
+                opts={"include_name": lambda name, type_, parent_names: not (name and name.startswith("cfi_"))},
+            )
             diff = compare_metadata(ctx, Base.metadata)
             assert diff == [], f"Detected schema drift between models and migrations: {diff}"
     finally:

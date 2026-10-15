@@ -15,18 +15,19 @@ from app.presentation.websockets.training_ws import _stream_via_redis
 
 def test_settings_redis_url_construction() -> None:
     """Validate Redis URL construction with and without passwords and explicit REDIS_URL."""
-    # 1. No password
-    s1 = Settings(redis_host="localhost", redis_port=6379, redis_db=0, redis_password="")
-    assert s1.redis_url == "redis://localhost:6379/0"
+    with patch.dict(os.environ, {"REDIS_URL": ""}):
+        # 1. No password
+        s1 = Settings(redis_host="localhost", redis_port=6379, redis_db=0, redis_password="")
+        assert s1.redis_url == "redis://localhost:6379/0"
 
-    # 2. With password
-    s2 = Settings(
-        redis_host="localhost",
-        redis_port=6379,
-        redis_db=0,
-        redis_password="cfi_test_redis_pass",
-    )
-    assert s2.redis_url == "redis://:cfi_test_redis_pass@localhost:6379/0"
+        # 2. With password
+        s2 = Settings(
+            redis_host="localhost",
+            redis_port=6379,
+            redis_db=0,
+            redis_password="cfi_test_redis_pass",
+        )
+        assert s2.redis_url == "redis://:cfi_test_redis_pass@localhost:6379/0"
 
     # 3. Empty host returns None
     s3 = Settings(redis_host="")
@@ -37,15 +38,16 @@ def test_settings_redis_url_construction() -> None:
     with patch.dict(os.environ, {"REDIS_URL": "redis://custom-redis:6380/2"}):
         assert s1.redis_url == "redis://custom-redis:6380/2"
 
-    # 5. TLS URL construction with rediss:// scheme
-    s4 = Settings(
-        redis_host="managed-redis.cloud",
-        redis_port=6380,
-        redis_db=0,
-        redis_password="secure_tls_pass",
-        redis_tls=True,
-    )
-    assert s4.redis_url == "rediss://:secure_tls_pass@managed-redis.cloud:6380/0"
+    with patch.dict(os.environ, {"REDIS_URL": ""}):
+        # 5. TLS URL construction with rediss:// scheme
+        s4 = Settings(
+            redis_host="managed-redis.cloud",
+            redis_port=6380,
+            redis_db=0,
+            redis_password="secure_tls_pass",
+            redis_tls=True,
+        )
+        assert s4.redis_url == "rediss://:secure_tls_pass@managed-redis.cloud:6380/0"
 
     # 6. Direct REDIS_URL env var override with rediss:// scheme
     with patch.dict(os.environ, {"REDIS_URL": "rediss://default:cloud_secret@upstash.io:6379/0"}):
@@ -151,14 +153,15 @@ def test_redact_redis_url_masks_credentials() -> None:
     assert redact_redis_url("") == "not configured"
 
     # 5. Settings property integration
-    s = Settings(
-        redis_host="managed.redis.net",
-        redis_port=6380,
-        redis_password="super_secret_pwd",
-        redis_tls=True,
-    )
-    assert "super_secret_pwd" not in s.redacted_redis_url
-    assert ":***@" in s.redacted_redis_url
+    with patch.dict(os.environ, {"REDIS_URL": ""}):
+        s = Settings(
+            redis_host="managed.redis.net",
+            redis_port=6380,
+            redis_password="super_secret_pwd",
+            redis_tls=True,
+        )
+        assert "super_secret_pwd" not in s.redacted_redis_url
+        assert ":***@" in s.redacted_redis_url
 
 
 @pytest.mark.asyncio

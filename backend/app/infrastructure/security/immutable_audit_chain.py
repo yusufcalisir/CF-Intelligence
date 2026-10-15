@@ -29,6 +29,7 @@ import logging
 import os
 import re
 import threading
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -496,7 +497,14 @@ class ImmutableAuditChain:
             os.fsync(f.fileno())
 
         _restrict_file_permissions(tmp_path)
-        os.replace(tmp_path, self._store_path)
+        for attempt in range(5):
+            try:
+                os.replace(tmp_path, self._store_path)
+                break
+            except PermissionError:
+                if attempt == 4 or os.name != "nt":
+                    raise
+                time.sleep(0.05 * (attempt + 1))
 
         # Update stat cache
         stat = os.stat(self._store_path)

@@ -101,6 +101,7 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setenv("CFI_ACCOUNT_AUTHORITY_SECRET", "authoritative_signing_master_secret_key_64_bytes_test")
     monkeypatch.setenv("CFI_AUDIT_LEDGER_PATH", audit_file)
     monkeypatch.setenv("CFI_AUDIT_LEDGER_SECRET", payload_secret)
+    orig_app_env = get_settings().app_env
     monkeypatch.setenv("APP_ENV", "production")
 
     get_settings.cache_clear()
@@ -133,6 +134,7 @@ def isolated_env(tmp_path, monkeypatch):
     DurableConsortiumStore._instance = None
     AuthenticationService._instance = None
     ImmutableAuditChain.reset_instance()
+    get_settings().app_env = orig_app_env
 
 
 def _create_champion_fixtures(env: dict[str, Any], sim_id: str = "sim_prod_champ_01") -> tuple[ModelRegistry, int, str]:
@@ -770,7 +772,7 @@ def test_final_auth_03_v1_signed_unscoped_context_cannot_authorize_production_mu
     assert not is_valid
     assert "production mode strictly requires V2" in reason or "cannot authorize privileged state mutations" in reason
 
-    # 2. Non-production check: even in development, V1 cannot authorize a state mutation (consume_nonce=True)
+    orig_env = settings.app_env
     monkeypatch.setenv("APP_ENV", "development")
     settings.app_env = "development"
     try:
@@ -778,8 +780,8 @@ def test_final_auth_03_v1_signed_unscoped_context_cannot_authorize_production_mu
         assert not is_valid_dev
         assert "cannot authorize privileged state mutations" in reason_dev
     finally:
-        monkeypatch.setenv("APP_ENV", "production")
-        settings.app_env = "production"
+        monkeypatch.setenv("APP_ENV", orig_env)
+        settings.app_env = orig_env
 
 
 def test_final_auth_04_missing_or_default_production_secret_fails_closed(isolated_env, monkeypatch):

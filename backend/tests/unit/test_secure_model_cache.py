@@ -64,6 +64,7 @@ def _setup_approved_champion(tmp_dir: str, simulation_id: str = "sim_cache_test"
         feature_names=[f"f_{i}" for i in range(10)],
         simulation_id=simulation_id,
         metrics={"loss": 0.01},
+        owning_bank_id="bank_a",
     )
 
     metadata = registry.save_version(
@@ -74,12 +75,13 @@ def _setup_approved_champion(tmp_dir: str, simulation_id: str = "sim_cache_test"
         provenance_type="TRAINING_RECORDED",
         provenance_receipt=receipt.to_dict(),
         artifact_bytes=raw_bytes,
+        owning_bank_id="bank_a",
     )
     version = metadata["version"]
 
     auth_svc = AuthenticationService.get_instance()
-    u1 = auth_svc.register_user("eng_dave", "Pass123!", "bank_a", roles=["ml_engineer"])
-    u2 = auth_svc.register_user("comp_ann", "Pass123!", "bank_a", roles=["compliance"])
+    u1 = auth_svc.register_user("eng_dave", "Pass123!", "bank_a", roles=["ml_engineer"], clearance_level=2)
+    u2 = auth_svc.register_user("comp_ann", "Pass123!", "bank_a", roles=["compliance"], clearance_level=2)
     tok1 = auth_svc.create_token_bundle(u1).access_token
     tok2 = auth_svc.create_token_bundle(u2).access_token
 
@@ -90,7 +92,7 @@ def _setup_approved_champion(tmp_dir: str, simulation_id: str = "sim_cache_test"
     registry.sign_off(simulation_id, version, "compliance", user="comp_ann", signature=sig2, auth_token=tok2)
 
     with patch.object(get_settings(), "app_env", "production"):
-        registry.promote_version(simulation_id, version)
+        registry.promote_version(simulation_id, version, auth_token=tok1)
 
     return registry, version
 

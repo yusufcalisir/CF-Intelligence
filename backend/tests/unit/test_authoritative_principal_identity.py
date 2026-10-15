@@ -506,8 +506,14 @@ class TestAuthoritativePrincipalIdentity:
         assert resp2.status_code == 200
         data2 = resp2.json()
         assert len(data2["sign_offs"]) == 2
-        assert data2["status"] == "champion"
-        assert data2["is_active"] is True
+        assert data2["status"] == "approved"
+        assert data2["is_approved"] is True
+        assert data2["is_production_eligible"] is True
+
+        # Explicit promotion to champion
+        promoted = registry.promote_version("sim_ident_10", 1, target_status="champion", auth_token=tok_eng)
+        assert promoted["status"] == "champion"
+        assert promoted["is_active"] is True
 
         # Invariant: Four-Eyes dual approvals verified and champion promoted in metadata
         final_meta = registry.get_version_metadata("sim_ident_10", 1)
