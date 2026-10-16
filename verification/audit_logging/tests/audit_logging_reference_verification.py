@@ -148,7 +148,7 @@ def run_reference_verification() -> list[tuple[str, bool, str]]:
     results.append(("13. Splunk HEC Wrapper Structure", splunk_ok, f"Sourcetype: {splunk_json.get('sourcetype')}"))
 
     # 14. LRA Privacy Audit AUC Calculation
-    embs: dict[str, np.ndarray] = {"n1": np.array([1.0, 0.0]), "n2": np.array([0.9, 0.1]), "n3": np.array([0.0, 1.0])}
+    embs = {"n1": np.array([1.0, 0.0]), "n2": np.array([0.9, 0.1]), "n3": np.array([0.0, 1.0])}
     adj = [[1], [0], []]
     idx_map = {"n1": 0, "n2": 1, "n3": 2}
     lra_res = privacy_svc.audit_link_reconstruction(embs, adj, idx_map)

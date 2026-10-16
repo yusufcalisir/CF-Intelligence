@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import math
+from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
@@ -20,7 +21,7 @@ class PrivacyAuditService:
 
     def audit_link_reconstruction(
         self,
-        embeddings: dict[str, np.ndarray],
+        embeddings: Mapping[str, np.ndarray] | dict[str, Any],
         adjacency_lists: list[list[int]],
         node_id_to_index: dict[str, int],
         seed: int | None = None,

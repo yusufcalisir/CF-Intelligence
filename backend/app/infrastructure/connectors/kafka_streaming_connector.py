@@ -30,6 +30,7 @@ from app.application.schemas.event_schemas import (
     CloudEvent,
     DLQEnvelope,
     PublishReceipt,
+    PublishReceiptStatus,
 )
 from app.config import get_settings
 from app.infrastructure.connectors.base_connector import (
@@ -494,7 +495,9 @@ class KafkaStreamingConnector(BaseBankConnector):
         if self.enable_idempotency:
             idempotency_committed = self._idempotency.mark_processed(dedup_key)
 
-        receipt_status = "COMMITTED" if idempotency_committed else "COMMITTED_IDEMPOTENCY_UNCERTAIN"
+        receipt_status: PublishReceiptStatus = (
+            "COMMITTED" if idempotency_committed else "COMMITTED_IDEMPOTENCY_UNCERTAIN"
+        )
         if not idempotency_committed:
             logger.warning(
                 "Kafka event %s acknowledged by broker on %s [p=%d, off=%d], but idempotency completion "

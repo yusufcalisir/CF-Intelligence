@@ -243,6 +243,16 @@ class DLQEnvelope(BaseModel):
 
 # ── Kafka Delivery Receipt ───────────────────────────────────────────────────
 
+PublishReceiptStatus = Literal[
+    "COMMITTED",
+    "DUPLICATE_IGNORED",
+    "DLQ_ROUTED",
+    "FAILED",
+    "COMMITTED_IDEMPOTENCY_UNCERTAIN",
+    "COMMITTED_IDEMPOTENCY_DEGRADED",
+]
+
+
 class PublishReceipt(BaseModel):
     """Receipt returned upon committing an event to Kafka or in-memory streaming bus."""
 
@@ -253,14 +263,7 @@ class PublishReceipt(BaseModel):
     partition: int = Field(default=0, description="Assigned broker partition", ge=0)
     offset: int = Field(default=0, description="Committed log offset", ge=0)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Broker timestamp UTC")
-    status: Literal[
-        "COMMITTED",
-        "DUPLICATE_IGNORED",
-        "DLQ_ROUTED",
-        "FAILED",
-        "COMMITTED_IDEMPOTENCY_UNCERTAIN",
-        "COMMITTED_IDEMPOTENCY_DEGRADED",
-    ] = Field(
+    status: PublishReceiptStatus = Field(
         default="COMMITTED", description="Publish status"
     )
     idempotent_duplicate: bool = Field(default=False, description="True if skipped due to distributed deduplication")
