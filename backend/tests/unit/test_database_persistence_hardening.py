@@ -21,6 +21,7 @@ Validates:
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -599,4 +600,114 @@ def test_tenant_connections_isolation_urls() -> None:
     assert bank_a != bank_b
     assert "bank_a" in bank_a
     assert "bank_b" in bank_b
+
+
+def test_redact_database_url_various_schemes() -> None:
+    """Verifies that redact_database_url hides passwords across all URL formats without corrupting non-sensitive parts."""
+    from app.infrastructure.database import redact_database_url
+
+    # SQLite
+    sqlite_url = "sqlite+aiosqlite:///storage/cfi_central.db"
+    assert redact_database_url(sqlite_url) == sqlite_url
+
+    # PostgreSQL with password
+    secret_pass = "P@ssw0rd_SuperSecret_99!"
+    pg_url = f"postgresql+asyncpg://postgres:{secret_pass}@localhost:5432/cfi_central"
+    redacted = redact_database_url(pg_url)
+    assert secret_pass not in redacted
+    assert redacted == "postgresql+asyncpg://postgres:***@localhost:5432/cfi_central"
+
+    # PostgreSQL without password
+    no_pass_url = "postgresql+asyncpg://readonly_user@localhost:5432/cfi_db"
+    assert redact_database_url(no_pass_url) == no_pass_url
+
+    # Empty and None
+    assert redact_database_url("") == ""
+    assert redact_database_url(None) == ""
+
+
+@pytest.mark.asyncio
+async def test_database_configuration_mismatch_exception_redacts_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that database configuration mismatch RuntimeError redacts credentials."""
+    from app.config import get_settings
+    from app.infrastructure.database import _get_or_create_engine, dispose_all_engines
+
+    await dispose_all_engines()
+    secret_initial = "InitSecretPass_123!"
+    secret_changed = "ChangedSecretPass_456!"
+
+    try:
+        current_settings = get_settings()
+        monkeypatch.setattr(current_settings, "database_type", "postgres")
+        monkeypatch.setattr(current_settings, "postgres_user", "db_admin")
+        monkeypatch.setattr(current_settings, "postgres_password", secret_initial)
+        monkeypatch.setattr(current_settings, "postgres_host", "db.internal.bank")
+        monkeypatch.setattr(current_settings, "postgres_port", 5432)
+        monkeypatch.setattr(current_settings, "postgres_db", "cfi_prod")
+
+        mock_eng1 = MagicMock()
+        mock_eng1.dispose = AsyncMock()
+        mock_eng1.sync_engine = MagicMock()
+        monkeypatch.setattr(
+            "app.infrastructure.database.create_async_engine",
+            MagicMock(return_value=mock_eng1),
+        )
+
+        eng1 = _get_or_create_engine("bank_a")
+        assert eng1 is not None
+
+        # Change password, creating configuration mismatch
+        monkeypatch.setattr(current_settings, "postgres_password", secret_changed)
+
+        with pytest.raises(RuntimeError) as exc_info:
+            _get_or_create_engine("bank_a")
+
+        err_msg = str(exc_info.value)
+        assert secret_initial not in err_msg
+        assert secret_changed not in err_msg
+        assert "postgresql+asyncpg://db_admin:***@db.internal.bank:5432/cfi_prod_bank_a" in err_msg
+        assert "Database configuration change detected for tenant 'bank_a'" in err_msg
+    finally:
+        await dispose_all_engines()
+
+
+@pytest.mark.asyncio
+async def test_database_engine_creation_log_redacts_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Verifies that database engine creation logger never prints raw database secrets."""
+    from app.config import get_settings
+    from app.infrastructure.database import _get_or_create_engine, dispose_all_engines
+
+    await dispose_all_engines()
+    secret_pw = "SecretLogPass_789!"
+
+    try:
+        current_settings = get_settings()
+        monkeypatch.setattr(current_settings, "database_type", "postgres")
+        monkeypatch.setattr(current_settings, "postgres_user", "db_logger")
+        monkeypatch.setattr(current_settings, "postgres_password", secret_pw)
+        monkeypatch.setattr(current_settings, "postgres_host", "db.internal.bank")
+        monkeypatch.setattr(current_settings, "postgres_port", 5432)
+        monkeypatch.setattr(current_settings, "postgres_db", "cfi_prod")
+
+        mock_eng2 = MagicMock()
+        mock_eng2.dispose = AsyncMock()
+        mock_eng2.sync_engine = MagicMock()
+        monkeypatch.setattr(
+            "app.infrastructure.database.create_async_engine",
+            MagicMock(return_value=mock_eng2),
+        )
+
+        with caplog.at_level(logging.INFO, logger="app.infrastructure.database"):
+            _get_or_create_engine("bank_b")
+
+        assert "Created database engine for tenant=bank_b" in caplog.text
+        assert secret_pw not in caplog.text
+        assert "postgresql+asyncpg://db_logger:***@db.internal.bank:5432/cfi_prod_bank_b" in caplog.text
+    finally:
+        await dispose_all_engines()
 

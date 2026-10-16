@@ -26,6 +26,7 @@ import contextlib
 import contextvars
 import logging
 import os
+import re
 import secrets
 from typing import TYPE_CHECKING, Any
 
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
     from starlette.responses import Response
 
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -106,6 +108,20 @@ def _resolve_database_url(tenant: str | None) -> str:
     )
 
 
+def redact_database_url(url: str | None) -> str:
+    """Return a safely redacted representation of the database URL with credentials hidden.
+
+    Uses SQLAlchemy's safe URL rendering with a fallback to regex pattern redaction.
+    """
+    if not url:
+        return ""
+    try:
+        rendered = make_url(url).render_as_string(hide_password=True)
+        return re.sub(r"(://[^:]+:)(.+)@", r"\1***@", rendered)
+    except Exception:
+        return re.sub(r"(://[^:]+:)(.+)@", r"\1***@", str(url))
+
+
 def _make_engine_kwargs(tenant: str | None) -> dict[str, Any]:
     """Build engine keyword arguments with production connection pooling."""
     current_settings = get_settings()
@@ -170,10 +186,12 @@ def _get_or_create_engine(tenant: str | None) -> AsyncEngine:
     if clean_tenant in _tenant_engines:
         cached_sig = _tenant_engine_configs.get(clean_tenant)
         if cached_sig is not None and cached_sig != current_sig:
+            current_redacted = redact_database_url(current_sig[0])
+            cached_redacted = redact_database_url(cached_sig[0])
             raise RuntimeError(
                 f"Database configuration change detected for tenant '{clean_tenant or 'central'}'. "
-                f"Active settings resolved to URL '{current_sig[0]}' with pool config {dict(current_sig[1])}, "
-                f"but an engine was already cached with URL '{cached_sig[0]}' and pool config {dict(cached_sig[1])}. "
+                f"Active settings resolved to URL '{current_redacted}' with pool config {dict(current_sig[1])}, "
+                f"but an engine was already cached with URL '{cached_redacted}' and pool config {dict(cached_sig[1])}. "
                 "Silent engine reuse across incompatible configurations is prohibited. "
                 "Explicitly call dispose_all_engines() before reconfiguring database settings in test environments."
             )
@@ -187,7 +205,9 @@ def _get_or_create_engine(tenant: str | None) -> AsyncEngine:
     )
     _tenant_engine_configs[clean_tenant] = current_sig
     logger.info(
-        "Created database engine for tenant=%s url=%s", clean_tenant or "central", url
+        "Created database engine for tenant=%s url=%s",
+        clean_tenant or "central",
+        redact_database_url(url),
     )
     return _tenant_engines[clean_tenant]
 
