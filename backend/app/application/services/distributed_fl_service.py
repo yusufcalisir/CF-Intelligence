@@ -336,6 +336,7 @@ class BankPrivateStorageVault:
         self.app_env = app_env
         self._is_prod = app_env.lower() == "production"
         self._os_lock_handle: Any = None
+        self._orig_mode: int | None = None
 
         if self.bank_encryption_key is None and os.path.exists(self.key_path):
             with contextlib.suppress(Exception):
