@@ -256,14 +256,25 @@ class TestMissingIdentityAuthorityFailClosed:
 
     def test_missing_06_existing_harden_and_ident_suites_remain_passing(self):
         """MISSING-06: Existing HARDEN-01-10 and IDENT-01-10 suites remain passing."""
+        import shutil
+        import tempfile
+
         backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        sub_env = dict(os.environ)
+        tmp_ident_dir = tempfile.mkdtemp()
+        try:
+            sub_env["CFI_INTERNAL_NONCE_STORE_PATH"] = os.path.join(tmp_ident_dir, "consumed_nonces.json")
+            sub_env["CFI_AUDIT_LEDGER_PATH"] = os.path.join(tmp_ident_dir, "audit_ledger.json")
 
-        # Run IDENT suite
-        cmd_ident = [sys.executable, "-m", "pytest", "tests/unit/test_authoritative_principal_identity.py", "-v"]
-        res_ident = subprocess.run(cmd_ident, cwd=backend_dir, capture_output=True, text=True, timeout=120)
-        assert res_ident.returncode == 0, f"IDENT regression failed:\nSTDOUT:\n{res_ident.stdout}\nSTDERR:\n{res_ident.stderr}"
+            # Run IDENT suite
+            cmd_ident = [sys.executable, "-m", "pytest", "tests/unit/test_authoritative_principal_identity.py", "-v"]
+            res_ident = subprocess.run(cmd_ident, cwd=backend_dir, capture_output=True, text=True, timeout=120, env=sub_env)
+            assert res_ident.returncode == 0, f"IDENT regression failed:\nSTDOUT:\n{res_ident.stdout}\nSTDERR:\n{res_ident.stderr}"
 
-        # Run HARDEN suite
-        cmd_harden = [sys.executable, "-m", "pytest", "tests/unit/test_identity_authority_hardening.py", "-v"]
-        res_harden = subprocess.run(cmd_harden, cwd=backend_dir, capture_output=True, text=True, timeout=180)
-        assert res_harden.returncode == 0, f"HARDEN regression failed:\nSTDOUT:\n{res_harden.stdout}\nSTDERR:\n{res_harden.stderr}"
+            # Run HARDEN suite
+            cmd_harden = [sys.executable, "-m", "pytest", "tests/unit/test_identity_authority_hardening.py", "-v"]
+            res_harden = subprocess.run(cmd_harden, cwd=backend_dir, capture_output=True, text=True, timeout=180, env=sub_env)
+            assert res_harden.returncode == 0, f"HARDEN regression failed:\nSTDOUT:\n{res_harden.stdout}\nSTDERR:\n{res_harden.stderr}"
+        finally:
+            shutil.rmtree(tmp_ident_dir, ignore_errors=True)
+

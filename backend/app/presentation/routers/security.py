@@ -77,7 +77,8 @@ _vault_client = VaultClient(
     vault_token=settings.vault_token,
     enabled=settings.vault_enabled,
 )
-_audit_chain = ImmutableAuditChain.get_instance()
+def _get_audit_chain() -> ImmutableAuditChain:
+    return ImmutableAuditChain.get_instance()
 _zk_verifier = ZKSNARKProofVerifier()
 _unlearning_engine = FederatedUnlearningEngine()
 _pqc_driver = PQCSecAggDriver()
@@ -91,7 +92,7 @@ _rdp_autoscaler = AdaptiveDPAutoScaler()
 async def get_security_status() -> SecurityStatusResponse:
     """Get Enterprise Security Suite status across mTLS, OIDC, ABAC, Vault, and Audit Chain."""
     cert = _mtls_mgr.generate_cert_info("gateway.internal")
-    chain_rpt = _audit_chain.verify_chain_integrity()
+    chain_rpt = _get_audit_chain().verify_chain_integrity()
     vault_meta = _vault_client.get_secret_metadata("database/credentials")
 
     from app.infrastructure.security.hsm_key_service import HSMKeyService, HSMProvider
@@ -151,7 +152,7 @@ async def get_security_status() -> SecurityStatusResponse:
         },
         audit_chain={
             "enabled": settings.immutable_audit_chain_enabled,
-            "total_events": len(_audit_chain.chain),
+            "total_events": len(_get_audit_chain().chain),
             "chain_valid": chain_rpt.is_valid,
             "last_hash": chain_rpt.last_hash,
             "hashing_algorithm": "SHA-256 Chain (H_i = SHA256(L_i || H_{i-1}))",
@@ -203,7 +204,7 @@ async def evaluate_abac_policy(req: ABACEvalRequest) -> ABACEvalResponse:
     )
 
     # Log evaluation in cryptographic audit chain
-    _audit_chain.append_event(
+    _get_audit_chain().append_event(
         event_type="ABAC_EVALUATION",
         actor=username,
         target_id=f"{req.resource_type}:{req.resource_id}",
@@ -224,7 +225,7 @@ async def evaluate_abac_policy(req: ABACEvalRequest) -> ABACEvalResponse:
 
 async def list_audit_chain(limit: int = Query(50, ge=1, le=200)) -> list[AuditChainEntryResponse]:
     """Get entries from the cryptographic SHA-256 audit chain ledger."""
-    entries = _audit_chain.chain[-limit:]
+    entries = _get_audit_chain().chain[-limit:]
     return [
         AuditChainEntryResponse(
             index=e.index,
@@ -242,7 +243,7 @@ async def list_audit_chain(limit: int = Query(50, ge=1, le=200)) -> list[AuditCh
 
 async def verify_audit_chain() -> AuditChainVerifyResponse:
     """Execute 1-click retrospective SHA-256 chain verification to detect tampering."""
-    rpt = _audit_chain.verify_chain_integrity()
+    rpt = _get_audit_chain().verify_chain_integrity()
     return AuditChainVerifyResponse(
         is_valid=rpt.is_valid,
         total_records=rpt.total_records,

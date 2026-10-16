@@ -37,6 +37,8 @@ from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.security.durable_account_store import DurableAccountStore
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 
+mp_ctx = multiprocessing.get_context("spawn")
+
 
 @pytest.fixture
 def signoff_env(tmp_path, monkeypatch):
@@ -320,7 +322,7 @@ def test_crash_before_signoff_persistence_reconciles_to_failed(signoff_env):
     tmp_path = signoff_env["tmp_path"]
     barrier = str(tmp_path / "barrier_signoff_01.txt")
 
-    p = multiprocessing.Process(
+    p = mp_ctx.Process(
         target=_worker_signoff_process,
         args=(
             signoff_env["reg_dir"],
@@ -358,7 +360,7 @@ def test_crash_before_signoff_persistence_reconciles_to_failed(signoff_env):
 
     # Reconcile via independent worker
     out_file = str(tmp_path / "recon_signoff_out_01.json")
-    p_b = multiprocessing.Process(
+    p_b = mp_ctx.Process(
         target=_worker_reconciler,
         args=(
             signoff_env["reg_dir"],
@@ -391,7 +393,7 @@ def test_crash_after_signoff_persistence_reconciles_to_approved(signoff_env):
     tmp_path = signoff_env["tmp_path"]
     barrier = str(tmp_path / "barrier_signoff_02.txt")
 
-    p = multiprocessing.Process(
+    p = mp_ctx.Process(
         target=_worker_signoff_process,
         args=(
             signoff_env["reg_dir"],
@@ -429,7 +431,7 @@ def test_crash_after_signoff_persistence_reconciles_to_approved(signoff_env):
 
     # Reconcile via independent worker
     out_file = str(tmp_path / "recon_signoff_out_02.json")
-    p_b = multiprocessing.Process(
+    p_b = mp_ctx.Process(
         target=_worker_reconciler,
         args=(
             signoff_env["reg_dir"],
@@ -472,7 +474,7 @@ def test_failed_signoff_does_not_become_committed_due_to_unrelated_prior_signoff
     tmp_path = signoff_env["tmp_path"]
     barrier = str(tmp_path / "barrier_signoff_03.txt")
 
-    p = multiprocessing.Process(
+    p = mp_ctx.Process(
         target=_worker_signoff_process,
         args=(
             signoff_env["reg_dir"],
@@ -510,7 +512,7 @@ def test_failed_signoff_does_not_become_committed_due_to_unrelated_prior_signoff
 
     # 3. Reconcile
     out_file = str(tmp_path / "recon_signoff_out_03.json")
-    p_b = multiprocessing.Process(
+    p_b = mp_ctx.Process(
         target=_worker_reconciler,
         args=(
             signoff_env["reg_dir"],

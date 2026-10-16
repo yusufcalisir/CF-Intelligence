@@ -712,7 +712,7 @@ def test_t21_multiple_active_champion_ambiguity_fails_closed(temp_registry_dir: 
     # Scans across all simulations without explicit scope must fail closed
     with pytest.raises(ModelCompatibilityError) as exc_info:
         reg.resolve_and_verify_champion()
-    assert "Ambiguous champion state" in str(exc_info.value)
+    assert "Ambiguous unscoped champion" in str(exc_info.value) or "Ambiguous champion" in str(exc_info.value)
 
 
 # ── T22: Redis Stale Version Rejection ─────────────────────────────────────────
@@ -1080,10 +1080,10 @@ def test_t32_untrained_checkpoint_provenance_honesty(temp_registry_dir: str) -> 
         is_promoted=True,
         provenance_type="structural_fixture",
     )
-    assert entry["provenance_type"] == "structural_fixture"
+    assert entry["provenance_type"].lower() == "structural_fixture"
     meta = reg.get_champion_metadata()
     assert meta is not None
-    assert meta["provenance_type"] == "structural_fixture"
+    assert meta["provenance_type"].lower() == "structural_fixture"
     assert meta["authenticity_status"] != "AUTHENTICATED"
 
 
@@ -1143,14 +1143,46 @@ def test_tc03_genuine_training_evidence_recorded_truthfully(temp_registry_dir: s
     y = np.random.randint(0, 2, size=(64,)).astype(np.float32)
     trained, losses, _ = svc.train_local(model, X, y, epochs=1, batch_size=32)
 
+    import io
+    from datetime import UTC, datetime
+
+    from app.application.services.training_provenance_service import (
+        TrainingExecutionEvidence,
+        get_default_training_issuer,
+    )
+
+    buf = io.BytesIO()
+    torch.save(trained.state_dict(), buf)
+    m_bytes = buf.getvalue()
+    m_sha = hashlib.sha256(m_bytes).hexdigest()
+
+    issuer = get_default_training_issuer()
+    evidence = TrainingExecutionEvidence(
+        training_run_id="run_tc03_job_99",
+        job_id="job_tc03",
+        simulation_id="sim_tc03",
+        completed_at=datetime.now(UTC).isoformat(),
+        executed_rounds=1,
+        executed_epochs=1,
+        sample_count=64,
+        observed_metrics={"loss": float(losses[-1]), "auc_roc": 0.82},
+        artifact_sha256=m_sha,
+        architecture="FraudDetectionNN",
+        feature_schema_version="v1.0",
+        feature_names=[f"f{i}" for i in range(NUM_FEATURES)],
+    )
+    receipt = issuer.issue_receipt(evidence=evidence, model_bytes=m_bytes)
+
     entry = reg.save_version(
         "sim_tc03",
         trained.state_dict(),
+        artifact_bytes=m_bytes,
         metrics={"loss": float(losses[-1]), "auc_roc": 0.82},
         is_promoted=True,
         training_run_id="run_tc03_job_99",
         training_evidence={"loss": float(losses[-1]), "epochs": 1, "batch_size": 32},
         provenance_type="TRAINING_RECORDED",
+        training_receipt=receipt.to_dict(),
     )
     assert entry["provenance_type"] == "TRAINING_RECORDED"
     assert entry["training_run_id"] == "run_tc03_job_99"
@@ -1187,6 +1219,15 @@ def test_tc05_forged_role_fields_not_cryptographically_authorized(temp_registry_
     svc = ModelService(settings)
     reg = ModelRegistry(storage_dir=temp_registry_dir)
 
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    auth_svc = AuthenticationService.get_instance()
+    auth_svc.register_user("officer_alice", "Pass1234!", "bank_a", roles=["compliance"])
+    auth_svc.register_user("engineer_bob", "Pass1234!", "bank_a", roles=["ml_engineer"])
+    admin_user = auth_svc.get_user("admin")
+    admin_token = auth_svc.create_token_bundle(admin_user).access_token
+    reg.bind_simulation_ownership("sim_tc05", "bank_a", auth_token=admin_token)
+
     model = svc.create_model(dp_compatible=True)
     entry = reg.save_version("sim_tc05", model.state_dict(), {"auc": 0.80}, is_promoted=True)
 
@@ -1221,6 +1262,16 @@ def test_tc06_cryptographic_signoff_verification_and_replay_rejection(temp_regis
     svc = ModelService(settings)
     reg = ModelRegistry(storage_dir=temp_registry_dir)
 
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    auth_svc = AuthenticationService.get_instance()
+    auth_svc.register_user("sam_same", "Pass1234!", "bank_a", roles=["compliance", "ml_engineer"])
+    auth_svc.register_user("officer_alice", "Pass1234!", "bank_a", roles=["compliance"])
+    auth_svc.register_user("engineer_bob", "Pass1234!", "bank_a", roles=["ml_engineer"])
+    admin_user = auth_svc.get_user("admin")
+    admin_token = auth_svc.create_token_bundle(admin_user).access_token
+    reg.bind_simulation_ownership("sim_tc06", "bank_a", auth_token=admin_token)
+
     m1 = svc.create_model(dp_compatible=True)
     reg.save_version("sim_tc06", m1.state_dict(), {"auc": 0.80}, is_promoted=True)
 
@@ -1231,6 +1282,7 @@ def test_tc06_cryptographic_signoff_verification_and_replay_rejection(temp_regis
 
     # 2. Genuine HMAC signatures binding canonical payload
     reg2 = ModelRegistry(storage_dir=temp_registry_dir)
+    reg2.bind_simulation_ownership("sim_tc06_b", "bank_a", auth_token=admin_token)
     m2 = svc.create_model(dp_compatible=True)
     v2 = reg2.save_version("sim_tc06_b", m2.state_dict(), {"auc": 0.80}, is_promoted=True)
     v2_sha = v2["sha256"]
@@ -1810,8 +1862,8 @@ def test_p07_fake_training_attestation_rejected(temp_registry_dir: str) -> None:
     )
     # Must NOT confer TRAINING_EVIDENCE_VERIFIED without an independent hardware/PKI verifier
     assert entry["provenance_type"] != "TRAINING_EVIDENCE_VERIFIED"
-    assert entry["provenance_type"] == "TRAINING_RECORDED"
-    assert entry["attestation_status"] == "INDEPENDENT_ATTESTATION_UNAVAILABLE"
+    assert entry["provenance_type"] == "UNVERIFIED"
+    assert entry["attestation_status"] == "CALLER_NUMERIC_EVIDENCE_UNAUTHENTICATED"
 
 
 # ── P08: Forged Dual Identity Not Reported as Human Authorized ────────────────
@@ -1823,6 +1875,15 @@ def test_p08_forged_dual_identity_not_reported_as_human_authorized(temp_registry
     svc = ModelService(settings)
     reg = ModelRegistry(storage_dir=temp_registry_dir)
     m = svc.create_model(dp_compatible=True)
+
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    auth_svc = AuthenticationService.get_instance()
+    auth_svc.register_user("invented_user_1", "Pass1234!", "bank_a", roles=["ml_engineer"])
+    auth_svc.register_user("invented_user_2", "Pass1234!", "bank_a", roles=["compliance"])
+    admin_user = auth_svc.get_user("admin")
+    admin_token = auth_svc.create_token_bundle(admin_user).access_token
+    reg.bind_simulation_ownership("sim_p08", "bank_a", auth_token=admin_token)
 
     entry = reg.save_version("sim_p08", m.state_dict(), {"auc": 0.80}, is_promoted=True)
     v_sha = entry["sha256"]
@@ -1895,18 +1956,77 @@ def test_p10_legitimate_training_compatibility(temp_registry_dir: str) -> None:
     y = np.random.randint(0, 2, size=(64,)).astype(np.float32)
     trained, losses, _ = svc.train_local(model, X, y, epochs=1, batch_size=32)
 
-    with patch.object(settings, "app_env", "production"):
+    import io
+    from datetime import UTC, datetime
+
+    from app.application.services.model_registry import generate_signoff_signature
+    from app.application.services.training_provenance_service import (
+        TrainingExecutionEvidence,
+        get_default_training_issuer,
+    )
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    buf = io.BytesIO()
+    torch.save(trained.state_dict(), buf)
+    m_bytes = buf.getvalue()
+    m_sha = hashlib.sha256(m_bytes).hexdigest()
+
+    issuer = get_default_training_issuer()
+    evidence = TrainingExecutionEvidence(
+        training_run_id="run_p10_job",
+        job_id="job_p10",
+        simulation_id="sim_p10",
+        completed_at=datetime.now(UTC).isoformat(),
+        executed_rounds=1,
+        executed_epochs=1,
+        sample_count=64,
+        observed_metrics={"loss": float(losses[-1]), "auc_roc": 0.85},
+        artifact_sha256=m_sha,
+        architecture="FraudDetectionNN",
+        feature_schema_version="v1.0",
+        feature_names=[f"f{i}" for i in range(NUM_FEATURES)],
+    )
+    receipt = issuer.issue_receipt(evidence=evidence, model_bytes=m_bytes)
+
+    auth_svc = AuthenticationService.get_instance()
+    auth_svc.register_user("ml_eng_p10", "Pass1234!", "bank_a", roles=["ml_engineer"])
+    auth_svc.register_user("comp_off_p10", "Pass1234!", "bank_a", roles=["compliance"])
+    admin_user = auth_svc.get_user("admin")
+    admin_token = auth_svc.create_token_bundle(admin_user).access_token
+    reg.bind_simulation_ownership("sim_p10", "bank_a", auth_token=admin_token)
+
+    with (
+        patch.object(settings, "app_env", "production"),
+        patch.object(settings, "payload_signing_secret", "prod_signing_secret_p10_auth_9999"),
+        patch.object(settings, "oidc_jwt_signing_secret", "prod_oidc_jwt_signing_secret_p10_auth_9999"),
+        patch.object(settings, "training_receipt_public_key", issuer.public_bytes_hex),
+    ):
+
         entry = reg.save_version(
             simulation_id="sim_p10",
             state_dict=trained.state_dict(),
+            artifact_bytes=m_bytes,
             metrics={"loss": float(losses[-1]), "auc_roc": 0.85},
-            is_promoted=True,
+            is_promoted=False,
             training_run_id="run_p10_job",
             training_evidence={"loss": float(losses[-1]), "epochs": 1, "batch_size": 32},
             provenance_type="TRAINING_RECORDED",
+            training_receipt=receipt.to_dict(),
         )
         assert entry["provenance_type"] == "TRAINING_RECORDED"
         assert entry["is_production_eligible"] is True
+
+        v_sha = entry["sha256"]
+        user_ml = auth_svc.get_user("ml_eng_p10")
+        token_ml = auth_svc.create_token_bundle(user_ml).access_token
+        user_comp = auth_svc.get_user("comp_off_p10")
+        token_comp = auth_svc.create_token_bundle(user_comp).access_token
+
+        sig_ml = generate_signoff_signature("sim_p10", 1, v_sha, "ml_engineer", "ml_eng_p10", signing_secret="prod_signing_secret_p10_auth_9999")
+        sig_comp = generate_signoff_signature("sim_p10", 1, v_sha, "compliance", "comp_off_p10", signing_secret="prod_signing_secret_p10_auth_9999")
+        reg.sign_off("sim_p10", 1, "ml_engineer", user="ml_eng_p10", signature=sig_ml, auth_token=token_ml)
+        reg.sign_off("sim_p10", 1, "compliance", user="comp_off_p10", signature=sig_comp, auth_token=token_comp)
+        reg.promote_version("sim_p10", 1, "champion", auth_token=admin_token)
 
         champ = svc.get_champion(dp_compatible=True, registry=reg)
         assert champ is not None

@@ -776,6 +776,7 @@ def test_audit_11_audit_persistence_failure_no_silent_unaudited_mutation(audit_e
     sig_comp = generate_signoff_signature(sim_id, version, sha, "compliance", "officer_jones_compliance", signing_secret=audit_env["payload_secret"])
     reg.sign_off(sim_id, version, "ml_engineer", "dr_smith_ml", signature=sig_ml, auth_token=token_ml)
     reg.sign_off(sim_id, version, "compliance", "officer_jones_compliance", signature=sig_comp, auth_token=token_comp)
+    reg.promote_version(sim_id, version, "champion", auth_token=token_admin)
 
     # 2. Save version 2 (candidate/challenger)
     state2 = {"layer.weight": torch.randn(10, 10)}
@@ -833,10 +834,10 @@ def test_audit_11_audit_persistence_failure_no_silent_unaudited_mutation(audit_e
     reg.sign_off(sim_id, v2, "ml_engineer", "dr_smith_ml", signature=sig_ml2, auth_token=token_ml)
     reg.sign_off(sim_id, v2, "compliance", "officer_jones_compliance", signature=sig_comp2, auth_token=token_comp)
 
-    # v2 is currently status='challenger' because v1 is champion
+    # v2 is currently status='approved' because it was signed off but not yet promoted to champion
     manifest_before = reg.list_versions(sim_id)
     v2_before = next(e for e in manifest_before if e["version"] == v2)
-    assert v2_before["status"] == "challenger"
+    assert v2_before["status"] == "approved"
     assert v2_before["is_active"] is False
 
     # Simulate audit chain disk failure during promotion of v2 to champion
@@ -844,10 +845,10 @@ def test_audit_11_audit_persistence_failure_no_silent_unaudited_mutation(audit_e
         with pytest.raises(AuditLedgerSecurityError, match="Disk I/O failure on audit ledger"):
             reg.promote_version(sim_id, v2, "champion", auth_token=token_admin)
 
-    # Prove no silent successful mutation: v2 must STILL be challenger, not champion!
+    # Prove no silent successful mutation: v2 must STILL be approved, not champion!
     manifest_after = reg.list_versions(sim_id)
     v2_after = next(e for e in manifest_after if e["version"] == v2)
-    assert v2_after["status"] == "challenger"
+    assert v2_after["status"] == "approved"
     assert v2_after["is_active"] is False
     v1_after = next(e for e in manifest_after if e["version"] == 1)
     assert v1_after["status"] == "champion"

@@ -96,7 +96,10 @@ _oidc_auth = OIDCAuthenticator(
     signing_secret=settings.oidc_jwt_signing_secret,
 )
 _abac_engine = ABACEngine()
-_audit_chain = ImmutableAuditChain.get_instance()
+
+
+def _get_audit_chain() -> ImmutableAuditChain:
+    return ImmutableAuditChain.get_instance()
 
 # Thread-safe metrics collector
 _metrics_lock = threading.RLock()
@@ -344,7 +347,7 @@ def check_authorization(
                 resource_bank_id,
                 abac_result.policy_name,
             )
-            _audit_chain.append_event(
+            _get_audit_chain().append_event(
                 event_type="ACCESS_DENIED_ABAC",
                 actor=identity,
                 target_id=full_path,
@@ -571,7 +574,7 @@ async def _execute_http_proxy(request: Request, full_path: str):
     identity, role, api_key, user_claims = authenticate_request(request)
     if not identity:
         _record_metric("auth_failures_total", 1)
-        _audit_chain.append_event(
+        _get_audit_chain().append_event(
             event_type="ACCESS_DENIED_UNAUTHORIZED",
             actor="anonymous",
             target_id=full_path,

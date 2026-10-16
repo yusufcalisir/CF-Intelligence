@@ -141,6 +141,19 @@ def _isolate_audit_chain_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_nonce_store_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Ensure every test has a clean, isolated DurableNonceStore file."""
+    from app.infrastructure.security.durable_nonce_store import reset_default_nonce_store
+
+    if "CFI_INTERNAL_NONCE_STORE_PATH" not in os.environ:
+        test_nonce_file = tmp_path / "test_consumed_nonces.json"
+        monkeypatch.setenv("CFI_INTERNAL_NONCE_STORE_PATH", str(test_nonce_file))
+    reset_default_nonce_store()
+    yield
+    reset_default_nonce_store()
+
+
+@pytest.fixture(autouse=True)
 def _reset_ddos_state():
     """Reset DDoSProtectionMiddleware's class-level shared request counter before each test."""
     try:
@@ -215,11 +228,22 @@ def canonical_alert() -> dict[str, Any]:
 @pytest.fixture(autouse=True)
 def _restore_settings_and_security_singletons():
     """Snapshot settings and security singletons before each test and restore cleanly after."""
+    from app.application.services.training_provenance_service import (
+        reset_default_training_issuer,
+        reset_default_training_job_record_source,
+        reset_default_training_verifier,
+        reset_default_trust_store,
+    )
     from app.config import get_settings
     from app.infrastructure.security.auth_service import AuthenticationService
     from app.infrastructure.security.durable_nonce_store import reset_default_nonce_store
     from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
     from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
+    from app.presentation.routers.model_registry import deployer
+    from app.presentation.routers.realtime_inference import (
+        reset_circuit_breaker,
+        reset_model_cache,
+    )
 
     settings = get_settings()
     saved_env = {
@@ -237,6 +261,10 @@ def _restore_settings_and_security_singletons():
             "CFI_INTERNAL_NONCE_STORE_PATH",
             "CFI_CONSORTIUM_STORE_PATH",
             "CFI_IDENTITY_STORE_PATH",
+            "CFI_TRUST_STORE_ADMIN_TOKEN",
+            "CFI_TRUST_STORE_PATH",
+            "CFI_TRAINING_RECEIPT_PUBLIC_KEY",
+            "CFI_INTERNAL_CONTEXT_SECRET",
         )
     }
     yield
@@ -251,6 +279,13 @@ def _restore_settings_and_security_singletons():
     AuthenticationService.reset_instance()
     reset_default_nonce_store()
     ImmutableAuditChain.reset_instance()
+    reset_default_trust_store()
+    reset_default_training_verifier()
+    reset_default_training_issuer()
+    reset_default_training_job_record_source()
+    reset_circuit_breaker()
+    reset_model_cache()
+    deployer.reset()
     DurableConsortiumStore._instance = None
 
 
@@ -265,6 +300,9 @@ def clear_fallback_stores():
     from app.infrastructure.redis_store import RedisStore
 
     RedisStore._shared_fallback_stores.clear()
+    with contextlib.suppress(Exception):
+        RedisStore("entity").clear()
+        RedisStore("relationship").clear()
     try:
         from app.application.services.idempotency import IdempotencyService
 
@@ -292,6 +330,9 @@ def clear_fallback_stores():
             os.environ.pop(k, None)
     yield
     RedisStore._shared_fallback_stores.clear()
+    with contextlib.suppress(Exception):
+        RedisStore("entity").clear()
+        RedisStore("relationship").clear()
     try:
         from app.application.services.idempotency import IdempotencyService
 

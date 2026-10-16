@@ -27,6 +27,8 @@ from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.security.durable_account_store import DurableAccountStore
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 
+mp_ctx = multiprocessing.get_context("spawn")
+
 
 @pytest.fixture
 def own_env(tmp_path, monkeypatch):
@@ -184,7 +186,7 @@ def test_crash_before_ownership_persistence_reconciles_to_failed(own_env):
     tmp_path = own_env["tmp_path"]
     barrier = str(tmp_path / "barrier_own_01.txt")
 
-    p = multiprocessing.Process(
+    p = mp_ctx.Process(
         target=_worker_bind_process,
         args=(
             own_env["reg_dir"],
@@ -216,7 +218,7 @@ def test_crash_before_ownership_persistence_reconciles_to_failed(own_env):
 
     # Reconcile via independent worker
     out_file = str(tmp_path / "recon_own_out_01.json")
-    p_b = multiprocessing.Process(
+    p_b = mp_ctx.Process(
         target=_worker_reconciler,
         args=(
             own_env["reg_dir"],
@@ -248,7 +250,7 @@ def test_crash_after_ownership_persistence_reconciles_to_committed(own_env):
     tmp_path = own_env["tmp_path"]
     barrier = str(tmp_path / "barrier_own_02.txt")
 
-    p = multiprocessing.Process(
+    p = mp_ctx.Process(
         target=_worker_bind_process,
         args=(
             own_env["reg_dir"],
@@ -280,7 +282,7 @@ def test_crash_after_ownership_persistence_reconciles_to_committed(own_env):
 
     # Reconcile via independent worker
     out_file = str(tmp_path / "recon_own_out_02.json")
-    p_b = multiprocessing.Process(
+    p_b = mp_ctx.Process(
         target=_worker_reconciler,
         args=(
             own_env["reg_dir"],
@@ -313,7 +315,7 @@ def test_concurrent_independent_workers_conflicting_ownership_race(own_env):
     out_a = str(tmp_path / "worker_a_res.json")
     out_b = str(tmp_path / "worker_b_res.json")
 
-    p_a = multiprocessing.Process(
+    p_a = mp_ctx.Process(
         target=_worker_bind_process,
         args=(
             own_env["reg_dir"],
@@ -330,7 +332,7 @@ def test_concurrent_independent_workers_conflicting_ownership_race(own_env):
             out_a,
         ),
     )
-    p_b = multiprocessing.Process(
+    p_b = mp_ctx.Process(
         target=_worker_bind_process,
         args=(
             own_env["reg_dir"],

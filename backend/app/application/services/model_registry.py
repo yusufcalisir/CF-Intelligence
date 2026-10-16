@@ -639,10 +639,6 @@ def validate_production_admission(
             f"Production admission rejected: model provenance '{prov}' is not production-eligible ({context})."
         )
 
-    if is_eligible is False and context != "sign_off":
-        raise ModelIntegrityError(
-            f"Production admission rejected: model is explicitly marked as not production-eligible ({context})."
-        )
 
     if isinstance(entry_or_provenance, dict):
         if sha256_val is not None and not sha256_val.strip():
@@ -821,6 +817,11 @@ def validate_production_admission(
                     f"Production promotion rejected: Four-Eyes Principle violation, approvers resolve to same principal '{ml_rec.user_id}' ({context})."
                 )
 
+    if is_eligible is False and context != "sign_off":
+        raise ModelIntegrityError(
+            f"Production admission rejected: model is explicitly marked as not production-eligible ({context})."
+        )
+
 
 class ModelRegistry:
     """Manages versioned model artifacts and registry manifests.
@@ -904,6 +905,14 @@ class ModelRegistry:
         sim_dir = os.path.abspath(os.path.join(self.registry_root, clean_id))
         real_sim_dir = os.path.realpath(sim_dir)
 
+        # Check for unsafe symlinks pointing outside registry root
+        if os.path.islink(sim_dir):
+            target = os.path.realpath(sim_dir)
+            if os.path.commonpath([target, canonical_root]) != canonical_root:
+                raise ModelIntegrityError(
+                    f"Simulation symlink '{clean_id}' targets external path '{target}' outside registry root."
+                )
+
         # Enforce canonical path containment
         try:
             if (
@@ -917,14 +926,6 @@ class ModelRegistry:
             raise ModelIntegrityError(
                 f"Path containment check failed for simulation '{clean_id}': {exc}"
             ) from exc
-
-        # Check for unsafe symlinks pointing outside registry root
-        if os.path.islink(sim_dir):
-            target = os.path.realpath(sim_dir)
-            if os.path.commonpath([target, canonical_root]) != canonical_root:
-                raise ModelIntegrityError(
-                    f"Simulation symlink '{clean_id}' targets external path '{target}' outside registry root."
-                )
 
         if create:
             os.makedirs(sim_dir, exist_ok=True)
@@ -3365,13 +3366,6 @@ class ModelRegistry:
 
             settings = get_settings()
 
-            if (
-                settings.app_env.lower() == "production"
-                and target_entry.get("is_production_eligible") is False
-            ):
-                raise ModelIntegrityError(
-                    f"Cannot promote model version {version} for {simulation_id}: explicitly marked not production eligible."
-                )
             target_entry["simulation_id"] = simulation_id
             effective_operator = authenticated_operator or actor
             if effective_operator:
@@ -3752,13 +3746,6 @@ class ModelRegistry:
 
             settings = get_settings()
 
-            if (
-                settings.app_env.lower() == "production"
-                and target_entry.get("is_production_eligible") is False
-            ):
-                raise ModelIntegrityError(
-                    f"Cannot roll back to model version {version} for {simulation_id}: explicitly marked not production eligible."
-                )
             target_entry["simulation_id"] = simulation_id
             effective_operator = authenticated_operator or actor
             if effective_operator:

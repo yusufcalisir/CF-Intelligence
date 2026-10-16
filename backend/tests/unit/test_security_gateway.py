@@ -116,7 +116,7 @@ class TestOIDCBearerAuthentication:
 
     def test_legacy_api_key_fallback(self):
         """Valid API key in X-API-Key header authenticates when no Bearer token is provided."""
-        req = make_request_with_header("X-API-Key", "test_key_1")
+        req = make_request_with_header("X-API-Key", "key_analyst")
         identity, role, key_used, claims = authenticate_request(req)
 
         # Legacy API key returns analyst identity

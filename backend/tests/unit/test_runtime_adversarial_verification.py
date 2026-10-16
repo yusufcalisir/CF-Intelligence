@@ -604,13 +604,20 @@ def test_model_registry_promote_distinguishes_validity_from_quality() -> None:
 
     from fastapi import HTTPException
 
+    from app.infrastructure.security.auth_service import AuthenticationService
     from app.presentation.routers.model_registry import (
         ModelPromoteRequest,
         promote_model_version,
         registry,
     )
+    auth_svc = AuthenticationService.get_instance()
+    admin_user = auth_svc.get_user("admin")
+    admin_token = auth_svc.create_token_bundle(admin_user).access_token
+    auth_header = f"Bearer {admin_token}"
 
     sim_id = "sim_test_audit"
+    registry.bind_simulation_ownership(sim_id, "bank_a", auth_token=admin_token)
+
     v0_meta = registry.save_version(
         simulation_id=sim_id,
         state_dict={},
@@ -629,6 +636,7 @@ def test_model_registry_promote_distinguishes_validity_from_quality() -> None:
                     enforce_sr11_7=True,
                     min_auc=0.75,
                 ),
+                authorization=auth_header,
             )
         )
     assert exc_info.value.status_code == 422
@@ -651,6 +659,7 @@ def test_model_registry_promote_distinguishes_validity_from_quality() -> None:
                     enforce_sr11_7=True,
                     min_auc=0.75,
                 ),
+                authorization=auth_header,
             )
         )
     assert exc_info_bool.value.status_code == 422
@@ -673,6 +682,7 @@ def test_model_registry_promote_distinguishes_validity_from_quality() -> None:
                     enforce_sr11_7=True,
                     min_auc=0.75,
                 ),
+                authorization=auth_header,
             )
         )
     assert exc_info_str.value.status_code == 422
@@ -1358,6 +1368,7 @@ def test_pr_auc_promotion_fails_closed_when_metric_unavailable() -> None:
     # 10 transactions with only class 0 (single-class: PR-AUC is None)
     records = [
         {
+            "champion_version": 1,
             "actual_label": 0,
             "champion_prob": 0.1,
             "champion_latency_ms": 10.0,

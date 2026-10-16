@@ -224,6 +224,16 @@ def client() -> TestClient:
     return TestClient(app)
 
 
+def _admin_headers() -> dict[str, str]:
+    """Helper providing authoritative admin operator bearer token headers."""
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    auth_svc = AuthenticationService.get_instance()
+    admin_user = auth_svc.get_user("admin")
+    token = auth_svc.create_token_bundle(admin_user).access_token
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_router_active_model_and_promotion_endpoints(client: TestClient) -> None:
     """Validates /active, /versions/{v}, and promotion REST endpoints."""
     import uuid
@@ -238,11 +248,16 @@ def test_router_active_model_and_promotion_endpoints(client: TestClient) -> None
         # Create model files directly via registry instance
         from app.presentation.routers.model_registry import registry as app_reg
 
+        app_reg.bind_simulation_ownership(
+            sim_id, "bank_a", auth_token=_admin_headers()["Authorization"].split(" ")[1]
+        )
+
         entry1 = app_reg.save_version(
             simulation_id=sim_id,
             state_dict={"weight": 1.0},
             metrics={"auc_roc": 0.82},
             is_promoted=True,
+            owning_bank_id="bank_a",
         )
         assert entry1["version"] == 1
 
@@ -251,6 +266,7 @@ def test_router_active_model_and_promotion_endpoints(client: TestClient) -> None
             state_dict={"weight": 2.0},
             metrics={"auc_roc": 0.89},
             is_promoted=False,
+            owning_bank_id="bank_a",
         )
         assert entry2["version"] == 2
 
@@ -268,6 +284,7 @@ def test_router_active_model_and_promotion_endpoints(client: TestClient) -> None
         resp_promo = client.post(
             f"/api/v1/registry/{sim_id}/versions/2/promote",
             json={"target_status": "champion"},
+            headers=_admin_headers(),
         )
         assert resp_promo.status_code == 200
         assert resp_promo.json()["status"] == "champion"
@@ -296,6 +313,7 @@ def test_router_zero_downtime_deployment_endpoints(client: TestClient) -> None:
             "compatibility_window_hours": 24,
             "initial_connections": 80,
         },
+        headers=_admin_headers(),
     )
     assert resp_init.status_code == 200
     session_id = resp_init.json()["session_id"]
@@ -310,6 +328,7 @@ def test_router_zero_downtime_deployment_endpoints(client: TestClient) -> None:
     resp_drain = client.post(
         f"/api/v1/registry/deployment/{session_id}/drain",
         json={"batch_size": 80},
+        headers=_admin_headers(),
     )
     assert resp_drain.status_code == 200
     assert resp_drain.json()["stage"] == "ROLLING_UPGRADE"
@@ -318,12 +337,16 @@ def test_router_zero_downtime_deployment_endpoints(client: TestClient) -> None:
     resp_roll = client.post(
         f"/api/v1/registry/deployment/{session_id}/rolling-update",
         json={"instance_ids": ["cluster-node-a", "cluster-node-b"]},
+        headers=_admin_headers(),
     )
     assert resp_roll.status_code == 200
     assert resp_roll.json()["stage"] == "DUAL_VERSION_ACTIVE"
 
     # Finalize upgrade
-    resp_fin = client.post(f"/api/v1/registry/deployment/{session_id}/finalize")
+    resp_fin = client.post(
+        f"/api/v1/registry/deployment/{session_id}/finalize",
+        headers=_admin_headers(),
+    )
     assert resp_fin.status_code == 200
     assert resp_fin.json()["stage"] == "UPGRADE_COMPLETED"
 
@@ -338,6 +361,7 @@ def test_router_deployment_abort_endpoint(client: TestClient) -> None:
     resp_init = client.post(
         "/api/v1/registry/deployment/initiate",
         json={"target_version": "v4.0.0", "initial_connections": 50},
+        headers=_admin_headers(),
     )
     assert resp_init.status_code == 200
     session_id = resp_init.json()["session_id"]
@@ -345,6 +369,7 @@ def test_router_deployment_abort_endpoint(client: TestClient) -> None:
     resp_abort = client.post(
         f"/api/v1/registry/deployment/{session_id}/abort",
         json={"reason": "Canary error rate spike > 1%"},
+        headers=_admin_headers(),
     )
     assert resp_abort.status_code == 200
     assert resp_abort.json()["stage"] == "ABORTED"
@@ -353,3 +378,4 @@ def test_router_deployment_abort_endpoint(client: TestClient) -> None:
     # 404 check
     resp_missing = client.get("/api/v1/registry/deployment/non_existent_session")
     assert resp_missing.status_code == 404
+

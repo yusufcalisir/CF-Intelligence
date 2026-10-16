@@ -74,7 +74,7 @@ def _authenticate_and_authorize_operator(
     6. Evaluates token claims for required role and clearance as defense-in-depth against privilege elevation without re-authentication.
     7. Refuses to use caller-supplied request fields (user, role, approved_by, actor) for authority.
     """
-    if not authorization:
+    if not isinstance(authorization, str) or not authorization.strip():
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing Authorization header. Expected 'Bearer <token>'.",

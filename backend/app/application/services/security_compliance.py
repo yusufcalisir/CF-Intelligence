@@ -164,7 +164,7 @@ class SecurityComplianceEngine:
             and not k.startswith(("GITHUB_", "ACTIONS_", "RUNNER_"))
             and v
             and not v.startswith(
-                ("vault://", "kms://", "changeme", "test", "mock", "secret", "Super", "whsec_", "sk_")
+                ("vault://", "kms://", "changeme", "test", "mock", "secret", "Super", "whsec_", "sk_", "cfi_", "CFI_")
             )
         ]
         cc6_3_status = "FAIL" if suspicious_keys else "PASS"

@@ -155,10 +155,10 @@ class ZeroDowntimeDeploymentManager:
             return self._sessions.get(session_id)
 
     def get_active_session(self) -> DeploymentSession | None:
-        """Returns the first non-terminal deployment session, or None."""
+        """Returns the most recent non-terminal deployment session, or None."""
         with self._lock:
             terminal_stages = {DeploymentStage.UPGRADE_COMPLETED, DeploymentStage.ABORTED}
-            for session in self._sessions.values():
+            for session in reversed(list(self._sessions.values())):
                 if session.stage not in terminal_stages:
                     return session
             return None
@@ -172,3 +172,10 @@ class ZeroDowntimeDeploymentManager:
         """Returns current dual-version upgrade window parameters."""
         with self._lock:
             return self._upgrade_window
+
+    def reset(self) -> None:
+        """Resets all tracked sessions and dual-version window (for testing isolation)."""
+        with self._lock:
+            self._sessions.clear()
+            self._upgrade_window = None
+

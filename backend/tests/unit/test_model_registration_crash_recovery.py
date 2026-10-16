@@ -42,6 +42,8 @@ from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.security.durable_account_store import DurableAccountStore
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 
+mp_ctx = multiprocessing.get_context("spawn")
+
 
 class SimpleLinearNet(nn.Module):
     def __init__(self, in_features: int = 10, out_features: int = 2):
@@ -323,7 +325,7 @@ def test_crash_before_artifact_publication_reconciles_to_failed(reg_crash_env):
     tmp_path = reg_crash_env["tmp_path"]
     barrier = str(tmp_path / "barrier_01.txt")
 
-    p = multiprocessing.Process(
+    p = mp_ctx.Process(
         target=_worker_register_process,
         args=(
             reg_crash_env["reg_dir"],
@@ -359,7 +361,7 @@ def test_crash_before_artifact_publication_reconciles_to_failed(reg_crash_env):
 
     # Reconcile via independent worker
     out_file = str(tmp_path / "recon_out_01.json")
-    p_b = multiprocessing.Process(
+    p_b = mp_ctx.Process(
         target=_worker_reconciler,
         args=(
             reg_crash_env["reg_dir"],
@@ -398,7 +400,7 @@ def test_crash_after_artifact_publish_before_manifest_cleans_unregistered_file(r
     tmp_path = reg_crash_env["tmp_path"]
     barrier = str(tmp_path / "barrier_02.txt")
 
-    p = multiprocessing.Process(
+    p = mp_ctx.Process(
         target=_worker_register_process,
         args=(
             reg_crash_env["reg_dir"],
@@ -438,7 +440,7 @@ def test_crash_after_artifact_publish_before_manifest_cleans_unregistered_file(r
 
     # Run reconciler
     out_file = str(tmp_path / "recon_out_02.json")
-    p_b = multiprocessing.Process(
+    p_b = mp_ctx.Process(
         target=_worker_reconciler,
         args=(
             reg_crash_env["reg_dir"],
@@ -475,7 +477,7 @@ def test_crash_after_manifest_persistence_reconciles_to_committed(reg_crash_env)
     tmp_path = reg_crash_env["tmp_path"]
     barrier = str(tmp_path / "barrier_03.txt")
 
-    p = multiprocessing.Process(
+    p = mp_ctx.Process(
         target=_worker_register_process,
         args=(
             reg_crash_env["reg_dir"],
@@ -523,7 +525,7 @@ def test_crash_after_manifest_persistence_reconciles_to_committed(reg_crash_env)
 
     # Run reconciler
     out_file = str(tmp_path / "recon_out_03.json")
-    p_b = multiprocessing.Process(
+    p_b = mp_ctx.Process(
         target=_worker_reconciler,
         args=(
             reg_crash_env["reg_dir"],
@@ -581,7 +583,7 @@ def test_reconciliation_never_deletes_legitimate_prior_model_artifact(reg_crash_
     tmp_path = reg_crash_env["tmp_path"]
     barrier = str(tmp_path / "barrier_04.txt")
 
-    p = multiprocessing.Process(
+    p = mp_ctx.Process(
         target=_worker_register_process,
         args=(
             reg_crash_env["reg_dir"],
@@ -617,7 +619,7 @@ def test_reconciliation_never_deletes_legitimate_prior_model_artifact(reg_crash_
 
     # Run reconciler
     out_file = str(tmp_path / "recon_out_04.json")
-    p_b = multiprocessing.Process(
+    p_b = mp_ctx.Process(
         target=_worker_reconciler,
         args=(
             reg_crash_env["reg_dir"],

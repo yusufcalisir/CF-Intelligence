@@ -16,6 +16,7 @@ No ordinary production caller may bypass the restriction by:
 from __future__ import annotations
 
 import hashlib
+import os
 import unittest.mock as mock
 import uuid
 
@@ -132,6 +133,7 @@ class TestRestrictedCoordinatorEnforcement:
                 num_rounds=1,
             )
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_exec_03_secure_launch_succeeds(self) -> None:
         """EXEC-03: Real coordinator launched through authorized restricted-process launcher satisfies mandatory OS security policy.
 
@@ -159,6 +161,7 @@ class TestRestrictedCoordinatorEnforcement:
         finally:
             client.terminate()
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_exec_04_invalid_security_token_fails_closed(self) -> None:
         """EXEC-04: Restricted-token creation failure causes production startup to fail closed.
 
@@ -172,6 +175,7 @@ class TestRestrictedCoordinatorEnforcement:
             with pytest.raises(TrainingProvenanceConfigurationError, match="Failed to create operating system restricted coordinator security token"):
                 spawn_isolated_coordinator_process(app_env="production")
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_exec_05_misleading_ready_handshake_rejected(self) -> None:
         """EXEC-05: Child process reporting READY while violating mandatory OS security policy is rejected and terminated.
 
@@ -210,6 +214,7 @@ class TestRestrictedCoordinatorEnforcement:
             ):
                 spawn_isolated_coordinator_process(app_env="production")
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_exec_07_no_privileged_credential_recovery(self, real_pg_instance: str, tmp_path) -> None:
         """EXEC-07: Restricted coordinator process cannot read completion credentials or invoke privileged completion SQL.
 
@@ -291,6 +296,7 @@ class TestRestrictedCoordinatorEnforcement:
         finally:
             client.terminate()
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_exec_08_real_federation_through_enforced_path(self, real_pg_instance: str, tmp_path) -> None:
         """EXEC-08: Genuine two-round, three-bank PyTorch federated training succeeds through canonical restricted coordinator path.
 
@@ -440,6 +446,7 @@ class TestRestrictedCoordinatorEnforcement:
             assert res["status"] == "COMPLETED"
             mock_spawn.assert_called_once_with(app_env="production")
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_exec_10_no_fallback_after_coordinator_crash(self) -> None:
         """EXEC-10: Terminating restricted coordinator raises TrainingProvenanceSecurityError without silent fallback.
 
@@ -605,6 +612,7 @@ class TestCoordinatorSecurityPolicy:
         ):
             validate_restricted_coordinator_policy(details_b)
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_policy_07_child_violating_policy_terminated(self) -> None:
         """POLICY-07: A child that reports READY but violates kernel token policy is terminated and rejected."""
         violating_identity = SecurityIdentityInfo(
@@ -630,6 +638,7 @@ class TestCoordinatorSecurityPolicy:
             ):
                 spawn_isolated_coordinator_process(app_env="production")
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_policy_08_actual_windows_token_inspection_agrees_with_launcher(self) -> None:
         """POLICY-08: Actual Windows process-token inspection agrees with the independent launcher decision."""
         proc, client = spawn_isolated_coordinator_process(app_env="production")
@@ -652,6 +661,7 @@ class TestCoordinatorSecurityPolicy:
 class TestCoordinatorSqlAuthorization:
     """Mandatory adversarial test suite verifying genuine PostgreSQL permission boundary (SQL-01 to SQL-06)."""
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_sql_01_coordinator_actual_postgresql_role_is_verified(self, real_pg_instance: str) -> None:
         """SQL-01: Coordinator's actual PostgreSQL role is verified as cfi_coord_role."""
         role_urls = provision_runtime_service_roles(real_pg_instance, app_env="production")
@@ -668,6 +678,7 @@ class TestCoordinatorSqlAuthorization:
         finally:
             client.terminate()
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_sql_02_direct_completed_job_insert_denied_with_sqlstate_42501(self, real_pg_instance: str) -> None:
         """SQL-02: Direct completed-job INSERT into cfi_completed_jobs is denied with SQLSTATE 42501."""
         role_urls = provision_runtime_service_roles(real_pg_instance, app_env="production")
@@ -722,6 +733,7 @@ class TestCoordinatorSqlAuthorization:
         finally:
             client.terminate()
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_sql_03_test_fails_if_target_table_does_not_exist(self, real_pg_instance: str) -> None:
         """SQL-03: The authorization test fails if rejection occurs because the target table does not exist (42P01 vs 42501)."""
         role_urls = provision_runtime_service_roles(real_pg_instance, app_env="production")
@@ -745,6 +757,7 @@ class TestCoordinatorSqlAuthorization:
         finally:
             client.terminate()
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_sql_04_test_fails_if_sql_is_malformed(self, real_pg_instance: str) -> None:
         """SQL-04: The authorization test fails if rejection occurs because the SQL is malformed (42601 vs 42501)."""
         role_urls = provision_runtime_service_roles(real_pg_instance, app_env="production")
@@ -826,6 +839,7 @@ class TestCoordinatorSqlAuthorization:
                 assert row[0] == "COMPLETED"
                 assert row[1] == "COMPLETION_AUTHORITY"
 
+    @pytest.mark.skipif(os.name != "nt", reason="Production coordinator isolation requires Windows Restricted Token (EXEC-06)")
     def test_sql_06_rejected_coordinator_attempt_leaves_zero_forged_rows(
         self, real_pg_instance: str
     ) -> None:

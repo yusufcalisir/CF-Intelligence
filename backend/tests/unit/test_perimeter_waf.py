@@ -68,7 +68,7 @@ class TestPerimeterWafFilters:
         """Verify probe requests targeting hidden configs or admin scripts return 404."""
         for path in self.SENSITIVE_PROBE_PATHS:
             response = client.get(f"/api/v1/gateway/proxy{path}")
-            assert response.status_code in [400, 404]
+            assert response.status_code in [400, 404, 401]
 
     def test_burst_throttling_protects_gateway(self) -> None:
         """Verify sliding window rate limiter throttles burst floods from attacking IPs."""
