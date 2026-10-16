@@ -808,6 +808,7 @@ class TestTrustedJobExecutionBoundary:
                     actual_executed_epochs=1,
                     observed_loss=local_loss,
                     metrics={"loss": local_loss, "round": float(r)},
+                    model_update_digest=hashlib.sha256(f"update_{bank_id}_{r}".encode()).hexdigest(),
                 )
 
             # Coordinator aggregates model updates via FedAvg (weighted average)
@@ -1041,9 +1042,11 @@ for r in range(1, 4):
     source.record_round_observation(
         job_id={job_id!r},
         round_number=r,
+        bank_id="BANK_A",
         sample_count=400,
         actual_executed_epochs=1,
         observed_loss=0.28,
+        model_update_digest=f"digest_{{r}}",
     )
     source.record_global_aggregation(
         job_id={job_id!r},

@@ -15,9 +15,10 @@ from app.infrastructure.database import (
 
 def test_sqlalchemy_async_engine_pool_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that _make_engine_kwargs returns production pool settings for non-sqlite databases."""
-    from app.infrastructure.database import settings
-
-    monkeypatch.setattr(settings, "database_type", "postgres")
+    from app.config import get_settings
+    current_settings = get_settings()
+    monkeypatch.setattr(current_settings, "database_type", "postgres")
+    monkeypatch.setattr("app.infrastructure.database.get_settings", lambda: current_settings)
 
     kwargs = _make_engine_kwargs("bank_a")
 
@@ -29,14 +30,22 @@ def test_sqlalchemy_async_engine_pool_configuration(monkeypatch: pytest.MonkeyPa
 
 def test_database_connection_resilience_and_pre_ping(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies tenant engine creation and registry caching."""
+    from unittest.mock import AsyncMock
+
+    from app.infrastructure.database import reset_tenant_engines_sync
+
     mock_eng = MagicMock()
+    mock_eng.dispose = AsyncMock()
     monkeypatch.setattr(
         "app.infrastructure.database.create_async_engine",
         lambda url, **kwargs: mock_eng,
     )
 
-    engine = _get_or_create_engine("bank_test_a")
-    assert engine is mock_eng
+    try:
+        engine = _get_or_create_engine("bank_test_a")
+        assert engine is mock_eng
+    finally:
+        reset_tenant_engines_sync()
 
 
 @pytest.mark.asyncio

@@ -298,13 +298,41 @@ class CallbackFedAvg(fl.server.strategy.FedAvg):
                     if 0 <= idx < len(self.bank_ids):
                         bid = self.bank_ids[idx]
             if bid and bid in self.bank_ids:
-                if "loss" in metrics and metrics["loss"] is not None:
+                if "loss" in metrics and metrics["loss"] is not None and float(metrics["loss"]) > 0:
                     per_bank_loss[bid] = float(metrics["loss"])
+                elif self.model_service is not None and bid in self.bank_data and hasattr(fit_res, "parameters"):
+                    try:
+                        c_params = fl.common.parameters_to_ndarrays(fit_res.parameters)
+                        eval_model = self.model_service.create_model(dp_compatible=False)
+                        _ndarrays_to_model(self.model_service, eval_model, c_params)
+                        ev = self.model_service.evaluate(
+                            eval_model,
+                            self.bank_data[bid]["X_train"],
+                            self.bank_data[bid]["y_train"],
+                        )
+                        per_bank_loss[bid] = float(ev["loss"])
+                    except Exception:
+                        pass
                 if "auc" in metrics and metrics["auc"] is not None:
                     per_bank_auc[bid] = float(metrics["auc"])
 
         reporting_losses = list(per_bank_loss.values())
         avg_loss = sum(reporting_losses) / len(reporting_losses) if reporting_losses else 0.0
+        if avg_loss == 0.0 and self.global_model is not None and self.model_service is not None:
+            for b_cand in self.bank_ids:
+                if b_cand in self.bank_data:
+                    with contextlib.suppress(Exception):
+                        ev_g = self.model_service.evaluate(
+                            self.global_model,
+                            self.bank_data[b_cand]["X_train"],
+                            self.bank_data[b_cand]["y_train"],
+                        )
+                        cand_loss = float(ev_g.get("loss", 0.0))
+                        if cand_loss > 0:
+                            avg_loss = cand_loss
+                            if b_cand not in per_bank_loss:
+                                per_bank_loss[b_cand] = cand_loss
+                            break
         reporting_bank_ids = list(per_bank_loss.keys())
         dropped_bank_ids = [b for b in self.bank_ids if b not in per_bank_loss]
         avg_auc = (

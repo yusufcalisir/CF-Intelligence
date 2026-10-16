@@ -640,6 +640,11 @@ def validate_production_admission(
         )
 
 
+    if is_eligible is False and context != "sign_off":
+        raise ModelIntegrityError(
+            f"Production admission rejected: model is explicitly marked as not production-eligible ({context})."
+        )
+
     if isinstance(entry_or_provenance, dict):
         if sha256_val is not None and not sha256_val.strip():
             raise ModelIntegrityError(
@@ -817,11 +822,6 @@ def validate_production_admission(
                     f"Production promotion rejected: Four-Eyes Principle violation, approvers resolve to same principal '{ml_rec.user_id}' ({context})."
                 )
 
-    if is_eligible is False and context != "sign_off":
-        raise ModelIntegrityError(
-            f"Production admission rejected: model is explicitly marked as not production-eligible ({context})."
-        )
-
 
 class ModelRegistry:
     """Manages versioned model artifacts and registry manifests.
@@ -829,6 +829,11 @@ class ModelRegistry:
     Models are stored in the filesystem under `storage/registry/{simulation_id}/`.
     A manifest file `registry.json` tracks versions, metrics, and active states.
     """
+
+    _shared_manifest_cache: dict[str, tuple[float, float, list[dict[str, Any]]]] = {}
+    _manifest_cache_guard: threading.Lock = threading.Lock()
+    _shared_champion_sim_hint: str | None = None
+    _shared_registry_root_mtime: float = 0.0
 
     def __init__(
         self,
@@ -887,6 +892,7 @@ class ModelRegistry:
 
         self.registry_root = os.path.join(self.storage_dir, "registry")
         os.makedirs(self.registry_root, exist_ok=True)
+        self.canonical_root = os.path.realpath(self.registry_root)
         if os.name != "nt":
             with contextlib.suppress(OSError):
                 os.chmod(self.registry_root, 0o700)
@@ -901,9 +907,8 @@ class ModelRegistry:
         - Prevent read-only callers from creating directories as an unintended side effect.
         """
         clean_id = validate_simulation_id(simulation_id)
-        canonical_root = os.path.realpath(self.registry_root)
+        canonical_root = getattr(self, "canonical_root", None) or os.path.realpath(self.registry_root)
         sim_dir = os.path.abspath(os.path.join(self.registry_root, clean_id))
-        real_sim_dir = os.path.realpath(sim_dir)
 
         # Check for unsafe symlinks pointing outside registry root
         if os.path.islink(sim_dir):
@@ -912,20 +917,24 @@ class ModelRegistry:
                 raise ModelIntegrityError(
                     f"Simulation symlink '{clean_id}' targets external path '{target}' outside registry root."
                 )
-
-        # Enforce canonical path containment
-        try:
-            if (
-                os.path.commonpath([real_sim_dir, canonical_root]) != canonical_root
-                or real_sim_dir == canonical_root
-            ):
-                raise ModelIntegrityError(
-                    f"Simulation directory '{clean_id}' escapes authoritative registry root."
-                )
-        except ValueError as exc:
-            raise ModelIntegrityError(
-                f"Path containment check failed for simulation '{clean_id}': {exc}"
-            ) from exc
+        else:
+            # Enforce canonical path containment
+            # Fast-path: clean_id is validated alphanumeric/hyphen/underscore, so abspath is guaranteed inside registry_root
+            # Fall back to realpath only if sim_dir does not directly start with canonical_root
+            if not sim_dir.startswith(canonical_root):
+                real_sim_dir = os.path.realpath(sim_dir)
+                try:
+                    if (
+                        os.path.commonpath([real_sim_dir, canonical_root]) != canonical_root
+                        or real_sim_dir == canonical_root
+                    ):
+                        raise ModelIntegrityError(
+                            f"Simulation directory '{clean_id}' escapes authoritative registry root."
+                        )
+                except ValueError as exc:
+                    raise ModelIntegrityError(
+                        f"Path containment check failed for simulation '{clean_id}': {exc}"
+                    ) from exc
 
         if create:
             os.makedirs(sim_dir, exist_ok=True)
@@ -1556,9 +1565,24 @@ class ModelRegistry:
         sim_dir = self._get_sim_dir(clean_sim_id, create=False)
         if not os.path.isdir(sim_dir):
             return []
+        manifest_path = os.path.join(sim_dir, "registry.json")
+        own_path = os.path.join(sim_dir, "ownership.json")
+
+        # Fast path: check mtimes without acquiring reentrant file lock or reading files
+        try:
+            mtime_reg = os.path.getmtime(manifest_path)
+            mtime_own = os.path.getmtime(own_path) if os.path.exists(own_path) else 0.0
+            with ModelRegistry._manifest_cache_guard:
+                if clean_sim_id in ModelRegistry._shared_manifest_cache:
+                    cached_mtime_reg, cached_mtime_own, cached_data = ModelRegistry._shared_manifest_cache[clean_sim_id]
+                    if cached_mtime_reg == mtime_reg and cached_mtime_own == mtime_own:
+                        return [dict(x) for x in cached_data]
+        except OSError:
+            if not os.path.exists(manifest_path):
+                return []
+
         file_lock = _get_registry_file_lock(sim_dir)
         with self._lock, file_lock:
-            manifest_path = os.path.join(sim_dir, "registry.json")
             if not os.path.exists(manifest_path):
                 return []
             try:
@@ -1624,6 +1648,19 @@ class ModelRegistry:
                             f"Authoritative ownership record for simulation '{clean_sim_id}' is corrupted or unreadable: {sync_err}"
                         ) from sync_err
 
+                # Update shared manifest cache
+                try:
+                    mtime_reg = os.path.getmtime(manifest_path)
+                    mtime_own = os.path.getmtime(own_path) if os.path.exists(own_path) else 0.0
+                    with ModelRegistry._manifest_cache_guard:
+                        ModelRegistry._shared_manifest_cache[clean_sim_id] = (
+                            mtime_reg,
+                            mtime_own,
+                            [dict(x) for x in data],
+                        )
+                except OSError:
+                    pass
+
                 return data
             except ModelIntegrityError:
                 raise
@@ -1650,6 +1687,9 @@ class ModelRegistry:
                     os.fsync(f.fileno())
                 os.replace(tmp_own_path, own_path)
                 _sync_dir(sim_dir)
+                with ModelRegistry._manifest_cache_guard:
+                    ModelRegistry._shared_manifest_cache.pop(clean_sim_id, None)
+                    ModelRegistry._shared_champion_sim_hint = None
             except Exception as e:
                 logger.error(
                     "Authoritative ownership persistence failed for %s: %s", clean_sim_id, e
@@ -1678,6 +1718,9 @@ class ModelRegistry:
                     os.fsync(f.fileno())
                 os.replace(tmp_manifest_path, manifest_path)
                 _sync_dir(sim_dir)
+                with ModelRegistry._manifest_cache_guard:
+                    ModelRegistry._shared_manifest_cache.pop(clean_sim_id, None)
+                    ModelRegistry._shared_champion_sim_hint = None
             except Exception as e:
                 logger.error(
                     "Authoritative manifest persistence failed for %s: %s", simulation_id, e
@@ -2945,27 +2988,55 @@ class ModelRegistry:
             if target_sim_id is not None:
                 sim_dirs = [target_sim_id]
             else:
-                sim_dirs = []
-                for entry_name in sorted(os.listdir(self.registry_root)):
-                    try:
-                        clean_name = validate_simulation_id(entry_name)
-                        candidate_dir = os.path.join(self.registry_root, clean_name)
-                        if os.path.isdir(candidate_dir):
-                            sim_dirs.append(clean_name)
-                    except ValueError:
-                        continue
+                sim_dirs = None
+                with ModelRegistry._manifest_cache_guard:
+                    hint = ModelRegistry._shared_champion_sim_hint
+                    cached_root_mtime = ModelRegistry._shared_registry_root_mtime
 
-            for s_id in sim_dirs:
-                sim_path = os.path.join(self.registry_root, s_id)
-                if not os.path.isdir(sim_path):
-                    continue
-                manifest = self._load_manifest(s_id)
-                active_entries = [
-                    e for e in manifest if e.get("status") == "champion" and e.get("is_active")
-                ]
-                if len(active_entries) == 1:
-                    entry = active_entries[0]
-                    candidates.append((s_id, entry))
+                if hint is not None:
+                    try:
+                        current_root_mtime = os.path.getmtime(self.registry_root)
+                        if current_root_mtime == cached_root_mtime:
+                            hint_manifest = self._load_manifest(hint)
+                            hint_active = [
+                                e for e in hint_manifest if e.get("status") == "champion" and e.get("is_active")
+                            ]
+                            if len(hint_active) == 1:
+                                candidates.append((hint, hint_active[0]))
+                    except OSError:
+                        pass
+
+                if not candidates:
+                    sim_dirs = []
+                    for entry_name in sorted(os.listdir(self.registry_root)):
+                        try:
+                            clean_name = validate_simulation_id(entry_name)
+                            candidate_dir = os.path.join(self.registry_root, clean_name)
+                            if os.path.isdir(candidate_dir):
+                                sim_dirs.append(clean_name)
+                        except ValueError:
+                            continue
+
+            if sim_dirs is not None:
+                for s_id in sim_dirs:
+                    sim_path = os.path.join(self.registry_root, s_id)
+                    if not os.path.isdir(sim_path):
+                        continue
+                    manifest = self._load_manifest(s_id)
+                    active_entries = [
+                        e for e in manifest if e.get("status") == "champion" and e.get("is_active")
+                    ]
+                    if len(active_entries) == 1:
+                        entry = active_entries[0]
+                        candidates.append((s_id, entry))
+
+                if len(candidates) == 1 and target_sim_id is None:
+                    try:
+                        with ModelRegistry._manifest_cache_guard:
+                            ModelRegistry._shared_champion_sim_hint = candidates[0][0]
+                            ModelRegistry._shared_registry_root_mtime = os.path.getmtime(self.registry_root)
+                    except OSError:
+                        pass
 
             if len(candidates) != 1:
                 return None

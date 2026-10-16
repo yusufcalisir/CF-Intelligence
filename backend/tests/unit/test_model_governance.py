@@ -18,7 +18,8 @@ class TestModelGovernance(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp()
         self.registry = ModelRegistry(storage_dir=self.test_dir)
         self.evaluation_engine = ModelEvaluationEngine(self.registry)
-        self.simulation_id = "gov_sim_123"
+        import uuid
+        self.simulation_id = f"gov_sim_{uuid.uuid4().hex[:8]}"
         from app.application.services.model_registry import create_trusted_internal_context
         ctx = create_trusted_internal_context(
             service_name="training_orchestrator",
@@ -44,6 +45,7 @@ class TestModelGovernance(unittest.TestCase):
         }
         self.mock_metrics = {"auc_roc": 0.85, "f1_score": 0.82, "loss": 0.15}
         from app.infrastructure.redis_store import RedisStore
+        RedisStore("model_evaluation").clear()
         RedisStore._shared_fallback_stores.clear()
 
     def tearDown(self) -> None:
@@ -61,6 +63,7 @@ class TestModelGovernance(unittest.TestCase):
         from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
         ImmutableAuditChain.reset_instance()
         from app.infrastructure.redis_store import RedisStore
+        RedisStore("model_evaluation").clear()
         RedisStore._shared_fallback_stores.clear()
         from app.application.services.training_provenance_service import (
             reset_default_training_verifier,

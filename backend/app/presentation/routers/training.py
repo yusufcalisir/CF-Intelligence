@@ -113,6 +113,8 @@ async def get_training_history(
     all_sims = list(_simulation_results.list_values())
     runs: list[TrainingHistoryItem] = []
     for sim in all_sims:
+        if not isinstance(sim, dict):
+            continue
         runs.append(
             TrainingHistoryItem(
                 simulation_id=sim.get("id", ""),
@@ -125,6 +127,7 @@ async def get_training_history(
                 duration_seconds=sim.get("duration_seconds"),
             )
         )
+    runs.sort(key=lambda r: r.created_at or "", reverse=True)
     return TrainingHistoryResponse(
         total_count=len(runs),
         runs=runs[:limit],

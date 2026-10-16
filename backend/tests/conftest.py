@@ -253,27 +253,15 @@ def _restore_settings_and_security_singletons():
         "identity_store_path": settings.identity_store_path,
         "identity_store_secret": settings.identity_store_secret,
     }
-    saved_os_env = {
-        k: os.environ.get(k)
-        for k in (
-            "APP_ENV",
-            "CFI_AUDIT_LEDGER_PATH",
-            "CFI_INTERNAL_NONCE_STORE_PATH",
-            "CFI_CONSORTIUM_STORE_PATH",
-            "CFI_IDENTITY_STORE_PATH",
-            "CFI_TRUST_STORE_ADMIN_TOKEN",
-            "CFI_TRUST_STORE_PATH",
-            "CFI_TRAINING_RECEIPT_PUBLIC_KEY",
-            "CFI_INTERNAL_CONTEXT_SECRET",
-        )
-    }
+    saved_os_env = dict(os.environ)
     yield
     for k, v in saved_env.items():
         setattr(settings, k, v)
-    for k, v in saved_os_env.items():
-        if v is None:
+    for k in list(os.environ.keys()):
+        if k not in saved_os_env:
             os.environ.pop(k, None)
-        else:
+    for k, v in saved_os_env.items():
+        if os.environ.get(k) != v:
             os.environ[k] = v
     get_settings.cache_clear()
     AuthenticationService.reset_instance()
@@ -287,6 +275,8 @@ def _restore_settings_and_security_singletons():
     reset_model_cache()
     deployer.reset()
     DurableConsortiumStore._instance = None
+    from app.infrastructure.database import reset_tenant_engines_sync
+    reset_tenant_engines_sync()
 
 
 @pytest.fixture(autouse=True)
@@ -303,6 +293,14 @@ def clear_fallback_stores():
     with contextlib.suppress(Exception):
         RedisStore("entity").clear()
         RedisStore("relationship").clear()
+        RedisStore("intelligence").clear()
+        RedisStore("alert").clear()
+        RedisStore("sim_results").clear()
+        RedisStore("sim_events").clear()
+        RedisStore("model_evaluation").clear()
+    with contextlib.suppress(Exception):
+        from app.presentation.routers.simulation import _tombstones
+        _tombstones.clear()
     try:
         from app.application.services.idempotency import IdempotencyService
 

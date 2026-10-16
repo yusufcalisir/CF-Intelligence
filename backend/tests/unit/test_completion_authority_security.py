@@ -1291,7 +1291,9 @@ class TestCompletionAuthoritySecurity:
 
         Must fail closed: raise TrainingProvenanceConfigurationError; no unsecured vault accepted.
         """
-        invalid_vault_dir = str(tmp_path / "nonexistent_sub" / "invalid:*:?name")
+        blocked_file = tmp_path / "blocked_file"
+        blocked_file.write_text("blocker")
+        invalid_vault_dir = str(blocked_file / "invalid_sub_vault")
         with pytest.raises(TrainingProvenanceConfigurationError):
             provision_isolated_completion_authority_vault(invalid_vault_dir, "postgres://user:pass@localhost/db")
 

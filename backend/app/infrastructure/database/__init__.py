@@ -438,7 +438,11 @@ async def dispose_all_engines() -> None:
     """Dispose all tenant engines on application shutdown or lifecycle transitions."""
     for tenant, eng in list(_tenant_engines.items()):
         logger.info("Disposing engine for tenant=%s", tenant or "central")
-        await eng.dispose()
+        dispose_fn = getattr(eng, "dispose", None)
+        if callable(dispose_fn):
+            res = dispose_fn()
+            if asyncio.iscoroutine(res) or hasattr(res, "__await__"):
+                await res
     _tenant_engines.clear()
     _tenant_sessions.clear()
     _tenant_initialized.clear()

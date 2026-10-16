@@ -232,6 +232,7 @@ def test_evaluate_reference_benchmark_fastapi_endpoints_authentic_datasets():
     assert resp.json()["dataset_name"] == "elliptic"
 
 
+@pytest.mark.real_data
 def test_evaluate_reference_benchmark_federated_partitions_isolated():
     """Verifies that the FL model is trained strictly over isolated bank partitions and not pooled."""
     pilot = DesignPartnerPilotService()

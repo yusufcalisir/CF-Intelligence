@@ -6,6 +6,17 @@ from app.application.services.alert_service import AlertIntelligenceService
 from app.domain.enums import AlertSeverity
 
 
+@pytest.fixture(autouse=True)
+def _clear_alert_and_intelligence_stores():
+    from app.infrastructure.redis_store import RedisStore
+
+    RedisStore("intelligence").clear()
+    RedisStore("alert").clear()
+    yield
+    RedisStore("intelligence").clear()
+    RedisStore("alert").clear()
+
+
 @pytest.fixture
 def alert_service() -> AlertIntelligenceService:
     return AlertIntelligenceService(alert_threshold=0.5)

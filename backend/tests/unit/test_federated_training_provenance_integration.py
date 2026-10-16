@@ -200,6 +200,7 @@ class TestFederatedTrainingProvenanceIntegrationAdversarial:
             bank_id="BANK_A",
             sample_count=150,
             observed_loss=0.40,
+            model_update_digest="d1_a",
         )
         # Session 1 terminates (simulating worker crash/restart)
         del s1
@@ -213,6 +214,7 @@ class TestFederatedTrainingProvenanceIntegrationAdversarial:
             bank_id="BANK_B",
             sample_count=250,
             observed_loss=0.38,
+            model_update_digest="d1_b",
         )
         # Round 2 executed
         s2.record_round_observation(
@@ -221,6 +223,7 @@ class TestFederatedTrainingProvenanceIntegrationAdversarial:
             bank_id="BANK_A",
             sample_count=150,
             observed_loss=0.30,
+            model_update_digest="d2_a",
         )
         s2.record_round_observation(
             job_id=job_id,
@@ -228,6 +231,7 @@ class TestFederatedTrainingProvenanceIntegrationAdversarial:
             bank_id="BANK_B",
             sample_count=250,
             observed_loss=0.28,
+            model_update_digest="d2_b",
         )
 
         s2.record_global_aggregation(
@@ -296,8 +300,10 @@ class TestFederatedTrainingProvenanceIntegrationAdversarial:
         source.record_round_observation(
             job_id=job_id,
             round_number=1,
+            bank_id="BANK_A",
             sample_count=100,
             observed_loss=0.30,
+            model_update_digest="d15",
         )
 
         model = FraudDetectionModel(input_dim=NUM_FEATURES)

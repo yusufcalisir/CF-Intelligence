@@ -59,6 +59,7 @@ class TestModelPromotionGovernance(unittest.TestCase):
         self.reg_dir = os.path.join(self.test_dir, "models")
         os.makedirs(self.reg_dir, exist_ok=True)
 
+        self._orig_os_environ = dict(os.environ)
         self.payload_secret = "payload_secret_for_tests_entropy_high_32bytes"
         self.jwt_secret = "jwt_signing_secret_high_entropy_32_bytes_test"
         self.admin_token = "admin-token-test-secret-12345"
@@ -175,6 +176,13 @@ class TestModelPromotionGovernance(unittest.TestCase):
 
     def tearDown(self) -> None:
         shutil.rmtree(self.test_dir, ignore_errors=True)
+        if hasattr(self, "_orig_os_environ"):
+            for k in list(os.environ.keys()):
+                if k not in self._orig_os_environ:
+                    os.environ.pop(k, None)
+            for k, v in self._orig_os_environ.items():
+                if os.environ.get(k) != v:
+                    os.environ[k] = v
         get_settings.cache_clear()
         reset_default_nonce_store()
         DurableNonceStore._instance = None

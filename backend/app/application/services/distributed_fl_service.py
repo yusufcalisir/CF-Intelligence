@@ -495,9 +495,19 @@ class BankPrivateStorageVault:
                 self._os_lock_handle = fd
             except Exception:
                 pass
+            try:
+                self._orig_mode = os.stat(self.data_path).st_mode
+                os.chmod(self.data_path, 0o000)
+            except Exception:
+                pass
 
     def release_exclusive_os_boundary(self) -> None:
         """Release the OS-level lock on dataset file."""
+        if hasattr(self, "_orig_mode") and self._orig_mode is not None:
+            with contextlib.suppress(Exception):
+                os.chmod(self.data_path, self._orig_mode)
+            self._orig_mode = None
+
         if self._os_lock_handle is not None:
             if os.name == "nt":
                 import ctypes

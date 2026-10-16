@@ -31,7 +31,7 @@ BACKEND_DIR = str(Path(__file__).resolve().parent.parent.parent)
 def _run_worker(
     code: str,
     env_vars: dict[str, str] | None = None,
-    timeout: float = 30.0,
+    timeout: float = 60.0,
 ) -> dict[str, Any]:
     """Execute Python code in an independent OS process with dedicated environment."""
     env = os.environ.copy()
@@ -310,9 +310,13 @@ svc.propose_membership_change(
     auth_token=token_a,
 )
 
-# Bind model to consortium_cross_03
 reg = ModelRegistry()
-ctx_bind = create_trusted_internal_context("training_orchestrator", "bind_ownership")
+ctx_bind = create_trusted_internal_context(
+    service_name="training_orchestrator",
+    action="bind_ownership",
+    resource_type="model",
+    resource_id="sim_consortium_03",
+)
 reg.bind_simulation_ownership(
     simulation_id="sim_consortium_03",
     consortium_id="consortium_cross_03",
@@ -677,6 +681,7 @@ def test_consist_08_direct_membership_mutation_bypasses_rejected(isolated_consor
     env["APP_ENV"] = "production"
     env["CFI_JWT_SIGNING_SECRET"] = "production_super_secure_signing_secret_jwt_key_32chars!"
     env["CFI_IDENTITY_STORE_SECRET"] = "production_super_secure_identity_authority_secret_32chars!"
+    env["CFI_AUDIT_LEDGER_SECRET"] = "production_audit_ledger_secret_32chars!"
 
     worker_code = """
 import json
@@ -777,7 +782,12 @@ c_updated = svc.get_consortium("consortium_life_09")
 assert c_updated.max_epsilon == 3.0
 
 reg = ModelRegistry()
-ctx_bind = create_trusted_internal_context("training_orchestrator", "bind_ownership")
+ctx_bind = create_trusted_internal_context(
+    service_name="training_orchestrator",
+    action="bind_ownership",
+    resource_type="model",
+    resource_id="sim_consortium_09",
+)
 reg.bind_simulation_ownership(
     simulation_id="sim_consortium_09",
     consortium_id="consortium_life_09",

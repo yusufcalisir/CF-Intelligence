@@ -596,10 +596,17 @@ async def list_simulations() -> list[SimulationSummaryResponse]:
     """List all simulation runs."""
     summaries = []
     for sim in _simulation_results.list_values():
+        if not isinstance(sim, dict) or "id" not in sim:
+            continue
+        raw_status = sim.get("status", "pending")
+        try:
+            status_enum = SimulationStatus(raw_status)
+        except ValueError:
+            status_enum = SimulationStatus.PENDING
         summaries.append(
             SimulationSummaryResponse(
                 id=sim["id"],
-                status=SimulationStatus(sim["status"]),
+                status=status_enum,
                 current_round=sim.get("current_round", 0),
                 total_rounds=sim.get("total_rounds", 10),
                 progress_pct=_calc_progress(sim),

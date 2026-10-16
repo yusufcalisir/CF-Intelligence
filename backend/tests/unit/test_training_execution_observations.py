@@ -183,8 +183,10 @@ class TestTrainingExecutionObservationsAdversarial:
         source.record_round_observation(
             job_id=job_id,
             round_number=1,
+            bank_id="BANK_A",
             sample_count=500,
             observed_loss=0.45,
+            model_update_digest="d" * 64,
             worker_token="worker_secret_12345678901234567890",
         )
         source.record_global_aggregation(

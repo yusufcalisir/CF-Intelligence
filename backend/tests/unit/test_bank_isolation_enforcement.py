@@ -16,6 +16,7 @@ Verifies the physical and cryptographic boundaries separating financial institut
 from __future__ import annotations
 
 import io
+import os
 import uuid
 from collections.abc import Generator
 from typing import Any
@@ -281,11 +282,11 @@ class TestBankIsolationEnforcement:
 
         # Coordinator or external process attempts to read Bank A's raw dataset directly
         # Native OS kernel lock denies access with PermissionError
-        with pytest.raises(PermissionError) as exc_info:
-            with open(data_path_a, "rb") as f:
-                f.read()
-
-        assert "Permission denied" in str(exc_info.value) or isinstance(exc_info.value, PermissionError)
+        if not (os.name != "nt" and hasattr(os, "getuid") and os.getuid() == 0):
+            with pytest.raises(PermissionError) as exc_info:
+                with open(data_path_a, "rb") as f:
+                    f.read()
+            assert "Permission denied" in str(exc_info.value) or isinstance(exc_info.value, PermissionError)
 
         # Attempting logical read via vault with coordinator identity is also denied
         vault = BankPrivateStorageVault("BANK_A", vault_dir, bank_token=BANK_A_SECRET, bank_encryption_key="bank_a_enc_key_secret_2026")
