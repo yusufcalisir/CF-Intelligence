@@ -95,11 +95,16 @@ def harden_env():
     orig_jwt = settings.oidc_jwt_signing_secret
     orig_ident_sec = settings.identity_store_secret
     orig_ident_key = settings.identity_store_authority_key
+    orig_payload_sec = settings.payload_signing_secret
 
     settings.app_env = "production"
     settings.oidc_jwt_signing_secret = PROD_JWT_SECRET
     settings.identity_store_secret = PROD_AUTH_SECRET
     settings.identity_store_authority_key = ""
+    settings.payload_signing_secret = PROD_AUTH_SECRET
+
+    from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+    ImmutableAuditChain.reset_instance()
 
     old_storage = registry.storage_dir
     old_root = registry.registry_root
@@ -118,6 +123,7 @@ def harden_env():
     }
 
     AuthenticationService.reset_instance()
+    ImmutableAuditChain.reset_instance()
     registry.storage_dir = old_storage
     registry.registry_root = old_root
     registry._verifier = old_verifier
@@ -125,6 +131,7 @@ def harden_env():
     settings.oidc_jwt_signing_secret = orig_jwt
     settings.identity_store_secret = orig_ident_sec
     settings.identity_store_authority_key = orig_ident_key
+    settings.payload_signing_secret = orig_payload_sec
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 

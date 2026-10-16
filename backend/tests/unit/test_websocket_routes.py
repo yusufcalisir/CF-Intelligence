@@ -11,8 +11,11 @@ Verifies:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from starlette.testclient import TestClient
@@ -227,3 +230,83 @@ def test_connection_manager_diagnostics():
     assert "total_broadcasts" in stats
     assert "total_evicted_clients" in stats
     assert "active_rooms_count" in stats
+
+
+# ── Redis-Empty vs Redis-Unavailable Honest Replay Verification ────────────
+
+
+@pytest.mark.asyncio
+async def test_training_ws_redis_empty_does_not_replay_worker_local_history():
+    """When Redis is reachable and returns an empty list, worker-local ring buffer must not be replayed."""
+    from app.presentation.websockets.training_ws import _stream_via_redis
+
+    ws = AsyncMock()
+    ws.client_state = 1
+    sent_messages: list[str] = []
+
+    async def fake_send(text: str) -> None:
+        sent_messages.append(text)
+
+    ws.send_text = AsyncMock(side_effect=fake_send)
+
+    redis_mock = MagicMock()
+    redis_mock.lrange = AsyncMock(return_value=[])  # Empty Redis list (0 events)
+
+    pubsub_mock = MagicMock()
+    pubsub_mock.subscribe = AsyncMock()
+
+    async def fake_get_message(*args: Any, **kwargs: Any) -> None:
+        raise asyncio.CancelledError()
+
+    pubsub_mock.get_message = fake_get_message
+    redis_mock.pubsub = MagicMock(return_value=pubsub_mock)
+
+    room = "simulation:sim_redis_empty_test"
+    training_ws_manager.broadcast_to_room_sync(room, {"event": "local_only_event"})
+
+    with pytest.raises(asyncio.CancelledError):
+        await _stream_via_redis(ws, "sim_redis_empty_test", redis_mock, room_name=room)
+
+    events = [json.loads(m) for m in sent_messages]
+    assert len(events) == 1
+    assert events[0]["event"] == "connected"
+    assert not any(e.get("event") == "local_only_event" for e in events)
+
+
+@pytest.mark.asyncio
+async def test_training_ws_redis_unavailable_replays_worker_local_history():
+    """When Redis fails or is unavailable during replay fetch, worker-local ring buffer is used as best-effort fallback."""
+    from app.presentation.websockets.training_ws import _stream_via_redis
+
+    ws = AsyncMock()
+    ws.client_state = 1
+    sent_messages: list[str] = []
+
+    async def fake_send(text: str) -> None:
+        sent_messages.append(text)
+
+    ws.send_text = AsyncMock(side_effect=fake_send)
+
+    redis_mock = MagicMock()
+    redis_mock.lrange = AsyncMock(side_effect=ConnectionError("Redis connection lost"))
+
+    pubsub_mock = MagicMock()
+    pubsub_mock.subscribe = AsyncMock()
+
+    async def fake_get_message(*args: Any, **kwargs: Any) -> None:
+        raise asyncio.CancelledError()
+
+    pubsub_mock.get_message = fake_get_message
+    redis_mock.pubsub = MagicMock(return_value=pubsub_mock)
+
+    room = "simulation:sim_redis_unavail_test"
+    training_ws_manager.broadcast_to_room_sync(room, {"event": "worker_local_fallback"})
+
+    with pytest.raises(asyncio.CancelledError):
+        await _stream_via_redis(ws, "sim_redis_unavail_test", redis_mock, room_name=room)
+
+    events = [json.loads(m) for m in sent_messages]
+    assert len(events) == 2
+    assert events[0]["event"] == "connected"
+    assert events[1]["event"] == "worker_local_fallback"
+

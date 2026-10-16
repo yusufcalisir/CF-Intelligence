@@ -627,16 +627,23 @@ class TestAggregationProvenanceHardened:
             coordinator_token=COORD_SECRET,
         )
 
-        # Attacker records evaluation observation referencing a DIFFERENT model digest
-        source.record_evaluation_observation(
-            job_id=job_id,
-            metric_name="val_loss",
-            metric_value=0.3,
-            evaluated_artifact_digest="2" * 64,
-            coordinator_token=COORD_SECRET,
-        )
+        # Attacker attempts to record evaluation observation referencing an unaggregated model digest
+        with pytest.raises(
+            TrainingProvenanceSecurityError,
+            match=r"Evaluation forgery: evaluated artifact digest .* does not match any authentic global aggregation",
+        ):
+            source.record_evaluation_observation(
+                job_id=job_id,
+                metric_name="val_loss",
+                metric_value=0.3,
+                evaluated_artifact_digest="2" * 64,
+                coordinator_token=COORD_SECRET,
+            )
 
-        with pytest.raises(TrainingProvenanceSecurityError, match="has no matching trusted evaluation event"):
+        with pytest.raises(
+            TrainingProvenanceSecurityError,
+            match=r"has no matching trusted evaluation event|without verified model evaluation observations",
+        ):
             source.complete_training_job(
                 job_id=job_id,
                 executed_rounds=1,

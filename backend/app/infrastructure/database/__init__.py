@@ -80,13 +80,14 @@ def _resolve_database_url(tenant: str | None) -> str:
     * ``None`` → central/system database
     * ``"bank_a"`` → bank_a's isolated database
     """
+    current_settings = get_settings()
     clean_tenant: str | None = None
     if tenant:
         from app.infrastructure.database.tenant_provisioner import sanitize_bank_id
 
         clean_tenant = sanitize_bank_id(tenant)
 
-    if settings.database_type == "sqlite":
+    if current_settings.database_type == "sqlite":
         storage_dir = get_storage_dir()
         with contextlib.suppress(OSError):
             os.makedirs(storage_dir, exist_ok=True)
@@ -97,31 +98,32 @@ def _resolve_database_url(tenant: str | None) -> str:
         return f"sqlite+aiosqlite:///{db_path}"
 
     # PostgreSQL / CockroachDB: append tenant suffix to database name
-    base_db = settings.postgres_db
+    base_db = current_settings.postgres_db
     db_name = f"{base_db}_{clean_tenant}" if clean_tenant else base_db
     return (
-        f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}"
-        f"@{settings.postgres_host}:{settings.postgres_port}/{db_name}"
+        f"postgresql+asyncpg://{current_settings.postgres_user}:{current_settings.postgres_password}"
+        f"@{current_settings.postgres_host}:{current_settings.postgres_port}/{db_name}"
     )
 
 
 def _make_engine_kwargs(tenant: str | None) -> dict[str, Any]:
     """Build engine keyword arguments with production connection pooling."""
-    if settings.database_type == "sqlite":
+    current_settings = get_settings()
+    if current_settings.database_type == "sqlite":
         return {
-            "echo": settings.app_debug,
+            "echo": current_settings.app_debug,
             "connect_args": {"timeout": 30.0, "check_same_thread": False},
         }
 
     kwargs: dict[str, Any] = {
-        "echo": settings.app_debug,
-        "pool_size": getattr(settings, "database_pool_size", 20),
-        "max_overflow": getattr(settings, "database_max_overflow", 10),
-        "pool_timeout": getattr(settings, "database_pool_timeout", 30.0),
-        "pool_recycle": getattr(settings, "database_pool_recycle", 3600),
+        "echo": current_settings.app_debug,
+        "pool_size": getattr(current_settings, "database_pool_size", 20),
+        "max_overflow": getattr(current_settings, "database_max_overflow", 10),
+        "pool_timeout": getattr(current_settings, "database_pool_timeout", 30.0),
+        "pool_recycle": getattr(current_settings, "database_pool_recycle", 3600),
         "pool_pre_ping": True,
     }
-    if settings.database_type == "cockroachdb":
+    if current_settings.database_type == "cockroachdb":
         kwargs["connect_args"] = {"application_name": f"cfi_{tenant or 'central'}"}
     return kwargs
 
@@ -131,26 +133,62 @@ def _make_engine_kwargs(tenant: str | None) -> dict[str, Any]:
 _tenant_engines: dict[str | None, AsyncEngine] = {}
 _tenant_sessions: dict[str | None, async_sessionmaker[AsyncSession]] = {}
 _tenant_initialized: set[str | None] = set()
+_tenant_engine_configs: dict[str | None, tuple[str, tuple[tuple[str, Any], ...]]] = {}
+
+
+def _compute_engine_signature(tenant: str | None) -> tuple[str, tuple[tuple[str, Any], ...]]:
+    """Compute an immutable signature of the URL and engine options for the given tenant."""
+    url = _resolve_database_url(tenant)
+    kwargs = _make_engine_kwargs(tenant)
+    connect_args = kwargs.get("connect_args")
+    frozen_connect_args = (
+        tuple(sorted(connect_args.items())) if isinstance(connect_args, dict) else ()
+    )
+    sig_items: list[tuple[str, Any]] = []
+    for k, v in sorted(kwargs.items()):
+        if k == "connect_args":
+            sig_items.append((k, frozen_connect_args))
+        else:
+            sig_items.append((k, v))
+    return (url, tuple(sig_items))
 
 
 def _get_or_create_engine(tenant: str | None) -> AsyncEngine:
-    """Return (and cache) the async engine for a tenant, creating it on first access."""
+    """Return (and cache) the async engine for a tenant, creating it on first access.
+
+    Fails closed if the database configuration has changed for this tenant since
+    engine creation, preventing silent reuse across incompatible configurations.
+    """
     clean_tenant: str | None = None
     if tenant:
         from app.infrastructure.database.tenant_provisioner import sanitize_bank_id
 
         clean_tenant = sanitize_bank_id(tenant)
 
-    if clean_tenant not in _tenant_engines:
-        url = _resolve_database_url(clean_tenant)
-        eng = create_async_engine(url, **_make_engine_kwargs(clean_tenant))
-        _tenant_engines[clean_tenant] = eng
-        _tenant_sessions[clean_tenant] = async_sessionmaker(
-            eng, class_=AsyncSession, expire_on_commit=False
-        )
-        logger.info(
-            "Created database engine for tenant=%s url=%s", clean_tenant or "central", url
-        )
+    current_sig = _compute_engine_signature(clean_tenant)
+
+    if clean_tenant in _tenant_engines:
+        cached_sig = _tenant_engine_configs.get(clean_tenant)
+        if cached_sig is not None and cached_sig != current_sig:
+            raise RuntimeError(
+                f"Database configuration change detected for tenant '{clean_tenant or 'central'}'. "
+                f"Active settings resolved to URL '{current_sig[0]}' with pool config {dict(current_sig[1])}, "
+                f"but an engine was already cached with URL '{cached_sig[0]}' and pool config {dict(cached_sig[1])}. "
+                "Silent engine reuse across incompatible configurations is prohibited. "
+                "Explicitly call dispose_all_engines() before reconfiguring database settings in test environments."
+            )
+        return _tenant_engines[clean_tenant]
+
+    url = current_sig[0]
+    eng = create_async_engine(url, **_make_engine_kwargs(clean_tenant))
+    _tenant_engines[clean_tenant] = eng
+    _tenant_sessions[clean_tenant] = async_sessionmaker(
+        eng, class_=AsyncSession, expire_on_commit=False
+    )
+    _tenant_engine_configs[clean_tenant] = current_sig
+    logger.info(
+        "Created database engine for tenant=%s url=%s", clean_tenant or "central", url
+    )
     return _tenant_engines[clean_tenant]
 
 
@@ -248,22 +286,26 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     Reads ``active_tenant`` to select the tenant-specific session factory.
     Falls back to the central database when no tenant context is set.
     """
+    current_settings = get_settings()
     tenant = active_tenant.get()
     await init_tenant_tables(tenant)
     factory = get_session_factory(tenant)
     async with factory() as session:
-        if tenant and settings.database_type != "sqlite":
+        if tenant and current_settings.database_type != "sqlite":
             from app.infrastructure.database.tenant_provisioner import (
                 _pg_quote_identifier,
                 sanitize_bank_id,
             )
 
+            clean_id = sanitize_bank_id(tenant)
             try:
-                clean_id = sanitize_bank_id(tenant)
                 q_schema = _pg_quote_identifier(f"tenant_{clean_id}")
                 await session.execute(text(f"SET search_path TO {q_schema}, public"))
             except Exception as exc:
-                logger.warning("Could not set search_path for tenant_%s: %s", tenant, exc)
+                logger.error("Could not set search_path for tenant_%s: %s", tenant, exc)
+                raise RuntimeError(
+                    f"Tenant isolation failure: could not set search_path for tenant '{clean_id}'"
+                ) from exc
         try:
             yield session
         finally:
@@ -272,6 +314,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 async def get_tenant_session(bank_id: str) -> AsyncGenerator[AsyncSession, None]:
     """Yield an AsyncSession scoped to the specified tenant's PostgreSQL schema (tenant_{bank_id})."""
+    current_settings = get_settings()
     from app.infrastructure.database.tenant_provisioner import sanitize_bank_id
 
     clean_bank_id = sanitize_bank_id(bank_id)
@@ -279,14 +322,17 @@ async def get_tenant_session(bank_id: str) -> AsyncGenerator[AsyncSession, None]
     factory = get_session_factory(clean_bank_id)
 
     async with factory() as session:
-        if settings.database_type != "sqlite":
+        if current_settings.database_type != "sqlite":
             from app.infrastructure.database.tenant_provisioner import _pg_quote_identifier
 
             try:
                 q_schema = _pg_quote_identifier(f"tenant_{clean_bank_id}")
                 await session.execute(text(f"SET search_path TO {q_schema}, public"))
             except Exception as exc:
-                logger.warning("Could not set search_path for tenant_%s: %s", clean_bank_id, exc)
+                logger.error("Could not set search_path for tenant_%s: %s", clean_bank_id, exc)
+                raise RuntimeError(
+                    f"Tenant isolation failure: could not set search_path for tenant '{clean_bank_id}'"
+                ) from exc
         try:
             yield session
         finally:
@@ -369,10 +415,25 @@ async def run_cockroach_transaction(
 
 
 async def dispose_all_engines() -> None:
-    """Dispose all tenant engines on application shutdown."""
-    for tenant, eng in _tenant_engines.items():
+    """Dispose all tenant engines on application shutdown or lifecycle transitions."""
+    for tenant, eng in list(_tenant_engines.items()):
         logger.info("Disposing engine for tenant=%s", tenant or "central")
         await eng.dispose()
     _tenant_engines.clear()
     _tenant_sessions.clear()
     _tenant_initialized.clear()
+    _tenant_engine_configs.clear()
+
+
+def reset_tenant_engines_sync() -> None:
+    """Synchronously dispose and clear all tenant engines for synchronous test fixtures."""
+    for tenant, eng in list(_tenant_engines.items()):
+        logger.info("Synchronously disposing engine for tenant=%s", tenant or "central")
+        try:
+            eng.sync_engine.dispose()
+        except Exception as exc:
+            logger.warning("Error disposing engine for tenant %s: %s", tenant, exc)
+    _tenant_engines.clear()
+    _tenant_sessions.clear()
+    _tenant_initialized.clear()
+    _tenant_engine_configs.clear()

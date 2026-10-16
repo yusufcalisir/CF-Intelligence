@@ -128,6 +128,19 @@ def _reset_redis_store_state():
 
 
 @pytest.fixture(autouse=True)
+def _isolate_audit_chain_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Ensure every test has a clean, isolated ImmutableAuditChain ledger file."""
+    from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+    if "CFI_AUDIT_LEDGER_PATH" not in os.environ:
+        test_ledger = tmp_path / "test_audit_ledger.json"
+        monkeypatch.setenv("CFI_AUDIT_LEDGER_PATH", str(test_ledger))
+    ImmutableAuditChain.reset_instance()
+    yield
+    ImmutableAuditChain.reset_instance()
+
+
+@pytest.fixture(autouse=True)
 def _reset_ddos_state():
     """Reset DDoSProtectionMiddleware's class-level shared request counter before each test."""
     try:

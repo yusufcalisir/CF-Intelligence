@@ -185,7 +185,7 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
     try:
         if redis_available and redis_client is not None:
             try:
-                await _stream_via_redis(websocket, simulation_id, redis_client)
+                await _stream_via_redis(websocket, simulation_id, redis_client, room_name=room_name)
             except Exception as stream_exc:
                 if _is_client_disconnect(websocket, stream_exc):
                     logger.info("WebSocket disconnected for simulation %s", simulation_id)
@@ -221,8 +221,29 @@ async def _stream_via_redis(
     websocket: WebSocket,
     simulation_id: str,
     redis_client: aioredis.Redis,  # type: ignore[type-arg]
+    room_name: str | None = None,
 ) -> None:
     """Primary streaming path: Redis list replay + pub/sub live events."""
+    if _is_client_disconnect(websocket):
+        return
+
+    try:
+        await websocket.send_text(
+            json.dumps(
+                {
+                    "event": "connected",
+                    "status": "streaming",
+                    "mode": "redis",
+                    "simulation_id": simulation_id,
+                }
+            )
+        )
+        training_ws_manager.record_client_activity(websocket)
+    except Exception as send_err:
+        if _is_client_disconnect(websocket, send_err):
+            return
+        raise
+
     events_key = f"simulation:{simulation_id}:events"
 
     # Step 1: Replay past events stored in Redis list
@@ -235,17 +256,17 @@ async def _stream_via_redis(
         )
     except TimeoutError:
         logger.warning(
-            "Redis REPLAY_READ_TIMEOUT reading %s (>2.0s) — continuing to live pub/sub",
+            "Redis REPLAY_READ_TIMEOUT reading %s (>2.0s) — falling back to worker-local buffer",
             events_key,
         )
-        past_events = []
+        past_events = training_ws_manager.get_room_history(room_name) if room_name else []
     except Exception as exc:
         logger.warning(
-            "Redis replay read failed for %s (%s) — continuing to live pub/sub",
+            "Redis replay read failed for %s (%s) — falling back to worker-local buffer",
             events_key,
             type(exc).__name__,
         )
-        past_events = []
+        past_events = training_ws_manager.get_room_history(room_name) if room_name else []
 
     if isinstance(past_events, (list, tuple)):
         for raw_event in past_events:

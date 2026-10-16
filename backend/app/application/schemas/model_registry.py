@@ -96,6 +96,8 @@ class ModelVersionItem(BaseModel):
     )
     sign_offs: list[SignOffRecord] = Field(default_factory=list)
     created_at: str
+    is_approved: bool = Field(False, description="Whether the model version has all required sign-offs")
+    is_production_eligible: bool = Field(False, description="Whether the model version is eligible for production promotion")
 
 
 class ModelSummary(BaseModel):

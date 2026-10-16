@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 
 from app.application.services.coordinator_service import CoordinatorService
-from app.application.services.model_registry import ModelRegistry
+from app.application.services.model_registry import ModelIntegrityError, ModelRegistry
 from app.infrastructure.connectors.kafka_connector import KafkaBankConnector
 from app.infrastructure.connectors.kafka_streaming_connector import (
     CloudEvent,
@@ -227,7 +227,7 @@ def test_corrupt_model_artifact_fails_closed() -> None:
         with open(corrupt_path, "wb") as f:
             f.write(b"CORRUPTED_NOT_A_PYTORCH_TENSOR_FILE")
 
-        with pytest.raises((RuntimeError, OSError, pickle.PickleError)):
+        with pytest.raises((RuntimeError, OSError, pickle.PickleError, ModelIntegrityError)):
             registry.load_version(sim_id, 1)
 
 

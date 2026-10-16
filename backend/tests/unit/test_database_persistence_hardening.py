@@ -494,3 +494,109 @@ def test_enterprise_stress_test_percentiles_calculation() -> None:
     assert "p50_latency_ms" in as_dict
     assert "p95_latency_ms" in as_dict
     assert "p99_latency_ms" in as_dict
+
+
+# ── 8. Database Configuration Consistency & Tenant Isolation Hardening ────────
+
+
+@pytest.mark.asyncio
+async def test_database_configuration_change_rejects_silent_reuse(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies that changing database configuration without explicit disposal raises RuntimeError."""
+    from app.config import get_settings
+    from app.infrastructure.database import (
+        _get_or_create_engine,
+        dispose_all_engines,
+    )
+
+    await dispose_all_engines()
+    try:
+        # Create initial engine for bank_test
+        eng1 = _get_or_create_engine("bank_test_cfg")
+        assert eng1 is not None
+
+        # Re-fetching with same configuration succeeds and reuses engine
+        eng1_reused = _get_or_create_engine("bank_test_cfg")
+        assert eng1_reused is eng1
+
+        # Simulate dynamic settings change (switching database_type to postgres with custom pool size)
+        current_settings = get_settings()
+        monkeypatch.setattr(current_settings, "database_type", "postgres")
+        monkeypatch.setattr(current_settings, "database_pool_size", 99)
+
+        # Attempting to fetch engine without dispose must fail closed
+        with pytest.raises(RuntimeError, match="Database configuration change detected for tenant 'bank_test_cfg'"):
+            _get_or_create_engine("bank_test_cfg")
+
+        # Explicit disposal allows new engine with updated configuration
+        await dispose_all_engines()
+        eng2 = _get_or_create_engine("bank_test_cfg")
+        assert eng2 is not None
+        assert eng2 is not eng1
+    finally:
+        await dispose_all_engines()
+
+
+@pytest.mark.asyncio
+async def test_tenant_isolation_fails_closed_on_schema_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies that failures during schema switching fail closed and do not yield unintended sessions."""
+    from unittest.mock import AsyncMock
+
+    from app.config import get_settings
+    from app.infrastructure.database import (
+        active_tenant,
+        get_async_session,
+        get_tenant_session,
+    )
+
+    current_settings = get_settings()
+    monkeypatch.setattr(current_settings, "database_type", "postgres")
+
+    # Mock session factory producing a session whose execute fails on search_path
+    class FailingSession:
+        def __init__(self) -> None:
+            self.closed = False
+
+        async def execute(self, stmt: Any) -> Any:
+            raise RuntimeError("Database permission denied for tenant schema")
+
+        async def close(self) -> None:
+            self.closed = True
+
+        async def __aenter__(self) -> FailingSession:
+            return self
+
+        async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+            await self.close()
+
+    mock_factory = MagicMock(return_value=FailingSession())
+    monkeypatch.setattr("app.infrastructure.database.get_session_factory", lambda tenant: mock_factory)
+    monkeypatch.setattr("app.infrastructure.database.init_tenant_tables", AsyncMock())
+
+    # get_tenant_session must raise RuntimeError
+    with pytest.raises(RuntimeError, match="Tenant isolation failure: could not set search_path for tenant 'bank_fail'"):
+        async for _ in get_tenant_session("bank_fail"):
+            pytest.fail("Session should not have been yielded after schema failure")
+
+    # get_async_session with active_tenant must raise RuntimeError
+    tok = active_tenant.set("bank_fail")
+    try:
+        with pytest.raises(RuntimeError, match="Tenant isolation failure: could not set search_path for tenant 'bank_fail'"):
+            async for _ in get_async_session():
+                pytest.fail("Session should not have been yielded after schema failure")
+    finally:
+        active_tenant.reset(tok)
+
+
+def test_tenant_connections_isolation_urls() -> None:
+    """Verifies separate and distinct database URLs for central, bank_a, and bank_b."""
+    from app.infrastructure.database import _resolve_database_url
+
+    central = _resolve_database_url(None)
+    bank_a = _resolve_database_url("bank_a")
+    bank_b = _resolve_database_url("bank_b")
+
+    assert central != bank_a
+    assert bank_a != bank_b
+    assert "bank_a" in bank_a
+    assert "bank_b" in bank_b
+

@@ -258,9 +258,9 @@ class IdempotencyService:
             try:
                 if not owner_id:
                     if hasattr(self._redis_client, "setex"):
-                        self._redis_client.setex(redis_key, int(ttl_seconds), serialized)
+                        self._redis_client.setex(redis_key, ttl_seconds, serialized)
                     else:
-                        self._redis_client.set(redis_key, serialized, ex=int(ttl_seconds))
+                        self._redis_client.set(redis_key, serialized, ex=ttl_seconds)
                     return True
                 elif hasattr(self._redis_client, "eval"):
                     lua_complete = """
@@ -280,7 +280,7 @@ class IdempotencyService:
 
                     return 0
                     """
-                    res = self._redis_client.eval(lua_complete, 1, redis_key, owner_id, serialized, int(ttl_seconds))
+                    res = self._redis_client.eval(lua_complete, 1, redis_key, owner_id, serialized, ttl_seconds)
                     return bool(res)
                 else:
                     raw = self._redis_client.get(redis_key)
@@ -288,9 +288,9 @@ class IdempotencyService:
                         val_str = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
                         if val_str == f"IN_PROGRESS:{owner_id}" or val_str == owner_id:
                             if hasattr(self._redis_client, "setex"):
-                                self._redis_client.setex(redis_key, int(ttl_seconds), serialized)
+                                self._redis_client.setex(redis_key, ttl_seconds, serialized)
                             else:
-                                self._redis_client.set(redis_key, serialized, ex=int(ttl_seconds))
+                                self._redis_client.set(redis_key, serialized, ex=ttl_seconds)
                             return True
                     return False
             except Exception as exc:

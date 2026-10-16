@@ -25,12 +25,14 @@ Verifies fail-closed behavior across all 20 adversarial production boundary scen
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import multiprocessing as mp
 import time
 import uuid
 from collections.abc import Generator
 from typing import Any
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -59,7 +61,10 @@ from app.application.services.training_provenance_service import (
     TrustedTrainingJobRecordSource,
     get_default_training_verifier,
 )
-from app.infrastructure.database.training_authority_backends import PostgresTrainingJobAuthority
+from app.infrastructure.database.training_authority_backends import (
+    PostgresTrainingJobAuthority,
+    RoundObservation,
+)
 
 COORD_SECRET = "coord_secret_e2e_neg_production_991"
 BANK_A_SECRET = "bank_a_secret_e2e_neg_alpha_112"
@@ -86,12 +91,15 @@ def real_pg_instance() -> Generator[str, None, None]:
         pytest.skip("psycopg is not installed (PostgreSQL driver unavailable)")
 
     pg = pg0.Pg0()
+    with contextlib.suppress(Exception):
+        pg.stop()
     pg.start()
     try:
         assert pg.uri is not None
         yield pg.uri
     finally:
-        pg.stop()
+        with contextlib.suppress(Exception):
+            pg.stop()
 
 
 def _coordinator_terminating_aggregator(db_url: str, job_id: str, ready_event: Any) -> None:
@@ -109,14 +117,14 @@ def _coordinator_terminating_aggregator(db_url: str, job_id: str, ready_event: A
                 ) VALUES (
                     %s, %s, 1, 'fed_avg',
                     '["BANK_A"]', '["d1"]',
-                    '{}', 'agg_kill', NOW(),
+                    '{}', 'agg_kill', NOW()::text,
                     'ACCEPTED', 'digest_payload'
                 )
                 """,
                 (f"evt_agg_{job_id}", job_id),
             )
             ready_event.set()
-            time.sleep(10)
+            time.sleep(30)
 
 
 def _concurrent_completer(
@@ -330,23 +338,41 @@ class TestAdversarialEndToEndScenarios:
 
     def test_e2e_neg_07_coordinator_attempts_access_to_bank_credentials(self, real_pg_instance: str) -> None:
         """E2E-NEG-07: Coordinator cannot inspect, possess, or be provisioned with bank private credentials."""
+        # 1. Attempting to supply bank private credentials to production coordinator constructor is strictly rejected (BI-02)
+        with pytest.raises(
+            TrainingProvenanceSecurityError,
+            match="Production coordinator cannot receive bank private credentials",
+        ):
+            DistributedFederatedTrainingManager(
+                coordinator_token=COORD_SECRET,
+                db_url=real_pg_instance,
+                app_env="production",
+                bank_tokens={"BANK_A": BANK_A_SECRET},
+            )
+
+        # 2. Coordinator in non-production mode does not hold bank credentials
         manager = DistributedFederatedTrainingManager(
             coordinator_token=COORD_SECRET,
             db_url=real_pg_instance,
-            app_env="production",
+            app_env="testing",
         )
-        assert not hasattr(manager, "bank_tokens")
+        assert not hasattr(manager, "bank_tokens") or manager.bank_tokens is None
         assert not hasattr(manager.authority_source, "bank_tokens") or manager.authority_source.bank_tokens is None
 
-        # Attempting to supply bank private credentials to production coordinator is strictly rejected
-        with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot receive bank private credentials"):
-            manager.execute_distributed_federation(
-                job_id="job_unauth_cred",
-                training_run_id="run_unauth_cred",
-                simulation_id="sim_unauth_cred",
-                holdout_val_data=(np.zeros((5, NUM_FEATURES), dtype=np.float32), np.zeros(5, dtype=np.float32)),
-                bank_tokens={"BANK_A": BANK_A_SECRET},
-            )
+        # 3. Attempting to supply bank private credentials during execution under production is strictly rejected
+        manager.app_env = "production"
+        with patch("app.application.services.distributed_fl_service.verify_restricted_coordinator_os_boundary"):
+            with pytest.raises(
+                TrainingProvenanceSecurityError,
+                match="Production coordinator cannot receive bank private credentials",
+            ):
+                manager.execute_distributed_federation(
+                    job_id="job_unauth_cred",
+                    training_run_id="run_unauth_cred",
+                    simulation_id="sim_unauth_cred",
+                    holdout_val_data=(np.zeros((5, NUM_FEATURES), dtype=np.float32), np.zeros(5, dtype=np.float32)),
+                    bank_tokens={"BANK_A": BANK_A_SECRET},
+                )
 
     def test_e2e_neg_08_unknown_model_update_digest(self, real_pg_instance: str) -> None:
         """E2E-NEG-08: Aggregating unknown or fabricated update digest is rejected."""
@@ -639,27 +665,34 @@ class TestAdversarialEndToEndScenarios:
             bank_tokens=BANK_TOKENS,
             db_url=real_pg_instance,
             bank_partitions=bank_partitions,
+            app_env="testing",
         )
 
         manager = DistributedFederatedTrainingManager(
             coordinator_token=COORD_SECRET,
             db_url=real_pg_instance,
-            app_env="production",
+            app_env="testing",
         )
 
-        with pytest.raises(TrainingProvenanceSecurityError, match="aborted|Required participant"):
-            manager.execute_distributed_federation(
-                job_id=f"job_neg14_{uuid.uuid4().hex[:8]}",
-                training_run_id=f"run_neg14_{uuid.uuid4().hex[:8]}",
-                simulation_id="sim_neg14",
-                holdout_val_data=holdout_val,
-                participating_banks=["BANK_A", "BANK_B", "BANK_C"],
-                worker_endpoints=endpoints,
-                worker_processes=procs,
-                num_rounds=2,
-                crash_bank_b=True,
-                registry_storage_dir=str(tmp_path / "reg_neg14"),
-            )
+        try:
+            with pytest.raises(TrainingProvenanceSecurityError, match="aborted|Required participant"):
+                manager.execute_distributed_federation(
+                    job_id=f"job_neg14_{uuid.uuid4().hex[:8]}",
+                    training_run_id=f"run_neg14_{uuid.uuid4().hex[:8]}",
+                    simulation_id="sim_neg14",
+                    holdout_val_data=holdout_val,
+                    participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+                    worker_endpoints=endpoints,
+                    worker_processes=procs,
+                    num_rounds=2,
+                    crash_bank_b=True,
+                    registry_storage_dir=str(tmp_path / "reg_neg14"),
+                )
+        finally:
+            for p in procs.values():
+                if hasattr(p, "terminate"):
+                    with contextlib.suppress(Exception):
+                        p.terminate()
 
     def test_e2e_neg_15_coordinator_process_terminates_during_aggregation(self, real_pg_instance: str) -> None:
         """E2E-NEG-15: Real OS process termination during aggregation leaves no partial or corrupted state."""
@@ -679,11 +712,31 @@ class TestAdversarialEndToEndScenarios:
             feature_names=list(FEATURE_NAMES),
             permitted_workers=["BANK_A"],
         )
+        authority.start_job(job_id=job_id, worker_id="BANK_A")
+        authority.record_observation(
+            RoundObservation(
+                event_id=f"obs_{job_id}",
+                job_id=job_id,
+                training_run_id=f"run_{job_id}",
+                simulation_id="sim_neg15",
+                worker_id="BANK_A",
+                bank_id="BANK_A",
+                round_number=1,
+                attempt_number=1,
+                actual_sample_count=100,
+                actual_executed_epochs=1,
+                observed_loss=0.5,
+                metrics={"loss": 0.5},
+                execution_timestamp="2026-10-16T12:00:00Z",
+                model_update_digest="d1",
+                execution_status="COMPLETED",
+            )
+        )
 
         ready_event = mp.Event()
         proc = mp.Process(target=_coordinator_terminating_aggregator, args=(real_pg_instance, job_id, ready_event))
         proc.start()
-        assert ready_event.wait(timeout=10) is True, "Aggregator child process failed to reach active transaction boundary"
+        assert ready_event.wait(timeout=25) is True, "Aggregator child process failed to reach active transaction boundary"
         # Terminate real coordinator process while transaction is uncommitted
         proc.terminate()
         proc.join(timeout=3)

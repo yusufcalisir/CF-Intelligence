@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 
 from app.application.services.coordinator_service import CoordinatorService
-from app.application.services.model_registry import ModelRegistry
+from app.application.services.model_registry import ModelIntegrityError, ModelRegistry
 from app.infrastructure.connectors.kafka_streaming_connector import (
     CloudEvent,
     InMemoryKafkaBroker,
@@ -202,10 +202,9 @@ def test_model_artifact_identity_properties_verification() -> None:
         assert entry1["version"] == 1
         assert entry1["filename"] == "model_v1.pt"
 
-        # 2. Content hash binding: verify registry does NOT enforce content hash
-        # Entry has dataset_hash and git_commit_hash, but NOT model_content_hash
-        assert "model_content_hash" not in entry1
-        assert "sha256" not in entry1
+        # 2. Content hash binding: verify registry binds artifact SHA-256
+        assert "sha256" in entry1
+        assert len(entry1["sha256"]) == 64
 
         # 3. Artifact lookup binding & actual loading
         loaded_dict = registry.load_version(sim_id, 1)
@@ -215,13 +214,13 @@ def test_model_artifact_identity_properties_verification() -> None:
         with pytest.raises(ValueError, match="Version 99 not found in registry"):
             registry.load_version(sim_id, 99)
 
-        # 5. Corrupt artifact fails closed
+        # 5. Corrupt artifact fails closed with cryptographic integrity check
         sim_dir = registry._get_sim_dir(sim_id)
         corrupt_file = os.path.join(sim_dir, "model_v1.pt")
         with open(corrupt_file, "wb") as f:
             f.write(b"POISONED_NON_TENSOR_BYTES")
 
-        with pytest.raises((RuntimeError, OSError, pickle.PickleError)):
+        with pytest.raises((RuntimeError, OSError, pickle.PickleError, ModelIntegrityError)):
             registry.load_version(sim_id, 1)
 
 

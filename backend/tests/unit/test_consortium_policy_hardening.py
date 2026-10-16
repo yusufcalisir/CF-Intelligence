@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -16,6 +18,45 @@ from app.domain.consortium_policy import (
     ConsortiumPolicyEngine,
     ConsortiumPolicyViolation,
 )
+from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
+
+
+@pytest.fixture(autouse=True)
+def isolate_consortium_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    store_file = tmp_path / "consortium_test_store.json"
+    monkeypatch.setenv("CFI_CONSORTIUM_STORE_PATH", str(store_file))
+    DurableConsortiumStore.set_instance(None)
+    yield
+    DurableConsortiumStore.set_instance(None)
+
+
+@pytest.fixture
+def auth_tokens() -> dict[str, str]:
+    auth_svc = AuthenticationService.get_instance()
+    u_a = auth_svc.get_user("gov_admin_a") or auth_svc.register_user(
+        "gov_admin_a", "AdminPass123!", "bank_a", roles=["admin"], clearance_level=3
+    )
+    u_b = auth_svc.get_user("gov_admin_b") or auth_svc.register_user(
+        "gov_admin_b", "AdminPass123!", "bank_b", roles=["admin"], clearance_level=3
+    )
+    u_c = auth_svc.get_user("gov_admin_c") or auth_svc.register_user(
+        "gov_admin_c", "AdminPass123!", "bank_c", roles=["admin"], clearance_level=3
+    )
+    u_eu = auth_svc.get_user("gov_admin_eu") or auth_svc.register_user(
+        "gov_admin_eu", "AdminPass123!", "bank_eu", roles=["admin"], clearance_level=3
+    )
+    u_us = auth_svc.get_user("gov_admin_us") or auth_svc.register_user(
+        "gov_admin_us", "AdminPass123!", "bank_us", roles=["admin"], clearance_level=3
+    )
+    return {
+        "bank_a": auth_svc.create_token_bundle(u_a).access_token,
+        "bank_b": auth_svc.create_token_bundle(u_b).access_token,
+        "bank_c": auth_svc.create_token_bundle(u_c).access_token,
+        "bank_eu": auth_svc.create_token_bundle(u_eu).access_token,
+        "bank_us": auth_svc.create_token_bundle(u_us).access_token,
+    }
+
 
 # ==============================================================================
 # 1. ConsortiumPolicyConfig & Input Validation Tests
@@ -39,10 +80,12 @@ def test_consortium_policy_config_validations() -> None:
         ConsortiumPolicyConfig(min_data_samples_per_member=0)
 
 
-def test_consortium_policy_rejects_empty_bank_roster() -> None:
+def test_consortium_policy_rejects_empty_bank_roster(auth_tokens: dict[str, str]) -> None:
     """Verifies that an empty participating bank list is rejected immediately."""
     service = ConsortiumGovernanceService()
-    consortium = service.create_consortium("c_empty", "Empty Test", "bank_a")
+    consortium = service.create_consortium(
+        "c_empty", "Empty Test", "bank_a", auth_token=auth_tokens["bank_a"]
+    )
     engine = ConsortiumPolicyEngine()
 
     is_valid, reasons = engine.validate_fl_round_preconditions(
@@ -54,10 +97,12 @@ def test_consortium_policy_rejects_empty_bank_roster() -> None:
     assert any("cannot be empty" in r for r in reasons)
 
 
-def test_consortium_policy_detects_duplicate_bank_participants() -> None:
+def test_consortium_policy_detects_duplicate_bank_participants(auth_tokens: dict[str, str]) -> None:
     """Verifies that duplicate bank IDs in participating roster are rejected and cannot fake quorum."""
     service = ConsortiumGovernanceService()
-    consortium = service.create_consortium("c_dup", "Dup Test", "bank_a")
+    consortium = service.create_consortium(
+        "c_dup", "Dup Test", "bank_a", auth_token=auth_tokens["bank_a"]
+    )
     engine = ConsortiumPolicyEngine(config=ConsortiumPolicyConfig(min_active_members=2))
 
     # Single bank duplicated to look like 2 members
@@ -71,11 +116,15 @@ def test_consortium_policy_detects_duplicate_bank_participants() -> None:
     assert any("Insufficient participating members" in r for r in reasons)
 
 
-def test_consortium_policy_rejects_invalid_epsilon() -> None:
+def test_consortium_policy_rejects_invalid_epsilon(auth_tokens: dict[str, str]) -> None:
     """Verifies rejection of non-positive, non-finite or NaN epsilon parameters."""
     service = ConsortiumGovernanceService()
-    consortium = service.create_consortium("c_eps", "Eps Test", "bank_a")
-    service.propose_membership_change("c_eps", "bank_a", "bank_b")
+    consortium = service.create_consortium(
+        "c_eps", "Eps Test", "bank_a", auth_token=auth_tokens["bank_a"]
+    )
+    service.propose_membership_change(
+        "c_eps", "bank_a", "bank_b", auth_token=auth_tokens["bank_a"]
+    )
     engine = ConsortiumPolicyEngine(config=ConsortiumPolicyConfig(min_active_members=2))
 
     # Negative epsilon
@@ -102,11 +151,15 @@ def test_consortium_policy_rejects_invalid_epsilon() -> None:
 # ==============================================================================
 
 
-def test_cross_border_sharing_blocked_without_waiver() -> None:
+def test_cross_border_sharing_blocked_without_waiver(auth_tokens: dict[str, str]) -> None:
     """Verifies that multi-region FL rounds are blocked when cross-border sharing is disabled."""
     service = ConsortiumGovernanceService()
-    consortium = service.create_consortium("c_cross", "Cross-Border Test", "bank_eu")
-    service.propose_membership_change("c_cross", "bank_eu", "bank_us")
+    consortium = service.create_consortium(
+        "c_cross", "Cross-Border Test", "bank_eu", auth_token=auth_tokens["bank_eu"]
+    )
+    service.propose_membership_change(
+        "c_cross", "bank_eu", "bank_us", auth_token=auth_tokens["bank_eu"]
+    )
 
     engine = ConsortiumPolicyEngine(
         config=ConsortiumPolicyConfig(
@@ -130,11 +183,15 @@ def test_cross_border_sharing_blocked_without_waiver() -> None:
     assert any("Cross-border feature and model sharing" in r for r in reasons)
 
 
-def test_cross_border_sharing_allowed_with_sovereignty_waiver() -> None:
+def test_cross_border_sharing_allowed_with_sovereignty_waiver(auth_tokens: dict[str, str]) -> None:
     """Verifies that multi-region FL rounds pass when cross-border sharing is explicitly enabled."""
     service = ConsortiumGovernanceService()
-    consortium = service.create_consortium("c_cross_ok", "Cross-Border Allowed", "bank_eu")
-    service.propose_membership_change("c_cross_ok", "bank_eu", "bank_us")
+    consortium = service.create_consortium(
+        "c_cross_ok", "Cross-Border Allowed", "bank_eu", auth_token=auth_tokens["bank_eu"]
+    )
+    service.propose_membership_change(
+        "c_cross_ok", "bank_eu", "bank_us", auth_token=auth_tokens["bank_eu"]
+    )
 
     engine = ConsortiumPolicyEngine(
         config=ConsortiumPolicyConfig(
@@ -158,11 +215,15 @@ def test_cross_border_sharing_allowed_with_sovereignty_waiver() -> None:
     assert len(reasons) == 0
 
 
-def test_unapproved_jurisdiction_blocked() -> None:
+def test_unapproved_jurisdiction_blocked(auth_tokens: dict[str, str]) -> None:
     """Verifies that a bank in an unauthorized jurisdiction is flagged by policy."""
     service = ConsortiumGovernanceService()
-    consortium = service.create_consortium("c_unauth_geo", "Jurisdiction Test", "bank_eu")
-    service.propose_membership_change("c_unauth_geo", "bank_eu", "bank_unknown")
+    consortium = service.create_consortium(
+        "c_unauth_geo", "Jurisdiction Test", "bank_eu", auth_token=auth_tokens["bank_eu"]
+    )
+    service.propose_membership_change(
+        "c_unauth_geo", "bank_eu", "bank_unknown", auth_token=auth_tokens["bank_eu"]
+    )
 
     engine = ConsortiumPolicyEngine(
         config=ConsortiumPolicyConfig(
@@ -186,11 +247,15 @@ def test_unapproved_jurisdiction_blocked() -> None:
     assert any("operates in unapproved jurisdiction" in r for r in reasons)
 
 
-def test_restricted_features_governance() -> None:
+def test_restricted_features_governance(auth_tokens: dict[str, str]) -> None:
     """Verifies that sharing forbidden PII features (SSN, IBAN, Tax ID) is blocked."""
     service = ConsortiumGovernanceService()
-    consortium = service.create_consortium("c_feat", "Features Test", "bank_a")
-    service.propose_membership_change("c_feat", "bank_a", "bank_b")
+    consortium = service.create_consortium(
+        "c_feat", "Features Test", "bank_a", auth_token=auth_tokens["bank_a"]
+    )
+    service.propose_membership_change(
+        "c_feat", "bank_a", "bank_b", auth_token=auth_tokens["bank_a"]
+    )
 
     engine = ConsortiumPolicyEngine(config=ConsortiumPolicyConfig(min_active_members=2))
 
@@ -205,11 +270,15 @@ def test_restricted_features_governance() -> None:
     assert any("Feature 'raw_iban' is restricted" in r for r in reasons)
 
 
-def test_minimum_data_sample_contribution_enforcement() -> None:
+def test_minimum_data_sample_contribution_enforcement(auth_tokens: dict[str, str]) -> None:
     """Verifies that banks with insufficient local sample counts are blocked from round."""
     service = ConsortiumGovernanceService()
-    consortium = service.create_consortium("c_samples", "Sample Count Test", "bank_a")
-    service.propose_membership_change("c_samples", "bank_a", "bank_b")
+    consortium = service.create_consortium(
+        "c_samples", "Sample Count Test", "bank_a", auth_token=auth_tokens["bank_a"]
+    )
+    service.propose_membership_change(
+        "c_samples", "bank_a", "bank_b", auth_token=auth_tokens["bank_a"]
+    )
 
     engine = ConsortiumPolicyEngine(
         config=ConsortiumPolicyConfig(
@@ -288,10 +357,12 @@ def test_validate_cross_border_sharing_direct_helper() -> None:
     assert len(reasons) == 0
 
 
-def test_enforce_fl_round_preconditions_raises_violation() -> None:
+def test_enforce_fl_round_preconditions_raises_violation(auth_tokens: dict[str, str]) -> None:
     """Verifies enforce_fl_round_preconditions raises ConsortiumPolicyViolation with all combined reasons."""
     service = ConsortiumGovernanceService()
-    consortium = service.create_consortium("c_viol", "Violation Test", "bank_a")
+    consortium = service.create_consortium(
+        "c_viol", "Violation Test", "bank_a", auth_token=auth_tokens["bank_a"]
+    )
     engine = ConsortiumPolicyEngine(config=ConsortiumPolicyConfig(min_active_members=2))
 
     with pytest.raises(ConsortiumPolicyViolation) as exc_info:

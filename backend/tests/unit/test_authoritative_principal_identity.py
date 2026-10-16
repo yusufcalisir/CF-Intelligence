@@ -91,6 +91,15 @@ def identity_test_env():
     reg_dir = os.path.join(temp_dir, "registry_storage")
     os.makedirs(reg_dir, exist_ok=True)
 
+    from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+    audit_path = os.path.join(temp_dir, "test_audit_ledger.json")
+    orig_audit_path = os.environ.get("CFI_AUDIT_LEDGER_PATH")
+    orig_audit_secret = os.environ.get("CFI_AUDIT_LEDGER_SECRET")
+    os.environ["CFI_AUDIT_LEDGER_PATH"] = audit_path
+    os.environ["CFI_AUDIT_LEDGER_SECRET"] = TEST_SIGNING_SECRET
+    ImmutableAuditChain.reset_instance()
+
     settings = get_settings()
     orig_env = settings.app_env
     orig_secret = settings.payload_signing_secret
@@ -139,6 +148,15 @@ def identity_test_env():
     }
 
     AuthenticationService.reset_instance()
+    ImmutableAuditChain.reset_instance()
+    if orig_audit_path is not None:
+        os.environ["CFI_AUDIT_LEDGER_PATH"] = orig_audit_path
+    else:
+        os.environ.pop("CFI_AUDIT_LEDGER_PATH", None)
+    if orig_audit_secret is not None:
+        os.environ["CFI_AUDIT_LEDGER_SECRET"] = orig_audit_secret
+    else:
+        os.environ.pop("CFI_AUDIT_LEDGER_SECRET", None)
     registry.storage_dir = old_storage
     registry.registry_root = old_root
     registry._verifier = old_verifier
@@ -471,8 +489,8 @@ class TestAuthoritativePrincipalIdentity:
         """IDENT-10: Existing receipt, admission, HMAC, and legitimate dual-approval regressions remain correct."""
         ctx = identity_test_env
         auth_svc: AuthenticationService = ctx["auth_svc"]
-        eng_user = auth_svc.register_user("eng_lead", "Password2026!", "bank_a", ["ml_engineer"])
-        cp_user = auth_svc.register_user("cp_officer", "Password2026!", "bank_a", ["compliance"])
+        eng_user = auth_svc.register_user("eng_lead", "Password2026!", "bank_a", ["ml_engineer"], clearance_level=2)
+        cp_user = auth_svc.register_user("cp_officer", "Password2026!", "bank_a", ["compliance"], clearance_level=2)
 
         tok_eng = auth_svc.create_token_bundle(eng_user).access_token
         tok_cp = auth_svc.create_token_bundle(cp_user).access_token

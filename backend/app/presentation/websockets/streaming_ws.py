@@ -62,10 +62,12 @@ async def _handle_scenario_stream(websocket: WebSocket, scenario_id: str) -> Non
             # Fast ping check to verify Redis reachability
             await asyncio.wait_for(r.ping(), timeout=0.2)
 
-            # Replay stored events from Redis
+            # Replay stored events from Redis or in-process ring buffer (worker-local best-effort)
             events_key = f"scenario:{scenario_id}:events"
             lrange_res: Any = r.lrange(events_key, 0, -1)
             stored_events = await lrange_res if inspect.isawaitable(lrange_res) else lrange_res
+            if not stored_events:
+                stored_events = streaming_ws_manager.get_room_history(room_name)
             if isinstance(stored_events, (list, tuple)):
                 for raw_event in stored_events:
                     if isinstance(raw_event, str):

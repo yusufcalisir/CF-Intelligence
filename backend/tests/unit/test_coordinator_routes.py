@@ -269,7 +269,24 @@ def test_get_consortium_details(client: TestClient) -> None:
     assert resp404.status_code == 404
 
 
+def _make_auth_header(bank_id: str, role: str = "admin", clearance: int = 3) -> dict[str, str]:
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    auth_svc = AuthenticationService.get_instance()
+    username = f"user_{bank_id}_{role}"
+    user = auth_svc.get_user(username) or auth_svc.register_user(
+        username=username,
+        plain_password="TestPassword123!",
+        bank_id=bank_id,
+        roles=[role],
+        clearance_level=clearance,
+    )
+    token = auth_svc.create_token_bundle(user).access_token
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_create_new_consortium(client: TestClient) -> None:
+    headers = _make_auth_header("bank_nordic_1")
     payload = {
         "consortium_id": "nordic-alliance",
         "name": "Nordic Cross-Border Fraud Alliance",
@@ -278,7 +295,7 @@ def test_create_new_consortium(client: TestClient) -> None:
         "max_epsilon": 4.0,
         "min_members_n": 3,
     }
-    resp = client.post("/api/v1/coordinator/consortium", json=payload)
+    resp = client.post("/api/v1/coordinator/consortium", json=payload, headers=headers)
     assert resp.status_code == 201
     data = resp.json()
     assert data["consortium_id"] == "nordic-alliance"
@@ -299,6 +316,8 @@ def test_list_consortium_members(client: TestClient) -> None:
 
 
 def test_membership_proposal_lifecycle_and_voting(client: TestClient) -> None:
+    headers_a = _make_auth_header("bank_a")
+    headers_b = _make_auth_header("bank_b")
     # 1. Propose adding bank_d
     prop_payload = {
         "consortium_id": "cfi-consortium",
@@ -308,7 +327,7 @@ def test_membership_proposal_lifecycle_and_voting(client: TestClient) -> None:
         "ttl_seconds": 86400,
         "metadata": {"jurisdiction": "EU"},
     }
-    create_resp = client.post("/api/v1/coordinator/proposals/membership", json=prop_payload)
+    create_resp = client.post("/api/v1/coordinator/proposals/membership", json=prop_payload, headers=headers_a)
     assert create_resp.status_code == 201
     prop = create_resp.json()
     proposal_id = prop["proposal_id"]
@@ -325,6 +344,7 @@ def test_membership_proposal_lifecycle_and_voting(client: TestClient) -> None:
     vote_resp = client.post(
         f"/api/v1/coordinator/proposals/{proposal_id}/vote",
         json={"bank_id": "bank_b", "approve": True},
+        headers=headers_b,
     )
     assert vote_resp.status_code == 200
     vote_data = vote_resp.json()
@@ -340,6 +360,7 @@ def test_membership_proposal_lifecycle_and_voting(client: TestClient) -> None:
 
 
 def test_policy_update_proposal(client: TestClient) -> None:
+    headers_a = _make_auth_header("bank_a")
     policy_payload = {
         "consortium_id": "cfi-consortium",
         "creator_bank_id": "bank_a",
@@ -349,7 +370,7 @@ def test_policy_update_proposal(client: TestClient) -> None:
         },
         "ttl_seconds": 3600,
     }
-    resp = client.post("/api/v1/coordinator/proposals/policy", json=policy_payload)
+    resp = client.post("/api/v1/coordinator/proposals/policy", json=policy_payload, headers=headers_a)
     assert resp.status_code == 201
     data = resp.json()
     assert data["action"] == "UPDATE_POLICY"
@@ -357,6 +378,7 @@ def test_policy_update_proposal(client: TestClient) -> None:
 
 
 def test_cancel_proposal(client: TestClient) -> None:
+    headers_a = _make_auth_header("bank_a")
     prop_resp = client.post(
         "/api/v1/coordinator/proposals/membership",
         json={
@@ -365,12 +387,16 @@ def test_cancel_proposal(client: TestClient) -> None:
             "target_bank_id": "bank_e",
             "action": "ADD_MEMBER",
         },
+        headers=headers_a,
     )
     assert prop_resp.status_code == 201
     pid = prop_resp.json()["proposal_id"]
 
     # Cancel by sponsor
-    cancel_resp = client.post(f"/api/v1/coordinator/proposals/{pid}/cancel?creator_bank_id=bank_a")
+    cancel_resp = client.post(
+        f"/api/v1/coordinator/proposals/{pid}/cancel?creator_bank_id=bank_a",
+        headers=headers_a,
+    )
     assert cancel_resp.status_code == 200
     assert cancel_resp.json()["status"] == "CANCELLED"
 

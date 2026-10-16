@@ -70,7 +70,7 @@ def mask_pii_in_text(text: str, salt: bytes | None = None) -> str:
 # Sentry integration helper (graceful optional import)
 _sentry_available = False
 try:
-    import sentry_sdk  # type: ignore[import-untyped]
+    import sentry_sdk  # type: ignore[import-not-found,import-untyped]
 
     _sentry_available = True
 except ImportError:

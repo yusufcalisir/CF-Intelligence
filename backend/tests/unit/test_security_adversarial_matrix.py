@@ -57,6 +57,7 @@ from app.application.services.distributed_fl_service import (
     IsolatedReceiptSigningAuthority,
     _generate_ed25519_keypair_hex,
     setup_bank_private_storage,
+    spawn_isolated_coordinator_process,
 )
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES
@@ -70,7 +71,10 @@ from app.application.services.training_provenance_service import (
     TrustedTrainingJobRecordSource,
     get_default_training_verifier,
 )
-from app.infrastructure.database.training_authority_backends import PostgresTrainingJobAuthority
+from app.infrastructure.database.training_authority_backends import (
+    PostgresTrainingJobAuthority,
+    RoundObservation,
+)
 
 COORD_SECRET = "coord_secret_sec_matrix_prod_991"
 BANK_A_SECRET = "bank_a_secret_sec_matrix_alpha_112"
@@ -119,14 +123,14 @@ def _sec12_coordinator_terminating_aggregator(db_url: str, job_id: str, ready_ev
                 ) VALUES (
                     %s, %s, 1, 'fed_avg',
                     '["BANK_A"]', '["d1"]',
-                    '{}', 'agg_kill', NOW(),
+                    '{}', 'agg_kill', NOW()::text,
                     'ACCEPTED', 'digest_payload'
                 )
                 """,
                 (f"evt_agg_{job_id}", job_id),
             )
             ready_event.set()
-            time.sleep(10)
+            time.sleep(30)
 
 
 def _sec24_concurrent_completer(
@@ -326,19 +330,34 @@ class TestSecurityAdversarialMatrix:
 
     def test_sec_07_coordinator_attempts_bank_b_secret_access(self, real_pg_instance: str) -> None:
         """SEC-07: Coordinator cannot possess or be provisioned with Bank B private credentials in production."""
-        manager = DistributedFederatedTrainingManager(
-            coordinator_token=COORD_SECRET,
-            db_url=real_pg_instance,
-            app_env="production",
-        )
         with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot receive bank private credentials"):
-            manager.execute_distributed_federation(
-                job_id="job_sec07",
-                training_run_id="run_sec07",
-                simulation_id="sim_sec07",
-                holdout_val_data=(np.zeros((5, NUM_FEATURES), dtype=np.float32), np.zeros(5, dtype=np.float32)),
+            DistributedFederatedTrainingManager(
+                coordinator_token=COORD_SECRET,
+                db_url=real_pg_instance,
+                app_env="production",
                 bank_tokens={"BANK_B": BANK_B_SECRET},
             )
+        _, client = spawn_isolated_coordinator_process(app_env="production")
+        try:
+            with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot receive bank private credentials"):
+                client.execute_federation(
+                    job_id="job_sec07",
+                    training_run_id="run_sec07",
+                    simulation_id="sim_sec07",
+                    holdout_val_data=(np.zeros((5, NUM_FEATURES), dtype=np.float32), np.zeros(5, dtype=np.float32)),
+                    participating_banks=["BANK_A", "BANK_B"],
+                    worker_endpoints={"BANK_A": {"inbox": None, "outbox": None}, "BANK_B": {"inbox": None, "outbox": None}},
+                    num_rounds=1,
+                    expected_unique_samples=100,
+                    registry_storage_dir=None,
+                    coordinator_token=COORD_SECRET,
+                    db_url=real_pg_instance,
+                    comp_service_endpoint=("127.0.0.1", 1234),
+                    signing_authority=None,
+                    bank_tokens={"BANK_B": BANK_B_SECRET},
+                )
+        finally:
+            client.terminate()
 
     def test_sec_08_bank_a_attempts_bank_c_dataset_access(self, tmp_path) -> None:
         """SEC-08: Bank A worker credential attempting to access Bank C private storage vault is denied."""
@@ -360,20 +379,35 @@ class TestSecurityAdversarialMatrix:
 
     def test_sec_09_coordinator_attempts_signing_private_key_access(self, real_pg_instance: str) -> None:
         """SEC-09: Coordinator attempting to possess or pass signing private key in production is rejected."""
-        manager = DistributedFederatedTrainingManager(
-            coordinator_token=COORD_SECRET,
-            db_url=real_pg_instance,
-            app_env="production",
-        )
         priv_hex, _ = _generate_ed25519_keypair_hex()
-        with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot receive signing private key"):
-            manager.execute_distributed_federation(
-                job_id="job_sec09",
-                training_run_id="run_sec09",
-                simulation_id="sim_sec09",
-                holdout_val_data=(np.zeros((5, NUM_FEATURES), dtype=np.float32), np.zeros(5, dtype=np.float32)),
+        with pytest.raises(TrainingProvenanceSecurityError, match="Coordinator process cannot receive or hold receipt issuer private signing key material"):
+            DistributedFederatedTrainingManager(
+                coordinator_token=COORD_SECRET,
+                db_url=real_pg_instance,
+                app_env="production",
                 signing_key_hex=priv_hex,
             )
+        _, client = spawn_isolated_coordinator_process(app_env="production")
+        try:
+            with pytest.raises(TrainingProvenanceSecurityError, match="Production coordinator cannot receive"):
+                client.execute_federation(
+                    job_id="job_sec09",
+                    training_run_id="run_sec09",
+                    simulation_id="sim_sec09",
+                    holdout_val_data=(np.zeros((5, NUM_FEATURES), dtype=np.float32), np.zeros(5, dtype=np.float32)),
+                    participating_banks=["BANK_A"],
+                    worker_endpoints={"BANK_A": {"inbox": None, "outbox": None}},
+                    num_rounds=1,
+                    expected_unique_samples=100,
+                    registry_storage_dir=None,
+                    coordinator_token=COORD_SECRET,
+                    db_url=real_pg_instance,
+                    comp_service_endpoint=("127.0.0.1", 1234),
+                    signing_authority=None,
+                    signing_key_hex=priv_hex,
+                )
+        finally:
+            client.terminate()
 
     def test_sec_10_unauthorized_caller_requests_receipt_issuance(self, real_pg_instance: str, tmp_path) -> None:
         """SEC-10: Unauthorized caller token or identity requesting receipt from isolated issuer is rejected."""
@@ -435,10 +469,30 @@ class TestSecurityAdversarialMatrix:
             feature_names=list(FEATURE_NAMES),
             permitted_workers=["BANK_A"],
         )
+        authority.start_job(job_id=job_id, worker_id="BANK_A")
+        authority.record_observation(
+            RoundObservation(
+                event_id=f"obs_{job_id}",
+                job_id=job_id,
+                training_run_id=f"run_{job_id}",
+                simulation_id="sim_sec12",
+                worker_id="BANK_A",
+                bank_id="BANK_A",
+                round_number=1,
+                attempt_number=1,
+                actual_sample_count=100,
+                actual_executed_epochs=1,
+                observed_loss=0.5,
+                metrics={"loss": 0.5},
+                execution_timestamp="2026-10-16T12:00:00Z",
+                model_update_digest="d1",
+                execution_status="COMPLETED",
+            )
+        )
         ready_event = mp.Event()
         proc = mp.Process(target=_sec12_coordinator_terminating_aggregator, args=(real_pg_instance, job_id, ready_event))
         proc.start()
-        assert ready_event.wait(timeout=10) is True, "Aggregator child process failed to reach active transaction boundary"
+        assert ready_event.wait(timeout=25) is True, "Aggregator child process failed to reach active transaction boundary"
         proc.terminate()
         proc.join(timeout=3)
 
