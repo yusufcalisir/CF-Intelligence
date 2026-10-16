@@ -259,7 +259,7 @@ def _worker_register_process(
                     time.sleep(0.05)
             orig_replace(src, dst, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd)
 
-        os.replace = hooked_replace
+        os.replace = hooked_replace  # type: ignore[assignment]
 
     elif crash_stage == "BEFORE_MANIFEST":
         orig_save_manifest = reg._save_manifest

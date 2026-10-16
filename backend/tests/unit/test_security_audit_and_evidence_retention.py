@@ -693,7 +693,9 @@ def test_audit_09_intermediate_tampering_or_deletion_detected(audit_env):
     chain_tampered = ImmutableAuditChain(store_path=audit_env["audit_file"], signing_secret=audit_env["audit_secret"])
     report_tampered = chain_tampered.verify_chain_integrity()
     assert report_tampered.is_valid is False
-    assert "tampering detected" in report_tampered.tamper_reason.lower() or "signature verification failed" in report_tampered.tamper_reason.lower()
+    assert report_tampered.tamper_reason is not None
+    tamper_reason = report_tampered.tamper_reason.lower()
+    assert "tampering detected" in tamper_reason or "signature verification failed" in tamper_reason
 
     # 2. Deletion of record
     del data["entries"][2]
@@ -703,7 +705,9 @@ def test_audit_09_intermediate_tampering_or_deletion_detected(audit_env):
     chain_deleted = ImmutableAuditChain(store_path=audit_env["audit_file"], signing_secret=audit_env["audit_secret"])
     report_deleted = chain_deleted.verify_chain_integrity()
     assert report_deleted.is_valid is False
-    assert "index mismatch" in report_deleted.tamper_reason.lower() or "sequence deletion" in report_deleted.tamper_reason.lower()
+    assert report_deleted.tamper_reason is not None
+    tamper_reason = report_deleted.tamper_reason.lower()
+    assert "index mismatch" in tamper_reason or "sequence deletion" in tamper_reason
 
 
 def test_audit_10_forged_chain_missing_auth_fail_closed(audit_env, monkeypatch):
@@ -749,7 +753,9 @@ def test_audit_10_forged_chain_missing_auth_fail_closed(audit_env, monkeypatch):
     verifier_chain = ImmutableAuditChain(store_path=audit_env["audit_file"], signing_secret=audit_env["audit_secret"])
     report = verifier_chain.verify_chain_integrity()
     assert report.is_valid is False
-    assert "tampering detected" in report.tamper_reason.lower() or "signature verification failed" in report.tamper_reason.lower()
+    assert report.tamper_reason is not None
+    tamper_reason = report.tamper_reason.lower()
+    assert "tampering detected" in tamper_reason or "signature verification failed" in tamper_reason
 
     # In production with missing secret -> fails closed
     monkeypatch.setenv("APP_ENV", "production")

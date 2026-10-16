@@ -92,7 +92,9 @@ def test_model_lifecycle_production_rollback_to_archived() -> None:
     manager.transition_state("model_v2.0.0", ModelState.CANARY, signoff_approved=True)
     manager.transition_state("model_v2.0.0", ModelState.PRODUCTION)
 
-    assert manager.get_production_model().model_version == "model_v2.0.0"
+    prod = manager.get_production_model()
+    assert prod is not None
+    assert prod.model_version == "model_v2.0.0"
 
     # Execute rollback
     demoted, restored = manager.rollback_production(
@@ -104,7 +106,9 @@ def test_model_lifecycle_production_rollback_to_archived() -> None:
     assert demoted.current_state == ModelState.ARCHIVED
     assert restored.model_version == "model_v1.0.0"
     assert restored.current_state == ModelState.PRODUCTION
-    assert manager.get_production_model().model_version == "model_v1.0.0"
+    prod_final = manager.get_production_model()
+    assert prod_final is not None
+    assert prod_final.model_version == "model_v1.0.0"
 
 
 def test_model_lifecycle_rollback_fails_when_no_active_or_archived() -> None:
@@ -230,6 +234,7 @@ def _admin_headers() -> dict[str, str]:
 
     auth_svc = AuthenticationService.get_instance()
     admin_user = auth_svc.get_user("admin")
+    assert admin_user is not None
     token = auth_svc.create_token_bundle(admin_user).access_token
     return {"Authorization": f"Bearer {token}"}
 

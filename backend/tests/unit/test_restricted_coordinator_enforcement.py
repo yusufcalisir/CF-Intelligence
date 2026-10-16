@@ -809,8 +809,7 @@ class TestCoordinatorSqlAuthorization:
                 )
             conn.commit()
 
-        # 2. Completion Authority role (cfi_completion_role) writes to cfi_completed_jobs
-        valid_completion_sql = f"""
+        valid_completion_sql = """
             INSERT INTO cfi_completed_jobs (
                 job_id, training_run_id, simulation_id, completed_at,
                 executed_rounds, executed_epochs, sample_count,
@@ -819,15 +818,15 @@ class TestCoordinatorSqlAuthorization:
                 worker_id, status, git_commit_hash, dataset_manifest_id,
                 evidence_fingerprint
             ) VALUES (
-                '{job_id}', '{run_id}', '{sim_id}', '2026-10-12T00:00:00',
-                2, 1, 100, '{{}}', 'sha256_legit_artifact', 'FraudDetectionNN',
-                'v1.0', {NUM_FEATURES}, '["f1", "f2"]', 'COMPLETION_AUTHORITY', 'COMPLETED',
+                %s, %s, %s, '2026-10-12T00:00:00',
+                2, 1, 100, '{}', 'sha256_legit_artifact', 'FraudDetectionNN',
+                'v1.0', %s, '["f1", "f2"]', 'COMPLETION_AUTHORITY', 'COMPLETED',
                 NULL, NULL, 'fp_legit_sql05'
             )
         """
         with psycopg.connect(role_urls["completion"]) as conn:
             with conn.cursor() as cur:
-                cur.execute(valid_completion_sql)
+                cur.execute(valid_completion_sql, (job_id, run_id, sim_id, NUM_FEATURES))
             conn.commit()
 
         # 3. Verify record was persisted and is readable

@@ -612,6 +612,7 @@ def test_model_registry_promote_distinguishes_validity_from_quality() -> None:
     )
     auth_svc = AuthenticationService.get_instance()
     admin_user = auth_svc.get_user("admin")
+    assert admin_user is not None
     admin_token = auth_svc.create_token_bundle(admin_user).access_token
     auth_header = f"Bearer {admin_token}"
 

@@ -1225,6 +1225,7 @@ def test_tc05_forged_role_fields_not_cryptographically_authorized(temp_registry_
     auth_svc.register_user("officer_alice", "Pass1234!", "bank_a", roles=["compliance"])
     auth_svc.register_user("engineer_bob", "Pass1234!", "bank_a", roles=["ml_engineer"])
     admin_user = auth_svc.get_user("admin")
+    assert admin_user is not None
     admin_token = auth_svc.create_token_bundle(admin_user).access_token
     reg.bind_simulation_ownership("sim_tc05", "bank_a", auth_token=admin_token)
 
@@ -1269,6 +1270,7 @@ def test_tc06_cryptographic_signoff_verification_and_replay_rejection(temp_regis
     auth_svc.register_user("officer_alice", "Pass1234!", "bank_a", roles=["compliance"])
     auth_svc.register_user("engineer_bob", "Pass1234!", "bank_a", roles=["ml_engineer"])
     admin_user = auth_svc.get_user("admin")
+    assert admin_user is not None
     admin_token = auth_svc.create_token_bundle(admin_user).access_token
     reg.bind_simulation_ownership("sim_tc06", "bank_a", auth_token=admin_token)
 
@@ -1882,6 +1884,7 @@ def test_p08_forged_dual_identity_not_reported_as_human_authorized(temp_registry
     auth_svc.register_user("invented_user_1", "Pass1234!", "bank_a", roles=["ml_engineer"])
     auth_svc.register_user("invented_user_2", "Pass1234!", "bank_a", roles=["compliance"])
     admin_user = auth_svc.get_user("admin")
+    assert admin_user is not None
     admin_token = auth_svc.create_token_bundle(admin_user).access_token
     reg.bind_simulation_ownership("sim_p08", "bank_a", auth_token=admin_token)
 
@@ -1992,6 +1995,7 @@ def test_p10_legitimate_training_compatibility(temp_registry_dir: str) -> None:
     auth_svc.register_user("ml_eng_p10", "Pass1234!", "bank_a", roles=["ml_engineer"])
     auth_svc.register_user("comp_off_p10", "Pass1234!", "bank_a", roles=["compliance"])
     admin_user = auth_svc.get_user("admin")
+    assert admin_user is not None
     admin_token = auth_svc.create_token_bundle(admin_user).access_token
     reg.bind_simulation_ownership("sim_p10", "bank_a", auth_token=admin_token)
 
@@ -2018,8 +2022,10 @@ def test_p10_legitimate_training_compatibility(temp_registry_dir: str) -> None:
 
         v_sha = entry["sha256"]
         user_ml = auth_svc.get_user("ml_eng_p10")
+        assert user_ml is not None
         token_ml = auth_svc.create_token_bundle(user_ml).access_token
         user_comp = auth_svc.get_user("comp_off_p10")
+        assert user_comp is not None
         token_comp = auth_svc.create_token_bundle(user_comp).access_token
 
         sig_ml = generate_signoff_signature("sim_p10", 1, v_sha, "ml_engineer", "ml_eng_p10", signing_secret="prod_signing_secret_p10_auth_9999")
