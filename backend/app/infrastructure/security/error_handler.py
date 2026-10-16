@@ -107,7 +107,7 @@ def format_safe_error_response(
     incident_id = f"inc_{uuid.uuid4().hex[:12]}"
     client_ip = request.client.host if request.client else "127.0.0.1"
     method = request.method
-    path = mask_pii_in_text(str(request.url.path))
+    path = mask_pii_in_text(request.url.path)
 
     # 1. Server-side error logging with complete PII sanitization across message and traceback
     clean_exc_str = mask_pii_in_text(str(exc))

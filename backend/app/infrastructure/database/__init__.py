@@ -119,7 +119,7 @@ def redact_database_url(url: str | None) -> str:
         rendered = make_url(url).render_as_string(hide_password=True)
         return re.sub(r"(://[^:]+:)(.+)@", r"\1***@", rendered)
     except Exception:
-        return re.sub(r"(://[^:]+:)(.+)@", r"\1***@", str(url))
+        return re.sub(r"(://[^:]+:)(.+)@", r"\1***@", url)
 
 
 def _make_engine_kwargs(tenant: str | None) -> dict[str, Any]:
