@@ -519,6 +519,11 @@ class ImmutableAuditChain:
                 mf.flush()
             _restrict_file_permissions(marker)
 
+    def _seed_default_chain(self) -> None:
+        """Seed genesis and initial system audit events under lock."""
+        with self._lock:
+            self._seed_default_chain_unlocked()
+
     def _seed_default_chain_unlocked(self) -> None:
         """Seed genesis and initial system audit events."""
         if not self.chain:

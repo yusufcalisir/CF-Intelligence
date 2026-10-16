@@ -24,30 +24,33 @@ from __future__ import annotations
 import json
 import re
 import sys
-from datetime import datetime
 from pathlib import Path
 
 # Add backend directory to sys.path
 backend_dir = Path(__file__).parent.parent.parent.parent / "backend"
 sys.path.insert(0, str(backend_dir))
 
-from fastapi.testclient import TestClient
-from app.main import app
-from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain, GENESIS_HASH
-from app.infrastructure.logging.siem_exporter import (
-    SIEMLogExporter,
+import numpy as np  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.application.services.privacy_audit_service import PrivacyAuditService  # noqa: E402
+from app.infrastructure.logging.siem_exporter import (  # noqa: E402
+    RETRY_QUEUE_FILE,
     SIEMAuditEvent,
     SIEMFormat,
-    RETRY_QUEUE_FILE,
+    SIEMLogExporter,
 )
-from app.application.services.privacy_audit_service import PrivacyAuditService
-import numpy as np
+from app.infrastructure.security.immutable_audit_chain import (  # noqa: E402
+    GENESIS_HASH,
+    ImmutableAuditChain,
+)
+from app.main import app  # noqa: E402
 
 client = TestClient(app)
 
 def run_reference_verification() -> list[tuple[str, bool, str]]:
     results: list[tuple[str, bool, str]] = []
-    
+
     audit_chain = ImmutableAuditChain.get_instance()
     siem = SIEMLogExporter()
     privacy_svc = PrivacyAuditService()
@@ -82,7 +85,14 @@ def run_reference_verification() -> list[tuple[str, bool, str]]:
         target_id=entry0.target_id,
         timestamp=entry0.timestamp,
         details=entry0.details,
-        prev_hash=entry0.prev_hash
+        prev_hash=entry0.prev_hash,
+        event_id=entry0.event_id,
+        actor_type=entry0.actor_type,
+        actor_institution=entry0.actor_institution,
+        target_type=entry0.target_type,
+        action=entry0.action,
+        decision=entry0.decision,
+        correlation_id=entry0.correlation_id,
     )
     results.append(("4. Serialization & Hash Determinism", recalc_hash == entry0.curr_hash, f"Hash match: {recalc_hash[:12]}"))
 

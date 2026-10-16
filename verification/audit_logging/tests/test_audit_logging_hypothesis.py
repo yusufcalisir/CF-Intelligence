@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 """Hypothesis Property-Based Test Suite for Audit Logging Subsystem.
 
 Verifies 10 core mathematical and security invariants across randomized input spaces:
@@ -17,20 +17,29 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 # Add backend directory to sys.path
 backend_dir = Path(__file__).parent.parent.parent.parent / "backend"
 sys.path.insert(0, str(backend_dir))
 
-from hypothesis import given, settings, HealthCheck, strategies as st
-from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain, GENESIS_HASH
-from app.infrastructure.logging.siem_exporter import SIEMLogExporter, SIEMAuditEvent, RETRY_QUEUE_FILE
+from hypothesis import HealthCheck, given, settings  # noqa: E402
+from hypothesis import strategies as st  # noqa: E402
+
+from app.infrastructure.logging.siem_exporter import (  # noqa: E402
+    RETRY_QUEUE_FILE,
+    SIEMAuditEvent,
+    SIEMLogExporter,
+)
+from app.infrastructure.security.immutable_audit_chain import (  # noqa: E402
+    GENESIS_HASH,
+    ImmutableAuditChain,
+)
+
 
 # Test instance helper
 def get_fresh_chain() -> ImmutableAuditChain:
-    chain = ImmutableAuditChain()
+    chain = ImmutableAuditChain(in_memory=True)
     chain.chain = []
     chain._seed_default_chain()
     return chain
@@ -42,7 +51,7 @@ def test_inv01_sequential_hash_continuity(events: list[tuple[str, str]]):
     chain = get_fresh_chain()
     for evt_type, actor in events:
         chain.append_event(event_type=evt_type, actor=actor, target_id="target_x")
-    
+
     for i in range(1, len(chain.chain)):
         assert chain.chain[i].prev_hash == chain.chain[i-1].curr_hash
 
@@ -53,7 +62,7 @@ def test_inv02_tamper_detection(mutation_idx: int, new_actor: str):
     chain = get_fresh_chain()
     for i in range(6):
         chain.append_event(event_type=f"EVT_{i}", actor="legit_actor", target_id=f"t_{i}")
-    
+
     # Mutate historical entry
     chain.chain[mutation_idx].actor = new_actor + "_TAMPERED"
     rpt = chain.verify_chain_integrity()
@@ -67,7 +76,7 @@ def test_inv03_index_monotonicity(n: int):
     chain = get_fresh_chain()
     for i in range(n):
         entry = chain.append_event(event_type="COUNT", actor="sys", target_id="x")
-    
+
     for idx, entry in enumerate(chain.chain):
         assert entry.index == idx
 

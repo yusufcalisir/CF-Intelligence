@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import sys
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -25,19 +24,23 @@ from pathlib import Path
 backend_dir = Path(__file__).parent.parent.parent.parent / "backend"
 sys.path.insert(0, str(backend_dir))
 
-from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain, GENESIS_HASH
-from app.infrastructure.logging.siem_exporter import SIEMLogExporter, SIEMExportError, RETRY_QUEUE_FILE
-from app.application.services.privacy_audit_service import PrivacyAuditService
+from app.infrastructure.logging.siem_exporter import (  # noqa: E402
+    RETRY_QUEUE_FILE,
+    SIEMExportError,
+    SIEMLogExporter,
+)
+from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain  # noqa: E402
+
 
 def get_fresh_chain() -> ImmutableAuditChain:
-    chain = ImmutableAuditChain()
+    chain = ImmutableAuditChain(in_memory=True)
     chain.chain = []
     chain._seed_default_chain()
     return chain
 
 def run_robustness_suite() -> list[tuple[str, bool, str]]:
     results: list[tuple[str, bool, str]] = []
-    
+
     # 1. Historical Log Record Corruption & Tamper Detection
     chain1 = get_fresh_chain()
     chain1.append_event("LOGIN", "admin", "node_1")
@@ -105,10 +108,10 @@ def run_robustness_suite() -> list[tuple[str, bool, str]]:
     with open(RETRY_QUEUE_FILE, "a", encoding="utf-8") as f:
         f.write("{MALFORMED_JSON_LINE_BROKEN\n")
         f.write(json.dumps({"event": "VALID_BUFFERED_EVENT", "actor": "sys"}) + "\n")
-    
+
     flushed7 = siem7.flush_retry_queue()
     ok7 = isinstance(flushed7, int)
-    results.append(("7. Corrupted JSON Lines in SIEM Retry Buffer", ok7, f"Flushed valid entries, handled malformed gracefully"))
+    results.append(("7. Corrupted JSON Lines in SIEM Retry Buffer", ok7, "Flushed valid entries, handled malformed gracefully"))
 
     # 8. Oversized Detail Payloads & Boundary Stress
     chain8 = get_fresh_chain()
@@ -133,7 +136,7 @@ def run_robustness_suite() -> list[tuple[str, bool, str]]:
     rpt10 = chain10.verify_chain_integrity()
     hashes10 = [e.curr_hash for e in chain10.chain[-5:]]
     ok10 = rpt10.is_valid is True and len(set(hashes10)) == 5
-    results.append(("10. Replay Attack & Duplicate Identifier Handling", ok10, f"5 replayed events produced 5 distinct SHA-256 hashes"))
+    results.append(("10. Replay Attack & Duplicate Identifier Handling", ok10, "5 replayed events produced 5 distinct SHA-256 hashes"))
 
     return results
 
