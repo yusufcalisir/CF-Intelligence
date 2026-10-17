@@ -4282,9 +4282,7 @@ class ModelRegistry:
                 has_role = False
                 if norm_role == "compliance" and any(
                     r in ("compliance", "compliance_officer", "admin") for r in auth_roles
-                ):
-                    has_role = True
-                elif norm_role == "ml_engineer" and any(
+                ) or norm_role == "ml_engineer" and any(
                     r in ("ml_engineer", "ml_lead") for r in auth_roles
                 ):
                     has_role = True
