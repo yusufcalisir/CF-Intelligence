@@ -94,6 +94,7 @@ def _build_candidate(
     key_id: str,
     sim_id: str,
     version_metrics: dict | None = None,
+    owning_bank_id: str = "bank_a",
 ):
     """Construct authentic PyTorch model weights, hash, genuine Ed25519 receipt, and candidate version."""
     svc = ModelService(get_settings())
@@ -117,6 +118,7 @@ def _build_candidate(
         architecture="FraudDetectionNN",
         feature_schema_version="v1.0",
         feature_names=list(FEATURE_NAMES),
+        owning_bank_id=owning_bank_id,
     )
     receipt = issuer.issue_receipt(evidence=evidence, model_bytes=model_bytes).to_dict()
 
@@ -127,6 +129,7 @@ def _build_candidate(
         artifact_bytes=model_bytes,
         training_receipt=receipt,
         is_promoted=False,
+        owning_bank_id=owning_bank_id,
     )
     return entry, model, model_bytes, sha256, receipt
 
@@ -426,7 +429,7 @@ def test_rev06_challenger_cached_before_revocation_cannot_be_served():
                 bank_id="bank_a",
             )
 
-            with patch.object(eval_engine, "log_prediction", wraps=eval_engine.log_prediction) as mock_log:
+            with patch.object(eval_engine, "log_prediction") as mock_log:
                 res = asyncio.run(
                     predict_module.predict_transaction(
                         request=req,

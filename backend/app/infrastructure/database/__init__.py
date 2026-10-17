@@ -28,6 +28,8 @@ import logging
 import os
 import re
 import secrets
+import threading
+import weakref
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -212,7 +214,25 @@ def _get_or_create_engine(tenant: str | None) -> AsyncEngine:
     return _tenant_engines[clean_tenant]
 
 
-_init_lock = asyncio.Lock()
+_init_locks: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = (
+    weakref.WeakKeyDictionary()
+)
+_init_locks_mutex = threading.Lock()
+
+
+def _get_init_lock() -> asyncio.Lock:
+    """Return an asyncio.Lock bound to the current running event loop.
+
+    Avoids RuntimeError when tests or asynchronous handlers execute across multiple
+    isolated event loop instances.
+    """
+    loop = asyncio.get_running_loop()
+    with _init_locks_mutex:
+        lock = _init_locks.get(loop)
+        if lock is None:
+            lock = asyncio.Lock()
+            _init_locks[loop] = lock
+        return lock
 
 
 async def init_tenant_tables(tenant: str | None) -> None:
@@ -222,7 +242,7 @@ async def init_tenant_tables(tenant: str | None) -> None:
     """
     if tenant in _tenant_initialized:
         return
-    async with _init_lock:
+    async with _get_init_lock():
         if tenant in _tenant_initialized:
             return
         eng = _get_or_create_engine(tenant)

@@ -479,7 +479,7 @@ def test_production_prediction_cannot_select_unverified_challenger():
                     bank_id="bank_a",
                 )
 
-                with patch.object(eval_engine, "log_prediction", wraps=eval_engine.log_prediction) as mock_log:
+                with patch.object(eval_engine, "log_prediction") as mock_log:
                     # Invoke prediction route handler
                     res = asyncio.run(
                         predict_module.predict_transaction(
@@ -603,7 +603,7 @@ def test_existing_champion_and_legitimate_challenger_inference_correct():
                     bank_id="bank_a",
                 )
 
-                with patch.object(eval_engine, "log_prediction", wraps=eval_engine.log_prediction) as mock_log:
+                with patch.object(eval_engine, "log_prediction") as mock_log:
                     res = asyncio.run(
                         predict_module.predict_transaction(
                             request=req,
