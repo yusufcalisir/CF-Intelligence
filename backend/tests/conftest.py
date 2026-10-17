@@ -82,7 +82,7 @@ def _is_local_redis_live(host: str = "127.0.0.1", port: int = 6379) -> bool:
     try:
         with socket.create_connection((host, port), timeout=0.5):
             return True
-    except (OSError, ConnectionRefusedError):
+    except OSError:
         return False
 
 

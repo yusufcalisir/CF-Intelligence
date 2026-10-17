@@ -12,7 +12,7 @@ import logging
 import os
 import time
 from collections.abc import Callable, Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import flwr as fl
 import numpy as np
@@ -671,25 +671,26 @@ class FlowerFLEngine:
                     )
                 )
 
+                backend_config: Any = {
+                    "client_resources": {"num_cpus": 0.5, "num_gpus": 0.0},
+                    "init_args": {
+                        "runtime_env": {
+                            "env_vars": {
+                                "PYTHONPATH": backend_dir,
+                                "RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO": "0",
+                                "KMP_DUPLICATE_LIB_OK": "TRUE",
+                            },
+                            "sys_paths": [backend_dir],
+                        },
+                    },
+                }
                 _run_simulation(
                     num_supernodes=len(bank_ids),
                     client_app=client_app,
                     server_app=server_app,
                     app_dir=backend_dir,
                     exit_event=EventType.START_SIMULATION_LEAVE,
-                    backend_config={
-                        "client_resources": {"num_cpus": 0.5, "num_gpus": 0.0},
-                        "init_args": {
-                            "runtime_env": {
-                                "env_vars": {
-                                    "PYTHONPATH": backend_dir,
-                                    "RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO": "0",
-                                    "KMP_DUPLICATE_LIB_OK": "TRUE",
-                                },
-                                "sys_paths": [backend_dir],
-                            },
-                        },
-                    },
+                    backend_config=cast("Any", backend_config),
                 )
                 history = recording_server.simulation_history
                 if history is None:
