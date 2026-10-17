@@ -7,6 +7,7 @@ from __future__ import annotations
 import concurrent.futures
 import io
 import time
+from typing import cast
 from unittest.mock import patch
 
 import numpy as np
@@ -195,7 +196,7 @@ def test_safe_torchscript_jit_redis_serialization():
     model.eval()
 
     dummy_input = torch.zeros(1, 10)
-    scripted = torch.jit.trace(model, dummy_input, check_trace=False)
+    scripted = cast("torch.jit.ScriptModule", torch.jit.trace(model, dummy_input, check_trace=False))
 
     # Serialize using torch.jit.save to BytesIO
     buffer = io.BytesIO()
@@ -205,7 +206,7 @@ def test_safe_torchscript_jit_redis_serialization():
 
     # Deserialize using torch.jit.load from BytesIO
     read_buffer = io.BytesIO(serialized_bytes)
-    loaded_model = torch.jit.load(read_buffer)
+    loaded_model = cast("torch.jit.ScriptModule", torch.jit.load(read_buffer))
     loaded_model.eval()
 
     # Compare forward pass outputs
