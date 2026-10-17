@@ -677,7 +677,19 @@ class FlowerFLEngine:
                     server_app=server_app,
                     app_dir=backend_dir,
                     exit_event=EventType.START_SIMULATION_LEAVE,
-                    backend_config={"client_resources": {"num_cpus": 0.5, "num_gpus": 0.0}},
+                    backend_config={
+                        "client_resources": {"num_cpus": 0.5, "num_gpus": 0.0},
+                        "init_args": {
+                            "runtime_env": {
+                                "env_vars": {
+                                    "PYTHONPATH": backend_dir,
+                                    "RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO": "0",
+                                    "KMP_DUPLICATE_LIB_OK": "TRUE",
+                                },
+                                "sys_paths": [backend_dir],
+                            },
+                        },
+                    },
                 )
                 history = recording_server.simulation_history
                 if history is None:
@@ -691,6 +703,18 @@ class FlowerFLEngine:
                     config=fl.server.ServerConfig(num_rounds=sim_config.num_rounds),
                     strategy=strategy,
                     client_resources={"num_cpus": 0.5, "num_gpus": 0.0},
+                    ray_init_args={
+                        "ignore_reinit_error": True,
+                        "include_dashboard": False,
+                        "runtime_env": {
+                            "env_vars": {
+                                "PYTHONPATH": backend_dir,
+                                "RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO": "0",
+                                "KMP_DUPLICATE_LIB_OK": "TRUE",
+                            },
+                            "sys_paths": [backend_dir],
+                        },
+                    },
                 )
 
             # Ensure final global_model weights are loaded from strategy

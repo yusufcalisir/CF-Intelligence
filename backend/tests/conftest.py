@@ -73,6 +73,7 @@ def require_real_data(request: pytest.FixtureRequest) -> bool:
 # to skip all volumetric counting, preventing cross-test 429 bleed from the
 # shared class-level _requests dict.
 os.environ.setdefault("TESTING", "1")
+os.environ.setdefault("CFI_AUDIT_LEDGER_SECRET", "cfi_test_prod_audit_signing_secret_64bytes_long!")
 
 
 def _is_local_redis_live(host: str = "127.0.0.1", port: int = 6379) -> bool:

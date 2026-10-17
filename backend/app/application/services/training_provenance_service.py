@@ -1225,17 +1225,11 @@ class DurableTrustStore:
 
             self._trust_file_path = os.path.abspath(configured_path)
 
-        is_prod = (
-            (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or get_settings().app_env).lower()
-            == "production"
-        )
         self._admin_token: str | None = (
             admin_token
             or os.environ.get("CFI_TRUST_STORE_ADMIN_TOKEN")
             or getattr(get_settings(), "trust_store_admin_token", None)
         )
-        if not self._admin_token and not is_prod:
-            self._admin_token = "cfi_dev_trust_store_admin_token_2026_test"
         self._authority_public_key_hex: str | None = (
             authority_public_key
             or os.environ.get("CFI_TRUST_STORE_AUTHORITY_KEY")
@@ -1355,16 +1349,15 @@ class DurableTrustStore:
                     "Administrative authority is unconfigured for DurableTrustStore: "
                     "mutating operations are disabled (fail-closed)."
                 )
-            if not is_prod and not token:
-                pass
-            elif not token or not hmac.compare_digest(token, self._admin_token):
+            if not token or not hmac.compare_digest(token, self._admin_token):
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized administrative operation: invalid or missing admin token for DurableTrustStore."
                 )
-        elif self._admin_token is not None and token and not hmac.compare_digest(token, self._admin_token):
-            raise TrainingProvenanceSecurityError(
-                "Unauthorized administrative operation: invalid or missing admin token for DurableTrustStore."
-            )
+        elif self._admin_token is not None:
+            if not token or not hmac.compare_digest(token, self._admin_token):
+                raise TrainingProvenanceSecurityError(
+                    "Unauthorized administrative operation: invalid or missing admin token for DurableTrustStore."
+                )
 
         if operator_token:
             from app.infrastructure.security.auth_service import AuthenticationService

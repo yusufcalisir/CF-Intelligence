@@ -261,7 +261,6 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
 
     if active_ident is None:
         with _serving_cache_lock:
-            had_cached = simulation_id in _serving_model_cache
             _serving_model_cache.pop(simulation_id, None)
             if _cached_serving_model is not None and (
                 simulation_id is None or simulation_id == get_settings().default_simulation_id
@@ -278,7 +277,7 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"No trained models found for simulation ID: {simulation_id}",
                 )
-            if had_cached or any(v.get("status") == "champion" for v in versions):
+            if any(v.get("status") == "champion" for v in versions):
                 champ = next((v for v in versions if v.get("status") == "champion"), None)
                 if champ:
                     rcpt = champ.get("training_receipt")

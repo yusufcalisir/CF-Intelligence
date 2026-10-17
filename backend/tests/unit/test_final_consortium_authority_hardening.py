@@ -89,6 +89,8 @@ def prod_consortium_env(tmp_path: Path):
         "CFI_IDENTITY_STORE_SECRET": PROD_STORE_SECRET,
         "CFI_JWT_SIGNING_SECRET": PROD_JWT_SECRET,
         "CFI_INTERNAL_CONTEXT_SECRET": PROD_STORE_SECRET,
+        "CFI_AUDIT_LEDGER_SECRET": PROD_STORE_SECRET,
+        "CFI_PAYLOAD_SIGNING_SECRET": PROD_STORE_SECRET,
         "APP_ENV": "production",
     }
     return {
