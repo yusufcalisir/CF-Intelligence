@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 def ensure_default_champion_model():
     """Ensure a verified champion model is active in ModelRegistry for alert explainability routes."""
     import numpy as np
+
     from app.application.services.model_registry import ModelRegistry
     from app.application.services.model_service import NUM_FEATURES, ModelService
     from app.config import get_settings

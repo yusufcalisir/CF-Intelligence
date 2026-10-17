@@ -20,8 +20,6 @@ import os
 import threading
 import time
 import uuid
-
-mp_ctx = multiprocessing.get_context("spawn")
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import patch
@@ -45,6 +43,8 @@ from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.security.durable_nonce_store import DurableNonceStore
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
+
+mp_ctx = multiprocessing.get_context("spawn")
 
 
 @pytest.fixture

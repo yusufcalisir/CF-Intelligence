@@ -16,8 +16,6 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-mp_ctx = multiprocessing.get_context("spawn")
-
 import pytest
 import torch
 import torch.nn as nn
@@ -37,6 +35,8 @@ from app.config import get_settings
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.security.durable_account_store import DurableAccountStore
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+mp_ctx = multiprocessing.get_context("spawn")
 
 
 class SmallModel(nn.Module):

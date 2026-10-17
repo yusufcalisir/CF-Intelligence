@@ -480,10 +480,11 @@ def test_coordinator_and_privacy_defense_contract(client: TestClient):
 
 def test_registry_and_inference_contract(client: TestClient):
     """Validate model registry tracking, shadow evaluation, and real-time scoring."""
+    import numpy as np
+
     from app.application.services.model_registry import ModelRegistry
     from app.application.services.model_service import NUM_FEATURES, ModelService
     from app.config import get_settings
-    import numpy as np
 
     reg = ModelRegistry()
     if reg.get_champion_metadata(simulation_id="live_prod_v2") is None:

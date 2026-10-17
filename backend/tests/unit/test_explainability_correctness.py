@@ -22,8 +22,8 @@ from app.application.services.data_generator import (
     preprocess_transaction,
 )
 from app.application.services.explainability_service import ExplainabilityService
-from app.application.services.model_service import FraudDetectionModel, NUM_FEATURES, ModelService
 from app.application.services.model_registry import ModelRegistry
+from app.application.services.model_service import NUM_FEATURES, FraudDetectionModel, ModelService
 from app.config import get_settings
 from app.domain.realtime_explainer import (
     FastInferenceExplainer,
