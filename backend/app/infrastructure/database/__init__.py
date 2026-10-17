@@ -454,8 +454,10 @@ def reset_tenant_engines_sync() -> None:
     for tenant, eng in list(_tenant_engines.items()):
         logger.info("Synchronously disposing engine for tenant=%s", tenant or "central")
         try:
-            eng.sync_engine.dispose()
-        except Exception as exc:
+            sync_eng = getattr(eng, "sync_engine", None)
+            if sync_eng is not None and hasattr(sync_eng, "dispose"):
+                sync_eng.dispose()
+        except BaseException as exc:
             logger.warning("Error disposing engine for tenant %s: %s", tenant, exc)
     _tenant_engines.clear()
     _tenant_sessions.clear()

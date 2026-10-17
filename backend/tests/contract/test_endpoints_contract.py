@@ -480,6 +480,28 @@ def test_coordinator_and_privacy_defense_contract(client: TestClient):
 
 def test_registry_and_inference_contract(client: TestClient):
     """Validate model registry tracking, shadow evaluation, and real-time scoring."""
+    from app.application.services.model_registry import ModelRegistry
+    from app.application.services.model_service import NUM_FEATURES, ModelService
+    from app.config import get_settings
+    import numpy as np
+
+    reg = ModelRegistry()
+    if reg.get_champion_metadata(simulation_id="live_prod_v2") is None:
+        svc = ModelService(get_settings())
+        model = svc.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+        X = np.random.RandomState(42).randn(64, NUM_FEATURES).astype(np.float32)
+        y = np.random.RandomState(42).randint(0, 2, size=(64,)).astype(np.float32)
+        trained, _, _ = svc.train_local(model, X, y, epochs=1, batch_size=32)
+        trained.eval()
+        reg.save_version(
+            simulation_id="live_prod_v2",
+            state_dict=trained.state_dict(),
+            metrics={"auc_roc": 0.92, "f1_score": 0.85, "loss": 0.28},
+            is_promoted=True,
+            status="champion",
+            provenance_type="TRAINING_RECORDED",
+        )
+
     # List model versions for mock simulation
     res_versions = client.get("/api/v1/registry/live_prod_v2/versions")
     assert res_versions.status_code == 200
@@ -501,6 +523,7 @@ def test_registry_and_inference_contract(client: TestClient):
     # Predict transaction contract
     predict_payload = {
         "transaction_id": "TXN-998822",
+        "simulation_id": "live_prod_v2",
         "transaction_amount": 12500.0,
         "merchant_category": "crypto_exchange",
         "country_code": "NG",

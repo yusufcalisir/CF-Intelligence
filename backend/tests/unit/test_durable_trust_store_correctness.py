@@ -1094,6 +1094,7 @@ class TestTrustAnchorBootstrapSecurity:
         """ANCHOR-01: No independently trusted authority key in production -> fail closed."""
         monkeypatch.setenv("APP_ENV", "production")
         monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setenv("CFI_AUDIT_LEDGER_SECRET", "authoritative_test_audit_secret_32_chars_long")
         from app.config import get_settings
 
         get_settings.cache_clear()

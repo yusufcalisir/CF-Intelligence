@@ -7,6 +7,7 @@ Global models are saved per simulation run with metrics metadata.
 from __future__ import annotations
 
 import contextlib
+import copy
 import hashlib
 import hmac
 import io
@@ -67,17 +68,21 @@ def validate_simulation_id(simulation_id: str) -> str:
     return clean
 
 
-_REGISTRY_FILE_LOCKS: dict[str, FileLock] = {}
+_REGISTRY_FILE_LOCKS: dict[tuple[str, int], FileLock] = {}
 _REGISTRY_LOCKS_GUARD = threading.Lock()
 
 
 def _get_registry_file_lock(sim_dir: str) -> FileLock:
     """Return shared FileLock instance for simulation dir to ensure process-local reentrancy."""
     lock_path = os.path.abspath(os.path.join(sim_dir, "registry.lock"))
+    current_pid = os.getpid()
+    cache_key = (lock_path, current_pid)
     with _REGISTRY_LOCKS_GUARD:
-        if lock_path not in _REGISTRY_FILE_LOCKS:
-            _REGISTRY_FILE_LOCKS[lock_path] = FileLock(lock_path, timeout=15)
-        return _REGISTRY_FILE_LOCKS[lock_path]
+        lock = _REGISTRY_FILE_LOCKS.get(cache_key)
+        if lock is None or getattr(lock, "_pid", None) not in (None, current_pid):
+            lock = FileLock(lock_path, timeout=15)
+            _REGISTRY_FILE_LOCKS[cache_key] = lock
+        return lock
 
 
 def compute_file_sha256(filepath: str) -> str:
@@ -892,10 +897,14 @@ class ModelRegistry:
 
         self.registry_root = os.path.join(self.storage_dir, "registry")
         os.makedirs(self.registry_root, exist_ok=True)
-        self.canonical_root = os.path.realpath(self.registry_root)
         if os.name != "nt":
             with contextlib.suppress(OSError):
                 os.chmod(self.registry_root, 0o700)
+
+    @property
+    def canonical_root(self) -> str:
+        """Dynamically resolve canonical root to guarantee parity if registry_root changes."""
+        return os.path.realpath(self.registry_root)
 
     def _get_sim_dir(self, simulation_id: str, create: bool = True) -> str:
         """Resolve canonical simulation directory contained within the registry root.
@@ -1576,7 +1585,7 @@ class ModelRegistry:
                 if clean_sim_id in ModelRegistry._shared_manifest_cache:
                     cached_mtime_reg, cached_mtime_own, cached_data = ModelRegistry._shared_manifest_cache[clean_sim_id]
                     if cached_mtime_reg == mtime_reg and cached_mtime_own == mtime_own:
-                        return [dict(x) for x in cached_data]
+                        return copy.deepcopy(cached_data)
         except OSError:
             if not os.path.exists(manifest_path):
                 return []
@@ -1656,7 +1665,7 @@ class ModelRegistry:
                         ModelRegistry._shared_manifest_cache[clean_sim_id] = (
                             mtime_reg,
                             mtime_own,
-                            [dict(x) for x in data],
+                            copy.deepcopy(data),
                         )
                 except OSError:
                     pass
@@ -5319,6 +5328,12 @@ class ModelRegistry:
             - 'FAILED': authoritative manifest is valid, readable, and mutation is absent.
             - 'INDETERMINATE': manifest is corrupt, unreadable, or storage state is ambiguous.
         """
+        try:
+            clean_sim_id = validate_simulation_id(simulation_id)
+            with ModelRegistry._manifest_cache_guard:
+                ModelRegistry._shared_manifest_cache.pop(clean_sim_id, None)
+        except Exception:
+            pass
         try:
             manifest = self._load_manifest(simulation_id)
         except ModelIntegrityError as mie:

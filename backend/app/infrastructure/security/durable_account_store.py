@@ -98,17 +98,21 @@ class UserRecord:
         )
 
 
-_ACCOUNT_STORE_FILE_LOCKS: dict[str, FileLock] = {}
+_ACCOUNT_STORE_FILE_LOCKS: dict[tuple[str, int], FileLock] = {}
 _ACCOUNT_STORE_LOCKS_GUARD = threading.Lock()
 
 
 def _get_account_store_file_lock(file_path: str, timeout: float = 15.0) -> FileLock:
     """Return process-shared FileLock for durable account store."""
     lock_path = os.path.abspath(f"{file_path}.lock")
+    current_pid = os.getpid()
+    cache_key = (lock_path, current_pid)
     with _ACCOUNT_STORE_LOCKS_GUARD:
-        if lock_path not in _ACCOUNT_STORE_FILE_LOCKS:
-            _ACCOUNT_STORE_FILE_LOCKS[lock_path] = FileLock(lock_path, timeout=timeout)
-        return _ACCOUNT_STORE_FILE_LOCKS[lock_path]
+        lock = _ACCOUNT_STORE_FILE_LOCKS.get(cache_key)
+        if lock is None or getattr(lock, "_pid", None) not in (None, current_pid):
+            lock = FileLock(lock_path, timeout=timeout)
+            _ACCOUNT_STORE_FILE_LOCKS[cache_key] = lock
+        return lock
 
 
 class DurableAccountStore:

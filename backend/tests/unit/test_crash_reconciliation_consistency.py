@@ -20,6 +20,8 @@ import os
 import threading
 import time
 import uuid
+
+mp_ctx = multiprocessing.get_context("spawn")
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import patch
@@ -472,7 +474,7 @@ def test_reconciliation_recovers_process_terminated_before_manifest_persistence(
     tmp_path = reconciliation_env["tmp_path"]
     barrier_path = str(tmp_path / "barrier_before.txt")
 
-    p = multiprocessing.Process(
+    p = mp_ctx.Process(
         target=_worker_mutation_process,
         args=(
             reconciliation_env["reg_dir"],
@@ -522,7 +524,7 @@ def test_reconciliation_recovers_process_terminated_before_manifest_persistence(
 
     # Start independent Worker B process to reconcile
     out_file = str(tmp_path / "recon_before_out.json")
-    p_b = multiprocessing.Process(
+    p_b = mp_ctx.Process(
         target=_worker_reconciler_process,
         args=(
             reconciliation_env["reg_dir"],
@@ -561,7 +563,7 @@ def test_reconciliation_recovers_process_terminated_after_manifest_persistence(r
     tmp_path = reconciliation_env["tmp_path"]
     barrier_path = str(tmp_path / "barrier_after.txt")
 
-    p = multiprocessing.Process(
+    p = mp_ctx.Process(
         target=_worker_mutation_process,
         args=(
             reconciliation_env["reg_dir"],
@@ -614,7 +616,7 @@ def test_reconciliation_recovers_process_terminated_after_manifest_persistence(r
 
     # Start independent Worker B process to reconcile
     out_file = str(tmp_path / "recon_after_out.json")
-    p_b = multiprocessing.Process(
+    p_b = mp_ctx.Process(
         target=_worker_reconciler_process,
         args=(
             reconciliation_env["reg_dir"],
@@ -675,7 +677,7 @@ def test_concurrent_multiprocess_reconciliation_produces_single_terminal_outcome
     num_processes = 3
     out_files = [str(tmp_path / f"recon_race_out_{i}.json") for i in range(num_processes)]
     processes = [
-        multiprocessing.Process(
+        mp_ctx.Process(
             target=_worker_reconciler_process,
             args=(
                 reconciliation_env["reg_dir"],

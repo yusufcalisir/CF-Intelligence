@@ -22,13 +22,37 @@ from app.application.services.data_generator import (
     preprocess_transaction,
 )
 from app.application.services.explainability_service import ExplainabilityService
-from app.application.services.model_service import FraudDetectionModel
+from app.application.services.model_service import FraudDetectionModel, NUM_FEATURES, ModelService
+from app.application.services.model_registry import ModelRegistry
+from app.config import get_settings
 from app.domain.realtime_explainer import (
     FastInferenceExplainer,
     _build_cache_key,
     _compute_feature_fingerprint,
     _get_local_cache,
 )
+
+
+@pytest.fixture(autouse=True)
+def ensure_default_champion_model():
+    """Ensure a verified champion model is active in ModelRegistry for tests omitting explicit model."""
+    reg = ModelRegistry()
+    if reg.get_champion_metadata(simulation_id="live_prod_v2") is None:
+        svc = ModelService(get_settings())
+        model = svc.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+        X = np.random.RandomState(42).randn(64, NUM_FEATURES).astype(np.float32)
+        y = np.random.RandomState(42).randint(0, 2, size=(64,)).astype(np.float32)
+        trained, _, _ = svc.train_local(model, X, y, epochs=1, batch_size=32)
+        trained.eval()
+        reg.save_version(
+            simulation_id="live_prod_v2",
+            state_dict=trained.state_dict(),
+            metrics={"auc_roc": 0.91, "f1_score": 0.82, "loss": 0.29},
+            is_promoted=True,
+            status="champion",
+            provenance_type="TRAINING_RECORDED",
+        )
+
 
 # ============================================================================
 # 1. Prediction & Model Binding (XAI-INV-01, XAI-INV-02)

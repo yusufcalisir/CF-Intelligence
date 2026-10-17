@@ -16,6 +16,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+mp_ctx = multiprocessing.get_context("spawn")
+
 import pytest
 import torch
 import torch.nn as nn
@@ -277,7 +279,7 @@ def test_concurrent_registrations_produce_distinct_sequential_versions(concur_en
     out1 = str(tmp_path / "reg_out_1.json")
     out2 = str(tmp_path / "reg_out_2.json")
 
-    p1 = multiprocessing.Process(
+    p1 = mp_ctx.Process(
         target=_worker_register,
         args=(
             concur_env["reg_dir"],
@@ -297,7 +299,7 @@ def test_concurrent_registrations_produce_distinct_sequential_versions(concur_en
             concur_env["pub_hex"],
         ),
     )
-    p2 = multiprocessing.Process(
+    p2 = mp_ctx.Process(
         target=_worker_register,
         args=(
             concur_env["reg_dir"],
@@ -397,7 +399,7 @@ def test_three_racing_reconcilers_produce_exactly_one_terminal_outcome(concur_en
     out_files = [str(tmp_path / f"recon_race_{i}.json") for i in range(3)]
 
     workers = [
-        multiprocessing.Process(
+        mp_ctx.Process(
             target=_worker_reconcile,
             args=(
                 concur_env["reg_dir"],
