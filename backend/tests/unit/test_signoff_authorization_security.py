@@ -87,6 +87,7 @@ def _create_authentic_candidate(
     priv: ed25519.Ed25519PrivateKey,
     kid: str,
     sim_id: str,
+    owning_bank_id: str = "bank_a",
 ):
     """Generate authentic candidate model with genuine receipt in development environment."""
     svc = ModelService(get_settings())
@@ -111,7 +112,7 @@ def _create_authentic_candidate(
         feature_schema_version="v1.0",
         feature_names=FEATURE_NAMES,
     )
-    receipt = issuer.issue_receipt(evidence=evidence, model_bytes=model_bytes).to_dict()
+    receipt = issuer.issue_receipt(evidence=evidence, model_bytes=model_bytes, owning_bank_id=owning_bank_id).to_dict()
 
     entry = reg.save_version(
         simulation_id=sim_id,
@@ -120,6 +121,7 @@ def _create_authentic_candidate(
         artifact_bytes=model_bytes,
         training_receipt=receipt,
         is_promoted=False,
+        owning_bank_id=owning_bank_id,
     )
     return entry, model, model_bytes, sha256, receipt
 

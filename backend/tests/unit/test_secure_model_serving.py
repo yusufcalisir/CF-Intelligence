@@ -1748,6 +1748,9 @@ def test_p04_signoff_promotion_bypass_rejected_in_production(temp_registry_dir: 
     auth_svc = AuthenticationService.get_instance()
     auth_svc.register_user("ml_lead_user", "Pass1234!ml", "bank_a", roles=["ml_lead"])
     auth_svc.register_user("comp_officer_user", "Pass1234!comp", "bank_a", roles=["compliance_officer"])
+    admin_user = auth_svc.get_user("admin")
+    admin_token = auth_svc.create_token_bundle(admin_user).access_token
+    reg.bind_simulation_ownership("sim_p04", "bank_a", auth_token=admin_token)
 
     v1 = reg.save_version(
         simulation_id="sim_p04",
@@ -1807,6 +1810,13 @@ def test_p05_operational_serving_bypass_returns_503(temp_registry_dir: str) -> N
         "target_account": "acc_2",
         "merchant_category": "retail",
         "velocity_1h": 1,
+        "customer_history_score": 0.85,
+        "chargeback_count": 0,
+        "account_age_days": 365,
+        "country_code": "US",
+        "device_type": "mobile",
+        "merchant_risk_score": 0.1,
+        "hour_of_day": 12,
     }
 
     with (
@@ -1920,6 +1930,9 @@ def test_p09_missing_role_authority_cannot_promote_in_production(temp_registry_d
     # Register an analyst who does NOT hold compliance or ml_engineer roles
     auth_svc.register_user("analyst_only", "Pass1234!", "bank_a", roles=["analyst"])
     auth_svc.register_user("real_ml_eng", "Pass1234!", "bank_a", roles=["ml_engineer"])
+    admin_user = auth_svc.get_user("admin")
+    admin_token = auth_svc.create_token_bundle(admin_user).access_token
+    reg.bind_simulation_ownership("sim_p09", "bank_a", auth_token=admin_token)
 
     entry = reg.save_version(
         "sim_p09",

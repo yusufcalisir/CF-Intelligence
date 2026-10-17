@@ -60,12 +60,37 @@ def temp_reg_dir():
 
 
 @pytest.fixture(autouse=True)
-def clean_state():
+def clean_state(monkeypatch):
+    from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
     reset_circuit_breaker()
     reset_model_cache()
+    temp_audit_dir = tempfile.mkdtemp(prefix="cfi_audit_lifecycle_")
+    monkeypatch.setenv("CFI_AUDIT_LEDGER_PATH", os.path.join(temp_audit_dir, "audit.json"))
+    monkeypatch.setenv("CFI_AUDIT_LEDGER_SECRET", "cfi_prod_audit_ledger_signing_secret_64bytes!")
+    settings = get_settings()
+    orig_payload_sec = settings.payload_signing_secret
+    orig_jwt_sec = settings.oidc_jwt_signing_secret
+    settings.payload_signing_secret = "cfi_prod_payload_signing_secret_64bytes!"
+    settings.oidc_jwt_signing_secret = "cfi_prod_jwt_signing_secret_64bytes_entropy!"
+    ImmutableAuditChain.reset_instance()
+    AuthenticationService.reset_instance()
+    AuthenticationService.get_instance()
     yield
+    settings.payload_signing_secret = orig_payload_sec
+    settings.oidc_jwt_signing_secret = orig_jwt_sec
     reset_circuit_breaker()
     reset_model_cache()
+    AuthenticationService.reset_instance()
+    ImmutableAuditChain.reset_instance()
+    shutil.rmtree(temp_audit_dir, ignore_errors=True)
+
+
+def _bind_sim_for_test(reg: ModelRegistry, sim_id: str, bank_id: str = "bank_a") -> None:
+    auth_svc = AuthenticationService.get_instance()
+    admin_user = auth_svc.get_user("admin")
+    if admin_user:
+        admin_tok = auth_svc.create_token_bundle(admin_user).access_token
+        reg.bind_simulation_ownership(sim_id, bank_id, auth_token=admin_tok)
 
 
 # ==============================================================================
@@ -378,22 +403,22 @@ def test_direct_rollback_to_unverified_model_rejected(temp_reg_dir: str):
 
 
 def test_signoff_with_unregistered_username_marked_unverified(temp_reg_dir: str):
-    """Checks that sign-off with a username not in AuthenticationService is marked unverified."""
+    """Checks that sign-off with a username not in AuthenticationService is rejected fail-closed."""
     reg = ModelRegistry(storage_dir=temp_reg_dir)
+    _bind_sim_for_test(reg, "sim_ghost_user")
     svc = ModelService(get_settings())
     m = svc.create_model(dp_compatible=True)
 
     entry = reg.save_version("sim_ghost_user", m.state_dict(), {"auc": 0.80}, is_promoted=False)
     sig = generate_signoff_signature("sim_ghost_user", 1, entry["sha256"], "ml_engineer", "ghost_user")
-    updated = reg.sign_off("sim_ghost_user", 1, "ml_engineer", user="ghost_user", signature=sig)
-
-    assert updated["sign_offs"][0]["is_identity_verified"] is False
-    assert updated["sign_offs"][0]["is_role_verified"] is False
+    with pytest.raises(ModelIntegrityError, match="not an active authoritative user"):
+        reg.sign_off("sim_ghost_user", 1, "ml_engineer", user="ghost_user", signature=sig)
 
 
 def test_unauthenticated_signoff_caller_cannot_promote_in_production(temp_reg_dir: str):
     """Checks that in production, sign-offs without verified authenticated token cannot promote a model."""
     reg = ModelRegistry(storage_dir=temp_reg_dir)
+    _bind_sim_for_test(reg, "sim_unauth_promote")
     svc = ModelService(get_settings())
     m = svc.create_model(dp_compatible=True)
 
@@ -425,6 +450,7 @@ def test_user_lacking_required_role_rejected_from_signoff(temp_reg_dir: str):
     tok_ana = auth_svc.create_token_bundle(u_ana).access_token
 
     reg = ModelRegistry(storage_dir=temp_reg_dir)
+    _bind_sim_for_test(reg, "sim_lacking_role")
     svc = ModelService(get_settings())
     m = svc.create_model(dp_compatible=True)
 
@@ -454,6 +480,7 @@ def test_single_principal_attempting_both_signoff_roles_rejected(temp_reg_dir: s
     auth_svc.register_user("super_user", "Secret123!", "bank_a", roles=["ml_engineer", "compliance"])
 
     reg = ModelRegistry(storage_dir=temp_reg_dir)
+    _bind_sim_for_test(reg, "sim_four_eyes")
     svc = ModelService(get_settings())
     m = svc.create_model(dp_compatible=True)
 
@@ -469,6 +496,9 @@ def test_single_principal_attempting_both_signoff_roles_rejected(temp_reg_dir: s
 def test_signoff_replay_for_different_model_version_rejected(temp_reg_dir: str):
     """Checks that a sign-off signature for model v1 is invalid when submitted for model v2."""
     reg = ModelRegistry(storage_dir=temp_reg_dir)
+    _bind_sim_for_test(reg, "sim_version_replay")
+    auth_svc = AuthenticationService.get_instance()
+    auth_svc.register_user("mle1", "Secret123!", "bank_a", roles=["ml_engineer"])
     svc = ModelService(get_settings())
     m = svc.create_model(dp_compatible=True)
 
@@ -483,6 +513,10 @@ def test_signoff_replay_for_different_model_version_rejected(temp_reg_dir: str):
 def test_signoff_replay_for_different_simulation_rejected(temp_reg_dir: str):
     """Checks that a sign-off signature for simulation A is invalid when submitted for simulation B."""
     reg = ModelRegistry(storage_dir=temp_reg_dir)
+    _bind_sim_for_test(reg, "sim_bank_x")
+    _bind_sim_for_test(reg, "sim_bank_y")
+    auth_svc = AuthenticationService.get_instance()
+    auth_svc.register_user("mle1", "Secret123!", "bank_a", roles=["ml_engineer"])
     svc = ModelService(get_settings())
     m = svc.create_model(dp_compatible=True)
 
@@ -1052,6 +1086,7 @@ def test_end_to_end_trusted_champion_lifecycle(temp_reg_dir: str):
         metrics={"loss": float(losses[-1]), "auc_roc": 0.86},
     )
 
+    _bind_sim_for_test(reg, "sim_e2e_champion")
     candidate = reg.save_version(
         "sim_e2e_champion",
         trained.state_dict(),
@@ -1066,8 +1101,8 @@ def test_end_to_end_trusted_champion_lifecycle(temp_reg_dir: str):
     assert candidate["provenance_type"] == "TRAINING_RECORDED"
 
     auth_svc = AuthenticationService.get_instance()
-    u_mle = auth_svc.register_user("mle_governance", "Secret123!", "bank_a", roles=["ml_engineer"])
-    u_cmp = auth_svc.register_user("comp_governance", "Secret123!", "bank_a", roles=["compliance"])
+    u_mle = auth_svc.register_user("mle_governance", "Secret123!", "bank_a", roles=["ml_engineer"], clearance_level=2)
+    u_cmp = auth_svc.register_user("comp_governance", "Secret123!", "bank_a", roles=["compliance"], clearance_level=2)
     tok_mle = auth_svc.create_token_bundle(u_mle).access_token
     tok_cmp = auth_svc.create_token_bundle(u_cmp).access_token
 
@@ -1075,7 +1110,8 @@ def test_end_to_end_trusted_champion_lifecycle(temp_reg_dir: str):
     sig_comp = generate_signoff_signature("sim_e2e_champion", 1, candidate["sha256"], "compliance", "comp_governance")
 
     reg.sign_off("sim_e2e_champion", 1, "ml_engineer", user="mle_governance", signature=sig_ml, auth_token=tok_mle)
-    promoted = reg.sign_off("sim_e2e_champion", 1, "compliance", user="comp_governance", signature=sig_comp, auth_token=tok_cmp)
+    reg.sign_off("sim_e2e_champion", 1, "compliance", user="comp_governance", signature=sig_comp, auth_token=tok_cmp)
+    promoted = reg.promote_version("sim_e2e_champion", 1, auth_token=tok_mle)
     assert promoted["status"] == "champion"
     assert promoted["is_active"] is True
 
@@ -1109,6 +1145,7 @@ def test_unauthorized_signoff_identities_fail_production_activation(temp_reg_dir
     """Verifies that a valid artifact cannot become a production champion using unverified sign-off identities."""
     svc = ModelService(get_settings())
     reg = ModelRegistry(storage_dir=temp_reg_dir)
+    _bind_sim_for_test(reg, "sim_unauth_activation")
     m = svc.create_model(dp_compatible=True)
 
     entry = reg.save_version(

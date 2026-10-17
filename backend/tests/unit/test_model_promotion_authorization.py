@@ -176,9 +176,8 @@ class TestDualApprovalAndInstitutionalGovernance:
             assert "compliance" not in meta_revoked["sign_offs"]
             assert meta_revoked["generation"] > 1
 
-            # Promotion must fail closed
             with patch.object(get_settings(), "app_env", "production"), \
-                 pytest.raises(ModelIntegrityError, match=r"(Missing required sign-offs|not production eligible)"):
+                 pytest.raises(ModelIntegrityError, match=r"(Missing required sign-offs|not production-?eligible)"):
                 registry.promote_version("sim_test_gov", version)
 
     def test_rollback_to_model_lacking_approvals_is_rejected(self):

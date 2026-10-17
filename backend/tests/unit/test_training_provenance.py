@@ -26,6 +26,7 @@ import hashlib
 import io
 import math
 import os
+import shutil
 import tempfile
 from types import MappingProxyType
 from typing import Any
@@ -59,6 +60,29 @@ from app.application.services.training_provenance_service import (
 )
 from app.config import get_settings
 from app.domain.model_serving_errors import ModelIntegrityError
+from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+
+@pytest.fixture(autouse=True)
+def clean_audit_state(monkeypatch):
+    temp_audit_dir = tempfile.mkdtemp(prefix="cfi_audit_prov_")
+    monkeypatch.setenv("CFI_AUDIT_LEDGER_PATH", os.path.join(temp_audit_dir, "audit.json"))
+    monkeypatch.setenv("CFI_AUDIT_LEDGER_SECRET", "cfi_prod_audit_ledger_signing_secret_64bytes!")
+    settings = get_settings()
+    orig_payload_sec = settings.payload_signing_secret
+    orig_jwt_sec = settings.oidc_jwt_signing_secret
+    settings.payload_signing_secret = "cfi_prod_payload_signing_secret_64bytes!"
+    settings.oidc_jwt_signing_secret = "cfi_prod_jwt_signing_secret_64bytes_entropy!"
+    ImmutableAuditChain.reset_instance()
+    AuthenticationService.reset_instance()
+    AuthenticationService.get_instance()
+    yield
+    settings.payload_signing_secret = orig_payload_sec
+    settings.oidc_jwt_signing_secret = orig_jwt_sec
+    AuthenticationService.reset_instance()
+    ImmutableAuditChain.reset_instance()
+    shutil.rmtree(temp_audit_dir, ignore_errors=True)
 
 
 def _create_mock_checkpoint() -> tuple[dict[str, torch.Tensor], bytes, str]:

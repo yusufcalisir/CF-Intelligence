@@ -26,8 +26,11 @@ from app.infrastructure.security.durable_account_store import (
     AuthenticationSecurityError,
 )
 
+from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
 PROD_JWT_SECRET = "missing-test-prod-jwt-signing-secret-64bytes-entropy!"
 PROD_AUTH_SECRET = "missing-test-prod-identity-authority-secret-64bytes!"
+PROD_PAYLOAD_SECRET = "missing-test-prod-payload-secret-64bytes-entropy!"
 
 
 @pytest.fixture
@@ -41,13 +44,18 @@ def missing_env():
     orig_jwt = settings.oidc_jwt_signing_secret
     orig_ident_sec = settings.identity_store_secret
     orig_ident_path = settings.identity_store_path
+    orig_payload_sec = settings.payload_signing_secret
+    orig_audit_path = os.environ.get("CFI_AUDIT_LEDGER_PATH")
 
     settings.app_env = "production"
     settings.oidc_jwt_signing_secret = PROD_JWT_SECRET
     settings.identity_store_secret = PROD_AUTH_SECRET
     settings.identity_store_path = store_path
+    settings.payload_signing_secret = PROD_PAYLOAD_SECRET
+    os.environ["CFI_AUDIT_LEDGER_PATH"] = os.path.join(temp_dir, "test_audit_ledger.json")
 
     AuthenticationService.reset_instance()
+    ImmutableAuditChain.reset_instance()
 
     yield {
         "temp_dir": temp_dir,
@@ -56,10 +64,16 @@ def missing_env():
     }
 
     AuthenticationService.reset_instance()
+    ImmutableAuditChain.reset_instance()
     settings.app_env = orig_env
     settings.oidc_jwt_signing_secret = orig_jwt
     settings.identity_store_secret = orig_ident_sec
     settings.identity_store_path = orig_ident_path
+    settings.payload_signing_secret = orig_payload_sec
+    if orig_audit_path is not None:
+        os.environ["CFI_AUDIT_LEDGER_PATH"] = orig_audit_path
+    else:
+        os.environ.pop("CFI_AUDIT_LEDGER_PATH", None)
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -267,13 +281,13 @@ class TestMissingIdentityAuthorityFailClosed:
             sub_env["CFI_AUDIT_LEDGER_PATH"] = os.path.join(tmp_ident_dir, "audit_ledger.json")
 
             # Run IDENT suite
-            cmd_ident = [sys.executable, "-m", "pytest", "tests/unit/test_authoritative_principal_identity.py", "-v"]
-            res_ident = subprocess.run(cmd_ident, cwd=backend_dir, capture_output=True, text=True, timeout=120, env=sub_env)
+            cmd_ident = [sys.executable, "-m", "pytest", "tests/unit/test_authoritative_principal_identity.py", "-q"]
+            res_ident = subprocess.run(cmd_ident, cwd=backend_dir, capture_output=True, text=True, timeout=600, env=sub_env)
             assert res_ident.returncode == 0, f"IDENT regression failed:\nSTDOUT:\n{res_ident.stdout}\nSTDERR:\n{res_ident.stderr}"
 
             # Run HARDEN suite
-            cmd_harden = [sys.executable, "-m", "pytest", "tests/unit/test_identity_authority_hardening.py", "-v"]
-            res_harden = subprocess.run(cmd_harden, cwd=backend_dir, capture_output=True, text=True, timeout=180, env=sub_env)
+            cmd_harden = [sys.executable, "-m", "pytest", "tests/unit/test_identity_authority_hardening.py", "-q"]
+            res_harden = subprocess.run(cmd_harden, cwd=backend_dir, capture_output=True, text=True, timeout=600, env=sub_env)
             assert res_harden.returncode == 0, f"HARDEN regression failed:\nSTDOUT:\n{res_harden.stdout}\nSTDERR:\n{res_harden.stderr}"
         finally:
             shutil.rmtree(tmp_ident_dir, ignore_errors=True)

@@ -1938,9 +1938,12 @@ class ModelRegistry:
         target_rcpt = receipt_obj if receipt_obj is not None else receipt_dict
         if target_rcpt is not None:
             verifier = self._verifier or get_default_training_verifier()
+            initial_candidate_sha = (
+                hashlib.sha256(artifact_bytes).hexdigest() if artifact_bytes is not None else None
+            )
             is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
                 target_rcpt,
-                candidate_artifact_sha256=None,
+                candidate_artifact_sha256=initial_candidate_sha,
                 simulation_id=simulation_id,
                 expected_architecture=exp_arch,
                 expected_feature_schema_version=exp_schema_ver,
@@ -1971,6 +1974,19 @@ class ModelRegistry:
                 "CALLER_NUMERIC_EVIDENCE_UNAUTHENTICATED" if has_recorded_evidence else "NONE"
             )
             is_prod_eligible = False
+
+        if is_promoted or status in ("champion", "active"):
+            validate_production_admission(
+                {
+                    "provenance_type": final_provenance,
+                    "status": "champion",
+                    "is_active": True,
+                    "training_receipt": receipt_dict if has_valid_receipt else None,
+                    "sign_offs": [],
+                    "is_production_eligible": is_prod_eligible,
+                },
+                context="save_version",
+            )
 
         if should_bind_initial:
             has_init_auth, init_auth_reason = self._verify_initial_ownership_authority(
@@ -4261,30 +4277,37 @@ class ModelRegistry:
                     )
                 is_identity_verified = True
                 is_role_verified = True
+            elif authoritative_user and authoritative_user.is_active:
+                auth_roles = [r.lower().strip() for r in authoritative_user.roles]
+                has_role = False
+                if norm_role == "compliance" and any(
+                    r in ("compliance", "compliance_officer", "admin") for r in auth_roles
+                ):
+                    has_role = True
+                elif norm_role == "ml_engineer" and any(
+                    r in ("ml_engineer", "ml_lead") for r in auth_roles
+                ):
+                    has_role = True
+
+                if has_role:
+                    is_identity_verified = True
+                    is_role_verified = True
+                else:
+                    if settings.app_env.lower() == "production":
+                        is_identity_verified = True
+                        is_role_verified = False
+                    else:
+                        raise ModelIntegrityError(
+                            f"Sign-off rejected: user '{user}' lacks authoritative {norm_role} role permissions."
+                        )
             elif settings.app_env.lower() == "production":
                 raise ModelIntegrityError(
                     "Production promotion rejected: authenticated session token is required for institutional sign-off."
                 )
             else:
-                if not authoritative_user or not authoritative_user.is_active:
-                    raise ModelIntegrityError(
-                        f"Sign-off rejected: user '{user}' is not an active authoritative user."
-                    )
-                auth_roles = [r.lower().strip() for r in authoritative_user.roles]
-                if norm_role == "compliance" and not any(
-                    r in ("compliance", "compliance_officer", "admin") for r in auth_roles
-                ):
-                    raise ModelIntegrityError(
-                        f"Sign-off rejected: user '{user}' lacks authoritative compliance role permissions."
-                    )
-                if norm_role == "ml_engineer" and not any(
-                    r in ("ml_engineer", "ml_lead") for r in auth_roles
-                ):
-                    raise ModelIntegrityError(
-                        f"Sign-off rejected: user '{user}' lacks authoritative ml_engineer role permissions."
-                    )
-                is_identity_verified = True
-                is_role_verified = True
+                raise ModelIntegrityError(
+                    f"Sign-off rejected: user '{user}' is not an active authoritative user."
+                )
 
             # Authoritative institutional tenant check
             self._verify_institutional_governance_authority(

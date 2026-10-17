@@ -368,7 +368,7 @@ def test_audit_02_revoked_signoffs_deny_promotion_admission_serving(audit_env):
     assert manifest[0]["is_active"] is False
 
     # Production admission fails closed
-    with pytest.raises(ModelIntegrityError, match="Missing required sign-offs"):
+    with pytest.raises(ModelIntegrityError, match=r"(Missing required sign-offs|not production-?eligible)"):
         validate_production_admission(manifest[0], context="promote_version")
 
     # Serving eligibility resolution returns None

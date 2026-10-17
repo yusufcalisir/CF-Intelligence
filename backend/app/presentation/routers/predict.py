@@ -260,6 +260,14 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
         ) from exc
 
     if active_ident is None:
+        with _serving_cache_lock:
+            had_cached = simulation_id in _serving_model_cache
+            _serving_model_cache.pop(simulation_id, None)
+            if _cached_serving_model is not None and (
+                simulation_id is None or simulation_id == get_settings().default_simulation_id
+            ):
+                _cached_serving_model = None
+
         if simulation_id:
             try:
                 versions = _registry.list_versions(simulation_id)
@@ -269,6 +277,26 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"No trained models found for simulation ID: {simulation_id}",
+                )
+            if had_cached or any(v.get("status") == "champion" for v in versions):
+                champ = next((v for v in versions if v.get("status") == "champion"), None)
+                if champ:
+                    rcpt = champ.get("training_receipt")
+                    kid = rcpt.get("key_id") if isinstance(rcpt, dict) else None
+                    if kid:
+                        from app.application.services.training_provenance_service import (
+                            get_default_training_verifier,
+                        )
+
+                        verifier = _registry._verifier or get_default_training_verifier()
+                        if not verifier.is_key_trusted(kid):
+                            raise HTTPException(
+                                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                                detail="Serving model rejected: model authority or signing key has been revoked.",
+                            )
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Serving model unavailable: champion authorization or integrity verification failed.",
                 )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
