@@ -1294,9 +1294,10 @@ class TestModule01ACompletionPatch:
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             shared_trust_file = os.path.join(tmp_dir, "shared_trust_registry.json")
+            admin_tok = "admin_secret_token_a8"
 
-            store_worker_1 = DurableTrustStore(trust_file_path=shared_trust_file)
-            store_worker_2 = DurableTrustStore(trust_file_path=shared_trust_file)
+            store_worker_1 = DurableTrustStore(trust_file_path=shared_trust_file, admin_token=admin_tok)
+            store_worker_2 = DurableTrustStore(trust_file_path=shared_trust_file, admin_token=admin_tok)
 
             verifier_1 = TrainingReceiptVerifier(
                 trusted_keys={"cross_worker_key": pub},
@@ -1312,7 +1313,7 @@ class TestModule01ACompletionPatch:
             assert verifier_2.verify_receipt(receipt, candidate_artifact_sha256=sha256)[0] is True
 
             # Worker 1 revokes the key due to compromise
-            verifier_1.revoke_key("cross_worker_key", reason="compromised_by_adversary")
+            verifier_1.revoke_key("cross_worker_key", reason="compromised_by_adversary", admin_token=admin_tok)
 
             # Worker 2 must immediately reject without process restart via mtime reload contract
             is_valid_2, reason_2 = verifier_2.verify_receipt(receipt, candidate_artifact_sha256=sha256)

@@ -97,6 +97,10 @@ def tenant_env():
     nonce_path = os.path.join(temp_dir, "nonces.json")
     old_nonce_path = settings.internal_nonce_store_path
     old_internal_secret = settings.internal_context_signing_secret
+    old_env_nonce_path = os.environ.get("CFI_INTERNAL_NONCE_STORE_PATH")
+    old_env_internal_secret = os.environ.get("CFI_INTERNAL_CONTEXT_SECRET")
+    os.environ["CFI_INTERNAL_NONCE_STORE_PATH"] = nonce_path
+    os.environ["CFI_INTERNAL_CONTEXT_SECRET"] = TEST_SIGNING_SECRET
     settings.internal_nonce_store_path = nonce_path
     settings.internal_context_signing_secret = TEST_SIGNING_SECRET
     reset_default_nonce_store()
@@ -171,6 +175,14 @@ def tenant_env():
     consortium_governance_service._store = old_service_store
     settings.internal_nonce_store_path = old_nonce_path
     settings.internal_context_signing_secret = old_internal_secret
+    if old_env_nonce_path is not None:
+        os.environ["CFI_INTERNAL_NONCE_STORE_PATH"] = old_env_nonce_path
+    else:
+        os.environ.pop("CFI_INTERNAL_NONCE_STORE_PATH", None)
+    if old_env_internal_secret is not None:
+        os.environ["CFI_INTERNAL_CONTEXT_SECRET"] = old_env_internal_secret
+    else:
+        os.environ.pop("CFI_INTERNAL_CONTEXT_SECRET", None)
     reset_default_nonce_store()
     shutil.rmtree(temp_dir, ignore_errors=True)
 

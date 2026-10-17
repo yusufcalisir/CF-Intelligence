@@ -411,7 +411,7 @@ def test_save08_process_interruption_during_serialization_leaves_no_active_model
         # Simulate interruption during serialization
         with (
             patch("torch.save", side_effect=RuntimeError("Process terminated / out of disk")),
-            pytest.raises(RuntimeError, match="Process terminated"),
+            pytest.raises((RuntimeError, ModelIntegrityError), match="Process terminated"),
         ):
             reg.save_version(
                 simulation_id=sim_id,

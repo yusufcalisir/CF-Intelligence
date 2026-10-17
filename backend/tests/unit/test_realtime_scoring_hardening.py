@@ -217,10 +217,11 @@ def test_safe_torchscript_jit_redis_serialization():
     assert torch.allclose(out_orig, out_loaded, atol=1e-5)
 
 
-def test_circuit_breaker_thread_safe_tripping():
+def test_circuit_breaker_thread_safe_tripping(monkeypatch):
     """VECTOR 16: Verifies atomic circuit breaker tripping under multi-threaded
     forced failure conditions.
     """
+    monkeypatch.setattr(get_settings(), "enable_demo_fallback", True)
     payload_fail = {
         "transaction_id": "tx_cb_fail",
         "amount": 100.0,

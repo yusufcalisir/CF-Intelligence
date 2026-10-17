@@ -77,6 +77,7 @@ def boundary_env():
         for k in (
             "CFI_INTERNAL_NONCE_STORE_PATH",
             "CFI_AUDIT_LEDGER_PATH",
+            "CFI_AUDIT_LEDGER_SECRET",
             "CFI_CONSORTIUM_STORE_PATH",
             "CFI_INTERNAL_CONTEXT_SECRET",
             "CFI_INTERNAL_NONCE_SECRET",
@@ -93,6 +94,7 @@ def boundary_env():
 
     os.environ["CFI_INTERNAL_NONCE_STORE_PATH"] = nonce_path
     os.environ["CFI_AUDIT_LEDGER_PATH"] = audit_path
+    os.environ["CFI_AUDIT_LEDGER_SECRET"] = TEST_SECRET
     os.environ["CFI_CONSORTIUM_STORE_PATH"] = consortium_path
     os.environ["CFI_INTERNAL_CONTEXT_SECRET"] = TEST_SECRET
     os.environ["CFI_INTERNAL_NONCE_SECRET"] = TEST_SECRET

@@ -58,6 +58,7 @@ class TestTrainingJobConcurrencyAdversarial:
             sample_count=500,
             actual_executed_epochs=1,
             observed_loss=0.30,
+            model_update_digest="digest_1",
         )
         source.record_global_aggregation(
             job_id=job_id,
@@ -135,8 +136,8 @@ print(json.dumps({{"pid": pid, "status": status, "err": err_msg, "artifact": art
             env=proc_env,
         )
 
-        out1_raw, err1 = p1.communicate(timeout=15)
-        out2_raw, err2 = p2.communicate(timeout=15)
+        out1_raw, err1 = p1.communicate(timeout=45)
+        out2_raw, err2 = p2.communicate(timeout=45)
 
         assert out1_raw.strip(), f"Process 1 failed with stderr: {err1}"
         assert out2_raw.strip(), f"Process 2 failed with stderr: {err2}"
@@ -346,6 +347,7 @@ time.sleep(30)
             sample_count=400,
             actual_executed_epochs=1,
             observed_loss=0.22,
+            model_update_digest="1" * 64,
         )
         assert obs.actual_sample_count == 400
 

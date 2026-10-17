@@ -122,6 +122,7 @@ _feature_store = FeatureStoreService()
 _cached_serving_model: torch.nn.Module | None = None
 _cached_serving_model_mtime: float = 0.0
 _cached_serving_model_kid: str | None = None
+_cached_serving_model_version: int | None = None
 
 _challenger_cache_lock = threading.RLock()
 _challenger_model_cache: dict[tuple[str, int, bool], tuple[torch.nn.Module, str | None]] = {}
@@ -222,12 +223,13 @@ _serving_cache_lock = threading.Lock()
 
 def clear_all_serving_caches() -> None:
     """Clear all process-local model serving caches."""
-    global _cached_serving_model, _cached_serving_model_mtime, _cached_serving_model_kid
+    global _cached_serving_model, _cached_serving_model_mtime, _cached_serving_model_kid, _cached_serving_model_version
     with _serving_cache_lock:
         _serving_model_cache.clear()
     _cached_serving_model = None
     _cached_serving_model_mtime = 0.0
     _cached_serving_model_kid = None
+    _cached_serving_model_version = None
     _clear_challenger_model_cache()
 
 
@@ -242,7 +244,16 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
     - Controlled HTTP 503 / 404 error responses with sanitized details.
     - Fast lightweight champion identity revalidation to preserve sub-millisecond warm serving latency.
     """
-    global _cached_serving_model, _cached_serving_model_mtime, _cached_serving_model_kid
+    global _cached_serving_model, _cached_serving_model_mtime, _cached_serving_model_kid, _cached_serving_model_version
+
+    # 0. Warm-cache fast path for high-frequency burst serving (100ms window)
+    now = time.time()
+    with _serving_cache_lock:
+        cached_entry = _serving_model_cache.get(simulation_id)
+        if cached_entry is not None and (now - _cached_serving_model_mtime < 0.10):
+            cached_model, cached_ident = cached_entry
+            _cached_serving_model_version = cached_ident.get("version")
+            return cached_model
 
     # 1. Revalidate active champion identity from manifest
     try:
@@ -333,6 +344,7 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
                             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                             detail="Serving model rejected: model authority or signing key has been revoked.",
                         )
+                _cached_serving_model_version = cached_ident.get("version")
                 return cached_model
 
     # 3. Load genuine champion model via authoritative ModelService
@@ -403,6 +415,7 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
         _cached_serving_model = model
         _cached_serving_model_mtime = time.time()
         _cached_serving_model_kid = active_ident.get("issuer_key_id")
+        _cached_serving_model_version = active_ident.get("version")
 
     return model
 
@@ -1156,8 +1169,7 @@ async def score_transaction(
                     "merchant_id": payload.merchant_id,
                 }
             ]
-            online_feats = await asyncio.to_thread(
-                _feature_store.get_online_features,
+            online_feats = _feature_store.get_online_features(
                 entity_rows,
                 [
                     "customer_history_score",
@@ -1210,7 +1222,7 @@ async def score_transaction(
             )
         elif input_tensor.shape[1] > input_dim:
             input_tensor = input_tensor[:, :input_dim]
-        ml_prediction = await asyncio.to_thread(_eval_model, serving_model, input_tensor)
+        ml_prediction = _eval_model(serving_model, input_tensor)
     except HTTPException:
         raise
     except Exception as exc:
@@ -1220,11 +1232,9 @@ async def score_transaction(
             detail="Inference pipeline execution error.",
         )
 
-    # Run composite risk scoring engine offloaded to threadpool with genuine ML confidence
+    # Run composite risk scoring engine with genuine ML confidence
     entity_hash = f"scoring:{x_bank_id or 'global'}:{payload.account_id}"
-    risk_score_obj = await asyncio.to_thread(
-        _risk_engine.score_transaction, txn_dict, ml_prediction, entity_hash
-    )
+    risk_score_obj = _risk_engine.score_transaction(txn_dict, ml_prediction, entity_hash)
     raw_score = risk_score_obj.score
 
     # Normalize integer risk score [0, 1000]
@@ -1260,17 +1270,20 @@ async def score_transaction(
     else:
         decision = "ALLOW"
 
-    # Model version tag — resolve from active simulation if available, fallback to v2.4.1
-    model_ver = "v2.4.1"
-    try:
-        active_sim_id = _model_service.get_active_simulation_id()
-        if active_sim_id:
-            versions = _registry.list_versions(active_sim_id)
-            champion = next((v for v in reversed(versions) if v.get("status") == "champion"), None)
-            if champion:
-                model_ver = f"v{champion['version']}.0.0"
-    except Exception:
-        pass
+    # Model version tag — resolve from cached serving model if available, fallback to v2.4.1
+    if _cached_serving_model_version is not None:
+        model_ver = f"v{_cached_serving_model_version}.0.0"
+    else:
+        model_ver = "v2.4.1"
+        try:
+            active_sim_id = _model_service.get_active_simulation_id()
+            if active_sim_id:
+                versions = _registry.list_versions(active_sim_id)
+                champion = next((v for v in reversed(versions) if v.get("status") == "champion"), None)
+                if champion:
+                    model_ver = f"v{champion['version']}.0.0"
+        except Exception:
+            pass
 
     # Map internal risk scoring signal names to canonical API / SHAP feature names
     SIGNAL_FEATURE_MAP = {
