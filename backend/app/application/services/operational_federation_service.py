@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import contextlib
 import hmac
+import json
 import logging
 import os
 import threading
@@ -121,6 +122,8 @@ class WorkerEndpointRegistry:
         trusted_context: Any | None = None,
         registered_by: str = "provisioner",
         app_env: str | None = None,
+        bank_tokens: dict[str, str] | None = None,
+        allow_replacement: bool = False,
     ) -> None:
         """Register a provisioned bank worker endpoint with capability, institutional credential, and liveness verification."""
         if not isinstance(bank_id, str) or not bank_id.strip():
@@ -170,22 +173,37 @@ class WorkerEndpointRegistry:
                 )
             attestation_type = "trusted_context"
         elif registration_token is not None:
-            bank_tokens = settings.training_bank_tokens or {}
-            expected_token = bank_tokens.get(clean_id) or settings.training_worker_token
+            # 1. Reject generic shared worker credentials for institution-scoped registration
+            raw_worker_token = getattr(settings, "training_worker_token", None)
+            generic_worker_token = raw_worker_token.strip() if isinstance(raw_worker_token, str) else ""
+            if generic_worker_token and hmac.compare_digest(registration_token.strip(), generic_worker_token):
+                raise TrainingProvenanceSecurityError(
+                    f"Registration rejected for bank [{clean_id}]: generic shared worker credentials "
+                    "are insufficient for institution-scoped registration."
+                )
+
+            # 2. Strict bank-specific authorization without fallback to generic worker token
+            active_bank_tokens = dict(bank_tokens) if bank_tokens is not None else dict(getattr(settings, "training_bank_tokens", {}))
+            if clean_id not in active_bank_tokens:
+                env_toks = os.environ.get("CFI_TRAINING_BANK_TOKENS")
+                if env_toks:
+                    try:
+                        parsed = json.loads(env_toks)
+                        if isinstance(parsed, dict):
+                            active_bank_tokens.update(parsed)
+                    except Exception:
+                        pass
+
+            expected_token = active_bank_tokens.get(clean_id) or active_bank_tokens.get(bank_id)
             if not expected_token:
-                if is_prod:
-                    raise TrainingProvenanceSecurityError(
-                        f"Registration rejected for bank [{clean_id}]: no authorized institutional token configured in production."
-                    )
-                if not registration_token.strip():
-                    raise TrainingProvenanceSecurityError(
-                        f"Registration rejected for bank [{clean_id}]: empty registration token."
-                    )
-            else:
-                if not hmac.compare_digest(registration_token.strip(), expected_token.strip()):
-                    raise TrainingProvenanceSecurityError(
-                        f"Registration authentication failed for bank [{clean_id}]: invalid institutional token."
-                    )
+                raise TrainingProvenanceSecurityError(
+                    f"Registration rejected for bank [{clean_id}]: no authorized institutional credential configured for this bank."
+                )
+
+            if not isinstance(expected_token, str) or not hmac.compare_digest(registration_token.strip(), expected_token.strip()):
+                raise TrainingProvenanceSecurityError(
+                    f"Registration authentication failed for bank [{clean_id}]: invalid institutional token."
+                )
             attestation_type = "institutional_token"
         else:
             if is_prod:
@@ -208,14 +226,34 @@ class WorkerEndpointRegistry:
         )
 
         with cls._lock:
-            # Overwrite protection: prevent unauthorized overwriting of active, alive worker
+            # Genuine worker registration ownership and safe replacement
             existing = cls._registry.get(clean_id)
             if existing is not None and existing.state == "ACTIVE":
-                if existing.pid is not None and _is_process_alive(existing.pid):
+                is_alive = existing.pid is not None and _is_process_alive(existing.pid)
+                if is_alive:
+                    if not allow_replacement:
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot overwrite active live worker for bank [{clean_id}]. "
+                            f"Existing worker PID {existing.pid} is still running. "
+                            "Authorized replacement lifecycle transition required."
+                        )
                     if attestation_type == "development_direct" and existing.attestation_type != "development_direct":
                         raise TrainingProvenanceSecurityError(
                             f"Cannot overwrite active verified worker for bank [{clean_id}] with unauthenticated registration."
                         )
+                    logger.warning(
+                        "Replaced active worker for bank [%s] (old pid=%s) with new worker (pid=%s, attestation=%s)",
+                        clean_id,
+                        existing.pid,
+                        pid,
+                        attestation_type,
+                    )
+                else:
+                    logger.info(
+                        "Existing worker PID %s for bank [%s] is dead or terminated. Permitting authenticated re-registration.",
+                        existing.pid,
+                        clean_id,
+                    )
 
             cls._registry[clean_id] = record
             logger.info(
@@ -233,6 +271,7 @@ class WorkerEndpointRegistry:
         pids: dict[str, int] | None = None,
         bank_tokens: dict[str, str] | None = None,
         app_env: str | None = None,
+        allow_replacement: bool = True,
     ) -> None:
         """Batch registration helper for the legitimate bank worker provisioner (e.g. spawn_bank_workers)."""
         tokens = bank_tokens or {}
@@ -252,31 +291,126 @@ class WorkerEndpointRegistry:
                 registration_token=token,
                 registered_by="spawn_bank_workers",
                 app_env=app_env,
+                bank_tokens=tokens,
+                allow_replacement=allow_replacement,
+            )
+
+    @classmethod
+    def _authenticate_lifecycle_caller(
+        cls,
+        clean_id: str,
+        token: str | None,
+        trusted_context: Any | None,
+        action_name: str,
+        existing: TrustedWorkerEndpoint,
+        is_prod: bool,
+        bank_tokens: dict[str, str] | None = None,
+    ) -> None:
+        """Enforce authentic institutional authorization for worker lifecycle mutations (revocation/unregistration)."""
+        settings = get_settings()
+        if trusted_context is not None:
+            from app.application.services.model_registry import verify_trusted_internal_context
+
+            is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                trusted_context,
+                expected_action=action_name,
+                expected_service_name="bank_worker_provisioner",
+                expected_bank_id=clean_id,
+                consume_nonce=True,
+            )
+            if not is_valid_ctx:
+                raise TrainingProvenanceSecurityError(
+                    f"Lifecycle action '{action_name}' rejected for bank [{clean_id}]: {ctx_reason}"
+                )
+            return
+
+        if token is not None:
+            raw_worker_token = getattr(settings, "training_worker_token", None)
+            generic_worker_token = raw_worker_token.strip() if isinstance(raw_worker_token, str) else ""
+            if generic_worker_token and hmac.compare_digest(token.strip(), generic_worker_token):
+                raise TrainingProvenanceSecurityError(
+                    f"Lifecycle action '{action_name}' rejected for bank [{clean_id}]: "
+                    "generic shared worker credentials cannot authorize endpoint lifecycle mutations."
+                )
+            active_bank_tokens = dict(bank_tokens) if bank_tokens is not None else dict(getattr(settings, "training_bank_tokens", {}))
+            if clean_id not in active_bank_tokens:
+                env_toks = os.environ.get("CFI_TRAINING_BANK_TOKENS")
+                if env_toks:
+                    try:
+                        parsed = json.loads(env_toks)
+                        if isinstance(parsed, dict):
+                            active_bank_tokens.update(parsed)
+                    except Exception:
+                        pass
+            expected_token = active_bank_tokens.get(clean_id)
+            if not expected_token:
+                raise TrainingProvenanceSecurityError(
+                    f"Lifecycle action '{action_name}' rejected for bank [{clean_id}]: no authorized institutional token configured."
+                )
+            if not isinstance(expected_token, str) or not hmac.compare_digest(token.strip(), expected_token.strip()):
+                raise TrainingProvenanceSecurityError(
+                    f"Lifecycle action '{action_name}' authentication failed for bank [{clean_id}]: invalid institutional token."
+                )
+            return
+
+        # Neither token nor trusted context supplied
+        if is_prod:
+            raise TrainingProvenanceSecurityError(
+                f"Lifecycle action '{action_name}' rejected for bank [{clean_id}]: production requires authentic institutional "
+                "token or verified internal attestation context. Plain unauthenticated modification forbidden."
+            )
+        if existing.attestation_type != "development_direct":
+            raise TrainingProvenanceSecurityError(
+                f"Cannot perform '{action_name}' on verified institutional worker for bank [{clean_id}] without valid credential."
             )
 
     @classmethod
     def revoke_worker_endpoint(
         cls,
         bank_id: str,
+        revocation_token: str | None = None,
+        trusted_context: Any | None = None,
         reason: str = "revoked by authority",
+        app_env: str | None = None,
+        bank_tokens: dict[str, str] | None = None,
+        token: str | None = None,
     ) -> None:
         """Explicitly revoke a registered bank worker endpoint upon security event or node withdrawal."""
+        if not isinstance(bank_id, str) or not bank_id.strip():
+            raise TrainingProvenanceConfigurationError("Bank identifier must be a non-empty string.")
         clean_id = bank_id.strip().upper()
+        settings = get_settings()
+        env = (app_env or settings.app_env).strip().lower()
+        is_prod = env == "production"
+        effective_token = revocation_token or token
+
         with cls._lock:
             rec = cls._registry.get(clean_id)
-            if rec is not None:
-                revoked_rec = TrustedWorkerEndpoint(
-                    bank_id=rec.bank_id,
-                    endpoint=rec.endpoint,
-                    pid=rec.pid,
-                    registered_at=rec.registered_at,
-                    capabilities=rec.capabilities,
-                    attestation_type=rec.attestation_type,
-                    state="REVOKED",
-                    registered_by=rec.registered_by,
-                )
-                cls._registry[clean_id] = revoked_rec
-                logger.warning("Revoked worker endpoint for bank [%s]: %s", clean_id, reason)
+            if rec is None or rec.state == "REVOKED":
+                return
+
+            cls._authenticate_lifecycle_caller(
+                clean_id=clean_id,
+                token=effective_token,
+                trusted_context=trusted_context,
+                action_name="revoke_worker_endpoint",
+                existing=rec,
+                is_prod=is_prod,
+                bank_tokens=bank_tokens,
+            )
+
+            revoked_rec = TrustedWorkerEndpoint(
+                bank_id=rec.bank_id,
+                endpoint=rec.endpoint,
+                pid=rec.pid,
+                registered_at=rec.registered_at,
+                capabilities=rec.capabilities,
+                attestation_type=rec.attestation_type,
+                state="REVOKED",
+                registered_by=rec.registered_by,
+            )
+            cls._registry[clean_id] = revoked_rec
+            logger.warning("Revoked worker endpoint for bank [%s]: %s", clean_id, reason)
 
     @classmethod
     def get_worker_endpoint(cls, bank_id: str) -> dict[str, Any] | None:
@@ -340,10 +474,39 @@ class WorkerEndpointRegistry:
             return res
 
     @classmethod
-    def unregister_worker_endpoint(cls, bank_id: str) -> None:
-        """Remove a worker endpoint upon explicit shutdown or disconnection."""
+    def unregister_worker_endpoint(
+        cls,
+        bank_id: str,
+        unregistration_token: str | None = None,
+        trusted_context: Any | None = None,
+        app_env: str | None = None,
+        bank_tokens: dict[str, str] | None = None,
+        token: str | None = None,
+    ) -> None:
+        """Remove a worker endpoint upon explicit shutdown or disconnection with authentication check."""
+        if not isinstance(bank_id, str) or not bank_id.strip():
+            raise TrainingProvenanceConfigurationError("Bank identifier must be a non-empty string.")
         clean_id = bank_id.strip().upper()
+        settings = get_settings()
+        env = (app_env or settings.app_env).strip().lower()
+        is_prod = env == "production"
+        effective_token = unregistration_token or token
+
         with cls._lock:
+            rec = cls._registry.get(clean_id)
+            if rec is None:
+                return
+
+            cls._authenticate_lifecycle_caller(
+                clean_id=clean_id,
+                token=effective_token,
+                trusted_context=trusted_context,
+                action_name="unregister_worker_endpoint",
+                existing=rec,
+                is_prod=is_prod,
+                bank_tokens=bank_tokens,
+            )
+
             cls._registry.pop(clean_id, None)
 
     @classmethod
@@ -351,6 +514,135 @@ class WorkerEndpointRegistry:
         """Clear all registered endpoints (useful for test isolation)."""
         with cls._lock:
             cls._registry.clear()
+
+    @classmethod
+    def clear_for_testing(cls) -> None:
+        """Alias for clear() used in test isolation."""
+        cls.clear()
+
+
+class SingleHostBankWorkerProvisioner:
+    """Authoritative single-host bank worker supervisor and provisioning authority.
+
+    Provides dedicated lifecycle ownership (spawn, register, heartbeat/monitor, terminate, and revoke)
+    for dedicated bank worker processes on a single physical/virtual host.
+
+    Architectural Boundary Guarantee:
+    - This provisioner manages workers on the LOCAL host via OS processes (e.g. Windows restricted tokens in production).
+    - Multi-host distributed worker execution across separate network nodes requires an out-of-process
+      mutual-TLS / gRPC control plane. Multi-host coordination is not faked through process-local dictionaries.
+    """
+
+    def __init__(
+        self,
+        db_url: str,
+        app_env: str = "production",
+        bank_tokens: dict[str, str] | None = None,
+        bank_db_urls: dict[str, str] | None = None,
+        bank_data_paths: dict[str, str] | None = None,
+        bank_partitions: dict[str, tuple[np.ndarray, np.ndarray]] | None = None,
+        bank_encryption_keys: dict[str, bytes] | None = None,
+    ) -> None:
+        self.db_url = db_url
+        self.app_env = app_env.strip().lower()
+        self.bank_tokens = dict(bank_tokens) if bank_tokens is not None else dict(getattr(get_settings(), "training_bank_tokens", {}))
+        self.bank_db_urls = bank_db_urls
+        self.bank_data_paths = bank_data_paths
+        self.bank_partitions = bank_partitions
+        self.bank_encryption_keys = bank_encryption_keys
+        self._processes: dict[str, Any] = {}
+        self._endpoints: dict[str, dict[str, Any]] = {}
+        self._is_provisioned = False
+
+    @property
+    def is_single_host(self) -> bool:
+        return True
+
+    def provision_bank_workers(
+        self,
+        participating_banks: list[str],
+    ) -> dict[str, dict[str, Any]]:
+        """Spawn and register dedicated bank worker processes with authentic bank tokens."""
+        from app.application.services.distributed_fl_service import spawn_bank_workers
+
+        clean_banks = [b.strip().upper() for b in participating_banks]
+        if not clean_banks:
+            raise TrainingProvenanceConfigurationError("Cannot provision workers: participating_banks list is empty.")
+
+        # Verify tokens exist for each requested bank
+        missing_tokens = [b for b in clean_banks if b not in self.bank_tokens or not self.bank_tokens[b]]
+        if missing_tokens:
+            raise TrainingProvenanceSecurityError(
+                f"Cannot provision workers: missing dedicated credentials for banks {sorted(missing_tokens)}."
+            )
+
+        procs, endpoints = spawn_bank_workers(
+            participating_banks=clean_banks,
+            bank_tokens=self.bank_tokens,
+            db_url=self.db_url,
+            bank_db_urls=self.bank_db_urls,
+            bank_data_paths=self.bank_data_paths,
+            bank_partitions=self.bank_partitions,
+            bank_encryption_keys=self.bank_encryption_keys,
+            app_env=self.app_env,
+        )
+
+        self._processes = procs
+        self._endpoints = endpoints
+
+        WorkerEndpointRegistry.register_provisioned_workers(
+            endpoints=endpoints,
+            processes=procs,
+            bank_tokens=self.bank_tokens,
+            app_env=self.app_env,
+            allow_replacement=True,
+        )
+        self._is_provisioned = True
+        return endpoints
+
+    def get_worker_status(self) -> dict[str, dict[str, Any]]:
+        """Audit status and liveness of managed worker processes."""
+        status_map: dict[str, dict[str, Any]] = {}
+        for b_id, proc in self._processes.items():
+            pid = getattr(proc, "pid", None) if not isinstance(proc, int) else proc
+            alive = _is_process_alive(pid) if pid else False
+            status_map[b_id] = {
+                "pid": pid,
+                "is_alive": alive,
+                "is_registered": WorkerEndpointRegistry.is_registered(b_id),
+            }
+        return status_map
+
+    def terminate_all(self, reason: str = "provisioner teardown") -> None:
+        """Gracefully shutdown and unregister all spawned bank worker processes with authentic credentials."""
+        for b_id, proc in list(self._processes.items()):
+            token = self.bank_tokens.get(b_id)
+            with contextlib.suppress(Exception):
+                WorkerEndpointRegistry.revoke_worker_endpoint(
+                    bank_id=b_id,
+                    revocation_token=token,
+                    reason=reason,
+                    app_env=self.app_env,
+                    bank_tokens=self.bank_tokens,
+                )
+            if hasattr(proc, "terminate"):
+                with contextlib.suppress(Exception):
+                    proc.terminate()
+            elif isinstance(proc, int) and _is_process_alive(proc):
+                if os.name == "nt":
+                    with contextlib.suppress(Exception):
+                        import win32process
+
+                        win32process.TerminateProcess(proc, 1)
+        self._processes.clear()
+        self._endpoints.clear()
+        self._is_provisioned = False
+
+    def __enter__(self) -> SingleHostBankWorkerProvisioner:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.terminate_all(reason="context exit")
 
 
 class OperationalFederationService:
@@ -709,12 +1001,14 @@ class OperationalFederationService:
         participating_banks: list[str] | None = None,
         num_rounds: int = 2,
         expected_unique_samples: int | None = None,
+        consortium_id: str = "cfi-consortium",
     ) -> dict[str, Any]:
         """Execute operational federated learning lifecycle with complete authority verification and lifecycle ownership."""
         settings = get_settings()
         active_env = (self._app_env or settings.app_env).strip()
         is_prod = active_env.lower() == "production"
 
+        clean_consortium_id = (consortium_id or "cfi-consortium").strip().lower()
         banks = [b.strip().upper() for b in participating_banks] if participating_banks else ["BANK_A", "BANK_B", "BANK_C"]
         clean_job_id = (job_id or f"job_fed_{uuid.uuid4().hex[:12]}").strip()
         clean_sim_id = (simulation_id or f"sim_{clean_job_id}").strip()
@@ -735,15 +1029,16 @@ class OperationalFederationService:
             holdout_data = self.resolve_holdout_data(is_prod)
 
             logger.info(
-                "Executing operational federation: job_id=%s, simulation_id=%s, env=%s, banks=%s, rounds=%d",
+                "Executing operational federation: job_id=%s, simulation_id=%s, consortium_id=%s, env=%s, banks=%s, rounds=%d",
                 clean_job_id,
                 clean_sim_id,
+                clean_consortium_id,
                 active_env,
                 banks,
                 num_rounds,
             )
 
-            # 2. Invoke canonical runner
+            # 2. Invoke canonical runner with explicit consortium_id
             if is_prod:
                 if comp_endpoint is None:
                     raise TrainingProvenanceConfigurationError(
@@ -765,6 +1060,7 @@ class OperationalFederationService:
                     registry_storage_dir=self._registry_storage_dir,
                     worker_pids=worker_pids,
                     app_env=active_env,
+                    consortium_id=clean_consortium_id,
                 )
             else:
                 # Non-production path: direct execution through manager
@@ -786,6 +1082,7 @@ class OperationalFederationService:
                     expected_unique_samples=expected_unique_samples,
                     registry_storage_dir=self._registry_storage_dir,
                     model_registry=self._model_registry,
+                    consortium_id=clean_consortium_id,
                 )
 
             # 3. Truthful execution status and evidence validation
@@ -801,10 +1098,20 @@ class OperationalFederationService:
             saved_version = result.get("saved_version")
             ver_number = saved_version.get("version") if isinstance(saved_version, dict) else None
 
+            # Verify saved candidate carried the authorized consortium scope
+            if isinstance(saved_version, dict):
+                saved_cid = saved_version.get("consortium_id")
+                if saved_cid and saved_cid.lower() != clean_consortium_id:
+                    raise TrainingProvenanceSecurityError(
+                        f"Consortium scope mismatch: Requested consortium '{clean_consortium_id}', "
+                        f"but model was saved under consortium '{saved_cid}'."
+                    )
+
             return {
                 "job_id": clean_job_id,
                 "training_run_id": training_run_id,
                 "simulation_id": clean_sim_id,
+                "consortium_id": clean_consortium_id,
                 "status": raw_status,
                 "is_verified": is_verified,
                 "metrics": result.get("metrics") or {},

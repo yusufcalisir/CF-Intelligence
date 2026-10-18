@@ -143,10 +143,40 @@ async def start_operational_federation_job(
             detail=f"Requested cohort size ({len(normalized_banks)}) is below minimum required members ({consortium.min_members_n}) for consortium '{target_consortium_id}'.",
         )
 
-    # 3. Enforce institution-scoped operator authorization
+    # 3. Enforce institution-scoped operator authorization bound to target consortium
     op_bank = (getattr(operator_user, "bank_id", "") or claims.get("bank_id", "") or "").strip().upper()
     op_clearance = int(getattr(operator_user, "clearance_level", 1) or claims.get("clearance_level", 1))
     op_roles = {r.lower().strip() for r in (getattr(operator_user, "roles", []) or claims.get("roles", []))}
+
+    if not op_bank:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Operator '{operator_user.username}' has no institutional affiliation (bank_id missing) and cannot initiate consortium training.",
+        )
+
+    clean_op_bank = op_bank.lower()
+
+    if clean_op_bank in consortium.removed_members:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Operator's institution '{op_bank}' was expelled or removed from consortium '{target_consortium_id}' and cannot administer or initiate training.",
+        )
+
+    op_member = consortium.members.get(clean_op_bank)
+    if op_member is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Operator's institution '{op_bank}' is not an authorized member of target consortium '{target_consortium_id}'. "
+                "Global administrative role does not grant authority over arbitrary consortia."
+            ),
+        )
+
+    if op_member.role == MemberRole.OBSERVER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Operator's institution '{op_bank}' is an OBSERVER in consortium '{target_consortium_id}' and lacks governance authority to initiate model training.",
+        )
 
     # Verifiable elevated authority check for cross-institution coordination:
     # Requires clearance >= 3 AND an admin / governance role.
@@ -162,18 +192,18 @@ async def start_operational_federation_job(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
-                    f"Initiating cross-institution federated training for cohort {sorted(normalized_banks)} "
+                    f"Initiating cross-institution federated training for cohort {sorted(normalized_banks)} in consortium '{target_consortium_id}' "
                     f"requires elevated consortium administrator authority (clearance >= 3, admin role). "
-                    f"Operator '{operator_user.username}' (institution: '{op_bank or 'none'}', clearance: {op_clearance}) "
+                    f"Operator '{operator_user.username}' (institution: '{op_bank}', clearance: {op_clearance}) "
                     "is not authorized for cross-institution coordination."
                 ),
             )
     else:
         # Single-institution run: operator must belong to that institution
-        if not op_bank or op_bank != normalized_banks[0]:
+        if op_bank != normalized_banks[0]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Operator from institution '{op_bank or 'none'}' is not authorized to initiate training for institution '{normalized_banks[0]}'.",
+                detail=f"Operator from institution '{op_bank}' is not authorized to initiate training for institution '{normalized_banks[0]}'.",
             )
 
     svc = OperationalFederationService()
@@ -186,6 +216,7 @@ async def start_operational_federation_job(
             participating_banks=normalized_banks,
             num_rounds=payload.num_rounds,
             expected_unique_samples=payload.expected_unique_samples,
+            consortium_id=target_consortium_id,
         )
 
         exec_status = result.get("status")
@@ -195,6 +226,19 @@ async def start_operational_federation_job(
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Federation execution failed or produced unverified execution state.",
+            )
+
+        # Invariant: Execution result must carry the verified authorized consortium scope
+        res_consortium = (result.get("consortium_id") or "").strip().lower()
+        if not res_consortium or res_consortium != target_consortium_id:
+            logger.error(
+                "Federation completion returned consortium scope mismatch: expected=%s, actual=%s",
+                target_consortium_id,
+                res_consortium,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Federation execution returned inconsistent consortium scope binding.",
             )
 
         saved_ver = result.get("saved_version")
@@ -207,6 +251,20 @@ async def start_operational_federation_job(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Federation execution produced no durable candidate model registration.",
             )
+
+        # Invariant: Durable candidate model registration must be bound to the target consortium
+        if isinstance(saved_ver, dict):
+            cand_consortium = (saved_ver.get("consortium_id") or "").strip().lower()
+            if cand_consortium and cand_consortium != target_consortium_id:
+                logger.error(
+                    "Candidate model registration consortium scope mismatch: expected=%s, actual=%s",
+                    target_consortium_id,
+                    cand_consortium,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Model candidate registration violates authoritative consortium scope.",
+                )
 
         artifact_sha = str(result.get("artifact_sha256") or result.get("final_artifact_sha256") or "").strip().lower()
         if len(artifact_sha) != 64 or not all(c in "0123456789abcdef" for c in artifact_sha):

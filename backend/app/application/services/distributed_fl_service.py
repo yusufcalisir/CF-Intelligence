@@ -1841,6 +1841,7 @@ class IsolatedCoordinatorClient:
         bank_data_paths: Any = None,
         signing_key_hex: str | None = None,
         pause_aggregation_checkpoint_file: str | None = None,
+        consortium_id: str | None = None,
     ) -> dict[str, Any]:
         req = {
             "command": "EXECUTE_FEDERATION",
@@ -1863,6 +1864,7 @@ class IsolatedCoordinatorClient:
             "signing_key_hex": signing_key_hex,
             "pause_aggregation_checkpoint_file": pause_aggregation_checkpoint_file,
             "has_worker_endpoints": bool(worker_endpoints),
+            "consortium_id": consortium_id,
         }
         try:
             self._conn.send(req)
@@ -2199,6 +2201,7 @@ def _run_isolated_coordinator_worker(
                     bank_data_paths=req.get("bank_data_paths"),
                     signing_key_hex=req.get("signing_key_hex"),
                     pause_aggregation_checkpoint_file=req.get("pause_aggregation_checkpoint_file"),
+                    consortium_id=req.get("consortium_id"),
                 )
 
                 if "worker_pids" in req:
@@ -2391,6 +2394,7 @@ def run_production_federation(
     registry_storage_dir: str | None = None,
     worker_pids: dict[str, int] | None = None,
     app_env: str = "production",
+    consortium_id: str | None = None,
 ) -> dict[str, Any]:
     """Canonical production entry point executing distributed federation under the mandatory restricted coordinator boundary."""
     proc, client = spawn_isolated_coordinator_process(app_env=app_env)
@@ -2410,6 +2414,7 @@ def run_production_federation(
             comp_service_endpoint=comp_service_endpoint,
             signing_authority=signing_authority,
             worker_pids=worker_pids,
+            consortium_id=consortium_id,
         )
     finally:
         client.terminate()
@@ -3895,6 +3900,7 @@ class DistributedFederatedTrainingManager:
         receipt_issuer: TrainingReceiptIssuer | None = None,
         receipt_verifier: TrainingReceiptVerifier | None = None,
         model_registry: ModelRegistry | None = None,
+        consortium_id: str | None = None,
     ) -> dict[str, Any]:
         """Execute complete distributed E2E federated training lifecycle across independent processes.
 
@@ -4239,6 +4245,7 @@ class DistributedFederatedTrainingManager:
                     feature_schema_version="v1.0",
                     feature_names=list(FEATURE_NAMES),
                     producer_id="FEDERATED_COORDINATOR",
+                    consortium_id=consortium_id,
                 )
                 receipt = active_issuer.issue_receipt(evidence=evidence, model_bytes=final_model_bytes)
 
@@ -4279,6 +4286,7 @@ class DistributedFederatedTrainingManager:
                 expected_feature_schema_version="v1.0",
                 expected_input_dim=NUM_FEATURES,
                 expected_feature_names=list(FEATURE_NAMES),
+                consortium_id=consortium_id,
             )
 
             # Confirm model is NOT champion
@@ -4296,6 +4304,7 @@ class DistributedFederatedTrainingManager:
                 "is_promoted_champion": is_promoted_champion,
                 "metrics": {"loss": final_loss, "auc_roc": val_auc, "val_loss": val_loss},
                 "final_artifact_sha256": final_artifact_sha256,
+                "consortium_id": consortium_id,
             }
 
         finally:

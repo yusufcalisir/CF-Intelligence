@@ -24,6 +24,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from app.application.schemas.simulation import (
@@ -31,12 +32,15 @@ from app.application.schemas.simulation import (
 )
 from app.application.services.distributed_fl_service import (
     DistributedFederatedTrainingManager,
+    setup_bank_private_storage,
+    spawn_bank_workers,
 )
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES
 from app.application.services.operational_federation_service import (
     OperationalFederationService,
+    SingleHostBankWorkerProvisioner,
     TrustedWorkerEndpoint,
     WorkerEndpointRegistry,
 )
@@ -179,6 +183,7 @@ class TestOperationalFederationIntegration:
             "job_id": "job_op_test_101",
             "training_run_id": "run_job_op_test_101",
             "simulation_id": "sim_op_test_101",
+            "consortium_id": "cfi-consortium",
             "status": "COMPLETED",
             "is_verified": True,
             "metrics": {"loss": 0.285, "auc_roc": 0.892, "val_loss": 0.291},
@@ -190,6 +195,7 @@ class TestOperationalFederationIntegration:
                 "provenance_type": "TRAINING_RECORDED",
                 "is_promoted": False,
                 "is_production_eligible": True,
+                "consortium_id": "cfi-consortium",
             },
             "is_promoted_champion": False,
             "coordinator_pid": 1100,
@@ -221,9 +227,11 @@ class TestOperationalFederationIntegration:
                 participating_banks=["BANK_A", "BANK_B"],
                 num_rounds=2,
                 expected_unique_samples=None,
+                consortium_id="cfi-consortium",
             )
 
             assert data["job_id"] == "job_op_test_101"
+            assert data["consortium_id"] == "cfi-consortium"
             assert data["status"] == "COMPLETED"
             assert data["is_verified"] is True
             assert data["model_version"] == 3
@@ -553,8 +561,8 @@ class TestOperationalFederationIntegration:
         assert resp_cross_with_self.status_code == 403
         assert "requires elevated consortium administrator authority" in resp_cross_with_self.json()["detail"]
 
-        # 4. Caller claiming CENTRAL bank identity but with clearance < 3 rejected
-        central_low_clearance_headers = _get_operator_auth_headers(
+        # 4. Caller claiming CENTRAL bank identity (not an authorized member of cfi-consortium) is rejected
+        central_headers = _get_operator_auth_headers(
             username="fake_central_operator",
             bank_id="CENTRAL",
             roles=["admin"],
@@ -563,10 +571,10 @@ class TestOperationalFederationIntegration:
         resp_fake_central = client.post(
             "/api/v1/training/federation/jobs",
             json={"participating_banks": ["BANK_A", "BANK_B"], "num_rounds": 1},
-            headers=central_low_clearance_headers,
+            headers=central_headers,
         )
         assert resp_fake_central.status_code == 403
-        assert "requires elevated consortium administrator authority" in resp_fake_central.json()["detail"]
+        assert "not an authorized member of target consortium" in resp_fake_central.json()["detail"]
 
         # 5. Duplicate participant identities rejected with 400
         resp_dup = client.post(
@@ -594,10 +602,10 @@ class TestOperationalFederationIntegration:
         )
         assert resp_empty.status_code in (400, 422)
 
-        # 8. Central/Consortium Admin (Clearance >= 3 and admin role) CAN initiate multi-bank training
+        # 8. Consortium Member Admin with elevated authority (Clearance >= 3 and admin role) CAN initiate multi-bank training
         consortium_admin_headers = _get_operator_auth_headers(
-            username="central_consortium_admin",
-            bank_id="consortium",
+            username="bank_a_consortium_admin",
+            bank_id="BANK_A",
             roles=["admin"],
             clearance_level=3,
         )
@@ -605,6 +613,7 @@ class TestOperationalFederationIntegration:
             "job_id": "job_consortium_01",
             "training_run_id": "run_01",
             "simulation_id": "sim_01",
+            "consortium_id": "cfi-consortium",
             "status": "COMPLETED",
             "is_verified": True,
             "metrics": {"auc_roc": 0.85},
@@ -699,10 +708,20 @@ class TestOperationalFederationIntegration:
                     pid=current_pid,
                     app_env="development",
                 )
-            assert "Cannot overwrite active verified worker" in str(exc_overwrite.value)
+            assert "Cannot overwrite active" in str(exc_overwrite.value)
 
-        # 7. Explicit revocation marks state REVOKED and removes from active endpoint retrieval
-        WorkerEndpointRegistry.revoke_worker_endpoint("BANK_A", reason="Key rotation")
+        # 7. Unauthenticated revocation of institutional worker is rejected
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_unauth_rev:
+            WorkerEndpointRegistry.revoke_worker_endpoint("BANK_A", reason="Unauthenticated key rotation")
+        assert "without valid credential" in str(exc_unauth_rev.value)
+
+        # Explicit authenticated revocation marks state REVOKED and removes from active endpoint retrieval
+        WorkerEndpointRegistry.revoke_worker_endpoint(
+            "BANK_A",
+            reason="Key rotation",
+            token="valid_secret_token_12345",
+            bank_tokens={"BANK_A": "valid_secret_token_12345"},
+        )
         assert not WorkerEndpointRegistry.is_registered("BANK_A")
         assert WorkerEndpointRegistry.get_worker_endpoint("BANK_A") is None
 
@@ -874,6 +893,7 @@ class TestOperationalFederationIntegration:
         # 1. Unverified execution result
         unverified_result = {
             "job_id": "job_unverified_01",
+            "consortium_id": "cfi-consortium",
             "status": "COMPLETED",
             "is_verified": False,
             "metrics": {},
@@ -892,6 +912,7 @@ class TestOperationalFederationIntegration:
         # 2. Missing artifact SHA-256
         no_sha_result = {
             "job_id": "job_nosha_01",
+            "consortium_id": "cfi-consortium",
             "status": "COMPLETED",
             "is_verified": True,
             "metrics": {},
@@ -910,6 +931,7 @@ class TestOperationalFederationIntegration:
         # 3. Malformed artifact SHA-256 (not 64 hex characters)
         bad_sha_result = {
             "job_id": "job_badsha_01",
+            "consortium_id": "cfi-consortium",
             "status": "COMPLETED",
             "is_verified": True,
             "metrics": {},
@@ -1053,6 +1075,7 @@ class TestOperationalFederationIntegration:
 
             assert result["status"] == "COMPLETED"
             assert result["is_verified"] is True
+            assert result["consortium_id"] == "cfi-consortium"
             assert len(result["artifact_sha256"]) == 64
             assert result["model_version"] is not None
 
@@ -1060,6 +1083,7 @@ class TestOperationalFederationIntegration:
             saved_ver = result["saved_version"]
             assert saved_ver["status"] == "inactive"
             assert saved_ver["provenance_type"] == "TRAINING_RECORDED"
+            assert saved_ver.get("consortium_id") == "cfi-consortium"
             assert result["is_promoted_champion"] is False
         finally:
             for proc in procs.values():
@@ -1068,5 +1092,355 @@ class TestOperationalFederationIntegration:
                     proc.join(timeout=2.0)
                 except Exception:
                     pass
+
+    def test_boundary_proof_a_cross_bank_token_misuse_rejected(self) -> None:
+        """Targeted Proof A: Cross-bank token misuse and generic worker credential rejection."""
+        WorkerEndpointRegistry.clear_for_testing()
+        q_in: mp.Queue[Any] = mp.Queue()
+        q_out: mp.Queue[Any] = mp.Queue()
+        tokens = {
+            "BANK_A": "auth_token_bank_a_secret_111",
+            "BANK_B": "auth_token_bank_b_secret_222",
+        }
+
+        with mock.patch("app.application.services.operational_federation_service.get_settings") as mock_set:
+            mock_s = mock.MagicMock()
+            mock_s.app_env = "production"
+            mock_s.training_bank_tokens = tokens
+            mock_s.training_worker_token = "generic_shared_training_worker_credential_999"
+            mock_set.return_value = mock_s
+
+            # 1. Bank A registration credentials cannot register Bank B
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_cross:
+                WorkerEndpointRegistry.register_worker_endpoint(
+                    bank_id="BANK_B",
+                    endpoint={"inbox": q_in, "outbox": q_out},
+                    pid=os.getpid(),
+                    registration_token="auth_token_bank_a_secret_111",
+                    app_env="production",
+                    bank_tokens=tokens,
+                )
+            assert "invalid institutional token" in str(exc_cross.value)
+
+            # 2. Missing Bank C authorization fails closed
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_missing:
+                WorkerEndpointRegistry.register_worker_endpoint(
+                    bank_id="BANK_C",
+                    endpoint={"inbox": q_in, "outbox": q_out},
+                    pid=os.getpid(),
+                    registration_token="some_unconfigured_token",
+                    app_env="production",
+                    bank_tokens=tokens,
+                )
+            assert "no authorized institutional credential configured" in str(exc_missing.value)
+
+            # 3. Generic shared worker credentials are insufficient for institution-scoped registration
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_generic:
+                WorkerEndpointRegistry.register_worker_endpoint(
+                    bank_id="BANK_A",
+                    endpoint={"inbox": q_in, "outbox": q_out},
+                    pid=os.getpid(),
+                    registration_token="generic_shared_training_worker_credential_999",
+                    app_env="production",
+                    bank_tokens=tokens,
+                )
+            assert "generic shared worker credentials are insufficient" in str(exc_generic.value)
+
+            # 4. Authentic Bank B provisioner CAN register Bank B with legitimate dedicated token
+            WorkerEndpointRegistry.register_worker_endpoint(
+                bank_id="BANK_B",
+                endpoint={"inbox": q_in, "outbox": q_out},
+                pid=os.getpid(),
+                registration_token="auth_token_bank_b_secret_222",
+                app_env="production",
+                bank_tokens=tokens,
+            )
+            assert WorkerEndpointRegistry.is_registered("BANK_B")
+            ep_b = WorkerEndpointRegistry.get_trusted_endpoint("BANK_B")
+            assert ep_b is not None
+            assert ep_b.attestation_type == "institutional_token"
+            assert ep_b.state == "ACTIVE"
+
+    def test_boundary_proof_b_unauthorized_live_worker_replacement_rejected(self) -> None:
+        """Targeted Proof B: Unauthorized live-worker replacement rejected; verified ownership preserved."""
+        WorkerEndpointRegistry.clear_for_testing()
+        q_in1: mp.Queue[Any] = mp.Queue()
+        q_out1: mp.Queue[Any] = mp.Queue()
+        q_in2: mp.Queue[Any] = mp.Queue()
+        q_out2: mp.Queue[Any] = mp.Queue()
+        tokens = {"BANK_A": "bank_a_active_token_1234"}
+
+        # 1. Register active worker with live PID
+        WorkerEndpointRegistry.register_worker_endpoint(
+            bank_id="BANK_A",
+            endpoint={"inbox": q_in1, "outbox": q_out1},
+            pid=os.getpid(),
+            registration_token="bank_a_active_token_1234",
+            app_env="production",
+            bank_tokens=tokens,
+        )
+        assert WorkerEndpointRegistry.is_registered("BANK_A")
+
+        # 2. Overwrite attempt on active live worker without allow_replacement=True fails closed
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_no_replace:
+            WorkerEndpointRegistry.register_worker_endpoint(
+                bank_id="BANK_A",
+                endpoint={"inbox": q_in2, "outbox": q_out2},
+                pid=os.getpid(),
+                registration_token="bank_a_active_token_1234",
+                app_env="production",
+                bank_tokens=tokens,
+                allow_replacement=False,
+            )
+        assert "Cannot overwrite active live worker" in str(exc_no_replace.value)
+
+        # 3. Unauthenticated development_direct attempt to replace verified institutional worker fails closed
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_unauth_downgrade:
+            WorkerEndpointRegistry.register_worker_endpoint(
+                bank_id="BANK_A",
+                endpoint={"inbox": q_in2, "outbox": q_out2},
+                pid=os.getpid(),
+                app_env="development",
+                allow_replacement=True,
+            )
+        assert "Cannot overwrite active verified worker" in str(exc_unauth_downgrade.value)
+
+    def test_boundary_proof_c_worker_revocation_and_legitimate_reregistration(self) -> None:
+        """Targeted Proof C: Worker revocation and legitimate re-registration lifecycle."""
+        WorkerEndpointRegistry.clear_for_testing()
+        q_in: mp.Queue[Any] = mp.Queue()
+        q_out: mp.Queue[Any] = mp.Queue()
+        tokens = {"BANK_A": "token_lifecycle_bank_a_555"}
+
+        WorkerEndpointRegistry.register_worker_endpoint(
+            bank_id="BANK_A",
+            endpoint={"inbox": q_in, "outbox": q_out},
+            pid=os.getpid(),
+            registration_token="token_lifecycle_bank_a_555",
+            app_env="production",
+            bank_tokens=tokens,
+        )
+
+        # 1. Unauthenticated revocation attempt is rejected
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_unauth:
+            WorkerEndpointRegistry.revoke_worker_endpoint("BANK_A", reason="Unauthorized attempt")
+        assert "without valid credential" in str(exc_unauth.value)
+
+        # 2. Revocation with mismatched token is rejected
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_mismatch:
+            WorkerEndpointRegistry.revoke_worker_endpoint(
+                "BANK_A",
+                reason="Wrong token attempt",
+                token="wrong_token_777",
+                bank_tokens=tokens,
+            )
+        assert "invalid institutional token" in str(exc_mismatch.value)
+
+        # 3. Authentic revocation with Bank A token succeeds
+        WorkerEndpointRegistry.revoke_worker_endpoint(
+            "BANK_A",
+            reason="Authorized key rotation",
+            token="token_lifecycle_bank_a_555",
+            bank_tokens=tokens,
+        )
+        assert not WorkerEndpointRegistry.is_registered("BANK_A")
+        assert WorkerEndpointRegistry.get_worker_endpoint("BANK_A") is None
+
+        # 4. Legitimate re-registration with authentic token and allow_replacement=True succeeds
+        WorkerEndpointRegistry.register_worker_endpoint(
+            bank_id="BANK_A",
+            endpoint={"inbox": q_in, "outbox": q_out},
+            pid=os.getpid(),
+            registration_token="token_lifecycle_bank_a_555",
+            app_env="production",
+            bank_tokens=tokens,
+            allow_replacement=True,
+        )
+        assert WorkerEndpointRegistry.is_registered("BANK_A")
+        ep_re = WorkerEndpointRegistry.get_trusted_endpoint("BANK_A")
+        assert ep_re is not None
+        assert ep_re.state == "ACTIVE"
+
+    def test_boundary_proof_d_single_host_worker_provisioner_lifecycle(self, tmp_path: Any) -> None:
+        """Targeted Proof D: Authenticated single-host worker provisioning through supported runtime owner."""
+        WorkerEndpointRegistry.clear_for_testing()
+        db_file = os.path.join(str(tmp_path), "test_provisioner.db")
+        vault_root = os.path.join(str(tmp_path), "vaults")
+        SQLiteTrainingJobAuthority(db_target=db_file)
+
+        tokens = {
+            "BANK_A": "prov_token_a_123",
+            "BANK_B": "prov_token_b_456",
+        }
+        enc_keys = {b: Fernet.generate_key() for b in tokens}
+        data_paths = {}
+
+        np.random.seed(42)
+        for b_id in tokens:
+            X_part = np.random.randn(20, NUM_FEATURES).astype(np.float32)
+            y_part = np.random.randint(0, 2, size=20).astype(np.float32)
+            data_paths[b_id] = setup_bank_private_storage(
+                bank_storage_dir=vault_root,
+                bank_id=b_id,
+                X_partition=X_part,
+                y_partition=y_part,
+                bank_token=tokens[b_id],
+                bank_encryption_key=enc_keys[b_id],
+            )
+
+        provisioner = SingleHostBankWorkerProvisioner(
+            bank_tokens=tokens,
+            db_url=db_file,
+            bank_data_paths=data_paths,
+            bank_encryption_keys=enc_keys,
+            app_env="development",
+        )
+
+        with provisioner:
+            endpoints = provisioner.provision_bank_workers(["BANK_A", "BANK_B"])
+            assert len(endpoints) == 2
+            assert "BANK_A" in endpoints and "BANK_B" in endpoints
+            assert WorkerEndpointRegistry.is_registered("BANK_A")
+            assert WorkerEndpointRegistry.is_registered("BANK_B")
+
+            status = provisioner.get_worker_status()
+            assert "BANK_A" in status and "BANK_B" in status
+            assert status["BANK_A"]["is_alive"] is True
+            assert status["BANK_B"]["is_alive"] is True
+            assert status["BANK_A"]["pid"] > 0
+            assert status["BANK_B"]["pid"] > 0
+
+        # After context exit, workers are cleanly terminated and unregistered
+        assert not WorkerEndpointRegistry.is_registered("BANK_A")
+        assert not WorkerEndpointRegistry.is_registered("BANK_B")
+
+    def test_boundary_proof_e_consortium_specific_operator_authorization(self) -> None:
+        """Targeted Proof E: Operator authorization bound to specific target consortium."""
+        # 1. Non-member operator attempting to initiate training on cfi-consortium is rejected with 403
+        outsider_headers = _get_operator_auth_headers(
+            username="external_operator",
+            bank_id="BANK_OUTSIDER",
+            roles=["admin", "security_admin"],
+            clearance_level=3,
+        )
+        resp_outsider = client.post(
+            "/api/v1/training/federation/jobs",
+            json={"participating_banks": ["BANK_A", "BANK_B"], "num_rounds": 1},
+            headers=outsider_headers,
+        )
+        assert resp_outsider.status_code == 403
+        assert "not an authorized member of target consortium" in resp_outsider.json()["detail"]
+
+        # 2. Member operator with clearance < 3 attempting cross-bank training is rejected with 403
+        member_low_clearance_headers = _get_operator_auth_headers(
+            username="bank_a_analyst",
+            bank_id="BANK_A",
+            roles=["admin"],
+            clearance_level=2,
+        )
+        resp_low = client.post(
+            "/api/v1/training/federation/jobs",
+            json={"participating_banks": ["BANK_A", "BANK_B"], "num_rounds": 1},
+            headers=member_low_clearance_headers,
+        )
+        assert resp_low.status_code == 403
+        assert "requires elevated consortium administrator authority" in resp_low.json()["detail"]
+
+    def test_boundary_proof_f_consortium_scope_binding_to_execution_and_candidate(self) -> None:
+        """Targeted Proof F: Immutable consortium scope binding to execution and candidate identity."""
+        headers = _get_operator_auth_headers(
+            username="consortium_admin",
+            bank_id="BANK_A",
+            roles=["admin"],
+            clearance_level=3,
+        )
+
+        # 1. Mismatched consortium in execution result rejected with 500
+        mismatched_result = {
+            "job_id": "job_mismatch_01",
+            "consortium_id": "malicious-foreign-consortium",
+            "status": "COMPLETED",
+            "is_verified": True,
+            "metrics": {},
+            "artifact_sha256": "d" * 64,
+            "model_version": 2,
+            "saved_version": {"version": 2, "consortium_id": "cfi-consortium"},
+        }
+        with mock.patch.object(OperationalFederationService, "execute_operational_federation", return_value=mismatched_result):
+            resp = client.post(
+                "/api/v1/training/federation/jobs",
+                json={"participating_banks": ["BANK_A", "BANK_B"], "num_rounds": 1},
+                headers=headers,
+            )
+            assert resp.status_code == 500
+            assert "inconsistent consortium scope binding" in resp.json()["detail"]
+
+        # 2. Candidate model in registry carrying conflicting consortium scope rejected with 500
+        conflicting_candidate_result = {
+            "job_id": "job_cand_mismatch_01",
+            "consortium_id": "cfi-consortium",
+            "status": "COMPLETED",
+            "is_verified": True,
+            "metrics": {},
+            "artifact_sha256": "e" * 64,
+            "model_version": 2,
+            "saved_version": {"version": 2, "consortium_id": "unauthorized-consortium"},
+        }
+        with mock.patch.object(OperationalFederationService, "execute_operational_federation", return_value=conflicting_candidate_result):
+            resp_cand = client.post(
+                "/api/v1/training/federation/jobs",
+                json={"participating_banks": ["BANK_A", "BANK_B"], "num_rounds": 1},
+                headers=headers,
+            )
+            assert resp_cand.status_code == 500
+            assert "violates authoritative consortium scope" in resp_cand.json()["detail"]
+
+    def test_boundary_proof_h_no_receipt_or_candidate_on_authorization_failure(self, tmp_path: Any) -> None:
+        """Targeted Proof H: No receipt or production-eligible candidate created when worker resolution fails."""
+        WorkerEndpointRegistry.clear_for_testing()
+        db_file = os.path.join(str(tmp_path), "test_fail_closed.db")
+        registry_dir = os.path.join(str(tmp_path), "registry")
+        SQLiteTrainingJobAuthority(db_target=db_file)
+
+        svc = OperationalFederationService(
+            db_url=db_file,
+            registry_storage_dir=registry_dir,
+            app_env="production",
+        )
+
+        # 1. Missing coordinator token in production fails closed
+        with pytest.raises(TrainingProvenanceConfigurationError) as exc_coord:
+            svc.execute_operational_federation(
+                job_id="job_fail_closed_999",
+                participating_banks=["BANK_A", "BANK_B"],
+                num_rounds=1,
+            )
+        assert "Production training coordinator credential is not configured" in str(exc_coord.value)
+
+        # 2. In production mode, missing worker endpoints raises fail-closed security error
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_missing_workers:
+            svc.resolve_worker_endpoints(["BANK_A", "BANK_B"], is_prod=True)
+        assert "Production bank worker endpoints are not provisioned or registered" in str(exc_missing_workers.value)
+
+        # 3. Development execution without worker endpoints aborts fail-closed
+        dev_svc = OperationalFederationService(
+            db_url=db_file,
+            registry_storage_dir=registry_dir,
+            app_env="development",
+        )
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_dev_abort:
+            dev_svc.execute_operational_federation(
+                job_id="job_fail_closed_999",
+                participating_banks=["BANK_A", "BANK_B"],
+                num_rounds=1,
+            )
+        assert "aborted" in str(exc_dev_abort.value)
+
+        # 4. Verify no candidate model was saved in the ModelRegistry
+        reg = ModelRegistry(storage_dir=registry_dir)
+        assert reg.resolve_and_verify_champion("job_fail_closed_999") is None
+        assert reg._load_manifest("job_fail_closed_999") == []
+        assert not os.path.exists(os.path.join(reg.registry_root, "job_fail_closed_999"))
+
 
 
