@@ -31,10 +31,11 @@ from app.presentation.routers.simulation import _simulation_events, _simulation_
 
 logger = logging.getLogger(__name__)
 
+from app.application.services.consortium_service import ConsortiumGovernanceService
+from app.domain.consortium_governance import ConsortiumStatus, MemberRole
+
 router = APIRouter(prefix="/api/v1/training", tags=["training"])
 api_router = APIRouter(prefix="/v1/training", tags=["training"])
-
-SUPPORTED_CONSORTIUM_INSTITUTIONS: frozenset[str] = frozenset({"BANK_A", "BANK_B", "BANK_C"})
 
 
 def _sanitize_client_error(raw_msg: str, default_msg: str) -> str:
@@ -57,8 +58,9 @@ async def start_operational_federation_job(
 
     Guarantees:
     - Cryptographically authenticates initiating operator via live RBAC (requires admin, ml_lead, or ml_engineer role with clearance level >= 2).
-    - Enforces authoritative institutional scope: bank-bound operators cannot initiate training excluding their institution.
-    - Validates participant consortium membership and strictly rejects duplicates or unregistered institutions.
+    - Resolves cohort against durable authoritative ConsortiumGovernanceService state; rejects unknown, removed, or observer institutions.
+    - Enforces institutional authorization: cross-institution runs require verified elevated consortium admin authority (clearance >= 3).
+    - Never infers authority solely from caller-controlled bank labels (e.g. CENTRAL, CONSORTIUM).
     - Resolves authorities, credentials, vault paths, and pre-provisioned bank endpoints strictly server-side.
     - Executes asynchronously via threadpool offloading to avoid blocking the event loop.
     - Never accepts private keys, database URLs, bank credentials, raw datasets, or process handles from clients.
@@ -74,7 +76,22 @@ async def start_operational_federation_job(
     )
     logger.info("Operator [%s] authenticated for operational federation job", operator_user.username)
 
-    # 1. Validate participant consortium list
+    # 1. Resolve and validate active consortium
+    target_consortium_id = (payload.consortium_id or "cfi-consortium").strip().lower()
+    consortium_svc = ConsortiumGovernanceService()
+    consortium = consortium_svc.get_consortium(target_consortium_id)
+    if consortium is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Authoritative consortium '{target_consortium_id}' does not exist or has not been provisioned.",
+        )
+    if consortium.status != ConsortiumStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Consortium '{target_consortium_id}' is not in ACTIVE state (current status: {consortium.status.value}).",
+        )
+
+    # 2. Validate participant cohort against authoritative consortium
     raw_participants = payload.participating_banks
     if not raw_participants:
         raise HTTPException(
@@ -91,40 +108,72 @@ async def start_operational_federation_job(
                 detail="Invalid participant bank identity in training request: non-empty string required.",
             )
         norm_b = b.strip().upper()
+        clean_bank_id = norm_b.lower()
         if norm_b in seen_banks:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Duplicate participant bank identity '{norm_b}' in training request.",
             )
-        if norm_b not in SUPPORTED_CONSORTIUM_INSTITUTIONS:
+
+        if clean_bank_id in consortium.removed_members:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Institution '{norm_b}' was expelled or removed from consortium '{target_consortium_id}' and cannot participate.",
+            )
+
+        member = consortium.members.get(clean_bank_id)
+        if member is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unrecognized or unregistered consortium participant: '{norm_b}'.",
+                detail=f"Institution '{norm_b}' is not an authorized member of consortium '{target_consortium_id}'.",
             )
+
+        if member.role == MemberRole.OBSERVER:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Institution '{norm_b}' is an OBSERVER in consortium '{target_consortium_id}' and cannot participate in model training.",
+            )
+
         seen_banks.add(norm_b)
         normalized_banks.append(norm_b)
 
-    # 2. Enforce institution-scoped operator authorization
+    if len(normalized_banks) < consortium.min_members_n:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Requested cohort size ({len(normalized_banks)}) is below minimum required members ({consortium.min_members_n}) for consortium '{target_consortium_id}'.",
+        )
+
+    # 3. Enforce institution-scoped operator authorization
     op_bank = (getattr(operator_user, "bank_id", "") or claims.get("bank_id", "") or "").strip().upper()
     op_clearance = int(getattr(operator_user, "clearance_level", 1) or claims.get("clearance_level", 1))
     op_roles = {r.lower().strip() for r in (getattr(operator_user, "roles", []) or claims.get("roles", []))}
-    is_consortium_admin = ("admin" in op_roles and op_clearance >= 3) or op_bank in {"CENTRAL", "CONSORTIUM", "REGULATOR"}
 
-    if not is_consortium_admin:
-        if not op_bank:
+    # Verifiable elevated authority check for cross-institution coordination:
+    # Requires clearance >= 3 AND an admin / governance role.
+    # NEVER infer elevated authority solely from bank labels like "CENTRAL", "CONSORTIUM", or "REGULATOR".
+    has_elevated_consortium_admin = op_clearance >= 3 and bool(op_roles & {"admin", "consortium_admin", "security_admin"})
+
+    # Check if run includes institutions other than operator's own institution:
+    # Never infer permission to involve another institution simply because initiator includes their own bank.
+    requires_cross_institution_authority = any(b != op_bank for b in normalized_banks)
+
+    if requires_cross_institution_authority:
+        if not has_elevated_consortium_admin:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Operator has no authoritative institutional binding and cannot initiate federated training.",
+                detail=(
+                    f"Initiating cross-institution federated training for cohort {sorted(normalized_banks)} "
+                    f"requires elevated consortium administrator authority (clearance >= 3, admin role). "
+                    f"Operator '{operator_user.username}' (institution: '{op_bank or 'none'}', clearance: {op_clearance}) "
+                    "is not authorized for cross-institution coordination."
+                ),
             )
-        if op_bank not in SUPPORTED_CONSORTIUM_INSTITUTIONS:
+    else:
+        # Single-institution run: operator must belong to that institution
+        if not op_bank or op_bank != normalized_banks[0]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Operator institution '{op_bank}' is not an authorized consortium institution.",
-            )
-        if op_bank not in seen_banks:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Operator from institution '{op_bank}' is not authorized to initiate training for cohort {normalized_banks} excluding their own institution.",
+                detail=f"Operator from institution '{op_bank or 'none'}' is not authorized to initiate training for institution '{normalized_banks[0]}'.",
             )
 
     svc = OperationalFederationService()
@@ -159,18 +208,19 @@ async def start_operational_federation_job(
                 detail="Federation execution produced no durable candidate model registration.",
             )
 
-        artifact_sha = result.get("artifact_sha256") or result.get("final_artifact_sha256")
-        if not artifact_sha:
-            logger.error("Federation completion reported success but artifact SHA-256 is missing.")
+        artifact_sha = str(result.get("artifact_sha256") or result.get("final_artifact_sha256") or "").strip().lower()
+        if len(artifact_sha) != 64 or not all(c in "0123456789abcdef" for c in artifact_sha):
+            logger.error("Federation completion reported invalid artifact digest: %s", artifact_sha)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Federation execution produced no verified artifact digest.",
+                detail="Federation execution produced no verified artifact digest (SHA-256).",
             )
 
         return OperationalFederationResponse(
             job_id=result["job_id"],
             training_run_id=result.get("training_run_id", ""),
             simulation_id=result.get("simulation_id", payload.simulation_id or ""),
+            consortium_id=target_consortium_id,
             status="COMPLETED",
             is_verified=True,
             metrics=result.get("metrics", {}),

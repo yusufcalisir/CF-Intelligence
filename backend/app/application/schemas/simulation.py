@@ -482,6 +482,10 @@ class OperationalFederationRequest(BaseModel):
         le=50,
         description="Number of federated aggregation rounds",
     )
+    consortium_id: str | None = Field(
+        default="cfi-consortium",
+        description="Target authoritative consortium identifier for cohort membership authorization",
+    )
     expected_unique_samples: int | None = Field(
         default=None,
         ge=1,
@@ -495,6 +499,7 @@ class OperationalFederationResponse(BaseModel):
     job_id: str
     training_run_id: str
     simulation_id: str
+    consortium_id: str = "cfi-consortium"
     status: str
     is_verified: bool
     metrics: dict[str, float] = Field(default_factory=dict)

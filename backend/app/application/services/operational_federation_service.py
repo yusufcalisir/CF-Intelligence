@@ -26,6 +26,7 @@ Security & Architectural Contracts Enforced:
 from __future__ import annotations
 
 import contextlib
+import hmac
 import logging
 import os
 import threading
@@ -89,14 +90,22 @@ class TrustedWorkerEndpoint:
     pid: int | None
     registered_at: float
     capabilities: tuple[str, ...]
+    attestation_type: str = "unauthenticated"
+    state: str = "ACTIVE"
+    registered_by: str = "provisioner"
 
 
 class WorkerEndpointRegistry:
     """Thread-safe registry of authenticated, provisioned bank worker communication endpoints.
 
-    In production multi-institution topologies, independent bank worker daemons establish
-    authenticated IPC/network proxies. Their endpoints are recorded here so the coordinator
-    can dispatch training rounds without possessing bank-private credentials or data paths.
+    Topology & Distribution Model:
+    This in-memory registry is authoritative strictly within the single-node / local-supervisor
+    topology (e.g. standalone server, development, or containerized supervisor where bank worker
+    daemons and the operational coordinator run within the same application process supervisor).
+    In multi-host distributed clusters where API nodes and worker hosts reside in disjoint address
+    spaces without shared memory, worker registration must be backed by an external durable service
+    mesh or message broker. If worker endpoints for required institutions are not registered in the
+    active process address space, operational federation fails closed.
     """
 
     _lock = threading.Lock()
@@ -108,8 +117,12 @@ class WorkerEndpointRegistry:
         bank_id: str,
         endpoint: dict[str, Any],
         pid: int | None = None,
+        registration_token: str | None = None,
+        trusted_context: Any | None = None,
+        registered_by: str = "provisioner",
+        app_env: str | None = None,
     ) -> None:
-        """Register a provisioned bank worker endpoint with capability and liveness verification."""
+        """Register a provisioned bank worker endpoint with capability, institutional credential, and liveness verification."""
         if not isinstance(bank_id, str) or not bank_id.strip():
             raise TrainingProvenanceConfigurationError("Bank identifier must be a non-empty string.")
 
@@ -135,6 +148,53 @@ class WorkerEndpointRegistry:
                 f"Cannot register dead/terminated worker process PID {pid} for bank [{clean_id}]."
             )
 
+        settings = get_settings()
+        env = (app_env or settings.app_env).strip().lower()
+        is_prod = env == "production"
+
+        attestation_type = "unauthenticated"
+        # Verify institutional authority: registration_token or trusted_context
+        if trusted_context is not None:
+            from app.application.services.model_registry import verify_trusted_internal_context
+
+            is_valid_ctx, ctx_reason = verify_trusted_internal_context(
+                trusted_context,
+                expected_action="register_worker_endpoint",
+                expected_service_name="bank_worker_provisioner",
+                expected_bank_id=clean_id,
+                consume_nonce=True,
+            )
+            if not is_valid_ctx:
+                raise TrainingProvenanceSecurityError(
+                    f"Institutional attestation rejected for bank [{clean_id}]: {ctx_reason}"
+                )
+            attestation_type = "trusted_context"
+        elif registration_token is not None:
+            bank_tokens = settings.training_bank_tokens or {}
+            expected_token = bank_tokens.get(clean_id) or settings.training_worker_token
+            if not expected_token:
+                if is_prod:
+                    raise TrainingProvenanceSecurityError(
+                        f"Registration rejected for bank [{clean_id}]: no authorized institutional token configured in production."
+                    )
+                if not registration_token.strip():
+                    raise TrainingProvenanceSecurityError(
+                        f"Registration rejected for bank [{clean_id}]: empty registration token."
+                    )
+            else:
+                if not hmac.compare_digest(registration_token.strip(), expected_token.strip()):
+                    raise TrainingProvenanceSecurityError(
+                        f"Registration authentication failed for bank [{clean_id}]: invalid institutional token."
+                    )
+            attestation_type = "institutional_token"
+        else:
+            if is_prod:
+                raise TrainingProvenanceSecurityError(
+                    f"Registration rejected for bank [{clean_id}]: production requires authentic institutional "
+                    "registration token or verified internal attestation context. Plain unauthenticated registration forbidden."
+                )
+            attestation_type = "development_direct"
+
         caps = ("inbox", "outbox")
         record = TrustedWorkerEndpoint(
             bank_id=clean_id,
@@ -142,19 +202,89 @@ class WorkerEndpointRegistry:
             pid=pid,
             registered_at=time.time(),
             capabilities=caps,
+            attestation_type=attestation_type,
+            state="ACTIVE",
+            registered_by=registered_by,
         )
 
         with cls._lock:
+            # Overwrite protection: prevent unauthorized overwriting of active, alive worker
+            existing = cls._registry.get(clean_id)
+            if existing is not None and existing.state == "ACTIVE":
+                if existing.pid is not None and _is_process_alive(existing.pid):
+                    if attestation_type == "development_direct" and existing.attestation_type != "development_direct":
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot overwrite active verified worker for bank [{clean_id}] with unauthenticated registration."
+                        )
+
             cls._registry[clean_id] = record
-            logger.info("Registered trusted worker endpoint for bank [%s] (pid=%s)", clean_id, pid)
+            logger.info(
+                "Registered trusted worker endpoint for bank [%s] (pid=%s, attestation=%s)",
+                clean_id,
+                pid,
+                attestation_type,
+            )
 
     @classmethod
-    def get_worker_endpoint(cls, bank_id: str) -> dict[str, Any] | None:
-        """Retrieve pre-provisioned endpoint for a bank, evicting stale/dead registrations."""
+    def register_provisioned_workers(
+        cls,
+        endpoints: dict[str, dict[str, Any]],
+        processes: dict[str, Any] | None = None,
+        pids: dict[str, int] | None = None,
+        bank_tokens: dict[str, str] | None = None,
+        app_env: str | None = None,
+    ) -> None:
+        """Batch registration helper for the legitimate bank worker provisioner (e.g. spawn_bank_workers)."""
+        tokens = bank_tokens or {}
+        for b_id, ep in endpoints.items():
+            clean_b = b_id.strip().upper()
+            pid = None
+            if pids and clean_b in pids:
+                pid = pids[clean_b]
+            elif processes and clean_b in processes:
+                proc = processes[clean_b]
+                pid = getattr(proc, "pid", None) if not isinstance(proc, int) else proc
+            token = tokens.get(clean_b) or tokens.get(b_id)
+            cls.register_worker_endpoint(
+                bank_id=clean_b,
+                endpoint=ep,
+                pid=pid,
+                registration_token=token,
+                registered_by="spawn_bank_workers",
+                app_env=app_env,
+            )
+
+    @classmethod
+    def revoke_worker_endpoint(
+        cls,
+        bank_id: str,
+        reason: str = "revoked by authority",
+    ) -> None:
+        """Explicitly revoke a registered bank worker endpoint upon security event or node withdrawal."""
         clean_id = bank_id.strip().upper()
         with cls._lock:
             rec = cls._registry.get(clean_id)
-            if rec is None:
+            if rec is not None:
+                revoked_rec = TrustedWorkerEndpoint(
+                    bank_id=rec.bank_id,
+                    endpoint=rec.endpoint,
+                    pid=rec.pid,
+                    registered_at=rec.registered_at,
+                    capabilities=rec.capabilities,
+                    attestation_type=rec.attestation_type,
+                    state="REVOKED",
+                    registered_by=rec.registered_by,
+                )
+                cls._registry[clean_id] = revoked_rec
+                logger.warning("Revoked worker endpoint for bank [%s]: %s", clean_id, reason)
+
+    @classmethod
+    def get_worker_endpoint(cls, bank_id: str) -> dict[str, Any] | None:
+        """Retrieve pre-provisioned endpoint for a bank, evicting stale/dead/revoked registrations."""
+        clean_id = bank_id.strip().upper()
+        with cls._lock:
+            rec = cls._registry.get(clean_id)
+            if rec is None or rec.state != "ACTIVE":
                 return None
 
             # Re-verify process liveness if PID is tracked
@@ -180,7 +310,7 @@ class WorkerEndpointRegistry:
         clean_id = bank_id.strip().upper()
         with cls._lock:
             rec = cls._registry.get(clean_id)
-            if rec is None:
+            if rec is None or rec.state != "ACTIVE":
                 return None
             if rec.pid is not None and not _is_process_alive(rec.pid):
                 cls._registry.pop(clean_id, None)
@@ -205,7 +335,7 @@ class WorkerEndpointRegistry:
             for b in bank_ids:
                 clean_id = b.strip().upper()
                 rec = cls._registry.get(clean_id)
-                if rec and rec.pid is not None and _is_process_alive(rec.pid):
+                if rec and rec.state == "ACTIVE" and rec.pid is not None and _is_process_alive(rec.pid):
                     res[clean_id] = rec.pid
             return res
 
@@ -590,24 +720,29 @@ class OperationalFederationService:
         clean_sim_id = (simulation_id or f"sim_{clean_job_id}").strip()
         training_run_id = f"run_{clean_job_id}"
 
-        # 1. Resolve server-side authoritative dependencies
-        coordinator_token = self.resolve_coordinator_token(is_prod)
-        db_url = self.resolve_db_url(is_prod)
-        worker_endpoints, worker_pids = self.resolve_worker_endpoints(banks, is_prod)
-        signing_auth, spawned_signing = self.resolve_signing_authority(coordinator_token, db_url, active_env, is_prod)
-        comp_auth, comp_endpoint, spawned_comp = self.resolve_completion_authority(coordinator_token, active_env, is_prod)
-        holdout_data = self.resolve_holdout_data(is_prod)
-
-        logger.info(
-            "Executing operational federation: job_id=%s, simulation_id=%s, env=%s, banks=%s, rounds=%d",
-            clean_job_id,
-            clean_sim_id,
-            active_env,
-            banks,
-            num_rounds,
-        )
+        signing_auth: Any | None = None
+        spawned_signing: bool = False
+        comp_auth: IsolatedTrainingCompletionAuthority | None = None
+        spawned_comp: bool = False
 
         try:
+            # 1. Resolve server-side authoritative dependencies
+            coordinator_token = self.resolve_coordinator_token(is_prod)
+            db_url = self.resolve_db_url(is_prod)
+            worker_endpoints, worker_pids = self.resolve_worker_endpoints(banks, is_prod)
+            signing_auth, spawned_signing = self.resolve_signing_authority(coordinator_token, db_url, active_env, is_prod)
+            comp_auth, comp_endpoint, spawned_comp = self.resolve_completion_authority(coordinator_token, active_env, is_prod)
+            holdout_data = self.resolve_holdout_data(is_prod)
+
+            logger.info(
+                "Executing operational federation: job_id=%s, simulation_id=%s, env=%s, banks=%s, rounds=%d",
+                clean_job_id,
+                clean_sim_id,
+                active_env,
+                banks,
+                num_rounds,
+            )
+
             # 2. Invoke canonical runner
             if is_prod:
                 if comp_endpoint is None:

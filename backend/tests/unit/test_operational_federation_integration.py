@@ -17,6 +17,7 @@ import os
 import shutil
 import tempfile
 import threading
+import time
 import unittest.mock as mock
 from typing import Any
 
@@ -76,6 +77,7 @@ def _get_operator_auth_headers(
     user.clearance_level = clearance_level
     user.is_active = is_active
     user.status = "active" if is_active else "suspended"
+    auth_svc.identity_store.save_user(user)
 
     bundle = auth_svc.create_token_bundle(user)
     return {"Authorization": f"Bearer {bundle.access_token}"}
@@ -168,8 +170,8 @@ class TestOperationalFederationIntegration:
         """Criteria A & H: Authorized operator successfully triggers execution, producing verified inactive candidate."""
         headers = _get_operator_auth_headers(
             username="test_authorized_lead",
-            roles=["ml_engineer"],
-            clearance_level=2,
+            roles=["admin", "ml_lead"],
+            clearance_level=3,
         )
 
         # Mock the server-side executor to simulate canonical execution
@@ -512,23 +514,61 @@ class TestOperationalFederationIntegration:
             mock_cmd.assert_called_once()
 
     def test_institution_scoped_training_authorization(self) -> None:
-        """Requirement 2: Enforce institution-scoped operator authorization and participant validation."""
-        # 1. Operator bound to BANK_A attempting cross-institution training for BANK_B and BANK_C
+        """Requirement 2: Enforce authoritative ConsortiumGovernanceService checks and institution-scoped operator authorization."""
+        # 1. Non-existent consortium rejected with 404
         bank_a_headers = _get_operator_auth_headers(
             username="operator_bank_a_lead",
             bank_id="bank_a",
             roles=["ml_lead"],
             clearance_level=2,
         )
+        resp_unknown_consortium = client.post(
+            "/api/v1/training/federation/jobs",
+            json={
+                "consortium_id": "non_existent_alliance_xyz",
+                "participating_banks": ["BANK_A", "BANK_B"],
+                "num_rounds": 1,
+            },
+            headers=bank_a_headers,
+        )
+        assert resp_unknown_consortium.status_code == 404
+        assert "does not exist or has not been provisioned" in resp_unknown_consortium.json()["detail"]
+
+        # 2. Operator bound to BANK_A attempting cross-institution training for BANK_B and BANK_C (clearance 2)
         resp_cross = client.post(
             "/api/v1/training/federation/jobs",
             json={"participating_banks": ["BANK_B", "BANK_C"], "num_rounds": 1},
             headers=bank_a_headers,
         )
         assert resp_cross.status_code == 403
-        assert "excluding their own institution" in resp_cross.json()["detail"]
+        assert "requires elevated consortium administrator authority" in resp_cross.json()["detail"]
 
-        # 2. Duplicate participant identities rejected with 400
+        # 3. Operator bound to BANK_A attempting cross-institution training including BANK_A and BANK_B (clearance 2)
+        # Cannot infer cross-institution authority simply because initiator includes their own bank
+        resp_cross_with_self = client.post(
+            "/api/v1/training/federation/jobs",
+            json={"participating_banks": ["BANK_A", "BANK_B"], "num_rounds": 1},
+            headers=bank_a_headers,
+        )
+        assert resp_cross_with_self.status_code == 403
+        assert "requires elevated consortium administrator authority" in resp_cross_with_self.json()["detail"]
+
+        # 4. Caller claiming CENTRAL bank identity but with clearance < 3 rejected
+        central_low_clearance_headers = _get_operator_auth_headers(
+            username="fake_central_operator",
+            bank_id="CENTRAL",
+            roles=["admin"],
+            clearance_level=2,
+        )
+        resp_fake_central = client.post(
+            "/api/v1/training/federation/jobs",
+            json={"participating_banks": ["BANK_A", "BANK_B"], "num_rounds": 1},
+            headers=central_low_clearance_headers,
+        )
+        assert resp_fake_central.status_code == 403
+        assert "requires elevated consortium administrator authority" in resp_fake_central.json()["detail"]
+
+        # 5. Duplicate participant identities rejected with 400
         resp_dup = client.post(
             "/api/v1/training/federation/jobs",
             json={"participating_banks": ["BANK_A", "BANK_A", "BANK_B"], "num_rounds": 1},
@@ -537,16 +577,16 @@ class TestOperationalFederationIntegration:
         assert resp_dup.status_code == 400
         assert "Duplicate participant bank identity" in resp_dup.json()["detail"]
 
-        # 3. Unrecognized or invalid consortium participant rejected with 400
+        # 6. Unrecognized or invalid consortium participant rejected with 400
         resp_unrec = client.post(
             "/api/v1/training/federation/jobs",
             json={"participating_banks": ["BANK_A", "BANK_UNREGISTERED"], "num_rounds": 1},
             headers=bank_a_headers,
         )
         assert resp_unrec.status_code == 400
-        assert "Unrecognized or unregistered consortium participant" in resp_unrec.json()["detail"]
+        assert "not an authorized member of consortium" in resp_unrec.json()["detail"]
 
-        # 4. Empty or missing participating_banks rejected with 400
+        # 7. Empty or missing participating_banks rejected with 400
         resp_empty = client.post(
             "/api/v1/training/federation/jobs",
             json={"participating_banks": [], "num_rounds": 1},
@@ -554,7 +594,7 @@ class TestOperationalFederationIntegration:
         )
         assert resp_empty.status_code in (400, 422)
 
-        # 5. Central/Consortium Admin (Clearance >= 3 or CONSORTIUM bank) CAN initiate multi-bank training
+        # 8. Central/Consortium Admin (Clearance >= 3 and admin role) CAN initiate multi-bank training
         consortium_admin_headers = _get_operator_auth_headers(
             username="central_consortium_admin",
             bank_id="consortium",
@@ -582,9 +622,10 @@ class TestOperationalFederationIntegration:
             )
             assert resp_consortium.status_code == 201
             assert resp_consortium.json()["job_id"] == "job_consortium_01"
+            assert resp_consortium.json()["consortium_id"] == "cfi-consortium"
 
     def test_worker_endpoint_lifecycle_and_stale_eviction(self) -> None:
-        """Requirement 1: WorkerEndpointRegistry validates capabilities, tracks liveness, and evicts dead workers."""
+        """Requirement 1: WorkerEndpointRegistry validates capabilities, authenticates tokens, protects overwrites, and evicts dead workers."""
         svc = OperationalFederationService(app_env="development")
 
         # 1. Registering with dead PID is strictly rejected
@@ -609,30 +650,87 @@ class TestOperationalFederationIntegration:
             )
         assert "put" in str(exc_caps.value)
 
-        # 3. Registering live worker succeeds and is retrievable
-        WorkerEndpointRegistry.register_worker_endpoint(
-            bank_id="BANK_A",
-            endpoint={"inbox": q_in, "outbox": q_out},
-            pid=current_pid,
-        )
-        assert WorkerEndpointRegistry.is_registered("BANK_A")
-        ep = WorkerEndpointRegistry.get_trusted_endpoint("BANK_A")
-        assert ep is not None
-        assert ep.pid == current_pid
+        # 3. In production, unauthenticated registration is rejected
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_no_tok:
+            WorkerEndpointRegistry.register_worker_endpoint(
+                bank_id="BANK_A",
+                endpoint={"inbox": q_in, "outbox": q_out},
+                pid=current_pid,
+                app_env="production",
+            )
+        assert "production requires authentic institutional registration token" in str(exc_no_tok.value)
 
-        # 4. If worker dies (simulate by replacing registration with dead PID), resolve_worker_endpoints evicts it
+        # 4. In production, registering with invalid/spoofed token is rejected
+        with mock.patch("app.application.services.operational_federation_service.get_settings") as mock_set:
+            mock_s = mock.MagicMock()
+            mock_s.app_env = "production"
+            mock_s.training_bank_tokens = {"BANK_A": "valid_secret_token_12345"}
+            mock_set.return_value = mock_s
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_bad_tok:
+                WorkerEndpointRegistry.register_worker_endpoint(
+                    bank_id="BANK_A",
+                    endpoint={"inbox": q_in, "outbox": q_out},
+                    pid=current_pid,
+                    registration_token="spoofed_token_wrong",
+                    app_env="production",
+                )
+            assert "invalid institutional token" in str(exc_bad_tok.value)
+
+            # 5. Registering with valid institutional token succeeds
+            WorkerEndpointRegistry.register_worker_endpoint(
+                bank_id="BANK_A",
+                endpoint={"inbox": q_in, "outbox": q_out},
+                pid=current_pid,
+                registration_token="valid_secret_token_12345",
+                app_env="production",
+            )
+            assert WorkerEndpointRegistry.is_registered("BANK_A")
+            ep = WorkerEndpointRegistry.get_trusted_endpoint("BANK_A")
+            assert ep is not None
+            assert ep.pid == current_pid
+            assert ep.attestation_type == "institutional_token"
+            assert ep.state == "ACTIVE"
+
+            # 6. Overwrite protection: unauthenticated attempt to overwrite active verified worker is rejected
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_overwrite:
+                WorkerEndpointRegistry.register_worker_endpoint(
+                    bank_id="BANK_A",
+                    endpoint={"inbox": q_in, "outbox": q_out},
+                    pid=current_pid,
+                    app_env="development",
+                )
+            assert "Cannot overwrite active verified worker" in str(exc_overwrite.value)
+
+        # 7. Explicit revocation marks state REVOKED and removes from active endpoint retrieval
+        WorkerEndpointRegistry.revoke_worker_endpoint("BANK_A", reason="Key rotation")
+        assert not WorkerEndpointRegistry.is_registered("BANK_A")
+        assert WorkerEndpointRegistry.get_worker_endpoint("BANK_A") is None
+
+        # 8. If worker dies (simulate by replacing registration with dead PID), resolve_worker_endpoints evicts it
         with WorkerEndpointRegistry._lock:
             WorkerEndpointRegistry._registry["BANK_A"] = TrustedWorkerEndpoint(
                 bank_id="BANK_A",
                 endpoint={"inbox": q_in, "outbox": q_out},
                 pid=dead_pid,
-                registered_at=ep.registered_at,
-                capabilities=ep.capabilities,
+                registered_at=time.time(),
+                capabilities=("inbox", "outbox"),
+                state="ACTIVE",
             )
         with pytest.raises(TrainingProvenanceSecurityError) as exc_evict:
             svc.resolve_worker_endpoints(["BANK_A"], is_prod=True)
         assert "not provisioned or registered" in str(exc_evict.value)
         assert not WorkerEndpointRegistry.is_registered("BANK_A")
+
+        # 9. Batch registration helper register_provisioned_workers succeeds
+        WorkerEndpointRegistry.clear()
+        fake_procs = {"BANK_A": mock.MagicMock(pid=current_pid)}
+        WorkerEndpointRegistry.register_provisioned_workers(
+            endpoints={"BANK_A": {"inbox": q_in, "outbox": q_out}},
+            processes=fake_procs,
+            bank_tokens={"BANK_A": "tok_batch_123"},
+            app_env="development",
+        )
+        assert WorkerEndpointRegistry.is_registered("BANK_A")
 
     def test_holdout_evaluation_data_contract(self) -> None:
         """Requirement 3: Enforce FEATURE_NAMES schema ordering, canonical encoding, and non-empty finite evaluation data."""
@@ -689,13 +787,46 @@ class TestOperationalFederationIntegration:
         assert "Production holdout evaluation dataset is not configured" in str(exc_prod_syn.value)
 
     def test_authority_process_lifecycle_cleanup(self) -> None:
-        """Requirement 5: OperationalFederationService owns and cleans up spawned isolated authorities."""
+        """Requirement 5: OperationalFederationService owns and cleans up spawned isolated authorities across all failure paths."""
         svc = OperationalFederationService(app_env="production")
 
         mock_signing = mock.MagicMock()
         mock_comp = mock.MagicMock()
 
-        # Simulate execution failure during runner dispatch in production
+        # 1. Failure during completion authority resolution terminates already-spawned signing authority
+        with mock.patch.object(svc, "resolve_signing_authority", return_value=(mock_signing, True)), \
+             mock.patch.object(svc, "resolve_completion_authority", side_effect=TrainingProvenanceConfigurationError("Comp vault missing")), \
+             mock.patch.object(svc, "resolve_coordinator_token", return_value="tok"), \
+             mock.patch.object(svc, "resolve_db_url", return_value="postgresql://u:p@localhost/db"), \
+             mock.patch.object(svc, "resolve_worker_endpoints", return_value=({"BANK_A": {}, "BANK_B": {}}, {"BANK_A": 1, "BANK_B": 2})):
+            with pytest.raises(TrainingProvenanceConfigurationError):
+                svc.execute_operational_federation(
+                    job_id="job_clean_intermediate_01",
+                    participating_banks=["BANK_A", "BANK_B"],
+                    num_rounds=1,
+                )
+        mock_signing.terminate.assert_called_once()
+        mock_signing.reset_mock()
+
+        # 2. Failure during holdout resolution terminates BOTH spawned signing and completion authorities
+        with mock.patch.object(svc, "resolve_signing_authority", return_value=(mock_signing, True)), \
+             mock.patch.object(svc, "resolve_completion_authority", return_value=(mock_comp, ("127.0.0.1", 9999), True)), \
+             mock.patch.object(svc, "resolve_coordinator_token", return_value="tok"), \
+             mock.patch.object(svc, "resolve_db_url", return_value="postgresql://u:p@localhost/db"), \
+             mock.patch.object(svc, "resolve_worker_endpoints", return_value=({"BANK_A": {}, "BANK_B": {}}, {"BANK_A": 1, "BANK_B": 2})), \
+             mock.patch.object(svc, "resolve_holdout_data", side_effect=TrainingProvenanceConfigurationError("Holdout corrupted")):
+            with pytest.raises(TrainingProvenanceConfigurationError):
+                svc.execute_operational_federation(
+                    job_id="job_clean_intermediate_02",
+                    participating_banks=["BANK_A", "BANK_B"],
+                    num_rounds=1,
+                )
+        mock_signing.terminate.assert_called_once()
+        mock_comp.terminate.assert_called_once()
+        mock_signing.reset_mock()
+        mock_comp.reset_mock()
+
+        # 3. Simulate execution failure during runner dispatch in production terminates both
         with mock.patch.object(svc, "resolve_signing_authority", return_value=(mock_signing, True)), \
              mock.patch.object(svc, "resolve_completion_authority", return_value=(mock_comp, ("127.0.0.1", 9999), True)), \
              mock.patch.object(svc, "resolve_coordinator_token", return_value="tok"), \
@@ -714,7 +845,7 @@ class TestOperationalFederationIntegration:
         mock_signing.terminate.assert_called_once()
         mock_comp.terminate.assert_called_once()
 
-        # Externally provisioned authorities are NOT terminated
+        # 4. Externally provisioned authorities are NOT terminated
         mock_ext_signing = mock.MagicMock()
         mock_ext_comp = mock.MagicMock()
         svc_ext = OperationalFederationService(
@@ -737,8 +868,8 @@ class TestOperationalFederationIntegration:
         mock_ext_comp.terminate.assert_not_called()
 
     def test_truthful_execution_reporting_rejections(self) -> None:
-        """Requirement 4: Non-completed status, unverified state, or missing digests are strictly rejected with 500."""
-        headers = _get_operator_auth_headers(username="test_lead_truth", bank_id="bank_a", roles=["ml_lead"], clearance_level=2)
+        """Requirement 4: Non-completed status, unverified state, or missing/malformed digests are strictly rejected with 500."""
+        headers = _get_operator_auth_headers(username="test_lead_truth", bank_id="bank_a", roles=["admin", "ml_lead"], clearance_level=3)
 
         # 1. Unverified execution result
         unverified_result = {
@@ -776,8 +907,31 @@ class TestOperationalFederationIntegration:
             assert resp.status_code == 500
             assert "no verified artifact digest" in resp.json()["detail"]
 
+        # 3. Malformed artifact SHA-256 (not 64 hex characters)
+        bad_sha_result = {
+            "job_id": "job_badsha_01",
+            "status": "COMPLETED",
+            "is_verified": True,
+            "metrics": {},
+            "artifact_sha256": "not_a_valid_hex_sha256",
+            "model_version": 1,
+        }
+        with mock.patch.object(OperationalFederationService, "execute_operational_federation", return_value=bad_sha_result):
+            resp = client.post(
+                "/api/v1/training/federation/jobs",
+                json={"participating_banks": ["BANK_A", "BANK_B"]},
+                headers=headers,
+            )
+            assert resp.status_code == 500
+            assert "verified artifact digest" in resp.json()["detail"]
+
     def test_database_authority_concurrency_and_start_job_lifecycle(self, tmp_path: Any) -> None:
-        """Requirement 6: Verify database start_job under actual concurrency and multi-worker lifecycle."""
+        """Requirement 6: Verify database start_job under actual concurrency and multi-worker lifecycle.
+
+        Verification Environment Note:
+        - SQLite atomic transactions (INSERT OR IGNORE + SELECT) are tested under multi-threaded concurrency.
+        - Production PostgreSQL cluster concurrency uses ON CONFLICT (job_id) DO NOTHING (UNVERIFIED locally due to absent PostgreSQL service).
+        """
         db_path = os.path.join(str(tmp_path), "test_authority_concurrency.db")
         auth = SQLiteTrainingJobAuthority(db_target=db_path)
 
@@ -830,3 +984,89 @@ class TestOperationalFederationIntegration:
         with pytest.raises(TrainingProvenanceSecurityError) as exc_unauth:
             auth.start_job("job_conc_01", worker_id="BANK_UNAUTHORIZED")
         assert "not authorized to start job" in str(exc_unauth.value)
+
+    def test_operational_federation_service_real_adapter_execution(self, clean_test_environment: str, tmp_path: Any) -> None:
+        """Criteria G & H: Real execution through OperationalFederationService without mocking execute_operational_federation."""
+        from cryptography.fernet import Fernet
+        from app.application.services.distributed_fl_service import (
+            spawn_bank_workers,
+            setup_bank_private_storage,
+        )
+
+        registry_dir = str(tmp_path / "model_registry")
+        db_file = str(tmp_path / "authority.db")
+        vault_root = str(tmp_path / "bank_vaults")
+
+        val_X = np.random.randn(20, NUM_FEATURES).astype(np.float32)
+        val_y = np.random.randint(0, 2, size=20).astype(np.float32)
+
+        bank_data_paths = {}
+        bank_enc_keys = {b: Fernet.generate_key() for b in ("BANK_A", "BANK_B")}
+        bank_tokens = {b: f"test_worker_token_{b}" for b in ("BANK_A", "BANK_B")}
+
+        np.random.seed(42)
+        for b_id, n_samples in (("BANK_A", 40), ("BANK_B", 40)):
+            X_part = np.random.randn(n_samples, NUM_FEATURES).astype(np.float32)
+            y_part = np.random.randint(0, 2, size=n_samples).astype(np.float32)
+            p = setup_bank_private_storage(
+                bank_storage_dir=vault_root,
+                bank_id=b_id,
+                X_partition=X_part,
+                y_partition=y_part,
+                bank_token=bank_tokens[b_id],
+                bank_encryption_key=bank_enc_keys[b_id],
+            )
+            bank_data_paths[b_id] = p
+
+        procs, endpoints = spawn_bank_workers(
+            participating_banks=["BANK_A", "BANK_B"],
+            bank_tokens=bank_tokens,
+            db_url=db_file,
+            bank_data_paths=bank_data_paths,
+            bank_encryption_keys=bank_enc_keys,
+            app_env="development",
+        )
+
+        try:
+            pids = {b: proc.pid or 0 for b, proc in procs.items()}
+            # Legitimate institutional provisioning owner registers authentic endpoints into registry
+            WorkerEndpointRegistry.register_provisioned_workers(
+                endpoints=endpoints,
+                pids=pids,
+                app_env="development",
+            )
+
+            svc = OperationalFederationService(
+                db_url=db_file,
+                holdout_val_data=(val_X, val_y),
+                registry_storage_dir=registry_dir,
+                app_env="development",
+            )
+
+            # Execute through the operational service adapter
+            result = svc.execute_operational_federation(
+                job_id="job_real_adapter_01",
+                simulation_id="sim_real_adapter_01",
+                participating_banks=["BANK_A", "BANK_B"],
+                num_rounds=1,
+            )
+
+            assert result["status"] == "COMPLETED"
+            assert result["is_verified"] is True
+            assert len(result["artifact_sha256"]) == 64
+            assert result["model_version"] is not None
+
+            # Confirm inactive candidate was recorded in ModelRegistry
+            saved_ver = result["saved_version"]
+            assert saved_ver["status"] == "inactive"
+            assert saved_ver["provenance_type"] == "TRAINING_RECORDED"
+            assert result["is_promoted_champion"] is False
+        finally:
+            for proc in procs.values():
+                try:
+                    proc.terminate()
+                    proc.join(timeout=2.0)
+                except Exception:
+                    pass
+
+
