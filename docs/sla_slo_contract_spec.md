@@ -9,10 +9,10 @@ The SLA Contract Engine monitors enterprise Service Level Agreements ($99.9\%$ u
 | Metric Dimension | Target Commitment | Measurement Window | Enforcement Action | Verification Reference |
 | :--- | :--- | :--- | :--- | :--- |
 | **Uptime Availability (SLA)** | $\ge 99.90\%$ monthly | Calendar Month ($\approx 43.8\text{ min}$ max downtime) | 10% invoice credit discount per breach tier | Prometheus availability probe |
-| **Inference Latency ($p99$ SLO)** | $< 100.0\text{ ms}$ | Continuous 5-minute sliding window | Heuristic Circuit Breaker auto-failover | `sla_monitor.py` / Locust load runner |
+| **Inference Latency ($p99$ SLO)** | $< 100.0\text{ ms}$ | Continuous 5-minute sliding window | Fail-closed circuit breaker auto-trip (`HTTP 503` in production; heuristic fallback strictly restricted to demo mode) | `sla_monitor.py` / Locust load runner |
 | **Median Latency ($p50$ SLO)** | $< 60.0\text{ ms}$ | Continuous 5-minute sliding window | Dynamic worker scaling alert | OpenTelemetry OTLP tracing |
 | **Recovery Time Objective (RTO)**| $< 30.0\text{ seconds}$ | Regional failure event | Standby region automatic promotion | `MultiRegionFailoverManager` |
-| **Recovery Point Objective (RPO)**| 0 transactions lost | Synchronous Raft replication | Zero state rollback guarantee | `BackupVerifier` |
+| **Recovery Point Objective (RPO)**| 0 uncommitted transactions lost | Cross-region database replication & verified backup probes | Standby sync validation & zero data corruption | `BackupVerifier` / `MultiRegionFailoverManager` |
 
 ---
 

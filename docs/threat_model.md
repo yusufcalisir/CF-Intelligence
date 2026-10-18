@@ -100,7 +100,7 @@ mindmap
 | **Denial of Service / Tampering** | T1, T5 | A2, A4 | **Concurrent Job Race & Duplicate Execution:** Concurrent orchestration requests trigger race conditions, duplicate executions, or epoch skipping during training rounds. | **`PostgresTrainingJobAuthority` Row Locks (`SELECT ... FOR UPDATE`) + Sequential Epoch Reconciliation:** Transactional row locking guarantees single-writer state transitions; `reconcile_job_completion_evidence` strictly enforces contiguous $[1..E]$ epochs. | `tests/unit/test_training_authority_backends.py`<br/>`tests/unit/test_training_provenance_service.py`<br/>*(Zero race conditions under concurrent workers)* |
 | **Tampering / Elevation of Privilege** | T1, T3 | A2, A4 | **Warm-Cache Revocation Bypass:** Revoked or quarantined model continues serving live inference traffic due to stale worker in-memory caches. | **Redis Sentinel Instant Cross-Worker Invalidation Pub/Sub (`model_registry.py`):** Broadcasts eviction messages (`MODEL_REVOKED`, `MODEL_ROLLBACK`, `MODEL_PROMOTED`) purging warm in-memory model caches across all distributed API worker instances within sub-100ms. | `tests/unit/test_enterprise_model_registry.py`<br/>*(Zero stale model inference windows)* |
 | **Tampering / Information Disclosure** | T2, T5 | A2, A4 | **Serving Fallback Fabrication & Heuristic Impersonation:** When ML model is unavailable or inference fails, system returns plausible synthetic/random scores or static heuristics, misleading fraud analysts and violating model risk regulations (SR 11-7). | **Strict Fail-Closed Serving Invariant (`inference_service.py`):** Returns `HTTP 503 Service Unavailable` with `ModelNotAvailableError`; absolute prohibition on fabricated fallback scores or heuristic impersonation (`AGENTS.md` runtime truth invariant). | `tests/unit/test_inference_service.py`<br/>`tests/unit/test_enterprise_model_registry.py`<br/>*(100% fail-closed verification on missing model)* |
-| **Tampering / Denial of Service** | T1 | A2, A5 | **Concurrent Vault File Lock Contention:** Multi-process local bank daemon instances access vault files simultaneously, causing partial writes or checkpoint corruption. | **OS-Level Cross-Platform Vault File Locking (`BankPrivateStorageVault`):** Windows `CreateFileW` with `FILE_SHARE_READ` and `LOCKFILE_EXCLUSIVE_LOCK`; POSIX `fcntl.flock(LOCK_EX | LOCK_NB)` on Linux/macOS. | `tests/unit/test_bank_private_storage_vault.py`<br/>*(Zero partial-read or torn-write corruptions)* |
+| **Tampering / Denial of Service** | T1 | A2, A5 | **Concurrent Vault File Lock Contention:** Multi-process local bank daemon instances access vault files simultaneously, causing partial writes or checkpoint corruption. | **OS-Level Cross-Platform Vault File Locking (`BankPrivateStorageVault`):** Windows `CreateFileW` with `dwShareMode=0`; POSIX `fcntl.flock(LOCK_EX)` on Linux/macOS. | `tests/unit/test_bank_private_storage_vault.py`<br/>*(Zero partial-read or torn-write corruptions)* |
 
 
 ---
@@ -656,7 +656,7 @@ The platform incorporates comprehensive defenses against Broken Object Level Aut
 
 ## 20. Production Training Provenance, Execution Authority & Model Admission Threat Surface
 
-The Production Training Provenance suite (`training_provenance_service.py`, `training_authority_backends.py`, `distributed_fl_service.py`, `model_registry.py`) secures federated learning lifecycle execution, parameter verification, and production model serving against Byzantine coordinators, colluding nodes, replay injections, race conditions, warm-cache desynchronization, and fabricated serving outputs:
+The Production Training Provenance and Execution Authority subsystem ([`backend/app/application/services/training_provenance_service.py`](../backend/app/application/services/training_provenance_service.py), [`backend/app/infrastructure/database/training_authority_backends.py`](../backend/app/infrastructure/database/training_authority_backends.py), [`backend/app/application/services/distributed_fl_service.py`](../backend/app/application/services/distributed_fl_service.py), and [`backend/app/application/services/model_registry.py`](../backend/app/application/services/model_registry.py)) secures federated learning lifecycle execution, parameter verification, and production model serving against Byzantine coordinators, colluding nodes, replay injections, race conditions, warm-cache desynchronization, and fabricated serving outputs:
 
 ### 20.1 Training History & Receipt Forgery Defense (Spoofing & Repudiation)
 * **Threat**: A rogue coordinator or participant manufactures false training receipts, claims unearned computational contribution, or signs receipts with forged symmetric/ephemeral keys.
@@ -667,8 +667,8 @@ The Production Training Provenance suite (`training_provenance_service.py`, `tra
 ### 20.2 Duplicate Execution & Epoch Skipping Defense (Tampering & Denial of Service)
 * **Threat**: Concurrent orchestration calls cause race conditions, duplicate worker executions, phantom round completions, or partial epoch skipping.
 * **Mitigations**:
-  * **PostgreSQL ACID Row Locks (`PostgresTrainingJobAuthority`)**: Job state transitions and round progression acquire transactional `SELECT ... FOR UPDATE` row locks, preventing race conditions and phantom executions across concurrent processes.
-  * **Sequential Epoch Reconciliation (`reconcile_job_completion_evidence`)**: Aggregation strictly requires contiguous $[1..E]$ epoch receipts. Any skipped, duplicate, or out-of-order epoch evidence causes immediate job rejection.
+  * **PostgreSQL ACID Row Locks (`PostgresTrainingJobAuthority`)**: Job state transitions and round progression acquire transactional `SELECT ... FOR UPDATE` row locks, preventing race conditions and phantom executions across concurrent processes. DDL migrations synchronize via `pg_advisory_xact_lock`.
+  * **Sequential Epoch & Unique Sample Reconciliation (`reconcile_job_completion_evidence`)**: Aggregation strictly requires contiguous $[1..E]$ epoch receipts and unique dataset sample consistency ($\sum \text{unique\_samples}_b$). Any skipped, duplicate, or out-of-order epoch evidence or sample exposure substitution causes immediate job rejection.
 
 ### 20.3 Parameter Update Replay Defense (Tampering)
 * **Threat**: A lagging or malicious participant re-submits previously computed gradient updates or parameters from earlier rounds to satisfy quotas without performing actual computation.
@@ -680,15 +680,31 @@ The Production Training Provenance suite (`training_provenance_service.py`, `tra
 * **Mitigations**:
   * **Instant Cross-Worker Invalidation Pub/Sub**: The Enterprise Model Registry publishes eviction events (`MODEL_PROMOTED`, `MODEL_ROLLBACK`, `MODEL_REVOKED`) across a Redis Sentinel Pub/Sub channel. All distributed inference worker processes subscribe to this channel and evict their local in-memory model caches within sub-100ms.
 
-### 20.5 Serving Fallback Fabrication Defense (Tampering & Information Disclosure)
+### 20.5 Combined Production Model Admission Boundary (Elevation of Privilege & Tampering)
+* **Threat**: Adversary attempts to activate an unverified model checkpoint, bypass holdout canary gates, or submit single-approver sign-offs to deploy backdoored weights.
+* **Mitigations**:
+  * **Combined Cryptographic & Four-Eyes Invariants (`validate_production_admission`)**: In production, admission requires **both** verified Ed25519 receipts (`TRAINING_RECORDED`) **and** Four-Eyes dual control sign-offs from distinct individuals (`ml_engineer` + `compliance_officer`). Seeded development accounts (`admin`, `analyst_a1`, `analyst_b1`, `analyst_c1`, `auditor`) are rejected. Sign-offs are cryptographically bound to `{sim_id}:{version}:{sha256}:{role}:{user}` using `DOMAIN_APPROVAL_SIGNOFF`.
+
+### 20.6 Internal Authority Spoofing & Replay Defense (Elevation of Privilege)
+* **Threat**: Rogue processes or network attackers replay captured internal orchestration tokens to force unauthorized model rollbacks or metadata mutations.
+* **Mitigations**:
+  * **Cryptographically Signed Scoped Contexts (`TrustedInternalContext`)**: Binds service name, action, target bank, version, timestamp, TTL, and single-use nonce under `DOMAIN_INTERNAL_AUTHORITY`. Requires a 32-character high-entropy production secret (`CFI_INTERNAL_CONTEXT_SECRET`).
+  * **Durable Nonce Replay Prevention (`DurableNonceStore`)**: Nonces are consumed atomically with multi-process file locking (`filelock.FileLock`) and an HMAC integrity seal under `DOMAIN_REPLAY_STORE_INTEGRITY`. In-memory fallback stores fail closed in production.
+
+### 20.7 Kafka Ingestion Stale-Worker & Race Condition Defense (Tampering & Consistency)
+* **Threat**: Network partitions or delayed worker executions cause stale workers to commit duplicate or out-of-order transaction events into the processing pipeline.
+* **Mitigations**:
+  * **Ownership-Bound Reservations (`IdempotencyEngine`)**: Workers acquire Redis reservations bound to ephemeral tokens (`owner_id = engine_id + "_" + uuid`). If a worker stalls and its reservation TTL expires, atomic Lua scripts reject late commits from the stale worker. In the event of broker-ACK / Redis-completion uncertainty, operations return `False` and retry, enforcing at-least-once delivery without claiming unverified exactly-once guarantees.
+
+### 20.8 Serving Fallback Fabrication Defense (Tampering & Information Disclosure)
 * **Threat**: When an inference model is unavailable, unloaded, or encounters errors, the serving layer returns synthetic, randomized, or heuristic risk scores to avoid throwing an exception, leading to silent false positives/negatives in fraud screening.
 * **Mitigations**:
-  * **Fail-Closed Invariant (`ModelNotAvailableError`)**: The real-time inference endpoint (`POST /v1/inference/score`) strictly enforces fail-closed semantics. If no valid champion model is loaded, it immediately returns `HTTP 503 Service Unavailable`. Fabricating fallback risk scores or impersonating model inference is strictly prohibited (`AGENTS.md` runtime truth invariant).
+  * **Fail-Closed Invariant (`ModelNotAvailableError`)**: The real-time inference endpoint (`POST /v1/inference/score`) strictly enforces fail-closed semantics in production (`HTTP 503 Service Unavailable`). Heuristic score fallback is restricted strictly to supported demo/simulation modes (`_is_demo_mode_active()`). Fabricating fallback risk scores or impersonating model inference in production is strictly prohibited (`AGENTS.md` runtime truth invariant).
 
-### 20.6 Local Vault File Contention & Checkpoint Corruption (Tampering & Denial of Service)
+### 20.9 Local Vault File Contention & Checkpoint Corruption (Tampering & Denial of Service)
 * **Threat**: Concurrent bank daemon or Celery worker processes attempt simultaneous reads and writes to local model checkpoint files and credentials, causing torn writes or partial-read corruption.
 * **Mitigations**:
-  * **OS-Level Cross-Platform File Locking (`BankPrivateStorageVault`)**: Enforces OS kernel-level file locks on vault manifests and weights: Windows `CreateFileW` with `FILE_SHARE_READ` and `LOCKFILE_EXCLUSIVE_LOCK`; POSIX `fcntl.flock(LOCK_EX | LOCK_NB)` on Linux/macOS.
+  * **OS-Level Cross-Platform File Locking (`BankPrivateStorageVault`)**: Enforces OS kernel-level file locks on vault manifests and weights: Windows `CreateFileW` with `dwShareMode=0`; POSIX `fcntl.flock(LOCK_EX)` on Linux/macOS.
 
 | STRIDE Category | Training Provenance & Admission Threat | Platform Mitigation |
 |:---|:---|:---|
@@ -698,6 +714,8 @@ The Production Training Provenance suite (`training_provenance_service.py`, `tra
 | **Information Disclosure** | Memory dump or file exposure of local bank vault credentials | Encrypted `BankPrivateStorageVault` with AES-256-GCM + OS-level file locking |
 | **Denial of Service** | Concurrent orchestration race condition or duplicate job execution | `PostgresTrainingJobAuthority` transactional `SELECT ... FOR UPDATE` row locking |
 | **Elevation of Privilege** | Serving revoked model via warm-cache desynchronization | Redis Sentinel Pub/Sub instantaneous cross-worker model cache invalidation |
+| **Elevation of Privilege** | Replayed internal authority context for model demotion | Scoped `TrustedInternalContext` + `DurableNonceStore` atomic nonce consumption |
+| **Tampering** | Stale worker race conditions during Kafka streaming ingestion | Redis 3-state idempotency reservations with `owner_id` verification via Lua script |
 
 
 

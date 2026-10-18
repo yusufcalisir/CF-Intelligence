@@ -102,22 +102,51 @@ $$\mathrm{DIR} = \frac{P(\hat{Y}=1 \mid A=0)}{P(\hat{Y}=1 \mid A=1)}, \quad \mat
 
 *Artifact: [`benchmarks/results/raw/demographic_fairness_audit.json`](../benchmarks/results/raw/demographic_fairness_audit.json)*
 
-### 3.3. Multi-Stage Production Model State Machine
-Model progression follows a strict 5-stage promotion pipeline managed by `ModelLifecycleManager` (`backend/app/domain/model_lifecycle.py`):
+### 3.3. Multi-Stage Production Model State Machine & Registry Manifest Parity
+Model progression follows a strict promotion pipeline managed across the domain state machine (`ModelLifecycleManager` in `backend/app/domain/model_lifecycle.py`) and the production model registry manifest (`ModelRegistry` in `backend/app/application/services/model_registry.py`):
 
 $$\mathrm{STAGING} \;\longrightarrow\; \mathrm{SHADOW} \;\longrightarrow\; \mathrm{CANARY} \;\longrightarrow\; \mathrm{PRODUCTION} \;\longrightarrow\; \mathrm{ARCHIVED} \;/\; \mathrm{ROLLED}_{\mathrm{BACK}}$$
 
+#### 3.3.1. Domain State Machine
 1. **`STAGING`**: Initial registration and parameter validation in an isolated sandbox.
 2. **`SHADOW`**: Replays live transaction traffic in parallel with the active champion model without affecting transaction authorization decisions.
 3. **`CANARY`**: Gated traffic split ($5\% \to 20\% \to 50\%$) requiring explicit `COMPLIANCE_OFFICER` sign-off.
 4. **`PRODUCTION`**: Active champion model serving sub-100ms real-time transaction scoring.
 5. **`ARCHIVED` / `ROLLED_BACK`**: Terminal or superseded states preserving full lineage for regulatory audit. Illegal state jumps (e.g. `STAGING` directly to `PRODUCTION`) are blocked by `InvalidStateTransitionError`.
 
-### 3.4. Dual Cryptographic Sign-Off Gating
-Model promotion to `PRODUCTION` requires dual-role cryptographic authorization:
-1. **`ml_engineer`**: Validates convergence metrics, PR-AUC, and loss stability.
-2. **`compliance_officer`**: Validates SR 11-7 compliance documentation, disparate impact audits, and differential privacy consumption.
-3. **HSM Digital Signature**: Checkpoints are sealed with a Hardware Security Module (HSM) digital signature envelope (`vault.sign_checkpoint()`). Promotion fails closed if the signature is missing, invalid, or signed by an unauthorized key.
+#### 3.3.2. Production `ModelRegistry` Manifest Statuses & Flags
+The underlying production registry persists model version state via `ModelManifest` records with concrete status enums and boolean capability flags:
+
+| Manifest Status | Flags (`is_approved`, `is_active`, `is_revoked`) | Governance & Lifecycle Meaning | Serving Permission |
+|:---|:---|:---|:---|
+| **`inactive`** *(Pending)* | `is_approved=False`, `is_active=False` | Newly registered model checkpoint awaiting receipt verification and dual sign-offs. | Isolated sandbox testing only |
+| **`inactive`** *(Approved)* | `is_approved=True`, `is_active=False` | Cryptographically signed off by ML Lead and Compliance Officer; eligible for promotion. | Staging / Validation only |
+| **`challenger`** | `is_approved=True`, `is_active=False` | Approved model version actively routing shadow inference traffic for canary comparison. | Shadow evaluation only |
+| **`champion`** | `is_approved=True`, `is_active=True` | Active production decision-maker certified for real-time transaction scoring. | Live primary serving |
+| **`revoked`** | `is_revoked=True`, `is_active=False` | Revoked due to drift alert, key revocation, security defect, or regulatory mandate. | Strictly prohibited (Fails closed) |
+
+> [!IMPORTANT]
+> **Approval vs. Champion Activation:** An approved model version (`is_approved=True`) does not automatically serve live traffic. It remains in `status="inactive", is_active=False` until an authenticated operator with clearance level $\ge 2$ explicitly triggers champion activation via `promote_version` or `rollback`. Exactly one active champion version is permitted per model family at any time.
+
+### 3.4. Combined Production Admission Invariant & Four-Eyes Gating
+Production model admission (`validate_production_admission` in `backend/app/application/services/model_registry.py`) strictly enforces a **combined admission invariant** requiring **BOTH** verified asymmetric training receipts **AND** Four-Eyes institutional sign-offs. It never accepts one in place of the other:
+
+1. **Cryptographic Training Receipt Invariant (Mandatory)**:
+   - Provenance type must be `TRAINING_RECORDED` or `TRAINING_EVIDENCE_VERIFIED`. Models with `UNVERIFIED`, `STRUCTURAL_FIXTURE`, or `LEGACY_UNVERIFIED` are rejected immediately.
+   - Checkpoint must include a cryptographically verified `TrainingExecutionReceipt` signed with an authorized Ed25519 private key by `IsolatedReceiptSigningAuthority`, matching feature names, input dimension (`input_dim = 10`), and non-revoked `key_id`.
+2. **Four-Eyes Dual Control Sign-Off Invariant (Mandatory)**:
+   - Must contain at least two verified, active institutional sign-offs:
+     - One ML Engineer sign-off (`role in ("ml_engineer", "ml_lead")`): Validates convergence metrics, PR-AUC, and loss stability.
+     - One Compliance Officer sign-off (`role in ("compliance", "compliance_officer")`): Validates SR 11-7 compliance documentation, disparate impact audits, and differential privacy consumption.
+   - **Distinct Individuals**: The two sign-offs must originate from distinct institutional users (`ml_user != comp_user` and `ml_uid != comp_uid`). Self-approval is strictly prevented.
+   - **Non-Development Accounts**: Production promotion rejects development seeded accounts (`admin`, `analyst_a1`, `analyst_b1`, `analyst_c1`, `auditor`). Approvers must be verified active institutional accounts in `DurableAccountStore`.
+   - **Cryptographic Binding**: Each sign-off is bound to canonical payload `{simulation_id}:{version}:{artifact_sha256}:{role}:{user}` with an HMAC-SHA256 signature generated under the derived domain key `DOMAIN_APPROVAL_SIGNOFF`.
+3. **Artifact Integrity & Canary Gate**:
+   - Checkpoint artifact on disk must be a non-empty regular file matching its recorded SHA-256 digest.
+   - Candidate model must satisfy holdout validation performance criteria:
+     $$\text{PR-AUC}_{\text{candidate}} \ge \text{PR-AUC}_{\text{champion}} - 0.005 \quad \text{and} \quad \text{Recall@0.01\% FPR} \ge 0.50$$
+4. **Hardware Security Envelope**:
+   - Production checkpoints and key rings are sealed under Hardware Security Module (HSM) digital signature envelopes (`vault.sign_checkpoint()`). Promotion fails closed if signatures are missing, corrupted, or signed by an unauthorized key.
 
 ---
 

@@ -10,10 +10,10 @@ The scoring gateway exposes three production REST endpoints tailored for differe
 
 1. **`POST /api/v1/score-transaction`** *(Alias: `POST /api/v1/transactions/score`)*: Standard core banking transaction scoring endpoint with normalized transaction payload, entity resolution, FATF blacklist/greylist sanctions checks, and top feature attributions.
 2. **`POST /api/v1/predict`**: Full-feature vector inference endpoint returning detailed multi-signal composite risk breakdowns (GNN, velocity, customer history, smurfing heuristics, SHAP attributions) and dynamic policy rule triggers.
-3. **`POST /v1/inference/score`**: Ultra-low-latency streaming scoring endpoint backed by PyTorch TorchScript JIT compilation, Redis in-memory caching (`cfi:champion_model`), and automatic heuristic fallback.
+3. **`POST /v1/inference/score`**: Ultra-low-latency streaming scoring endpoint backed by PyTorch TorchScript JIT compilation, Redis in-memory caching (`cfi:champion_model`), and fail-closed production serving (with heuristic fallback strictly restricted to supported demo/simulation modes).
 
 - **Content-Type**: `application/json`
-- **SLA**: $<100\text{ms}$ ($p99$) latency guarantee backed by automatic heuristic fallback.
+- **Operational Performance**: Sub-100ms response times observed under empirical multi-bank benchmark load (e.g., 87.26 ms $p99$ at 51.3 req/s in fast-path benchmarks); strictly fails closed in production upon model unavailability.
 
 ---
 
@@ -155,24 +155,37 @@ The platform supports dual-scale decision mappings corresponding to API interfac
 
 ---
 
-## ⚡ 4. TorchScript JIT Acceleration & Circuit Breaker Fallback
+## ⚡ 4. TorchScript JIT Acceleration, Redis Caching & Invalidation
 
 > [!IMPORTANT]
-> Real-time inference executes PyTorch models using **TorchScript JIT compilation** and **Redis In-Memory Caching (`cfi:champion_model`)** with a 1-hour TTL.
+> Real-time inference executes PyTorch models using **TorchScript JIT compilation** and **Redis In-Memory Caching (`cfi:champion_model:{simulation_id}`)** with atomic version-bound HMAC validation and a 1-hour TTL.
 
-1. **Redis JIT Caching**:
-   - The champion model is compiled to TorchScript on startup and cached in Redis (`cfi:champion_model`).
-   - Subsequent inference requests load directly from Redis, bypassing database and disk IO.
-2. **PubSub Invalidation**:
-   - When a new model is promoted, `ModelService.invalidate_model_cache()` deletes the Redis key and publishes a `model_updated` event to Redis PubSub (`cfi:model_events`) for zero-downtime hot reloading.
+1. **Redis JIT Caching & Atomic Pipeline**:
+   - The verified champion model is compiled to TorchScript on startup and cached in Redis with an atomic pipeline (`pipe.set(model_key, bytes); pipe.set(auth_key, envelope)`).
+   - Redis cache entries are strictly verified: checks include HMAC authenticity under domain key `DOMAIN_MODEL_CACHE`, SHA-256 match, version, generation, simulation ID, and architecture parity.
+   - Subsequent inference requests load directly from the verified cache, bypassing database and disk IO.
+2. **Instant PubSub Invalidation**:
+   - When a new champion is promoted, rolled back, or revoked, `ModelService.invalidate_model_cache()` deletes Redis keys and broadcasts an eviction event across Redis Sentinel Pub/Sub (`cfi:model_events`), prompting all distributed workers to purge warm in-memory model instances immediately.
 3. **3-Strikes Circuit Breaker**:
-   - If model loading or evaluation encounters 3 consecutive failures, the Circuit Breaker trips open for 60 seconds, routing all incoming transactions directly to `InferenceFallbackEngine`.
+   - If model loading or evaluation encounters 3 consecutive failures, the Circuit Breaker trips open for a 60-second cooldown under thread-safe lock synchronization.
+   - In production mode (`app_env == 'production'`), requests during an open circuit breaker fail closed with **`HTTP 503 Service Unavailable`** (`detail.code: "CIRCUIT_BREAKER_OPEN"`).
+   - In supported demo/simulation modes (`demo_active`), requests are routed to `InferenceFallbackEngine`.
 
 ---
 
-## 🛡️ 5. Heuristic Fallback SLA Guarantee
+## 🛡️ 5. Serving Fallback Invariants: Production vs. Demo/Simulation Modes
 
-If primary PyTorch ML model execution fails or exceeds timeout thresholds, the system triggers `InferenceFallbackEngine` to evaluate velocity, amount, and merchant category heuristics without blocking payment flows (`evaluated_by: "HEURISTIC_FALLBACK"`).
+In strict compliance with the repository's `AGENTS.md` runtime truth rule, fallback behavior depends strictly on deployment environment:
+
+### 5.1 Production Serving Rules (`app_env == 'production'`)
+- **Strict Fail-Closed Invariant**: If a verified champion model is missing, corrupt, revoked, or fails validation (`ModelNotAvailableError`, `ModelIntegrityError`, `ModelCompatibilityError`), or if the circuit breaker is open, the inference gateway returns **`HTTP 503 Service Unavailable`** (`MODEL_NOT_READY` or `CIRCUIT_BREAKER_OPEN`).
+- **No Plausible Fallbacks**: The production serving layer **never** silently substitutes untrained weights, synthetic/random numbers, heuristic scores, or static low-risk values to mask model unavailability. A truthful failure is enforced over a fabricated success.
+- **Explicit Simulation Rejection**: Passing `force_fallback: true` in production yields **`HTTP 400 Bad Request`** with `SIMULATION_NOT_ALLOWED`.
+
+### 5.2 Supported Demo & Simulation Modes (`demo_active`)
+- When running in an explicitly configured demonstration or simulation environment (`_is_demo_mode_active()`), fallback behavior is enabled:
+  - If a champion model is not loaded or during simulated circuit breaker trips, `InferenceFallbackEngine` evaluates deterministic velocity, amount, and merchant category heuristics (`evaluated_by: "HEURISTIC_FALLBACK"`).
+  - Explicit simulation fallback testing (`force_fallback: true`) is permitted in non-production environments when demo mode is active, returning diagnostic heuristic scores and explanations. If demo mode is inactive, returns **`HTTP 403 Forbidden`** (`DEMO_MODE_DISABLED`).
 
 ---
 

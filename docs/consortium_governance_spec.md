@@ -165,38 +165,51 @@ If any invariant fails, the engine raises `ConsortiumPolicyViolation` and aborts
 
 ---
 
-## 🛠️ 5. Programmatic Implementation Example
+## 🛠️ 5. Programmatic Implementation Example & Negative Authorization Boundaries
+
+### 5.1 Programmatic Workflow with Authentic Institutional Context
+
+Direct service operations require an authentic cryptographic authorization context—either an authenticated Bearer token (`auth_token`) belonging to an active institutional principal with governance authority (`admin`, `ml_lead`, or `compliance`), or a signed [`TrustedInternalContext`](../backend/app/application/services/model_registry.py) from the automated consortium coordinator:
 
 ```python
+from app.infrastructure.security.auth_service import AuthenticationService
 from app.application.services.consortium_service import ConsortiumGovernanceService
 from app.domain.consortium_governance import MemberRole, ProposalAction, ProposalStatus
 from app.domain.consortium_policy import ConsortiumPolicyEngine, ConsortiumPolicyConfig
 
-# 1. Initialize governance service
+# 1. Obtain authenticated Bearer token for authorized institutional operator
+auth_svc = AuthenticationService.get_instance()
+# Authenticated user 'lead_ml_a' belonging to 'bank_a' holding governance role 'ml_lead'
+token_data = auth_svc.login("lead_ml_a", "SecurePassword123!")
+auth_token = token_data["access_token"]
+
+# 2. Initialize governance service
 service = ConsortiumGovernanceService()
 
-# 2. Create consortium
+# 3. Create consortium with authentic institutional authority
 consortium = service.create_consortium(
     consortium_id="eu_aml_network",
     name="European AML Network",
     founder_bank_id="bank_a",
     quorum_ratio=0.51,
     max_epsilon=4.0,
+    auth_token=auth_token,
 )
 assert consortium.members["bank_a"].role == MemberRole.FOUNDER
 
-# 3. Propose admitting Bank B
+# 4. Propose admitting Bank B
 proposal = service.propose_membership_change(
     consortium_id="eu_aml_network",
     creator_bank_id="bank_a",
     target_bank_id="bank_b",
     action=ProposalAction.ADD_MEMBER,
+    auth_token=auth_token,
 )
 # Automatically approved (1/1 founder vote = 100% >= 51%)
 assert proposal.status == ProposalStatus.APPROVED
 assert "bank_b" in consortium.members
 
-# 4. Enforce FL round preconditions with cross-border and sample validation
+# 5. Enforce FL round preconditions with cross-border and sample validation
 engine = ConsortiumPolicyEngine(
     config=ConsortiumPolicyConfig(
         min_active_members=2,
@@ -215,6 +228,31 @@ is_valid, reasons = engine.validate_fl_round_preconditions(
 )
 assert is_valid is True
 ```
+
+### 5.2 Negative Authorization Boundaries & Fail-Closed Invariants
+
+In strict adherence to the `AGENTS.md` runtime truth invariant, `_verify_service_actor_bank` enforces non-bypassable negative authorization boundaries:
+
+1. **Unauthenticated Call Rejection**:
+   - Calling governance mutations (`create_consortium`, `propose_membership_change`, `vote_on_proposal`) without `auth_token` or `trusted_context` raises `PermissionError`:
+     ```text
+     Authentication required: Direct service operation requires a valid Bearer auth_token or trusted internal context.
+     ```
+2. **Actor Identity Impersonation Guard**:
+   - Providing a caller-supplied `actor="alice"` string without an authentic Bearer token raises:
+     ```text
+     Caller-supplied actor identity ('alice') cannot establish authority without valid authentication.
+     ```
+   - If an `actor` argument is supplied alongside an `auth_token`, it must strictly match the token's authenticated subject (`username`); token-identity divergence raises `PermissionError`.
+3. **Cross-Bank Institutional Boundary**:
+   - A valid token issued to a user at `bank_b` cannot execute actions on behalf of `bank_a`:
+     ```text
+     Cross-bank direct service operation rejected: Principal 'user_b' from institution 'bank_b' cannot perform governance actions on behalf of institution 'bank_a'.
+     ```
+4. **Inactive Principal Invalidation**:
+   - The user account must be actively provisioned in `DurableAccountStore` (`is_active=True` and `status == "active"`). Suspended, locked out, or deleted users are rejected.
+5. **Governance Role Gating**:
+   - The principal's assigned roles must intersect with the governance whitelist `{"admin", "ml_lead", "compliance"}`. Non-governance roles (`analyst`, `auditor`, `external_evaluator`) fail closed with `PermissionError`.
 
 ---
 

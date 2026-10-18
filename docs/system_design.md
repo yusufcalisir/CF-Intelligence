@@ -97,29 +97,31 @@ The Collaborative Fraud Intelligence (CFI) platform supports 3 flexible deployme
 Services write states to `RedisStore`. In development environments, `RedisStore`, `CacheService`, `RedisBankClientListener`, and the core lifespan startup probes implement dual-layer credential auto-healing and container host re-routing (mapping Docker container hostname `redis` to `127.0.0.1` and reconciling development credential variations between `.env` and local scripts). If Redis is completely offline or unconfigured, `RedisStore` catches the exception and routes reads/writes to a thread-safe, in-memory Python dictionary backend. This ensures the demo interface and local test suites remain stable under transient failures.
 
 ### 3.3 Enterprise Model Registry & Governance (SR 11-7 Compliance)
-*   **Production Admission Gating (`validate_production_admission`):** Before any candidate model can be promoted to active production serving, it must pass rigorous automated quality gates:
+*   **Production Admission Gating (`validate_production_admission`):** Before any candidate model checkpoint can be admitted for production serving, it must pass combined cryptographic and institutional quality gates:
+    - **Combined Admission Invariant (Strictly Mandatory in Production):** Both a verified asymmetric Ed25519 training execution receipt (`TRAINING_RECORDED` or `TRAINING_EVIDENCE_VERIFIED`) **AND** Four-Eyes Principle dual control sign-offs must be present and verified. Neither alone is sufficient.
     - **PR-AUC Degradation Boundary:** $\text{PR-AUC}_{\text{cand}} \ge \text{PR-AUC}_{\text{champ}} - 0.005$.
     - **ROC-AUC Floor:** $\text{ROC-AUC}_{\text{cand}} \ge 0.65$.
     - **False Positive Rate Ceiling:** $\text{FPR}_{\text{cand}} \le 5\%$ ($0.05$).
-    - **Inference Latency SLA:** $p95 \le 200\text{ms}$ under production benchmark load.
-    - **Fairness Disparity Guardrails:** Demographic Parity and Equal Opportunity disparity across demographic/regional slices bounded by $\le 0.10$.
+    - **Fairness Disparity Guardrails:** Demographic Parity and Equal Opportunity disparity across proxy segments bounded by $\le 0.10$.
     - **Finite Tensor Weight Verification:** All parameter tensors strictly validated via `torch.isfinite()` to eliminate NaN/Inf contamination.
     - **Holdout Canary Gate:** Evaluated against an isolated, non-training verification holdout set. Candidates failing any admission condition remain registered in historical audit archives but are blocked from deployment.
-*   **Four-Eyes Dual Sign-off Workflow:** Promotion to Champion or Challenger is gated behind cryptographic approval from distinct institutional roles: an ML Engineer (`ROLE_ML_ENGINEER`) and a Compliance Officer (`ROLE_COMPLIANCE_OFFICER`). Dual signatures are recorded immutably with role verification and timestamps.
+*   **Model Registry Manifest Lifecycle & Four-Eyes Governance:**
+    - **Manifest Lifecycle States:** Checkpoints transition through manifest statuses (`inactive`, `challenger`, `champion`, `revoked`) and governance flags (`is_approved`, `is_production_eligible`, `is_active`).
+    - **Approval vs. Champion Activation:** Valid Four-Eyes dual control sign-offs from an ML Engineer (`ml_engineer` or `ml_lead`) and a Compliance Officer (`compliance` or `compliance_officer`) grant `is_approved=True`. An approved model version remains in `status="inactive", is_active=False` until an authenticated operator with clearance level $\ge 2$ explicitly triggers champion activation via `promote_version` or `rollback`.
+    - **Anti-Collusion & Account Restrictions:** The two approvers must be distinct individuals (`ml_user != comp_user`, `ml_uid != comp_uid`). Development seeded accounts (`admin`, `analyst_a1`, `analyst_b1`, `analyst_c1`, `auditor`) are rejected; approvers must be verified active institutional accounts in `DurableAccountStore`.
+    - **Cryptographic Sign-Off Binding:** Each sign-off binds to `{simulation_id}:{version}:{artifact_sha256}:{role}:{user}` with an HMAC-SHA256 signature generated under domain key `DOMAIN_APPROVAL_SIGNOFF`.
 *   **Production Serving Isolation & Safe Deserialization:**
     - Runtime isolation between Champion (active production decision-maker) and Challenger (shadow routing) execution paths.
     - Safe model weight loading strictly enforcing `torch.load(..., weights_only=True)` to prevent arbitrary code execution vulnerabilities.
-    - Atomic on-disk symlink updates (`global_model.pt`) leveraging temporary file creation (`tempfile.NamedTemporaryFile`) and atomic replacement (`os.replace`) to eliminate partial read or torn read hazards under high-concurrency inference streams.
+    - Atomic on-disk symlink updates (`active_model.pt`) leveraging temporary file creation (`tempfile.NamedTemporaryFile`) and atomic replacement (`os.replace`) to eliminate partial read or torn read hazards under high-concurrency inference streams.
 *   **Instant Cross-Worker Cache Invalidation:**
     - Redis Sentinel Pub/Sub broadcasts eviction messages (`MODEL_PROMOTED`, `MODEL_ROLLBACK`, `MODEL_REVOKED`) across all distributed API worker instances.
-    - On receiving an invalidation event, workers purge warm in-memory model caches and reload the new champion model within sub-100ms, completely closing stale serving windows.
-*   **Fail-Closed Serving Invariants (SR 11-7 & `AGENTS.md`):** Real-time scoring routes (`POST /v1/inference/score`) strictly enforce fail-closed behavior. If no valid champion model is available, if a model has been revoked, or if scoring fails, the endpoint returns `HTTP 503 Service Unavailable` with `ModelNotAvailableError`. The system strictly prohibits synthetic, random, or heuristic score fallbacks.
-*   **Shadow Routing & Performance Monitoring:** Routes 100% of live traffic to the Challenger model silently, logging comparative performance statistics. A randomized 10% slice of decision-making traffic can be routed to Challenger predictions for production A/B testing.
-*   **Lineage & Reproducibility Audits:** Each saved model tracks Git commit SHA, dataset SHA-256 hashes, differential privacy noise configuration ($\epsilon, \delta, \sigma$), and training receipt signatures to guarantee an unbroken chain-of-custody.
-*   **Automated Rollback Engine:** Tracks live performance metrics on a sliding window. Automatically triggers rollback to the last known stable champion version if active model telemetry breaches:
-    - ROC-AUC drops below `0.65`
-    - Scoring latency exceeds `200ms`
-    - False Positive Rate (FPR) exceeds `5%` ($0.05$)
+    - On receiving an invalidation event, workers purge warm in-memory model caches and reload the new champion model within sub-100ms, closing stale serving windows.
+*   **Fail-Closed Serving Invariants (SR 11-7 & `AGENTS.md`):** Real-time scoring routes (`POST /v1/inference/score`) strictly enforce fail-closed behavior in production. If no valid champion model is available, if a model has been revoked, or if scoring fails, the endpoint returns `HTTP 503 Service Unavailable` with `ModelNotAvailableError`. Heuristic score fallback is strictly restricted to supported demo/simulation modes (`_is_demo_mode_active()`).
+*   **Durable Nonce Replay Prevention:** Internal authority contexts (`TrustedInternalContext`) used for automated rollbacks or orchestrations are bound to single-use nonces atomically consumed via `DurableNonceStore`, with file-level locking (`filelock.FileLock`) and domain-separated integrity seals (`DOMAIN_REPLAY_STORE_INTEGRITY`). In-memory stores fail closed in production.
+*   **Kafka Ingestion & Stale-Worker Idempotency:** Payment streaming ingestion via `IdempotencyEngine` acquires Redis reservations bound to worker ownership tokens (`owner_id`). Stale workers whose reservations expire cannot commit messages; Lua scripts enforce owner matching upon completion. In the event of broker-ACK / Redis-completion uncertainty, the system returns `False` and retries, guaranteeing at-least-once delivery.
+*   **WebSocket Replay Semantics Duality:** Multi-worker deployments stream replayed events via Redis list (`lrange` on `simulation:{id}:events`) and Pub/Sub. When Redis is unavailable or unconfigured, the system falls back to a worker-local in-memory ring buffer (`get_room_history`), which only retains events processed by that specific worker process.
+*   **Tenant Database Engine Lifecycle Consistency:** The engine registry verifies `_compute_engine_signature` (URL and pool options) on checked-out tenant sessions, raising `RuntimeError` if configurations diverge during runtime.
 
 ### 3.4 Physical Multi-Tenancy & Cryptographic Key Isolation (SOC2 / PCI-DSS)
 To guarantee data sovereignty and strict database-level boundaries required by banking regulations (SOC2, PCI-DSS):
@@ -172,24 +174,31 @@ For high-frequency sliding-window behavioral aggregations across continuous paym
 
 To guarantee mathematical reproducibility, eliminate phantom execution claims, and provide cryptographically verifiable training provenance:
 
-*   **Transactional Job Authority Backends (`training_authority_backends.py`):**
-    - **`PostgresTrainingJobAuthority` (Production ACID Authority):** Coordinates federated training jobs and round assignments using transactional row-level locks (`SELECT ... FOR UPDATE`). Eliminates check-then-act race conditions, duplicate job execution attempts, and phantom round submissions under high-concurrency multi-bank scheduling.
-    - **`InMemoryTrainingJobAuthority` (Development/Testing):** Thread-safe, lock-synchronized execution authority backend used for deterministic unit testing and local developer workflows without database dependencies.
-*   **Asymmetric Ed25519 Execution Receipts (`IsolatedReceiptSigningAuthority`):**
-    - Client banks generate cryptographically verifiable execution receipts signed via isolated Ed25519 asymmetric key pairs (`training_provenance_service.py`).
-    - Receipts bind immutable tuples: `(job_id, round_number, epoch_index, bank_id, parameter_hash, timestamp, signature)`.
+*   **Transactional Job Authority Backends ([`backend/app/infrastructure/database/training_authority_backends.py`](../backend/app/infrastructure/database/training_authority_backends.py)):**
+    - **`PostgresTrainingJobAuthority` (Production ACID Relational Authority):** Coordinates federated training jobs and round assignments using transactional row-level locks (`SELECT ... FOR UPDATE`). Eliminates check-then-act race conditions, duplicate job execution attempts, and phantom round submissions under high-concurrency multi-bank scheduling. Uses `pg_advisory_xact_lock` for DDL synchronization and scrubs database connection credentials (`redact_database_url`, `sanitize_database_error_message`) prior to logging.
+    - **Concrete Immutable Execution Records:** State transitions and telemetry are recorded across 6 schema-isolated tables:
+      1. `ScheduledTrainingJob` (`cfi_scheduled_jobs`): Coordinator registration, expected rounds/epochs, input dimension, architectural bounds.
+      2. `StartedTrainingJob` (`cfi_started_jobs`): Worker initialization and start timestamp.
+      3. `RoundObservation` (`cfi_round_observations`): Per-bank, per-round telemetry (actual samples, executed epochs, observed loss, and $\text{SHA-256}(\Delta w)$ update digest).
+      4. `GlobalAggregationEvent` (`cfi_global_aggregations`): Immutable aggregation record binding accepted participants and aggregated global model digest.
+      5. `ModelEvaluationEvent` (`cfi_model_evaluations`): Evaluation run metrics bound to final artifact SHA-256 digest.
+      6. `CompletedJobExecutionRecord` (`cfi_completed_executions`): Authoritative completion record certifying reconciled rounds, epochs, samples, and artifact digest.
+    - **`SQLiteTrainingJobAuthority` & `InMemoryTrainingJobAuthority` (Development/Testing Only):** Restrictive single-host WAL or in-memory authorities used exclusively for local development and unit tests. In production mode, non-Postgres authorities fail closed (`TrainingProvenanceConfigurationError`).
+*   **Asymmetric Ed25519 Execution Receipts ([`backend/app/application/services/training_provenance_service.py`](../backend/app/application/services/training_provenance_service.py)):**
+    - Client banks generate cryptographically verifiable execution receipts signed via isolated Ed25519 asymmetric key pairs by [`IsolatedReceiptSigningAuthority`](../backend/app/application/services/distributed_fl_service.py).
+    - Receipts bind immutable tuples: `(job_id, round_number, epoch_index, bank_id, parameter_hash, timestamp, signature)` with domain token `cfi-training-provenance-v1`.
     - Central coordinator validates every receipt against an authoritative public key registry; receipts signed with unknown, forged, or revoked keys are rejected immediately.
-*   **Sequential Epoch Reconciliation (`reconcile_job_completion_evidence`):**
-    - Enforces strict canonical epoch sequence verification across submitted receipts before round aggregation.
-    - Requires contiguously ordered epochs $[1..E]$ without skips, gaps, duplicates, or out-of-order execution claims.
-    - Prevents planned-only or partial execution claims from being credited as complete training runs.
+*   **Canonical Sequential Epoch & Unique Sample Reconciliation (`reconcile_job_completion_evidence`):**
+    - Enforces strict canonical epoch sequence verification:
+      $$\text{canonical\_epochs} = \sum_{r=1}^{R} \max_{b \in B_r} (\text{actual\_local\_epochs}_{b, r})$$
+      Rejects worker-sum, planned-only, or last-round-only epoch substitutions.
+    - Strictly reconciles dataset sample counts against unique dataset samples across participating banks ($\sum \text{unique\_samples}_b$); repeated sample exposures cannot be substituted for unique dataset samples.
 *   **Parameter Update Digest Anti-Replay Verification:**
     - Coordinator cryptographically computes and validates the SHA-256 digest of submitted parameter updates against execution receipt hashes before aggregating weights.
     - Detects and rejects replay attacks where an adversarial or lagging participant attempts to reuse previous rounds' updates or cross-round cached parameters.
-*   **OS-Level Multi-Process Vault File Locking (`BankPrivateStorageVault`):**
+*   **OS-Level Multi-Process Vault File Locking ([`BankPrivateStorageVault`](../backend/app/application/services/distributed_fl_service.py)):**
     - Prevents concurrent process race conditions and write corruption on local bank model vaults, checkpoints, and credentials.
-    - Employs Windows `CreateFileW` with `FILE_SHARE_READ` and `LOCKFILE_EXCLUSIVE_LOCK` via Win32 API.
-    - Employs POSIX `fcntl.flock(LOCK_EX | LOCK_NB)` on Linux/macOS systems.
+    - Employs Windows `CreateFileW` with `dwShareMode=0` via Win32 API and POSIX `fcntl.flock(LOCK_EX)` on Linux/macOS.
     - Ensures atomic, single-writer multi-reader integrity across distributed container daemons and background Celery workers.
 
 ### 3.10 OpenTelemetry Distributed Tracing & Span Lifecycle Architecture

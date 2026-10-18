@@ -1086,49 +1086,51 @@ Provides real-time bank edge-node registration, institutional hardware capabilit
 
 ### 18.21 Model Registry Production Admission Verification (`POST /api/v1/models/{simulation_id}/versions/{version}/promote`)
 
-Submits a candidate model checkpoint for formal production admission gating. Enforces HMAC-SHA256 integrity, canonical schema match, holdout Canary Gate evaluation, and either a cryptographically verified Ed25519 `TrainingExecutionReceipt` or formal Four-Eyes dual control sign-off:
+Promotes a specific model version (`version: int`) to `champion` or `challenger` status. In production mode (`app_env == 'production'`), this endpoint strictly requires:
+1. **Mandatory Bearer Authorization Header** (`Authorization: Bearer <access_token>`). Principal must be active in `DurableAccountStore` with role in `{"admin", "ml_lead", "ml_engineer"}` and minimum clearance level 2.
+2. **Institutional Governance Authority**: Calling principal's institution must match simulation ownership.
+3. **Combined Admission Invariants**:
+   - Cryptographic Ed25519 `TrainingExecutionReceipt` verification (`architecture`, `feature_schema_version`, `input_dim`, `feature_names`, matching SHA-256 artifact digest on disk, non-revoked `key_id`).
+   - Four-Eyes Principle: Two active, distinct institutional sign-offs (`ml_engineer` and `compliance_officer`), neither of which can be a development seeded account (`admin`, `analyst_a1`, etc.), bound to the canonical HMAC payload.
+   - Holdout Canary Gate evaluation (when `enforce_sr11_7: true` and `target_status: "champion"`): $\text{PR-AUC} \ge \text{min\_auc}$ and disparate impact ratio $\ge \text{min\_fairness\_score}$.
 
-**Promotion Request:**
+**Request Headers:**
+```http
+Authorization: Bearer <operator_jwt_token>
+Content-Type: application/json
+```
+
+**Request Payload (`ModelPromoteRequest`):**
 ```json
 {
-  "simulation_id": "sim_crossbank_prod_01",
-  "version": "v3.2.0",
-  "evaluation_dataset": "holdout_validation_set_2026_q3",
-  "canary_pr_auc_threshold": 0.85,
-  "provenance_receipt": {
-    "job_id": "job_fl_round_25",
-    "authority_id": "auth_postgres_production_01",
-    "domain_token": "cfi-training-provenance-v1",
-    "signature_algorithm": "Ed25519",
-    "public_key_id": "key_ed25519_authority_2026",
-    "signature": "3b68f3a9e142c...d5a892b1",
-    "canonical_epochs": 25,
-    "feature_schema_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-  }
+  "target_status": "champion",
+  "enforce_sr11_7": true,
+  "min_auc": 0.65,
+  "min_fairness_score": 0.80
 }
 ```
 
-*Response (HTTP 200 OK):*
+*Response (HTTP 200 OK — `ModelPromoteResponse`):*
 ```json
 {
-  "simulation_id": "sim_crossbank_prod_01",
-  "version": "v3.2.0",
-  "status": "PRODUCTION",
-  "champion": true,
-  "promoted_at": 1758922800.0,
-  "weights_sha256": "4a72d3f9b8c12e87a552b419c8f003b123992147ea4182410a568282362489c7",
-  "canary_gate": {
-    "status": "PASSED",
-    "candidate_pr_auc": 0.8842,
-    "champion_pr_auc": 0.8810,
-    "delta_pr_auc": 0.0032
+  "version": 1,
+  "target_status": "champion",
+  "message": "Model version 1 successfully promoted to champion.",
+  "is_active": true,
+  "status": "champion",
+  "sr11_7_validation": {
+    "passed": true,
+    "rule_name": "Federal Reserve SR 11-7 / OCC 2011-12",
+    "checks": {
+      "performance_gate": "AUC-ROC 0.8842 >= 0.6500",
+      "fairness_gate": "Disparate impact >= 0.8000",
+      "sign_offs_count": 2
+    },
+    "recommendations": [
+      "Maintain continuous telemetry monitoring for concept drift post-rollout."
+    ]
   },
-  "provenance_verification": {
-    "status": "VERIFIED",
-    "verifier": "TrainingReceiptVerifier",
-    "signing_authority": "auth_postgres_production_01"
-  },
-  "cache_invalidation_broadcast": true
+  "timestamp": "2026-10-18T04:15:00Z"
 }
 ```
 
@@ -1136,21 +1138,57 @@ Submits a candidate model checkpoint for formal production admission gating. Enf
 
 ### 18.22 Active Champion Model Query (`GET /api/v1/models/{simulation_id}/active`)
 
-Retrieves the active certified production champion model metadata, version hash, and serving status:
+Retrieves metadata of the currently active champion model version from the registry manifest (also aliased at `GET /api/v1/models/{simulation_id}/champion`). Returns HTTP 404 if no champion is currently active.
 
-*Response (HTTP 200 OK):*
+*Response (HTTP 200 OK — `ModelVersionItem`):*
 ```json
 {
-  "simulation_id": "sim_crossbank_prod_01",
-  "active_version": "v3.2.0",
-  "status": "PRODUCTION",
-  "model_family": "fraud_detection_mlp",
-  "weights_sha256": "4a72d3f9b8c12e87a552b419c8f003b123992147ea4182410a568282362489c7",
-  "feature_schema_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "serving_path": "active_model.pt",
-  "pr_auc": 0.8842,
-  "recall_at_001_fpr": 0.582,
-  "verified_at": 1758922800.0
+  "version": 1,
+  "filename": "global_model.pt",
+  "metrics": {
+    "auc_roc": 0.8842,
+    "pr_auc": 0.8415,
+    "f1": 0.8620,
+    "loss": 0.1245
+  },
+  "is_active": true,
+  "status": "champion",
+  "git_commit_hash": "be3270135b797777035d6a396f3753a594c9b15b",
+  "dataset_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "dp_noise_profile": {
+    "mechanism": "gaussian",
+    "epsilon": 2.5,
+    "delta": 1e-5
+  },
+  "sign_offs": [
+    {
+      "role": "ml_engineer",
+      "user": "engineer_chen",
+      "signature": "a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8",
+      "timestamp": "2026-10-18T03:50:00Z",
+      "fairness_score": 0.94,
+      "bias_metric": 0.02,
+      "drift_divergence": 0.01,
+      "status": "active",
+      "is_active": true,
+      "is_revoked": false
+    },
+    {
+      "role": "compliance",
+      "user": "officer_valerie",
+      "signature": "f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9",
+      "timestamp": "2026-10-18T04:05:00Z",
+      "fairness_score": 0.94,
+      "bias_metric": 0.02,
+      "drift_divergence": 0.01,
+      "status": "active",
+      "is_active": true,
+      "is_revoked": false
+    }
+  ],
+  "created_at": "2026-10-18T03:30:00Z",
+  "is_approved": true,
+  "is_production_eligible": true
 }
 ```
 
@@ -1158,79 +1196,132 @@ Retrieves the active certified production champion model metadata, version hash,
 
 ### 18.23 Four-Eyes Dual Control Sign-Off (`POST /api/v1/models/{simulation_id}/versions/{version}/signoff`)
 
-Submits an authoritative supervisory cryptographic sign-off satisfying **Federal Reserve SR 11-7** and **OCC Bulletin 2011-12** model risk management governance:
+Records an authoritative officer sign-off on a specific integer model version. Enforces strict Four-Eyes governance:
+- **Authorization**: Mandatory Bearer token (`Authorization: Bearer <access_token>`).
+- **Claimed User Match**: `payload.user` must match the authenticated token principal (`username` or `sub`).
+- **Active User Verification**: Principal must exist and be active in `DurableAccountStore`.
+- **Role Verification**: `role` must be `'compliance'` (matching roles `{"compliance", "compliance_officer", "admin"}`) or `'ml_engineer'` (matching roles `{"ml_engineer", "ml_lead"}`). Both token claims and live database roles are enforced.
+- **Institutional Governance**: Calling principal's institution must match simulation ownership.
+- **Cryptographic Binding**: The signature is cryptographically bound to `{simulation_id}:{version}:{sha256}:{role}:{user}`.
 
-**Sign-Off Request:**
+**Request Headers:**
+```http
+Authorization: Bearer <officer_jwt_token>
+Content-Type: application/json
+```
+
+**Request Payload (`ModelSignOffRequest`):**
 ```json
 {
-  "role": "compliance_officer",
-  "supervisor_id": "usr_compliance_lead_04",
-  "approval_rationale": "Validated holdout PR-AUC retention and demographic fairness parity across all participating bank partitions.",
-  "signature_token": "SIG_SUPERVISOR_4a72d3f9b8c12e87a552b419"
+  "role": "compliance",
+  "user": "officer_valerie",
+  "signature": "f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9",
+  "fairness_score": 0.94,
+  "bias_metric": 0.02,
+  "drift_divergence": 0.01
 }
 ```
 
-*Response (HTTP 200 OK):*
+*Response (HTTP 200 OK — `ModelVersionItem`):*
 ```json
 {
-  "simulation_id": "sim_crossbank_prod_01",
-  "version": "v3.2.0",
-  "signoff_status": "APPROVED",
-  "approvals": [
+  "version": 1,
+  "filename": "global_model.pt",
+  "metrics": {
+    "auc_roc": 0.8842,
+    "pr_auc": 0.8415
+  },
+  "is_active": false,
+  "status": "inactive",
+  "git_commit_hash": "be3270135b797777035d6a396f3753a594c9b15b",
+  "dataset_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "dp_noise_profile": {
+    "mechanism": "gaussian",
+    "epsilon": 2.5,
+    "delta": 1e-5
+  },
+  "sign_offs": [
     {
-      "role": "ml_lead",
-      "supervisor_id": "usr_ml_lead_01",
-      "signed_at": 1758922100.0
-    },
-    {
-      "role": "compliance_officer",
-      "supervisor_id": "usr_compliance_lead_04",
-      "signed_at": 1758922750.0
+      "role": "compliance",
+      "user": "officer_valerie",
+      "signature": "f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9",
+      "timestamp": "2026-10-18T04:05:00Z",
+      "fairness_score": 0.94,
+      "bias_metric": 0.02,
+      "drift_divergence": 0.01,
+      "status": "active",
+      "is_active": true,
+      "is_revoked": false
     }
   ],
-  "governance_compliant": true
+  "created_at": "2026-10-18T03:30:00Z",
+  "is_approved": false,
+  "is_production_eligible": false
 }
 ```
 
 ---
 
-### 18.24 High-Throughput Real-Time Inference & Fail-Closed Serving (`POST /v1/inference/score`)
+### 18.24 Real-Time Inference & Fail-Closed Serving (`POST /v1/inference/score`)
 
-High-throughput, low-latency transaction inference endpoint with multi-tenant quota accounting and fail-closed security invariants:
+High-throughput, real-time transaction scoring route (aliased at `POST /api/v1/inference/score`). Evaluates transactions against the verified active champion model with Redis in-memory model caching, circuit breaker protection, and multi-tenant quota metering:
 
-**Inference Request:**
+- **Production Fail-Closed Invariant**: In production environments (`app_env == 'production'`), if a verified champion model is not loaded, is revoked, or is corrupt, this endpoint **fails closed** with `HTTP 503 Service Unavailable`. In production, all 10 features are strictly required; missing features return `HTTP 422 Unprocessable Entity` (zero fabrication). `force_fallback: true` returns `HTTP 400 Bad Request`.
+- **Demo / Simulation Fallback**: Heuristic fallback via `InferenceFallbackEngine` is **strictly restricted to supported demo/simulation modes** (`_is_demo_mode_active()`).
+
+**Request Payload (`RealtimeInferenceRequest`):**
 ```json
 {
   "transaction_id": "tx_2026_9948201",
   "amount": 1450.00,
-  "velocity_1h": 3,
+  "currency": "USD",
+  "source_account": "acc_001",
+  "target_account": "acc_002",
   "merchant_category": "electronics",
+  "velocity_1h": 3,
+  "customer_history_score": 0.85,
+  "chargeback_count": 0,
+  "account_age_days": 180,
   "country_code": "DE",
-  "hour_of_day": 14
+  "device_type": "mobile_app",
+  "merchant_risk_score": 0.12,
+  "hour_of_day": 14,
+  "force_fallback": false,
+  "simulation_id": "sim_crossbank_prod_01"
 }
 ```
 
-*Response (HTTP 200 OK):*
+*Response (HTTP 200 OK — `RealtimeInferenceResponse`):*
 ```json
 {
   "transaction_id": "tx_2026_9948201",
   "risk_score": 0.082,
   "decision": "ALLOW",
-  "evaluated_by": "CHAMPION_MODEL_v3.2.0",
   "latency_ms": 2.45,
-  "explanation": "Normal velocity (3 tx/h) and domestic retail profile within baseline variance."
+  "evaluated_by": "ML_MODEL",
+  "explanation": "ML Model: Normal transaction pattern"
 }
 ```
 
-**Fail-Closed Error Response (HTTP 503 Service Unavailable):**
-When the active model is unavailable, unverified, or revoked, or when the inference circuit breaker trips, the system strictly returns HTTP 503 in accordance with the repository's `AGENTS.md` runtime truth invariant (zero fake scores or silent low-risk placeholders):
+**Production Fail-Closed Error Response (HTTP 503 Service Unavailable):**
 ```json
 {
   "detail": {
-    "code": "MODEL_NOT_AVAILABLE",
-    "message": "Production champion model is unverified, revoked, or unavailable; inference fails closed."
+    "code": "MODEL_NOT_READY",
+    "message": "A verified champion model is not currently available."
   }
 }
 ```
+
+**Circuit Breaker Open Response (HTTP 503 Service Unavailable):**
+```json
+{
+  "detail": {
+    "code": "CIRCUIT_BREAKER_OPEN",
+    "message": "Inference circuit breaker is open due to consecutive failures; scoring unavailable."
+  }
+}
+```
+
 
 ---

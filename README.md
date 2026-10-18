@@ -471,7 +471,6 @@ CF-Intelligence/
 │   │   │
 │   │   ├── infrastructure/                          # Infrastructure & External Technology Adapters
 │   │   │   ├── security/                            # Enterprise Security Suite & Cryptographic Drivers
-│   │   │   │   ├── training_authority_backends.py   # Authoritative ACID training job backends (PostgresTrainingJobAuthority with SELECT ... FOR UPDATE)
 │   │   │   │   ├── auth_service.py                  # Enterprise auth, short-lived JWTs (15m), refresh rotation, brute-force lockout
 │   │   │   │   ├── password_hasher.py               # Bcrypt password hashing (cost=12) with salted digests
 │   │   │   │   ├── error_handler.py                 # Production error sanitization, zero stack trace leakage & Sentry hook
@@ -505,6 +504,7 @@ CF-Intelligence/
 │   │   │   │
 │   │   │   ├── database/                            # SQLAlchemy Async ORM, engine, search_path isolation & DDL quoting
 │   │   │   │   ├── __init__.py                      # Engine pool, multi-tenant session factory & metadata migration
+│   │   │   │   ├── training_authority_backends.py   # Authoritative ACID training job backends (PostgresTrainingJobAuthority with SELECT ... FOR UPDATE)
 │   │   │   │   ├── tenant_provisioner.py            # PostgreSQL schema & SQLite dynamic tenant database provisioner
 │   │   │   │   ├── migration_manager.py             # Programmatic Alembic database migration runner & auto-stamping
 │   │   │   │   └── migrations/                      # Alembic versioned schema migrations
@@ -925,7 +925,7 @@ $$
    - `GET /api/v1/coordinator/quorum-status`: Inspect dynamic round quorum progress and countdown.
    - `POST /api/v1/coordinator/rounds/prune`: Free historical in-memory round data to maintain constant memory footprint.
 
-### 5.4 Production Training Provenance & Execution Authority (`training_provenance_service.py`, `training_authority_backends.py`, `distributed_fl_service.py`)
+### 5.4 Production Training Provenance & Execution Authority (`training_provenance_service.py`, `backend/app/infrastructure/database/training_authority_backends.py`, `distributed_fl_service.py`)
 To prevent training history fabrication and unverified model promotion, production federated training is governed by decoupled execution and provenance authorities:
 - **Asymmetric Ed25519 Receipts:** The decoupled `IsolatedReceiptSigningAuthority` signs `TrainingExecutionReceipt` envelopes with its private Ed25519 key. Verifiers (such as the Model Registry) evaluate receipts using public keys exclusively.
 - **Postgres ACID Row Locks:** `PostgresTrainingJobAuthority` enforces atomic state transitions (`REGISTERED` $\to$ `ROUNDS_IN_PROGRESS` $\to$ `RECONCILING` $\to$ `COMPLETED`) via PostgreSQL `SELECT ... FOR UPDATE` row locks (strictly required in `app_env="production"`).
@@ -1284,9 +1284,9 @@ The persistence tier utilizes SQLAlchemy 2.0 Async ORM backed by a linear, three
 - **Offline Migration Mode:** Generates standalone SQL DDL statements (`--sql`) for strict air-gapped change-control environments.
 
 ### 12.2 Concurrency Safety, Model Registry Admission & Instant Cache Invalidation
-- **Enterprise Model Registry Admission & Four-Eyes Governance:** `ModelRegistry` and `ModelRegistryVault` enforce formal admission verification (`validate_production_admission`), requiring HMAC-SHA256 integrity, canonical schema match, holdout Canary Gate evaluation, and either verified Ed25519 training receipts or Four-Eyes dual control sign-off (`DOMAIN_APPROVAL_SIGNOFF`).
+- **Enterprise Model Registry Admission & Combined Invariants:** `ModelRegistry` enforces formal admission verification (`validate_production_admission`), requiring HMAC-SHA256 integrity, canonical schema match, holdout Canary Gate evaluation, and the **combined admission invariant**: BOTH verified asymmetric Ed25519 training receipts (`TRAINING_RECORDED`) AND Four-Eyes dual control sign-offs (`ml_engineer` + `compliance_officer`), distinct individuals, non-development accounts, and payload binding under `DOMAIN_APPROVAL_SIGNOFF`. Approved models transition to manifest status `inactive` (`is_approved=True`) and require explicit operator activation before serving live traffic as `champion`.
 - **Atomic File Swaps & Instant Cross-Worker Invalidation:** Checkpoint persistence enforces atomic tempfile replacements (`tempfile` + `os.replace`) and atomic symlinks (`active_model.pt`). Key or model revocation triggers an instant Redis Sentinel pub/sub broadcast, immediately evicting warm in-memory model instances across all workers to eliminate warm-cache bypass.
-- **Fail-Closed Serving Invariants:** Real-time inference endpoints (`/api/v1/predict`, `/v1/inference/score`) return HTTP 503 (`ModelNotAvailableError`) if the champion model is missing, unverified, or revoked. Untrained, random, or heuristic fallbacks are strictly prohibited.
+- **Fail-Closed Serving Invariants:** Real-time inference endpoints (`/api/v1/predict`, `/v1/inference/score`) return HTTP 503 (`ModelNotAvailableError`) if the champion model is missing, unverified, or revoked. Untrained, random, or heuristic fallbacks are strictly prohibited in production.
 - **Atomic Tenant Metering:** `TenantMeteringService` utilizes an atomic `acquire_quota(tenant_id, tier, units)` routine to eliminate check-then-act race conditions during high-volume inference bursts.
 - **Three-State Idempotency Key Pipeline:** `IdempotencyService` manages request states (`"ACQUIRED"`, `"IN_PROGRESS"`, `"HIT"`) with a bounded 24-hour TTL (86,400s) preventing duplicate concurrent execution of financial workflows and replay attacks.
 - **Tamper-Evident Audit Chain:** `ImmutableAuditChain` guarantees thread-safe, append-only block addition with HMAC-SHA256 integrity verification.

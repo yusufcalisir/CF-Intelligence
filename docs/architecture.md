@@ -74,7 +74,7 @@ Contains business logic orchestration. Defines ports (interfaces) for data acces
 ### 2.3 Infrastructure Layer ([`backend/app/infrastructure/`](../backend/app/infrastructure))
 Contains concrete implementations of adapters, persistence engines, cryptographic drivers, and external systems.
 
-* [`security/training_authority_backends.py`](../backend/app/infrastructure/security/training_authority_backends.py): Authoritative ACID persistence backends for federated training execution (`PostgresTrainingJobAuthority` with row-level locks `SELECT ... FOR UPDATE`, strictly mandatory in production; `SQLiteTrainingJobAuthority` for isolated local development), and canonical sequential execution epoch reconciliation (`reconcile_job_completion_evidence`).
+* [`database/training_authority_backends.py`](../backend/app/infrastructure/database/training_authority_backends.py): Authoritative ACID persistence backends for federated training execution (`PostgresTrainingJobAuthority` with row-level locks `SELECT ... FOR UPDATE`, strictly mandatory in production; `SQLiteTrainingJobAuthority` for isolated local development), and canonical sequential execution epoch reconciliation (`reconcile_job_completion_evidence`).
 * [`database/migration_manager.py`](../backend/app/infrastructure/database/migration_manager.py) & [`database/migrations/env.py`](../backend/app/infrastructure/database/migrations/env.py): Alembic linear dual-revision migration engine (`001_production_domain_tables` $\to$ `002_core_and_aml_tables`) with dynamic tenant discovery from `tenant_configs`, PostgreSQL `search_path` injection protection (`_pg_quote_identifier`), SQLite file-based tenant isolation, offline airgap `--sql` generation, and automatic schema adoption (`_ensure_migrated_or_stamped`).
 * [`database/models.py`](../backend/app/infrastructure/models.py) & [`database/session.py`](../backend/app/infrastructure/database/__init__.py): SQLAlchemy 2.0 async engine and relational models partitioned dynamically per active tenant.
 * [`security/kms_service.py`](../backend/app/application/services/kms_service.py): Multi-tenant Key Management Service enforcing AES-256-GCM versioned envelope encryption (`v2:{iv_b64}:{tag_b64}:{ciphertext_b64}`), live HashiCorp Vault connectivity detection with simulated fallback telemetry, and automated background database re-encryption pipelines.
@@ -586,7 +586,7 @@ The full signed certificate string is hashed with SHA-256 to produce an immutabl
 
 ## 14. Production Training Provenance & Execution Authority
 
-To eliminate single-point coordinator trust, prevent training history spoofing, and guarantee that models deployed to production are derived exclusively from authentic, verified federated training rounds, the platform introduces a decoupled **Production Training Provenance & Execution Authority** subsystem ([`backend/app/application/services/training_provenance_service.py`](../backend/app/application/services/training_provenance_service.py), [`backend/app/infrastructure/security/training_authority_backends.py`](../backend/app/infrastructure/security/training_authority_backends.py), and [`backend/app/application/services/distributed_fl_service.py`](../backend/app/application/services/distributed_fl_service.py)).
+To eliminate single-point coordinator trust, prevent training history spoofing, and guarantee that models deployed to production are derived exclusively from authentic, verified federated training rounds, the platform introduces a decoupled **Production Training Provenance & Execution Authority** subsystem ([`backend/app/application/services/training_provenance_service.py`](../backend/app/application/services/training_provenance_service.py), [`backend/app/infrastructure/database/training_authority_backends.py`](../backend/app/infrastructure/database/training_authority_backends.py), and [`backend/app/application/services/distributed_fl_service.py`](../backend/app/application/services/distributed_fl_service.py)).
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -594,8 +594,9 @@ To eliminate single-point coordinator trust, prevent training history spoofing, 
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │ 1. JOB REGISTRATION & ACID STATE MACHINE                                              │
 │    Coordinator ──(Register Job)──► PostgresTrainingJobAuthority                        │
+│                                    ├── Advisory Lock: pg_advisory_xact_lock()           │
 │                                    ├── ACID Row Lock: SELECT ... FOR UPDATE            │
-│                                    └── State: REGISTERED -> ROUNDS_IN_PROGRESS         │
+│                                    └── Records: ScheduledTrainingJob -> StartedTraining│
 │                                                                                        │
 │ 2. ISOLATED MULTI-PROCESS EXECUTION & OS-LOCKED VAULTS                                │
 │    Bank Node Worker A (PID 101)                Bank Node Worker B (PID 102)            │
@@ -604,52 +605,109 @@ To eliminate single-point coordinator trust, prevent training history spoofing, 
 │        └── Zero raw data to coordinator            └── Zero private keys to coordinator│
 │                                                                                        │
 │ 3. ROUND PROGRESSION & ANTI-REPLAY ENFORCEMENT                                         │
-│    Workers submit (Round, Epoch Evidence, Update Digest SHA-256(Δw))                   │
+│    Workers submit RoundObservation (actual_sample_count, actual_epochs, Δw digest)     │
 │    └── Authority asserts digests are unique & sequential (Rejects cross-round replay)  │
+│    Coordinator commits GlobalAggregationEvent (accepted participants & model digest)   │
 │                                                                                        │
-│ 4. CANONICAL EPOCH RECONCILIATION                                                      │
+│ 4. CANONICAL RECONCILIATION & EVALUATION GATE                                          │
 │    PostgresTrainingJobAuthority.reconcile_job_completion_evidence()                    │
-│    └── canonical_epochs = sum(max(round_epochs_per_bank)) [Rejects planned spoofing]  │
+│    ├── canonical_epochs = sum(max(actual_executed_epochs per round))                   │
+│    ├── canonical_samples = sum(unique_samples across participating banks)              │
+│    └── ModelEvaluationEvent bound to final artifact_sha256 digest                      │
 │                                                                                        │
 │ 5. ASYMMETRIC RECEIPT SIGNING (DECOUPLED AUTHORITY)                                    │
 │    IsolatedReceiptSigningAuthority (Holds Ed25519 Private Key)                         │
 │    └── Signs TrainingExecutionReceipt with Domain Token "cfi-training-provenance-v1"   │
 │    └── Coordinator holds ZERO receipt signing keys                                     │
 │                                                                                        │
-│ 6. CONSUMPTION AT MODEL REGISTRY ADMISSION                                             │
+│ 6. COMBINED ADMISSION GATING AT MODEL REGISTRY                                         │
 │    ModelRegistry.validate_production_admission()                                       │
-│    └── TrainingReceiptVerifier verifies receipt using Ed25519 Public Key Only          │
+│    ├── Invariant A: Cryptographically Verified Ed25519 TrainingExecutionReceipt        │
+│    └── Invariant B: Four-Eyes Dual Sign-Off (ML Engineer + Compliance Officer)         │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 14.1 Asymmetric Ed25519 Digital Signatures
-In legacy configurations, symmetric HMAC keys created an architectural flaw where verifiers (such as model registries or compliance gateways) possessed the ability to forge valid training receipts. The platform strictly enforces asymmetric **Ed25519** digital signatures (Edwards-curve Digital Signature Algorithm):
+### 14.1 Authoritative Training Execution Records & State Schema
+
+The Training Execution Authority enforces strict schema isolation and immutable execution telemetry via 6 concrete dataclass records defined in [`backend/app/infrastructure/database/training_authority_backends.py`](../backend/app/infrastructure/database/training_authority_backends.py):
+
+1. **`ScheduledTrainingJob`**:
+   - Persisted when an authorized training coordinator registers a training job (`cfi_scheduled_jobs`).
+   - Fields: `job_id`, `training_run_id`, `simulation_id`, `coordinator_id`, `architecture`, `feature_schema_version`, `expected_rounds`, `expected_epochs`, `input_dim`, `feature_names`, `permitted_workers`, `config_fingerprint`, `scheduled_at`, `status="SCHEDULED"`.
+   - Represents an unverified scheduling contract; cannot be certified without verified runtime execution evidence.
+
+2. **`StartedTrainingJob`**:
+   - Persisted when an authorized worker process begins training execution (`cfi_started_jobs`).
+   - Fields: `job_id`, `training_run_id`, `simulation_id`, `worker_id`, `started_at`, `status="STARTED"`.
+
+3. **`RoundObservation`**:
+   - Immutable record of an authorized training round observation submitted by a participating bank node (`cfi_round_observations`).
+   - Fields: `event_id`, `job_id`, `training_run_id`, `simulation_id`, `worker_id`, `bank_id`, `round_number`, `attempt_number`, `actual_sample_count`, `actual_executed_epochs`, `observed_loss`, `metrics`, `execution_timestamp`, `model_update_digest`, `execution_status="COMPLETED"`.
+   - Generates deterministic `payload_digest` via SHA-256 for idempotent deduplication and anti-conflict checking.
+
+4. **`GlobalAggregationEvent`**:
+   - Immutable record of an authorized federated parameter aggregation operation (`cfi_global_aggregations`).
+   - Fields: `event_id`, `job_id`, `round_number`, `aggregation_algorithm`, `accepted_participant_ids`, `accepted_local_update_digests`, `aggregation_configuration`, `aggregated_global_model_digest`, `timestamp`, `aggregation_status="COMPLETED"`.
+   - Enforces $1:1$ parity between accepted participant identifiers and accepted parameter update digests.
+
+5. **`ModelEvaluationEvent`**:
+   - Immutable record of an authorized model evaluation (`cfi_model_evaluations`).
+   - Fields: `event_id`, `job_id`, `evaluation_run_id`, `metric_name`, `metric_value`, `evaluated_artifact_digest`, `evaluator_identity`, `evaluation_timestamp`, `evaluation_dataset_manifest`.
+   - Binds evaluation metrics (such as PR-AUC or ROC-AUC) directly to the 64-character SHA-256 digest of the evaluated checkpoint artifact.
+
+6. **`CompletedJobExecutionRecord`**:
+   - Authoritative, persisted record of a fully completed and reconciled training execution (`cfi_completed_executions`).
+   - Fields: `job_id`, `training_run_id`, `simulation_id`, `completed_at`, `executed_rounds`, `executed_epochs`, `sample_count`, `observed_metrics`, `artifact_sha256`, `architecture`, `feature_schema_version`, `input_dim`, `feature_names`, `worker_id`, `status="COMPLETED"`, `git_commit_hash`, `dataset_manifest_id`.
+
+### 14.2 Authoritative ACID Job Authority Backends & PostgreSQL Concurrency Control
+
+To eliminate race conditions, duplicate executions, and out-of-order state transitions, job execution tracking is governed by authoritative backends:
+
+- **`PostgresTrainingJobAuthority`**:
+  - Mandatory in production deployments (`app_env="production"`). Backed by `psycopg` (v3) with transactional connection management.
+  - **Advisory Locks During Schema Migration**: Schema initialization synchronizes using `SELECT pg_advisory_xact_lock(hashtext('cfi_schema_init_lock'))` to prevent DDL collisions across concurrent workers.
+  - **Row-Level Concurrency Control**: State transitions acquire explicit PostgreSQL row-level locks:
+    ```sql
+    SELECT status, expected_rounds, expected_epochs, architecture, feature_schema_version, input_dim
+    FROM cfi_scheduled_jobs
+    WHERE job_id = %(job_id)s
+    FOR UPDATE
+    ```
+    This eliminates check-then-act race conditions, duplicate worker executions, and concurrent round collision across distributed orchestration workers.
+  - **Connection Credential Redaction & Log Scrubbing**: Database URLs and connection credentials are scrubbed using `redact_database_url` and `sanitize_database_error_message` prior to emission in logs or exception contexts.
+- **SQLite and In-Memory Backends**:
+  - [`SQLiteTrainingJobAuthority`](../backend/app/infrastructure/database/training_authority_backends.py) (WAL mode) and `InMemoryTrainingJobAuthority` are strictly restricted to isolated local development and single-process test fixtures.
+  - Production initialization fails closed (`TrainingProvenanceConfigurationError`) if an in-memory authority or SQLite is configured in a production environment.
+
+### 14.3 Canonical Sequential Epoch & Sample Reconciliation
+
+A common vulnerability in distributed training telemetry is reporting "planned" epochs, worker-sum epochs (e.g., claiming 50 epochs because 5 workers each trained for 10 epochs), or repeated sample exposures as unique training data. The authority strictly enforces reconciliation via `reconcile_job_completion_evidence()`:
+
+1. **Round Count & Continuity**:
+   - Observed rounds must form a contiguous, unbroken sequence $[1, 2, \dots, R]$ matching claimed `executed_rounds`.
+   - Completed rounds cannot be fewer than the scheduled contract (`executed_rounds >= sched_expected_rounds`).
+2. **Canonical Unique Sample Reconciliation**:
+   - The receipt `sample_count` must strictly represent unique dataset samples across participating banks:
+     $$\text{canonical\_unique\_samples} = \sum_{b \in B} \text{unique\_samples}_b$$
+   - Repeated sample exposures across rounds ($\sum \text{samples}_{b,r} \times \text{epochs}_{b,r}$) cannot be substituted for unique dataset samples. Mismatched sample claims raise `TrainingProvenanceSecurityError`.
+3. **Canonical Sequential Epoch Accounting**:
+   - Executed epochs are reconciled as the sum of the maximum local epochs per round:
+     $$\text{canonical\_executed\_epochs} = \sum_{r=1}^{R} \max_{b \in B_r} (\text{actual\_local\_epochs}_{b, r})$$
+   - Claiming worker-sum epochs, last-round-only epochs, planned epochs, or 0 epochs raises `TrainingProvenanceSecurityError` and fails the job.
+
+### 14.4 Decoupled Asymmetric Ed25519 Receipt Signing Authority
+
+In legacy configurations, symmetric HMAC keys created an architectural flaw where verifiers possessed the ability to forge valid training receipts. The platform strictly enforces asymmetric **Ed25519** digital signatures:
 - **Decoupled Signing Authority**: Only [`IsolatedReceiptSigningAuthority`](../backend/app/application/services/distributed_fl_service.py) holds the Ed25519 private signing key. The training coordinator, bank worker processes, and API gateway hold zero receipt-signing keys.
 - **Public-Key Verification**: Any consuming service (including [`TrainingReceiptVerifier`](../backend/app/application/services/training_provenance_service.py) in the Model Registry) validates receipts using strictly the public key of the authoritative signing entity.
 - **Domain Separation Token**: Every signature envelope binds a mandatory domain separation token (`domain_token="cfi-training-provenance-v1"`), canonical model family, dataset hash, feature schema digest, and ISO 8601 UTC timestamp to prevent cross-protocol signature substitution.
+- **Instant Revocation**: If a signing key or authority is compromised, calling `revoke_key(key_id, reason)` marks the key as revoked with an immutable timestamp. Any subsequent verification attempt for receipts signed by that key fails closed immediately.
 
-### 14.2 Authoritative ACID Job Authority Backends
-To prevent race conditions, duplicate executions, and out-of-order state transitions, job execution tracking is governed by authoritative backends:
-- **`PostgresTrainingJobAuthority`**: In production deployments (`app_env="production"`), PostgreSQL row-level locks (`SELECT ... FOR UPDATE`) are strictly mandatory. State transitions (`REGISTERED` $\to$ `ROUNDS_IN_PROGRESS` $\to$ `RECONCILING` $\to$ `COMPLETED`) are committed within atomic database transactions.
-- **SQLite and In-Memory Backends**: [`SQLiteTrainingJobAuthority`](../backend/app/infrastructure/security/training_authority_backends.py) and `InMemoryTrainingJobAuthority` are strictly restricted to isolated local development and single-process test fixtures. Production initialization fails closed if an in-memory authority is configured.
-- **Anti-Replay & Update Digest Verification**: Participating bank nodes must compute and submit parameter update digests:
-  $$\text{Update Digest} = \text{SHA-256}(\mathbf{w}_{\text{new}} - \mathbf{w}_{\text{old}})$$
-  The authority verifies that update digests are globally unique per round, preventing malicious or compromised nodes from replaying previously recorded updates across different training rounds or parallel jobs.
+### 14.5 Bank Node Private Storage Vaults & Physical OS Locks
 
-### 14.3 Canonical Sequential Epoch Reconciliation
-A common vulnerability in distributed training telemetry is reporting "planned" epochs or summing epochs across all workers (e.g., reporting 50 epochs because 5 workers each trained for 10 epochs). The authority enforces strict sequential epoch reconciliation via `reconcile_job_completion_evidence()`:
-$$\text{canonical\_epochs} = \sum_{r=1}^{R} \max_{b \in B_r} (\text{actual\_local\_epochs}_{b, r})$$
-If any participating bank node failed to complete the round or if intermediate evidence is missing, the authority refuses to certify the job and transitions the state to `FAILED` or `REJECTED`.
-
-### 14.4 Bank Node Private Storage Vaults & Physical OS Locks
 Bank node data sovereignty is enforced at the operating system level via [`BankPrivateStorageVault`](../backend/app/application/services/distributed_fl_service.py):
 - **Exclusive OS File Locking**: Vault files are locked using platform-native APIs—`kernel32.CreateFileW` with `dwShareMode=0` on Windows, and `fcntl.flock(LOCK_EX)` on POSIX—guaranteeing exclusive read/write access and preventing concurrent file access or race tampering by other processes.
 - **Zero Raw Data Access**: The central coordinator process has zero filesystem access to raw bank transaction ledgers. Model training executes in dedicated worker processes (`DistributedFederatedTrainingManager`), which serialize only gradient/weight updates through secure aggregation pipelines.
-
-### 14.5 Trusted Public Key Registry & Instant Revocation
-The provenance subsystem maintains a dynamic [`TrustedKeyRegistry`](../backend/app/application/services/training_provenance_service.py):
-- **Authority Trust Binding**: Public keys must be registered with an explicit authority identifier, algorithm (`Ed25519`), validity window, and authorized model families.
-- **Instant Revocation**: If a signing key or authority is compromised, calling `revoke_key(key_id, reason)` marks the key as revoked with an immutable timestamp. Any subsequent verification attempt for receipts signed by that key fails closed immediately.
 
 ---
 
@@ -662,42 +720,62 @@ The `ModelRegistry` ([`backend/app/application/services/model_registry.py`](../b
                │
                ▼
  [ validate_production_admission() ]
-       ├── 1. Checkpoint Integrity: HMAC-SHA256 digest verification
-       ├── 2. Feature Schema Match: Canonical input tensor shape & order
-       ├── 3. Provenance Gate (Either / Or):
-       │     ├── Pathway A: Valid Ed25519 TrainingExecutionReceipt from trusted authority
-       │     └── Pathway B: Four-Eyes Dual Sign-Off (ML Lead + Compliance Officer per SR 11-7)
+       ├── 1. Checkpoint Integrity: SHA-256 digest on disk matches manifest
+       ├── 2. Feature Schema Match: Canonical FraudDetectionNN input tensor (10 features)
+       ├── 3. COMBINED ADMISSION INVARIANTS (BOTH STRICTLY MANDATORY IN PRODUCTION):
+       │     ├── Invariant A: Verified Ed25519 TrainingExecutionReceipt (TRAINING_RECORDED)
+       │     └── Invariant B: Four-Eyes Dual Sign-Off (ML Engineer + Compliance Officer)
+       │           ├── Distinct Individuals (ml_user != comp_user)
+       │           ├── Non-Development Accounts (Seeded admin/analyst rejected)
+       │           └── Cryptographic HMAC-SHA256 bound to {sim_id}:{version}:{sha256}:{role}:{user}
        ├── 4. Canary Evaluation Gate: Holdout validation PR-AUC >= Active AUC - 0.005
        └── 5. Secure Deserialization: torch.load(weights_only=True)
                │
-               ▼ (Admission Granted)
- [ Atomic Promotion & Cache Invalidation ]
-       ├── Atomic Symlink: tempfile.NamedTemporaryFile + os.replace -> active_model.pt
-       └── Redis Sentinel Pub/Sub: Invalidation event broadcasts to all workers
+               ▼ (Admission Granted: is_approved = True)
+ [ Promotion / Activation Stage ]
+       ├── Inactive Approved State: status = "inactive", is_active = False
+       └── Explicit Champion Activation (POST .../promote or rollback):
+             ├── Manifest State Transition: status = "champion", is_active = True
+             ├── Atomic Symlink Pointer: NamedTemporaryFile + os.replace -> active_model.pt
+             └── Redis Sentinel Invalidation Bus: Broadcasts cache eviction to all workers
 ```
 
-### 15.1 Model Checkpoint Lifecycle State Machine
-Model versions transition through a strictly governed lifecycle:
-| State | Description | Serving Availability |
-|:---|:---|:---|
-| `DRAFT` | Checkpoint registered during local or intermediate federated training rounds. | Offline only |
-| `CANDIDATE` | Fully aggregated and evaluated global model awaiting production admission verification. | Staging / Validation only |
-| `PRODUCTION` | Active champion model certified for real-time inference and transaction scoring. | Live serving (Single active version) |
-| `ARCHIVED` | Former champion model preserved for audit compliance, reproducible replay, and rollback. | Offline / Replay only |
-| `ROLLED_BACK` | Model demoted due to live performance degradation, data drift, or canary alert. | Deprecated |
-| `REVOKED` | Model revoked due to security defect, key compromise, or regulatory mandate. | Strictly prohibited |
+### 15.1 Model Registry Manifest Lifecycle State Machine
 
-Only one single model version can occupy the `PRODUCTION` champion state per model family at any given time.
+Model checkpoints in the active `ModelRegistry` manifest transition through explicit statuses and governance flags:
 
-### 15.2 Production Admission Validation (`validate_production_admission`)
-Before any model checkpoint is permitted to transition to `PRODUCTION`, it must pass comprehensive gatekeeping:
-1. **Checkpoint File Integrity**: The checkpoint file's cryptographic hash must match the registered manifest SHA-256 digest, verifying that weights were not tampered with on disk.
-2. **Canonical Feature Schema Verification**: The model's expected input feature vector dimensionality and ordering are verified against the repository's canonical feature schema hash. Checkpoints trained on mismatched or obsolete feature representations are rejected.
-3. **Cryptographic Provenance Gate**: The checkpoint must provide authoritative proof of provenance via one of two mutually exclusive or combined criteria:
-   - **`TRAINING_RECORDED`**: A verified, cryptographically signed `TrainingExecutionReceipt` issued by an authorized `PostgresTrainingJobAuthority` and verified via asymmetric Ed25519 public key.
-   - **`DOMAIN_APPROVAL_SIGNOFF`**: A formal Four-Eyes dual control sign-off envelope adhering to **Federal Reserve SR 11-7** and **OCC Bulletin 2011-12** model risk management guidance, requiring digital signatures from both the Lead ML Engineer and the Chief Compliance Officer.
-4. **Canary Evaluation Gate**: The candidate model is evaluated on a designated holdout validation dataset. It must satisfy:
-   $$\text{PR-AUC}_{\text{candidate}} \ge \text{PR-AUC}_{\text{champion}} - 0.005 \quad \text{and} \quad \text{Recall@0.01\% FPR} \ge 0.50$$
+| Manifest Status | Governance Attributes | Operational Semantics | Serving Availability |
+|:---|:---|:---|:---|
+| `inactive` | `is_approved=False`, `is_active=False` | Newly registered version awaiting dual sign-offs and admission verification. | Offline only |
+| `inactive` *(Approved)* | `is_approved=True`, `is_active=False` | Cryptographically signed off by ML Lead and Compliance Officer; eligible for promotion. | Staging / Validation only |
+| `challenger` | `is_approved=True`, `is_active=False` | Approved model version actively routing shadow inference traffic for canary comparison. | Shadow evaluation only |
+| `champion` | `is_approved=True`, `is_active=True` | Active production decision-maker certified for real-time transaction scoring. | Live primary serving |
+| `revoked` | `is_revoked=True`, `is_active=False` | Revoked due to drift alert, key revocation, security defect, or regulatory mandate. | Strictly prohibited (Fails closed) |
+
+> [!IMPORTANT]
+> **Approval vs. Champion Activation:** An approved model version (`is_approved=True`) does not automatically serve live traffic. It remains in `status="inactive", is_active=False` until an authenticated operator with clearance level $\ge 2$ explicitly triggers champion activation via `promote_version` or `rollback`. Exactly one active champion version is permitted per model family at any time.
+
+### 15.2 Combined Production Admission Invariants (`validate_production_admission`)
+
+In production environments (`app_env == 'production'`), model admission strictly enforces combined cryptographic and institutional verification:
+
+1. **Integrity & Schema Verification**:
+   - Checkpoint artifact on disk must be a non-empty regular file located within the simulation directory.
+   - Cryptographic SHA-256 digest of the on-disk file must match the registered manifest digest.
+   - Model input dimensions and tensor order must match the repository's canonical schema (`input_dim = 10`, `architecture = "FraudDetectionNN"`).
+2. **Cryptographic Training Receipt Invariant (Mandatory)**:
+   - Provenance type must be `TRAINING_RECORDED` or `TRAINING_EVIDENCE_VERIFIED`. Models with `UNVERIFIED`, `STRUCTURAL_FIXTURE`, or `LEGACY_UNVERIFIED` are rejected immediately.
+   - Checkpoint must include a cryptographically verified `TrainingExecutionReceipt` signed with an authorized Ed25519 private key by `IsolatedReceiptSigningAuthority`, matching feature names, input dimension, and non-revoked `key_id`.
+3. **Four-Eyes Dual Control Sign-Off Invariant (Mandatory)**:
+   - Must contain at least two verified, active institutional sign-offs:
+     - One ML Engineer sign-off (`role in ("ml_engineer", "ml_lead")`).
+     - One Compliance Officer sign-off (`role in ("compliance", "compliance_officer")`).
+   - **Distinct Individuals**: The two sign-offs must originate from distinct institutional users (`ml_user != comp_user` and `ml_uid != comp_uid`).
+   - **Non-Development Accounts**: Production promotion rejects development seeded accounts (`admin`, `analyst_a1`, `analyst_b1`, `analyst_c1`, `auditor`). Approvers must be verified active institutional accounts in `DurableAccountStore`.
+   - **Cryptographic Binding**: Each sign-off is bound to canonical payload `{simulation_id}:{version}:{artifact_sha256}:{role}:{user}` with an HMAC-SHA256 signature generated under the derived domain key `DOMAIN_APPROVAL_SIGNOFF`.
+4. **Canary Evaluation Gate**:
+   - The candidate model must satisfy holdout validation performance criteria:
+     $$\text{PR-AUC}_{\text{candidate}} \ge \text{PR-AUC}_{\text{champion}} - 0.005 \quad \text{and} \quad \text{Recall@0.01\% FPR} \ge 0.50$$
 
 ### 15.3 Secure Deserialization & Atomic Disk Persistence
 - **Arbitrary Code Execution Protection**: Checkpoint deserialization strictly enforces PyTorch's `torch.load(..., weights_only=True)`. Unpickling of arbitrary Python executable code, functions, or unapproved classes is completely blocked.
@@ -714,7 +792,55 @@ When an active model, signing key, or training authority is revoked, leaving sta
 ### 15.5 Fail-Closed Serving Invariants
 In strict adherence to the repository's `AGENTS.md` runtime truth rule:
 - If no active champion model is certified in the registry, or if the active model fails validation or is revoked, live inference endpoints (`/api/v1/predict`, `/v1/inference/score`) return **HTTP 503 Service Unavailable** (`ModelNotAvailableError`).
-- The system **never** silently substitutes untrained weights, random probability outputs, heuristic fallbacks, or static low-risk scores (e.g., returning `0.15` or `0.0`) to mask model unavailability. A truthful failure is enforced over a fabricated success.
+- The system **never** silently substitutes untrained weights, random probability outputs, heuristic fallbacks, or static low-risk scores (e.g., returning `0.15` or `0.0`) to mask model unavailability in production. A truthful failure is enforced over a fabricated success.
+
+### 15.6 Durable Nonce Replay Prevention & Trusted Internal Context
+
+Automated orchestration workflows (such as canary evaluation rollbacks or coordinator mutations) utilize [`TrustedInternalContext`](../backend/app/application/services/model_registry.py):
+- **Cryptographic Authority Token**: Context payloads bind `service_name`, `action`, `resource_type`, `resource_id`, `model_version`, `bank_id`, `created_at`, `ttl_seconds`, and a unique `nonce`.
+- **Domain Separation**: Signed with HMAC-SHA256 under `DOMAIN_INTERNAL_AUTHORITY` ("cfi:internal_execution_context:v2"). In production mode, an independently provisioned high-entropy secret (`CFI_INTERNAL_CONTEXT_SECRET` $\ge 32$ characters) is mandatory; default or test secrets fail closed immediately.
+- **Durable Nonce Store (`DurableNonceStore`)**:
+  - Nonces are consumed atomically via [`DurableNonceStore`](../backend/app/infrastructure/security/durable_nonce_store.py) to prevent multi-process replay attacks.
+  - State is persisted with file-level locking (`filelock.FileLock`) and an HMAC integrity seal under `DOMAIN_REPLAY_STORE_INTEGRITY`.
+  - In-memory nonce stores are strictly forbidden in production mode (`NonceStoreIntegrityError`).
+
+### 15.7 Kafka Streaming Connector, Redis Idempotency & Stale-Worker Protection
+
+High-throughput streaming ingestion is managed by [`KafkaStreamingConnector`](../backend/app/infrastructure/connectors/kafka_streaming_connector.py) and [`IdempotencyEngine`](../backend/app/infrastructure/connectors/kafka_streaming_connector.py):
+- **Ownership-Bound Reservations**: To avoid race conditions between distributed consumer workers, `try_acquire(idempotency_key)` acquires a Redis reservation bound to an ephemeral worker ownership token:
+  $$\text{owner\_id} = \text{engine\_id} + \text{"\_"} + \text{uuid4().hex[:8]}$$
+- **Authoritative 3-State Lifecycle**: State transitions progress from `ACQUIRED` $\to$ `IN_PROGRESS` $\to$ `COMMITTED`. In production, if Redis is unavailable during acquisition, `try_acquire` fails closed (returns `False`).
+- **Stale-Worker Protection**: When a worker stalls or network partitions exceed `ttl_seconds`, the reservation expires. If the stale worker subsequently attempts to invoke `mark_processed()`, an atomic Redis Lua script verifies ownership; because the reservation expired or was reassigned to a healthy worker, completion is rejected.
+- **Broker-ACK / Redis-Completion Uncertainty**:
+  If a message is successfully acknowledged by the Kafka broker but the subsequent Redis `mark_processed()` call fails or experiences a timeout, the operation returns `False`. The message was transmitted to Kafka but was not marked as committed in Redis. A subsequent retry will reprocess or redeliver the event, providing **at-least-once delivery semantics**. The system does not assert unverified distributed "exactly-once" delivery across independent distributed state stores.
+
+### 15.8 WebSocket Replay Semantics Duality
+
+Real-time training telemetry and simulation monitoring over WebSockets (`backend/app/presentation/websockets/training_ws.py`) exhibit dual replay semantics based on deployment infrastructure:
+- **Redis-Backed Distributed Replay (Multi-Worker Production)**:
+  - When Redis is available, historical events are retrieved via `redis_client.lrange("simulation:{simulation_id}:events", 0, -1)`.
+  - Replayed events are streamed sequentially to newly connected clients, followed by subscription to the Redis Pub/Sub channel for live events. This guarantees consistent event history across horizontally scaled API workers.
+  - A 2.0-second timeout guard prevents slow Redis queries from hanging client handshakes.
+- **Worker-Local In-Process Fallback (Single-Process Development)**:
+  - When Redis is unconfigured, offline, or times out, the handler falls back to `training_ws_manager.get_room_history(room_name)`.
+  - This in-memory ring buffer is strictly local to the specific OS process handling the connection. Events emitted on other workers are not visible in the replay, truthfully reflecting single-process non-durability limitations.
+
+### 15.9 Multi-Tenant Database Engine Lifecycle & Configuration Consistency
+
+Multi-tenant database access ([`backend/app/infrastructure/database/__init__.py`](../backend/app/infrastructure/database/__init__.py)) provides isolated relational persistence per banking institution:
+- **Tenant Context Variable**: Requests and background loops bind institution identity to `active_tenant: contextvars.ContextVar[str | None]`.
+- **Engine Signature Verification (`_compute_engine_signature`)**:
+  - The engine registry caches `AsyncEngine` instances per tenant.
+  - An immutable configuration signature is computed over the resolved database URL and connection pool settings (`pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle`, `connect_args`).
+  - If database configuration changes while an engine is cached, `_get_or_create_engine()` refuses to silently reuse stale connections and raises `RuntimeError`, requiring an explicit call to `dispose_all_engines()`.
+- **PostgreSQL Schema Isolation**: Production multi-tenancy isolates data via separate databases (`fraud_intelligence_{bank_id}`) or isolated PostgreSQL schemas with sanitized identifier escaping (`_pg_quote_identifier`).
+
+### 15.10 Operational Reality & Boundary Guarantees
+
+In adherence to the `AGENTS.md` runtime truth rule:
+- **No Unverifiable SLAs**: The platform does not assert unconditional sub-millisecond tail latencies ($p99$) or zero-downtime cluster SLAs unless backed by concrete operational benchmark artifacts under specified hardware conditions.
+- **No Fabricated Distributed Guarantees**: In-memory dictionary fallbacks are explicitly documented as worker-local and non-durable. Software-emulated TEE drivers (`tee_driver.py`) are labeled as software emulations rather than physical hardware enclaves.
+- **Fail-Closed Principle**: When dependencies (such as PostgreSQL authorities, Redis locks, or cryptographic sign-off verifiers) fail, the system fails closed rather than substituting synthetic success.
 
 ---
 
