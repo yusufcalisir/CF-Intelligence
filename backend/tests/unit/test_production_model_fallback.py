@@ -40,11 +40,17 @@ def clean_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[No
     # Reinitialize global registry and service in router
     import app.presentation.routers.predict as predict_module
 
+    old_registry = predict_module._registry
+    old_model_service = predict_module._model_service
     predict_module._registry = ModelRegistry(storage_dir=storage_dir)
     predict_module._model_service = ModelService(get_settings())
     clear_all_serving_caches()
-    yield
-    clear_all_serving_caches()
+    try:
+        yield
+    finally:
+        predict_module._registry = old_registry
+        predict_module._model_service = old_model_service
+        clear_all_serving_caches()
 
 
 class TestProductionModelFallbackElimination:

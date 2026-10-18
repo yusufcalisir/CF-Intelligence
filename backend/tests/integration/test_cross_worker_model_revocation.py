@@ -128,21 +128,26 @@ def revocation_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str,
     verifier = TrainingReceiptVerifier(trust_store=trust_store)
     registry = ModelRegistry(storage_dir=storage_dir, verifier=verifier)
 
+    old_registry = predict_router._registry
     predict_router.clear_all_serving_caches()
     predict_router._registry = registry
 
-    return {
-        "storage_dir": storage_dir,
-        "tokens": tokens,
-        "issuer": issuer,
-        "verifier": verifier,
-        "trust_store": trust_store,
-        "key_id": key_id,
-        "admin_token": admin_token,
-        "jwt_secret": jwt_secret,
-        "registry": registry,
-        "auth_svc": auth_svc,
-    }
+    try:
+        yield {
+            "storage_dir": storage_dir,
+            "tokens": tokens,
+            "issuer": issuer,
+            "verifier": verifier,
+            "trust_store": trust_store,
+            "key_id": key_id,
+            "admin_token": admin_token,
+            "jwt_secret": jwt_secret,
+            "registry": registry,
+            "auth_svc": auth_svc,
+        }
+    finally:
+        predict_router._registry = old_registry
+        predict_router.clear_all_serving_caches()
 
 
 def _create_and_register_champion(

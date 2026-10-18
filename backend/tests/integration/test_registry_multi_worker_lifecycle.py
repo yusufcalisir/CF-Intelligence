@@ -156,20 +156,30 @@ def lifecycle_env(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> dict[str, A
 
     import app.presentation.routers.predict as predict_router
 
+    old_registry = predict_router._registry
+    old_trust_store = tps._DEFAULT_TRUST_STORE
+    old_verifier = tps._DEFAULT_VERIFIER
+
     predict_router.clear_all_serving_caches()
     predict_router._registry = registry
 
-    return {
-        "registry": registry,
-        "eval_engine": eval_engine,
-        "tokens": tokens,
-        "issuer": issuer,
-        "verifier": verifier,
-        "jwt_secret": jwt_secret,
-        "tmp_path": tmp_path,
-        "key_id": key_id,
-        "trust_store": trust_store,
-    }
+    try:
+        yield {
+            "registry": registry,
+            "eval_engine": eval_engine,
+            "tokens": tokens,
+            "issuer": issuer,
+            "verifier": verifier,
+            "jwt_secret": jwt_secret,
+            "tmp_path": tmp_path,
+            "key_id": key_id,
+            "trust_store": trust_store,
+        }
+    finally:
+        predict_router._registry = old_registry
+        tps._DEFAULT_TRUST_STORE = old_trust_store
+        tps._DEFAULT_VERIFIER = old_verifier
+        predict_router.clear_all_serving_caches()
 
 
 def _create_serialized_model_and_receipt(

@@ -246,15 +246,6 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
     """
     global _cached_serving_model, _cached_serving_model_mtime, _cached_serving_model_kid, _cached_serving_model_version
 
-    # 0. Warm-cache fast path for high-frequency burst serving (100ms window)
-    now = time.time()
-    with _serving_cache_lock:
-        cached_entry = _serving_model_cache.get(simulation_id)
-        if cached_entry is not None and (now - _cached_serving_model_mtime < 0.10):
-            cached_model, cached_ident = cached_entry
-            _cached_serving_model_version = cached_ident.get("version")
-            return cached_model
-
     # 1. Revalidate active champion identity from manifest
     try:
         active_ident = _registry.get_active_champion_identity(simulation_id=simulation_id)
