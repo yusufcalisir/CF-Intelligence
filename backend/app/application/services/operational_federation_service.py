@@ -33,6 +33,7 @@ import os
 import threading
 import time
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -1034,6 +1035,7 @@ class OperationalFederationService:
         num_rounds: int = 2,
         expected_unique_samples: int | None = None,
         consortium_id: str = "cfi-consortium",
+        dp_config: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute operational federated learning lifecycle with complete authority verification and lifecycle ownership."""
         settings = get_settings()
@@ -1093,6 +1095,7 @@ class OperationalFederationService:
                     worker_pids=worker_pids,
                     app_env=active_env,
                     consortium_id=clean_consortium_id,
+                    dp_config=dp_config,
                 )
             else:
                 # Non-production path: direct execution through manager
@@ -1115,6 +1118,7 @@ class OperationalFederationService:
                     registry_storage_dir=self._registry_storage_dir,
                     model_registry=self._model_registry,
                     consortium_id=clean_consortium_id,
+                    dp_config=dp_config,
                 )
 
             # 3. Truthful execution status and evidence validation
@@ -1154,6 +1158,8 @@ class OperationalFederationService:
                 "worker_pids": result.get("worker_pids") or {},
                 "saved_version": saved_version,
                 "receipt": result.get("receipt"),
+                "dp_enabled": bool(result.get("dp_enabled", False)),
+                "dp_provenance": result.get("dp_provenance") or {},
             }
 
         finally:

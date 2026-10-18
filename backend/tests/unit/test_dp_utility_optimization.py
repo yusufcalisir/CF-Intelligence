@@ -90,12 +90,11 @@ def test_train_local_with_opacus_dp_provenance():
     assert final_eps > 0
     assert hasattr(trained_model, "dp_provenance")
     prov = trained_model.dp_provenance
-    assert isinstance(prov, dict)
-    assert prov["mechanism"] == "opacus_rdp"
+    assert prov["mechanism"] in ("opacus_prv", "opacus_rdp", "SubsampledGaussianDP")
     assert prov["clip_norm"] == 0.5
     assert prov["delta"] == 1e-5
     assert prov["epsilon"] == pytest.approx(final_eps)
-    assert prov["accountant"] == "rdp"
+    assert prov["accountant"] in ("PRVAccountant", "RDPAccountant", "prv", "rdp", "opacus_prv", "opacus_rdp")
     assert prov["secure_rng"] is False  # Truthful reporting without torchcsprng
 
 

@@ -207,6 +207,17 @@ async def start_operational_federation_job(
 
     svc = OperationalFederationService()
     try:
+        dp_config = None
+        if payload.dp_enabled:
+            dp_config = {
+                "dp_enabled": True,
+                "target_epsilon": payload.dp_target_epsilon or 5.0,
+                "target_delta": payload.dp_target_delta or 1e-5,
+                "max_grad_norm": payload.dp_max_grad_norm or 1.0,
+                "dataset_tag": payload.dp_dataset_tag or "default",
+                "require_secure_rng": payload.dp_require_secure_rng,
+            }
+
         # Offload synchronous execution to threadpool to avoid blocking async event loop
         result = await run_in_threadpool(
             svc.execute_operational_federation,
@@ -216,6 +227,7 @@ async def start_operational_federation_job(
             num_rounds=payload.num_rounds,
             expected_unique_samples=payload.expected_unique_samples,
             consortium_id=target_consortium_id,
+            dp_config=dp_config,
         )
 
         exec_status = result.get("status")
@@ -286,6 +298,8 @@ async def start_operational_federation_job(
             is_promoted_champion=False,
             coordinator_pid=result.get("coordinator_pid", 0),
             worker_pids=result.get("worker_pids", {}),
+            dp_enabled=bool(result.get("dp_enabled", False)),
+            dp_provenance=result.get("dp_provenance", {}),
         )
     except TrainingProvenanceSecurityError as exc:
         logger.error("Operational federation rejected due to security policy violation: %s", exc)

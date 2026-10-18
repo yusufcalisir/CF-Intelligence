@@ -71,14 +71,16 @@ class PrivacyBudget:
         eval_orders = orders or DEFAULT_RDP_ORDERS
         best_eps = float("inf")
 
+        from opacus.accountants.analysis.rdp import compute_rdp
+
         for alpha in eval_orders:
             if alpha <= 1.0:
                 continue
-            rdp_sum = sum(
-                (alpha * (q**2)) / (2.0 * (sigma**2))
-                for sigma, q in zip(self._sigma_history, self._q_history, strict=False)
-                if sigma > 0
-            )
+            rdp_sum = 0.0
+            for sigma, q in zip(self._sigma_history, self._q_history, strict=False):
+                if sigma > 0:
+                    step_rdp = float(compute_rdp(q=q, noise_multiplier=sigma, steps=1, orders=[alpha])[0])
+                    rdp_sum += step_rdp
             converted_eps = rdp_sum + (np.log(1.0 / target_delta) / (alpha - 1.0))
             if converted_eps < best_eps:
                 best_eps = float(converted_eps)

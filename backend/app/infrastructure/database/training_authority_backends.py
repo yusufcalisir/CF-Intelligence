@@ -111,12 +111,41 @@ class ScheduledTrainingJob:
     scheduled_at: str = ""
     status: str = "SCHEDULED"
     consortium_id: str | None = None
+    dp_config: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.feature_names, (list, tuple)):
             object.__setattr__(self, "feature_names", tuple(self.feature_names))
         if isinstance(self.permitted_workers, (list, tuple)):
             object.__setattr__(self, "permitted_workers", tuple(self.permitted_workers))
+
+
+@dataclasses.dataclass(frozen=True)
+class InstitutionalPrivacyBudget:
+    """Authoritative durable record of an institution's privacy budget for a protected dataset."""
+
+    bank_id: str
+    dataset_tag: str
+    allocated_epsilon: float
+    allocated_delta: float
+    spent_epsilon: float = 0.0
+    spent_delta: float = 0.0
+    reserved_epsilon: float = 0.0
+    reserved_delta: float = 0.0
+    total_steps_executed: int = 0
+    active_reservations: dict[str, Any] = dataclasses.field(default_factory=dict)
+    history: list[Any] = dataclasses.field(default_factory=list)
+    last_job_id: str | None = None
+    created_at: str | None = None
+    updated_at: str | float = 0.0
+
+    @property
+    def remaining_epsilon(self) -> float:
+        return max(0.0, self.allocated_epsilon - (self.spent_epsilon + self.reserved_epsilon))
+
+    @property
+    def remaining_delta(self) -> float:
+        return max(0.0, self.allocated_delta - (self.spent_delta + self.reserved_delta))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -347,6 +376,99 @@ class CompletedJobExecutionRecord:
                 raise ValueError(f"Metric '{k}' must be a finite float, got {v!r}.")
 
 
+def validate_dp_config(dp_config: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """Validates DP configuration parameters, failing closed on invalid or missing requirements."""
+    if dp_config is None:
+        return None
+    if not isinstance(dp_config, (dict, Mapping)):
+        raise TrainingProvenanceSecurityError("dp_config must be a dictionary or mapping if provided.")
+    clean = dict(dp_config)
+    dp_enabled = clean.get("dp_enabled", False)
+    if not isinstance(dp_enabled, bool):
+        raise TrainingProvenanceSecurityError("dp_config['dp_enabled'] must be a boolean.")
+    if not dp_enabled:
+        return {"dp_enabled": False}
+
+    target_epsilon = clean.get("target_epsilon")
+    if (
+        target_epsilon is None
+        or not isinstance(target_epsilon, (int, float))
+        or not math.isfinite(target_epsilon)
+        or target_epsilon <= 0.0
+    ):
+        raise TrainingProvenanceSecurityError(
+            f"DP-enabled job requires finite positive target_epsilon, got: {target_epsilon}"
+        )
+
+    target_delta = clean.get("target_delta")
+    if target_delta is None:
+        target_delta = 1e-5
+        clean["target_delta"] = target_delta
+    if (
+        not isinstance(target_delta, (int, float))
+        or not math.isfinite(target_delta)
+        or not (0.0 < target_delta < 1.0)
+    ):
+        raise TrainingProvenanceSecurityError(
+            f"DP-enabled job requires target_delta in (0, 1), got: {target_delta}"
+        )
+
+    max_grad_norm = clean.get("max_grad_norm", 0.5)
+    if (
+        not isinstance(max_grad_norm, (int, float))
+        or not math.isfinite(max_grad_norm)
+        or max_grad_norm <= 0.0
+    ):
+        raise TrainingProvenanceSecurityError(
+            f"DP-enabled job requires finite positive max_grad_norm, got: {max_grad_norm}"
+        )
+
+    noise_multiplier = clean.get("noise_multiplier")
+    if noise_multiplier is not None and (
+        not isinstance(noise_multiplier, (int, float))
+        or not math.isfinite(noise_multiplier)
+        or noise_multiplier <= 0.0
+    ):
+        raise TrainingProvenanceSecurityError(
+            f"noise_multiplier must be positive and finite if provided, got: {noise_multiplier}"
+        )
+
+    dataset_tag = str(clean.get("dataset_tag", "canonical_fraud_partition")).strip()
+    if not dataset_tag:
+        raise TrainingProvenanceSecurityError(
+            "DP-enabled job requires non-empty dataset_tag identifying the protected dataset."
+        )
+
+    accountant_type = str(clean.get("accountant_type", "prv")).strip().lower()
+    if accountant_type not in ("prv", "rdp"):
+        raise TrainingProvenanceSecurityError(
+            f"Unsupported DP accountant_type: '{accountant_type}'. Supported: 'prv', 'rdp'."
+        )
+
+    require_secure_rng = bool(clean.get("require_secure_rng", False))
+    allocated_epsilon = clean.get("allocated_epsilon")
+    if allocated_epsilon is not None and (
+        not isinstance(allocated_epsilon, (int, float))
+        or not math.isfinite(allocated_epsilon)
+        or allocated_epsilon <= 0.0
+    ):
+        raise TrainingProvenanceSecurityError(
+            f"allocated_epsilon must be positive and finite if provided, got: {allocated_epsilon}"
+        )
+
+    return {
+        "dp_enabled": True,
+        "target_epsilon": float(target_epsilon),
+        "target_delta": float(target_delta),
+        "max_grad_norm": float(max_grad_norm),
+        "noise_multiplier": float(noise_multiplier) if noise_multiplier is not None else None,
+        "dataset_tag": dataset_tag,
+        "accountant_type": accountant_type,
+        "require_secure_rng": require_secure_rng,
+        "allocated_epsilon": float(allocated_epsilon) if allocated_epsilon is not None else None,
+    }
+
+
 def compute_config_fingerprint(
     job_id: str,
     training_run_id: str,
@@ -362,6 +484,7 @@ def compute_config_fingerprint(
     min_quorum: int | None = None,
     training_configuration: dict[str, Any] | None = None,
     consortium_id: str | None = None,
+    dp_config: Mapping[str, Any] | None = None,
 ) -> str:
     """Computes deterministic canonical SHA-256 fingerprint binding all security-critical scheduled parameters.
 
@@ -384,6 +507,7 @@ def compute_config_fingerprint(
         "min_quorum": min_quorum if min_quorum is not None else len(permitted_workers),
         "training_configuration": training_configuration or {},
         "consortium_id": consortium_id.strip() if consortium_id else None,
+        "dp_config": dict(dp_config) if dp_config else None,
     }
     canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
@@ -456,6 +580,7 @@ class TrainingJobAuthorityBackend(abc.ABC):
         coordinator_id: str = "COORDINATOR",
         permitted_workers: Sequence[str] = (),
         consortium_id: str | None = None,
+        dp_config: Mapping[str, Any] | None = None,
     ) -> ScheduledTrainingJob: ...
 
     @abc.abstractmethod
@@ -519,6 +644,45 @@ class TrainingJobAuthorityBackend(abc.ABC):
 
     @abc.abstractmethod
     def get_started_job(self, job_id: str) -> StartedTrainingJob | None: ...
+
+    @abc.abstractmethod
+    def get_or_create_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        allocated_epsilon: float,
+        allocated_delta: float,
+    ) -> InstitutionalPrivacyBudget: ...
+
+    @abc.abstractmethod
+    def get_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+    ) -> InstitutionalPrivacyBudget | None: ...
+
+    @abc.abstractmethod
+    def reserve_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        job_id: str,
+        round_number: int,
+        requested_epsilon: float,
+        requested_delta: float,
+    ) -> tuple[bool, str, float]: ...
+
+    @abc.abstractmethod
+    def commit_institutional_privacy_expenditure(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        job_id: str,
+        round_number: int,
+        spent_epsilon: float,
+        spent_delta: float,
+        steps_executed: int,
+    ) -> InstitutionalPrivacyBudget: ...
 
     @abc.abstractmethod
     def clear(self) -> None: ...
@@ -1241,11 +1405,33 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 config_fingerprint VARCHAR(64) NOT NULL,
                                 scheduled_at VARCHAR(64) NOT NULL,
                                 status VARCHAR(32) NOT NULL DEFAULT 'SCHEDULED',
-                                consortium_id VARCHAR(128)
+                                consortium_id VARCHAR(128),
+                                dp_config_json TEXT
                             );
                             """
                         )
                         cur.execute("ALTER TABLE cfi_scheduled_jobs ADD COLUMN IF NOT EXISTS consortium_id VARCHAR(128);")
+                        cur.execute("ALTER TABLE cfi_scheduled_jobs ADD COLUMN IF NOT EXISTS dp_config_json TEXT;")
+                        cur.execute(
+                            """
+                            CREATE TABLE IF NOT EXISTS cfi_institutional_privacy_budgets (
+                                bank_id VARCHAR(128) NOT NULL,
+                                dataset_tag VARCHAR(128) NOT NULL,
+                                allocated_epsilon DOUBLE PRECISION NOT NULL,
+                                allocated_delta DOUBLE PRECISION NOT NULL,
+                                spent_epsilon DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+                                spent_delta DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+                                reserved_epsilon DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+                                reserved_delta DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+                                total_steps_executed INT NOT NULL DEFAULT 0,
+                                active_reservations_json TEXT NOT NULL DEFAULT '{}',
+                                history_json TEXT NOT NULL DEFAULT '[]',
+                                created_at VARCHAR(64) NOT NULL,
+                                updated_at VARCHAR(64) NOT NULL,
+                                PRIMARY KEY (bank_id, dataset_tag)
+                            );
+                            """
+                        )
                         cur.execute(
                             """
                             CREATE TABLE IF NOT EXISTS cfi_started_jobs (
@@ -1384,11 +1570,13 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         coordinator_id: str = "COORDINATOR",
         permitted_workers: Sequence[str] = (),
         consortium_id: str | None = None,
+        dp_config: Mapping[str, Any] | None = None,
     ) -> ScheduledTrainingJob:
         clean_job_id = job_id.strip()
         clean_run_id = training_run_id.strip()
         clean_sim_id = simulation_id.strip()
         clean_consortium_id = consortium_id.strip() if consortium_id else None
+        clean_dp_config = validate_dp_config(dp_config)
         fnames_tuple = tuple(feature_names)
         perm_workers_tuple = tuple(permitted_workers)
         now_str = datetime.now(UTC).isoformat()
@@ -1406,6 +1594,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             coordinator_id=coordinator_id,
             permitted_workers=perm_workers_tuple,
             consortium_id=clean_consortium_id,
+            dp_config=clean_dp_config,
         )
 
         with self._connect() as conn:
@@ -1431,6 +1620,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 scheduled_at=existing["scheduled_at"],
                                 status=existing["status"],
                                 consortium_id=existing.get("consortium_id"),
+                                dp_config=json.loads(existing["dp_config_json"]) if existing.get("dp_config_json") else None,
                             )
                         else:
                             raise TrainingProvenanceSecurityError(
@@ -1454,8 +1644,8 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             architecture, feature_schema_version, expected_rounds,
                             expected_epochs, input_dim, feature_names_json,
                             permitted_workers_json, config_fingerprint, scheduled_at, status,
-                            consortium_id
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            consortium_id, dp_config_json
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             clean_job_id,
@@ -1473,6 +1663,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             now_str,
                             "SCHEDULED",
                             clean_consortium_id,
+                            json.dumps(clean_dp_config) if clean_dp_config else None,
                         ),
                     )
 
@@ -1492,6 +1683,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             scheduled_at=now_str,
             status="SCHEDULED",
             consortium_id=clean_consortium_id,
+            dp_config=clean_dp_config,
         )
 
     def start_job(self, job_id: str, worker_id: str = "TRAINING_EXECUTOR") -> StartedTrainingJob:
@@ -2333,6 +2525,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                 scheduled_at=r["scheduled_at"],
                 status=r["status"],
                 consortium_id=r.get("consortium_id"),
+                dp_config=json.loads(r["dp_config_json"]) if r.get("dp_config_json") else None,
             )
 
     def get_started_job(self, job_id: str) -> StartedTrainingJob | None:
@@ -2351,8 +2544,304 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                 status=r["status"],
             )
 
+    def get_or_create_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        allocated_epsilon: float,
+        allocated_delta: float,
+    ) -> InstitutionalPrivacyBudget:
+        clean_bank = bank_id.strip()
+        clean_tag = dataset_tag.strip()
+        if not clean_bank:
+            raise ValueError("bank_id must be non-empty")
+        if not clean_tag:
+            raise ValueError("dataset_tag must be non-empty")
+        if allocated_epsilon <= 0.0 or not math.isfinite(allocated_epsilon):
+            raise ValueError(f"allocated_epsilon must be positive finite float, got {allocated_epsilon}")
+        if allocated_delta <= 0.0 or allocated_delta >= 1.0 or not math.isfinite(allocated_delta):
+            raise ValueError(f"allocated_delta must be in (0, 1), got {allocated_delta}")
+
+        now_str = datetime.now(UTC).isoformat()
+        with self._connect() as conn:
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT * FROM cfi_institutional_privacy_budgets WHERE bank_id = %s AND dataset_tag = %s FOR UPDATE",
+                        (clean_bank, clean_tag),
+                    )
+                    r = cur.fetchone()
+                    if r:
+                        return InstitutionalPrivacyBudget(
+                            bank_id=r["bank_id"],
+                            dataset_tag=r["dataset_tag"],
+                            allocated_epsilon=float(r["allocated_epsilon"]),
+                            allocated_delta=float(r["allocated_delta"]),
+                            spent_epsilon=float(r["spent_epsilon"]),
+                            spent_delta=float(r["spent_delta"]),
+                            reserved_epsilon=float(r["reserved_epsilon"]),
+                            reserved_delta=float(r["reserved_delta"]),
+                            total_steps_executed=int(r["total_steps_executed"]),
+                            active_reservations=json.loads(r["active_reservations_json"] or "{}"),
+                            history=json.loads(r["history_json"] or "[]"),
+                            created_at=r["created_at"],
+                            updated_at=r["updated_at"],
+                        )
+                    cur.execute(
+                        """
+                        INSERT INTO cfi_institutional_privacy_budgets (
+                            bank_id, dataset_tag, allocated_epsilon, allocated_delta,
+                            spent_epsilon, spent_delta, reserved_epsilon, reserved_delta,
+                            total_steps_executed, active_reservations_json, history_json,
+                            created_at, updated_at
+                        ) VALUES (%s, %s, %s, %s, 0.0, 0.0, 0.0, 0.0, 0, '{}', '[]', %s, %s)
+                        """,
+                        (clean_bank, clean_tag, float(allocated_epsilon), float(allocated_delta), now_str, now_str),
+                    )
+                    return InstitutionalPrivacyBudget(
+                        bank_id=clean_bank,
+                        dataset_tag=clean_tag,
+                        allocated_epsilon=float(allocated_epsilon),
+                        allocated_delta=float(allocated_delta),
+                        spent_epsilon=0.0,
+                        spent_delta=0.0,
+                        reserved_epsilon=0.0,
+                        reserved_delta=0.0,
+                        total_steps_executed=0,
+                        active_reservations={},
+                        history=[],
+                        created_at=now_str,
+                        updated_at=now_str,
+                    )
+
+    def get_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+    ) -> InstitutionalPrivacyBudget | None:
+        clean_bank = bank_id.strip()
+        clean_tag = dataset_tag.strip()
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM cfi_institutional_privacy_budgets WHERE bank_id = %s AND dataset_tag = %s",
+                (clean_bank, clean_tag),
+            )
+            r = cur.fetchone()
+            if not r:
+                return None
+            return InstitutionalPrivacyBudget(
+                bank_id=r["bank_id"],
+                dataset_tag=r["dataset_tag"],
+                allocated_epsilon=float(r["allocated_epsilon"]),
+                allocated_delta=float(r["allocated_delta"]),
+                spent_epsilon=float(r["spent_epsilon"]),
+                spent_delta=float(r["spent_delta"]),
+                reserved_epsilon=float(r["reserved_epsilon"]),
+                reserved_delta=float(r["reserved_delta"]),
+                total_steps_executed=int(r["total_steps_executed"]),
+                active_reservations=json.loads(r["active_reservations_json"] or "{}"),
+                history=json.loads(r["history_json"] or "[]"),
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+            )
+
+    def reserve_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        job_id: str,
+        round_number: int,
+        requested_epsilon: float,
+        requested_delta: float,
+    ) -> tuple[bool, str, float]:
+        clean_bank = bank_id.strip()
+        clean_tag = dataset_tag.strip()
+        clean_job = job_id.strip()
+        if requested_epsilon <= 0.0 or not math.isfinite(requested_epsilon):
+            raise ValueError(f"requested_epsilon must be positive finite float, got {requested_epsilon}")
+        if requested_delta < 0.0 or not math.isfinite(requested_delta):
+            raise ValueError(f"requested_delta must be non-negative finite float, got {requested_delta}")
+
+        now_str = datetime.now(UTC).isoformat()
+        res_key = f"{clean_job}:{round_number}"
+
+        with self._connect() as conn:
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT * FROM cfi_institutional_privacy_budgets WHERE bank_id = %s AND dataset_tag = %s FOR UPDATE",
+                        (clean_bank, clean_tag),
+                    )
+                    r = cur.fetchone()
+                    if not r:
+                        return (False, f"No institutional privacy budget found for bank '{clean_bank}', dataset '{clean_tag}'.", 0.0)
+
+                    allocated_eps = float(r["allocated_epsilon"])
+                    spent_eps = float(r["spent_epsilon"])
+                    reserved_eps = float(r["reserved_epsilon"])
+                    allocated_del = float(r["allocated_delta"])
+                    spent_del = float(r["spent_delta"])
+                    reserved_del = float(r["reserved_delta"])
+
+                    active_res = json.loads(r["active_reservations_json"] or "{}")
+
+                    if res_key in active_res:
+                        remaining_eps = max(0.0, allocated_eps - (spent_eps + reserved_eps))
+                        return (True, f"Reservation already active for {res_key}.", remaining_eps)
+
+                    if spent_eps + reserved_eps + requested_epsilon > allocated_eps + 1e-9:
+                        remaining_eps = max(0.0, allocated_eps - (spent_eps + reserved_eps))
+                        return (
+                            False,
+                            f"Privacy budget exceeded for bank '{clean_bank}', dataset '{clean_tag}': "
+                            f"allocated={allocated_eps:.4f}, spent={spent_eps:.4f}, reserved={reserved_eps:.4f}, requested={requested_epsilon:.4f}.",
+                            remaining_eps,
+                        )
+
+                    if spent_del + reserved_del + requested_delta > allocated_del + 1e-12:
+                        remaining_eps = max(0.0, allocated_eps - (spent_eps + reserved_eps))
+                        return (
+                            False,
+                            f"Privacy delta budget exceeded for bank '{clean_bank}', dataset '{clean_tag}': "
+                            f"allocated={allocated_del:.2e}, spent={spent_del:.2e}, reserved={reserved_del:.2e}, requested={requested_delta:.2e}.",
+                            remaining_eps,
+                        )
+
+                    new_reserved_eps = reserved_eps + requested_epsilon
+                    new_reserved_del = reserved_del + requested_delta
+                    active_res[res_key] = {
+                        "job_id": clean_job,
+                        "round_number": round_number,
+                        "requested_epsilon": requested_epsilon,
+                        "requested_delta": requested_delta,
+                        "reserved_at": now_str,
+                    }
+
+                    cur.execute(
+                        """
+                        UPDATE cfi_institutional_privacy_budgets
+                        SET reserved_epsilon = %s, reserved_delta = %s, active_reservations_json = %s, updated_at = %s
+                        WHERE bank_id = %s AND dataset_tag = %s
+                        """,
+                        (new_reserved_eps, new_reserved_del, json.dumps(active_res), now_str, clean_bank, clean_tag),
+                    )
+                    remaining_eps = max(0.0, allocated_eps - (spent_eps + new_reserved_eps))
+                    return (True, "Reserved successfully.", remaining_eps)
+
+    def commit_institutional_privacy_expenditure(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        job_id: str,
+        round_number: int,
+        spent_epsilon: float,
+        spent_delta: float,
+        steps_executed: int,
+    ) -> InstitutionalPrivacyBudget:
+        clean_bank = bank_id.strip()
+        clean_tag = dataset_tag.strip()
+        clean_job = job_id.strip()
+        if spent_epsilon < 0.0 or not math.isfinite(spent_epsilon):
+            raise ValueError(f"spent_epsilon must be non-negative finite float, got {spent_epsilon}")
+        if spent_delta < 0.0 or not math.isfinite(spent_delta):
+            raise ValueError(f"spent_delta must be non-negative finite float, got {spent_delta}")
+        if steps_executed < 0:
+            raise ValueError(f"steps_executed must be non-negative, got {steps_executed}")
+
+        now_str = datetime.now(UTC).isoformat()
+        res_key = f"{clean_job}:{round_number}"
+
+        with self._connect() as conn:
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT * FROM cfi_institutional_privacy_budgets WHERE bank_id = %s AND dataset_tag = %s FOR UPDATE",
+                        (clean_bank, clean_tag),
+                    )
+                    r = cur.fetchone()
+                    if not r:
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot commit privacy expenditure: no budget record for bank '{clean_bank}', dataset '{clean_tag}'."
+                        )
+
+                    spent_eps = float(r["spent_epsilon"])
+                    reserved_eps = float(r["reserved_epsilon"])
+                    spent_del = float(r["spent_delta"])
+                    reserved_del = float(r["reserved_delta"])
+                    total_steps = int(r["total_steps_executed"])
+                    active_res = json.loads(r["active_reservations_json"] or "{}")
+                    history = json.loads(r["history_json"] or "[]")
+
+                    if res_key in active_res:
+                        old_res = active_res.pop(res_key)
+                        res_eps = float(old_res.get("requested_epsilon", 0.0))
+                        res_del = float(old_res.get("requested_delta", 0.0))
+                        reserved_eps = max(0.0, reserved_eps - res_eps)
+                        reserved_del = max(0.0, reserved_del - res_del)
+
+                    prior_job_spent_eps = 0.0
+                    prior_job_spent_del = 0.0
+                    for h in history:
+                        if isinstance(h, dict) and h.get("job_id") == clean_job:
+                            prior_job_spent_eps = max(prior_job_spent_eps, float(h.get("spent_epsilon", 0.0)))
+                            prior_job_spent_del = max(prior_job_spent_del, float(h.get("spent_delta", 0.0)))
+
+                    incremental_eps = max(0.0, spent_epsilon - prior_job_spent_eps)
+                    incremental_del = max(0.0, spent_delta - prior_job_spent_del)
+
+                    new_spent_eps = spent_eps + incremental_eps
+                    new_spent_del = spent_del + incremental_del
+                    new_total_steps = total_steps + steps_executed
+
+                    history.append({
+                        "job_id": clean_job,
+                        "round_number": round_number,
+                        "spent_epsilon": spent_epsilon,
+                        "spent_delta": spent_delta,
+                        "steps_executed": steps_executed,
+                        "committed_at": now_str,
+                    })
+
+                    cur.execute(
+                        """
+                        UPDATE cfi_institutional_privacy_budgets
+                        SET spent_epsilon = %s, spent_delta = %s, reserved_epsilon = %s, reserved_delta = %s,
+                            total_steps_executed = %s, active_reservations_json = %s, history_json = %s, updated_at = %s
+                        WHERE bank_id = %s AND dataset_tag = %s
+                        """,
+                        (
+                            new_spent_eps,
+                            new_spent_del,
+                            reserved_eps,
+                            reserved_del,
+                            new_total_steps,
+                            json.dumps(active_res),
+                            json.dumps(history),
+                            now_str,
+                            clean_bank,
+                            clean_tag,
+                        ),
+                    )
+
+                    return InstitutionalPrivacyBudget(
+                        bank_id=clean_bank,
+                        dataset_tag=clean_tag,
+                        allocated_epsilon=float(r["allocated_epsilon"]),
+                        allocated_delta=float(r["allocated_delta"]),
+                        spent_epsilon=new_spent_eps,
+                        spent_delta=new_spent_del,
+                        reserved_epsilon=reserved_eps,
+                        reserved_delta=reserved_del,
+                        total_steps_executed=new_total_steps,
+                        active_reservations=active_res,
+                        history=history,
+                        created_at=r["created_at"],
+                        updated_at=now_str,
+                    )
+
     def clear(self) -> None:
         with self._connect() as conn, conn.transaction(), conn.cursor() as cur:
+            cur.execute("DELETE FROM cfi_institutional_privacy_budgets")
             cur.execute("DELETE FROM cfi_completed_jobs")
             cur.execute("DELETE FROM cfi_model_evaluations")
             cur.execute("DELETE FROM cfi_global_aggregations")
@@ -2460,12 +2949,35 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 config_fingerprint TEXT NOT NULL,
                 scheduled_at TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'SCHEDULED',
-                consortium_id TEXT
+                consortium_id TEXT,
+                dp_config_json TEXT
             )
             """
         )
         with contextlib.suppress(sqlite3.OperationalError):
             conn.execute("ALTER TABLE cfi_scheduled_jobs ADD COLUMN consortium_id TEXT")
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE cfi_scheduled_jobs ADD COLUMN dp_config_json TEXT")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cfi_institutional_privacy_budgets (
+                bank_id TEXT NOT NULL,
+                dataset_tag TEXT NOT NULL,
+                allocated_epsilon REAL NOT NULL,
+                allocated_delta REAL NOT NULL,
+                spent_epsilon REAL NOT NULL DEFAULT 0.0,
+                spent_delta REAL NOT NULL DEFAULT 0.0,
+                reserved_epsilon REAL NOT NULL DEFAULT 0.0,
+                reserved_delta REAL NOT NULL DEFAULT 0.0,
+                total_steps_executed INTEGER NOT NULL DEFAULT 0,
+                active_reservations_json TEXT NOT NULL DEFAULT '{}',
+                history_json TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (bank_id, dataset_tag)
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS cfi_started_jobs (
@@ -2578,11 +3090,13 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         coordinator_id: str = "COORDINATOR",
         permitted_workers: Sequence[str] = (),
         consortium_id: str | None = None,
+        dp_config: Mapping[str, Any] | None = None,
     ) -> ScheduledTrainingJob:
         clean_job_id = job_id.strip()
         clean_run_id = training_run_id.strip()
         clean_sim_id = simulation_id.strip()
         clean_consortium_id = consortium_id.strip() if consortium_id else None
+        clean_dp_config = validate_dp_config(dp_config)
         fnames_tuple = tuple(feature_names)
         perm_workers_tuple = tuple(permitted_workers)
         now_str = datetime.now(UTC).isoformat()
@@ -2600,6 +3114,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
             coordinator_id=coordinator_id,
             permitted_workers=perm_workers_tuple,
             consortium_id=clean_consortium_id,
+            dp_config=clean_dp_config,
         )
 
         with self._connect() as conn:
@@ -2630,6 +3145,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 scheduled_at=existing["scheduled_at"],
                                 status=existing["status"],
                                 consortium_id=existing["consortium_id"] if "consortium_id" in set(existing.keys()) else None,
+                                dp_config=json.loads(existing["dp_config_json"]) if "dp_config_json" in set(existing.keys()) and existing["dp_config_json"] else None,
                             )
                         else:
                             raise TrainingProvenanceSecurityError(
@@ -2653,8 +3169,8 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                             architecture, feature_schema_version, expected_rounds,
                             expected_epochs, input_dim, feature_names_json,
                             permitted_workers_json, config_fingerprint, scheduled_at, status,
-                            consortium_id
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            consortium_id, dp_config_json
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             clean_job_id,
@@ -2672,6 +3188,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                             now_str,
                             "SCHEDULED",
                             clean_consortium_id,
+                            json.dumps(clean_dp_config) if clean_dp_config else None,
                         ),
                     )
                     conn.execute("COMMIT")
@@ -2695,6 +3212,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
             scheduled_at=now_str,
             status="SCHEDULED",
             consortium_id=clean_consortium_id,
+            dp_config=clean_dp_config,
         )
 
     def start_job(self, job_id: str, worker_id: str = "TRAINING_EXECUTOR") -> StartedTrainingJob:
@@ -3513,6 +4031,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 scheduled_at=r["scheduled_at"],
                 status=r["status"],
                 consortium_id=r["consortium_id"] if "consortium_id" in set(r.keys()) else None,
+                dp_config=json.loads(r["dp_config_json"]) if "dp_config_json" in set(r.keys()) and r["dp_config_json"] else None,
             )
 
     def get_started_job(self, job_id: str) -> StartedTrainingJob | None:
@@ -3531,10 +4050,326 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 status=r["status"],
             )
 
+    def get_or_create_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        allocated_epsilon: float,
+        allocated_delta: float,
+    ) -> InstitutionalPrivacyBudget:
+        clean_bank = bank_id.strip()
+        clean_tag = dataset_tag.strip()
+        if not clean_bank:
+            raise ValueError("bank_id must be non-empty")
+        if not clean_tag:
+            raise ValueError("dataset_tag must be non-empty")
+        if allocated_epsilon <= 0.0 or not math.isfinite(allocated_epsilon):
+            raise ValueError(f"allocated_epsilon must be positive finite float, got {allocated_epsilon}")
+        if allocated_delta <= 0.0 or allocated_delta >= 1.0 or not math.isfinite(allocated_delta):
+            raise ValueError(f"allocated_delta must be in (0, 1), got {allocated_delta}")
+
+        now_str = datetime.now(UTC).isoformat()
+        with self._connect() as conn, self._lock:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                cur = conn.execute(
+                    "SELECT * FROM cfi_institutional_privacy_budgets WHERE bank_id = ? AND dataset_tag = ?",
+                    (clean_bank, clean_tag),
+                )
+                r = cur.fetchone()
+                if r:
+                    conn.execute("COMMIT")
+                    return InstitutionalPrivacyBudget(
+                        bank_id=r["bank_id"],
+                        dataset_tag=r["dataset_tag"],
+                        allocated_epsilon=float(r["allocated_epsilon"]),
+                        allocated_delta=float(r["allocated_delta"]),
+                        spent_epsilon=float(r["spent_epsilon"]),
+                        spent_delta=float(r["spent_delta"]),
+                        reserved_epsilon=float(r["reserved_epsilon"]),
+                        reserved_delta=float(r["reserved_delta"]),
+                        total_steps_executed=int(r["total_steps_executed"]),
+                        active_reservations=json.loads(r["active_reservations_json"] or "{}"),
+                        history=json.loads(r["history_json"] or "[]"),
+                        created_at=r["created_at"],
+                        updated_at=r["updated_at"],
+                    )
+                conn.execute(
+                    """
+                    INSERT INTO cfi_institutional_privacy_budgets (
+                        bank_id, dataset_tag, allocated_epsilon, allocated_delta,
+                        spent_epsilon, spent_delta, reserved_epsilon, reserved_delta,
+                        total_steps_executed, active_reservations_json, history_json,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, 0.0, 0.0, 0.0, 0.0, 0, '{}', '[]', ?, ?)
+                    """,
+                    (clean_bank, clean_tag, float(allocated_epsilon), float(allocated_delta), now_str, now_str),
+                )
+                conn.execute("COMMIT")
+                return InstitutionalPrivacyBudget(
+                    bank_id=clean_bank,
+                    dataset_tag=clean_tag,
+                    allocated_epsilon=float(allocated_epsilon),
+                    allocated_delta=float(allocated_delta),
+                    spent_epsilon=0.0,
+                    spent_delta=0.0,
+                    reserved_epsilon=0.0,
+                    reserved_delta=0.0,
+                    total_steps_executed=0,
+                    active_reservations={},
+                    history=[],
+                    created_at=now_str,
+                    updated_at=now_str,
+                )
+            except Exception:
+                with contextlib.suppress(Exception):
+                    conn.execute("ROLLBACK")
+                raise
+
+    def get_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+    ) -> InstitutionalPrivacyBudget | None:
+        clean_bank = bank_id.strip()
+        clean_tag = dataset_tag.strip()
+        with self._connect() as conn:
+            cur = conn.execute(
+                "SELECT * FROM cfi_institutional_privacy_budgets WHERE bank_id = ? AND dataset_tag = ?",
+                (clean_bank, clean_tag),
+            )
+            r = cur.fetchone()
+            if not r:
+                return None
+            return InstitutionalPrivacyBudget(
+                bank_id=r["bank_id"],
+                dataset_tag=r["dataset_tag"],
+                allocated_epsilon=float(r["allocated_epsilon"]),
+                allocated_delta=float(r["allocated_delta"]),
+                spent_epsilon=float(r["spent_epsilon"]),
+                spent_delta=float(r["spent_delta"]),
+                reserved_epsilon=float(r["reserved_epsilon"]),
+                reserved_delta=float(r["reserved_delta"]),
+                total_steps_executed=int(r["total_steps_executed"]),
+                active_reservations=json.loads(r["active_reservations_json"] or "{}"),
+                history=json.loads(r["history_json"] or "[]"),
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+            )
+
+    def reserve_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        job_id: str,
+        round_number: int,
+        requested_epsilon: float,
+        requested_delta: float,
+    ) -> tuple[bool, str, float]:
+        clean_bank = bank_id.strip()
+        clean_tag = dataset_tag.strip()
+        clean_job = job_id.strip()
+        if requested_epsilon <= 0.0 or not math.isfinite(requested_epsilon):
+            raise ValueError(f"requested_epsilon must be positive finite float, got {requested_epsilon}")
+        if requested_delta < 0.0 or not math.isfinite(requested_delta):
+            raise ValueError(f"requested_delta must be non-negative finite float, got {requested_delta}")
+
+        now_str = datetime.now(UTC).isoformat()
+        res_key = f"{clean_job}:{round_number}"
+
+        with self._connect() as conn, self._lock:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                cur = conn.execute(
+                    "SELECT * FROM cfi_institutional_privacy_budgets WHERE bank_id = ? AND dataset_tag = ?",
+                    (clean_bank, clean_tag),
+                )
+                r = cur.fetchone()
+                if not r:
+                    conn.execute("COMMIT")
+                    return (False, f"No institutional privacy budget found for bank '{clean_bank}', dataset '{clean_tag}'.", 0.0)
+
+                allocated_eps = float(r["allocated_epsilon"])
+                spent_eps = float(r["spent_epsilon"])
+                reserved_eps = float(r["reserved_epsilon"])
+                allocated_del = float(r["allocated_delta"])
+                spent_del = float(r["spent_delta"])
+                reserved_del = float(r["reserved_delta"])
+
+                active_res = json.loads(r["active_reservations_json"] or "{}")
+
+                if res_key in active_res:
+                    conn.execute("COMMIT")
+                    remaining_eps = max(0.0, allocated_eps - (spent_eps + reserved_eps))
+                    return (True, f"Reservation already active for {res_key}.", remaining_eps)
+
+                if spent_eps + reserved_eps + requested_epsilon > allocated_eps + 1e-9:
+                    conn.execute("COMMIT")
+                    remaining_eps = max(0.0, allocated_eps - (spent_eps + reserved_eps))
+                    return (
+                        False,
+                        f"Privacy budget exceeded for bank '{clean_bank}', dataset '{clean_tag}': "
+                        f"allocated={allocated_eps:.4f}, spent={spent_eps:.4f}, reserved={reserved_eps:.4f}, requested={requested_epsilon:.4f}.",
+                        remaining_eps,
+                    )
+
+                if spent_del + reserved_del + requested_delta > allocated_del + 1e-12:
+                    conn.execute("COMMIT")
+                    remaining_eps = max(0.0, allocated_eps - (spent_eps + reserved_eps))
+                    return (
+                        False,
+                        f"Privacy delta budget exceeded for bank '{clean_bank}', dataset '{clean_tag}': "
+                        f"allocated={allocated_del:.2e}, spent={spent_del:.2e}, reserved={reserved_del:.2e}, requested={requested_delta:.2e}.",
+                        remaining_eps,
+                    )
+
+                new_reserved_eps = reserved_eps + requested_epsilon
+                new_reserved_del = reserved_del + requested_delta
+                active_res[res_key] = {
+                    "job_id": clean_job,
+                    "round_number": round_number,
+                    "requested_epsilon": requested_epsilon,
+                    "requested_delta": requested_delta,
+                    "reserved_at": now_str,
+                }
+
+                conn.execute(
+                    """
+                    UPDATE cfi_institutional_privacy_budgets
+                    SET reserved_epsilon = ?, reserved_delta = ?, active_reservations_json = ?, updated_at = ?
+                    WHERE bank_id = ? AND dataset_tag = ?
+                    """,
+                    (new_reserved_eps, new_reserved_del, json.dumps(active_res), now_str, clean_bank, clean_tag),
+                )
+                conn.execute("COMMIT")
+                remaining_eps = max(0.0, allocated_eps - (spent_eps + new_reserved_eps))
+                return (True, "Reserved successfully.", remaining_eps)
+            except Exception:
+                with contextlib.suppress(Exception):
+                    conn.execute("ROLLBACK")
+                raise
+
+    def commit_institutional_privacy_expenditure(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        job_id: str,
+        round_number: int,
+        spent_epsilon: float,
+        spent_delta: float,
+        steps_executed: int,
+    ) -> InstitutionalPrivacyBudget:
+        clean_bank = bank_id.strip()
+        clean_tag = dataset_tag.strip()
+        clean_job = job_id.strip()
+        if spent_epsilon < 0.0 or not math.isfinite(spent_epsilon):
+            raise ValueError(f"spent_epsilon must be non-negative finite float, got {spent_epsilon}")
+        if spent_delta < 0.0 or not math.isfinite(spent_delta):
+            raise ValueError(f"spent_delta must be non-negative finite float, got {spent_delta}")
+        if steps_executed < 0:
+            raise ValueError(f"steps_executed must be non-negative, got {steps_executed}")
+
+        now_str = datetime.now(UTC).isoformat()
+        res_key = f"{clean_job}:{round_number}"
+
+        with self._connect() as conn, self._lock:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                cur = conn.execute(
+                    "SELECT * FROM cfi_institutional_privacy_budgets WHERE bank_id = ? AND dataset_tag = ?",
+                    (clean_bank, clean_tag),
+                )
+                r = cur.fetchone()
+                if not r:
+                    raise TrainingProvenanceSecurityError(
+                        f"Cannot commit privacy expenditure: no budget record for bank '{clean_bank}', dataset '{clean_tag}'."
+                    )
+
+                spent_eps = float(r["spent_epsilon"])
+                reserved_eps = float(r["reserved_epsilon"])
+                spent_del = float(r["spent_delta"])
+                reserved_del = float(r["reserved_delta"])
+                total_steps = int(r["total_steps_executed"])
+                active_res = json.loads(r["active_reservations_json"] or "{}")
+                history = json.loads(r["history_json"] or "[]")
+
+                if res_key in active_res:
+                    old_res = active_res.pop(res_key)
+                    res_eps = float(old_res.get("requested_epsilon", 0.0))
+                    res_del = float(old_res.get("requested_delta", 0.0))
+                    reserved_eps = max(0.0, reserved_eps - res_eps)
+                    reserved_del = max(0.0, reserved_del - res_del)
+
+                prior_job_spent_eps = 0.0
+                prior_job_spent_del = 0.0
+                for h in history:
+                    if isinstance(h, dict) and h.get("job_id") == clean_job:
+                        prior_job_spent_eps = max(prior_job_spent_eps, float(h.get("spent_epsilon", 0.0)))
+                        prior_job_spent_del = max(prior_job_spent_del, float(h.get("spent_delta", 0.0)))
+
+                incremental_eps = max(0.0, spent_epsilon - prior_job_spent_eps)
+                incremental_del = max(0.0, spent_delta - prior_job_spent_del)
+
+                new_spent_eps = spent_eps + incremental_eps
+                new_spent_del = spent_del + incremental_del
+                new_total_steps = total_steps + steps_executed
+
+                history.append({
+                    "job_id": clean_job,
+                    "round_number": round_number,
+                    "spent_epsilon": spent_epsilon,
+                    "spent_delta": spent_delta,
+                    "steps_executed": steps_executed,
+                    "committed_at": now_str,
+                })
+
+                conn.execute(
+                    """
+                    UPDATE cfi_institutional_privacy_budgets
+                    SET spent_epsilon = ?, spent_delta = ?, reserved_epsilon = ?, reserved_delta = ?,
+                        total_steps_executed = ?, active_reservations_json = ?, history_json = ?, updated_at = ?
+                    WHERE bank_id = ? AND dataset_tag = ?
+                    """,
+                    (
+                        new_spent_eps,
+                        new_spent_del,
+                        reserved_eps,
+                        reserved_del,
+                        new_total_steps,
+                        json.dumps(active_res),
+                        json.dumps(history),
+                        now_str,
+                        clean_bank,
+                        clean_tag,
+                    ),
+                )
+                conn.execute("COMMIT")
+
+                return InstitutionalPrivacyBudget(
+                    bank_id=clean_bank,
+                    dataset_tag=clean_tag,
+                    allocated_epsilon=float(r["allocated_epsilon"]),
+                    allocated_delta=float(r["allocated_delta"]),
+                    spent_epsilon=new_spent_eps,
+                    spent_delta=new_spent_del,
+                    reserved_epsilon=reserved_eps,
+                    reserved_delta=reserved_del,
+                    total_steps_executed=new_total_steps,
+                    active_reservations=active_res,
+                    history=history,
+                    created_at=r["created_at"],
+                    updated_at=now_str,
+                )
+            except Exception:
+                with contextlib.suppress(Exception):
+                    conn.execute("ROLLBACK")
+                raise
+
     def clear(self) -> None:
         with self._connect() as conn, self._lock:
             conn.execute("BEGIN IMMEDIATE")
             try:
+                conn.execute("DELETE FROM cfi_institutional_privacy_budgets")
                 conn.execute("DELETE FROM cfi_completed_jobs")
                 conn.execute("DELETE FROM cfi_model_evaluations")
                 conn.execute("DELETE FROM cfi_global_aggregations")
@@ -3543,7 +4378,8 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 conn.execute("DELETE FROM cfi_scheduled_jobs")
                 conn.execute("COMMIT")
             except Exception:
-                conn.execute("ROLLBACK")
+                with contextlib.suppress(Exception):
+                    conn.execute("ROLLBACK")
                 raise
 
     def close(self) -> None:

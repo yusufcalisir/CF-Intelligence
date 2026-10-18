@@ -23,7 +23,7 @@ import os
 import threading
 import types
 import uuid
-from collections.abc import Generator, Sequence
+from collections.abc import Generator, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -45,6 +45,7 @@ from app.config import get_settings
 from app.infrastructure.database.training_authority_backends import (
     CompletedJobExecutionRecord,
     GlobalAggregationEvent,
+    InstitutionalPrivacyBudget,
     ModelEvaluationEvent,
     PostgresTrainingJobAuthority,
     RoundObservation,
@@ -180,17 +181,19 @@ class TrainingJobAuthorityDatabase:
         app_env: str | None = None,
         db_url: str | None = None,
         is_prod: bool | None = None,
+        active_env: str | None = None,
     ) -> None:
         effective_target = db_target if db_target is not None else (db_url or "")
         self._db_target = effective_target
         self._in_memory = in_memory
         clean = (effective_target or "").strip()
 
-        if is_prod is not None:
-            is_production = is_prod
-        else:
-            active_env = (app_env or get_settings().app_env).lower()
-            is_production = active_env == "production"
+        env_candidate = active_env if active_env is not None else app_env
+        active_env = (env_candidate or ("production" if is_prod else get_settings().app_env)).lower()
+        is_production = is_prod if is_prod is not None else active_env == "production"
+
+        self._active_env = active_env
+        self._is_prod = is_production
 
         if is_production and (in_memory or not (clean.startswith("postgresql://") or clean.startswith("postgres://"))):
             raise TrainingProvenanceConfigurationError(
@@ -212,8 +215,51 @@ class TrainingJobAuthorityDatabase:
             )
 
     @property
+    def active_env(self) -> str:
+        return self._active_env
+
+    @property
+    def is_prod(self) -> bool:
+        return self._is_prod
+
+    @property
     def backend_type(self) -> str:
         return self._backend.backend_type
+
+    def schedule_training_job(
+        self,
+        job_id: str,
+        training_run_id: str,
+        simulation_id: str,
+        architecture: str = "FraudDetectionNN",
+        feature_schema_version: str = "v1.0",
+        expected_rounds: int = 1,
+        expected_epochs: int = 0,
+        input_dim: int = 10,
+        feature_names: Sequence[str] | list[str] | tuple[str, ...] = (),
+        coordinator_token: str | None = None,
+        coordinator_id: str = "COORDINATOR",
+        permitted_workers: Sequence[str] = (),
+        consortium_id: str | None = None,
+        dp_config: Mapping[str, Any] | None = None,
+    ) -> ScheduledTrainingJob:
+        fnames = tuple(feature_names) if feature_names else tuple(CANONICAL_FEATURE_NAMES)
+        dim = input_dim or len(fnames) or 10
+        return self.schedule_job(
+            job_id=job_id,
+            training_run_id=training_run_id,
+            simulation_id=simulation_id,
+            architecture=architecture,
+            feature_schema_version=feature_schema_version,
+            expected_rounds=expected_rounds,
+            expected_epochs=expected_epochs,
+            input_dim=dim,
+            feature_names=fnames,
+            coordinator_id=coordinator_id,
+            permitted_workers=permitted_workers,
+            consortium_id=consortium_id,
+            dp_config=dp_config,
+        )
 
     def schedule_job(
         self,
@@ -229,6 +275,7 @@ class TrainingJobAuthorityDatabase:
         coordinator_id: str = "COORDINATOR",
         permitted_workers: Sequence[str] = (),
         consortium_id: str | None = None,
+        dp_config: Mapping[str, Any] | None = None,
     ) -> ScheduledTrainingJob:
         return self._backend.schedule_job(
             job_id=job_id,
@@ -243,6 +290,7 @@ class TrainingJobAuthorityDatabase:
             coordinator_id=coordinator_id,
             permitted_workers=permitted_workers,
             consortium_id=consortium_id,
+            dp_config=dp_config,
         )
 
     def start_job(self, job_id: str, worker_id: str = "TRAINING_EXECUTOR") -> StartedTrainingJob:
@@ -322,6 +370,77 @@ class TrainingJobAuthorityDatabase:
 
     def get_started_job(self, job_id: str) -> StartedTrainingJob | None:
         return self._backend.get_started_job(job_id)
+
+    def get_or_create_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        allocated_epsilon: float = 10.0,
+        allocated_delta: float = 1e-5,
+    ) -> InstitutionalPrivacyBudget:
+        return self._backend.get_or_create_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            allocated_epsilon=allocated_epsilon,
+            allocated_delta=allocated_delta,
+        )
+
+    def get_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+    ) -> InstitutionalPrivacyBudget | None:
+        return self._backend.get_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+        )
+
+    def reserve_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        job_id: str,
+        requested_epsilon: float | None = None,
+        requested_delta: float = 1e-5,
+        round_number: int = 1,
+        reserved_epsilon: float | None = None,
+        reserved_delta: float | None = None,
+    ) -> bool:
+        eps = reserved_epsilon if reserved_epsilon is not None else (requested_epsilon if requested_epsilon is not None else 0.0)
+        del_val = reserved_delta if reserved_delta is not None else requested_delta
+        ok, reason, remaining = self._backend.reserve_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            job_id=job_id,
+            round_number=round_number,
+            requested_epsilon=eps,
+            requested_delta=del_val,
+        )
+        if not ok:
+            raise TrainingProvenanceSecurityError(
+                f"Privacy budget exceeded: {reason} (requested {eps} exceeds remaining available {remaining:.4f})"
+            )
+        return True
+
+    def commit_institutional_privacy_expenditure(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        job_id: str,
+        spent_epsilon: float = 0.0,
+        spent_delta: float = 1e-5,
+        steps_executed: int = 0,
+        round_number: int = 1,
+    ) -> InstitutionalPrivacyBudget:
+        return self._backend.commit_institutional_privacy_expenditure(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            job_id=job_id,
+            round_number=round_number,
+            spent_epsilon=spent_epsilon,
+            spent_delta=spent_delta,
+            steps_executed=steps_executed,
+        )
 
     def clear(self) -> None:
         self._backend.clear()
@@ -661,6 +780,7 @@ class TrustedTrainingJobRecordSource:
         coordinator_id: str = "COORDINATOR",
         permitted_workers: Sequence[str] = (),
         consortium_id: str | None = None,
+        dp_config: Mapping[str, Any] | None = None,
     ) -> ScheduledTrainingJob:
         """Schedule a training job through the authorized training coordinator."""
         self._validate_coordinator_token(coordinator_token)
@@ -688,6 +808,7 @@ class TrustedTrainingJobRecordSource:
             coordinator_id=coordinator_id,
             permitted_workers=permitted_workers,
             consortium_id=consortium_id,
+            dp_config=dp_config,
         )
 
     def start_training_job(
@@ -1161,6 +1282,94 @@ class TrustedTrainingJobRecordSource:
         if started is not None:
             return started
         return self._db.get_scheduled_job(job_id)
+
+    def get_or_create_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        allocated_epsilon: float = 10.0,
+        allocated_delta: float = 1e-5,
+        token: str | None = None,
+    ) -> InstitutionalPrivacyBudget:
+        if token is not None:
+            try:
+                self._validate_coordinator_token(token)
+            except Exception:
+                self._validate_worker_token(token)
+
+        return self._db.get_or_create_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            allocated_epsilon=allocated_epsilon,
+            allocated_delta=allocated_delta,
+        )
+
+    def get_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        token: str | None = None,
+    ) -> InstitutionalPrivacyBudget | None:
+        if token is not None:
+            try:
+                self._validate_coordinator_token(token)
+            except Exception:
+                self._validate_worker_token(token)
+
+        return self._db.get_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+        )
+
+    def reserve_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        job_id: str,
+        requested_epsilon: float | None = None,
+        requested_delta: float = 1e-5,
+        round_number: int = 1,
+        worker_token: str | None = None,
+        reserved_epsilon: float | None = None,
+        reserved_delta: float | None = None,
+    ) -> bool:
+        if worker_token is not None:
+            self._validate_worker_token(worker_token)
+
+        return self._db.reserve_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            job_id=job_id,
+            round_number=round_number,
+            requested_epsilon=requested_epsilon,
+            requested_delta=requested_delta,
+            reserved_epsilon=reserved_epsilon,
+            reserved_delta=reserved_delta,
+        )
+
+    def commit_institutional_privacy_expenditure(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        job_id: str,
+        spent_epsilon: float = 0.0,
+        spent_delta: float = 1e-5,
+        steps_executed: int = 0,
+        round_number: int = 1,
+        worker_token: str | None = None,
+    ) -> InstitutionalPrivacyBudget:
+        if worker_token is not None:
+            self._validate_worker_token(worker_token)
+
+        return self._db.commit_institutional_privacy_expenditure(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            job_id=job_id,
+            round_number=round_number,
+            spent_epsilon=spent_epsilon,
+            spent_delta=spent_delta,
+            steps_executed=steps_executed,
+        )
 
     def clear(self) -> None:
         self._db.clear()

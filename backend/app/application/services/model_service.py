@@ -338,6 +338,11 @@ class ModelService:
         target_epsilon: float,
         target_delta: float,
         max_grad_norm: float = 0.5,
+        noise_multiplier: float | None = None,
+        total_steps: int | None = None,
+        accountant_type: str = "prv",
+        require_secure_rng: bool = False,
+        privacy_engine: Any | None = None,
         epochs: int | None = None,
         learning_rate: float | None = None,
         batch_size: int | None = None,
@@ -353,10 +358,19 @@ class ModelService:
     ) -> tuple[FraudDetectionModel, list[float], float]:
         """Train the model on a bank's local data with Differential Privacy using Opacus.
 
-        Performs per-sample gradient clipping and noise injection during training.
-        Returns the trained model, loss history, and actual epsilon spent.
+        Performs per-sample gradient clipping and calibrated noise injection during training.
+        Maintains genuine multi-round composition and returns the trained model, loss history,
+        and actual epsilon spent.
         """
         from opacus import PrivacyEngine
+        from opacus.accountants.utils import get_noise_multiplier
+
+        if target_epsilon <= 0.0 or not math.isfinite(target_epsilon):
+            raise ValueError(f"target_epsilon must be positive and finite, got {target_epsilon}")
+        if not (0.0 < target_delta < 1.0) or not math.isfinite(target_delta):
+            raise ValueError(f"target_delta must be in (0, 1), got {target_delta}")
+        if max_grad_norm <= 0.0 or not math.isfinite(max_grad_norm):
+            raise ValueError(f"max_grad_norm must be positive and finite, got {max_grad_norm}")
 
         epochs = epochs or self.settings.fl_default_local_epochs
         learning_rate = learning_rate or self.settings.fl_default_learning_rate
@@ -402,35 +416,55 @@ class ModelService:
         drop_last_batch = len(dataset) > batch_size and (len(dataset) % batch_size == 1)
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=drop_last_batch)
 
-        privacy_engine = PrivacyEngine()
+        sample_rate = float(batch_size) / max(len(dataset), 1)
+        steps_per_epoch = max(1, math.ceil(len(dataset) / batch_size))
+        calib_steps = total_steps or (epochs * steps_per_epoch)
 
-        # Prefer PyTorch native ExpandedWeights ('ew') mode to compute per-sample
-        # gradients directly on the autograd graph without registering full backward hooks
-        # on the input layer (which triggers PyTorch UserWarning when inputs do not require grad).
-        # Fall back to 'hooks' mode if ExpandedWeights is unsupported for the current architecture.
+        if noise_multiplier is not None and noise_multiplier > 0.0:
+            sigma = float(noise_multiplier)
+        else:
+            sigma = float(
+                get_noise_multiplier(
+                    target_epsilon=target_epsilon,
+                    target_delta=target_delta,
+                    sample_rate=sample_rate,
+                    steps=calib_steps,
+                    accountant=accountant_type,
+                )
+            )
+
+        if privacy_engine is None:
+            if require_secure_rng:
+                try:
+                    privacy_engine = PrivacyEngine(accountant=accountant_type, secure_mode=True)
+                except Exception as rng_e:
+                    raise RuntimeError(
+                        f"Cryptographic CSPRNG requested (require_secure_rng=True), but torchcsprng is unavailable: {rng_e}"
+                    ) from rng_e
+            else:
+                privacy_engine = PrivacyEngine(accountant=accountant_type, secure_mode=False)
+
         try:
-            res: Any = privacy_engine.make_private_with_epsilon(
+            res: Any = privacy_engine.make_private(
                 module=model,
                 optimizer=optimizer,
                 data_loader=loader,
-                target_epsilon=target_epsilon,
-                target_delta=target_delta,
-                epochs=epochs,
+                noise_multiplier=sigma,
                 max_grad_norm=max_grad_norm,
+                poisson_sampling=True,
                 grad_sample_mode="ew",
             )
         except Exception as e:
             logger.debug(
                 "ExpandedWeights grad sample mode unavailable, falling back to hooks: %s", e
             )
-            res = privacy_engine.make_private_with_epsilon(
+            res = privacy_engine.make_private(
                 module=model,
                 optimizer=optimizer,
                 data_loader=loader,
-                target_epsilon=target_epsilon,
-                target_delta=target_delta,
-                epochs=epochs,
+                noise_multiplier=sigma,
                 max_grad_norm=max_grad_norm,
+                poisson_sampling=True,
                 grad_sample_mode="hooks",
             )
         model_private: Any = res[0]
@@ -520,23 +554,48 @@ class ModelService:
         model_final = cast(
             "FraudDetectionModel", getattr(model_private, "_module", model_private)
         )
-        object.__setattr__(
-            model_final,
-            "dp_provenance",
-            {
-                "mechanism": "opacus_rdp",
-                "epsilon": float(actual_epsilon),
-                "delta": float(target_delta),
-                "accountant": "rdp",
-                "noise_multiplier": float(getattr(optimizer_private, "noise_multiplier", 0.0)),
-                "clip_norm": float(max_grad_norm),
-                "sample_rate": float(getattr(loader_private, "sample_rate", (batch_size or 64) / max(len(dataset), 1))),
-                "steps": int(getattr(optimizer_private, "steps_done", (epochs or 1) * max(n_batches, 1))),
-                "dp_mode": "opacus",
-                "secure_rng": False,
-                "version": "1.0",
-            },
+        accountant_obj = getattr(privacy_engine, "accountant", None)
+        accountant_name = type(accountant_obj).__name__ if accountant_obj else accountant_type
+        mechanism_name = getattr(accountant_obj, "mechanism", lambda: accountant_type)()
+        is_secure = bool(getattr(privacy_engine, "secure_mode", False))
+        accountant_tag = (
+            "opacus_prv"
+            if (accountant_type == "prv" or "prv" in accountant_name.lower())
+            else (f"opacus_{accountant_type}" if accountant_type else accountant_name)
         )
+
+        prov_dict = {
+            "mechanism": "SubsampledGaussianDP",
+            "mechanism_detail": f"opacus_{mechanism_name}",
+            "epsilon": float(actual_epsilon),
+            "actual_epsilon": float(actual_epsilon),
+            "delta": float(target_delta),
+            "accountant": accountant_tag,
+            "accountant_mechanism": mechanism_name,
+            "noise_multiplier": float(sigma),
+            "clip_norm": float(max_grad_norm),
+            "clipping_norm": float(max_grad_norm),
+            "sample_rate": float(sample_rate),
+            "steps": int(getattr(optimizer_private, "steps_done", (epochs or 1) * max(n_batches, 1))),
+            "total_steps": int(getattr(optimizer_private, "steps_done", (epochs or 1) * max(n_batches, 1))),
+            "sampling": "poisson",
+            "sampling_mechanism": "poisson",
+            "dp_mode": "opacus",
+            "secure_rng": is_secure,
+            "target_epsilon": float(target_epsilon),
+            "telemetry_classification": {
+                "model_weights": "differentially_private_record_level",
+                "update_digest": "post_processing_differential_privacy",
+                "sample_count": "public_metadata_exact",
+                "observed_loss": "bounded_non_private_observation",
+                "training_loss": "bounded_non_private_observation",
+                "receipt_attestation": "execution_and_accounting_integrity",
+            },
+            "version": "2.0",
+        }
+        object.__setattr__(model_final, "dp_provenance", prov_dict)
+        object.__setattr__(model_final, "_dp_provenance", prov_dict)
+        object.__setattr__(model_final, "_privacy_engine", privacy_engine)
 
         import gc
 

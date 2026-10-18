@@ -155,10 +155,10 @@ class RDPMomentsAccountant:
         q: float,
         alpha: float,
     ) -> float:
-        """Analytical first-order RDP bound for one step of the subsampled Gaussian mechanism.
+        """Exact tested RDP bound for one step of the subsampled Gaussian mechanism via Opacus.
 
-        Returns:
-            D_α(M(D) || M(D')) = α·q² / (2σ²)   for α > 1
+        Computes the formally justified subsampled Gaussian RDP bound without relying
+        on the first-order approximation α·q² / (2σ²).
 
         Raises:
             ValueError: for invalid parameters.
@@ -169,7 +169,11 @@ class RDPMomentsAccountant:
             raise ValueError(f"q must be in (0,1], got {q}")
         if alpha <= 1.0:
             raise ValueError(f"alpha must be > 1, got {alpha}")
-        return float((alpha * (q ** 2)) / (2.0 * (sigma ** 2)))
+
+        from opacus.accountants.analysis.rdp import compute_rdp
+
+        rdp_arr = compute_rdp(q=q, noise_multiplier=sigma, steps=1, orders=[alpha])
+        return float(rdp_arr[0])
 
     # ------------------------------------------------------------------
     # Mid-level: compose across T rounds and convert

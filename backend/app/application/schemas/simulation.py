@@ -491,6 +491,34 @@ class OperationalFederationRequest(BaseModel):
         ge=1,
         description="Strict sample count reconciliation expectation",
     )
+    dp_enabled: bool = Field(
+        default=False,
+        description="Whether to enable record-level Differential Privacy (DP-SGD) inside bank workers",
+    )
+    dp_target_epsilon: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="Target epsilon privacy loss bound per bank dataset across the job horizon",
+    )
+    dp_target_delta: float | None = Field(
+        default=None,
+        gt=0.0,
+        lt=1.0,
+        description="Target delta parameter for (epsilon, delta)-DP bound",
+    )
+    dp_max_grad_norm: float | None = Field(
+        default=1.0,
+        gt=0.0,
+        description="Maximum l2 clipping norm for per-sample gradients",
+    )
+    dp_dataset_tag: str | None = Field(
+        default="default",
+        description="Protected dataset tag identifier for institutional budget scoping",
+    )
+    dp_require_secure_rng: bool = Field(
+        default=False,
+        description="Whether to require CSPRNG backing for Opacus DP noise generation",
+    )
 
 
 class OperationalFederationResponse(BaseModel):
@@ -508,6 +536,8 @@ class OperationalFederationResponse(BaseModel):
     is_promoted_champion: bool = False
     coordinator_pid: int = 0
     worker_pids: dict[str, int] = Field(default_factory=dict)
+    dp_enabled: bool = False
+    dp_provenance: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
 
 

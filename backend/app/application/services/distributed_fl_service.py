@@ -1850,6 +1850,7 @@ class IsolatedCoordinatorClient:
         signing_key_hex: str | None = None,
         pause_aggregation_checkpoint_file: str | None = None,
         consortium_id: str | None = None,
+        dp_config: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         req = {
             "command": "EXECUTE_FEDERATION",
@@ -1873,6 +1874,7 @@ class IsolatedCoordinatorClient:
             "pause_aggregation_checkpoint_file": pause_aggregation_checkpoint_file,
             "has_worker_endpoints": bool(worker_endpoints),
             "consortium_id": consortium_id,
+            "dp_config": dp_config,
         }
         try:
             self._conn.send(req)
@@ -2210,6 +2212,7 @@ def _run_isolated_coordinator_worker(
                     signing_key_hex=req.get("signing_key_hex"),
                     pause_aggregation_checkpoint_file=req.get("pause_aggregation_checkpoint_file"),
                     consortium_id=req.get("consortium_id"),
+                    dp_config=req.get("dp_config"),
                 )
 
                 if "worker_pids" in req:
@@ -2403,6 +2406,7 @@ def run_production_federation(
     worker_pids: dict[str, int] | None = None,
     app_env: str = "production",
     consortium_id: str | None = None,
+    dp_config: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Canonical production entry point executing distributed federation under the mandatory restricted coordinator boundary."""
     proc, client = spawn_isolated_coordinator_process(app_env=app_env)
@@ -2423,6 +2427,7 @@ def run_production_federation(
             signing_authority=signing_authority,
             worker_pids=worker_pids,
             consortium_id=consortium_id,
+            dp_config=dp_config,
         )
     finally:
         client.terminate()
@@ -3526,6 +3531,7 @@ def run_bank_worker_node(
     fail_observation: bool = False,
     bank_encryption_key: str | bytes | None = None,
     app_env: str = "production",
+    local_partition: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> None:
     """Dedicated Operating System Process for a Participating Bank Worker.
 
@@ -3578,7 +3584,9 @@ def run_bank_worker_node(
 
         # Load local training data from isolated bank storage if path provided
         vault_handle: BankPrivateStorageVault | None = None
-        if data_path is not None:
+        if local_partition is not None:
+            X_train, y_train = local_partition
+        elif data_path is not None:
             if not os.path.exists(data_path):
                 raise FileNotFoundError(f"Bank [{bank_id}] private dataset not found at '{data_path}'")
             bank_vault_dir = os.path.dirname(os.path.dirname(data_path))
@@ -3596,6 +3604,8 @@ def run_bank_worker_node(
             y_train = y_partition
         else:
             raise ValueError(f"Bank [{bank_id}] must be supplied with either a private data_path or partition arrays.")
+
+        dp_sessions: dict[str, dict[str, Any]] = {}
 
         try:
             while True:
@@ -3742,20 +3752,155 @@ def run_bank_worker_node(
                             })
                             continue
 
+                    # Check scheduled job configuration for differential privacy requirements
+                    sched = authority_source.get_scheduled_job(job_id)
+                    dp_config = sched.dp_config if sched and sched.dp_config else None
+                    is_dp_enabled = bool(dp_config and dp_config.get("dp_enabled", False))
+
                     # Initialize local model and load latest global weights
                     local_model = model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
                     if global_weights_obj is not None:
                         model_service.set_parameters(local_model, global_weights_obj)
 
-                    # Execute real PyTorch optimization on private dataset partition
-                    local_model, loss_history, _ = model_service.train_local(
-                        model=local_model,
-                        X_train=X_train,
-                        y_train=y_train,
-                        epochs=1,
-                        learning_rate=0.01,
-                        batch_size=32,
-                    )
+                    dp_info: dict[str, Any] | None = None
+                    if is_dp_enabled:
+                        assert dp_config is not None
+                        target_epsilon = float(dp_config["target_epsilon"])
+                        target_delta = float(dp_config["target_delta"])
+                        max_grad_norm = float(dp_config.get("max_grad_norm", 1.0))
+                        noise_multiplier = (
+                            float(dp_config["noise_multiplier"])
+                            if "noise_multiplier" in dp_config and dp_config["noise_multiplier"] is not None
+                            else None
+                        )
+                        dataset_tag = str(dp_config.get("dataset_tag", "primary_vault")).strip()
+                        accountant_type = str(dp_config.get("accountant", "prv")).strip()
+                        require_secure_rng = bool(dp_config.get("require_secure_rng", False))
+                        batch_size = int(dp_config.get("batch_size", 32))
+                        learning_rate = float(dp_config.get("learning_rate", 0.01))
+                        expected_rounds = sched.expected_rounds if sched else 1
+
+                        # Session Continuity across rounds (no accounting horizon reset)
+                        session = dp_sessions.setdefault(job_id, {"privacy_engine": None, "steps_executed": 0})
+                        existing_engine = session.get("privacy_engine")
+
+                        # Authoritative Institutional Budget Check & Reservation
+                        alloc_eps_raw = dp_config.get("allocated_epsilon")
+                        alloc_eps = float(alloc_eps_raw) if alloc_eps_raw is not None else float(target_epsilon)
+                        alloc_del_raw = dp_config.get("allocated_delta")
+                        alloc_del = float(alloc_del_raw) if alloc_del_raw is not None else float(target_delta)
+                        authority_source.get_or_create_institutional_privacy_budget(
+                            bank_id=bank_id,
+                            dataset_tag=dataset_tag,
+                            allocated_epsilon=alloc_eps,
+                            allocated_delta=alloc_del,
+                            token=worker_token,
+                        )
+
+                        # Prior expenditure by this specific job on this dataset
+                        budget_record = authority_source.get_institutional_privacy_budget(bank_id, dataset_tag)
+                        history_job_eps = 0.0
+                        history_job_del = 0.0
+                        if budget_record and budget_record.history:
+                            for entry in budget_record.history:
+                                if isinstance(entry, dict) and entry.get("job_id") == job_id:
+                                    history_job_eps = max(history_job_eps, float(entry.get("spent_epsilon", 0.0)))
+                                    history_job_del = max(history_job_del, float(entry.get("spent_delta", 0.0)))
+
+                        prior_job_spent_eps = max(history_job_eps, float(session.get("last_committed_eps", 0.0)))
+                        prior_job_spent_del = max(history_job_del, float(session.get("last_committed_del", 0.0)))
+
+                        needed_eps = max(0.001, target_epsilon - prior_job_spent_eps)
+                        if budget_record and budget_record.remaining_epsilon > 0.0:
+                            needed_eps = min(needed_eps, budget_record.remaining_epsilon)
+                        needed_del = max(0.0, target_delta - prior_job_spent_del)
+
+                        try:
+                            authority_source.reserve_institutional_privacy_budget(
+                                bank_id=bank_id,
+                                dataset_tag=dataset_tag,
+                                job_id=job_id,
+                                round_number=round_number,
+                                requested_epsilon=needed_eps,
+                                requested_delta=needed_del,
+                                worker_token=worker_token,
+                            )
+                        except TrainingProvenanceSecurityError as pse:
+                            logger.error(
+                                "Bank worker [%s] privacy budget reservation rejected for job %s round %d: %s",
+                                bank_id, job_id, round_number, pse,
+                            )
+                            outbox.put({
+                                "status": "ERROR",
+                                "bank_id": bank_id,
+                                "error": f"Privacy budget exhausted: {pse}",
+                                "pid": pid,
+                            })
+                            continue
+
+                        # Execute Opacus DP-SGD
+                        steps_per_epoch = int(math.ceil(len(X_train) / max(1, batch_size)))
+                        total_job_steps = max(1, expected_rounds * steps_per_epoch)
+
+                        try:
+                            local_model, loss_history, actual_epsilon = model_service.train_local_with_opacus(
+                                model=local_model,
+                                X_train=X_train,
+                                y_train=y_train,
+                                epochs=1,
+                                batch_size=batch_size,
+                                learning_rate=learning_rate,
+                                target_epsilon=target_epsilon,
+                                target_delta=target_delta,
+                                max_grad_norm=max_grad_norm,
+                                noise_multiplier=noise_multiplier,
+                                total_steps=total_job_steps,
+                                accountant_type=accountant_type,
+                                require_secure_rng=require_secure_rng,
+                                privacy_engine=existing_engine,
+                            )
+                            session["privacy_engine"] = getattr(local_model, "_privacy_engine", None)
+                            session["steps_executed"] += steps_per_epoch
+                            dp_info = getattr(local_model, "dp_provenance", {})
+                        except Exception as dp_err:
+                            # FAIL CLOSED: Never silently fallback to vanilla non-DP training!
+                            logger.error(
+                                "Bank worker [%s] Opacus DP-SGD execution failed for job %s round %d: %s",
+                                bank_id, job_id, round_number, dp_err,
+                            )
+                            outbox.put({
+                                "status": "ERROR",
+                                "bank_id": bank_id,
+                                "error": f"Opacus DP-SGD failed: {dp_err}",
+                                "pid": pid,
+                            })
+                            continue
+
+                        # Commit expenditure in durable institutional budget table
+                        spent_eps = float(dp_info.get("epsilon", needed_eps)) if dp_info else needed_eps
+                        spent_del = float(dp_info.get("delta", target_delta)) if dp_info else target_delta
+                        authority_source.commit_institutional_privacy_expenditure(
+                            bank_id=bank_id,
+                            dataset_tag=dataset_tag,
+                            job_id=job_id,
+                            round_number=round_number,
+                            spent_epsilon=spent_eps,
+                            spent_delta=spent_del,
+                            steps_executed=steps_per_epoch,
+                            worker_token=worker_token,
+                        )
+                        session["last_committed_eps"] = spent_eps
+                        session["last_committed_del"] = spent_del
+                    else:
+                        # Non-DP vanilla training route (explicitly non-private FedAvg)
+                        local_model, loss_history, _ = model_service.train_local(
+                            model=local_model,
+                            X_train=X_train,
+                            y_train=y_train,
+                            epochs=1,
+                            learning_rate=0.01,
+                            batch_size=32,
+                        )
 
                     local_weights = model_service.get_parameters(local_model)
                     weights_bytes = _serialize_weights_to_bytes(local_weights)
@@ -3767,7 +3912,20 @@ def run_bank_worker_node(
                         raise TrainingProvenanceSecurityError(
                             f"Bank worker [{bank_id}] produced no loss history during local training."
                         )
-                    observed_loss = float(loss_history[-1])
+
+                    # Release surface protection: In DP mode, bounded aggregate loss avoids raw outlier leakage
+                    if is_dp_enabled:
+                        observed_loss = min(float(loss_history[-1]), 10.0)
+                        obs_metrics: dict[str, float] = {
+                            "loss": observed_loss,
+                            "dp_epsilon": float(dp_info.get("epsilon", 0.0)) if dp_info else 0.0,
+                            "dp_delta": float(dp_info.get("delta", 0.0)) if dp_info else 0.0,
+                            "dp_noise_multiplier": float(dp_info.get("noise_multiplier", 0.0)) if dp_info else 0.0,
+                        }
+                    else:
+                        observed_loss = float(loss_history[-1])
+                        obs_metrics = {"loss": observed_loss}
+
                     if not math.isfinite(observed_loss):
                         raise TrainingProvenanceSecurityError(
                             f"Bank worker [{bank_id}] produced non-finite observed loss: {observed_loss}"
@@ -3792,7 +3950,7 @@ def run_bank_worker_node(
                             sample_count=sample_count,
                             actual_executed_epochs=1,
                             observed_loss=observed_loss,
-                            metrics={"loss": observed_loss},
+                            metrics=obs_metrics,
                             worker_token=worker_token,
                             bank_id=bank_id,
                             model_update_digest=update_digest,
@@ -3811,7 +3969,7 @@ def run_bank_worker_node(
 
                     # Send local weights and digest to coordinator over federated transport
                     # Notice: Zero raw dataset samples (X_train, y_train) are transmitted across IPC.
-                    outbox.put({
+                    success_payload: dict[str, Any] = {
                         "status": "SUCCESS",
                         "bank_id": bank_id,
                         "pid": pid,
@@ -3821,7 +3979,10 @@ def run_bank_worker_node(
                         "sample_count": sample_count,
                         "loss": observed_loss,
                         "executed_epochs": 1,
-                    })
+                    }
+                    if dp_info is not None:
+                        success_payload["dp_provenance"] = dp_info
+                    outbox.put(success_payload)
         finally:
             if vault_handle is not None:
                 vault_handle.release_exclusive_os_boundary()
@@ -3913,6 +4074,7 @@ class DistributedFederatedTrainingManager:
         receipt_verifier: TrainingReceiptVerifier | None = None,
         model_registry: ModelRegistry | None = None,
         consortium_id: str | None = None,
+        dp_config: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute complete distributed E2E federated training lifecycle across independent processes.
 
@@ -3989,11 +4151,13 @@ class DistributedFederatedTrainingManager:
             feature_names=list(FEATURE_NAMES),
             permitted_workers=banks,
             consortium_id=consortium_id,
+            dp_config=dp_config,
         )
 
         inboxes = {b: endpoints[b]["inbox"] for b in banks}
         outboxes = {b: endpoints[b]["outbox"] for b in banks}
         worker_pids: dict[str, int] = {b: spawned_procs[b].pid or 0 for b in banks if b in spawned_procs}
+        latest_dp_provenance: dict[str, Any] = {}
 
         logger.info(
             "Spawned distributed topology: Coordinator PID=%d, Bank Worker PIDs=%s",
@@ -4026,6 +4190,7 @@ class DistributedFederatedTrainingManager:
                         "job_id": job_id,
                         "round_number": round_num,
                         "global_weights": global_weights,
+                        "dp_config": dp_config,
                     })
 
                 # Collect responses
@@ -4054,6 +4219,8 @@ class DistributedFederatedTrainingManager:
                     local_w = res["weights"]
                     w_digest = res["update_digest"]
                     s_count = res["sample_count"]
+                    if "dp_provenance" in res:
+                        latest_dp_provenance[b_id] = res["dp_provenance"]
 
                     # Coordinator verifies update digest against received weight bytes
                     calculated_digest = hashlib.sha256(_serialize_weights_to_bytes(local_w)).hexdigest()
@@ -4320,6 +4487,8 @@ class DistributedFederatedTrainingManager:
                 "metrics": {"loss": final_loss, "auc_roc": val_auc, "val_loss": val_loss},
                 "final_artifact_sha256": final_artifact_sha256,
                 "consortium_id": consortium_id,
+                "dp_enabled": bool(dp_config.get("dp_enabled", False)) if dp_config else False,
+                "dp_provenance": latest_dp_provenance,
             }
 
         finally:
