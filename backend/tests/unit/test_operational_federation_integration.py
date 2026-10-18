@@ -12,14 +12,16 @@ H. Genuine completion preserves verified evidence and inactive registry status.
 I. No valid receipt, completion record, or production candidate is fabricated when execution fails.
 """
 
-from __future__ import annotations
-
+import multiprocessing as mp
 import os
 import shutil
 import tempfile
+import threading
 import unittest.mock as mock
+from typing import Any
 
 import numpy as np
+import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
@@ -29,10 +31,12 @@ from app.application.schemas.simulation import (
 from app.application.services.distributed_fl_service import (
     DistributedFederatedTrainingManager,
 )
+from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.model_service import NUM_FEATURES
 from app.application.services.operational_federation_service import (
     OperationalFederationService,
+    TrustedWorkerEndpoint,
     WorkerEndpointRegistry,
 )
 from app.application.services.simulation_service import SimulationService
@@ -40,6 +44,7 @@ from app.application.services.training_provenance_service import (
     TrainingProvenanceConfigurationError,
     TrainingProvenanceSecurityError,
 )
+from app.infrastructure.database.training_authority_backends import SQLiteTrainingJobAuthority
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.main import app
 
@@ -48,6 +53,7 @@ client = TestClient(app)
 
 def _get_operator_auth_headers(
     username: str = "test_ml_lead",
+    bank_id: str = "bank_a",
     roles: list[str] | None = None,
     clearance_level: int = 2,
     is_active: bool = True,
@@ -61,10 +67,11 @@ def _get_operator_auth_headers(
         user = auth_svc.register_user(
             username=username,
             plain_password="SafePassword123!",
-            bank_id="bank_a",
+            bank_id=bank_id,
             roles=roles,
             clearance_level=clearance_level,
         )
+    user.bank_id = bank_id
     user.roles = roles
     user.clearance_level = clearance_level
     user.is_active = is_active
@@ -503,3 +510,323 @@ class TestOperationalFederationIntegration:
             ])
             assert ret == 0
             mock_cmd.assert_called_once()
+
+    def test_institution_scoped_training_authorization(self) -> None:
+        """Requirement 2: Enforce institution-scoped operator authorization and participant validation."""
+        # 1. Operator bound to BANK_A attempting cross-institution training for BANK_B and BANK_C
+        bank_a_headers = _get_operator_auth_headers(
+            username="operator_bank_a_lead",
+            bank_id="bank_a",
+            roles=["ml_lead"],
+            clearance_level=2,
+        )
+        resp_cross = client.post(
+            "/api/v1/training/federation/jobs",
+            json={"participating_banks": ["BANK_B", "BANK_C"], "num_rounds": 1},
+            headers=bank_a_headers,
+        )
+        assert resp_cross.status_code == 403
+        assert "excluding their own institution" in resp_cross.json()["detail"]
+
+        # 2. Duplicate participant identities rejected with 400
+        resp_dup = client.post(
+            "/api/v1/training/federation/jobs",
+            json={"participating_banks": ["BANK_A", "BANK_A", "BANK_B"], "num_rounds": 1},
+            headers=bank_a_headers,
+        )
+        assert resp_dup.status_code == 400
+        assert "Duplicate participant bank identity" in resp_dup.json()["detail"]
+
+        # 3. Unrecognized or invalid consortium participant rejected with 400
+        resp_unrec = client.post(
+            "/api/v1/training/federation/jobs",
+            json={"participating_banks": ["BANK_A", "BANK_UNREGISTERED"], "num_rounds": 1},
+            headers=bank_a_headers,
+        )
+        assert resp_unrec.status_code == 400
+        assert "Unrecognized or unregistered consortium participant" in resp_unrec.json()["detail"]
+
+        # 4. Empty or missing participating_banks rejected with 400
+        resp_empty = client.post(
+            "/api/v1/training/federation/jobs",
+            json={"participating_banks": [], "num_rounds": 1},
+            headers=bank_a_headers,
+        )
+        assert resp_empty.status_code in (400, 422)
+
+        # 5. Central/Consortium Admin (Clearance >= 3 or CONSORTIUM bank) CAN initiate multi-bank training
+        consortium_admin_headers = _get_operator_auth_headers(
+            username="central_consortium_admin",
+            bank_id="consortium",
+            roles=["admin"],
+            clearance_level=3,
+        )
+        mock_ok = {
+            "job_id": "job_consortium_01",
+            "training_run_id": "run_01",
+            "simulation_id": "sim_01",
+            "status": "COMPLETED",
+            "is_verified": True,
+            "metrics": {"auc_roc": 0.85},
+            "artifact_sha256": "f" * 64,
+            "model_version": 4,
+            "is_promoted_champion": False,
+            "coordinator_pid": 100,
+            "worker_pids": {"BANK_B": 101, "BANK_C": 102},
+        }
+        with mock.patch.object(OperationalFederationService, "execute_operational_federation", return_value=mock_ok):
+            resp_consortium = client.post(
+                "/api/v1/training/federation/jobs",
+                json={"participating_banks": ["BANK_B", "BANK_C"], "num_rounds": 1},
+                headers=consortium_admin_headers,
+            )
+            assert resp_consortium.status_code == 201
+            assert resp_consortium.json()["job_id"] == "job_consortium_01"
+
+    def test_worker_endpoint_lifecycle_and_stale_eviction(self) -> None:
+        """Requirement 1: WorkerEndpointRegistry validates capabilities, tracks liveness, and evicts dead workers."""
+        svc = OperationalFederationService(app_env="development")
+
+        # 1. Registering with dead PID is strictly rejected
+        dead_pid = 99999999
+        q_in: mp.Queue = mp.Queue()
+        q_out: mp.Queue = mp.Queue()
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_dead:
+            WorkerEndpointRegistry.register_worker_endpoint(
+                bank_id="BANK_A",
+                endpoint={"inbox": q_in, "outbox": q_out},
+                pid=dead_pid,
+            )
+        assert "dead/terminated" in str(exc_dead.value) or "is not alive" in str(exc_dead.value)
+
+        # 2. Registering with invalid queues is rejected
+        current_pid = os.getpid()
+        with pytest.raises(TrainingProvenanceConfigurationError) as exc_caps:
+            WorkerEndpointRegistry.register_worker_endpoint(
+                bank_id="BANK_A",
+                endpoint={"inbox": "not_a_queue", "outbox": q_out},
+                pid=current_pid,
+            )
+        assert "put" in str(exc_caps.value)
+
+        # 3. Registering live worker succeeds and is retrievable
+        WorkerEndpointRegistry.register_worker_endpoint(
+            bank_id="BANK_A",
+            endpoint={"inbox": q_in, "outbox": q_out},
+            pid=current_pid,
+        )
+        assert WorkerEndpointRegistry.is_registered("BANK_A")
+        ep = WorkerEndpointRegistry.get_trusted_endpoint("BANK_A")
+        assert ep is not None
+        assert ep.pid == current_pid
+
+        # 4. If worker dies (simulate by replacing registration with dead PID), resolve_worker_endpoints evicts it
+        with WorkerEndpointRegistry._lock:
+            WorkerEndpointRegistry._registry["BANK_A"] = TrustedWorkerEndpoint(
+                bank_id="BANK_A",
+                endpoint={"inbox": q_in, "outbox": q_out},
+                pid=dead_pid,
+                registered_at=ep.registered_at,
+                capabilities=ep.capabilities,
+            )
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_evict:
+            svc.resolve_worker_endpoints(["BANK_A"], is_prod=True)
+        assert "not provisioned or registered" in str(exc_evict.value)
+        assert not WorkerEndpointRegistry.is_registered("BANK_A")
+
+    def test_holdout_evaluation_data_contract(self) -> None:
+        """Requirement 3: Enforce FEATURE_NAMES schema ordering, canonical encoding, and non-empty finite evaluation data."""
+        svc = OperationalFederationService(app_env="development")
+
+        # 1. Valid (X, y) tuple with exactly NUM_FEATURES and binary labels
+        valid_X = np.random.randn(25, NUM_FEATURES).astype(np.float32)
+        valid_y = np.array([0] * 15 + [1] * 10, dtype=np.float32)
+        resolved_X, resolved_y = svc.resolve_holdout_data(is_prod=False, holdout_data=(valid_X, valid_y))
+        assert resolved_X.shape == (25, NUM_FEATURES)
+        assert resolved_y.shape == (25,)
+
+        # 2. Valid DataFrame with canonical raw FEATURE_NAMES correctly encoded to NUM_FEATURES
+        raw_df = pd.DataFrame({
+            "transaction_amount": [100.0, 50.0, 250.0, 15.0],
+            "merchant_category": ["dining", "grocery", "electronics", "travel"],
+            "country_code": ["US", "US", "GB", "CA"],
+            "device_type": ["mobile", "web", "mobile", "pos"],
+            "velocity": [1.0, 2.0, 7.0, 1.0],
+            "hour_of_day": [12, 14, 2, 8],
+            "merchant_risk_score": [0.10, 0.05, 0.88, 0.20],
+            "customer_history_score": [0.85, 0.95, 0.12, 0.70],
+            "chargeback_count": [0, 0, 2, 0],
+            "account_age_days": [365, 720, 30, 180],
+            "is_fraud": [0, 0, 1, 0],
+        })
+        enc_X, enc_y = svc.resolve_holdout_data(is_prod=False, holdout_data=raw_df)
+        assert enc_X.shape == (4, NUM_FEATURES)
+        assert enc_y.shape == (4,)
+
+        # 3. Incompatible feature dimension (e.g. 7 columns instead of 10) rejected
+        invalid_X = np.random.randn(20, 7).astype(np.float32)
+        with pytest.raises(TrainingProvenanceConfigurationError) as exc_dim:
+            svc.resolve_holdout_data(is_prod=False, holdout_data=(invalid_X, valid_y[:20]))
+        assert "dimension" in str(exc_dim.value) or "10" in str(exc_dim.value)
+
+        # 4. Non-finite values (NaN / Inf) rejected
+        nan_X = np.random.randn(20, NUM_FEATURES).astype(np.float32)
+        nan_X[0, 0] = np.nan
+        with pytest.raises(TrainingProvenanceConfigurationError) as exc_nan:
+            svc.resolve_holdout_data(is_prod=False, holdout_data=(nan_X, valid_y[:20]))
+        assert "finite" in str(exc_nan.value)
+
+        # 5. Single-class labels (all 0s) rejected
+        single_class_y = np.zeros(20, dtype=np.float32)
+        with pytest.raises(TrainingProvenanceConfigurationError) as exc_class:
+            svc.resolve_holdout_data(is_prod=False, holdout_data=(valid_X[:20], single_class_y))
+        assert "both positive and negative classes" in str(exc_class.value)
+
+        # 6. Production mode without holdout fails closed (zero synthetic fallback)
+        svc_prod = OperationalFederationService(app_env="production")
+        with pytest.raises(TrainingProvenanceConfigurationError) as exc_prod_syn:
+            svc_prod.resolve_holdout_data(is_prod=True, holdout_data=None)
+        assert "Production holdout evaluation dataset is not configured" in str(exc_prod_syn.value)
+
+    def test_authority_process_lifecycle_cleanup(self) -> None:
+        """Requirement 5: OperationalFederationService owns and cleans up spawned isolated authorities."""
+        svc = OperationalFederationService(app_env="production")
+
+        mock_signing = mock.MagicMock()
+        mock_comp = mock.MagicMock()
+
+        # Simulate execution failure during runner dispatch in production
+        with mock.patch.object(svc, "resolve_signing_authority", return_value=(mock_signing, True)), \
+             mock.patch.object(svc, "resolve_completion_authority", return_value=(mock_comp, ("127.0.0.1", 9999), True)), \
+             mock.patch.object(svc, "resolve_coordinator_token", return_value="tok"), \
+             mock.patch.object(svc, "resolve_db_url", return_value="postgresql://u:p@localhost/db"), \
+             mock.patch.object(svc, "resolve_worker_endpoints", return_value=({"BANK_A": {}, "BANK_B": {}}, {"BANK_A": 1, "BANK_B": 2})), \
+             mock.patch.object(svc, "resolve_holdout_data", return_value=(np.zeros((10, NUM_FEATURES)), np.array([0, 1] * 5))), \
+             mock.patch("app.application.services.operational_federation_service.run_production_federation", side_effect=RuntimeError("Runner crashed")):
+            with pytest.raises(RuntimeError):
+                svc.execute_operational_federation(
+                    job_id="job_clean_01",
+                    participating_banks=["BANK_A", "BANK_B"],
+                    num_rounds=1,
+                )
+
+        # Both spawned authorities must have been cleanly terminated via finally
+        mock_signing.terminate.assert_called_once()
+        mock_comp.terminate.assert_called_once()
+
+        # Externally provisioned authorities are NOT terminated
+        mock_ext_signing = mock.MagicMock()
+        mock_ext_comp = mock.MagicMock()
+        svc_ext = OperationalFederationService(
+            signing_authority=mock_ext_signing,
+            comp_authority=mock_ext_comp,
+            app_env="production",
+        )
+        with mock.patch.object(svc_ext, "resolve_coordinator_token", return_value="tok"), \
+             mock.patch.object(svc_ext, "resolve_db_url", return_value="postgresql://u:p@localhost/db"), \
+             mock.patch.object(svc_ext, "resolve_worker_endpoints", return_value=({"BANK_A": {}, "BANK_B": {}}, {"BANK_A": 1, "BANK_B": 2})), \
+             mock.patch.object(svc_ext, "resolve_holdout_data", return_value=(np.zeros((10, NUM_FEATURES)), np.array([0, 1] * 5))), \
+             mock.patch("app.application.services.operational_federation_service.run_production_federation", side_effect=RuntimeError("Runner crashed")):
+            with pytest.raises(RuntimeError):
+                svc_ext.execute_operational_federation(
+                    job_id="job_clean_ext",
+                    participating_banks=["BANK_A", "BANK_B"],
+                    num_rounds=1,
+                )
+        mock_ext_signing.terminate.assert_not_called()
+        mock_ext_comp.terminate.assert_not_called()
+
+    def test_truthful_execution_reporting_rejections(self) -> None:
+        """Requirement 4: Non-completed status, unverified state, or missing digests are strictly rejected with 500."""
+        headers = _get_operator_auth_headers(username="test_lead_truth", bank_id="bank_a", roles=["ml_lead"], clearance_level=2)
+
+        # 1. Unverified execution result
+        unverified_result = {
+            "job_id": "job_unverified_01",
+            "status": "COMPLETED",
+            "is_verified": False,
+            "metrics": {},
+            "artifact_sha256": "a" * 64,
+            "model_version": 1,
+        }
+        with mock.patch.object(OperationalFederationService, "execute_operational_federation", return_value=unverified_result):
+            resp = client.post(
+                "/api/v1/training/federation/jobs",
+                json={"participating_banks": ["BANK_A", "BANK_B"]},
+                headers=headers,
+            )
+            assert resp.status_code == 500
+            assert "unverified execution state" in resp.json()["detail"]
+
+        # 2. Missing artifact SHA-256
+        no_sha_result = {
+            "job_id": "job_nosha_01",
+            "status": "COMPLETED",
+            "is_verified": True,
+            "metrics": {},
+            "artifact_sha256": None,
+            "model_version": 1,
+        }
+        with mock.patch.object(OperationalFederationService, "execute_operational_federation", return_value=no_sha_result):
+            resp = client.post(
+                "/api/v1/training/federation/jobs",
+                json={"participating_banks": ["BANK_A", "BANK_B"]},
+                headers=headers,
+            )
+            assert resp.status_code == 500
+            assert "no verified artifact digest" in resp.json()["detail"]
+
+    def test_database_authority_concurrency_and_start_job_lifecycle(self, tmp_path: Any) -> None:
+        """Requirement 6: Verify database start_job under actual concurrency and multi-worker lifecycle."""
+        db_path = os.path.join(str(tmp_path), "test_authority_concurrency.db")
+        auth = SQLiteTrainingJobAuthority(db_target=db_path)
+
+        # Schedule job with permitted workers BANK_A, BANK_B, BANK_C
+        auth.schedule_job(
+            job_id="job_conc_01",
+            training_run_id="run_conc_01",
+            simulation_id="sim_conc_01",
+            architecture="CFIFraudDetectorMLP",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=FEATURE_NAMES,
+            coordinator_id="COORDINATOR_TEST",
+            permitted_workers=("BANK_A", "BANK_B", "BANK_C"),
+        )
+
+        # 1. Simultaneous start attempts by separate threads (simulating racing workers)
+        results: list[Any] = []
+        errors: list[Exception] = []
+
+        def worker_start(w_id: str):
+            try:
+                started = auth.start_job("job_conc_01", worker_id=w_id)
+                results.append(started)
+            except Exception as e:
+                errors.append(e)
+
+        t1 = threading.Thread(target=worker_start, args=("BANK_B",))
+        t2 = threading.Thread(target=worker_start, args=("BANK_C",))
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert len(errors) == 0, f"Concurrent start_job produced errors: {errors}"
+        assert len(results) == 2
+        # Both workers received valid StartedTrainingJob records
+        for res in results:
+            assert res.job_id == "job_conc_01"
+            assert res.status == "STARTED"
+
+        # 2. Duplicate start against already-started job returns the same started record
+        dup_start = auth.start_job("job_conc_01", worker_id="BANK_A")
+        assert dup_start.job_id == "job_conc_01"
+        assert dup_start.status == "STARTED"
+
+        # 3. Unauthorized worker identity is rejected with TrainingProvenanceSecurityError
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_unauth:
+            auth.start_job("job_conc_01", worker_id="BANK_UNAUTHORIZED")
+        assert "not authorized to start job" in str(exc_unauth.value)

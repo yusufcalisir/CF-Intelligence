@@ -10,6 +10,8 @@ import logging
 
 from fastapi import APIRouter, Header, HTTPException, Path, Query, status
 
+from starlette.concurrency import run_in_threadpool
+
 from app.application.schemas.simulation import (
     OperationalFederationRequest,
     OperationalFederationResponse,
@@ -32,6 +34,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/training", tags=["training"])
 api_router = APIRouter(prefix="/v1/training", tags=["training"])
 
+SUPPORTED_CONSORTIUM_INSTITUTIONS: frozenset[str] = frozenset({"BANK_A", "BANK_B", "BANK_C"})
+
+
+def _sanitize_client_error(raw_msg: str, default_msg: str) -> str:
+    """Strip filesystem paths, connection strings, and internal credentials from client-facing HTTP errors."""
+    if not raw_msg:
+        return default_msg
+    lowered = raw_msg.lower()
+    if any(k in lowered for k in ("password", "secret", "token", "private_key", "vault", "postgresql://", "sqlite:///", "c:\\", "c:/", "/tmp/")):
+        return default_msg
+    return raw_msg[:200]
+
 
 @router.post("/federation/jobs", response_model=OperationalFederationResponse, status_code=status.HTTP_201_CREATED)
 @api_router.post("/federation/jobs", response_model=OperationalFederationResponse, status_code=status.HTTP_201_CREATED)
@@ -43,10 +57,13 @@ async def start_operational_federation_job(
 
     Guarantees:
     - Cryptographically authenticates initiating operator via live RBAC (requires admin, ml_lead, or ml_engineer role with clearance level >= 2).
+    - Enforces authoritative institutional scope: bank-bound operators cannot initiate training excluding their institution.
+    - Validates participant consortium membership and strictly rejects duplicates or unregistered institutions.
     - Resolves authorities, credentials, vault paths, and pre-provisioned bank endpoints strictly server-side.
+    - Executes asynchronously via threadpool offloading to avoid blocking the event loop.
     - Never accepts private keys, database URLs, bank credentials, raw datasets, or process handles from clients.
     - Executes under isolated Windows Restricted Token in production via run_production_federation.
-    - Tracks actual resulting execution state without fabricated success, dummy receipts, or synthetic metrics.
+    - Strictly reports truthful execution state without fabricated success, dummy receipts, or synthetic metrics.
     - Registers verified candidate model in ModelRegistry with inactive status (never automatically promotes champion).
     """
     operator_user, claims, _ = _authenticate_and_authorize_operator(
@@ -55,58 +72,142 @@ async def start_operational_federation_job(
         operation_name="operational federated training initiation",
         min_clearance=2,
     )
-    logger.info("Operator [%s] authorized for operational federation job", operator_user.username)
+    logger.info("Operator [%s] authenticated for operational federation job", operator_user.username)
+
+    # 1. Validate participant consortium list
+    raw_participants = payload.participating_banks
+    if not raw_participants:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="participating_banks must be a non-empty list of consortium institutions.",
+        )
+
+    normalized_banks: list[str] = []
+    seen_banks: set[str] = set()
+    for b in raw_participants:
+        if not isinstance(b, str) or not b.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid participant bank identity in training request: non-empty string required.",
+            )
+        norm_b = b.strip().upper()
+        if norm_b in seen_banks:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate participant bank identity '{norm_b}' in training request.",
+            )
+        if norm_b not in SUPPORTED_CONSORTIUM_INSTITUTIONS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unrecognized or unregistered consortium participant: '{norm_b}'.",
+            )
+        seen_banks.add(norm_b)
+        normalized_banks.append(norm_b)
+
+    # 2. Enforce institution-scoped operator authorization
+    op_bank = (getattr(operator_user, "bank_id", "") or claims.get("bank_id", "") or "").strip().upper()
+    op_clearance = int(getattr(operator_user, "clearance_level", 1) or claims.get("clearance_level", 1))
+    op_roles = {r.lower().strip() for r in (getattr(operator_user, "roles", []) or claims.get("roles", []))}
+    is_consortium_admin = ("admin" in op_roles and op_clearance >= 3) or op_bank in {"CENTRAL", "CONSORTIUM", "REGULATOR"}
+
+    if not is_consortium_admin:
+        if not op_bank:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Operator has no authoritative institutional binding and cannot initiate federated training.",
+            )
+        if op_bank not in SUPPORTED_CONSORTIUM_INSTITUTIONS:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Operator institution '{op_bank}' is not an authorized consortium institution.",
+            )
+        if op_bank not in seen_banks:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Operator from institution '{op_bank}' is not authorized to initiate training for cohort {normalized_banks} excluding their own institution.",
+            )
 
     svc = OperationalFederationService()
     try:
-        result = svc.execute_operational_federation(
+        # Offload synchronous execution to threadpool to avoid blocking async event loop
+        result = await run_in_threadpool(
+            svc.execute_operational_federation,
             job_id=payload.job_id,
             simulation_id=payload.simulation_id,
-            participating_banks=payload.participating_banks,
+            participating_banks=normalized_banks,
             num_rounds=payload.num_rounds,
             expected_unique_samples=payload.expected_unique_samples,
         )
+
+        exec_status = result.get("status")
+        is_verified = bool(result.get("is_verified", False))
+        if not exec_status or exec_status != "COMPLETED" or not is_verified:
+            logger.error("Federation execution returned incomplete or unverified state: status=%s, verified=%s", exec_status, is_verified)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Federation execution failed or produced unverified execution state.",
+            )
+
         saved_ver = result.get("saved_version")
         ver_number = result.get("model_version")
         if ver_number is None and isinstance(saved_ver, dict):
             ver_number = saved_ver.get("version")
+        if ver_number is None:
+            logger.error("Federation completion reported success but model version is missing: %s", result)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Federation execution produced no durable candidate model registration.",
+            )
+
+        artifact_sha = result.get("artifact_sha256") or result.get("final_artifact_sha256")
+        if not artifact_sha:
+            logger.error("Federation completion reported success but artifact SHA-256 is missing.")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Federation execution produced no verified artifact digest.",
+            )
 
         return OperationalFederationResponse(
-            job_id=result.get("job_id", payload.job_id or ""),
+            job_id=result["job_id"],
             training_run_id=result.get("training_run_id", ""),
             simulation_id=result.get("simulation_id", payload.simulation_id or ""),
-            status=result.get("status", "COMPLETED"),
-            is_verified=bool(result.get("is_verified", False)),
+            status="COMPLETED",
+            is_verified=True,
             metrics=result.get("metrics", {}),
-            artifact_sha256=result.get("artifact_sha256") or result.get("final_artifact_sha256", ""),
+            artifact_sha256=artifact_sha,
             model_version=ver_number,
-            is_promoted_champion=bool(result.get("is_promoted_champion", False)),
+            is_promoted_champion=False,
             coordinator_pid=result.get("coordinator_pid", 0),
             worker_pids=result.get("worker_pids", {}),
         )
     except TrainingProvenanceSecurityError as exc:
         logger.error("Operational federation rejected due to security policy violation: %s", exc)
+        safe_msg = _sanitize_client_error(str(exc), "Federation security policy violation.")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Federation security policy violation: {exc}",
+            detail=safe_msg,
         ) from exc
     except TrainingProvenanceConfigurationError as exc:
         logger.error("Operational federation failed closed due to configuration error: %s", exc)
+        safe_msg = _sanitize_client_error(str(exc), "Federation authority configuration error.")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Federation authority configuration error: {exc}",
+            detail=safe_msg,
         ) from exc
     except ValueError as exc:
         logger.warning("Operational federation bad request: %s", exc)
+        safe_msg = _sanitize_client_error(str(exc), "Invalid federation request parameters.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
+            detail=safe_msg,
         ) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Operational federation execution failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Operational federation failed: {exc}",
+            detail="Operational federation execution failed unexpectedly.",
         ) from exc
 
 

@@ -2669,7 +2669,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
 
                     conn.execute(
                         """
-                        INSERT INTO cfi_started_jobs (
+                        INSERT OR IGNORE INTO cfi_started_jobs (
                             job_id, training_run_id, simulation_id, worker_id, started_at, status
                         ) VALUES (?, ?, ?, ?, ?, ?)
                         """,
@@ -2682,19 +2682,24 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                             "STARTED",
                         ),
                     )
+                    cur = conn.execute("SELECT * FROM cfi_started_jobs WHERE job_id = ?", (clean_job_id,))
+                    row = cur.fetchone()
+                    if not row:
+                        raise TrainingProvenanceSecurityError(
+                            f"Failed to record or retrieve started training job '{clean_job_id}'."
+                        )
                     conn.execute("COMMIT")
+                    return StartedTrainingJob(
+                        job_id=row["job_id"],
+                        training_run_id=row["training_run_id"],
+                        simulation_id=row["simulation_id"],
+                        worker_id=row["worker_id"],
+                        started_at=row["started_at"],
+                        status=row["status"],
+                    )
                 except Exception:
                     conn.execute("ROLLBACK")
                     raise
-
-        return StartedTrainingJob(
-            job_id=clean_job_id,
-            training_run_id=sched["training_run_id"],
-            simulation_id=sched["simulation_id"],
-            worker_id=worker_id,
-            started_at=now_str,
-            status="STARTED",
-        )
 
     def record_observation(self, obs: RoundObservation) -> RoundObservation:
         obs.validate()
