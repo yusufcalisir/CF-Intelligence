@@ -257,16 +257,16 @@ Arithmetic breakdown of the entire automated test suite:
 ├────────────────────────────────────────┬─────────────┬─────────────────┤
 │ Test Suite Component                   │ Count       │ Pass Rate       │
 ├────────────────────────────────────────┼─────────────┼─────────────────┤
-│ Backend Pytest Suite                   │ 3,971 tests │ 100% PASS       │
-│ Scientific Verification Master Suite   │   409 tests │ 100% PASS       │
-│ Frontend Vitest Suite                  │   364 tests │ 100% PASS       │
+│ Backend Pytest Suite                   │ 5,371 tests │ 5,001 PASS      │
+│ Scientific Verification Master Suite   │   410 tests │ 409 PASS, 1 SKIP│
+│ Frontend Vitest Suite                  │   375 tests │ 100% PASS       │
 │ Smart Contracts Hardhat Suite          │    31 tests │ 100% PASS       │
 ├────────────────────────────────────────┼─────────────┼─────────────────┤
-│ TOTAL MASTER COLLECTED & PASSING TESTS │ 4,775 tests │ 100% PASS       │
+│ TOTAL MASTER COLLECTED TESTS           │ 6,187 tests │ 5,816 PASS      │
 └────────────────────────────────────────┴─────────────┴─────────────────┘
 ```
 
-*Note on Whole-System Test Accounting:* The 23 whole-system adversarial integration tests (`test_tenant_isolation_e2e.py`, `test_retry_consistency.py`, `test_transaction_lifecycle.py`, `test_distributed_recovery.py`, and `test_lifecycle_integrity.py`) are located within `backend/tests/integration/` and are included within the 3,971 backend total; they are not double-counted.
+*Note on Whole-System Test Accounting:* The 23 whole-system adversarial integration tests (`test_tenant_isolation_e2e.py`, `test_retry_consistency.py`, `test_transaction_lifecycle.py`, `test_distributed_recovery.py`, and `test_lifecycle_integrity.py`) are located within `backend/tests/integration/` and are included within the backend total; they are not double-counted.
 
 ---
 

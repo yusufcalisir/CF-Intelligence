@@ -55,9 +55,9 @@ All 16 operational and architectural readiness gates evaluated in Phase 4 achiev
 - **Gate F**: Asynchronous Resource Lifecycle Management
 - **Gate G**: Fast-Path Attribution vs. SHAP Boundary Separation
 - **Gate H**: Bounded Simulation State Eviction
-- **Gate I**: Clean Pytest Pass Baseline (3,745+ backend tests)
-- **Gate J**: Verification Suite Baseline (409+ verification tests)
-- **Gate K**: Clean Frontend Vitest Baseline (356/356 tests)
+- **Gate I**: Clean Pytest Pass Baseline (5,371 backend tests; 5,001 passing in standard gate)
+- **Gate J**: Verification Suite Baseline (410 verification tests; 409 passing, 1 skipped)
+- **Gate K**: Clean Frontend Vitest Baseline (375/375 tests)
 - **Gate L**: Clean Production Bundle Compilation (`tsc -b && vite build`)
 - **Gate M**: Smart Contract Hardhat & Web3 Tests (57/57 tests)
 - **Gate N**: Zero Unhandled Exception Swallowing

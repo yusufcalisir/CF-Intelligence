@@ -119,7 +119,7 @@ All whole-system integration suites were executed in concert:
 | `test_lifecycle_integrity.py` | Adversarial Composition, 7 Invariants & Metamorphic Checks | 6 | 100% | **PASS** |
 | **Total Whole-System Suite** | **Complete Multi-Subsystem Adversarial Invariant Suite** | **23** | **100%** | **PASS** |
 
-Repository-wide total test suite: **4,775 / 4,775 passing** (3,971 Backend Pytest + 409 Scientific Verification + 364 Frontend Vitest + 31 Smart Contracts).
+Repository-wide total test suite: **6,187 collected tests / 5,816 passing in standard verification gates** (5,371 Backend Pytest + 410 Scientific Verification + 375 Frontend Vitest + 31 Smart Contracts).
 
 ---
 

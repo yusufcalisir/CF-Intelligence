@@ -150,11 +150,11 @@ All 17 integration tests spanning the complete whole-system verification matrix 
 - `test_distributed_recovery.py`: 6 tests passed (multi-worker CAS, ambiguous retry, partial FL, publish atomicity, restart consistency, compound security).
 
 **Total Repository Test Metric Synchronization:**
-- Backend Pytest: **3,965 passed**
-- Scientific Verification: **409 passed**
-- Frontend Vitest: **364 passed**
+- Backend Pytest: **5,371 collected (5,001 passed in standard gate)**
+- Scientific Verification: **410 collected (409 passed, 1 skipped)**
+- Frontend Vitest: **375 passed**
 - Smart Contracts: **31 passed**
-- **Grand Total:** **4,769 / 4,769 tests passing (100%)**
+- **Grand Total:** **6,187 collected tests / 5,816 passing in standard verification gates**
 
 ---
 

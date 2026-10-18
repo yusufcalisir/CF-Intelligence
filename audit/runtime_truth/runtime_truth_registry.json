@@ -16,7 +16,7 @@
     "total_e2e_flows_verified": 14,
     "integration_test_pass_rate": "100% (14/14 passed in test_system_integration_reality.py)",
     "backend_invariant_test_pass_rate": "100% (7/7 passed in test_runtime_truth_invariants.py)",
-    "frontend_test_pass_rate": "100% (356/356 passed across 86 suites)",
+    "frontend_test_pass_rate": "100% (375/375 passed across 87 suites)",
     "frontend_production_bundle": "BUILT_SUCCESSFULLY (0 errors, 10.78s)",
     "linter_status": "All checks passed! (0 errors, 0 warnings)",
     "failure_injections_tested": 8,

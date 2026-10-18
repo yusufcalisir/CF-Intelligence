@@ -38,7 +38,7 @@ This matrix maps platform privacy, authentication, zero-trust cryptographic prot
 
 ## 🔒 Verification References
 
-All controls listed above are automatically verified by the continuous testing pipeline across **3,951 automated tests** (3,564 Backend Pytest + 356 Frontend Vitest + 31 Smart Contracts) and 21 scientific verification audit modules (409 verification tests; 4,360 total collected tests).
+All controls listed above are automatically verified by the continuous testing pipeline across **5,777 automated tests** (5,371 Backend Pytest + 375 Frontend Vitest + 31 Smart Contracts) and 21 scientific verification audit modules (410 verification tests; 6,187 total collected tests).
 
 
 

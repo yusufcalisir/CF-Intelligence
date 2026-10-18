@@ -158,7 +158,7 @@ pytest backend/tests/integration/test_system_integration_reality.py -v
 ### 7.3 Frontend UI State & Component Verification
 ```powershell
 cd frontend
-# Run all Vitest suites (356/356 tests across 86 suites)
+# Run all Vitest suites (375/375 tests across 87 suites)
 npm test
 
 # Verify production bundle compilation (0 TypeScript errors)

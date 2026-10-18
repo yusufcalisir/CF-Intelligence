@@ -19,7 +19,7 @@ Every user-visible metric, chart, model result, and attestation badge has been l
 Key outcomes:
 - **14/14 End-to-End Reality Flows Verified (100% Pass Rate)** via [test_system_integration_reality.py](../../backend/tests/integration/test_system_integration_reality.py).
 - **7/7 Phase 2 Runtime Truth Invariants Revalidated (100% Pass Rate)** via [test_runtime_truth_invariants.py](../../backend/tests/unit/test_runtime_truth_invariants.py).
-- **356/356 Vitest Frontend Tests Passing (86/86 Suites, 100% Pass Rate)**.
+- **375/375 Vitest Frontend Tests Passing (87/87 Suites, 100% Pass Rate)**.
 - **Frontend Production Bundle Built Cleanly** (`tsc -b && vite build` in 10.78s with 0 errors).
 - **8/8 Failure Injections Validated** against the Fail-Truthful Invariant with zero fake success.
 - **12/12 Mandatory Certification Gates (Gates A through L) PASSED**.

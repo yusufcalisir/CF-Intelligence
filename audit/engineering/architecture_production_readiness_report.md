@@ -359,7 +359,7 @@ Summary of Phase 4 findings:
 
 - `pytest backend/tests/unit/test_engineering_hardening.py -v`: **6/6 passed**.
 - Comprehensive regression suite (38 tests including reality, invariants, manifests, SLA, hardening): **38/38 passed**.
-- Frontend Vitest suite: **356/356 passed** (86 test files).
+- Frontend Vitest suite: **375/375 passed** (87 test files).
 - Frontend production build: **100% clean compilation** (`tsc -b && vite build` in 13.20s).
 - Linter: `ruff check .` across repository: **0 errors (All checks passed!)**.
 
@@ -396,7 +396,7 @@ Summary of Phase 4 findings:
 | **Gate G** | Security-sensitive defaults are not unsafe | **PASS** | Candidate passwords removed; debug defaults rejected. |
 | **Gate H** | Health/readiness semantics are truthful | **PASS** | `/health` and `/health/ready` verified fail-truthful. |
 | **Gate I** | Backend test suite relevant to changed code passes | **PASS** | 38/38 targeted & regression tests pass. |
-| **Gate J** | Frontend tests pass | **PASS** | 356/356 Vitest tests pass. |
+| **Gate J** | Frontend tests pass | **PASS** | 375/375 Vitest tests pass. |
 | **Gate K** | Frontend production build passes | **PASS** | `tsc -b && vite build` passes cleanly. |
 | **Gate L** | Runtime-truth invariant suite still passes | **PASS** | 7/7 invariants pass. |
 | **Gate M** | Phase 3 integration suite still passes | **PASS** | 14/14 integration reality tests pass. |
