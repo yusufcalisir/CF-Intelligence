@@ -883,7 +883,9 @@ Ingress traffic to the FastAPI application layer is guarded by [`PerimeterWAFGua
 
 ---
 
-## 17. Live High-Throughput Payment Stream Benchmark
+## 17. Live High-Throughput Payment Stream Benchmark & Continuous Security Metrics
+
+### 17.1 Live High-Throughput Payment Stream Benchmark
 
 The enterprise benchmark framework (`scripts/run_enterprise_stress_test.py`) validates platform throughput capacity and latency under sustained ISO 20022 payment transaction loads.
 
@@ -891,9 +893,7 @@ The enterprise benchmark framework (`scripts/run_enterprise_stress_test.py`) val
 * **Concurrent Asyncio Workers**: Simulates multiple bank node payment feeds concurrently, measuring peak TPS, p50/p99 latency, and error rates.
 * **Benchmark Reports**: Saves results to `benchmark_<TIMESTAMP>.json` and human-readable Markdown reports conforming to `docs/enterprise_benchmark_report.md`.
 
----
-
-## 18. Continuous Security & Test Verification Metrics
+### 17.2 Continuous Security & Automated Test Verification Metrics
 
 The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise_security_ci.yml`](../.github/workflows/enterprise_security_ci.yml)) executes multi-layer security auditing across source code, third-party dependencies, container images, infrastructure templates, and testing suites.
 
@@ -908,7 +908,7 @@ The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise
      └── 6. pytest-security-and-compliance-suites (5,001 Backend + 410 Verification Automated Suites across 21 modules)
 ```
 
-### Comprehensive Test Suite Verification
+#### Comprehensive Test Suite Verification
 The entire codebase is validated by **5,001 passing backend unit/integration tests** (5,371 tests collected across all backend domain, application, and infrastructure modules), **410 scientific verification tests** across 21 modules (`verification/`), **375 frontend Vitest tests** (`frontend/`), and **31 smart contract tests** (`contracts/`), totaling **6,187 collected tests** across all 4 suites:
 
 ```bash
@@ -927,7 +927,7 @@ pytest backend/tests/ -q
 
 ---
 
-## 19. Software Correctness vs. Scientific Generalization Taxonomy
+## 18. Software Correctness vs. Scientific Generalization Taxonomy
 
 To satisfy the stringent model risk governance mandates of **Federal Reserve SR 11-7**, **OCC Bulletin 2011-12**, and the **EU Artificial Intelligence Act (Regulation 2024/1689)** Annex IV, the platform formally establishes an epistemological delineation between software correctness and statistical machine learning generalization (detailed in [`docs/verification_taxonomy_spec.md`](verification_taxonomy_spec.md)):
 
@@ -956,7 +956,7 @@ To satisfy the stringent model risk governance mandates of **Federal Reserve SR 
 └──────────────────────────────────────┴──────────────────────────────────────┘
 ```
 
-### 19.1 Architectural Segregation of Test and Evaluation Suites
+### 18.1 Architectural Segregation of Test and Evaluation Suites
 - **Software Correctness (`backend/tests/`)**: Unit, integration, chaos, and mutation tests execute deterministically against synthetic fixtures, asserting structural contracts, state machines, and security perimeters.
 - **Scientific Generalization (`benchmarks/`, `experiments/`)**: Decoupled statistical harnesses evaluate trained models against out-of-time splits across 8 canonical datasets (`paysim`, `ieee_cis`, `credit_card`, `elliptic`, `amlsim`, `synthaml`, `amlnet`, `cross_bank`), quantifying degradation under Dirichlet non-IID skew and Differential Privacy budgets.
 
