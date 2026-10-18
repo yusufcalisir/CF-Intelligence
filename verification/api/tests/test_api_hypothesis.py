@@ -15,6 +15,7 @@ Verifies 10 mathematical and structural system invariants across randomized scen
 """
 from __future__ import annotations
 
+# ruff: noqa: E402
 import os
 import sys
 from pathlib import Path
@@ -48,6 +49,8 @@ def reset_ddos_limiter():
 
 def _seed_global_model() -> None:
     """Ensure a verified champion model is active in ModelRegistry for API property tests."""
+    from typing import Any, cast
+
     import numpy as np
 
     from app.application.services.model_service import NUM_FEATURES
@@ -58,7 +61,9 @@ def _seed_global_model() -> None:
         model = svc.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
         X = np.random.RandomState(42).randn(64, NUM_FEATURES).astype(np.float32)
         y = np.random.RandomState(42).randint(0, 2, size=(64,)).astype(np.float32)
-        trained, _, _ = svc.train_local(model, X, y, epochs=1, batch_size=32)
+        trained, _, _ = svc.train_local(
+            model, cast("Any", X), cast("Any", y), epochs=1, batch_size=32
+        )
         trained.eval()
         reg.save_version(
             simulation_id="live_prod_v2",

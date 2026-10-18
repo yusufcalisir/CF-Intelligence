@@ -14,6 +14,8 @@ os.environ.setdefault("CFI_DEFAULT_SIMULATION_ID", "live_prod_v2")
 @pytest.fixture(scope="session", autouse=True)
 def _ensure_verification_default_champion_model():
     """Ensure a verified champion model is active in ModelRegistry for verification audits."""
+    from typing import Any, cast
+
     import numpy as np
     import torch
 
@@ -27,7 +29,9 @@ def _ensure_verification_default_champion_model():
         model = svc.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
         X = np.random.RandomState(42).randn(64, NUM_FEATURES).astype(np.float32)
         y = np.random.RandomState(42).randint(0, 2, size=(64,)).astype(np.float32)
-        trained, _, _ = svc.train_local(model, X, y, epochs=1, batch_size=32)
+        trained, _, _ = svc.train_local(
+            model, cast("Any", X), cast("Any", y), epochs=1, batch_size=32
+        )
         trained.eval()
         reg.save_version(
             simulation_id="live_prod_v2",
