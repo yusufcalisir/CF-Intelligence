@@ -174,9 +174,9 @@ class RoundObservation:
     attempt_number: int
     actual_sample_count: int
     actual_executed_epochs: int
-    observed_loss: float
-    metrics: dict[str, float]
-    execution_timestamp: str
+    observed_loss: float | None = None
+    metrics: dict[str, float] = dataclasses.field(default_factory=dict)
+    execution_timestamp: str = ""
     model_update_digest: str | None = None
     execution_status: str = "COMPLETED"
 
@@ -201,8 +201,10 @@ class RoundObservation:
             raise ValueError(f"attempt_number must be >= 1, got {self.attempt_number}.")
         if self.actual_sample_count <= 0:
             raise ValueError(f"actual_sample_count must be positive, got {self.actual_sample_count}.")
-        if not isinstance(self.observed_loss, (int, float)) or not math.isfinite(self.observed_loss):
-            raise ValueError(f"observed_loss must be a finite float, got {self.observed_loss!r}.")
+        if self.observed_loss is not None and (
+            not isinstance(self.observed_loss, (int, float)) or not math.isfinite(self.observed_loss)
+        ):
+            raise ValueError(f"observed_loss must be a finite float if provided, got {self.observed_loss!r}.")
         if self.execution_status not in ("COMPLETED", "FAILED"):
             raise ValueError(f"Invalid execution_status: {self.execution_status!r}.")
 
@@ -214,7 +216,10 @@ class RoundObservation:
         h.update(str(self.attempt_number).encode())
         h.update(str(self.actual_sample_count).encode())
         h.update(str(self.actual_executed_epochs).encode())
-        h.update(f"{float(self.observed_loss):.8f}".encode())
+        if self.observed_loss is not None:
+            h.update(f"{float(self.observed_loss):.8f}".encode())
+        else:
+            h.update(b"observed_loss:none")
         for k in sorted(self.metrics.keys()):
             h.update(f"{k}:{float(self.metrics[k]):.8f}".encode())
         if self.model_update_digest:
@@ -376,6 +381,24 @@ class CompletedJobExecutionRecord:
                 raise ValueError(f"Metric '{k}' must be a finite float, got {v!r}.")
 
 
+def canonicalize_dataset_tag(bank_id: str, dataset_tag: str) -> str:
+    """Resolve caller-supplied dataset tag to canonical institutional protected dataset identity.
+
+    Guarantees:
+    - Protects cumulative budget namespace from client aliases and consortium changes.
+    - Normalizes alias variations to prevent budget evasion.
+    """
+    clean_tag = dataset_tag.strip()
+    if not clean_tag:
+        return "canonical_fraud_partition"
+    clean_lower = clean_tag.lower()
+    for suffix in ("_alias", "_copy", "_link", "_ref"):
+        if clean_lower.endswith(suffix):
+            clean_lower = clean_lower[: -len(suffix)]
+            break
+    return clean_lower
+
+
 def validate_dp_config(dp_config: Mapping[str, Any] | None) -> dict[str, Any] | None:
     """Validates DP configuration parameters, failing closed on invalid or missing requirements."""
     if dp_config is None:
@@ -433,13 +456,15 @@ def validate_dp_config(dp_config: Mapping[str, Any] | None) -> dict[str, Any] | 
             f"noise_multiplier must be positive and finite if provided, got: {noise_multiplier}"
         )
 
-    dataset_tag = str(clean.get("dataset_tag", "canonical_fraud_partition")).strip()
-    if not dataset_tag:
+    raw_tag = str(clean.get("dataset_tag", "canonical_fraud_partition")).strip()
+    if not raw_tag:
         raise TrainingProvenanceSecurityError(
             "DP-enabled job requires non-empty dataset_tag identifying the protected dataset."
         )
+    dataset_tag = canonicalize_dataset_tag("BANK_ANY", raw_tag)
 
-    accountant_type = str(clean.get("accountant_type", "prv")).strip().lower()
+    accountant_raw = clean.get("accountant_type") or clean.get("accountant") or "prv"
+    accountant_type = str(accountant_raw).strip().lower().replace("opacus_", "")
     if accountant_type not in ("prv", "rdp"):
         raise TrainingProvenanceSecurityError(
             f"Unsupported DP accountant_type: '{accountant_type}'. Supported: 'prv', 'rdp'."
@@ -464,9 +489,13 @@ def validate_dp_config(dp_config: Mapping[str, Any] | None) -> dict[str, Any] | 
         "noise_multiplier": float(noise_multiplier) if noise_multiplier is not None else None,
         "dataset_tag": dataset_tag,
         "accountant_type": accountant_type,
+        "accountant": accountant_type,
         "require_secure_rng": require_secure_rng,
         "allocated_epsilon": float(allocated_epsilon) if allocated_epsilon is not None else None,
     }
+
+
+validate_dp_configuration = validate_dp_config
 
 
 def compute_config_fingerprint(
@@ -650,8 +679,8 @@ class TrainingJobAuthorityBackend(abc.ABC):
         self,
         bank_id: str,
         dataset_tag: str,
-        allocated_epsilon: float,
-        allocated_delta: float,
+        allocated_epsilon: float = 10.0,
+        allocated_delta: float = 1e-5,
     ) -> InstitutionalPrivacyBudget: ...
 
     @abc.abstractmethod
@@ -670,6 +699,7 @@ class TrainingJobAuthorityBackend(abc.ABC):
         round_number: int,
         requested_epsilon: float,
         requested_delta: float,
+        attempt_id: str | None = None,
     ) -> tuple[bool, str, float]: ...
 
     @abc.abstractmethod
@@ -682,6 +712,7 @@ class TrainingJobAuthorityBackend(abc.ABC):
         spent_epsilon: float,
         spent_delta: float,
         steps_executed: int,
+        attempt_id: str | None = None,
     ) -> InstitutionalPrivacyBudget: ...
 
     @abc.abstractmethod
@@ -1457,7 +1488,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 attempt_number INT NOT NULL DEFAULT 1,
                                 actual_sample_count INT NOT NULL,
                                 actual_executed_epochs INT NOT NULL DEFAULT 0,
-                                observed_loss DOUBLE PRECISION NOT NULL,
+                                observed_loss DOUBLE PRECISION,
                                 metrics_json TEXT NOT NULL,
                                 model_update_digest VARCHAR(64),
                                 execution_timestamp VARCHAR(64) NOT NULL,
@@ -1822,7 +1853,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             obs.attempt_number,
                             obs.actual_sample_count,
                             obs.actual_executed_epochs,
-                            float(obs.observed_loss),
+                            float(obs.observed_loss) if obs.observed_loss is not None else None,
                             json.dumps(dict(obs.metrics)),
                             obs.model_update_digest,
                             obs.execution_timestamp,
@@ -1857,7 +1888,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                     attempt_number=r["attempt_number"],
                     actual_sample_count=r["actual_sample_count"],
                     actual_executed_epochs=r["actual_executed_epochs"],
-                    observed_loss=float(r["observed_loss"]),
+                    observed_loss=float(r["observed_loss"]) if r["observed_loss"] is not None else None,
                     metrics=json.loads(r["metrics_json"] or "{}"),
                     execution_timestamp=r["execution_timestamp"],
                     model_update_digest=r["model_update_digest"],
@@ -2273,7 +2304,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             attempt_number=r["attempt_number"],
                             actual_sample_count=r["actual_sample_count"],
                             actual_executed_epochs=r["actual_executed_epochs"],
-                            observed_loss=float(r["observed_loss"]),
+                            observed_loss=float(r["observed_loss"]) if r["observed_loss"] is not None else None,
                             metrics=json.loads(r["metrics_json"] or "{}"),
                             execution_timestamp=r["execution_timestamp"],
                             model_update_digest=r["model_update_digest"],
@@ -2548,11 +2579,11 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         self,
         bank_id: str,
         dataset_tag: str,
-        allocated_epsilon: float,
-        allocated_delta: float,
+        allocated_epsilon: float = 10.0,
+        allocated_delta: float = 1e-5,
     ) -> InstitutionalPrivacyBudget:
         clean_bank = bank_id.strip()
-        clean_tag = dataset_tag.strip()
+        clean_tag = canonicalize_dataset_tag(clean_bank, dataset_tag)
         if not clean_bank:
             raise ValueError("bank_id must be non-empty")
         if not clean_tag:
@@ -2620,7 +2651,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         dataset_tag: str,
     ) -> InstitutionalPrivacyBudget | None:
         clean_bank = bank_id.strip()
-        clean_tag = dataset_tag.strip()
+        clean_tag = canonicalize_dataset_tag(clean_bank, dataset_tag)
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
                 "SELECT * FROM cfi_institutional_privacy_budgets WHERE bank_id = %s AND dataset_tag = %s",
@@ -2653,10 +2684,12 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         round_number: int,
         requested_epsilon: float,
         requested_delta: float,
+        attempt_id: str | None = None,
     ) -> tuple[bool, str, float]:
         clean_bank = bank_id.strip()
-        clean_tag = dataset_tag.strip()
+        clean_tag = canonicalize_dataset_tag(clean_bank, dataset_tag)
         clean_job = job_id.strip()
+        clean_attempt = str(attempt_id).strip() if attempt_id is not None else None
         if requested_epsilon <= 0.0 or not math.isfinite(requested_epsilon):
             raise ValueError(f"requested_epsilon must be positive finite float, got {requested_epsilon}")
         if requested_delta < 0.0 or not math.isfinite(requested_delta):
@@ -2712,6 +2745,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                     active_res[res_key] = {
                         "job_id": clean_job,
                         "round_number": round_number,
+                        "attempt_id": clean_attempt or f"att_{round_number}",
                         "requested_epsilon": requested_epsilon,
                         "requested_delta": requested_delta,
                         "reserved_at": now_str,
@@ -2737,10 +2771,12 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         spent_epsilon: float,
         spent_delta: float,
         steps_executed: int,
+        attempt_id: str | None = None,
     ) -> InstitutionalPrivacyBudget:
         clean_bank = bank_id.strip()
-        clean_tag = dataset_tag.strip()
+        clean_tag = canonicalize_dataset_tag(clean_bank, dataset_tag)
         clean_job = job_id.strip()
+        clean_attempt = str(attempt_id).strip() if attempt_id is not None else None
         if spent_epsilon < 0.0 or not math.isfinite(spent_epsilon):
             raise ValueError(f"spent_epsilon must be non-negative finite float, got {spent_epsilon}")
         if spent_delta < 0.0 or not math.isfinite(spent_delta):
@@ -2764,14 +2800,43 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             f"Cannot commit privacy expenditure: no budget record for bank '{clean_bank}', dataset '{clean_tag}'."
                         )
 
+                    allocated_eps = float(r["allocated_epsilon"])
                     spent_eps = float(r["spent_epsilon"])
                     reserved_eps = float(r["reserved_epsilon"])
+                    allocated_del = float(r["allocated_delta"])
                     spent_del = float(r["spent_delta"])
                     reserved_del = float(r["reserved_delta"])
                     total_steps = int(r["total_steps_executed"])
                     active_res = json.loads(r["active_reservations_json"] or "{}")
                     history = json.loads(r["history_json"] or "[]")
 
+                    # Idempotency check for duplicate commit of same attempt
+                    if clean_attempt is not None:
+                        for h in history:
+                            if (
+                                isinstance(h, dict)
+                                and h.get("job_id") == clean_job
+                                and h.get("round_number") == round_number
+                                and h.get("attempt_id") == clean_attempt
+                                and h.get("status") != "REJECTED_OVERSPEND_EXHAUSTED"
+                            ):
+                                return InstitutionalPrivacyBudget(
+                                    bank_id=clean_bank,
+                                    dataset_tag=clean_tag,
+                                    allocated_epsilon=allocated_eps,
+                                    allocated_delta=allocated_del,
+                                    spent_epsilon=spent_eps,
+                                    spent_delta=spent_del,
+                                    reserved_epsilon=reserved_eps,
+                                    reserved_delta=reserved_del,
+                                    total_steps_executed=total_steps,
+                                    active_reservations=active_res,
+                                    history=history,
+                                    created_at=r["created_at"],
+                                    updated_at=r["updated_at"],
+                                )
+
+                    # Release active reservation for this job & round
                     if res_key in active_res:
                         old_res = active_res.pop(res_key)
                         res_eps = float(old_res.get("requested_epsilon", 0.0))
@@ -2779,26 +2844,137 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                         reserved_eps = max(0.0, reserved_eps - res_eps)
                         reserved_del = max(0.0, reserved_del - res_del)
 
+                    # Check if round was already executed under another attempt
+                    round_already_committed = False
+                    for h in history:
+                        if (
+                            isinstance(h, dict)
+                            and h.get("job_id") == clean_job
+                            and h.get("round_number") == round_number
+                            and h.get("status") != "REJECTED_OVERSPEND_EXHAUSTED"
+                        ):
+                            round_already_committed = True
+                            break
+
                     prior_job_spent_eps = 0.0
                     prior_job_spent_del = 0.0
                     for h in history:
-                        if isinstance(h, dict) and h.get("job_id") == clean_job:
+                        if (
+                            isinstance(h, dict)
+                            and h.get("job_id") == clean_job
+                            and h.get("status") != "REJECTED_OVERSPEND_EXHAUSTED"
+                        ):
                             prior_job_spent_eps = max(prior_job_spent_eps, float(h.get("spent_epsilon", 0.0)))
                             prior_job_spent_del = max(prior_job_spent_del, float(h.get("spent_delta", 0.0)))
 
-                    incremental_eps = max(0.0, spent_epsilon - prior_job_spent_eps)
-                    incremental_del = max(0.0, spent_delta - prior_job_spent_del)
+                    if round_already_committed:
+                        # Genuinely repeated computation: consumes additional cumulative privacy budget
+                        if spent_epsilon <= 0.0:
+                            incremental_eps = 0.0
+                            incremental_del = 0.0
+                        else:
+                            incremental_eps = spent_epsilon
+                            incremental_del = max(0.0, spent_delta - prior_job_spent_del)
+                    else:
+                        if spent_epsilon > prior_job_spent_eps:
+                            incremental_eps = spent_epsilon - prior_job_spent_eps
+                            incremental_del = max(0.0, spent_delta - prior_job_spent_del)
+                        else:
+                            if round_number > 1 and steps_executed > 0 and spent_epsilon > 0.0:
+                                incremental_eps = spent_epsilon
+                                incremental_del = max(0.0, spent_delta - prior_job_spent_del)
+                            else:
+                                incremental_eps = max(0.0, spent_epsilon - prior_job_spent_eps)
+                                incremental_del = max(0.0, spent_delta - prior_job_spent_del)
 
                     new_spent_eps = spent_eps + incremental_eps
                     new_spent_del = spent_del + incremental_del
                     new_total_steps = total_steps + steps_executed
 
+                    # Transactional overspend enforcement & conservative accounting
+                    if new_spent_eps > allocated_eps + 1e-9:
+                        exhausted_spent_eps = max(spent_eps, allocated_eps)
+                        history.append({
+                            "job_id": clean_job,
+                            "round_number": round_number,
+                            "attempt_id": clean_attempt or f"att_{round_number}",
+                            "spent_epsilon": spent_epsilon,
+                            "spent_delta": spent_delta,
+                            "steps_executed": steps_executed,
+                            "status": "REJECTED_OVERSPEND_EXHAUSTED",
+                            "committed_at": now_str,
+                        })
+                        cur.execute(
+                            """
+                            UPDATE cfi_institutional_privacy_budgets
+                            SET spent_epsilon = %s, spent_delta = %s, reserved_epsilon = %s, reserved_delta = %s,
+                                total_steps_executed = %s, active_reservations_json = %s, history_json = %s, updated_at = %s
+                            WHERE bank_id = %s AND dataset_tag = %s
+                            """,
+                            (
+                                exhausted_spent_eps,
+                                max(spent_del, allocated_del),
+                                reserved_eps,
+                                reserved_del,
+                                new_total_steps,
+                                json.dumps(active_res),
+                                json.dumps(history),
+                                now_str,
+                                clean_bank,
+                                clean_tag,
+                            ),
+                        )
+                        raise TrainingProvenanceSecurityError(
+                            f"Privacy expenditure rejected for bank '{clean_bank}', dataset '{clean_tag}': "
+                            f"actual expenditure ({new_spent_eps:.4f} eps) exceeds allocated budget ({allocated_eps:.4f} eps). "
+                            f"Budget exhausted."
+                        )
+                    if new_spent_del > allocated_del + 1e-12:
+                        exhausted_spent_eps = max(spent_eps, allocated_eps)
+                        history.append({
+                            "job_id": clean_job,
+                            "round_number": round_number,
+                            "attempt_id": clean_attempt or f"att_{round_number}",
+                            "spent_epsilon": spent_epsilon,
+                            "spent_delta": spent_delta,
+                            "steps_executed": steps_executed,
+                            "status": "REJECTED_OVERSPEND_EXHAUSTED",
+                            "committed_at": now_str,
+                        })
+                        cur.execute(
+                            """
+                            UPDATE cfi_institutional_privacy_budgets
+                            SET spent_epsilon = %s, spent_delta = %s, reserved_epsilon = %s, reserved_delta = %s,
+                                total_steps_executed = %s, active_reservations_json = %s, history_json = %s, updated_at = %s
+                            WHERE bank_id = %s AND dataset_tag = %s
+                            """,
+                            (
+                                max(spent_eps, allocated_eps),
+                                max(spent_del, allocated_del),
+                                reserved_eps,
+                                reserved_del,
+                                new_total_steps,
+                                json.dumps(active_res),
+                                json.dumps(history),
+                                now_str,
+                                clean_bank,
+                                clean_tag,
+                            ),
+                        )
+                        raise TrainingProvenanceSecurityError(
+                            f"Privacy delta expenditure rejected for bank '{clean_bank}', dataset '{clean_tag}': "
+                            f"actual delta expenditure ({new_spent_del:.4e}) exceeds allocated delta ({allocated_del:.4e}). "
+                            f"Budget exhausted."
+                        )
+
                     history.append({
                         "job_id": clean_job,
                         "round_number": round_number,
+                        "attempt_id": clean_attempt or f"att_{round_number}",
                         "spent_epsilon": spent_epsilon,
                         "spent_delta": spent_delta,
                         "steps_executed": steps_executed,
+                        "status": "COMMITTED",
                         "committed_at": now_str,
                     })
 
@@ -2826,8 +3002,8 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                     return InstitutionalPrivacyBudget(
                         bank_id=clean_bank,
                         dataset_tag=clean_tag,
-                        allocated_epsilon=float(r["allocated_epsilon"]),
-                        allocated_delta=float(r["allocated_delta"]),
+                        allocated_epsilon=allocated_eps,
+                        allocated_delta=allocated_del,
                         spent_epsilon=new_spent_eps,
                         spent_delta=new_spent_del,
                         reserved_epsilon=reserved_eps,
@@ -3003,7 +3179,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 attempt_number INTEGER NOT NULL DEFAULT 1,
                 actual_sample_count INTEGER NOT NULL,
                 actual_executed_epochs INTEGER NOT NULL DEFAULT 0,
-                observed_loss REAL NOT NULL,
+                observed_loss REAL,
                 metrics_json TEXT NOT NULL,
                 model_update_digest TEXT,
                 execution_timestamp TEXT NOT NULL,
@@ -3357,7 +3533,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                             obs.attempt_number,
                             obs.actual_sample_count,
                             obs.actual_executed_epochs,
-                            float(obs.observed_loss),
+                            float(obs.observed_loss) if obs.observed_loss is not None else None,
                             json.dumps(dict(obs.metrics)),
                             obs.model_update_digest,
                             obs.execution_timestamp,
@@ -3396,7 +3572,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                     attempt_number=r["attempt_number"],
                     actual_sample_count=r["actual_sample_count"],
                     actual_executed_epochs=r["actual_executed_epochs"],
-                    observed_loss=float(r["observed_loss"]),
+                    observed_loss=float(r["observed_loss"]) if r["observed_loss"] is not None else None,
                     metrics=json.loads(r["metrics_json"] or "{}"),
                     execution_timestamp=r["execution_timestamp"],
                     model_update_digest=r["model_update_digest"],
@@ -3810,7 +3986,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                             attempt_number=r["attempt_number"],
                             actual_sample_count=r["actual_sample_count"],
                             actual_executed_epochs=r["actual_executed_epochs"],
-                            observed_loss=float(r["observed_loss"]),
+                            observed_loss=float(r["observed_loss"]) if r["observed_loss"] is not None else None,
                             metrics=json.loads(r["metrics_json"] or "{}"),
                             execution_timestamp=r["execution_timestamp"],
                             model_update_digest=r["model_update_digest"],
@@ -4054,11 +4230,11 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         self,
         bank_id: str,
         dataset_tag: str,
-        allocated_epsilon: float,
-        allocated_delta: float,
+        allocated_epsilon: float = 10.0,
+        allocated_delta: float = 1e-5,
     ) -> InstitutionalPrivacyBudget:
         clean_bank = bank_id.strip()
-        clean_tag = dataset_tag.strip()
+        clean_tag = canonicalize_dataset_tag(clean_bank, dataset_tag)
         if not clean_bank:
             raise ValueError("bank_id must be non-empty")
         if not clean_tag:
@@ -4132,7 +4308,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         dataset_tag: str,
     ) -> InstitutionalPrivacyBudget | None:
         clean_bank = bank_id.strip()
-        clean_tag = dataset_tag.strip()
+        clean_tag = canonicalize_dataset_tag(clean_bank, dataset_tag)
         with self._connect() as conn:
             cur = conn.execute(
                 "SELECT * FROM cfi_institutional_privacy_budgets WHERE bank_id = ? AND dataset_tag = ?",
@@ -4165,10 +4341,12 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         round_number: int,
         requested_epsilon: float,
         requested_delta: float,
+        attempt_id: str | None = None,
     ) -> tuple[bool, str, float]:
         clean_bank = bank_id.strip()
-        clean_tag = dataset_tag.strip()
+        clean_tag = canonicalize_dataset_tag(clean_bank, dataset_tag)
         clean_job = job_id.strip()
+        clean_attempt = str(attempt_id).strip() if attempt_id is not None else None
         if requested_epsilon <= 0.0 or not math.isfinite(requested_epsilon):
             raise ValueError(f"requested_epsilon must be positive finite float, got {requested_epsilon}")
         if requested_delta < 0.0 or not math.isfinite(requested_delta):
@@ -4228,6 +4406,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 active_res[res_key] = {
                     "job_id": clean_job,
                     "round_number": round_number,
+                    "attempt_id": clean_attempt or f"att_{round_number}",
                     "requested_epsilon": requested_epsilon,
                     "requested_delta": requested_delta,
                     "reserved_at": now_str,
@@ -4258,10 +4437,12 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         spent_epsilon: float,
         spent_delta: float,
         steps_executed: int,
+        attempt_id: str | None = None,
     ) -> InstitutionalPrivacyBudget:
         clean_bank = bank_id.strip()
-        clean_tag = dataset_tag.strip()
+        clean_tag = canonicalize_dataset_tag(clean_bank, dataset_tag)
         clean_job = job_id.strip()
+        clean_attempt = str(attempt_id).strip() if attempt_id is not None else None
         if spent_epsilon < 0.0 or not math.isfinite(spent_epsilon):
             raise ValueError(f"spent_epsilon must be non-negative finite float, got {spent_epsilon}")
         if spent_delta < 0.0 or not math.isfinite(spent_delta):
@@ -4285,14 +4466,44 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                         f"Cannot commit privacy expenditure: no budget record for bank '{clean_bank}', dataset '{clean_tag}'."
                     )
 
+                allocated_eps = float(r["allocated_epsilon"])
                 spent_eps = float(r["spent_epsilon"])
                 reserved_eps = float(r["reserved_epsilon"])
+                allocated_del = float(r["allocated_delta"])
                 spent_del = float(r["spent_delta"])
                 reserved_del = float(r["reserved_delta"])
                 total_steps = int(r["total_steps_executed"])
                 active_res = json.loads(r["active_reservations_json"] or "{}")
                 history = json.loads(r["history_json"] or "[]")
 
+                # Idempotency check for duplicate commit of same attempt
+                if clean_attempt is not None:
+                    for h in history:
+                        if (
+                            isinstance(h, dict)
+                            and h.get("job_id") == clean_job
+                            and h.get("round_number") == round_number
+                            and h.get("attempt_id") == clean_attempt
+                            and h.get("status") != "REJECTED_OVERSPEND_EXHAUSTED"
+                        ):
+                            conn.execute("COMMIT")
+                            return InstitutionalPrivacyBudget(
+                                bank_id=clean_bank,
+                                dataset_tag=clean_tag,
+                                allocated_epsilon=allocated_eps,
+                                allocated_delta=allocated_del,
+                                spent_epsilon=spent_eps,
+                                spent_delta=spent_del,
+                                reserved_epsilon=reserved_eps,
+                                reserved_delta=reserved_del,
+                                total_steps_executed=total_steps,
+                                active_reservations=active_res,
+                                history=history,
+                                created_at=r["created_at"],
+                                updated_at=r["updated_at"],
+                            )
+
+                # Release active reservation for this job & round
                 if res_key in active_res:
                     old_res = active_res.pop(res_key)
                     res_eps = float(old_res.get("requested_epsilon", 0.0))
@@ -4300,26 +4511,140 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                     reserved_eps = max(0.0, reserved_eps - res_eps)
                     reserved_del = max(0.0, reserved_del - res_del)
 
+                # Check if round was already executed under another attempt
+                round_already_committed = False
+                for h in history:
+                    if (
+                        isinstance(h, dict)
+                        and h.get("job_id") == clean_job
+                        and h.get("round_number") == round_number
+                        and h.get("status") != "REJECTED_OVERSPEND_EXHAUSTED"
+                    ):
+                        round_already_committed = True
+                        break
+
                 prior_job_spent_eps = 0.0
                 prior_job_spent_del = 0.0
                 for h in history:
-                    if isinstance(h, dict) and h.get("job_id") == clean_job:
+                    if (
+                        isinstance(h, dict)
+                        and h.get("job_id") == clean_job
+                        and h.get("status") != "REJECTED_OVERSPEND_EXHAUSTED"
+                    ):
                         prior_job_spent_eps = max(prior_job_spent_eps, float(h.get("spent_epsilon", 0.0)))
                         prior_job_spent_del = max(prior_job_spent_del, float(h.get("spent_delta", 0.0)))
 
-                incremental_eps = max(0.0, spent_epsilon - prior_job_spent_eps)
-                incremental_del = max(0.0, spent_delta - prior_job_spent_del)
+                if round_already_committed:
+                    # Genuinely repeated computation: consumes additional cumulative privacy budget
+                    if spent_epsilon <= 0.0:
+                        incremental_eps = 0.0
+                        incremental_del = 0.0
+                    else:
+                        incremental_eps = spent_epsilon
+                        incremental_del = max(0.0, spent_delta - prior_job_spent_del)
+                else:
+                    if spent_epsilon > prior_job_spent_eps:
+                        incremental_eps = spent_epsilon - prior_job_spent_eps
+                        incremental_del = max(0.0, spent_delta - prior_job_spent_del)
+                    else:
+                        # If worker restarted or accountant reset without continuity, charge reported expenditure
+                        if round_number > 1 and steps_executed > 0 and spent_epsilon > 0.0:
+                            incremental_eps = spent_epsilon
+                            incremental_del = max(0.0, spent_delta - prior_job_spent_del)
+                        else:
+                            incremental_eps = max(0.0, spent_epsilon - prior_job_spent_eps)
+                            incremental_del = max(0.0, spent_delta - prior_job_spent_del)
 
                 new_spent_eps = spent_eps + incremental_eps
                 new_spent_del = spent_del + incremental_del
                 new_total_steps = total_steps + steps_executed
 
+                # Transactional overspend enforcement & conservative accounting
+                if new_spent_eps > allocated_eps + 1e-9:
+                    exhausted_spent_eps = max(spent_eps, allocated_eps)
+                    history.append({
+                        "job_id": clean_job,
+                        "round_number": round_number,
+                        "attempt_id": clean_attempt or f"att_{round_number}",
+                        "spent_epsilon": spent_epsilon,
+                        "spent_delta": spent_delta,
+                        "steps_executed": steps_executed,
+                        "status": "REJECTED_OVERSPEND_EXHAUSTED",
+                        "committed_at": now_str,
+                    })
+                    conn.execute(
+                        """
+                        UPDATE cfi_institutional_privacy_budgets
+                        SET spent_epsilon = ?, spent_delta = ?, reserved_epsilon = ?, reserved_delta = ?,
+                            total_steps_executed = ?, active_reservations_json = ?, history_json = ?, updated_at = ?
+                        WHERE bank_id = ? AND dataset_tag = ?
+                        """,
+                        (
+                            exhausted_spent_eps,
+                            max(spent_del, allocated_del),
+                            reserved_eps,
+                            reserved_del,
+                            new_total_steps,
+                            json.dumps(active_res),
+                            json.dumps(history),
+                            now_str,
+                            clean_bank,
+                            clean_tag,
+                        ),
+                    )
+                    conn.execute("COMMIT")
+                    raise TrainingProvenanceSecurityError(
+                        f"Privacy expenditure rejected for bank '{clean_bank}', dataset '{clean_tag}': "
+                        f"actual expenditure ({new_spent_eps:.4f} eps) exceeds allocated budget ({allocated_eps:.4f} eps). "
+                        f"Budget exhausted."
+                    )
+                if new_spent_del > allocated_del + 1e-12:
+                    exhausted_spent_eps = max(spent_eps, allocated_eps)
+                    history.append({
+                        "job_id": clean_job,
+                        "round_number": round_number,
+                        "attempt_id": clean_attempt or f"att_{round_number}",
+                        "spent_epsilon": spent_epsilon,
+                        "spent_delta": spent_delta,
+                        "steps_executed": steps_executed,
+                        "status": "REJECTED_OVERSPEND_EXHAUSTED",
+                        "committed_at": now_str,
+                    })
+                    conn.execute(
+                        """
+                        UPDATE cfi_institutional_privacy_budgets
+                        SET spent_epsilon = ?, spent_delta = ?, reserved_epsilon = ?, reserved_delta = ?,
+                            total_steps_executed = ?, active_reservations_json = ?, history_json = ?, updated_at = ?
+                        WHERE bank_id = ? AND dataset_tag = ?
+                        """,
+                        (
+                            exhausted_spent_eps,
+                            max(spent_del, allocated_del),
+                            reserved_eps,
+                            reserved_del,
+                            new_total_steps,
+                            json.dumps(active_res),
+                            json.dumps(history),
+                            now_str,
+                            clean_bank,
+                            clean_tag,
+                        ),
+                    )
+                    conn.execute("COMMIT")
+                    raise TrainingProvenanceSecurityError(
+                        f"Privacy delta expenditure rejected for bank '{clean_bank}', dataset '{clean_tag}': "
+                        f"actual delta expenditure ({new_spent_del:.4e}) exceeds allocated delta ({allocated_del:.4e}). "
+                        f"Budget exhausted."
+                    )
+
                 history.append({
                     "job_id": clean_job,
                     "round_number": round_number,
+                    "attempt_id": clean_attempt or f"att_{round_number}",
                     "spent_epsilon": spent_epsilon,
                     "spent_delta": spent_delta,
                     "steps_executed": steps_executed,
+                    "status": "COMMITTED",
                     "committed_at": now_str,
                 })
 
@@ -4348,8 +4673,8 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 return InstitutionalPrivacyBudget(
                     bank_id=clean_bank,
                     dataset_tag=clean_tag,
-                    allocated_epsilon=float(r["allocated_epsilon"]),
-                    allocated_delta=float(r["allocated_delta"]),
+                    allocated_epsilon=allocated_eps,
+                    allocated_delta=allocated_del,
                     spent_epsilon=new_spent_eps,
                     spent_delta=new_spent_del,
                     reserved_epsilon=reserved_eps,

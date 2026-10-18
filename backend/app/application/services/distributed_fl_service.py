@@ -3988,6 +3988,7 @@ def run_bank_worker_node(
                 if msg.get("command") == "TRAIN_ROUND":
                     job_id = msg["job_id"]
                     round_number = msg["round_number"]
+                    attempt_id = str(msg.get("attempt_id") or f"att_{job_id}_r{round_number}_{uuid.uuid4().hex[:8]}")
                     global_weights_obj: ModelWeights | None = msg.get("global_weights")
 
                     # On round 1, authorized worker initiates or verifies job start in PostgreSQL authority
@@ -4045,7 +4046,11 @@ def run_bank_worker_node(
                             else None
                         )
                         dataset_tag = str(dp_config.get("dataset_tag", "primary_vault")).strip()
-                        accountant_type = str(dp_config.get("accountant", "prv")).strip()
+                        accountant_type = str(
+                            dp_config.get("accountant_type")
+                            or dp_config.get("accountant")
+                            or "prv"
+                        ).strip().lower().replace("opacus_", "")
                         require_secure_rng = bool(dp_config.get("require_secure_rng", False))
                         batch_size = int(dp_config.get("batch_size", 32))
                         learning_rate = float(dp_config.get("learning_rate", 0.01))
@@ -4080,19 +4085,25 @@ def run_bank_worker_node(
 
                         # Prior expenditure by this specific job on this dataset
                         budget_record = authority_source.get_institutional_privacy_budget(
-                            bank_id, dataset_tag
+                            bank_id, dataset_tag, token=worker_token
                         )
                         history_job_eps = 0.0
                         history_job_del = 0.0
+                        prior_steps = 0
                         if budget_record and budget_record.history:
                             for entry in budget_record.history:
-                                if isinstance(entry, dict) and entry.get("job_id") == job_id:
+                                if (
+                                    isinstance(entry, dict)
+                                    and entry.get("job_id") == job_id
+                                    and entry.get("status") != "REJECTED_OVERSPEND_EXHAUSTED"
+                                ):
                                     history_job_eps = max(
                                         history_job_eps, float(entry.get("spent_epsilon", 0.0))
                                     )
                                     history_job_del = max(
                                         history_job_del, float(entry.get("spent_delta", 0.0))
                                     )
+                                    prior_steps += int(entry.get("steps_executed", 0))
 
                         prior_job_spent_eps = max(
                             history_job_eps, float(session.get("last_committed_eps", 0.0))
@@ -4102,9 +4113,24 @@ def run_bank_worker_node(
                         )
 
                         needed_eps = max(0.001, target_epsilon - prior_job_spent_eps)
-                        if budget_record and budget_record.remaining_epsilon > 0.0:
-                            needed_eps = min(needed_eps, budget_record.remaining_epsilon)
                         needed_del = max(0.0, target_delta - prior_job_spent_del)
+
+                        # Strict budget admission: Never reduce reservation without recalibration
+                        if budget_record is not None and budget_record.remaining_epsilon < (needed_eps - 1e-9):
+                            err_msg = (
+                                f"Privacy budget exceeded: job planned expenditure ({needed_eps:.4f}) "
+                                f"exceeds remaining available budget ({budget_record.remaining_epsilon:.4f})."
+                            )
+                            logger.error("Bank worker [%s] %s", bank_id, err_msg)
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": f"Privacy budget exhausted: {err_msg}",
+                                    "pid": pid,
+                                }
+                            )
+                            continue
 
                         try:
                             authority_source.reserve_institutional_privacy_budget(
@@ -4115,6 +4141,7 @@ def run_bank_worker_node(
                                 requested_epsilon=needed_eps,
                                 requested_delta=needed_del,
                                 worker_token=worker_token,
+                                attempt_id=attempt_id,
                             )
                         except TrainingProvenanceSecurityError as pse:
                             logger.error(
@@ -4155,6 +4182,7 @@ def run_bank_worker_node(
                                     accountant_type=accountant_type,
                                     require_secure_rng=require_secure_rng,
                                     privacy_engine=existing_engine,
+                                    prior_steps=prior_steps if existing_engine is None else 0,
                                 )
                             )
                             session["privacy_engine"] = getattr(
@@ -4197,6 +4225,7 @@ def run_bank_worker_node(
                             spent_delta=spent_del,
                             steps_executed=steps_per_epoch,
                             worker_token=worker_token,
+                            attempt_id=attempt_id,
                         )
                         session["last_committed_eps"] = spent_eps
                         session["last_committed_del"] = spent_del
@@ -4222,11 +4251,10 @@ def run_bank_worker_node(
                             f"Bank worker [{bank_id}] produced no loss history during local training."
                         )
 
-                    # Release surface protection: In DP mode, bounded aggregate loss avoids raw outlier leakage
+                    # Release surface protection: In DP mode, training loss is restricted bank-internal data
                     if is_dp_enabled:
-                        observed_loss = min(float(loss_history[-1]), 10.0)
+                        observed_loss = None
                         obs_metrics: dict[str, float] = {
-                            "loss": observed_loss,
                             "dp_epsilon": float(dp_info.get("epsilon", 0.0)) if dp_info else 0.0,
                             "dp_delta": float(dp_info.get("delta", 0.0)) if dp_info else 0.0,
                             "dp_noise_multiplier": float(dp_info.get("noise_multiplier", 0.0))
@@ -4237,7 +4265,7 @@ def run_bank_worker_node(
                         observed_loss = float(loss_history[-1])
                         obs_metrics = {"loss": observed_loss}
 
-                    if not math.isfinite(observed_loss):
+                    if observed_loss is not None and not math.isfinite(observed_loss):
                         raise TrainingProvenanceSecurityError(
                             f"Bank worker [{bank_id}] produced non-finite observed loss: {observed_loss}"
                         )
@@ -4295,6 +4323,7 @@ def run_bank_worker_node(
 
                     # Send local weights and digest to coordinator over federated transport
                     # Notice: Zero raw dataset samples (X_train, y_train) are transmitted across IPC.
+                    # In DP mode, un-noised training loss is restricted bank-internal data and omitted from release.
                     success_payload: dict[str, Any] = {
                         "status": "SUCCESS",
                         "bank_id": bank_id,
@@ -4303,9 +4332,10 @@ def run_bank_worker_node(
                         "weights": local_weights,
                         "update_digest": update_digest,
                         "sample_count": sample_count,
-                        "loss": observed_loss,
                         "executed_epochs": 1,
                     }
+                    if not is_dp_enabled:
+                        success_payload["loss"] = observed_loss
                     if dp_info is not None:
                         success_payload["dp_provenance"] = dp_info
                     outbox.put(success_payload)
@@ -4699,11 +4729,23 @@ class DistributedFederatedTrainingManager:
                     f"Observed unique samples {unique_samples} does not match expected {expected_unique_samples}"
                 )
 
-            tot_samples = sum(o.actual_sample_count for o in final_round_obs)
+            valid_losses = [
+                (float(o.observed_loss), o.actual_sample_count)
+                for o in final_round_obs
+                if o.observed_loss is not None
+            ]
             final_loss = (
-                sum(float(o.observed_loss) * o.actual_sample_count for o in final_round_obs)
-                / tot_samples
+                sum(loss_val * w for loss_val, w in valid_losses) / sum(w for _, w in valid_losses)
+                if (valid_losses and sum(w for _, w in valid_losses) > 0)
+                else None
             )
+
+            metrics_dict: dict[str, float] = {
+                "auc_roc": float(val_auc),
+                "val_loss": float(val_loss),
+            }
+            if final_loss is not None:
+                metrics_dict["loss"] = float(final_loss)
 
             # 6. Complete Job in PostgreSQL Authority via Independent Completion Authority
             if completion_authority is not None:
@@ -4712,11 +4754,7 @@ class DistributedFederatedTrainingManager:
                     executed_rounds=num_rounds,
                     executed_epochs=num_rounds,
                     sample_count=unique_samples,
-                    observed_metrics={
-                        "loss": final_loss,
-                        "auc_roc": val_auc,
-                        "val_loss": val_loss,
-                    },
+                    observed_metrics=metrics_dict,
                     artifact_sha256=final_artifact_sha256,
                     worker_id="FEDERATED_COORDINATOR",
                     coordinator_token=self.coordinator_token,
@@ -4733,11 +4771,7 @@ class DistributedFederatedTrainingManager:
                     executed_rounds=num_rounds,
                     executed_epochs=num_rounds,
                     sample_count=unique_samples,
-                    observed_metrics={
-                        "loss": final_loss,
-                        "auc_roc": val_auc,
-                        "val_loss": val_loss,
-                    },
+                    observed_metrics=metrics_dict,
                     artifact_sha256=final_artifact_sha256,
                     worker_id="FEDERATED_COORDINATOR",
                     coordinator_token=self.coordinator_token,
@@ -4816,11 +4850,7 @@ class DistributedFederatedTrainingManager:
             saved_version = active_registry.save_version(
                 simulation_id=simulation_id,
                 state_dict=global_model.state_dict(),
-                metrics={
-                    "loss": final_loss,
-                    "auc_roc": val_auc,
-                    "val_loss": val_loss,
-                },
+                metrics=metrics_dict,
                 is_promoted=False,
                 status="inactive",
                 provenance_type="TRAINING_RECORDED",
@@ -4852,7 +4882,7 @@ class DistributedFederatedTrainingManager:
                 "is_verified": is_valid,
                 "saved_version": saved_version,
                 "is_promoted_champion": is_promoted_champion,
-                "metrics": {"loss": final_loss, "auc_roc": val_auc, "val_loss": val_loss},
+                "metrics": metrics_dict,
                 "final_artifact_sha256": final_artifact_sha256,
                 "consortium_id": consortium_id,
                 "dp_enabled": bool(dp_config.get("dp_enabled", False)) if dp_config else False,

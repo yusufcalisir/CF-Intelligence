@@ -563,11 +563,13 @@ class TestProductionDifferentialPrivacy:
         )
         prov = model._dp_provenance  # type: ignore[attr-defined]
 
-        # Ensure telemetry classification clearly separates weights vs bounded loss observation
+        # Ensure telemetry classification clearly marks training loss as restricted bank-internal data
         telemetry = prov["telemetry_classification"]
         assert telemetry["model_weights"] == "differentially_private_record_level"
-        assert telemetry["training_loss"] == "bounded_non_private_observation"
+        assert telemetry["training_loss"] == "bank_internal_private_data_restricted"
+        assert telemetry["observed_loss"] == "bank_internal_private_data_restricted"
         assert telemetry["sample_count"] == "public_metadata_exact"
+        assert telemetry["receipt_attestation"] == "execution_evidence_not_mathematical_dp_proof"
         assert prov["secure_rng"] is False or prov["secure_rng"] is True
 
     # 13. Real multi-process operational training produces valid candidate
@@ -665,3 +667,294 @@ class TestProductionDifferentialPrivacy:
         # Case C: Neither passed, falls back to settings
         auth_default = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
         assert auth_default.active_env is not None
+
+    # Regression Evidence A: A job requiring epsilon greater than remaining budget cannot train using a smaller reservation.
+    def test_regression_a_job_requiring_epsilon_greater_than_remaining_cannot_train(
+        self, temp_db_url: str, synthetic_bank_data: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        X, y = synthetic_bank_data
+        coord_token = f"coord_{uuid.uuid4().hex}"
+        bank_id = "BANK_A"
+        worker_token = f"tok_{uuid.uuid4().hex}"
+        job_id = f"job_a_{uuid.uuid4().hex[:8]}"
+        dataset_tag = "budget_a_ds"
+
+        authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        # Allocate total 5.0, spend 3.5 -> remaining 1.5
+        authority.get_or_create_institutional_privacy_budget(
+            bank_id=bank_id, dataset_tag=dataset_tag, allocated_epsilon=5.0
+        )
+        authority.reserve_institutional_privacy_budget(bank_id, dataset_tag, "job_prior", 3.5)
+        authority.commit_institutional_privacy_expenditure(bank_id, dataset_tag, "job_prior", 3.5)
+
+        # Job requests target_epsilon 3.0 (needed_eps = 3.0 > remaining 1.5)
+        authority.schedule_training_job(
+            job_id=job_id,
+            training_run_id=f"run_{job_id}",
+            simulation_id=f"sim_{job_id}",
+            coordinator_token=coord_token,
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            permitted_workers=[bank_id],
+            dp_config={
+                "dp_enabled": True,
+                "target_epsilon": 3.0,
+                "target_delta": 1e-5,
+                "dataset_tag": dataset_tag,
+            },
+        )
+
+        import multiprocessing as mp
+        inbox: mp.Queue = mp.Queue()
+        outbox: mp.Queue = mp.Queue()
+        inbox.put({"command": "TRAIN_ROUND", "job_id": job_id, "round_number": 1, "global_weights": None})
+        inbox.put({"command": "STOP"})
+
+        run_bank_worker_node(
+            bank_id=bank_id,
+            worker_token=worker_token,
+            inbox=inbox,
+            outbox=outbox,
+            db_url=temp_db_url,
+            local_partition=(X, y),
+            app_env="development",
+        )
+
+        res = outbox.get(timeout=10)
+        # Must fail closed with ERROR status, NOT clamp reservation to 1.5
+        assert res["status"] == "ERROR"
+        assert "Privacy budget exhausted" in res["error"]
+        # Ensure budget was NOT consumed
+        b = authority.get_institutional_privacy_budget(bank_id, dataset_tag)
+        assert b is not None
+        assert b.spent_epsilon == pytest.approx(3.5, abs=1e-5)
+        assert b.reserved_epsilon == 0.0
+
+    # Regression Evidence B: Commit rejects actual expenditure exceeding available authorized budget.
+    def test_regression_b_commit_rejects_actual_expenditure_exceeding_authorized_budget(
+        self, temp_db_url: str
+    ) -> None:
+        authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        bank_id = "BANK_B"
+        dataset_tag = "overspend_ds"
+        authority.get_or_create_institutional_privacy_budget(
+            bank_id=bank_id, dataset_tag=dataset_tag, allocated_epsilon=2.0
+        )
+        authority.reserve_institutional_privacy_budget(bank_id, dataset_tag, "job_b", 2.0)
+
+        # Attempt to commit 3.5 epsilon (allocated is 2.0)
+        with pytest.raises(TrainingProvenanceSecurityError, match="exceeds allocated budget"):
+            authority.commit_institutional_privacy_expenditure(
+                bank_id=bank_id, dataset_tag=dataset_tag, job_id="job_b", spent_epsilon=3.5
+            )
+
+        # Conservative state: budget is exhausted/marked, reservation cleared
+        b = authority.get_institutional_privacy_budget(bank_id, dataset_tag)
+        assert b is not None
+        assert b.spent_epsilon >= 2.0
+        assert b.reserved_epsilon == 0.0
+        assert b.remaining_epsilon <= 0.0
+
+    # Regression Evidence C: Restarted workers cannot repeat training without additional accounting.
+    def test_regression_c_restarted_workers_cannot_repeat_training_without_accounting(
+        self, temp_db_url: str, synthetic_bank_data: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        X, y = synthetic_bank_data
+        bank_id = "BANK_A"
+        dataset_tag = "continuity_ds"
+        job_id = "job_restart"
+        authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        authority.get_or_create_institutional_privacy_budget(
+            bank_id=bank_id, dataset_tag=dataset_tag, allocated_epsilon=25.0, allocated_delta=1e-4
+        )
+        authority.reserve_institutional_privacy_budget(bank_id, dataset_tag, job_id, 2.0, round_number=1)
+        authority.commit_institutional_privacy_expenditure(
+            bank_id, dataset_tag, job_id, spent_epsilon=1.5, steps_executed=10, round_number=1, attempt_id="att_1"
+        )
+
+        b1 = authority.get_institutional_privacy_budget(bank_id, dataset_tag)
+        assert b1 is not None and b1.spent_epsilon == pytest.approx(1.5, abs=1e-5)
+
+        # Worker restarts in a new process (simulated fresh session with prior_steps restored from DB)
+        # Round 2 runs
+        model_svc = ModelService(get_settings())
+        model = model_svc.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+        # train with prior_steps=10
+        _, _, eps_r2 = model_svc.train_local_with_opacus(
+            model=model,
+            X_train=X,
+            y_train=y,
+            target_epsilon=10.0,
+            target_delta=1e-5,
+            prior_steps=10,
+            epochs=1,
+        )
+        # Cumulative epsilon is strictly positive and training adds to accounting
+        assert eps_r2 > 0.0
+        authority.reserve_institutional_privacy_budget(bank_id, dataset_tag, job_id, eps_r2, round_number=2)
+        authority.commit_institutional_privacy_expenditure(
+            bank_id, dataset_tag, job_id, spent_epsilon=eps_r2, steps_executed=10, round_number=2, attempt_id="att_2"
+        )
+        b2 = authority.get_institutional_privacy_budget(bank_id, dataset_tag)
+        assert b2 is not None
+        assert b2.spent_epsilon > 1.5
+
+    # Regression Evidence D: Replayed attempts are idempotent only when no new computation occurs.
+    def test_regression_d_replayed_attempts_are_idempotent_only_when_no_new_computation(
+        self, temp_db_url: str
+    ) -> None:
+        authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        bank_id = "BANK_C"
+        dataset_tag = "replay_ds"
+        job_id = "job_replay"
+        authority.get_or_create_institutional_privacy_budget(
+            bank_id=bank_id, dataset_tag=dataset_tag, allocated_epsilon=10.0
+        )
+        authority.reserve_institutional_privacy_budget(bank_id, dataset_tag, job_id, 2.0, round_number=1)
+
+        # Initial commit of attempt_alpha
+        b1 = authority.commit_institutional_privacy_expenditure(
+            bank_id, dataset_tag, job_id, spent_epsilon=1.8, steps_executed=10, round_number=1, attempt_id="attempt_alpha"
+        )
+        assert b1.spent_epsilon == pytest.approx(1.8, abs=1e-5)
+
+        # Exact duplicate commit of same attempt is idempotent
+        b2 = authority.commit_institutional_privacy_expenditure(
+            bank_id, dataset_tag, job_id, spent_epsilon=1.8, steps_executed=10, round_number=1, attempt_id="attempt_alpha"
+        )
+        assert b2.spent_epsilon == pytest.approx(1.8, abs=1e-5)
+
+        # Re-execution with new attempt consumes additional budget
+        b3 = authority.commit_institutional_privacy_expenditure(
+            bank_id, dataset_tag, job_id, spent_epsilon=1.8, steps_executed=10, round_number=1, attempt_id="attempt_beta"
+        )
+        assert b3.spent_epsilon == pytest.approx(3.6, abs=1e-5)
+
+    # Regression Evidence E: Cross-bank tokens cannot mutate another institution's budget.
+    def test_regression_e_cross_bank_tokens_cannot_mutate_or_read_budget(
+        self, temp_db_url: str
+    ) -> None:
+        source = TrustedTrainingJobRecordSource(
+            db_url=temp_db_url,
+            app_env="development",
+            bank_tokens={"BANK_A": "token_bank_a", "BANK_B": "token_bank_b"},
+        )
+        # Bank B worker attempts to query or mutate Bank A budget using Bank B token
+        with pytest.raises(TrainingProvenanceSecurityError, match="Cross-bank credential rejected"):
+            source.get_or_create_institutional_privacy_budget(
+                bank_id="BANK_A", dataset_tag="ds_a", token="token_bank_b"
+            )
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="Cross-bank credential rejected"):
+            source.reserve_institutional_privacy_budget(
+                bank_id="BANK_A", dataset_tag="ds_a", job_id="job_x", requested_epsilon=1.0, worker_token="token_bank_b"
+            )
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="Cross-bank credential rejected"):
+            source.commit_institutional_privacy_expenditure(
+                bank_id="BANK_A", dataset_tag="ds_a", job_id="job_x", spent_epsilon=1.0, worker_token="token_bank_b"
+            )
+
+        # Anonymous call when bank tokens are configured is also rejected
+        with pytest.raises(TrainingProvenanceSecurityError, match="missing training worker authorization token"):
+            source.reserve_institutional_privacy_budget(
+                bank_id="BANK_A", dataset_tag="ds_a", job_id="job_x", requested_epsilon=1.0, worker_token=None
+            )
+
+    # Regression Evidence F: Altering dataset_tag or consortium_id does not reset an existing dataset's budget.
+    def test_regression_f_altering_dataset_tag_aliases_does_not_reset_budget(
+        self, temp_db_url: str
+    ) -> None:
+        source = TrustedTrainingJobRecordSource(
+            db_url=temp_db_url, app_env="development", coordinator_token="coord_tok"
+        )
+        # Base dataset budget
+        source.get_or_create_institutional_privacy_budget(
+            bank_id="BANK_A", dataset_tag="vault_records", allocated_epsilon=5.0
+        )
+        source.reserve_institutional_privacy_budget("BANK_A", "vault_records", "job_1", 3.0)
+        source.commit_institutional_privacy_expenditure("BANK_A", "vault_records", "job_1", 3.0)
+
+        # Querying with alias or copy suffix resolves to canonical dataset tag
+        b_alias = source.get_institutional_privacy_budget("BANK_A", "vault_records_alias")
+        assert b_alias is not None
+        assert b_alias.spent_epsilon == pytest.approx(3.0, abs=1e-5)
+        assert b_alias.remaining_epsilon == pytest.approx(2.0, abs=1e-5)
+
+        b_copy = source.get_institutional_privacy_budget("BANK_A", "vault_records_copy")
+        assert b_copy is not None
+        assert b_copy.spent_epsilon == pytest.approx(3.0, abs=1e-5)
+
+    # Regression Evidence G: A client cannot arbitrarily allocate or increase privacy budgets.
+    def test_regression_g_client_cannot_arbitrarily_allocate_or_increase_budget(
+        self, temp_db_url: str
+    ) -> None:
+        source = TrustedTrainingJobRecordSource(
+            db_url=temp_db_url, app_env="development", coordinator_token="coord_tok"
+        )
+        # Institutional authority provisions 4.0
+        b1 = source.get_or_create_institutional_privacy_budget("BANK_A", "strict_ds", allocated_epsilon=4.0)
+        assert b1.allocated_epsilon == 4.0
+
+        # Subsequent client request claiming allocated_epsilon=50.0 does NOT increase it
+        b2 = source.get_or_create_institutional_privacy_budget("BANK_A", "strict_ds", allocated_epsilon=50.0)
+        assert b2.allocated_epsilon == 4.0
+
+    # Regression Evidence H: Protected training loss is not released merely because it was numerically clipped.
+    def test_regression_h_protected_training_loss_omitted_in_dp_mode(
+        self, temp_db_url: str, synthetic_bank_data: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        X, y = synthetic_bank_data
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_dp_h",
+            db_url=temp_db_url,
+            app_env="development",
+        )
+        job_id = f"job_h_{uuid.uuid4().hex[:8]}"
+        res = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=f"run_{job_id}",
+            simulation_id=f"sim_{job_id}",
+            holdout_val_data=(X[:50], y[:50]),
+            bank_partitions={"BANK_A": (X[:100], y[:100])},
+            num_rounds=1,
+            dp_config={
+                "dp_enabled": True,
+                "target_epsilon": 5.0,
+                "target_delta": 1e-5,
+                "dataset_tag": "h_ds",
+            },
+        )
+        assert res["status"] == "COMPLETED"
+        # Verify round observations stored in DB omit training loss
+        obs_list = manager.authority_source.get_round_observations(job_id)
+        assert len(obs_list) >= 1
+        for o in obs_list:
+            assert o.observed_loss is None
+            assert "loss" not in o.metrics
+
+    # Regression Evidence I: Actual Opacus accountant, sampling, noise, and secure RNG configuration match declared policy.
+    def test_regression_i_accountant_naming_and_secure_rng_match_policy(
+        self, synthetic_bank_data: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        X, y = synthetic_bank_data
+        model_svc = ModelService(get_settings())
+        model = model_svc.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+
+        # Test accountant_type normalization (opacus_prv -> prv)
+        _, _, _ = model_svc.train_local_with_opacus(
+            model=model,
+            X_train=X,
+            y_train=y,
+            target_epsilon=3.0,
+            target_delta=1e-5,
+            accountant_type="opacus_prv",
+            require_secure_rng=False,
+            epochs=1,
+        )
+        prov = model._dp_provenance  # type: ignore[attr-defined]
+        assert prov["accountant"] == "opacus_prv"
+        assert prov["secure_rng"] is False
+        assert prov["sampling"] == "poisson"

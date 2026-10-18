@@ -169,7 +169,7 @@ def get_authority_tables_metadata() -> sa.MetaData:
         sa.Column("attempt_number", sa.Integer, nullable=False, server_default="1"),
         sa.Column("actual_sample_count", sa.Integer, nullable=False),
         sa.Column("actual_executed_epochs", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("observed_loss", sa.Float, nullable=False),
+        sa.Column("observed_loss", sa.Float, nullable=True),
         sa.Column("metrics_json", sa.Text, nullable=False),
         sa.Column("model_update_digest", sa.String(64), nullable=True),
         sa.Column("execution_timestamp", sa.String(64), nullable=False),

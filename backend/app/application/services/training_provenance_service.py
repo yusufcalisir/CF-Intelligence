@@ -415,6 +415,7 @@ class TrainingJobAuthorityDatabase:
         round_number: int = 1,
         reserved_epsilon: float | None = None,
         reserved_delta: float | None = None,
+        attempt_id: str | None = None,
     ) -> bool:
         eps = (
             reserved_epsilon
@@ -429,6 +430,7 @@ class TrainingJobAuthorityDatabase:
             round_number=round_number,
             requested_epsilon=eps,
             requested_delta=del_val,
+            attempt_id=attempt_id,
         )
         if not ok:
             raise TrainingProvenanceSecurityError(
@@ -445,6 +447,7 @@ class TrainingJobAuthorityDatabase:
         spent_delta: float = 1e-5,
         steps_executed: int = 0,
         round_number: int = 1,
+        attempt_id: str | None = None,
     ) -> InstitutionalPrivacyBudget:
         return self._backend.commit_institutional_privacy_expenditure(
             bank_id=bank_id,
@@ -454,6 +457,7 @@ class TrainingJobAuthorityDatabase:
             spent_epsilon=spent_epsilon,
             spent_delta=spent_delta,
             steps_executed=steps_executed,
+            attempt_id=attempt_id,
         )
 
     def clear(self) -> None:
@@ -686,30 +690,42 @@ class TrustedTrainingJobRecordSource:
                     "Unauthorized training coordinator: invalid coordinator token."
                 )
 
-    def _validate_worker_token(self, provided_token: str | None) -> None:
+    def _validate_worker_token(
+        self,
+        provided_token: str | None,
+        claimed_bank_id: str | None = None,
+    ) -> str:
         active_env = self._app_env or get_settings().app_env
         is_prod = active_env.lower() == "production"
         expected = self._resolve_expected_worker_token()
         expected_coord = self._resolve_expected_coordinator_token()
+
+        if expected_coord and provided_token and hmac.compare_digest(provided_token, expected_coord):
+            raise TrainingProvenanceSecurityError(
+                "Coordinator credential cannot authorize worker execution events."
+            )
 
         if is_prod:
             if not provided_token:
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized training worker: missing training worker authorization token."
                 )
-            if expected_coord and hmac.compare_digest(provided_token, expected_coord):
-                raise TrainingProvenanceSecurityError(
-                    "Coordinator credential cannot authorize worker execution events."
-                )
             if self._bank_tokens:
-                if not any(
-                    hmac.compare_digest(provided_token, bt)
-                    for bt in self._bank_tokens.values()
-                    if bt
-                ):
+                matched_bank: str | None = None
+                for b_id, b_tok in self._bank_tokens.items():
+                    if b_tok and hmac.compare_digest(provided_token, b_tok):
+                        matched_bank = b_id
+                        break
+                if matched_bank is None:
                     raise TrainingProvenanceSecurityError(
                         "Unauthorized training worker: Invalid training worker authorization token."
                     )
+                if claimed_bank_id and claimed_bank_id.strip() != matched_bank:
+                    raise TrainingProvenanceSecurityError(
+                        f"Cross-bank credential rejected: worker credential belongs to '{matched_bank}', "
+                        f"not '{claimed_bank_id.strip()}'."
+                    )
+                return matched_bank
             else:
                 if not expected or expected in FORBIDDEN_WORKER_TOKENS or "change_me" in expected:
                     raise TrainingProvenanceConfigurationError(
@@ -720,31 +736,38 @@ class TrustedTrainingJobRecordSource:
                     raise TrainingProvenanceSecurityError(
                         "Unauthorized training worker: Invalid training worker authorization token."
                     )
+                return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
         else:
-            if (
-                expected_coord
-                and provided_token
-                and hmac.compare_digest(provided_token, expected_coord)
-            ):
-                raise TrainingProvenanceSecurityError(
-                    "Coordinator credential cannot authorize worker execution events."
-                )
-            if (
-                self._bank_tokens
-                and provided_token
-                and any(
-                    hmac.compare_digest(provided_token, bt)
-                    for bt in self._bank_tokens.values()
-                    if bt
-                )
-            ):
-                return
+            if self._bank_tokens:
+                if not provided_token:
+                    raise TrainingProvenanceSecurityError(
+                        "Unauthorized training worker: missing training worker authorization token."
+                    )
+                matched_bank = None
+                for b_id, b_tok in self._bank_tokens.items():
+                    if b_tok and hmac.compare_digest(provided_token, b_tok):
+                        matched_bank = b_id
+                        break
+                if matched_bank is not None:
+                    if claimed_bank_id and claimed_bank_id.strip() != matched_bank:
+                        raise TrainingProvenanceSecurityError(
+                            f"Cross-bank credential rejected: worker credential belongs to '{matched_bank}', "
+                            f"not '{claimed_bank_id.strip()}'."
+                        )
+                    return matched_bank
+                elif expected and hmac.compare_digest(provided_token, expected):
+                    return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
+                else:
+                    raise TrainingProvenanceSecurityError(
+                        "Unauthorized training worker: invalid worker token."
+                    )
             if expected and (
                 provided_token is None or not hmac.compare_digest(provided_token, expected)
             ):
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized training worker: invalid worker token."
                 )
+            return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
 
     def authenticate_bank_worker(
         self,
@@ -946,10 +969,15 @@ class TrustedTrainingJobRecordSource:
                 if k in target_metrics:
                     loss_val = float(target_metrics[k])
                     break
-        if loss_val is None or not math.isfinite(loss_val):
+        is_dp_obs = bool("dp_epsilon" in target_metrics or (sched and sched.dp_config and sched.dp_config.get("dp_enabled")))
+        if loss_val is None and not is_dp_obs:
             raise TrainingProvenanceSecurityError(
                 f"Missing or non-finite observed loss for round {r_num} of job '{clean_job_id}'. "
                 "Loss cannot be defaulted to 0.0 or fabricated."
+            )
+        if loss_val is not None and not math.isfinite(loss_val):
+            raise TrainingProvenanceSecurityError(
+                f"Non-finite observed loss ({loss_val}) for round {r_num} of job '{clean_job_id}'."
             )
 
         eid = (
@@ -1363,11 +1391,19 @@ class TrustedTrainingJobRecordSource:
         allocated_delta: float = 1e-5,
         token: str | None = None,
     ) -> InstitutionalPrivacyBudget:
+        active_env = self._app_env or get_settings().app_env
+        is_prod = active_env.lower() == "production"
+        if is_prod and not token:
+            raise TrainingProvenanceSecurityError(
+                "Unauthenticated budget creation/mutation rejected in production."
+            )
         if token is not None:
             try:
                 self._validate_coordinator_token(token)
             except Exception:
-                self._validate_worker_token(token)
+                self._validate_worker_token(token, claimed_bank_id=bank_id.strip())
+        elif self._bank_tokens:
+            self._validate_worker_token(None, claimed_bank_id=bank_id.strip())
 
         return self._db.get_or_create_institutional_privacy_budget(
             bank_id=bank_id,
@@ -1382,11 +1418,19 @@ class TrustedTrainingJobRecordSource:
         dataset_tag: str,
         token: str | None = None,
     ) -> InstitutionalPrivacyBudget | None:
+        active_env = self._app_env or get_settings().app_env
+        is_prod = active_env.lower() == "production"
+        if is_prod and not token:
+            raise TrainingProvenanceSecurityError(
+                "Unauthenticated budget query rejected in production."
+            )
         if token is not None:
             try:
                 self._validate_coordinator_token(token)
             except Exception:
-                self._validate_worker_token(token)
+                self._validate_worker_token(token, claimed_bank_id=bank_id.strip())
+        elif self._bank_tokens:
+            self._validate_worker_token(None, claimed_bank_id=bank_id.strip())
 
         return self._db.get_institutional_privacy_budget(
             bank_id=bank_id,
@@ -1404,9 +1448,18 @@ class TrustedTrainingJobRecordSource:
         worker_token: str | None = None,
         reserved_epsilon: float | None = None,
         reserved_delta: float | None = None,
+        attempt_id: str | None = None,
     ) -> bool:
+        active_env = self._app_env or get_settings().app_env
+        is_prod = active_env.lower() == "production"
+        if is_prod and not worker_token:
+            raise TrainingProvenanceSecurityError(
+                "Unauthenticated budget reservation rejected in production."
+            )
         if worker_token is not None:
-            self._validate_worker_token(worker_token)
+            self._validate_worker_token(worker_token, claimed_bank_id=bank_id.strip())
+        elif self._bank_tokens:
+            self._validate_worker_token(None, claimed_bank_id=bank_id.strip())
 
         return self._db.reserve_institutional_privacy_budget(
             bank_id=bank_id,
@@ -1417,6 +1470,7 @@ class TrustedTrainingJobRecordSource:
             requested_delta=requested_delta,
             reserved_epsilon=reserved_epsilon,
             reserved_delta=reserved_delta,
+            attempt_id=attempt_id,
         )
 
     def commit_institutional_privacy_expenditure(
@@ -1429,9 +1483,18 @@ class TrustedTrainingJobRecordSource:
         steps_executed: int = 0,
         round_number: int = 1,
         worker_token: str | None = None,
+        attempt_id: str | None = None,
     ) -> InstitutionalPrivacyBudget:
+        active_env = self._app_env or get_settings().app_env
+        is_prod = active_env.lower() == "production"
+        if is_prod and not worker_token:
+            raise TrainingProvenanceSecurityError(
+                "Unauthenticated budget commit rejected in production."
+            )
         if worker_token is not None:
-            self._validate_worker_token(worker_token)
+            self._validate_worker_token(worker_token, claimed_bank_id=bank_id.strip())
+        elif self._bank_tokens:
+            self._validate_worker_token(None, claimed_bank_id=bank_id.strip())
 
         return self._db.commit_institutional_privacy_expenditure(
             bank_id=bank_id,
@@ -1441,6 +1504,7 @@ class TrustedTrainingJobRecordSource:
             spent_epsilon=spent_epsilon,
             spent_delta=spent_delta,
             steps_executed=steps_executed,
+            attempt_id=attempt_id,
         )
 
     def clear(self) -> None:

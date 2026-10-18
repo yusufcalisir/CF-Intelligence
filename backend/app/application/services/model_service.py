@@ -343,6 +343,7 @@ class ModelService:
         accountant_type: str = "prv",
         require_secure_rng: bool = False,
         privacy_engine: Any | None = None,
+        prior_steps: int = 0,
         epochs: int | None = None,
         learning_rate: float | None = None,
         batch_size: int | None = None,
@@ -420,6 +421,8 @@ class ModelService:
         steps_per_epoch = max(1, math.ceil(len(dataset) / batch_size))
         calib_steps = total_steps or (epochs * steps_per_epoch)
 
+        acc_type_clean = accountant_type.lower().replace("opacus_", "")
+
         if noise_multiplier is not None and noise_multiplier > 0.0:
             sigma = float(noise_multiplier)
         else:
@@ -429,20 +432,25 @@ class ModelService:
                     target_delta=target_delta,
                     sample_rate=sample_rate,
                     steps=calib_steps,
-                    accountant=accountant_type,
+                    accountant=acc_type_clean,
                 )
             )
 
         if privacy_engine is None:
             if require_secure_rng:
                 try:
-                    privacy_engine = PrivacyEngine(accountant=accountant_type, secure_mode=True)
+                    privacy_engine = PrivacyEngine(accountant=acc_type_clean, secure_mode=True)
                 except Exception as rng_e:
                     raise RuntimeError(
                         f"Cryptographic CSPRNG requested (require_secure_rng=True), but torchcsprng is unavailable: {rng_e}"
                     ) from rng_e
             else:
-                privacy_engine = PrivacyEngine(accountant=accountant_type, secure_mode=False)
+                privacy_engine = PrivacyEngine(accountant=acc_type_clean, secure_mode=False)
+
+            if prior_steps > 0:
+                acc_obj = getattr(privacy_engine, "accountant", None)
+                if acc_obj is not None and hasattr(acc_obj, "history"):
+                    acc_obj.history.append((sigma, sample_rate, prior_steps))
 
         try:
             res: Any = privacy_engine.make_private(
@@ -564,6 +572,8 @@ class ModelService:
             else (f"opacus_{accountant_type}" if accountant_type else accountant_name)
         )
 
+        steps_done = prior_steps + int(getattr(optimizer_private, "steps_done", (epochs or 1) * max(n_batches, 1)))
+
         prov_dict = {
             "mechanism": "SubsampledGaussianDP",
             "mechanism_detail": f"opacus_{mechanism_name}",
@@ -576,8 +586,8 @@ class ModelService:
             "clip_norm": float(max_grad_norm),
             "clipping_norm": float(max_grad_norm),
             "sample_rate": float(sample_rate),
-            "steps": int(getattr(optimizer_private, "steps_done", (epochs or 1) * max(n_batches, 1))),
-            "total_steps": int(getattr(optimizer_private, "steps_done", (epochs or 1) * max(n_batches, 1))),
+            "steps": steps_done,
+            "total_steps": steps_done,
             "sampling": "poisson",
             "sampling_mechanism": "poisson",
             "dp_mode": "opacus",
@@ -587,9 +597,10 @@ class ModelService:
                 "model_weights": "differentially_private_record_level",
                 "update_digest": "post_processing_differential_privacy",
                 "sample_count": "public_metadata_exact",
-                "observed_loss": "bounded_non_private_observation",
-                "training_loss": "bounded_non_private_observation",
-                "receipt_attestation": "execution_and_accounting_integrity",
+                "observed_loss": "bank_internal_private_data_restricted",
+                "training_loss": "bank_internal_private_data_restricted",
+                "receipt_attestation": "execution_evidence_not_mathematical_dp_proof",
+                "individual_updates": "requires_secure_aggregation_for_confidentiality",
             },
             "version": "2.0",
         }
