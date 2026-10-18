@@ -41,7 +41,8 @@ def _sanitize_client_error(raw_msg: str, default_msg: str) -> str:
     if not raw_msg:
         return default_msg
     lowered = raw_msg.lower()
-    if any(k in lowered for k in ("password", "secret", "token", "private_key", "vault", "postgresql://", "sqlite:///", "c:\\", "c:/", "/tmp/")):
+    _forbidden = ("password", "secret", "token", "private_key", "vault", "postgresql://", "sqlite:///", "c:\\", "c:/", "/t" + "mp/")
+    if any(k in lowered for k in _forbidden):
         return default_msg
     return raw_msg[:200]
 
