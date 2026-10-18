@@ -895,13 +895,13 @@ class OperationalFederationService:
                         break
                 if not target_col:
                     raise TrainingProvenanceConfigurationError("Holdout dataset missing binary target column ('is_fraud').")
-                y = df[target_col].to_numpy(dtype=np.float32)
+                y = np.asarray(df[target_col].to_numpy(dtype=np.float32), dtype=np.float32)
                 has_raw_features = all(f in df.columns for f in FEATURE_NAMES)
                 if has_raw_features:
-                    X = DataGenerator.encode_features(df[list(FEATURE_NAMES)])
+                    X = np.asarray(DataGenerator.encode_features(df[list(FEATURE_NAMES)]), dtype=np.float32)
                 else:
                     feat_df = df.drop(columns=[target_col])
-                    X = feat_df.to_numpy(dtype=np.float32)
+                    X = np.asarray(feat_df.to_numpy(dtype=np.float32), dtype=np.float32)
                 self._validate_holdout_arrays(X, y)
                 return X, y
             else:
@@ -954,17 +954,17 @@ class OperationalFederationService:
                     if not target_col:
                         raise TrainingProvenanceConfigurationError("Holdout dataset missing binary target column ('is_fraud').")
 
-                    y = df[target_col].to_numpy(dtype=np.float32)
+                    y = np.asarray(df[target_col].to_numpy(dtype=np.float32), dtype=np.float32)
 
                     # Check if raw transaction schema is present
                     has_raw_features = all(f in df.columns for f in FEATURE_NAMES)
                     if has_raw_features:
                         # Canonical preprocessing / encoding
-                        X = DataGenerator.encode_features(df[list(FEATURE_NAMES)])
+                        X = np.asarray(DataGenerator.encode_features(df[list(FEATURE_NAMES)]), dtype=np.float32)
                     else:
                         feat_df = df.drop(columns=[target_col])
                         try:
-                            X = feat_df.to_numpy(dtype=np.float32)
+                            X = np.asarray(feat_df.to_numpy(dtype=np.float32), dtype=np.float32)
                         except Exception as parse_err:
                             raise TrainingProvenanceConfigurationError(
                                 f"Holdout features contain unencoded non-numeric data: {parse_err}"
@@ -985,8 +985,8 @@ class OperationalFederationService:
         gen = DataGenerator(seed=42)
         datasets = gen.generate_bank_datasets(bank_a_size=500, bank_b_size=200, bank_c_size=200)
         feats_df, labels = datasets["bank_a"]
-        X = DataGenerator.encode_features(feats_df)
-        y = labels.to_numpy(dtype=np.float32)
+        X = np.asarray(DataGenerator.encode_features(feats_df), dtype=np.float32)
+        y = np.asarray(labels.to_numpy(dtype=np.float32), dtype=np.float32)
         self._validate_holdout_arrays(X, y)
         return X, y
 

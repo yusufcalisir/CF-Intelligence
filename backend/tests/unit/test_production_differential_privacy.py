@@ -20,30 +20,27 @@ Covers all 15 operational requirements from Section 5:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 import uuid
-from typing import Any
 from unittest.mock import patch
 
 import numpy as np
 import pytest
 import torch
 
+from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
     DistributedFederatedTrainingManager,
     run_bank_worker_node,
 )
-from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.model_service import (
     NUM_FEATURES,
-    FraudDetectionModel,
     ModelService,
 )
-from app.application.services.privacy_service import PrivacyService
 from app.application.services.training_provenance_service import (
     TrainingJobAuthorityDatabase,
-    TrainingProvenanceConfigurationError,
     TrainingProvenanceSecurityError,
     TrustedTrainingJobRecordSource,
 )
@@ -58,10 +55,8 @@ def temp_db_url() -> str:
     db_url = f"sqlite:///{path}"
     yield db_url
     if os.path.exists(path):
-        try:
+        with contextlib.suppress(OSError):
             os.remove(path)
-        except OSError:
-            pass
 
 
 @pytest.fixture

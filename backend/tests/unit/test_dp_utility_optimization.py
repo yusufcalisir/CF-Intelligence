@@ -90,6 +90,7 @@ def test_train_local_with_opacus_dp_provenance():
     assert final_eps > 0
     assert hasattr(trained_model, "dp_provenance")
     prov = trained_model.dp_provenance
+    assert prov is not None
     assert prov["mechanism"] in ("opacus_prv", "opacus_rdp", "SubsampledGaussianDP")
     assert prov["clip_norm"] == 0.5
     assert prov["delta"] == 1e-5
