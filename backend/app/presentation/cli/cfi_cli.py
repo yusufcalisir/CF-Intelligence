@@ -56,12 +56,15 @@ def _api_request(
     method: str,
     url: str,
     payload: dict | None = None,
+    headers: dict | None = None,
     timeout: int = 30,
 ) -> dict:
     """Minimal HTTP client using stdlib urllib — no external deps."""
     data = json.dumps(payload).encode() if payload else None
-    headers = {"Content-Type": "application/json", "Accept": "application/json"}
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    req_headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    if headers:
+        req_headers.update(headers)
+    req = urllib.request.Request(url, data=data, headers=req_headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310  # nosec B310
             return json.loads(resp.read().decode())
@@ -242,6 +245,47 @@ def command_deploy(target_version: str = "v2.1.0") -> dict:
     return deploy_data
 
 
+def command_federate(
+    coordinator_url: str,
+    token: str,
+    banks: list[str] | None = None,
+    rounds: int = 2,
+    job_id: str | None = None,
+    simulation_id: str | None = None,
+    expected_samples: int | None = None,
+) -> dict:
+    """Trigger authorized operational federated training job on coordinator."""
+    if not token or not token.strip():
+        raise RuntimeError(
+            "Operator authorization token (--token or CFI_OPERATOR_TOKEN env var) is required "
+            "for federated training initiation."
+        )
+
+    endpoint = f"{coordinator_url.rstrip('/')}/api/v1/training/federation/jobs"
+    payload = {
+        "job_id": job_id,
+        "simulation_id": simulation_id,
+        "participating_banks": banks or ["BANK_A", "BANK_B", "BANK_C"],
+        "num_rounds": rounds,
+        "expected_unique_samples": expected_samples,
+    }
+    headers = {"Authorization": f"Bearer {token.strip()}"}
+    print(f"🚀 Initiating operational federation across {payload['participating_banks']} ({rounds} rounds)...")
+    res = _api_request("POST", endpoint, payload, headers=headers, timeout=120)
+
+    print(f"┌─ Federation Job Completed {'─' * 32}")
+    print(f"│  Job ID           : {res.get('job_id')}")
+    print(f"│  Simulation ID    : {res.get('simulation_id')}")
+    print(f"│  Status           : {res.get('status')}")
+    print(f"│  Receipt Verified : {res.get('is_verified')}")
+    print(f"│  Model Version    : {res.get('model_version')}")
+    print(f"│  Artifact SHA-256 : {(res.get('artifact_sha256') or '—')[:24]}...")
+    print(f"│  Champion Promoted: {res.get('is_promoted_champion')}")
+    print(f"│  Metrics          : {res.get('metrics')}")
+    print(f"└{'─' * 60}")
+    return res
+
+
 # ── Argument Parser ───────────────────────────────────────────────────────────
 
 
@@ -302,6 +346,41 @@ def build_parser() -> argparse.ArgumentParser:
         "--target-version", default="v2.1.0", help="Target release version to deploy"
     )
 
+    # federate
+    fed_p = subparsers.add_parser(
+        "federate", help="Trigger authorized operational federated training"
+    )
+    fed_p.add_argument(
+        "--coordinator-url",
+        default="http://localhost:8000",
+        help="Coordinator base URL (e.g. http://localhost:8000)",
+    )
+    fed_p.add_argument(
+        "--token",
+        default=os.environ.get("CFI_OPERATOR_TOKEN", ""),
+        help="Bearer operator JWT token for authorization",
+    )
+    fed_p.add_argument(
+        "--banks",
+        nargs="+",
+        default=["BANK_A", "BANK_B", "BANK_C"],
+        help="List of participating bank institution IDs",
+    )
+    fed_p.add_argument(
+        "--rounds",
+        type=int,
+        default=2,
+        help="Number of federated rounds",
+    )
+    fed_p.add_argument("--job-id", default=None, help="Optional job ID")
+    fed_p.add_argument("--simulation-id", default=None, help="Optional simulation namespace ID")
+    fed_p.add_argument(
+        "--expected-samples",
+        type=int,
+        default=None,
+        help="Expected unique sample count reconciliation threshold",
+    )
+
     return parser
 
 
@@ -333,6 +412,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             command_health()
         elif args.subcommand == "deploy":
             command_deploy(target_version=args.target_version)
+        elif args.subcommand == "federate":
+            command_federate(
+                coordinator_url=args.coordinator_url,
+                token=args.token,
+                banks=args.banks,
+                rounds=args.rounds,
+                job_id=args.job_id,
+                simulation_id=args.simulation_id,
+                expected_samples=args.expected_samples,
+            )
         else:
             parser.print_help()
             return 1

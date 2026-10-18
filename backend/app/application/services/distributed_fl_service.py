@@ -3706,10 +3706,24 @@ def run_bank_worker_node(
                     round_number = msg["round_number"]
                     global_weights_obj: ModelWeights | None = msg.get("global_weights")
 
-                    # On round 1, authorized worker initiates job start in PostgreSQL authority
-                    if round_number == 1 and bank_id == "BANK_A":
-                        with contextlib.suppress(Exception):
-                            authority_source.start_training_job(job_id=job_id, worker_token=worker_token)
+                    # On round 1, authorized worker initiates or verifies job start in PostgreSQL authority
+                    if round_number == 1:
+                        try:
+                            authority_source.start_training_job(
+                                job_id=job_id,
+                                worker_id=bank_id,
+                                worker_token=worker_token,
+                            )
+                            logger.info("Bank worker [%s] verified or initiated start for training job %s", bank_id, job_id)
+                        except Exception as start_err:
+                            logger.error("Bank worker [%s] failed to initiate training job %s: %s", bank_id, job_id, start_err)
+                            outbox.put({
+                                "status": "ERROR",
+                                "bank_id": bank_id,
+                                "error": f"Failed to start training job: {start_err}",
+                                "pid": pid,
+                            })
+                            continue
 
                     # Initialize local model and load latest global weights
                     local_model = model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
@@ -3942,6 +3956,7 @@ class DistributedFederatedTrainingManager:
                 bank_data_paths=bank_data_paths,
                 bank_partitions=bank_partitions,
                 fail_bank_b_observation=fail_bank_b_observation,
+                app_env=self.app_env,
             )
 
         # 1. Schedule training job in PostgreSQL authority

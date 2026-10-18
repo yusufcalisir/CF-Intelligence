@@ -1517,6 +1517,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                         INSERT INTO cfi_started_jobs (
                             job_id, training_run_id, simulation_id, worker_id, started_at, status
                         ) VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (job_id) DO NOTHING
                         """,
                         (
                             clean_job_id,
@@ -1528,14 +1529,17 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                         ),
                     )
 
-        return StartedTrainingJob(
-            job_id=clean_job_id,
-            training_run_id=sched["training_run_id"],
-            simulation_id=sched["simulation_id"],
-            worker_id=worker_id,
-            started_at=now_str,
-            status="STARTED",
-        )
+                    cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
+                    row = cur.fetchone()
+                    if row:
+                        return StartedTrainingJob(
+                            job_id=row["job_id"],
+                            training_run_id=row["training_run_id"],
+                            simulation_id=row["simulation_id"],
+                            worker_id=row["worker_id"],
+                            started_at=row["started_at"],
+                            status=row["status"],
+                        )
 
     def record_observation(self, obs: RoundObservation) -> RoundObservation:
         obs.validate()

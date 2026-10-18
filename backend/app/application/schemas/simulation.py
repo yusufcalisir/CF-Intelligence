@@ -455,5 +455,56 @@ class POCPresetsResponse(BaseModel):
     default_preset_id: str = "poc-enterprise-standard"
 
 
+class OperationalFederationRequest(BaseModel):
+    """Safe operator configuration for operational federated training initiation.
+
+    Security Contract:
+    - Never accepts raw data, file paths, private keys, or process handles from clients.
+    - Authorities, credentials, and worker endpoints are resolved server-side.
+    """
+
+    job_id: str | None = Field(
+        default=None,
+        description="Optional caller-specified job identifier (UUID generated if omitted)",
+    )
+    simulation_id: str | None = Field(
+        default=None,
+        description="Target simulation or candidate model namespace identifier",
+    )
+    participating_banks: list[str] = Field(
+        default_factory=lambda: ["BANK_A", "BANK_B", "BANK_C"],
+        min_length=1,
+        description="List of participating bank institution identifiers",
+    )
+    num_rounds: int = Field(
+        default=2,
+        ge=1,
+        le=50,
+        description="Number of federated aggregation rounds",
+    )
+    expected_unique_samples: int | None = Field(
+        default=None,
+        ge=1,
+        description="Strict sample count reconciliation expectation",
+    )
+
+
+class OperationalFederationResponse(BaseModel):
+    """Truthful execution status and provenance metadata for operational federated training."""
+
+    job_id: str
+    training_run_id: str
+    simulation_id: str
+    status: str
+    is_verified: bool
+    metrics: dict[str, float] = Field(default_factory=dict)
+    artifact_sha256: str = ""
+    model_version: int | None = None
+    is_promoted_champion: bool = False
+    coordinator_pid: int = 0
+    worker_pids: dict[str, int] = Field(default_factory=dict)
+    error: str | None = None
+
+
 # Rebuild models to resolve forward references
 SimulationDetailResponse.model_rebuild()

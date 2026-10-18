@@ -2479,7 +2479,9 @@ class SimulationService:
                     dataset_hash=dataset_hash,
                     dp_noise_profile=dp_noise_profile,
                     status="inactive",
-                    provenance_type="TRAINING_RECORDED" if fl_receipt is not None else "UNVERIFIED",
+                    # In-process simulation models must remain strictly UNVERIFIED to prevent
+                    # centrally held simulation runs from acquiring production promotion eligibility.
+                    provenance_type="UNVERIFIED",
                     training_run_id=f"fl_run_{simulation.id}",
                     training_receipt=fl_receipt,
                     artifact_bytes=model_bytes,

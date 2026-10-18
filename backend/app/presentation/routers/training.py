@@ -8,21 +8,106 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Path, Query, status
+from fastapi import APIRouter, Header, HTTPException, Path, Query, status
 
 from app.application.schemas.simulation import (
+    OperationalFederationRequest,
+    OperationalFederationResponse,
     TrainingHistoryItem,
     TrainingHistoryResponse,
     TrainingMetricsSummaryResponse,
     TrainingProgressResponse,
     TrainingRoundResponse,
 )
+from app.application.services.operational_federation_service import OperationalFederationService
+from app.application.services.training_provenance_service import (
+    TrainingProvenanceConfigurationError,
+    TrainingProvenanceSecurityError,
+)
+from app.presentation.routers.model_registry import _authenticate_and_authorize_operator
 from app.presentation.routers.simulation import _simulation_events, _simulation_results
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/training", tags=["training"])
 api_router = APIRouter(prefix="/v1/training", tags=["training"])
+
+
+@router.post("/federation/jobs", response_model=OperationalFederationResponse, status_code=status.HTTP_201_CREATED)
+@api_router.post("/federation/jobs", response_model=OperationalFederationResponse, status_code=status.HTTP_201_CREATED)
+async def start_operational_federation_job(
+    payload: OperationalFederationRequest,
+    authorization: str | None = Header(None, description="Bearer <operator_jwt>"),
+) -> OperationalFederationResponse:
+    """Authorized operational entry point to initiate the canonical distributed federated learning lifecycle.
+
+    Guarantees:
+    - Cryptographically authenticates initiating operator via live RBAC (requires admin, ml_lead, or ml_engineer role with clearance level >= 2).
+    - Resolves authorities, credentials, vault paths, and pre-provisioned bank endpoints strictly server-side.
+    - Never accepts private keys, database URLs, bank credentials, raw datasets, or process handles from clients.
+    - Executes under isolated Windows Restricted Token in production via run_production_federation.
+    - Tracks actual resulting execution state without fabricated success, dummy receipts, or synthetic metrics.
+    - Registers verified candidate model in ModelRegistry with inactive status (never automatically promotes champion).
+    """
+    operator_user, claims, _ = _authenticate_and_authorize_operator(
+        authorization=authorization,
+        allowed_roles={"admin", "ml_lead", "ml_engineer"},
+        operation_name="operational federated training initiation",
+        min_clearance=2,
+    )
+    logger.info("Operator [%s] authorized for operational federation job", operator_user.username)
+
+    svc = OperationalFederationService()
+    try:
+        result = svc.execute_operational_federation(
+            job_id=payload.job_id,
+            simulation_id=payload.simulation_id,
+            participating_banks=payload.participating_banks,
+            num_rounds=payload.num_rounds,
+            expected_unique_samples=payload.expected_unique_samples,
+        )
+        saved_ver = result.get("saved_version")
+        ver_number = result.get("model_version")
+        if ver_number is None and isinstance(saved_ver, dict):
+            ver_number = saved_ver.get("version")
+
+        return OperationalFederationResponse(
+            job_id=result.get("job_id", payload.job_id or ""),
+            training_run_id=result.get("training_run_id", ""),
+            simulation_id=result.get("simulation_id", payload.simulation_id or ""),
+            status=result.get("status", "COMPLETED"),
+            is_verified=bool(result.get("is_verified", False)),
+            metrics=result.get("metrics", {}),
+            artifact_sha256=result.get("artifact_sha256") or result.get("final_artifact_sha256", ""),
+            model_version=ver_number,
+            is_promoted_champion=bool(result.get("is_promoted_champion", False)),
+            coordinator_pid=result.get("coordinator_pid", 0),
+            worker_pids=result.get("worker_pids", {}),
+        )
+    except TrainingProvenanceSecurityError as exc:
+        logger.error("Operational federation rejected due to security policy violation: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Federation security policy violation: {exc}",
+        ) from exc
+    except TrainingProvenanceConfigurationError as exc:
+        logger.error("Operational federation failed closed due to configuration error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Federation authority configuration error: {exc}",
+        ) from exc
+    except ValueError as exc:
+        logger.warning("Operational federation bad request: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.exception("Operational federation execution failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Operational federation failed: {exc}",
+        ) from exc
 
 
 @router.get("/progress", response_model=TrainingProgressResponse)
