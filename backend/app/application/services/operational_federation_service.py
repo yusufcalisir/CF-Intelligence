@@ -314,10 +314,10 @@ class OperationalFederationService:
 
         # Non-production synthetic holdout dataset
         gen = DataGenerator(seed=42)
-        df = gen.generate_transactions(n_samples=200)
-        feat_cols = [c for c in df.columns if c.startswith("feat_")]
-        X = df[feat_cols].to_numpy(dtype=np.float32)
-        y = df["is_fraud"].to_numpy(dtype=np.float32)
+        datasets = gen.generate_bank_datasets(bank_a_size=100, bank_b_size=50, bank_c_size=50)
+        feats_df, labels = datasets["bank_a"]
+        X = DataGenerator.encode_features(feats_df)
+        y = labels.to_numpy(dtype=np.float32)
         return X, y
 
     def execute_operational_federation(

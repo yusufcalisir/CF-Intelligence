@@ -1531,15 +1531,18 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
 
                     cur.execute("SELECT * FROM cfi_started_jobs WHERE job_id = %s", (clean_job_id,))
                     row = cur.fetchone()
-                    if row:
-                        return StartedTrainingJob(
-                            job_id=row["job_id"],
-                            training_run_id=row["training_run_id"],
-                            simulation_id=row["simulation_id"],
-                            worker_id=row["worker_id"],
-                            started_at=row["started_at"],
-                            status=row["status"],
+                    if not row:
+                        raise TrainingProvenanceSecurityError(
+                            f"Failed to record or retrieve started training job '{clean_job_id}'."
                         )
+                    return StartedTrainingJob(
+                        job_id=row["job_id"],
+                        training_run_id=row["training_run_id"],
+                        simulation_id=row["simulation_id"],
+                        worker_id=row["worker_id"],
+                        started_at=row["started_at"],
+                        status=row["status"],
+                    )
 
     def record_observation(self, obs: RoundObservation) -> RoundObservation:
         obs.validate()
