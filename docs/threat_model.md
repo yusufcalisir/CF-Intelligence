@@ -694,7 +694,7 @@ The Production Training Provenance and Execution Authority subsystem ([`backend/
 ### 20.7 Kafka Ingestion Stale-Worker & Race Condition Defense (Tampering & Consistency)
 * **Threat**: Network partitions or delayed worker executions cause stale workers to commit duplicate or out-of-order transaction events into the processing pipeline.
 * **Mitigations**:
-  * **Ownership-Bound Reservations (`IdempotencyEngine`)**: Workers acquire Redis reservations bound to ephemeral tokens (`owner_id = engine_id + "_" + uuid`). If a worker stalls and its reservation TTL expires, atomic Lua scripts reject late commits from the stale worker. In the event of broker-ACK / Redis-completion uncertainty, operations return `False` and retry, enforcing at-least-once delivery without claiming unverified exactly-once guarantees.
+  * **Ownership-Bound Reservations (`IdempotencyEngine`)**: Workers acquire Redis reservations bound to ephemeral tokens (`owner_id = engine_id + "_" + uuid`). If a worker stalls and its reservation TTL expires, atomic Lua scripts reject late commits from the stale worker. If broker ACK succeeds but subsequent Redis idempotency recording fails, the connector produces a `PublishReceipt` with status `"COMMITTED_IDEMPOTENCY_UNCERTAIN"` (`idempotency_committed=False`) rather than automatically retrying, preventing duplicate event generation while truthfully communicating state uncertainty to upstream callers.
 
 ### 20.8 Serving Fallback Fabrication Defense (Tampering & Information Disclosure)
 * **Threat**: When an inference model is unavailable, unloaded, or encounters errors, the serving layer returns synthetic, randomized, or heuristic risk scores to avoid throwing an exception, leading to silent false positives/negatives in fraud screening.

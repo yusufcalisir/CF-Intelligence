@@ -120,13 +120,13 @@ The underlying production registry persists model version state via `ModelManife
 | Manifest Status | Flags (`is_approved`, `is_active`, `is_revoked`) | Governance & Lifecycle Meaning | Serving Permission |
 |:---|:---|:---|:---|
 | **`inactive`** *(Pending)* | `is_approved=False`, `is_active=False` | Newly registered model checkpoint awaiting receipt verification and dual sign-offs. | Isolated sandbox testing only |
-| **`inactive`** *(Approved)* | `is_approved=True`, `is_active=False` | Cryptographically signed off by ML Lead and Compliance Officer; eligible for promotion. | Staging / Validation only |
+| **`approved`** | `is_approved=True`, `is_active=False` | Cryptographically signed off by ML Lead and Compliance Officer; eligible for promotion. | Staging / Validation only |
 | **`challenger`** | `is_approved=True`, `is_active=False` | Approved model version actively routing shadow inference traffic for canary comparison. | Shadow evaluation only |
 | **`champion`** | `is_approved=True`, `is_active=True` | Active production decision-maker certified for real-time transaction scoring. | Live primary serving |
 | **`revoked`** | `is_revoked=True`, `is_active=False` | Revoked due to drift alert, key revocation, security defect, or regulatory mandate. | Strictly prohibited (Fails closed) |
 
 > [!IMPORTANT]
-> **Approval vs. Champion Activation:** An approved model version (`is_approved=True`) does not automatically serve live traffic. It remains in `status="inactive", is_active=False` until an authenticated operator with clearance level $\ge 2$ explicitly triggers champion activation via `promote_version` or `rollback`. Exactly one active champion version is permitted per model family at any time.
+> **Approval vs. Champion Activation:** An approved model version (`is_approved=True`) does not automatically serve live traffic. Upon successful dual sign-off, its manifest status transitions to `status="approved"` (`is_active=False`). It remains non-serving until an authenticated operator with clearance level $\ge 2$ explicitly triggers champion activation via `promote_version` or `rollback`. Approval does not automatically activate `champion`. Exactly one active champion version is permitted per model family at any time.
 
 ### 3.4. Combined Production Admission Invariant & Four-Eyes Gating
 Production model admission (`validate_production_admission` in `backend/app/application/services/model_registry.py`) strictly enforces a **combined admission invariant** requiring **BOTH** verified asymmetric training receipts **AND** Four-Eyes institutional sign-offs. It never accepts one in place of the other:

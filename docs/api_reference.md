@@ -1092,7 +1092,7 @@ Promotes a specific model version (`version: int`) to `champion` or `challenger`
 3. **Combined Admission Invariants**:
    - Cryptographic Ed25519 `TrainingExecutionReceipt` verification (`architecture`, `feature_schema_version`, `input_dim`, `feature_names`, matching SHA-256 artifact digest on disk, non-revoked `key_id`).
    - Four-Eyes Principle: Two active, distinct institutional sign-offs (`ml_engineer` and `compliance_officer`), neither of which can be a development seeded account (`admin`, `analyst_a1`, etc.), bound to the canonical HMAC payload.
-   - Holdout Canary Gate evaluation (when `enforce_sr11_7: true` and `target_status: "champion"`): $\text{PR-AUC} \ge \text{min\_auc}$ and disparate impact ratio $\ge \text{min\_fairness\_score}$.
+   - Holdout Canary Gate evaluation (when `enforce_sr11_7: true` and `target_status: "champion"`): Model ROC-AUC (evaluated from `auc_roc` or fallback `auc`) $\ge \text{min\_auc}$ and disparate impact ratio $\ge \text{min\_fairness\_score}$. Note: The gate specifically validates ROC-AUC against `min_auc`, distinct from precision-recall AUC (PR-AUC) which is tracked as a separate evaluation metric.
 
 **Request Headers:**
 ```http
@@ -1101,6 +1101,11 @@ Content-Type: application/json
 ```
 
 **Request Payload (`ModelPromoteRequest`):**
+- `target_status` (`string`): Target model status (`"champion"` or `"challenger"`).
+- `enforce_sr11_7` (`boolean`): Enforces Federal Reserve SR 11-7 / OCC 2011-12 admission quality gates.
+- `min_auc` (`float`, default `0.65`, bounds `[0.5, 1.0]`): Minimum validation ROC-AUC threshold evaluated against `auc_roc` (or fallback `auc`). Note: Validates ROC-AUC; precision-recall AUC (PR-AUC) is tracked independently and not conflated.
+- `min_fairness_score` (`float`, default `0.80`): Minimum disparate impact ratio enforcing the EEOC four-fifths fairness rule.
+
 ```json
 {
   "target_status": "champion",
@@ -1203,6 +1208,7 @@ Records an authoritative officer sign-off on a specific integer model version. E
 - **Role Verification**: `role` must be `'compliance'` (matching roles `{"compliance", "compliance_officer", "admin"}`) or `'ml_engineer'` (matching roles `{"ml_engineer", "ml_lead"}`). Both token claims and live database roles are enforced.
 - **Institutional Governance**: Calling principal's institution must match simulation ownership.
 - **Cryptographic Binding**: The signature is cryptographically bound to `{simulation_id}:{version}:{sha256}:{role}:{user}`.
+- **Manifest Status Progression**: With only one recorded sign-off, manifest status remains `"inactive"` (`is_approved=false`). Upon successful completion of dual sign-offs (both `ml_engineer` and `compliance`), manifest status becomes `"approved"` (`is_approved=true`, `is_production_eligible=true`, `is_active=false`). Approval does not automatically activate `"champion"` status or route live traffic; operational champion promotion requires a subsequent authorized call to `POST /api/v1/models/{simulation_id}/versions/{version}/promote`.
 
 **Request Headers:**
 ```http
@@ -1222,7 +1228,7 @@ Content-Type: application/json
 }
 ```
 
-*Response (HTTP 200 OK — `ModelVersionItem`):*
+*Response (HTTP 200 OK — `ModelVersionItem` upon successful dual sign-off):*
 ```json
 {
   "version": 1,
@@ -1232,7 +1238,7 @@ Content-Type: application/json
     "pr_auc": 0.8415
   },
   "is_active": false,
-  "status": "inactive",
+  "status": "approved",
   "git_commit_hash": "be3270135b797777035d6a396f3753a594c9b15b",
   "dataset_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "dp_noise_profile": {
@@ -1241,6 +1247,18 @@ Content-Type: application/json
     "delta": 1e-5
   },
   "sign_offs": [
+    {
+      "role": "ml_engineer",
+      "user": "engineer_chen",
+      "signature": "a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8",
+      "timestamp": "2026-10-18T03:50:00Z",
+      "fairness_score": 0.94,
+      "bias_metric": 0.02,
+      "drift_divergence": 0.01,
+      "status": "active",
+      "is_active": true,
+      "is_revoked": false
+    },
     {
       "role": "compliance",
       "user": "officer_valerie",
@@ -1255,8 +1273,8 @@ Content-Type: application/json
     }
   ],
   "created_at": "2026-10-18T03:30:00Z",
-  "is_approved": false,
-  "is_production_eligible": false
+  "is_approved": true,
+  "is_production_eligible": true
 }
 ```
 

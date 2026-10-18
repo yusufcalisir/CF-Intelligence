@@ -733,7 +733,7 @@ The `ModelRegistry` ([`backend/app/application/services/model_registry.py`](../b
                │
                ▼ (Admission Granted: is_approved = True)
  [ Promotion / Activation Stage ]
-       ├── Inactive Approved State: status = "inactive", is_active = False
+       ├── Approved State: status = "approved", is_approved = True, is_active = False
        └── Explicit Champion Activation (POST .../promote or rollback):
              ├── Manifest State Transition: status = "champion", is_active = True
              ├── Atomic Symlink Pointer: NamedTemporaryFile + os.replace -> active_model.pt
@@ -747,13 +747,13 @@ Model checkpoints in the active `ModelRegistry` manifest transition through expl
 | Manifest Status | Governance Attributes | Operational Semantics | Serving Availability |
 |:---|:---|:---|:---|
 | `inactive` | `is_approved=False`, `is_active=False` | Newly registered version awaiting dual sign-offs and admission verification. | Offline only |
-| `inactive` *(Approved)* | `is_approved=True`, `is_active=False` | Cryptographically signed off by ML Lead and Compliance Officer; eligible for promotion. | Staging / Validation only |
+| `approved` | `is_approved=True`, `is_active=False` | Cryptographically signed off by ML Lead and Compliance Officer; eligible for promotion. | Staging / Validation only |
 | `challenger` | `is_approved=True`, `is_active=False` | Approved model version actively routing shadow inference traffic for canary comparison. | Shadow evaluation only |
 | `champion` | `is_approved=True`, `is_active=True` | Active production decision-maker certified for real-time transaction scoring. | Live primary serving |
 | `revoked` | `is_revoked=True`, `is_active=False` | Revoked due to drift alert, key revocation, security defect, or regulatory mandate. | Strictly prohibited (Fails closed) |
 
 > [!IMPORTANT]
-> **Approval vs. Champion Activation:** An approved model version (`is_approved=True`) does not automatically serve live traffic. It remains in `status="inactive", is_active=False` until an authenticated operator with clearance level $\ge 2$ explicitly triggers champion activation via `promote_version` or `rollback`. Exactly one active champion version is permitted per model family at any time.
+> **Approval vs. Champion Activation:** An approved model version (`is_approved=True`) does not automatically serve live traffic. Upon successful dual sign-off, its manifest status becomes `status="approved"` (`is_active=False`). It remains non-serving until an authenticated operator with clearance level $\ge 2$ explicitly triggers champion activation via `promote_version` or `rollback`. Approval does not automatically activate `champion`. Exactly one active champion version is permitted per model family at any time.
 
 ### 15.2 Combined Production Admission Invariants (`validate_production_admission`)
 
@@ -812,7 +812,7 @@ High-throughput streaming ingestion is managed by [`KafkaStreamingConnector`](..
 - **Authoritative 3-State Lifecycle**: State transitions progress from `ACQUIRED` $\to$ `IN_PROGRESS` $\to$ `COMMITTED`. In production, if Redis is unavailable during acquisition, `try_acquire` fails closed (returns `False`).
 - **Stale-Worker Protection**: When a worker stalls or network partitions exceed `ttl_seconds`, the reservation expires. If the stale worker subsequently attempts to invoke `mark_processed()`, an atomic Redis Lua script verifies ownership; because the reservation expired or was reassigned to a healthy worker, completion is rejected.
 - **Broker-ACK / Redis-Completion Uncertainty**:
-  If a message is successfully acknowledged by the Kafka broker but the subsequent Redis `mark_processed()` call fails or experiences a timeout, the operation returns `False`. The message was transmitted to Kafka but was not marked as committed in Redis. A subsequent retry will reprocess or redeliver the event, providing **at-least-once delivery semantics**. The system does not assert unverified distributed "exactly-once" delivery across independent distributed state stores.
+  If a message is successfully acknowledged by the Kafka broker but the subsequent Redis `mark_processed()` call fails or experiences a timeout, the connector produces a `PublishReceipt` with status `"COMMITTED_IDEMPOTENCY_UNCERTAIN"` and `idempotency_committed=False`. Because the event was already committed to the Kafka broker, the connector does not automatically retry (avoiding uncoordinated duplicate event publication). Upstream consumers and callers inspect the receipt status directly, truthfully reflecting distributed transport state without asserting unverified distributed "exactly-once" delivery across independent distributed state stores.
 
 ### 15.8 WebSocket Replay Semantics Duality
 

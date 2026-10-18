@@ -177,11 +177,15 @@ from app.application.services.consortium_service import ConsortiumGovernanceServ
 from app.domain.consortium_governance import MemberRole, ProposalAction, ProposalStatus
 from app.domain.consortium_policy import ConsortiumPolicyEngine, ConsortiumPolicyConfig
 
-# 1. Obtain authenticated Bearer token for authorized institutional operator
+# 1. Authenticate an authorized, previously provisioned institutional account and issue a token bundle
+# In production, automatic demo account seeding is disabled; accounts must be provisioned in advance.
 auth_svc = AuthenticationService.get_instance()
-# Authenticated user 'lead_ml_a' belonging to 'bank_a' holding governance role 'ml_lead'
-token_data = auth_svc.login("lead_ml_a", "SecurePassword123!")
-auth_token = token_data["access_token"]
+# Authenticate institutional user previously provisioned with 'bank_a' affiliation and 'ml_lead' role
+success, user, msg, _ = auth_svc.authenticate("lead_ml_a", "SecurePassword123!", client_ip="10.0.1.5")
+if not success or user is None:
+    raise RuntimeError(f"Authentication failed: {msg}")
+token_bundle = auth_svc.create_token_bundle(user)
+auth_token = token_bundle.access_token
 
 # 2. Initialize governance service
 service = ConsortiumGovernanceService()
