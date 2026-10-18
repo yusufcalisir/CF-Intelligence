@@ -97,17 +97,29 @@ The Collaborative Fraud Intelligence (CFI) platform supports 3 flexible deployme
 Services write states to `RedisStore`. In development environments, `RedisStore`, `CacheService`, `RedisBankClientListener`, and the core lifespan startup probes implement dual-layer credential auto-healing and container host re-routing (mapping Docker container hostname `redis` to `127.0.0.1` and reconciling development credential variations between `.env` and local scripts). If Redis is completely offline or unconfigured, `RedisStore` catches the exception and routes reads/writes to a thread-safe, in-memory Python dictionary backend. This ensures the demo interface and local test suites remain stable under transient failures.
 
 ### 3.3 Enterprise Model Registry & Governance (SR 11-7 Compliance)
-*   **Active Symlinking:** Active models (`global_model.pt`) are symlinked on disk. A rollback request updates the symlink to the targeted historical manifest version atomically using temporary file generation (`tempfile.NamedTemporaryFile`) and atomic replacement (`os.replace`) to prevent partial read corruption.
-*   **Lineage Audits:** Each saved model tracks Git commit hashes, dataset hashes, and differential privacy noise configuration to guarantee chain-of-custody.
-*   **Dual Sign-off Workflow:** Promotion to Champion or Challenger is gated behind cryptographic approval from both an ML Engineer and a Compliance Officer.
-*   **Shadow Routing:** Routes 100% of live traffic to the Challenger model silently, logging performance statistics. A randomized 10% slice of decision-making traffic is exposed to Challenger predictions.
-*   **Canary Quality Gate:**
-    $$\text{Candidate AUC-ROC} \ge \text{Active AUC-ROC} - 0.005$$
-    If a candidate fails this check, it remains registered but is rejected for promotion.
-*   **Automated Rollback Engine:** Tracks performance metrics on a sliding window. Automatically rolls back to the last stable version if the active model's:
-    - AUC-ROC drops below `0.65`
+*   **Production Admission Gating (`validate_production_admission`):** Before any candidate model can be promoted to active production serving, it must pass rigorous automated quality gates:
+    - **PR-AUC Degradation Boundary:** $\text{PR-AUC}_{\text{cand}} \ge \text{PR-AUC}_{\text{champ}} - 0.005$.
+    - **ROC-AUC Floor:** $\text{ROC-AUC}_{\text{cand}} \ge 0.65$.
+    - **False Positive Rate Ceiling:** $\text{FPR}_{\text{cand}} \le 5\%$ ($0.05$).
+    - **Inference Latency SLA:** $p95 \le 200\text{ms}$ under production benchmark load.
+    - **Fairness Disparity Guardrails:** Demographic Parity and Equal Opportunity disparity across demographic/regional slices bounded by $\le 0.10$.
+    - **Finite Tensor Weight Verification:** All parameter tensors strictly validated via `torch.isfinite()` to eliminate NaN/Inf contamination.
+    - **Holdout Canary Gate:** Evaluated against an isolated, non-training verification holdout set. Candidates failing any admission condition remain registered in historical audit archives but are blocked from deployment.
+*   **Four-Eyes Dual Sign-off Workflow:** Promotion to Champion or Challenger is gated behind cryptographic approval from distinct institutional roles: an ML Engineer (`ROLE_ML_ENGINEER`) and a Compliance Officer (`ROLE_COMPLIANCE_OFFICER`). Dual signatures are recorded immutably with role verification and timestamps.
+*   **Production Serving Isolation & Safe Deserialization:**
+    - Runtime isolation between Champion (active production decision-maker) and Challenger (shadow routing) execution paths.
+    - Safe model weight loading strictly enforcing `torch.load(..., weights_only=True)` to prevent arbitrary code execution vulnerabilities.
+    - Atomic on-disk symlink updates (`global_model.pt`) leveraging temporary file creation (`tempfile.NamedTemporaryFile`) and atomic replacement (`os.replace`) to eliminate partial read or torn read hazards under high-concurrency inference streams.
+*   **Instant Cross-Worker Cache Invalidation:**
+    - Redis Sentinel Pub/Sub broadcasts eviction messages (`MODEL_PROMOTED`, `MODEL_ROLLBACK`, `MODEL_REVOKED`) across all distributed API worker instances.
+    - On receiving an invalidation event, workers purge warm in-memory model caches and reload the new champion model within sub-100ms, completely closing stale serving windows.
+*   **Fail-Closed Serving Invariants (SR 11-7 & `AGENTS.md`):** Real-time scoring routes (`POST /v1/inference/score`) strictly enforce fail-closed behavior. If no valid champion model is available, if a model has been revoked, or if scoring fails, the endpoint returns `HTTP 503 Service Unavailable` with `ModelNotAvailableError`. The system strictly prohibits synthetic, random, or heuristic score fallbacks.
+*   **Shadow Routing & Performance Monitoring:** Routes 100% of live traffic to the Challenger model silently, logging comparative performance statistics. A randomized 10% slice of decision-making traffic can be routed to Challenger predictions for production A/B testing.
+*   **Lineage & Reproducibility Audits:** Each saved model tracks Git commit SHA, dataset SHA-256 hashes, differential privacy noise configuration ($\epsilon, \delta, \sigma$), and training receipt signatures to guarantee an unbroken chain-of-custody.
+*   **Automated Rollback Engine:** Tracks live performance metrics on a sliding window. Automatically triggers rollback to the last known stable champion version if active model telemetry breaches:
+    - ROC-AUC drops below `0.65`
     - Scoring latency exceeds `200ms`
-    - False Positive Rate (FPR) exceeds `5%` (0.05)
+    - False Positive Rate (FPR) exceeds `5%` ($0.05$)
 
 ### 3.4 Physical Multi-Tenancy & Cryptographic Key Isolation (SOC2 / PCI-DSS)
 To guarantee data sovereignty and strict database-level boundaries required by banking regulations (SOC2, PCI-DSS):
@@ -156,7 +168,31 @@ For high-frequency sliding-window behavioral aggregations across continuous paym
     - `rolling_amount_zscore_24h`: Z-score of transaction amount relative to account's 24-hour rolling mean and standard deviation ($Z = (x - \mu) / \sigma$).
     - `previous_alerts_30d`: Count of prior AML SARs (Suspicious Activity Reports) triggered in the last 30 days.
 
-### 3.9 OpenTelemetry Distributed Tracing & Span Lifecycle Architecture
+### 3.9 Production Training Provenance & Execution Authority
+
+To guarantee mathematical reproducibility, eliminate phantom execution claims, and provide cryptographically verifiable training provenance:
+
+*   **Transactional Job Authority Backends (`training_authority_backends.py`):**
+    - **`PostgresTrainingJobAuthority` (Production ACID Authority):** Coordinates federated training jobs and round assignments using transactional row-level locks (`SELECT ... FOR UPDATE`). Eliminates check-then-act race conditions, duplicate job execution attempts, and phantom round submissions under high-concurrency multi-bank scheduling.
+    - **`InMemoryTrainingJobAuthority` (Development/Testing):** Thread-safe, lock-synchronized execution authority backend used for deterministic unit testing and local developer workflows without database dependencies.
+*   **Asymmetric Ed25519 Execution Receipts (`IsolatedReceiptSigningAuthority`):**
+    - Client banks generate cryptographically verifiable execution receipts signed via isolated Ed25519 asymmetric key pairs (`training_provenance_service.py`).
+    - Receipts bind immutable tuples: `(job_id, round_number, epoch_index, bank_id, parameter_hash, timestamp, signature)`.
+    - Central coordinator validates every receipt against an authoritative public key registry; receipts signed with unknown, forged, or revoked keys are rejected immediately.
+*   **Sequential Epoch Reconciliation (`reconcile_job_completion_evidence`):**
+    - Enforces strict canonical epoch sequence verification across submitted receipts before round aggregation.
+    - Requires contiguously ordered epochs $[1..E]$ without skips, gaps, duplicates, or out-of-order execution claims.
+    - Prevents planned-only or partial execution claims from being credited as complete training runs.
+*   **Parameter Update Digest Anti-Replay Verification:**
+    - Coordinator cryptographically computes and validates the SHA-256 digest of submitted parameter updates against execution receipt hashes before aggregating weights.
+    - Detects and rejects replay attacks where an adversarial or lagging participant attempts to reuse previous rounds' updates or cross-round cached parameters.
+*   **OS-Level Multi-Process Vault File Locking (`BankPrivateStorageVault`):**
+    - Prevents concurrent process race conditions and write corruption on local bank model vaults, checkpoints, and credentials.
+    - Employs Windows `CreateFileW` with `FILE_SHARE_READ` and `LOCKFILE_EXCLUSIVE_LOCK` via Win32 API.
+    - Employs POSIX `fcntl.flock(LOCK_EX | LOCK_NB)` on Linux/macOS systems.
+    - Ensures atomic, single-writer multi-reader integrity across distributed container daemons and background Celery workers.
+
+### 3.10 OpenTelemetry Distributed Tracing & Span Lifecycle Architecture
 
 OpenTelemetry (OTel) distributed tracing (`backend/app/infrastructure/telemetry/otel_tracer.py`) instruments end-to-end request flows across distributed bank nodes and central coordinator microservices:
 
@@ -180,7 +216,7 @@ sequenceDiagram
 
 * **W3C Trace Context Propagation**: Propagates `traceparent` (`00-{trace_id}-{span_id}-01`) and `tracestate` headers across HTTP, gRPC, and AMQP channels.
 * **OpenTelemetry Exporters**: Exports traces via OTLP/gRPC to Jaeger/Tempo (`:4317`) and Prometheus gauges (`/metrics`).
-### 3.10 Multi-Layer Perimeter & Gateway Defense-in-Depth Architecture
+### 3.11 Multi-Layer Perimeter & Gateway Defense-in-Depth Architecture
 
 The platform enforces a 3-layer perimeter defense architecture to withstand volumetric attacks, malicious scraping, and distributed denial-of-service attempts without overloading core ML scoring engines:
 
@@ -206,7 +242,7 @@ flowchart LR
 
 ---
 
-### 3.11 Broken Object Level Authorization (BOLA/IDOR) & Multi-Tenant Isolation
+### 3.12 Broken Object Level Authorization (BOLA/IDOR) & Multi-Tenant Isolation
 
 To prevent Broken Access Control (OWASP API1:2023), the platform implements cryptographic tenant isolation across all presentation routers:
 
@@ -219,6 +255,7 @@ To prevent Broken Access Control (OWASP API1:2023), the platform implements cryp
    - Routers invoke `enforce_tenant_isolation(caller_tenant, target_bank_id)` across alert, entity, and case endpoints.
 3. **Role-Based Cross-Institution Bypass**:
    - Authorized consortium roles (`super_admin`, `cross_bank_investigator`, `compliance_auditor`) are granted audited access across institutional boundaries.
+
 
 ---
 

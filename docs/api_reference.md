@@ -25,7 +25,7 @@ All CF-Intelligence API endpoints follow strict Clean Architecture, OpenAPI 3.1.
 
 ---
 
-## 📑 API Endpoint Directory (20 Endpoints)
+## 📑 API Endpoint Directory (24 Endpoints)
 
 | # | Endpoint | Method | Category | Description |
 | :--- | :--- | :---: | :--- | :--- |
@@ -49,6 +49,10 @@ All CF-Intelligence API endpoints follow strict Clean Architecture, OpenAPI 3.1.
 | **18.18** | /api/v1/scenarios/european-aml/evaluate | POST | European AML Rules | Hybrid deterministic FATF rule evaluation & scenario library |
 | **18.19** | /api/v1/operations/asset-recovery/hold | POST | Asset Recovery | Collaborative FININT operational hub & multi-bank asset freeze |
 | **18.20** | /api/v1/coordinator/* | GET/POST | FL Coordinator | Bank node registration, telemetry, and hyperparameter negotiation |
+| **18.21** | /api/v1/models/{simulation_id}/versions/{version}/promote | POST | Model Registry | Production model admission validation (Ed25519 receipt / Four-Eyes sign-off) |
+| **18.22** | /api/v1/models/{simulation_id}/active | GET | Model Registry | Active champion model metadata, version hash, and serving status |
+| **18.23** | /api/v1/models/{simulation_id}/versions/{version}/signoff | POST | Model Governance | SR 11-7 Four-Eyes dual control supervisor cryptographic sign-off |
+| **18.24** | /v1/inference/score | POST | Real-Time Inference | High-throughput low-latency inference endpoint (fails closed HTTP 503 if unverified) |
 
 ---
 
@@ -1080,3 +1084,153 @@ Provides real-time bank edge-node registration, institutional hardware capabilit
 
 ---
 
+### 18.21 Model Registry Production Admission Verification (`POST /api/v1/models/{simulation_id}/versions/{version}/promote`)
+
+Submits a candidate model checkpoint for formal production admission gating. Enforces HMAC-SHA256 integrity, canonical schema match, holdout Canary Gate evaluation, and either a cryptographically verified Ed25519 `TrainingExecutionReceipt` or formal Four-Eyes dual control sign-off:
+
+**Promotion Request:**
+```json
+{
+  "simulation_id": "sim_crossbank_prod_01",
+  "version": "v3.2.0",
+  "evaluation_dataset": "holdout_validation_set_2026_q3",
+  "canary_pr_auc_threshold": 0.85,
+  "provenance_receipt": {
+    "job_id": "job_fl_round_25",
+    "authority_id": "auth_postgres_production_01",
+    "domain_token": "cfi-training-provenance-v1",
+    "signature_algorithm": "Ed25519",
+    "public_key_id": "key_ed25519_authority_2026",
+    "signature": "3b68f3a9e142c...d5a892b1",
+    "canonical_epochs": 25,
+    "feature_schema_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
+```
+
+*Response (HTTP 200 OK):*
+```json
+{
+  "simulation_id": "sim_crossbank_prod_01",
+  "version": "v3.2.0",
+  "status": "PRODUCTION",
+  "champion": true,
+  "promoted_at": 1758922800.0,
+  "weights_sha256": "4a72d3f9b8c12e87a552b419c8f003b123992147ea4182410a568282362489c7",
+  "canary_gate": {
+    "status": "PASSED",
+    "candidate_pr_auc": 0.8842,
+    "champion_pr_auc": 0.8810,
+    "delta_pr_auc": 0.0032
+  },
+  "provenance_verification": {
+    "status": "VERIFIED",
+    "verifier": "TrainingReceiptVerifier",
+    "signing_authority": "auth_postgres_production_01"
+  },
+  "cache_invalidation_broadcast": true
+}
+```
+
+---
+
+### 18.22 Active Champion Model Query (`GET /api/v1/models/{simulation_id}/active`)
+
+Retrieves the active certified production champion model metadata, version hash, and serving status:
+
+*Response (HTTP 200 OK):*
+```json
+{
+  "simulation_id": "sim_crossbank_prod_01",
+  "active_version": "v3.2.0",
+  "status": "PRODUCTION",
+  "model_family": "fraud_detection_mlp",
+  "weights_sha256": "4a72d3f9b8c12e87a552b419c8f003b123992147ea4182410a568282362489c7",
+  "feature_schema_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "serving_path": "active_model.pt",
+  "pr_auc": 0.8842,
+  "recall_at_001_fpr": 0.582,
+  "verified_at": 1758922800.0
+}
+```
+
+---
+
+### 18.23 Four-Eyes Dual Control Sign-Off (`POST /api/v1/models/{simulation_id}/versions/{version}/signoff`)
+
+Submits an authoritative supervisory cryptographic sign-off satisfying **Federal Reserve SR 11-7** and **OCC Bulletin 2011-12** model risk management governance:
+
+**Sign-Off Request:**
+```json
+{
+  "role": "compliance_officer",
+  "supervisor_id": "usr_compliance_lead_04",
+  "approval_rationale": "Validated holdout PR-AUC retention and demographic fairness parity across all participating bank partitions.",
+  "signature_token": "SIG_SUPERVISOR_4a72d3f9b8c12e87a552b419"
+}
+```
+
+*Response (HTTP 200 OK):*
+```json
+{
+  "simulation_id": "sim_crossbank_prod_01",
+  "version": "v3.2.0",
+  "signoff_status": "APPROVED",
+  "approvals": [
+    {
+      "role": "ml_lead",
+      "supervisor_id": "usr_ml_lead_01",
+      "signed_at": 1758922100.0
+    },
+    {
+      "role": "compliance_officer",
+      "supervisor_id": "usr_compliance_lead_04",
+      "signed_at": 1758922750.0
+    }
+  ],
+  "governance_compliant": true
+}
+```
+
+---
+
+### 18.24 High-Throughput Real-Time Inference & Fail-Closed Serving (`POST /v1/inference/score`)
+
+High-throughput, low-latency transaction inference endpoint with multi-tenant quota accounting and fail-closed security invariants:
+
+**Inference Request:**
+```json
+{
+  "transaction_id": "tx_2026_9948201",
+  "amount": 1450.00,
+  "velocity_1h": 3,
+  "merchant_category": "electronics",
+  "country_code": "DE",
+  "hour_of_day": 14
+}
+```
+
+*Response (HTTP 200 OK):*
+```json
+{
+  "transaction_id": "tx_2026_9948201",
+  "risk_score": 0.082,
+  "decision": "ALLOW",
+  "evaluated_by": "CHAMPION_MODEL_v3.2.0",
+  "latency_ms": 2.45,
+  "explanation": "Normal velocity (3 tx/h) and domestic retail profile within baseline variance."
+}
+```
+
+**Fail-Closed Error Response (HTTP 503 Service Unavailable):**
+When the active model is unavailable, unverified, or revoked, or when the inference circuit breaker trips, the system strictly returns HTTP 503 in accordance with the repository's `AGENTS.md` runtime truth invariant (zero fake scores or silent low-risk placeholders):
+```json
+{
+  "detail": {
+    "code": "MODEL_NOT_AVAILABLE",
+    "message": "Production champion model is unverified, revoked, or unavailable; inference fails closed."
+  }
+}
+```
+
+---

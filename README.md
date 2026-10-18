@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-%E2%89%A50.115-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-%E2%89%A52.4-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Tests Collected](https://img.shields.io/badge/tests-5195_collected-blue.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Tests Collected](https://img.shields.io/badge/tests-6187_collected-blue.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -78,16 +78,18 @@ The system combines Federated Learning, Differential Privacy, Secure Aggregation
 To prevent ambiguity between production-grade components, algorithmic research explorations, and test simulations, the repository enforces a strict three-tier classification:
 
 - **Tier 1 — Production-Oriented Core:**
-  - Real-time fraud scoring and inference gateway (`predict.py`, 2.57 ms in-process fast-path compute, scaling with concurrency to 105.02 ms p99 at C=100).
+  - Real-time fraud scoring and inference gateway (`predict.py`, 2.57 ms in-process fast-path compute, scaling with concurrency to 105.02 ms p99 at C=100; fails closed with HTTP 503 `ModelNotAvailableError` if model unverified/missing).
   - 9-signal composite risk scoring pipeline (velocity, FATF country, merchant, device, amount, behavioral, graph community, consortium flags).
   - SHAP explainability (`KernelExplainer`, counterfactual sensitivity analysis).
   - Federated optimization engines (`FedAvg`, `FedProx`, `SCAFFOLD`) handling Dirichlet Non-IID skew ($\alpha \le 0.50$).
+  - Training Provenance & Execution Authority (`training_provenance_service.py`, `training_authority_backends.py`, `distributed_fl_service.py`): Decoupled `IsolatedReceiptSigningAuthority` issuing asymmetric Ed25519 digital receipts, `PostgresTrainingJobAuthority` enforcing ACID row locks (`SELECT ... FOR UPDATE`), canonical sequential epoch reconciliation, parameter update digest anti-replay verification, and bank node vault isolation via OS-level locks (`CreateFileW` with `dwShareMode=0` / `flock`).
+  - Enterprise Model Registry & Four-Eyes Governance (`model_registry.py`, `model_governance.py`): Mandatory admission verification (`validate_production_admission`), SR 11-7 Four-Eyes dual control approvals (`DOMAIN_APPROVAL_SIGNOFF`), Canary Gates, instant cross-worker cache invalidation via Redis Sentinel pub/sub, atomic disk writes (`tempfile` + `os.replace`), and secure deserialization (`weights_only=True`).
   - Differential Privacy via PyTorch Opacus with Rényi DP moments accounting (target $\epsilon \le 1.0, \delta = 10^{-5}$; measured $\epsilon = 0.3497$ at $\sigma=3.0$).
   - Secure Aggregation via Curve25519 pairwise Diffie-Hellman zero-sum masking and Shamir dropout recovery.
   - Byzantine consensus aggregators (`Krum`, `Coordinate-wise Trimmed Mean`, `Bulyan`) and Spectral SVD backdoor detection.
   - Relational graph intelligence via PyTorch `GraphSAGE` 2-hop neighborhood embeddings and MinHash LSH Fuzzy PSI.
   - Security perimeter: BOLA/IDOR tenant isolation, SSRF defense (RFC 1918 / loopback / cloud metadata blocking), slowapi rate limiting.
-  - Enterprise persistence & messaging: PostgreSQL multi-tenant schema isolation, Redis Sentinel integration, Kafka streaming connectors.
+  - Enterprise persistence & messaging: PostgreSQL multi-tenant schema isolation, Redis Sentinel HA integration, Kafka streaming connectors.
 
 - **Tier 2 — Research & Experimental Prototypes:**
   - *Fully Homomorphic Encryption (FHE):* Microsoft SEAL / TenSEAL CKKS homomorphic context generation and ciphertext addition/averaging (`fhe_driver.py`).
@@ -110,6 +112,8 @@ To prevent ambiguity between production-grade components, algorithmic research e
 |:---|:---|:---|:---|
 | **Real-Time Fraud Scoring** | Tier 1 (Production Core) | **Implemented** | `app/application/services/risk_engine.py`, `app/presentation/routers/predict.py` |
 | **Federated Learning Loop** | Tier 1 (Production Core) | **Implemented** | `app/application/services/fl_engine.py`, `backend/tests/unit/test_fl_engine.py` |
+| **Training Provenance Authority** | Tier 1 (Production Core) | **Implemented** | Ed25519 receipts in `training_provenance_service.py`, Postgres ACID locks in `training_authority_backends.py` |
+| **Model Registry & Admission Gating** | Tier 1 (Production Core) | **Implemented** | Four-Eyes dual control & Redis cache purge in `model_registry.py`, `model_governance.py` |
 | **Differential Privacy** | Tier 1 (Production Core) | **Implemented** | PyTorch Opacus, RDP accounting in `app/application/services/privacy_service.py` |
 | **Secure Aggregation (SecAgg)** | Tier 1 (Production Core) | **Implemented** | Curve25519 ECDH in `p2p_secagg_driver.py`, Shamir secret sharing in `shamir_engine.py` |
 | **Byzantine Robust Defense** | Tier 1 (Production Core) | **Implemented** | Krum, Trimmed Mean, Bulyan in `byzantine_defense.py`, Spectral SVD in `spectral_defense.py` |
@@ -448,7 +452,9 @@ CF-Intelligence/
 │   │   │       ├── tenant_metering.py               # Multi-tenant API metering, quotas & rate controls
 │   │   │       ├── webhook_service.py               # HMAC-SHA256 signed asynchronous webhook dispatcher
 │   │   │       ├── zero_downtime_deployer.py        # Rolling zero-downtime model deployment coordinator
-│   │   │       ├── model_registry.py                # Model versioning, lineage tracking & canary promoter
+│   │   │       ├── model_registry.py                # Enterprise model registry, Four-Eyes dual control & instant Redis cache purge
+│   │   │       ├── training_provenance_service.py   # Cryptographic training provenance, asymmetric Ed25519 receipts & verifier
+│   │   │       ├── distributed_fl_service.py        # Multi-process isolated federated training manager & OS-locked vaults
 │   │   │       ├── model_service.py                 # Local client training (FedProx proximal loss, SCAFFOLD drift correction, Opacus DP)
 │   │   │       ├── adversarial_service.py           # Adversarial attack simulation (sign-flip, label-flip, backdoor)
 │   │   │       ├── consortium_service.py            # Multi-bank consortium voting & policy management
@@ -465,6 +471,7 @@ CF-Intelligence/
 │   │   │
 │   │   ├── infrastructure/                          # Infrastructure & External Technology Adapters
 │   │   │   ├── security/                            # Enterprise Security Suite & Cryptographic Drivers
+│   │   │   │   ├── training_authority_backends.py   # Authoritative ACID training job backends (PostgresTrainingJobAuthority with SELECT ... FOR UPDATE)
 │   │   │   │   ├── auth_service.py                  # Enterprise auth, short-lived JWTs (15m), refresh rotation, brute-force lockout
 │   │   │   │   ├── password_hasher.py               # Bcrypt password hashing (cost=12) with salted digests
 │   │   │   │   ├── error_handler.py                 # Production error sanitization, zero stack trace leakage & Sentry hook
@@ -617,7 +624,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (4,370 Collected Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (5,371 Collected Tests [5,001 Passed])
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -703,7 +710,7 @@ CF-Intelligence/
 │   │   ├── hooks/                                   # Custom React Hooks
 │   │   ├── utils/                                   # Cryptographic helpers, number formatters & mutant killers
 │   │   │   └── piiSanitizer.ts                      # Luhn algorithm, IBAN/TCKN regex & Type-Salted HMAC Zero-PII sanitizer
-│   └── tests/                                       # Vitest & React Testing Library Suite (373 Collected Tests across 87 Files)
+│   └── tests/                                       # Vitest & React Testing Library Suite (375 Collected Tests across 87 Files)
 │
 ├── sdk/                                             # Official Consortium Client SDK
 │   ├── README.md                                    # Top-level SDK overview & quick-start guide
@@ -917,6 +924,14 @@ $$
    - `GET /api/v1/coordinator/async-status`: Retrieve runtime staleness metrics and engine parameters.
    - `GET /api/v1/coordinator/quorum-status`: Inspect dynamic round quorum progress and countdown.
    - `POST /api/v1/coordinator/rounds/prune`: Free historical in-memory round data to maintain constant memory footprint.
+
+### 5.4 Production Training Provenance & Execution Authority (`training_provenance_service.py`, `training_authority_backends.py`, `distributed_fl_service.py`)
+To prevent training history fabrication and unverified model promotion, production federated training is governed by decoupled execution and provenance authorities:
+- **Asymmetric Ed25519 Receipts:** The decoupled `IsolatedReceiptSigningAuthority` signs `TrainingExecutionReceipt` envelopes with its private Ed25519 key. Verifiers (such as the Model Registry) evaluate receipts using public keys exclusively.
+- **Postgres ACID Row Locks:** `PostgresTrainingJobAuthority` enforces atomic state transitions (`REGISTERED` $\to$ `ROUNDS_IN_PROGRESS` $\to$ `RECONCILING` $\to$ `COMPLETED`) via PostgreSQL `SELECT ... FOR UPDATE` row locks (strictly required in `app_env="production"`).
+- **Canonical Sequential Epoch Reconciliation:** `reconcile_job_completion_evidence()` computes sequential epochs $\text{canonical\_epochs} = \sum_{r=1}^R \max_{b \in B_r} (\text{epochs}_{b, r})$, rejecting planned-only or sum-of-workers spoofing.
+- **Update Digest Anti-Replay:** Participating bank nodes submit parameter update digests $\text{SHA-256}(\mathbf{w}_{\text{new}} - \mathbf{w}_{\text{old}})$; cross-round and duplicate replays are rejected.
+- **OS-Level Vault Locking:** Bank node private data vaults (`BankPrivateStorageVault`) are secured by OS-level exclusive locks (`CreateFileW` with `dwShareMode=0` on Windows, `flock` on POSIX); the coordinator process holds zero raw data or bank private keys.
 
 ---
 
@@ -1268,8 +1283,10 @@ The persistence tier utilizes SQLAlchemy 2.0 Async ORM backed by a linear, three
 - **Automatic Schema Adoption & Stamping:** Programmatic startup migration manager (`migration_manager.py`) inspects target databases; if domain tables exist without version records (e.g. from developer ORM bootstrapping), it automatically stamps `head` via `_ensure_migrated_or_stamped()`, preventing collision crashes during container boot.
 - **Offline Migration Mode:** Generates standalone SQL DDL statements (`--sql`) for strict air-gapped change-control environments.
 
-### 12.2 Concurrency Safety & Race Condition Defenses
-- **Thread-Safe Champion Promotion:** `ModelRegistry` and `ModelRegistryVault` enforce reentrant mutual exclusion locks (`threading.RLock()`) and atomic disk file swaps (`tempfile` + `os.replace`) to guarantee zero dual-champion states under concurrent load.
+### 12.2 Concurrency Safety, Model Registry Admission & Instant Cache Invalidation
+- **Enterprise Model Registry Admission & Four-Eyes Governance:** `ModelRegistry` and `ModelRegistryVault` enforce formal admission verification (`validate_production_admission`), requiring HMAC-SHA256 integrity, canonical schema match, holdout Canary Gate evaluation, and either verified Ed25519 training receipts or Four-Eyes dual control sign-off (`DOMAIN_APPROVAL_SIGNOFF`).
+- **Atomic File Swaps & Instant Cross-Worker Invalidation:** Checkpoint persistence enforces atomic tempfile replacements (`tempfile` + `os.replace`) and atomic symlinks (`active_model.pt`). Key or model revocation triggers an instant Redis Sentinel pub/sub broadcast, immediately evicting warm in-memory model instances across all workers to eliminate warm-cache bypass.
+- **Fail-Closed Serving Invariants:** Real-time inference endpoints (`/api/v1/predict`, `/v1/inference/score`) return HTTP 503 (`ModelNotAvailableError`) if the champion model is missing, unverified, or revoked. Untrained, random, or heuristic fallbacks are strictly prohibited.
 - **Atomic Tenant Metering:** `TenantMeteringService` utilizes an atomic `acquire_quota(tenant_id, tier, units)` routine to eliminate check-then-act race conditions during high-volume inference bursts.
 - **Three-State Idempotency Key Pipeline:** `IdempotencyService` manages request states (`"ACQUIRED"`, `"IN_PROGRESS"`, `"HIT"`) with a bounded 24-hour TTL (86,400s) preventing duplicate concurrent execution of financial workflows and replay attacks.
 - **Tamper-Evident Audit Chain:** `ImmutableAuditChain` guarantees thread-safe, append-only block addition with HMAC-SHA256 integrity verification.
@@ -1359,8 +1376,9 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 │ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
 │ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ Validated by 4,791 Python tests,     │ Evaluated across 8 canonical datasets│
-│ 373 Vitest components, 31 Hardhat.   │ via benchmarks/runners/ & harness.   │
+│ Validated by 5,001 passing backend   │ Evaluated across 8 canonical datasets│
+│ tests (5,371 collected), 410 verif., │ via benchmarks/runners/ & harness.   │
+│ 375 Vitest components, 31 Hardhat.   │ (6,187 total tests collected)        │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
 │ NOT prove fraud detection capability.│ if the gateway crashes or leaks PII. │
@@ -1406,7 +1424,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-SECAGG-CURVE25519`** | SecAgg Curve25519 Masking Throughput | `> 250k param/s` | `~513,000 param/s` | [`p2p_secagg_driver.py`](backend/app/infrastructure/security/p2p_secagg_driver.py) | `pytest backend/tests/unit/test_shamir_p2p_secagg.py -v` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-SECAGG-NUMPY`** | SecAgg NumPy Vectorized Masking | `> 1.0M param/s` | `~5,630,000 param/s` | [`fl_engine.py`](backend/app/application/services/fl_engine.py) | `python benchmarks/runners/secagg_benchmark_scalability.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-DR-FAILOVER-RTO`** | Disaster Recovery Failover (RTO) | `< 30.0 s` | `15.01 s` (RPO = 0 records) | [`chaos_dr_drill.py`](backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py) | `python backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
-| **`CLM-TEST-SUITE-PASS-RATE`** | Unit & Integration Test Inventory | `5,195 Tests` | `5,195 Collected Tests` (4,791 Python [4,370 Backend + 410 Verification + 11 SDK], 373 Vitest, 31 Smart Contracts) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `pytest & npm test discovery` | `EMPIRICAL_PARITY_VERIFIED` |
+| **`CLM-TEST-SUITE-PASS-RATE`** | Unit & Integration Test Inventory | `6,187 Tests` | `6,187 Collected Tests` (5,001 Passing Backend [5,371 Collected] + 410 Verification + 11 SDK, 375 Vitest, 31 Smart Contracts) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `pytest & npm test discovery` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-AMLSIM-GRAPHSAGE-PRAUC`** | IBM AMLSim Multi-Hop GraphSAGE PR-AUC | `—` (Agent Simulation) | `0.6527` (Inductive GraphSAGE 2-Layer) | [`results.json`](experiments/amlsim/results.json) | `python experiments/amlsim/evaluate_patterns.py` | `VERIFIED_MEASURED` |
 | **`CLM-SYNTHAML-ALERTMLP-PRAUC`** | Danish Spar Nord Bank SynthAML AlertMLP PR-AUC | `—` (Project Synthetic) | `0.9924` (FedAvg) / `0.9341` (Centralized) | [`fraud_benchmark_synthaml.json`](benchmarks/results/raw/fraud_benchmark_synthaml.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset synthaml` | `VERIFIED_MEASURED` |
 | **`CLM-AMLNET-FEDAVG-PRAUC`** | AUSTRAC AMLNet Structuring Detection PR-AUC | `—` (Project Synthetic) | `1.0000` (Synthetic Structuring Separability) | [`results.json`](experiments/amlnet/results.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset amlnet` | `VERIFIED_MEASURED` |
@@ -1434,7 +1452,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | $\mathbf{\epsilon = 0.3497}$ at $\sigma=3.0, \delta=10^{-5}$ (Opacus PRVAccountant; Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Opacus DP-SGD benchmark; PRV accounting via `run_dp_tradeoff.py`)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Unit & Integration Test Inventory** | **5,195 Collected Tests** | **5,195 Collected Tests** (4,370 Backend Pytest + 410 Scientific Verification + 11 Python SDK + 373 Frontend Vitest + 31 Smart Contracts) | `Static Runner Discovery` | `45 defined Playwright E2E tests across 18 files (405 browser viewport runs)` |
+| **Unit & Integration Test Inventory** | **6,187 Collected Tests** | **6,187 Collected Tests** (5,001 Passing Backend [5,371 Collected] + 410 Scientific Verification + 11 Python SDK + 375 Frontend Vitest + 31 Smart Contracts) | `Static Runner Discovery` | `45 defined Playwright E2E tests across 18 files (405 browser viewport runs)` |
 
 ---
 
@@ -1801,7 +1819,7 @@ python scripts/verify_reproducibility.py --all
   3. *Benchmark Matrices & Invariants (6/6)*: Master matrix schema, Strict Null Representation Invariant, evaluated zero distinction, cross-dataset numerical parity, 16-configuration factorial ablation matrix, 5-seed statistical robustness matrix (Student-t 95% CIs).
   4. *Claim Registry & Governance (6/6)*: 19 empirical claims reconciled with raw JSON execution outputs, 4-rule Anti-Metric Shopping Protocol, zero marketing superlatives, unified continuous metric definitions ([`docs/METRICS.md`](docs/METRICS.md)), demographic data minimization ($0/10$ protected attributes).
   5. *Cryptographic & Security Invariants (5/5)*: Strict zero-leakage federated partition contract, Rényi DP moments accounting ([`rdp_accountant.py`](backend/app/infrastructure/security/rdp_accountant.py)), pairwise zero-sum SecAgg ($\|\sum m_i\|_{\infty} < 10^{-4}$), Byzantine tolerance breakdown limits ($f < n/2$), multi-tenant BOLA/IDOR isolation with HMAC-SHA256 pseudonymization.
-  6. *Code Quality, CI/CD & Automated Test Suites (5/5)*: Deterministic CI smoke gates ($< 20\text{s}$), 4,370 Backend Pytest tests, 373 Frontend Vitest tests, 410 Scientific Verification tests, 11 Python SDK tests, 31 Smart Contract tests (5,195 total collected tests) and clean static analysis (0 Ruff errors).
+  6. *Code Quality, CI/CD & Automated Test Suites (5/5)*: Deterministic CI smoke gates ($< 20\text{s}$), 5,001 Passing Backend Pytest tests (5,371 collected), 375 Frontend Vitest tests, 410 Scientific Verification tests, 11 Python SDK tests, 31 Smart Contract tests (6,187 total collected tests) and clean static analysis (0 Ruff errors).
 - **Authoritative Attestation Document:** Full attestation sign-off codified in Section 8 of [`docs/engineering-audit.md`](docs/engineering-audit.md).
 
 ---
@@ -1834,7 +1852,7 @@ The technical architecture of CF-Intelligence explores how system design pattern
 
 ## 17. Software Correctness & Subsystem Self-Verification Reports (`verification/`)
 
-Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **4,370 collected Pytest backend tests**, **373 Vitest frontend tests**, **11 Python SDK tests**, **31 Hardhat EVM smart contracts**, and **410 mathematical self-verification tests** across 21 verification modules (totaling **5,195 collected tests** across independent runner discovery). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
+Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **5,001 passing Pytest backend tests (5,371 collected)**, **375 Vitest frontend tests**, **11 Python SDK tests**, **31 Hardhat EVM smart contracts**, and **410 mathematical self-verification tests** across 21 verification modules (totaling **6,187 collected tests** across all suites). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
 
 The reports below document the internal scientific verification suites validating mathematical invariants, differential privacy bounds, cryptographic drivers, and algorithmic implementations:
 
@@ -2174,16 +2192,16 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (4,780 Core Python [4,791 with SDK] / 5,195 Total Collected Tests)
+### Step 5: Master Test Suites Execution (5,001 Passing Backend [5,371 Collected] / 6,187 Total Collected Tests)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (4,370 collected tests)
+# 1. Run full backend pytest suite (5,371 collected tests, 5,001 passing)
 pytest backend/tests/ -v
 
 # 2. Run Interactive POC Sandbox Replay CLI evaluation
 python benchmark.py --poc-replay
 
-# 3. Run full frontend vitest suite (373 tests across 87 test files)
+# 3. Run full frontend vitest suite (375 tests across 87 test files)
 npm --prefix frontend test
 
 # 4. Run Playwright real-browser multi-device E2E suite (10 browser tests)

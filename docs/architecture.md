@@ -65,13 +65,16 @@ Contains business logic orchestration. Defines ports (interfaces) for data acces
 * [`services/open_aml_service.py`](../backend/app/application/services/open_aml_service.py): Drop-in European AML OpenAPI compatibility adapter and HMAC-SHA256 signed webhook gateway.
 * [`services/ubo_graph_service.py`](../backend/app/application/services/ubo_graph_service.py): Cross-Border Corporate UBO & Heterogeneous Graph Modeling service resolving multi-tier beneficial ownership, detecting circular ownership loops, nominee director syndicates, and offshore shell clusters.
 * [`services/european_scenario_library.py`](../backend/app/application/services/european_scenario_library.py): 16 European AML Monitoring Scenarios & Hybrid Deterministic Rule Engine blending EBA/FATF typologies with federated machine learning and GNN anomaly embeddings.
-* [`services/model_registry.py`](../backend/app/application/services/model_registry.py): Manifest-backed model repository managing versioning, active symlinks, Canary Gates, and atomic disk writes (`tempfile.NamedTemporaryFile` + `os.replace`) to prevent partial read corruption.
+* [`services/model_registry.py`](../backend/app/application/services/model_registry.py): Manifest-backed enterprise model repository managing versioning, active symlinks, production admission validation, Four-Eyes dual control approvals (`DOMAIN_APPROVAL_SIGNOFF`), Canary Gates (PR-AUC / Recall@FPR thresholds), instant cross-worker cache invalidation via Redis pub/sub, secure deserialization (`weights_only=True`), and atomic disk writes (`tempfile.NamedTemporaryFile` + `os.replace`) to prevent partial read corruption.
+* [`services/training_provenance_service.py`](../backend/app/application/services/training_provenance_service.py): Cryptographic training provenance authority managing asymmetric Ed25519 receipt signing and public-key verification (`TrainingReceiptVerifier`), domain separation token validation, feature schema hashing, canonical execution epoch verification, and trusted public key registry management with instant revocation.
+* [`services/distributed_fl_service.py`](../backend/app/application/services/distributed_fl_service.py): Multi-process isolated federated training manager (`DistributedFederatedTrainingManager`), bank node private storage vault management (`BankPrivateStorageVault`) with exclusive OS-level file locking (`CreateFileW` with `dwShareMode=0` / `flock`), decoupled receipt signing authority interface (`IsolatedReceiptSigningAuthority`), and zero-parameter production enforcement.
 * [`services/connector_diagnostics_service.py`](../backend/app/application/services/connector_diagnostics_service.py): Enterprise connector health evaluation and active TCP/TLS handshake ping engine for Kafka, Vault, KMS, Splunk, Redis, PostgreSQL, and ISO 20022 parser.
 * [`services/design_partner_service.py`](../backend/app/application/services/design_partner_service.py): Design partner cohort tracking and early-access pilot metrics.
 
 ### 2.3 Infrastructure Layer ([`backend/app/infrastructure/`](../backend/app/infrastructure))
 Contains concrete implementations of adapters, persistence engines, cryptographic drivers, and external systems.
 
+* [`security/training_authority_backends.py`](../backend/app/infrastructure/security/training_authority_backends.py): Authoritative ACID persistence backends for federated training execution (`PostgresTrainingJobAuthority` with row-level locks `SELECT ... FOR UPDATE`, strictly mandatory in production; `SQLiteTrainingJobAuthority` for isolated local development), and canonical sequential execution epoch reconciliation (`reconcile_job_completion_evidence`).
 * [`database/migration_manager.py`](../backend/app/infrastructure/database/migration_manager.py) & [`database/migrations/env.py`](../backend/app/infrastructure/database/migrations/env.py): Alembic linear dual-revision migration engine (`001_production_domain_tables` $\to$ `002_core_and_aml_tables`) with dynamic tenant discovery from `tenant_configs`, PostgreSQL `search_path` injection protection (`_pg_quote_identifier`), SQLite file-based tenant isolation, offline airgap `--sql` generation, and automatic schema adoption (`_ensure_migrated_or_stamped`).
 * [`database/models.py`](../backend/app/infrastructure/models.py) & [`database/session.py`](../backend/app/infrastructure/database/__init__.py): SQLAlchemy 2.0 async engine and relational models partitioned dynamically per active tenant.
 * [`security/kms_service.py`](../backend/app/application/services/kms_service.py): Multi-tenant Key Management Service enforcing AES-256-GCM versioned envelope encryption (`v2:{iv_b64}:{tag_b64}:{ciphertext_b64}`), live HashiCorp Vault connectivity detection with simulated fallback telemetry, and automated background database re-encryption pipelines.
@@ -82,7 +85,7 @@ Contains concrete implementations of adapters, persistence engines, cryptographi
 * [`security/security_headers.py`](../backend/app/infrastructure/security/security_headers.py): Comprehensive HTTP security headers (CSP, HSTS, X-Frame-Options: DENY, X-Content-Type-Options: nosniff) and strict CORS whitelist enforcement.
 * [`feature_store/`](../backend/app/infrastructure/feature_store): Low-latency online feature store (`redis_store.py`, `feast_store.py`) and rolling velocity/amount aggregators (<5ms retrieval).
 * [`disaster_recovery/`](../backend/app/infrastructure/disaster_recovery): Multi-region active-passive failover manager ([`region_failover.py`](../backend/app/infrastructure/disaster_recovery/region_failover.py), RTO < 30s, RPO = 0), continuous cryptographic backup verifier ([`backup_verifier.py`](../backend/app/infrastructure/disaster_recovery/backup_verifier.py), sub-5ms sandbox restore probes), and automated chaos DR drill runner ([`chaos_dr_drill.py`](../backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py)).
-* [`redis_store.py`](../backend/app/infrastructure/redis_store.py): Fault-tolerant state manager. It synchronizes simulation configurations and round metrics to Redis. If Redis is unreachable, it falls back to a thread-safe, in-memory cache to maintain liveness.
+* [`redis_store.py`](../backend/app/infrastructure/redis_store.py): Distributed coordination and state management adapter. In clustered deployments, interfaces with Redis Sentinel for high-availability caching, sliding-window rate limiting (`slowapi`), 3-state idempotency reservations (`ACQUIRED` $\to$ `IN_PROGRESS` $\to$ `HIT`), and instant cross-worker model revocation pub/sub. In single-process development and standalone testing environments without Redis, gracefully routes operations to an in-memory dictionary backend truthfully labeled with single-process non-durability limitations (zero distributed multi-process coordination).
 * [`security/p2p_secagg_driver.py`](../backend/app/infrastructure/security/p2p_secagg_driver.py) & [`security/shamir_engine.py`](../backend/app/infrastructure/security/shamir_engine.py): Client-side Curve25519 X25519 ECDH pairwise vector masking and Shamir $(t, n)$ threshold Galois field secret sharing.
 * [`security/pqc_secagg_driver.py`](../backend/app/infrastructure/security/pqc_secagg_driver.py): NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) and FIPS 204 (CRYSTALS-Dilithium-3 signatures) hybrid quantum-safe P2P SecAgg driver.
 * [`security/layer2_crosschain_bridge.py`](../backend/app/infrastructure/security/layer2_crosschain_bridge.py): Chainlink CCIP `EVM2AnyMessage` and LayerZero V2 multi-ledger settlement bridge for Arbitrum, Optimism, Canton, and Hyperledger Fabric.
@@ -124,21 +127,32 @@ Interactions with clients, compliance officers, investigators, and consortium ba
 ## 3. Data Flow & Mechanics
 
 ### 3.1 Federated Training Cycle
+
+The platform supports both multi-process isolated production execution ([`distributed_fl_service.py`](../backend/app/application/services/distributed_fl_service.py)) and high-throughput consortium simulation pipelines:
+
 ```
-[React UI] ──(Start)──► [Gateway] ──► [Simulation Tasks (Celery)]
-                                             │
-   ┌─────────────────────────────────────────┘
-   ▼
-[fl-coordinator]
-   ├── 1. Generate Non-IID bank datasets
-   ├── 2. For round r = 1..R:
-   │     ├── Apply client availability (dropout probability)
-   │     ├── Client local SGD training (ModelService.train_local)
-   │     ├── If DP: PrivacyService.clip_model_update + add_noise_to_weights
-   │     ├── If SecAgg: apply_secure_aggregation_masks
-   │     └── Aggregate parameters (FedAvg, Median, or Krum)
-   ├── 3. Evaluate candidate model on holdout validation data
-   └── 4. Promote candidate if AUC >= Active AUC - 0.005 (Canary Gate)
+[Coordinator API] ──(Register Job)──► [PostgresTrainingJobAuthority] (Row Locks: SELECT ... FOR UPDATE)
+        │                                         │
+        ▼                                         ▼ (State: REGISTERED -> ROUNDS_IN_PROGRESS)
+[DistributedFederatedTrainingManager]
+        ├── 1. Dispatch Round r = 1..R to Isolated Bank Processes
+        │     ├── Bank A Process ──► [BankPrivateStorageVault A] (OS File Lock: CreateFileW / flock)
+        │     │     ├── Local SGD / Opacus DP-SGD (Gradient clipping + Gaussian noise)
+        │     │     ├── Pairwise SecAgg Masking (Curve25519 ECDH / Shamir secret sharing)
+        │     │     └── Compute Update Digest SHA-256(Δw) & Epoch Evidence
+        │     └── Bank B Process ──► [BankPrivateStorageVault B] (Isolated Vault)
+        │           └── Local SGD + SecAgg Masking + Update Digest
+        ├── 2. Byzantine-Robust Aggregation (Krum, Bulyan, Trimmed Mean, or FedAvg)
+        │     └── Verification: Anti-Replay & Cross-Round Update Digest validation
+        ├── 3. Canonical Epoch Reconciliation (PostgresTrainingJobAuthority)
+        │     └── canonical_epochs = sum(max(round_epochs_per_bank)) [Rejects planned-only spoofing]
+        ├── 4. Asymmetric Execution Receipt Generation ([IsolatedReceiptSigningAuthority])
+        │     └── Ed25519 Private Key Signs TrainingExecutionReceipt (Coordinator holds zero signing keys)
+        └── 5. Model Registry Production Admission ([ModelRegistry])
+              ├── Cryptographic Verification via TrainingReceiptVerifier (Ed25519 Public Key)
+              ├── OR Four-Eyes Dual Sign-Off (ML Lead + Compliance Officer per SR 11-7)
+              ├── Canary Gate Verification (PR-AUC / Recall@FPR thresholds)
+              └── Atomic Symlink Activation & Instant Redis Cross-Worker Cache Invalidation
 ```
 
 ### 3.2 Real-Time Collaborative AML Screening
@@ -570,37 +584,141 @@ The full signed certificate string is hashed with SHA-256 to produce an immutabl
 
 ---
 
-## 14. Automated Model Lineage & Registry Vault
+## 14. Production Training Provenance & Execution Authority
 
-The `ModelRegistryVault` ([`backend/app/domain/model_governance.py`](../backend/app/domain/model_governance.py)) manages model checkpoint lifecycles, cryptographic lineage binding, and dual-gated promotion to production.
+To eliminate single-point coordinator trust, prevent training history spoofing, and guarantee that models deployed to production are derived exclusively from authentic, verified federated training rounds, the platform introduces a decoupled **Production Training Provenance & Execution Authority** subsystem ([`backend/app/application/services/training_provenance_service.py`](../backend/app/application/services/training_provenance_service.py), [`backend/app/infrastructure/security/training_authority_backends.py`](../backend/app/infrastructure/security/training_authority_backends.py), and [`backend/app/application/services/distributed_fl_service.py`](../backend/app/application/services/distributed_fl_service.py)).
 
 ```
- [ FL Training ] ──> DRAFT / CANDIDATE ──(Dual Sign-Off + HSM Sig)──> PRODUCTION
-                                                                         │
-                                                             (New Prod)  ▼
-                                                                     ARCHIVED
-                                                                         │
-                                                             (Rollback)  ▼
-                                                                    ROLLED_BACK
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│               DISTRIBUTED TRAINING PROVENANCE & EXECUTION TRUST BOUNDARY               │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1. JOB REGISTRATION & ACID STATE MACHINE                                              │
+│    Coordinator ──(Register Job)──► PostgresTrainingJobAuthority                        │
+│                                    ├── ACID Row Lock: SELECT ... FOR UPDATE            │
+│                                    └── State: REGISTERED -> ROUNDS_IN_PROGRESS         │
+│                                                                                        │
+│ 2. ISOLATED MULTI-PROCESS EXECUTION & OS-LOCKED VAULTS                                │
+│    Bank Node Worker A (PID 101)                Bank Node Worker B (PID 102)            │
+│    └── BankPrivateStorageVault A               └── BankPrivateStorageVault B           │
+│        └── Lock: CreateFileW(dwShareMode=0)        └── Lock: CreateFileW(dwShareMode=0)│
+│        └── Zero raw data to coordinator            └── Zero private keys to coordinator│
+│                                                                                        │
+│ 3. ROUND PROGRESSION & ANTI-REPLAY ENFORCEMENT                                         │
+│    Workers submit (Round, Epoch Evidence, Update Digest SHA-256(Δw))                   │
+│    └── Authority asserts digests are unique & sequential (Rejects cross-round replay)  │
+│                                                                                        │
+│ 4. CANONICAL EPOCH RECONCILIATION                                                      │
+│    PostgresTrainingJobAuthority.reconcile_job_completion_evidence()                    │
+│    └── canonical_epochs = sum(max(round_epochs_per_bank)) [Rejects planned spoofing]  │
+│                                                                                        │
+│ 5. ASYMMETRIC RECEIPT SIGNING (DECOUPLED AUTHORITY)                                    │
+│    IsolatedReceiptSigningAuthority (Holds Ed25519 Private Key)                         │
+│    └── Signs TrainingExecutionReceipt with Domain Token "cfi-training-provenance-v1"   │
+│    └── Coordinator holds ZERO receipt signing keys                                     │
+│                                                                                        │
+│ 6. CONSUMPTION AT MODEL REGISTRY ADMISSION                                             │
+│    ModelRegistry.validate_production_admission()                                       │
+│    └── TrainingReceiptVerifier verifies receipt using Ed25519 Public Key Only          │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-| State | Description |
-|:---|:---|
-| `DRAFT` | Checkpoint registered during local/intermediate FL training rounds |
-| `CANDIDATE` | Evaluated FL global model ready for dual sign-off and HSM signing |
-| `PRODUCTION` | Active champion model serving live fraud prediction traffic |
-| `ARCHIVED` | Superceded production model preserved for compliance and rollback |
-| `ROLLED_BACK` | Model demoted due to live telemetry degradation or anomaly trigger |
+### 14.1 Asymmetric Ed25519 Digital Signatures
+In legacy configurations, symmetric HMAC keys created an architectural flaw where verifiers (such as model registries or compliance gateways) possessed the ability to forge valid training receipts. The platform strictly enforces asymmetric **Ed25519** digital signatures (Edwards-curve Digital Signature Algorithm):
+- **Decoupled Signing Authority**: Only [`IsolatedReceiptSigningAuthority`](../backend/app/application/services/distributed_fl_service.py) holds the Ed25519 private signing key. The training coordinator, bank worker processes, and API gateway hold zero receipt-signing keys.
+- **Public-Key Verification**: Any consuming service (including [`TrainingReceiptVerifier`](../backend/app/application/services/training_provenance_service.py) in the Model Registry) validates receipts using strictly the public key of the authoritative signing entity.
+- **Domain Separation Token**: Every signature envelope binds a mandatory domain separation token (`domain_token="cfi-training-provenance-v1"`), canonical model family, dataset hash, feature schema digest, and ISO 8601 UTC timestamp to prevent cross-protocol signature substitution.
 
-### 14.1 Promotion Gating & Zero-Downtime Rollback
-1. **Dual Sign-Off Gate**: Both `ml_engineer` and `compliance_officer` roles must have approved the checkpoint (SR 11-7 model risk policy).
-2. **HSM Signature Envelope Verification**: The signature is verified over the canonical payload:
-   $$\text{Payload} = \text{model-id} : \text{version} : \text{weights-sha256} : \text{hyperparams-sha256} : \text{dataset-hash} : \text{dp-epsilon}$$
-3. **Automated Rollback Engine**: If live telemetry breaches safety thresholds (ROC-AUC $< 0.65$ or p99 latency $> 200\text{ms}$), current `PRODUCTION` model is demoted to `ROLLED_BACK` and the last `ARCHIVED` champion is restored.
+### 14.2 Authoritative ACID Job Authority Backends
+To prevent race conditions, duplicate executions, and out-of-order state transitions, job execution tracking is governed by authoritative backends:
+- **`PostgresTrainingJobAuthority`**: In production deployments (`app_env="production"`), PostgreSQL row-level locks (`SELECT ... FOR UPDATE`) are strictly mandatory. State transitions (`REGISTERED` $\to$ `ROUNDS_IN_PROGRESS` $\to$ `RECONCILING` $\to$ `COMPLETED`) are committed within atomic database transactions.
+- **SQLite and In-Memory Backends**: [`SQLiteTrainingJobAuthority`](../backend/app/infrastructure/security/training_authority_backends.py) and `InMemoryTrainingJobAuthority` are strictly restricted to isolated local development and single-process test fixtures. Production initialization fails closed if an in-memory authority is configured.
+- **Anti-Replay & Update Digest Verification**: Participating bank nodes must compute and submit parameter update digests:
+  $$\text{Update Digest} = \text{SHA-256}(\mathbf{w}_{\text{new}} - \mathbf{w}_{\text{old}})$$
+  The authority verifies that update digests are globally unique per round, preventing malicious or compromised nodes from replaying previously recorded updates across different training rounds or parallel jobs.
+
+### 14.3 Canonical Sequential Epoch Reconciliation
+A common vulnerability in distributed training telemetry is reporting "planned" epochs or summing epochs across all workers (e.g., reporting 50 epochs because 5 workers each trained for 10 epochs). The authority enforces strict sequential epoch reconciliation via `reconcile_job_completion_evidence()`:
+$$\text{canonical\_epochs} = \sum_{r=1}^{R} \max_{b \in B_r} (\text{actual\_local\_epochs}_{b, r})$$
+If any participating bank node failed to complete the round or if intermediate evidence is missing, the authority refuses to certify the job and transitions the state to `FAILED` or `REJECTED`.
+
+### 14.4 Bank Node Private Storage Vaults & Physical OS Locks
+Bank node data sovereignty is enforced at the operating system level via [`BankPrivateStorageVault`](../backend/app/application/services/distributed_fl_service.py):
+- **Exclusive OS File Locking**: Vault files are locked using platform-native APIs—`kernel32.CreateFileW` with `dwShareMode=0` on Windows, and `fcntl.flock(LOCK_EX)` on POSIX—guaranteeing exclusive read/write access and preventing concurrent file access or race tampering by other processes.
+- **Zero Raw Data Access**: The central coordinator process has zero filesystem access to raw bank transaction ledgers. Model training executes in dedicated worker processes (`DistributedFederatedTrainingManager`), which serialize only gradient/weight updates through secure aggregation pipelines.
+
+### 14.5 Trusted Public Key Registry & Instant Revocation
+The provenance subsystem maintains a dynamic [`TrustedKeyRegistry`](../backend/app/application/services/training_provenance_service.py):
+- **Authority Trust Binding**: Public keys must be registered with an explicit authority identifier, algorithm (`Ed25519`), validity window, and authorized model families.
+- **Instant Revocation**: If a signing key or authority is compromised, calling `revoke_key(key_id, reason)` marks the key as revoked with an immutable timestamp. Any subsequent verification attempt for receipts signed by that key fails closed immediately.
 
 ---
 
-## 15. Enterprise Role-Based Access Control (RBAC) & OAuth 2.0 / OIDC Gateway
+## 15. Enterprise Model Registry, Four-Eyes Governance & Admission Boundary
+
+The `ModelRegistry` ([`backend/app/application/services/model_registry.py`](../backend/app/application/services/model_registry.py)) and `ModelRegistryVault` ([`backend/app/domain/model_governance.py`](../backend/app/domain/model_governance.py)) act as the authoritative gatekeeper for all machine learning assets in the consortium.
+
+```
+ [ Candidate Model Checkpoint ]
+               │
+               ▼
+ [ validate_production_admission() ]
+       ├── 1. Checkpoint Integrity: HMAC-SHA256 digest verification
+       ├── 2. Feature Schema Match: Canonical input tensor shape & order
+       ├── 3. Provenance Gate (Either / Or):
+       │     ├── Pathway A: Valid Ed25519 TrainingExecutionReceipt from trusted authority
+       │     └── Pathway B: Four-Eyes Dual Sign-Off (ML Lead + Compliance Officer per SR 11-7)
+       ├── 4. Canary Evaluation Gate: Holdout validation PR-AUC >= Active AUC - 0.005
+       └── 5. Secure Deserialization: torch.load(weights_only=True)
+               │
+               ▼ (Admission Granted)
+ [ Atomic Promotion & Cache Invalidation ]
+       ├── Atomic Symlink: tempfile.NamedTemporaryFile + os.replace -> active_model.pt
+       └── Redis Sentinel Pub/Sub: Invalidation event broadcasts to all workers
+```
+
+### 15.1 Model Checkpoint Lifecycle State Machine
+Model versions transition through a strictly governed lifecycle:
+| State | Description | Serving Availability |
+|:---|:---|:---|
+| `DRAFT` | Checkpoint registered during local or intermediate federated training rounds. | Offline only |
+| `CANDIDATE` | Fully aggregated and evaluated global model awaiting production admission verification. | Staging / Validation only |
+| `PRODUCTION` | Active champion model certified for real-time inference and transaction scoring. | Live serving (Single active version) |
+| `ARCHIVED` | Former champion model preserved for audit compliance, reproducible replay, and rollback. | Offline / Replay only |
+| `ROLLED_BACK` | Model demoted due to live performance degradation, data drift, or canary alert. | Deprecated |
+| `REVOKED` | Model revoked due to security defect, key compromise, or regulatory mandate. | Strictly prohibited |
+
+Only one single model version can occupy the `PRODUCTION` champion state per model family at any given time.
+
+### 15.2 Production Admission Validation (`validate_production_admission`)
+Before any model checkpoint is permitted to transition to `PRODUCTION`, it must pass comprehensive gatekeeping:
+1. **Checkpoint File Integrity**: The checkpoint file's cryptographic hash must match the registered manifest SHA-256 digest, verifying that weights were not tampered with on disk.
+2. **Canonical Feature Schema Verification**: The model's expected input feature vector dimensionality and ordering are verified against the repository's canonical feature schema hash. Checkpoints trained on mismatched or obsolete feature representations are rejected.
+3. **Cryptographic Provenance Gate**: The checkpoint must provide authoritative proof of provenance via one of two mutually exclusive or combined criteria:
+   - **`TRAINING_RECORDED`**: A verified, cryptographically signed `TrainingExecutionReceipt` issued by an authorized `PostgresTrainingJobAuthority` and verified via asymmetric Ed25519 public key.
+   - **`DOMAIN_APPROVAL_SIGNOFF`**: A formal Four-Eyes dual control sign-off envelope adhering to **Federal Reserve SR 11-7** and **OCC Bulletin 2011-12** model risk management guidance, requiring digital signatures from both the Lead ML Engineer and the Chief Compliance Officer.
+4. **Canary Evaluation Gate**: The candidate model is evaluated on a designated holdout validation dataset. It must satisfy:
+   $$\text{PR-AUC}_{\text{candidate}} \ge \text{PR-AUC}_{\text{champion}} - 0.005 \quad \text{and} \quad \text{Recall@0.01\% FPR} \ge 0.50$$
+
+### 15.3 Secure Deserialization & Atomic Disk Persistence
+- **Arbitrary Code Execution Protection**: Checkpoint deserialization strictly enforces PyTorch's `torch.load(..., weights_only=True)`. Unpickling of arbitrary Python executable code, functions, or unapproved classes is completely blocked.
+- **Atomic Disk Persistence**: Checkpoint updates and manifest changes are written using `tempfile.NamedTemporaryFile` within the registry directory followed by atomic replacement via `os.replace`. This guarantees that concurrent inference workers reading the active checkpoint never observe truncated or partially written files.
+- **Active Symlink Pointer**: Live inference workers bind to the active model via an atomic symlink (`active_model.pt`), ensuring instantaneous version switching without restarting inference server processes.
+
+### 15.4 Instant Cross-Worker Revocation via Redis Sentinel
+When an active model, signing key, or training authority is revoked, leaving stale model instances in worker memory represents a severe compliance and security failure. The platform implements an active invalidation bus:
+1. Revocation triggers `ModelRegistry.revoke_model_version(...)`.
+2. An instant revocation broadcast is published to the consortium Redis Sentinel cluster.
+3. All distributed FastAPI inference workers subscribing to the channel immediately evict warm in-memory model instances and cached evaluation metrics.
+4. Subsequent inference requests immediately observe the revoked status and fail closed.
+
+### 15.5 Fail-Closed Serving Invariants
+In strict adherence to the repository's `AGENTS.md` runtime truth rule:
+- If no active champion model is certified in the registry, or if the active model fails validation or is revoked, live inference endpoints (`/api/v1/predict`, `/v1/inference/score`) return **HTTP 503 Service Unavailable** (`ModelNotAvailableError`).
+- The system **never** silently substitutes untrained weights, random probability outputs, heuristic fallbacks, or static low-risk scores (e.g., returning `0.15` or `0.0`) to mask model unavailability. A truthful failure is enforced over a fabricated success.
+
+---
+
+## 16. Enterprise Role-Based Access Control (RBAC) & OAuth 2.0 / OIDC Gateway
 
 The API Gateway ([`backend/app/presentation/routers/gateway.py`](../backend/app/presentation/routers/gateway.py)) and security routers act as the single security perimeter enforcing OpenID Connect (OIDC) Bearer JWT authentication, dynamic Attribute-Based Access Control (ABAC), and immutable audit logging via [`ABACEngine`](../backend/app/infrastructure/security/abac_engine.py).
 
@@ -614,19 +732,19 @@ The API Gateway ([`backend/app/presentation/routers/gateway.py`](../backend/app/
 | **Security Clearance** | `resource.classification_level > user.clearance_level` | Restricts access to sensitive classification models and reports (`RULE-CLEARANCE-LEVEL-INSUFFICIENT`) |
 | **Audit Logging** | Every ABAC decision (grant or denial) | Appends structured cryptographic event to `ImmutableAuditChain` |
 
-### 15.1 Fail-Closed Zero-Trust Enforcement & High-Throughput In-Memory Engine
+### 16.1 Fail-Closed Zero-Trust Enforcement & High-Throughput In-Memory Engine
 In strict accordance with Zero-Trust architectural invariants, `ABACEngine` enforces **Fail-Closed** exception handling across all attribute parsers:
 - **IP Range Exception Handling**: If an incoming client IP string is malformed or unparseable by `ipaddress.ip_address()`, the engine immediately denies access with `allowed=False` (`RULE-IP-RANGE-RESTRICTION`), preventing parser evasion attacks.
 - **Shift Window Exception Handling**: If employee shift string formats are unparseable or corrupted, the engine immediately denies access with `allowed=False` (`RULE-SHIFT-HOURS-RESTRICTION`).
 - **High-Throughput In-Memory Performance**: Evaluated via `scripts/run_abac_benchmark.py`, the stateless policy engine sustains **122,874 evaluations/second** with mean latency of **0.0078 ms (7.8 µs)** and p99 latency of **0.0184 ms (18.4 µs)**, introducing negligible overhead in the request pipeline.
 
-### 15.2 Cryptographic OIDC JWT Token Verification & Claim Extraction (`oidc_authenticator.py`)
+### 16.2 Cryptographic OIDC JWT Token Verification & Claim Extraction (`oidc_authenticator.py`)
 Enterprise federated SSO and consortium bearer tokens are validated through [`OIDCAuthenticator`](../backend/app/infrastructure/security/oidc_authenticator.py):
 - **HMAC-SHA256 Cryptographic Signature Enforcement**: Uses PyJWT `jwt.decode()` with mandatory signature verification (`verify_signature: True`, `verify_exp: True`), rejecting forged tokens claiming elevated roles (`super_admin`) or invalid signing secrets.
 - **Authoritative Claim Parsing**: Extracts subject (`sub`), tenant bank identity (`bank_id`), RBAC roles (`roles`), security clearance level (`clearance_level`), shift hours window (`shift_hours`), approval tier ceiling (`approval_tier`), and allowed IP subnet CIDRs (`allowed_ip_subnets`).
 - **Dynamic Key Management**: Automatically resolves symmetric signing secret from application configuration (`settings.oidc_jwt_signing_secret`), ensuring synchronization with the security gateway and auth routers.
 
-### 15.3 Application Perimeter Defense, WAF Guard & Defensive Security Headers
+### 16.3 Application Perimeter Defense, WAF Guard & Defensive Security Headers
 Ingress traffic to the FastAPI application layer is guarded by [`PerimeterWAFGuard`](../backend/app/infrastructure/security/perimeter_waf.py) and [`SecurityHeadersMiddleware`](../backend/app/infrastructure/security/security_headers.py) (pure ASGI):
 - **Deep OWASP Top 10 Header & Body Inspection**: Every request URL path, body payload, and all HTTP request headers (including `User-Agent`, `Referer`, and custom `X-*` headers) are systematically inspected for:
   - **SQL Injection (SQLi)**: Regex patterns (`UNION SELECT`, `DROP TABLE`, `OR 1=1`, inline comment sequences).
@@ -639,7 +757,7 @@ Ingress traffic to the FastAPI application layer is guarded by [`PerimeterWAFGua
 
 ---
 
-## 16. Live High-Throughput Payment Stream Benchmark
+## 17. Live High-Throughput Payment Stream Benchmark
 
 The enterprise benchmark framework (`scripts/run_enterprise_stress_test.py`) validates platform throughput capacity and latency under sustained ISO 20022 payment transaction loads.
 
@@ -649,7 +767,7 @@ The enterprise benchmark framework (`scripts/run_enterprise_stress_test.py`) val
 
 ---
 
-## 17. Continuous Security & Test Verification Metrics
+## 18. Continuous Security & Test Verification Metrics
 
 The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise_security_ci.yml`](../.github/workflows/enterprise_security_ci.yml)) executes multi-layer security auditing across source code, third-party dependencies, container images, infrastructure templates, and testing suites.
 
@@ -661,15 +779,15 @@ The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise
      ├── 3. gitleaks-secret-scan (Automated credential & secret leak detection)
      ├── 4. trivy-container-security (Trivy scanner for OS/library CVEs)
      ├── 5. helm-and-terraform-security-audit (Helm lint + AWS/Azure/GCP terraform validate)
-     └── 6. pytest-security-and-compliance-suites (5,371 Backend + 410 Verification Automated Suites across 21 modules)
+     └── 6. pytest-security-and-compliance-suites (5,001 Backend + 410 Verification Automated Suites across 21 modules)
 ```
 
 ### Comprehensive Test Suite Verification
-The entire codebase is validated by **5,371 backend automated tests collected** (and 410 scientific verification tests across 21 modules; 6,187 total collected system tests across all 4 suites) across unit, integration, and property-based suites:
+The entire codebase is validated by **5,001 passing backend unit/integration tests** (5,371 tests collected across all backend domain, application, and infrastructure modules), **410 scientific verification tests** across 21 modules (`verification/`), **375 frontend Vitest tests** (`frontend/`), and **31 smart contract tests** (`contracts/`), totaling **6,187 collected tests** across all 4 suites:
 
 ```bash
 pytest backend/tests/ -q
-# Result: 5,371 tests collected across all domain, application, and infrastructure modules
+# Result: 5,001 passed, 370 skipped (feature flags / external daemons) [5,371 backend tests collected]
 ```
 
 | Security & Compliance Job | Technology / Tool | Security Scope |
@@ -679,11 +797,11 @@ pytest backend/tests/ -q
 | **Secret Scanning** | `gitleaks` | Automated detection of hardcoded credentials, tokens, and private keys |
 | **Container Scan** | `aquasecurity/trivy-action` | Base OS image & installed library CVE scanning (`CRITICAL`, `HIGH`) |
 | **IaC Security** | `Helm`, `Terraform` | Helm chart linting & AWS/Azure/GCP multi-cloud template validation |
-| **Full Automated Test Suite**| `Pytest` | 5,371 automated backend tests collected (+ 410 scientific verification tests across 21 modules) covering Interactive POC Sandbox Replay & Multi-Bank Simulator, EU AI Act & SR 11-7 Regulatory Dossier Generator, Differential Privacy & RDP Moments Accounting, DP-SGD Noise Calibration & Privacy-Utility Frontier Visualization, Secure Aggregation Pairwise Zero-Sum Invariants & Zero-Knowledge Boundary Verification, Byzantine Robustness & Adversarial Poisoning Breakdown Point Analysis (Sign-Flip, Scaled Outliers, Gaussian Noise, Label Flipping against Krum, Bulyan, Median, Trimmed Mean), Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, Extended ISO 20022 Financial Rails (camt.053 / pacs.002 / pacs.003), Drift Retraining Feature Subset Bridge, Elliptic Bitcoin GraphSAGE Inductive Benchmark, IBM AMLSim Multi-Hop Graph & Topology Alert Benchmarking, SynthAML Spar Nord Bank Synthetic AML Benchmark, AMLNet Extreme Imbalance AUSTRAC Benchmark, Cross-Bank Synthetic Consortium Benchmark (CFI-CrossBank-01), Multi-Alpha FL Optimizer & Dirichlet Sensitivity Sweep, Architectural Component Factorial Ablation Matrix (Graph x DP x SecAgg x CrossBank), Temporal Generalization & Out-of-Time Degradation Quantification, Empirical Concept & Feature Drift Profiling & Automated Retraining Verification, Federated Communication Cost & Bandwidth Profiling (Payload Serialization, Zstandard Compression, Top-K Sparsification, INT8/FP16 Quantization, Protocol Overheads), Inference Gateway Scalability & Multi-Concurrency Latency Benchmark (Stage Decomposition, Bottleneck Analysis, p50/p95/p99 Percentile Scaling), Multi-Seed Statistical Robustness & Confidence Intervals (5 Seeds, Student-t 95% CIs, mu +/- sigma Matrix), Systematic Error Stratification & Failure Mode Diagnostics (Amount, Hour, MCC, Network Degree Strata, FM-01 to FM-04 Dossier), Demographic Attribute Availability Assessment & Algorithmic Fairness Governance (7 Benchmark Datasets Zero-Demographic PII Audit, SR 11-7 Bias Disclaimer, Proxy DIR/EOD Parity), Authoritative HuggingFace MODEL_CARD.md & Institutional EU AI Act SYSTEM_CARD.md Formalization, Authoritative Dataset Cards & Storage Architecture (DATASETS.md) Provenance & Licensing Formalization, Standardized Experiment Artifact Hierarchy & Automated Markdown Dossier Compilation (config.json, results.json, metrics.csv, report.md, plots/ across 8 benchmark datasets), Master Comparative Empirical Benchmark Matrix & Strict Null Representation, Architectural Component Factorial Ablation Matrix (16-Config Grid x ANOVA Main Effects), End-to-End Scientific Reproducibility Guide (REPRODUCIBILITY.md), Deterministic CI Smoke Gates & Decoupled Benchmark Workflows, Software Correctness vs Scientific Generalization Taxonomy, Unified Scientific Metric Definition Standard (docs/METRICS.md), Anti-Metric Shopping Protocol & Negative Result Ledger (docs/LIMITATIONS.md), Strict Zero-Leakage Federated Partitioning Contract (ZeroLeakagePartitionContract), Prometheus/SIEM Telemetry Export, and DR Failover |
+| **Full Automated Test Suite**| `Pytest`, `Vitest`, `Hardhat` | 6,187 total tests collected (5,001 passing backend unit/integration tests, 410 scientific verification tests across 21 modules, 375 frontend Vitest tests, 31 smart contract tests) covering Interactive POC Sandbox Replay & Multi-Bank Simulator, EU AI Act & SR 11-7 Regulatory Dossier Generator, Differential Privacy & RDP Moments Accounting, DP-SGD Noise Calibration & Privacy-Utility Frontier Visualization, Secure Aggregation Pairwise Zero-Sum Invariants & Zero-Knowledge Boundary Verification, Byzantine Robustness & Adversarial Poisoning Breakdown Point Analysis (Sign-Flip, Scaled Outliers, Gaussian Noise, Label Flipping against Krum, Bulyan, Median, Trimmed Mean), Spectral Defense, Training Provenance Authority & Asymmetric Ed25519 Receipts, Model Registry Production Admission & Instant Cross-Worker Revocation, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, Extended ISO 20022 Financial Rails (camt.053 / pacs.002 / pacs.003), Drift Retraining Feature Subset Bridge, Elliptic Bitcoin GraphSAGE Inductive Benchmark, IBM AMLSim Multi-Hop Graph & Topology Alert Benchmarking, SynthAML Spar Nord Bank Synthetic AML Benchmark, AMLNet Extreme Imbalance AUSTRAC Benchmark, Cross-Bank Synthetic Consortium Benchmark (CFI-CrossBank-01), Multi-Alpha FL Optimizer & Dirichlet Sensitivity Sweep, Architectural Component Factorial Ablation Matrix (Graph x DP x SecAgg x CrossBank), Temporal Generalization & Out-of-Time Degradation Quantification, Empirical Concept & Feature Drift Profiling & Automated Retraining Verification, Federated Communication Cost & Bandwidth Profiling (Payload Serialization, Zstandard Compression, Top-K Sparsification, INT8/FP16 Quantization, Protocol Overheads), Inference Gateway Scalability & Multi-Concurrency Latency Benchmark (Stage Decomposition, Bottleneck Analysis, p50/p95/p99 Percentile Scaling), Multi-Seed Statistical Robustness & Confidence Intervals (5 Seeds, Student-t 95% CIs, mu +/- sigma Matrix), Systematic Error Stratification & Failure Mode Diagnostics (Amount, Hour, MCC, Network Degree Strata, FM-01 to FM-04 Dossier), Demographic Attribute Availability Assessment & Algorithmic Fairness Governance (7 Benchmark Datasets Zero-Demographic PII Audit, SR 11-7 Bias Disclaimer, Proxy DIR/EOD Parity), Authoritative HuggingFace MODEL_CARD.md & Institutional EU AI Act SYSTEM_CARD.md Formalization, Authoritative Dataset Cards & Storage Architecture (DATASETS.md) Provenance & Licensing Formalization, Standardized Experiment Artifact Hierarchy & Automated Markdown Dossier Compilation (config.json, results.json, metrics.csv, report.md, plots/ across 8 benchmark datasets), Master Comparative Empirical Benchmark Matrix & Strict Null Representation, Architectural Component Factorial Ablation Matrix (16-Config Grid x ANOVA Main Effects), End-to-End Scientific Reproducibility Guide (REPRODUCIBILITY.md), Deterministic CI Smoke Gates & Decoupled Benchmark Workflows, Software Correctness vs Scientific Generalization Taxonomy, Unified Scientific Metric Definition Standard (docs/METRICS.md), Anti-Metric Shopping Protocol & Negative Result Ledger (docs/LIMITATIONS.md), Strict Zero-Leakage Federated Partitioning Contract (ZeroLeakagePartitionContract), Prometheus/SIEM Telemetry Export, and DR Failover |
 
 ---
 
-## 18. Software Correctness vs. Scientific Generalization Taxonomy
+## 19. Software Correctness vs. Scientific Generalization Taxonomy
 
 To satisfy the stringent model risk governance mandates of **Federal Reserve SR 11-7**, **OCC Bulletin 2011-12**, and the **EU Artificial Intelligence Act (Regulation 2024/1689)** Annex IV, the platform formally establishes an epistemological delineation between software correctness and statistical machine learning generalization (detailed in [`docs/verification_taxonomy_spec.md`](verification_taxonomy_spec.md)):
 
@@ -703,15 +821,16 @@ To satisfy the stringent model risk governance mandates of **Federal Reserve SR 
 │ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
 │ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ Validated by 5,371 Pytest unit tests,│ Evaluated across 8 canonical datasets│
-│ 375 Vitest components, 31 Hardhat.   │ via benchmarks/runners/ & harness.   │
+│ Validated by 5,001 passing backend   │ Evaluated across 8 canonical datasets│
+│ tests (5,371 collected), 410 verif., │ via benchmarks/runners/ & harness.   │
+│ 375 Vitest components, 31 Hardhat.   │ (6,187 total tests collected)        │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
 │ NOT prove fraud detection capability.│ if the gateway crashes or leaks PII. │
 └──────────────────────────────────────┴──────────────────────────────────────┘
 ```
 
-### 18.1 Architectural Segregation of Test and Evaluation Suites
+### 19.1 Architectural Segregation of Test and Evaluation Suites
 - **Software Correctness (`backend/tests/`)**: Unit, integration, chaos, and mutation tests execute deterministically against synthetic fixtures, asserting structural contracts, state machines, and security perimeters.
 - **Scientific Generalization (`benchmarks/`, `experiments/`)**: Decoupled statistical harnesses evaluate trained models against out-of-time splits across 8 canonical datasets (`paysim`, `ieee_cis`, `credit_card`, `elliptic`, `amlsim`, `synthaml`, `amlnet`, `cross_bank`), quantifying degradation under Dirichlet non-IID skew and Differential Privacy budgets.
 
