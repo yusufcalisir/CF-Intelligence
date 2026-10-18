@@ -644,7 +644,6 @@ def validate_production_admission(
             f"Production admission rejected: model provenance '{prov}' is not production-eligible ({context})."
         )
 
-
     if is_eligible is False and context != "sign_off":
         raise ModelIntegrityError(
             f"Production admission rejected: model is explicitly marked as not production-eligible ({context})."
@@ -916,7 +915,9 @@ class ModelRegistry:
         - Prevent read-only callers from creating directories as an unintended side effect.
         """
         clean_id = validate_simulation_id(simulation_id)
-        canonical_root = getattr(self, "canonical_root", None) or os.path.realpath(self.registry_root)
+        canonical_root = getattr(self, "canonical_root", None) or os.path.realpath(
+            self.registry_root
+        )
         sim_dir = os.path.abspath(os.path.join(self.registry_root, clean_id))
 
         # Check for unsafe symlinks pointing outside registry root
@@ -1197,7 +1198,6 @@ class ModelRegistry:
                 is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
                     receipt_obj,
                     simulation_id=simulation_id,
-                    expected_consortium_id=clean_consortium,
                 )
                 if is_valid_rcpt:
                     # ONLY read verified claims from the reconstructed TrainingExecutionReceipt object.
@@ -1584,7 +1584,9 @@ class ModelRegistry:
             mtime_own = os.path.getmtime(own_path) if os.path.exists(own_path) else 0.0
             with ModelRegistry._manifest_cache_guard:
                 if clean_sim_id in ModelRegistry._shared_manifest_cache:
-                    cached_mtime_reg, cached_mtime_own, cached_data = ModelRegistry._shared_manifest_cache[clean_sim_id]
+                    cached_mtime_reg, cached_mtime_own, cached_data = (
+                        ModelRegistry._shared_manifest_cache[clean_sim_id]
+                    )
                     if cached_mtime_reg == mtime_reg and cached_mtime_own == mtime_own:
                         return copy.deepcopy(cached_data)
         except OSError:
@@ -3071,7 +3073,9 @@ class ModelRegistry:
                         if current_root_mtime == cached_root_mtime:
                             hint_manifest = self._load_manifest(hint)
                             hint_active = [
-                                e for e in hint_manifest if e.get("status") == "champion" and e.get("is_active")
+                                e
+                                for e in hint_manifest
+                                if e.get("status") == "champion" and e.get("is_active")
                             ]
                             if len(hint_active) == 1:
                                 candidates.append((hint, hint_active[0]))
@@ -3106,7 +3110,9 @@ class ModelRegistry:
                     try:
                         with ModelRegistry._manifest_cache_guard:
                             ModelRegistry._shared_champion_sim_hint = candidates[0][0]
-                            ModelRegistry._shared_registry_root_mtime = os.path.getmtime(self.registry_root)
+                            ModelRegistry._shared_registry_root_mtime = os.path.getmtime(
+                                self.registry_root
+                            )
                     except OSError:
                         pass
 
@@ -4329,10 +4335,11 @@ class ModelRegistry:
             elif authoritative_user and authoritative_user.is_active:
                 auth_roles = [r.lower().strip() for r in authoritative_user.roles]
                 has_role = False
-                if norm_role == "compliance" and any(
-                    r in ("compliance", "compliance_officer", "admin") for r in auth_roles
-                ) or norm_role == "ml_engineer" and any(
-                    r in ("ml_engineer", "ml_lead") for r in auth_roles
+                if (
+                    norm_role == "compliance"
+                    and any(r in ("compliance", "compliance_officer", "admin") for r in auth_roles)
+                    or norm_role == "ml_engineer"
+                    and any(r in ("ml_engineer", "ml_lead") for r in auth_roles)
                 ):
                     has_role = True
 

@@ -128,7 +128,9 @@ class TrainingExecutionEvidence:
             raise ValueError("Executed rounds or epochs must be at least 1.")
         if self.sample_count <= 0:
             raise ValueError(f"Training sample count must be positive, got: {self.sample_count}")
-        if not self.observed_metrics or not isinstance(self.observed_metrics, (dict, types.MappingProxyType)):
+        if not self.observed_metrics or not isinstance(
+            self.observed_metrics, (dict, types.MappingProxyType)
+        ):
             raise ValueError("observed_metrics must be a non-empty dictionary.")
 
         loss_val = None
@@ -136,9 +138,12 @@ class TrainingExecutionEvidence:
             if k in self.observed_metrics:
                 loss_val = self.observed_metrics[k]
                 break
-        if loss_val is None or not isinstance(loss_val, (int, float)) or not math.isfinite(loss_val):
+        if (
+            loss_val is None
+            or not isinstance(loss_val, (int, float))
+            or not math.isfinite(loss_val)
+        ):
             raise ValueError("Training metrics must contain a finite numeric loss.")
-
 
 
 FORBIDDEN_WORKER_TOKENS = frozenset(
@@ -170,7 +175,6 @@ FORBIDDEN_COORDINATOR_TOKENS = frozenset(
 )
 
 
-
 class TrainingJobAuthorityDatabase:
     """ACID transactional database authority dispatching to PostgreSQL or SQLite backend."""
 
@@ -189,13 +193,17 @@ class TrainingJobAuthorityDatabase:
         clean = (effective_target or "").strip()
 
         env_candidate = active_env if active_env is not None else app_env
-        active_env = (env_candidate or ("production" if is_prod else get_settings().app_env)).lower()
+        active_env = (
+            env_candidate or ("production" if is_prod else get_settings().app_env)
+        ).lower()
         is_production = is_prod if is_prod is not None else active_env == "production"
 
         self._active_env = active_env
         self._is_prod = is_production
 
-        if is_production and (in_memory or not (clean.startswith("postgresql://") or clean.startswith("postgres://"))):
+        if is_production and (
+            in_memory or not (clean.startswith("postgresql://") or clean.startswith("postgres://"))
+        ):
             raise TrainingProvenanceConfigurationError(
                 "Production training job authority database must be a PostgreSQL connection URL (e.g. postgresql://...). "
                 "Plain filesystem paths, SQLite URLs, and in-memory storage are strictly forbidden in production."
@@ -208,7 +216,9 @@ class TrainingJobAuthorityDatabase:
         elif clean.startswith("postgresql://") or clean.startswith("postgres://"):
             self._backend = PostgresTrainingJobAuthority(db_url=clean, app_env=active_env)
         elif clean.startswith("sqlite://") or "://" not in clean:
-            self._backend = SQLiteTrainingJobAuthority(db_target=clean, in_memory=False, app_env=active_env)
+            self._backend = SQLiteTrainingJobAuthority(
+                db_target=clean, in_memory=False, app_env=active_env
+            )
         else:
             raise TrainingProvenanceConfigurationError(
                 f"Unsupported database URL scheme: '{clean}'. Only PostgreSQL ('postgresql://...') and SQLite ('sqlite://...') backends are supported."
@@ -406,7 +416,11 @@ class TrainingJobAuthorityDatabase:
         reserved_epsilon: float | None = None,
         reserved_delta: float | None = None,
     ) -> bool:
-        eps = reserved_epsilon if reserved_epsilon is not None else (requested_epsilon if requested_epsilon is not None else 0.0)
+        eps = (
+            reserved_epsilon
+            if reserved_epsilon is not None
+            else (requested_epsilon if requested_epsilon is not None else 0.0)
+        )
         del_val = reserved_delta if reserved_delta is not None else requested_delta
         ok, reason, remaining = self._backend.reserve_institutional_privacy_budget(
             bank_id=bank_id,
@@ -481,7 +495,11 @@ class TrustedTrainingJobRecordSource:
         self._app_env = app_env
 
         settings = get_settings()
-        self._bank_tokens = dict(bank_tokens) if bank_tokens is not None else dict(getattr(settings, "training_bank_tokens", {}))
+        self._bank_tokens = (
+            dict(bank_tokens)
+            if bank_tokens is not None
+            else dict(getattr(settings, "training_bank_tokens", {}))
+        )
         env_bank_tokens = os.environ.get("CFI_TRAINING_BANK_TOKENS")
         if env_bank_tokens:
             try:
@@ -500,7 +518,9 @@ class TrustedTrainingJobRecordSource:
             has_worker_creds = bool(self._bank_tokens or self._resolve_expected_worker_token())
 
             if (expected_coord or not has_worker_creds) and (
-                not expected_coord or expected_coord in FORBIDDEN_COORDINATOR_TOKENS or "change_me" in expected_coord
+                not expected_coord
+                or expected_coord in FORBIDDEN_COORDINATOR_TOKENS
+                or "change_me" in expected_coord
             ):
                 raise TrainingProvenanceConfigurationError(
                     "Production training coordinator credential is not configured or uses a forbidden default/placeholder. "
@@ -525,7 +545,11 @@ class TrustedTrainingJobRecordSource:
                     seen_tokens.add(b_tok)
             elif has_worker_creds or not expected_coord:
                 expected_worker = self._resolve_expected_worker_token()
-                if not expected_worker or expected_worker in FORBIDDEN_WORKER_TOKENS or "change_me" in expected_worker:
+                if (
+                    not expected_worker
+                    or expected_worker in FORBIDDEN_WORKER_TOKENS
+                    or "change_me" in expected_worker
+                ):
                     raise TrainingProvenanceConfigurationError(
                         "Production training worker credential is not configured or uses a forbidden default/placeholder. "
                         "Production execution recording fails closed."
@@ -553,7 +577,10 @@ class TrustedTrainingJobRecordSource:
             )
             if configured:
                 clean_target = configured.strip()
-                if is_prod and not (clean_target.startswith("postgresql://") or clean_target.startswith("postgres://")):
+                if is_prod and not (
+                    clean_target.startswith("postgresql://")
+                    or clean_target.startswith("postgres://")
+                ):
                     raise TrainingProvenanceConfigurationError(
                         "Production training job authority database must be a PostgreSQL connection URL (e.g. postgresql://...). "
                         "Plain filesystem paths, SQLite URLs, and in-memory storage are strictly forbidden in production."
@@ -639,7 +666,11 @@ class TrustedTrainingJobRecordSource:
                     "Unauthorized training coordinator: Invalid training coordinator authorization token."
                 )
         else:
-            if expected_worker and provided_token and hmac.compare_digest(provided_token, expected_worker):
+            if (
+                expected_worker
+                and provided_token
+                and hmac.compare_digest(provided_token, expected_worker)
+            ):
                 raise TrainingProvenanceSecurityError(
                     "Worker credential cannot authorize job scheduling; coordinator role required."
                 )
@@ -648,7 +679,9 @@ class TrustedTrainingJobRecordSource:
                     raise TrainingProvenanceSecurityError(
                         "Bank worker credential cannot authorize coordinator actions; coordinator role required."
                     )
-            if expected and (provided_token is None or not hmac.compare_digest(provided_token, expected)):
+            if expected and (
+                provided_token is None or not hmac.compare_digest(provided_token, expected)
+            ):
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized training coordinator: invalid coordinator token."
                 )
@@ -669,7 +702,11 @@ class TrustedTrainingJobRecordSource:
                     "Coordinator credential cannot authorize worker execution events."
                 )
             if self._bank_tokens:
-                if not any(hmac.compare_digest(provided_token, bt) for bt in self._bank_tokens.values() if bt):
+                if not any(
+                    hmac.compare_digest(provided_token, bt)
+                    for bt in self._bank_tokens.values()
+                    if bt
+                ):
                     raise TrainingProvenanceSecurityError(
                         "Unauthorized training worker: Invalid training worker authorization token."
                     )
@@ -684,17 +721,27 @@ class TrustedTrainingJobRecordSource:
                         "Unauthorized training worker: Invalid training worker authorization token."
                     )
         else:
-            if expected_coord and provided_token and hmac.compare_digest(provided_token, expected_coord):
+            if (
+                expected_coord
+                and provided_token
+                and hmac.compare_digest(provided_token, expected_coord)
+            ):
                 raise TrainingProvenanceSecurityError(
                     "Coordinator credential cannot authorize worker execution events."
                 )
             if (
                 self._bank_tokens
                 and provided_token
-                and any(hmac.compare_digest(provided_token, bt) for bt in self._bank_tokens.values() if bt)
+                and any(
+                    hmac.compare_digest(provided_token, bt)
+                    for bt in self._bank_tokens.values()
+                    if bt
+                )
             ):
                 return
-            if expected and (provided_token is None or not hmac.compare_digest(provided_token, expected)):
+            if expected and (
+                provided_token is None or not hmac.compare_digest(provided_token, expected)
+            ):
                 raise TrainingProvenanceSecurityError(
                     "Unauthorized training worker: invalid worker token."
                 )
@@ -761,9 +808,7 @@ class TrustedTrainingJobRecordSource:
         if not expected_worker:
             return claimed_bank_id.strip() if claimed_bank_id else "BANK_A"
 
-        raise TrainingProvenanceSecurityError(
-            "Unauthorized training worker: invalid worker token."
-        )
+        raise TrainingProvenanceSecurityError("Unauthorized training worker: invalid worker token.")
 
     def schedule_training_job(
         self,
@@ -825,7 +870,9 @@ class TrustedTrainingJobRecordSource:
         if self._bank_tokens:
             auth_bank = self.authenticate_bank_worker(
                 worker_token,
-                claimed_bank_id=worker_id if (worker_id and worker_id in self._bank_tokens) else None,
+                claimed_bank_id=worker_id
+                if (worker_id and worker_id in self._bank_tokens)
+                else None,
             )
             resolved_worker_id = auth_bank
         else:
@@ -875,14 +922,22 @@ class TrustedTrainingJobRecordSource:
                 f"Bank '{auth_bank}' is not authorized to record observations for job '{clean_job_id}' (permitted: {sched.permitted_workers})."
             )
 
-        r_num = round_number if round_number is not None else (round_num if round_num is not None else (round_idx if round_idx is not None else 1))
+        r_num = (
+            round_number
+            if round_number is not None
+            else (
+                round_num if round_num is not None else (round_idx if round_idx is not None else 1)
+            )
+        )
 
         if model_update_digest is not None and not model_update_digest.strip():
             raise TrainingProvenanceSecurityError("model_update_digest cannot be empty.")
 
         digest_val = model_update_digest
         if not digest_val and self._is_prod:
-            raise TrainingProvenanceSecurityError("model_update_digest is mandatory for recorded round observation.")
+            raise TrainingProvenanceSecurityError(
+                "model_update_digest is mandatory for recorded round observation."
+            )
 
         loss_val = observed_loss
         target_metrics = dict(metrics) if metrics is not None else {}
@@ -897,7 +952,10 @@ class TrustedTrainingJobRecordSource:
                 "Loss cannot be defaulted to 0.0 or fabricated."
             )
 
-        eid = event_id or f"evt_{clean_job_id}_r{r_num}_{auth_bank}_{attempt_number}_{uuid.uuid4().hex[:8]}"
+        eid = (
+            event_id
+            or f"evt_{clean_job_id}_r{r_num}_{auth_bank}_{attempt_number}_{uuid.uuid4().hex[:8]}"
+        )
 
         obs = RoundObservation(
             event_id=eid,
@@ -985,10 +1043,16 @@ class TrustedTrainingJobRecordSource:
                     f"Replay of earlier round update digest '{d}' rejected in round {round_number}."
                 )
 
-        round_obs = [o for o in obs_list if o.round_number == round_number and o.execution_status == "COMPLETED"]
+        round_obs = [
+            o
+            for o in obs_list
+            if o.round_number == round_number and o.execution_status == "COMPLETED"
+        ]
         obs_by_bank = {o.bank_id: o for o in round_obs}
 
-        for p_id, p_digest in zip(accepted_participant_ids, accepted_local_update_digests, strict=True):
+        for p_id, p_digest in zip(
+            accepted_participant_ids, accepted_local_update_digests, strict=True
+        ):
             if p_id not in obs_by_bank:
                 raise TrainingProvenanceSecurityError(
                     f"Accepted participant '{p_id}' has no verified completed round observation in round {round_number}."
@@ -1008,14 +1072,20 @@ class TrustedTrainingJobRecordSource:
                 raise TrainingProvenanceSecurityError(
                     f"Accepted local update digest for participant '{p_id}' is missing or empty."
                 )
-            if actual_digest and p_digest_clean and not hmac.compare_digest(actual_digest, p_digest_clean):
+            if (
+                actual_digest
+                and p_digest_clean
+                and not hmac.compare_digest(actual_digest, p_digest_clean)
+            ):
                 raise TrainingProvenanceSecurityError(
                     f"Accepted local update digest for participant '{p_id}' ({p_digest_clean}) does not match observed digest ({actual_digest})."
                 )
 
         # Quorum policy
         min_quorum: int = 1
-        if aggregation_configuration and any(k in aggregation_configuration for k in ("min_quorum", "min_participants", "quorum")):
+        if aggregation_configuration and any(
+            k in aggregation_configuration for k in ("min_quorum", "min_participants", "quorum")
+        ):
             for q_key in ("min_quorum", "min_participants", "quorum"):
                 if q_key in aggregation_configuration:
                     min_quorum = int(aggregation_configuration[q_key])
@@ -1208,7 +1278,9 @@ class TrustedTrainingJobRecordSource:
                 consortium_id=record.consortium_id or consortium_id,
             )
         if not job_id or not training_run_id:
-            raise ValueError("Either 'record' or both 'job_id' and 'training_run_id' must be provided.")
+            raise ValueError(
+                "Either 'record' or both 'job_id' and 'training_run_id' must be provided."
+            )
 
         if not self._is_prod and not self._db.get_scheduled_job(job_id):
             self.schedule_training_job(
@@ -1378,17 +1450,21 @@ class TrustedTrainingJobRecordSource:
         pass
 
 
-_TRUST_STORE_FILE_LOCKS: dict[str, FileLock] = {}
+_TRUST_STORE_FILE_LOCKS: dict[tuple[str, int], FileLock] = {}
 _TRUST_STORE_LOCKS_GUARD = threading.Lock()
 
 
 def _get_trust_store_file_lock(file_path: str, timeout: float = 15.0) -> FileLock:
     """Return process-shared FileLock for durable trust store."""
     lock_path = os.path.abspath(f"{file_path}.lock")
+    current_pid = os.getpid()
+    cache_key = (lock_path, current_pid)
     with _TRUST_STORE_LOCKS_GUARD:
-        if lock_path not in _TRUST_STORE_FILE_LOCKS:
-            _TRUST_STORE_FILE_LOCKS[lock_path] = FileLock(lock_path, timeout=timeout)
-        return _TRUST_STORE_FILE_LOCKS[lock_path]
+        lock = _TRUST_STORE_FILE_LOCKS.get(cache_key)
+        if lock is None or getattr(lock, "_pid", None) not in (None, current_pid):
+            lock = FileLock(lock_path, timeout=timeout)
+            _TRUST_STORE_FILE_LOCKS[cache_key] = lock
+        return lock
 
 
 def _restrict_file_permissions(filepath: str) -> None:
@@ -1478,10 +1554,14 @@ class DurableTrustStore:
         self._is_corrupted: bool = False
 
         for kid, k_val in initial_keys.items():
-            raw_hex = k_val if isinstance(k_val, str) else k_val.public_bytes(
-                encoding=serialization.Encoding.Raw,
-                format=serialization.PublicFormat.Raw,
-            ).hex()
+            raw_hex = (
+                k_val
+                if isinstance(k_val, str)
+                else k_val.public_bytes(
+                    encoding=serialization.Encoding.Raw,
+                    format=serialization.PublicFormat.Raw,
+                ).hex()
+            )
             self._approved_keys[kid] = {
                 "public_key_hex": raw_hex,
                 "added_at": datetime.now(UTC).isoformat(),
@@ -1503,17 +1583,27 @@ class DurableTrustStore:
         with lock:
             yield
 
-    def _get_authority_keys(self) -> tuple[ed25519.Ed25519PrivateKey | None, str | None, bytes | None]:
+    def _get_authority_keys(
+        self,
+    ) -> tuple[ed25519.Ed25519PrivateKey | None, str | None, bytes | None]:
         """Derive authoritative cryptographic key material from independently provisioned admin secret."""
         if not self._admin_token:
             return None, self._authority_public_key_hex, None
-        seed = hashlib.sha256(b"CFI-TRUST-STORE-AUTH-SEED-V2:" + self._admin_token.encode("utf-8")).digest()
+        seed = hashlib.sha256(
+            b"CFI-TRUST-STORE-AUTH-SEED-V2:" + self._admin_token.encode("utf-8")
+        ).digest()
         priv = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
-        pub_hex = priv.public_key().public_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PublicFormat.Raw,
-        ).hex()
-        hmac_key = hashlib.sha256(b"CFI-TRUST-STORE-HMAC-KEY-V2:" + self._admin_token.encode("utf-8")).digest()
+        pub_hex = (
+            priv.public_key()
+            .public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw,
+            )
+            .hex()
+        )
+        hmac_key = hashlib.sha256(
+            b"CFI-TRUST-STORE-HMAC-KEY-V2:" + self._admin_token.encode("utf-8")
+        ).digest()
         return priv, pub_hex, hmac_key
 
     def _verify_admin_authorization(
@@ -1535,9 +1625,8 @@ class DurableTrustStore:
         - Returns structured attribution metadata without fabricating an operator username.
         """
         is_prod = (
-            (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or get_settings().app_env).lower()
-            == "production"
-        )
+            os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or get_settings().app_env
+        ).lower() == "production"
 
         if internal_context is not None:
             from app.application.services.model_registry import verify_trusted_internal_context
@@ -1630,7 +1719,12 @@ class DurableTrustStore:
             stat = os.stat(self._trust_file_path)
             last_ns = getattr(self, "_last_mtime_ns", 0)
             last_sz = getattr(self, "_last_size", -1)
-            if not force and stat.st_mtime_ns == last_ns and stat.st_size == last_sz and stat.st_mtime == self._last_mtime:
+            if (
+                not force
+                and stat.st_mtime_ns == last_ns
+                and stat.st_size == last_sz
+                and stat.st_mtime == self._last_mtime
+            ):
                 return
 
             if stat.st_size == 0:
@@ -1687,12 +1781,15 @@ class DurableTrustStore:
 
             # Layer 3: Cryptographic Authenticity & Source-of-Authority Verification
             is_prod = (
-                (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or get_settings().app_env).lower()
-                == "production"
-            )
+                os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or get_settings().app_env
+            ).lower() == "production"
             has_auth = "authority_signature" in container or "integrity_hmac_sha256" in container
             if not has_auth:
-                if is_prod or self._admin_token is not None or self._authority_public_key_hex is not None:
+                if (
+                    is_prod
+                    or self._admin_token is not None
+                    or self._authority_public_key_hex is not None
+                ):
                     self._is_corrupted = True
                     raise TrainingProvenanceSecurityError(
                         f"Durable trust store at '{self._trust_file_path}' rejected: "
@@ -1710,7 +1807,9 @@ class DurableTrustStore:
                                 f"Durable trust store at '{self._trust_file_path}' failed cryptographic authentication: "
                                 "missing 'integrity_hmac_sha256' authentication tag."
                             )
-                        actual_hmac = hmac.new(hmac_key, canonical_bytes, hashlib.sha256).hexdigest()
+                        actual_hmac = hmac.new(
+                            hmac_key, canonical_bytes, hashlib.sha256
+                        ).hexdigest()
                         if not hmac.compare_digest(expected_hmac, actual_hmac):
                             self._is_corrupted = True
                             raise TrainingProvenanceSecurityError(
@@ -1729,9 +1828,10 @@ class DurableTrustStore:
                     )
 
                 is_prod = (
-                    (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or get_settings().app_env).lower()
-                    == "production"
-                )
+                    os.environ.get("APP_ENV")
+                    or os.environ.get("ENVIRONMENT")
+                    or get_settings().app_env
+                ).lower() == "production"
 
                 if is_prod and not self._authority_public_key_hex:
                     self._is_corrupted = True
@@ -1781,7 +1881,9 @@ class DurableTrustStore:
                     )
 
                 try:
-                    pub_obj = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(expected_pub))
+                    pub_obj = ed25519.Ed25519PublicKey.from_public_bytes(
+                        bytes.fromhex(expected_pub)
+                    )
                     pub_obj.verify(bytes.fromhex(file_sig), canonical_bytes)
                 except Exception as sig_err:
                     self._is_corrupted = True
@@ -1826,7 +1928,11 @@ class DurableTrustStore:
                 stat = os.stat(self._trust_file_path)
                 last_ns = getattr(self, "_last_mtime_ns", 0)
                 last_sz = getattr(self, "_last_size", -1)
-                if stat.st_mtime_ns != last_ns or stat.st_size != last_sz or stat.st_mtime != self._last_mtime:
+                if (
+                    stat.st_mtime_ns != last_ns
+                    or stat.st_size != last_sz
+                    or stat.st_mtime != self._last_mtime
+                ):
                     with self._file_lock_context():
                         self._reload_unlocked(force=True)
 
@@ -1849,7 +1955,9 @@ class DurableTrustStore:
                 existing_container = json.loads(existing_raw)
                 if isinstance(existing_container, dict):
                     existing_pub = existing_container.get("authority_public_key_hex")
-                    if existing_pub and not hmac.compare_digest(existing_pub.lower(), pub_hex.lower()):
+                    if existing_pub and not hmac.compare_digest(
+                        existing_pub.lower(), pub_hex.lower()
+                    ):
                         raise TrainingProvenanceSecurityError(
                             f"Cannot persist durable trust store at '{self._trust_file_path}': "
                             f"cannot replace existing authoritative trust anchor '{existing_pub}' with '{pub_hex}'."
@@ -1881,7 +1989,9 @@ class DurableTrustStore:
 
         parent_dir = os.path.dirname(os.path.abspath(self._trust_file_path))
         os.makedirs(parent_dir, exist_ok=True)
-        tmp_path = f"{self._trust_file_path}.{os.getpid()}.{threading.get_ident()}.{uuid.uuid4().hex}.tmp"
+        tmp_path = (
+            f"{self._trust_file_path}.{os.getpid()}.{threading.get_ident()}.{uuid.uuid4().hex}.tmp"
+        )
         with open(tmp_path, "wb") as f:
             f.write(json.dumps(container, indent=2).encode("utf-8"))
             f.flush()
@@ -1934,7 +2044,9 @@ class DurableTrustStore:
                 )
 
             if clean_kid in self._approved_keys:
-                existing_hex = self._approved_keys[clean_kid].get("public_key_hex", "").strip().lower()
+                existing_hex = (
+                    self._approved_keys[clean_kid].get("public_key_hex", "").strip().lower()
+                )
                 if existing_hex != clean_hex and not authorized_replacement:
                     raise ValueError(
                         f"Unauthorized public key substitution rejected: key_id '{clean_kid}' is already "
@@ -2138,14 +2250,20 @@ class DurableTrustStore:
         with self._lock:
             self.reload_if_modified()
             if self._is_corrupted:
-                raise TrainingProvenanceSecurityError("Durable trust store is corrupted. Access denied.")
+                raise TrainingProvenanceSecurityError(
+                    "Durable trust store is corrupted. Access denied."
+                )
             return key_id.strip() in self._revoked_keys
 
-    def is_key_retired(self, key_id: str, at_timestamp: str | None = None) -> tuple[bool, str | None]:
+    def is_key_retired(
+        self, key_id: str, at_timestamp: str | None = None
+    ) -> tuple[bool, str | None]:
         with self._lock:
             self.reload_if_modified()
             if self._is_corrupted:
-                raise TrainingProvenanceSecurityError("Durable trust store is corrupted. Access denied.")
+                raise TrainingProvenanceSecurityError(
+                    "Durable trust store is corrupted. Access denied."
+                )
             clean_kid = key_id.strip()
             if clean_kid not in self._retired_keys:
                 return False, None
@@ -2162,7 +2280,9 @@ class DurableTrustStore:
         with self._lock:
             self.reload_if_modified()
             if self._is_corrupted:
-                raise TrainingProvenanceSecurityError("Durable trust store is corrupted. Access denied.")
+                raise TrainingProvenanceSecurityError(
+                    "Durable trust store is corrupted. Access denied."
+                )
             return {
                 kid: v.get("public_key_hex", "")
                 for kid, v in self._approved_keys.items()
@@ -2173,7 +2293,9 @@ class DurableTrustStore:
         with self._lock:
             self.reload_if_modified()
             if self._is_corrupted:
-                raise TrainingProvenanceSecurityError("Durable trust store is corrupted. Access denied.")
+                raise TrainingProvenanceSecurityError(
+                    "Durable trust store is corrupted. Access denied."
+                )
             return dict(self._revoked_keys)
 
     def clear(self, admin_token: str | None = None) -> None:
@@ -2337,7 +2459,6 @@ def record_training_job_completion(
     )
 
 
-
 @dataclasses.dataclass(frozen=True)
 class TrainingExecutionReceipt:
     receipt_id: str
@@ -2396,7 +2517,9 @@ class TrainingExecutionReceipt:
         return d
 
     def canonical_bytes(self) -> bytes:
-        return json.dumps(self.canonical_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return json.dumps(self.canonical_dict(), sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
 
     def to_dict(self) -> dict[str, Any]:
         res = self.canonical_dict()
@@ -2502,7 +2625,9 @@ class TrainingReceiptIssuer:
     ) -> None:
         if signing_key_hex is not None:
             if signing_key_hex == "":
-                raise TrainingProvenanceConfigurationError("Signing key hex must be provided and non-empty.")
+                raise TrainingProvenanceConfigurationError(
+                    "Signing key hex must be provided and non-empty."
+                )
             private_key = signing_key_hex
         if enforce_job_records is not None:
             require_authenticated_job = enforce_job_records
@@ -2512,7 +2637,11 @@ class TrainingReceiptIssuer:
         self._job_record_source = job_record_source or get_default_training_job_record_source()
         self._trust_store = trust_store or get_default_trust_store()
         settings = get_settings()
-        is_prod = (app_env.lower() == "production") if app_env is not None else (settings.app_env.lower() == "production")
+        is_prod = (
+            (app_env.lower() == "production")
+            if app_env is not None
+            else (settings.app_env.lower() == "production")
+        )
 
         if is_prod and require_authenticated_job is False:
             raise TrainingProvenanceConfigurationError(
@@ -2539,7 +2668,9 @@ class TrainingReceiptIssuer:
             elif isinstance(private_key, str):
                 cleaned = private_key.strip()
                 if len(cleaned) == 64:
-                    self._private_key = ed25519.Ed25519PrivateKey.from_private_bytes(bytes.fromhex(cleaned))
+                    self._private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+                        bytes.fromhex(cleaned)
+                    )
                 else:
                     loaded = serialization.load_pem_private_key(cleaned.encode(), password=None)
                     if not isinstance(loaded, ed25519.Ed25519PrivateKey):
@@ -2553,7 +2684,9 @@ class TrainingReceiptIssuer:
             if env_key:
                 cleaned = env_key.strip()
                 if len(cleaned) == 64:
-                    self._private_key = ed25519.Ed25519PrivateKey.from_private_bytes(bytes.fromhex(cleaned))
+                    self._private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+                        bytes.fromhex(cleaned)
+                    )
                 else:
                     loaded = serialization.load_pem_private_key(cleaned.encode(), password=None)
                     if not isinstance(loaded, ed25519.Ed25519PrivateKey):
@@ -2614,7 +2747,11 @@ class TrainingReceiptIssuer:
     ) -> TrainingExecutionReceipt:
         """Issue an authenticated training execution receipt signed with Ed25519 private key."""
         settings = get_settings()
-        is_prod = (self._app_env.lower() == "production") if self._app_env is not None else (settings.app_env.lower() == "production")
+        is_prod = (
+            (self._app_env.lower() == "production")
+            if self._app_env is not None
+            else (settings.app_env.lower() == "production")
+        )
 
         target_owning_bank = owning_bank_id
         target_consortium = consortium_id
@@ -2690,12 +2827,18 @@ class TrainingReceiptIssuer:
                         "Production receipt issuance requires explicit executed_rounds or executed_epochs (work must be observed)."
                     )
                 if sample_count is None or sample_count <= 0:
-                    raise ValueError("Production receipt issuance requires explicit, positive sample_count.")
+                    raise ValueError(
+                        "Production receipt issuance requires explicit, positive sample_count."
+                    )
                 if metrics is None or not isinstance(metrics, dict):
-                    raise ValueError("Production receipt issuance requires explicit observed metrics dictionary.")
+                    raise ValueError(
+                        "Production receipt issuance requires explicit observed metrics dictionary."
+                    )
 
             target_rounds = (
-                executed_rounds if executed_rounds is not None else (0 if executed_epochs is not None else 1)
+                executed_rounds
+                if executed_rounds is not None
+                else (0 if executed_epochs is not None else 1)
             )
             target_epochs = executed_epochs if executed_epochs is not None else 0
             target_samples = sample_count if sample_count is not None else 100
@@ -2714,12 +2857,18 @@ class TrainingReceiptIssuer:
                 if k in target_metrics:
                     loss_val = target_metrics[k]
                     break
-            if loss_val is None or not isinstance(loss_val, (int, float)) or not math.isfinite(loss_val):
+            if (
+                loss_val is None
+                or not isinstance(loss_val, (int, float))
+                or not math.isfinite(loss_val)
+            ):
                 raise ValueError("Training metrics must contain a finite numeric loss.")
 
         # Check revocation and retirement of signing key
         if self._trust_store.is_key_revoked(self.key_id):
-            raise ValueError(f"Cannot issue receipt: key_id '{self.key_id}' has been revoked due to compromise.")
+            raise ValueError(
+                f"Cannot issue receipt: key_id '{self.key_id}' has been revoked due to compromise."
+            )
         is_ret, ret_at = self._trust_store.is_key_retired(self.key_id)
         if is_ret:
             raise ValueError(
@@ -2730,7 +2879,11 @@ class TrainingReceiptIssuer:
         enforce_record = (
             True
             if is_prod
-            else (self._require_authenticated_job if self._require_authenticated_job is not None else False)
+            else (
+                self._require_authenticated_job
+                if self._require_authenticated_job is not None
+                else False
+            )
         )
         if enforce_record:
             target_job = target_job_id or f"job_{target_run_id}"
@@ -2810,13 +2963,22 @@ class TrainingReceiptIssuer:
             # Match observed metrics
             for k, expected_v in rec.observed_metrics.items():
                 if k not in target_metrics:
-                    raise TrainingProvenanceSecurityError(f"Observed metric '{k}' missing from receipt request.")
+                    raise TrainingProvenanceSecurityError(
+                        f"Observed metric '{k}' missing from receipt request."
+                    )
                 actual_v = target_metrics[k]
-                if not (isinstance(actual_v, (int, float)) and math.isclose(actual_v, expected_v, rel_tol=1e-7, abs_tol=1e-7)):
+                if not (
+                    isinstance(actual_v, (int, float))
+                    and math.isclose(actual_v, expected_v, rel_tol=1e-7, abs_tol=1e-7)
+                ):
                     raise TrainingProvenanceSecurityError(
                         f"Metric '{k}' mismatch: caller claimed {actual_v}, but trusted record observed {expected_v}."
                     )
-            if rec.dataset_manifest_id and target_manifest and target_manifest != rec.dataset_manifest_id:
+            if (
+                rec.dataset_manifest_id
+                and target_manifest
+                and target_manifest != rec.dataset_manifest_id
+            ):
                 raise TrainingProvenanceSecurityError(
                     f"Dataset manifest mismatch: caller claimed '{target_manifest}', but trusted record observed '{rec.dataset_manifest_id}'."
                 )
@@ -2837,8 +2999,14 @@ class TrainingReceiptIssuer:
 
             # Finding SIGN-TRUST-01: Issuer independently reconciles underlying evidence chain
             is_durable_source = getattr(self._job_record_source, "is_durable", False)
-            source_enforces_lifecycle = getattr(self._job_record_source, "_enforce_lifecycle", False)
-            if (is_prod or source_enforces_lifecycle) and rec.executed_rounds > 0 and is_durable_source:
+            source_enforces_lifecycle = getattr(
+                self._job_record_source, "_enforce_lifecycle", False
+            )
+            if (
+                (is_prod or source_enforces_lifecycle)
+                and rec.executed_rounds > 0
+                and is_durable_source
+            ):
                 if hasattr(self._job_record_source, "get_round_observations"):
                     obs_list = self._job_record_source.get_round_observations(target_job)
                     if not obs_list:
@@ -2861,7 +3029,12 @@ class TrainingReceiptIssuer:
                             if (
                                 m_name in eval_metrics
                                 and m_name in rec.observed_metrics
-                                and not math.isclose(eval_metrics[m_name], rec.observed_metrics[m_name], rel_tol=1e-5, abs_tol=1e-5)
+                                and not math.isclose(
+                                    eval_metrics[m_name],
+                                    rec.observed_metrics[m_name],
+                                    rel_tol=1e-5,
+                                    abs_tol=1e-5,
+                                )
                             ):
                                 raise TrainingProvenanceSecurityError(
                                     f"Production receipt issuance rejected: metric '{m_name}' in completion record ({rec.observed_metrics[m_name]}) "
@@ -2897,7 +3070,9 @@ class TrainingReceiptIssuer:
             receipt_data["owning_bank_id"] = target_owning_bank
         if target_consortium is not None:
             receipt_data["consortium_id"] = target_consortium
-        canonical_bytes = json.dumps(receipt_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        canonical_bytes = json.dumps(receipt_data, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
         sig_bytes = self._private_key.sign(canonical_bytes)
         signature = sig_bytes.hex()
 
@@ -2955,7 +3130,9 @@ class TrainingReceiptVerifier:
                 for kid, hex_val in self._trust_store.get_approved_keys().items():
                     if hex_val:
                         with contextlib.suppress(Exception):
-                            self._trusted_keys[kid] = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(hex_val))
+                            self._trusted_keys[kid] = ed25519.Ed25519PublicKey.from_public_bytes(
+                                bytes.fromhex(hex_val)
+                            )
             except TrainingProvenanceSecurityError:
                 self._trusted_keys.clear()
         elif trusted_keys is not None:
@@ -2963,7 +3140,9 @@ class TrainingReceiptVerifier:
             self._in_memory_only = True
         else:
             settings = get_settings()
-            if settings.app_env.lower() != "production" and not os.environ.get("CFI_TRAINING_RECEIPT_TRUST_STORE"):
+            if settings.app_env.lower() != "production" and not os.environ.get(
+                "CFI_TRAINING_RECEIPT_TRUST_STORE"
+            ):
                 self._trust_store = DurableTrustStore(in_memory=True)
                 self._in_memory_only = True
             else:
@@ -2976,9 +3155,8 @@ class TrainingReceiptVerifier:
             settings = get_settings()
             is_prod = settings.app_env.lower() == "production"
 
-            pub_source = (
-                getattr(settings, "training_receipt_public_key", None)
-                or os.environ.get("CFI_TRAINING_RECEIPT_PUBLIC_KEY", "")
+            pub_source = getattr(settings, "training_receipt_public_key", None) or os.environ.get(
+                "CFI_TRAINING_RECEIPT_PUBLIC_KEY", ""
             )
             pub_source = pub_source.strip() if pub_source else ""
 
@@ -3025,7 +3203,9 @@ class TrainingReceiptVerifier:
                 dev_seed = hashlib.sha256(b"cfi_dev_ed25519_training_issuer_seed_v1").digest()
                 dev_priv = ed25519.Ed25519PrivateKey.from_private_bytes(dev_seed)
                 dev_pub = dev_priv.public_key()
-                self.register_trusted_key(DEFAULT_TRAINING_KEY_ID, dev_pub, authorized_replacement=True)
+                self.register_trusted_key(
+                    DEFAULT_TRAINING_KEY_ID, dev_pub, authorized_replacement=True
+                )
         else:
             settings = get_settings()
             is_prod = settings.app_env.lower() == "production"
@@ -3097,7 +3277,10 @@ class TrainingReceiptVerifier:
         if not self._in_memory_only:
             try:
                 approved_map = self._trust_store.get_approved_keys()
-                if clean_kid in approved_map and approved_map[clean_kid].lower() == new_bytes.hex().lower():
+                if (
+                    clean_kid in approved_map
+                    and approved_map[clean_kid].lower() == new_bytes.hex().lower()
+                ):
                     self._trusted_keys[clean_kid] = parsed_pub
                     return
             except TrainingProvenanceSecurityError:
@@ -3105,7 +3288,10 @@ class TrainingReceiptVerifier:
 
             try:
                 self._trust_store.register_approved_key(
-                    clean_kid, new_bytes.hex(), authorized_replacement=authorized_replacement, admin_token=admin_token
+                    clean_kid,
+                    new_bytes.hex(),
+                    authorized_replacement=authorized_replacement,
+                    admin_token=admin_token,
                 )
             except TrainingProvenanceSecurityError:
                 if admin_token is not None:
@@ -3127,7 +3313,11 @@ class TrainingReceiptVerifier:
 
         if not self._in_memory_only:
             approved_map = self._trust_store.get_approved_keys()
-            to_remove = [k for k in self._trusted_keys if k not in approved_map and k not in self._static_configured_keys]
+            to_remove = [
+                k
+                for k in self._trusted_keys
+                if k not in approved_map and k not in self._static_configured_keys
+            ]
             for k in to_remove:
                 self._trusted_keys.pop(k, None)
 
@@ -3176,7 +3366,9 @@ class TrainingReceiptVerifier:
                 self._trusted_keys.pop(clean_kid, None)
                 return False
             if clean_kid not in self._trusted_keys and clean_kid in approved_map:
-                self.register_trusted_key(clean_kid, approved_map[clean_kid], authorized_replacement=True)
+                self.register_trusted_key(
+                    clean_kid, approved_map[clean_kid], authorized_replacement=True
+                )
         return clean_kid in self._trusted_keys
 
     def verify(
@@ -3244,7 +3436,9 @@ class TrainingReceiptVerifier:
         except (TrainingProvenanceSecurityError, Exception) as exc:
             return False, f"Trust store corrupted or unavailable: {exc}"
 
-        if receipt_obj.key_id in self._revoked_keys or self._trust_store.is_key_revoked(receipt_obj.key_id):
+        if receipt_obj.key_id in self._revoked_keys or self._trust_store.is_key_revoked(
+            receipt_obj.key_id
+        ):
             self._trusted_keys.pop(receipt_obj.key_id, None)
             self._revoked_keys.add(receipt_obj.key_id)
             return False, f"Receipt key_id '{receipt_obj.key_id}' has been explicitly revoked."
@@ -3260,20 +3454,34 @@ class TrainingReceiptVerifier:
             )
 
         if expected_key_id and receipt_obj.key_id != expected_key_id:
-            return False, f"Receipt key_id mismatch: expected '{expected_key_id}', got '{receipt_obj.key_id}'."
+            return (
+                False,
+                f"Receipt key_id mismatch: expected '{expected_key_id}', got '{receipt_obj.key_id}'.",
+            )
 
         if not self._in_memory_only:
             approved_map = self._trust_store.get_approved_keys()
-            if receipt_obj.key_id not in approved_map and receipt_obj.key_id not in self._static_configured_keys:
+            if (
+                receipt_obj.key_id not in approved_map
+                and receipt_obj.key_id not in self._static_configured_keys
+            ):
                 self._trusted_keys.pop(receipt_obj.key_id, None)
-                return False, f"Receipt key_id '{receipt_obj.key_id}' is not present in trusted public key registry."
+                return (
+                    False,
+                    f"Receipt key_id '{receipt_obj.key_id}' is not present in trusted public key registry.",
+                )
             if receipt_obj.key_id not in self._trusted_keys and receipt_obj.key_id in approved_map:
                 self.register_trusted_key(
-                    receipt_obj.key_id, approved_map[receipt_obj.key_id], authorized_replacement=True
+                    receipt_obj.key_id,
+                    approved_map[receipt_obj.key_id],
+                    authorized_replacement=True,
                 )
 
         if receipt_obj.key_id not in self._trusted_keys:
-            return False, f"Receipt key_id '{receipt_obj.key_id}' is not present in trusted public key registry."
+            return (
+                False,
+                f"Receipt key_id '{receipt_obj.key_id}' is not present in trusted public key registry.",
+            )
 
         public_key = self._trusted_keys[receipt_obj.key_id]
 
@@ -3282,7 +3490,10 @@ class TrainingReceiptVerifier:
             sig_bytes = bytes.fromhex(receipt_obj.signature)
             public_key.verify(sig_bytes, receipt_obj.canonical_bytes())
         except (ValueError, InvalidSignature) as exc:
-            return False, f"Cryptographic signature mismatch: receipt was tampered with or signed with untrusted key ({exc})."
+            return (
+                False,
+                f"Cryptographic signature mismatch: receipt was tampered with or signed with untrusted key ({exc}).",
+            )
 
         # Exact artifact SHA-256 binding
         target_candidate_sha = candidate_artifact_sha256
@@ -3304,7 +3515,11 @@ class TrainingReceiptVerifier:
             )
 
         # Simulation scope binding
-        if simulation_id and receipt_obj.simulation_id and receipt_obj.simulation_id != simulation_id:
+        if (
+            simulation_id
+            and receipt_obj.simulation_id
+            and receipt_obj.simulation_id != simulation_id
+        ):
             return False, (
                 f"Simulation scope mismatch: receipt is for '{receipt_obj.simulation_id}', "
                 f"candidate requested for '{simulation_id}'."
@@ -3318,7 +3533,10 @@ class TrainingReceiptVerifier:
             )
 
         # Feature schema version binding
-        if expected_feature_schema_version and receipt_obj.feature_schema_version != expected_feature_schema_version:
+        if (
+            expected_feature_schema_version
+            and receipt_obj.feature_schema_version != expected_feature_schema_version
+        ):
             return False, (
                 f"Feature schema version mismatch: receipt binds '{receipt_obj.feature_schema_version}', "
                 f"expected '{expected_feature_schema_version}'."
@@ -3331,7 +3549,9 @@ class TrainingReceiptVerifier:
             )
 
         # Feature names binding
-        if expected_feature_names is not None and list(receipt_obj.feature_names) != list(expected_feature_names):
+        if expected_feature_names is not None and list(receipt_obj.feature_names) != list(
+            expected_feature_names
+        ):
             return False, (
                 f"Feature names or ordering mismatch: receipt binds {receipt_obj.feature_names}, "
                 f"expected {list(expected_feature_names)}."
@@ -3340,7 +3560,10 @@ class TrainingReceiptVerifier:
         # Consortium scope binding
         if expected_consortium_id is not None:
             if not receipt_obj.consortium_id:
-                return False, f"Consortium claim missing: receipt does not bind required consortium '{expected_consortium_id}'."
+                return (
+                    False,
+                    f"Consortium claim missing: receipt does not bind required consortium '{expected_consortium_id}'.",
+                )
             if receipt_obj.consortium_id != expected_consortium_id:
                 return False, (
                     f"Consortium scope mismatch: receipt binds '{receipt_obj.consortium_id}', "
@@ -3360,7 +3583,11 @@ class TrainingReceiptVerifier:
             if k in receipt_obj.metrics:
                 loss_val = receipt_obj.metrics[k]
                 break
-        if loss_val is None or not isinstance(loss_val, (int, float)) or not math.isfinite(loss_val):
+        if (
+            loss_val is None
+            or not isinstance(loss_val, (int, float))
+            or not math.isfinite(loss_val)
+        ):
             return False, "Recorded training loss is not a finite number."
 
         return True, "Training receipt verified successfully."
@@ -3536,13 +3763,20 @@ class TrainingReceiptAuthority:
                     f"Artifact digest mismatch: receipt binds '{receipt_obj.model_artifact_sha256}', "
                     f"candidate is '{candidate_artifact_sha256}'."
                 )
-            if simulation_id and receipt_obj.simulation_id and receipt_obj.simulation_id != simulation_id:
+            if (
+                simulation_id
+                and receipt_obj.simulation_id
+                and receipt_obj.simulation_id != simulation_id
+            ):
                 return False, (
                     f"Simulation scope mismatch: receipt is for '{receipt_obj.simulation_id}', "
                     f"requested '{simulation_id}'."
                 )
             if receipt_obj.status != "COMPLETED":
-                return False, f"Training run status is '{receipt_obj.status}', expected 'COMPLETED'."
+                return (
+                    False,
+                    f"Training run status is '{receipt_obj.status}', expected 'COMPLETED'.",
+                )
             if receipt_obj.executed_rounds < 1 and receipt_obj.executed_epochs < 1:
                 return False, "Executed rounds and epochs are both < 1."
             if receipt_obj.sample_count <= 0:
@@ -3552,7 +3786,11 @@ class TrainingReceiptAuthority:
                 if k in receipt_obj.metrics:
                     loss_val = receipt_obj.metrics[k]
                     break
-            if loss_val is None or not isinstance(loss_val, (int, float)) or not math.isfinite(loss_val):
+            if (
+                loss_val is None
+                or not isinstance(loss_val, (int, float))
+                or not math.isfinite(loss_val)
+            ):
                 return False, "Recorded training loss is not a finite number."
             return True, "Legacy HMAC receipt verified successfully (dev only)."
 

@@ -144,7 +144,10 @@ class TestTrainingProvenanceEnforcement:
             registry = ModelRegistry(storage_dir=tmp_dir)
             state_dict, raw_bytes, _ = _create_mock_checkpoint()
 
-            with patch.object(get_settings(), "app_env", "production"), pytest.raises(ModelIntegrityError):
+            with (
+                patch.object(get_settings(), "app_env", "production"),
+                pytest.raises(ModelIntegrityError),
+            ):
                 registry.save_version(
                     simulation_id="sim_prov_test",
                     state_dict=state_dict,
@@ -206,17 +209,22 @@ class TestModule01AAdversarialProvenance:
             "CFI_TRAINING_RECEIPT_PUBLIC_KEY": pub_hex,
             "CFI_TRAINING_RECEIPT_KEY_ID": "prod_authority_01",
         }
-        with patch.dict(os.environ, env_overrides, clear=False), \
-             patch.object(get_settings(), "app_env", "production"), \
-             patch.object(get_settings(), "training_receipt_public_key", pub_hex), \
-             patch.object(get_settings(), "training_receipt_key_id", "prod_authority_01"):
-
+        with (
+            patch.dict(os.environ, env_overrides, clear=False),
+            patch.object(get_settings(), "app_env", "production"),
+            patch.object(get_settings(), "training_receipt_public_key", pub_hex),
+            patch.object(get_settings(), "training_receipt_key_id", "prod_authority_01"),
+        ):
             # Ensure private key is completely unset
             os.environ.pop("CFI_TRAINING_RECEIPT_PRIVATE_KEY", None)
 
             # Assert that TrainingReceiptIssuer constructor is NEVER called during verifier operation
-            with patch("app.application.services.training_provenance_service.TrainingReceiptIssuer.__init__") as mock_issuer:
-                mock_issuer.side_effect = RuntimeError("SECURITY VIOLATION: Verifier must never construct TrainingReceiptIssuer!")
+            with patch(
+                "app.application.services.training_provenance_service.TrainingReceiptIssuer.__init__"
+            ) as mock_issuer:
+                mock_issuer.side_effect = RuntimeError(
+                    "SECURITY VIOLATION: Verifier must never construct TrainingReceiptIssuer!"
+                )
                 reset_default_training_verifier()
                 verifier = get_default_training_verifier()
 
@@ -238,15 +246,18 @@ class TestModule01AAdversarialProvenance:
         env_overrides = {
             "APP_ENV": "production",
         }
-        with patch.dict(os.environ, env_overrides, clear=False), \
-             patch.object(get_settings(), "app_env", "production"), \
-             patch.object(get_settings(), "training_receipt_public_key", ""):
-
+        with (
+            patch.dict(os.environ, env_overrides, clear=False),
+            patch.object(get_settings(), "app_env", "production"),
+            patch.object(get_settings(), "training_receipt_public_key", ""),
+        ):
             os.environ.pop("CFI_TRAINING_RECEIPT_PUBLIC_KEY", None)
             os.environ.pop("CFI_TRAINING_RECEIPT_PUBLIC_KEYS", None)
 
             reset_default_training_verifier()
-            with pytest.raises(TrainingProvenanceConfigurationError, match="Trusted public key is mandatory"):
+            with pytest.raises(
+                TrainingProvenanceConfigurationError, match="Trusted public key is mandatory"
+            ):
                 TrainingReceiptVerifier()
 
     def test_prov_03_application_payload_signing_secret_cannot_forge_provenance(self):
@@ -257,11 +268,12 @@ class TestModule01AAdversarialProvenance:
         env_overrides = {
             "APP_ENV": "production",
         }
-        with patch.dict(os.environ, env_overrides, clear=False), \
-             patch.object(get_settings(), "app_env", "production"), \
-             patch.object(get_settings(), "payload_signing_secret", "super_secret_app_key_2026"), \
-             patch.object(get_settings(), "training_receipt_public_key", ""):
-
+        with (
+            patch.dict(os.environ, env_overrides, clear=False),
+            patch.object(get_settings(), "app_env", "production"),
+            patch.object(get_settings(), "payload_signing_secret", "super_secret_app_key_2026"),
+            patch.object(get_settings(), "training_receipt_public_key", ""),
+        ):
             os.environ.pop("CFI_TRAINING_RECEIPT_PUBLIC_KEY", None)
 
             # Verifier cannot establish trust from application secret
@@ -280,11 +292,15 @@ class TestModule01AAdversarialProvenance:
             format=serialization.PublicFormat.Raw,
         ).hex()
 
-        with patch.dict(os.environ, {"APP_ENV": "production", "CFI_TRAINING_RECEIPT_PUBLIC_KEY": trusted_pub_hex}), \
-             patch.object(get_settings(), "app_env", "production"), \
-             patch.object(get_settings(), "payload_signing_secret", "super_secret_app_key_2026"), \
-             patch.object(get_settings(), "training_receipt_public_key", trusted_pub_hex):
-
+        with (
+            patch.dict(
+                os.environ,
+                {"APP_ENV": "production", "CFI_TRAINING_RECEIPT_PUBLIC_KEY": trusted_pub_hex},
+            ),
+            patch.object(get_settings(), "app_env", "production"),
+            patch.object(get_settings(), "payload_signing_secret", "super_secret_app_key_2026"),
+            patch.object(get_settings(), "training_receipt_public_key", trusted_pub_hex),
+        ):
             reset_default_training_verifier()
             authority = TrainingReceiptAuthority(signing_secret="super_secret_app_key_2026")
             _, _, sha256 = _create_mock_checkpoint()
@@ -310,7 +326,9 @@ class TestModule01AAdversarialProvenance:
                 "key_id": "app_secret_key",
                 "signature_scheme": "HMAC-SHA256",
             }
-            is_valid, reason = authority.verify_receipt(crafted_receipt, candidate_artifact_sha256=sha256)
+            is_valid, reason = authority.verify_receipt(
+                crafted_receipt, candidate_artifact_sha256=sha256
+            )
             assert is_valid is False
             assert "production rejects untrusted" in reason.lower()
 
@@ -393,7 +411,9 @@ class TestModule01AAdversarialProvenance:
             tampered_dict[field_name] = altered_value
 
             is_valid, reason = verifier.verify_receipt(tampered_dict)
-            assert is_valid is False, f"Tampered field '{field_name}' unexpectedly passed verification!"
+            assert is_valid is False, (
+                f"Tampered field '{field_name}' unexpectedly passed verification!"
+            )
             assert "signature mismatch" in reason.lower() or "status is" in reason.lower()
 
     def test_prov_06_modified_artifact_bytes_fails_binding(self):
@@ -427,7 +447,9 @@ class TestModule01AAdversarialProvenance:
         assert "artifact digest mismatch" in reason.lower()
 
         # Direct candidate bytes mismatch check
-        is_valid_bytes, reason_bytes = verifier.verify_receipt(receipt, candidate_artifact_bytes=bytes_b)
+        is_valid_bytes, reason_bytes = verifier.verify_receipt(
+            receipt, candidate_artifact_bytes=bytes_b
+        )
         assert is_valid_bytes is False
         assert "artifact digest mismatch" in reason_bytes.lower()
 
@@ -511,7 +533,9 @@ class TestModule01AAdversarialProvenance:
 
         # 4. Feature ordering / names mismatch
         ok, reason = verifier.verify_receipt(
-            receipt, candidate_artifact_sha256=sha256, expected_feature_names=["age", "amount", "tx_count", "risk_score"]
+            receipt,
+            candidate_artifact_sha256=sha256,
+            expected_feature_names=["age", "amount", "tx_count", "risk_score"],
         )
         assert ok is False
         assert "feature names or ordering mismatch" in reason.lower()
@@ -596,8 +620,13 @@ class TestModule01AAdversarialProvenance:
 
             # Also verify that TrainingReceiptIssuer rejects production issuance with missing/unobserved work
             issuer = TrainingReceiptIssuer()
-            with patch.object(get_settings(), "app_env", "production"), \
-                 pytest.raises(ValueError, match="Production receipt issuance requires explicit executed_rounds"):
+            with (
+                patch.object(get_settings(), "app_env", "production"),
+                pytest.raises(
+                    ValueError,
+                    match="Production receipt issuance requires explicit executed_rounds",
+                ),
+            ):
                 issuer.issue_receipt(
                     training_run_id="run_prod_no_work",
                     model_bytes=raw_bytes,
@@ -664,9 +693,7 @@ class TestModule01AAdversarialProvenance:
         receipt = issuer.issue_receipt(evidence=evidence, model_bytes=trained_bytes)
 
         # Verify with independent public-key-only verifier
-        verifier = TrainingReceiptVerifier(
-            trusted_keys={"local_authority_key": priv.public_key()}
-        )
+        verifier = TrainingReceiptVerifier(trusted_keys={"local_authority_key": priv.public_key()})
         ok, reason = verifier.verify_receipt(
             receipt,
             candidate_artifact_sha256=artifact_sha,
@@ -711,14 +738,19 @@ class TestModule01AAdversarialProvenance:
             "signature_scheme": "HMAC-SHA256",
         }
         # Compute HMAC signature
-        canonical = TrainingExecutionReceipt.from_dict({**receipt_dict, "signature": "temp"}).canonical_bytes()
+        canonical = TrainingExecutionReceipt.from_dict(
+            {**receipt_dict, "signature": "temp"}
+        ).canonical_bytes()
         signing_key = auth._get_signing_key()
         import hmac as pyhmac
+
         receipt_dict["signature"] = pyhmac.new(signing_key, canonical, hashlib.sha256).hexdigest()
 
         # In production: MUST be rejected
         with patch.object(get_settings(), "app_env", "production"):
-            ok_prod, reason_prod = auth.verify_receipt(receipt_dict, candidate_artifact_sha256=sha256)
+            ok_prod, reason_prod = auth.verify_receipt(
+                receipt_dict, candidate_artifact_sha256=sha256
+            )
             assert ok_prod is False
             assert "production rejects untrusted or non-asymmetric receipt" in reason_prod.lower()
 
@@ -844,13 +876,18 @@ class TestModule01AAdversarialProvenance:
             format=serialization.PublicFormat.Raw,
         ).hex()
 
-        with patch.dict(os.environ, {"CFI_TRAINING_RECEIPT_PUBLIC_KEY": pub_hex, "APP_ENV": "production"}), \
-             patch.object(get_settings(), "app_env", "production"), \
-             patch.object(get_settings(), "training_receipt_public_key", pub_hex):
-
+        with (
+            patch.dict(
+                os.environ, {"CFI_TRAINING_RECEIPT_PUBLIC_KEY": pub_hex, "APP_ENV": "production"}
+            ),
+            patch.object(get_settings(), "app_env", "production"),
+            patch.object(get_settings(), "training_receipt_public_key", pub_hex),
+        ):
             reset_default_training_verifier()
 
-            with patch("app.application.services.training_provenance_service.TrainingReceiptIssuer") as mock_issuer:
+            with patch(
+                "app.application.services.training_provenance_service.TrainingReceiptIssuer"
+            ) as mock_issuer:
                 verifier = get_default_training_verifier()
                 assert isinstance(verifier, TrainingReceiptVerifier)
                 assert mock_issuer.call_count == 0
@@ -890,11 +927,19 @@ class TestModule01AAdversarialProvenance:
         with tempfile.TemporaryDirectory() as tmp_dir:
             registry = ModelRegistry(storage_dir=tmp_dir)
 
-            with patch.dict(os.environ, {"CFI_TRAINING_RECEIPT_PUBLIC_KEY": pub_hex, "CFI_TRAINING_RECEIPT_KEY_ID": "reg_auth_01", "APP_ENV": "production"}), \
-                 patch.object(get_settings(), "app_env", "production"), \
-                 patch.object(get_settings(), "training_receipt_public_key", pub_hex), \
-                 patch.object(get_settings(), "training_receipt_key_id", "reg_auth_01"):
-
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "CFI_TRAINING_RECEIPT_PUBLIC_KEY": pub_hex,
+                        "CFI_TRAINING_RECEIPT_KEY_ID": "reg_auth_01",
+                        "APP_ENV": "production",
+                    },
+                ),
+                patch.object(get_settings(), "app_env", "production"),
+                patch.object(get_settings(), "training_receipt_public_key", pub_hex),
+                patch.object(get_settings(), "training_receipt_key_id", "reg_auth_01"),
+            ):
                 reset_default_training_verifier()
 
                 # Valid receipt registration
@@ -982,7 +1027,10 @@ class TestModule01ACompletionPatch:
                     architecture="FraudDetectionNN",
                     input_dim=2,
                 )
-            assert "Production receipt issuance rejected: job 'job_ghost_01' has no authenticated execution record" in str(exc_info.value)
+            assert (
+                "Production receipt issuance rejected: job 'job_ghost_01' has no authenticated execution record"
+                in str(exc_info.value)
+            )
 
     def test_prov_a2_forged_evidence_object_rejected(self):
         """PROV-A2: Possession of caller-created TrainingExecutionEvidence does NOT authorize issuance.
@@ -1023,7 +1071,10 @@ class TestModule01ACompletionPatch:
             # Passing evidence object alone without authenticated recorded job MUST be rejected
             with pytest.raises(TrainingProvenanceSecurityError) as exc_info:
                 issuer.issue_receipt(evidence=evidence)
-            assert "Production receipt issuance rejected: job 'job_forged_ev' has no authenticated execution record" in str(exc_info.value)
+            assert (
+                "Production receipt issuance rejected: job 'job_forged_ev' has no authenticated execution record"
+                in str(exc_info.value)
+            )
 
             # Unauthenticated recording attempt with wrong token is also rejected
             with pytest.raises(TrainingProvenanceSecurityError):
@@ -1051,7 +1102,9 @@ class TestModule01ACompletionPatch:
 
         # Receipt issuance must reject zero executed rounds in production
         priv = ed25519.Ed25519PrivateKey.generate()
-        issuer = TrainingReceiptIssuer(private_key=priv, key_id="prov_a3_key", require_authenticated_job=False)
+        issuer = TrainingReceiptIssuer(
+            private_key=priv, key_id="prov_a3_key", require_authenticated_job=False
+        )
 
         with pytest.raises(ValueError) as exc_info:
             issuer.issue_receipt(
@@ -1076,7 +1129,9 @@ class TestModule01ACompletionPatch:
         assert total_fl_samples == 0
 
         priv = ed25519.Ed25519PrivateKey.generate()
-        issuer = TrainingReceiptIssuer(private_key=priv, key_id="prov_a4_key", require_authenticated_job=False)
+        issuer = TrainingReceiptIssuer(
+            private_key=priv, key_id="prov_a4_key", require_authenticated_job=False
+        )
 
         with pytest.raises(ValueError) as exc_info:
             issuer.issue_receipt(
@@ -1123,6 +1178,7 @@ class TestModule01ACompletionPatch:
             input_dim=10,
             feature_names=tuple(FEATURE_NAMES[:10]),
             worker_token=token,
+            consortium_id="cfi-consortium",
         )
 
         with patch.object(get_settings(), "app_env", "production"):
@@ -1165,12 +1221,18 @@ class TestModule01ACompletionPatch:
         Verify it cannot obtain trusted production provenance.
         """
         priv = ed25519.Ed25519PrivateKey.generate()
-        pub_hex = priv.public_key().public_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PublicFormat.Raw,
-        ).hex()
+        pub_hex = (
+            priv.public_key()
+            .public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw,
+            )
+            .hex()
+        )
 
-        issuer = TrainingReceiptIssuer(private_key=priv, key_id="prov_a6_key", require_authenticated_job=False)
+        issuer = TrainingReceiptIssuer(
+            private_key=priv, key_id="prov_a6_key", require_authenticated_job=False
+        )
         state_dict, raw_bytes, sha256 = _create_mock_checkpoint()
 
         # Receipt signed for IncompatibleArchitecture
@@ -1192,11 +1254,19 @@ class TestModule01ACompletionPatch:
         with tempfile.TemporaryDirectory() as tmp_dir:
             registry = ModelRegistry(storage_dir=tmp_dir)
 
-            with patch.dict(os.environ, {"CFI_TRAINING_RECEIPT_PUBLIC_KEY": pub_hex, "CFI_TRAINING_RECEIPT_KEY_ID": "prov_a6_key", "APP_ENV": "production"}), \
-                 patch.object(get_settings(), "app_env", "production"), \
-                 patch.object(get_settings(), "training_receipt_public_key", pub_hex), \
-                 patch.object(get_settings(), "training_receipt_key_id", "prov_a6_key"):
-
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "CFI_TRAINING_RECEIPT_PUBLIC_KEY": pub_hex,
+                        "CFI_TRAINING_RECEIPT_KEY_ID": "prov_a6_key",
+                        "APP_ENV": "production",
+                    },
+                ),
+                patch.object(get_settings(), "app_env", "production"),
+                patch.object(get_settings(), "training_receipt_public_key", pub_hex),
+                patch.object(get_settings(), "training_receipt_key_id", "prov_a6_key"),
+            ):
                 reset_default_training_verifier()
 
                 # Registration with expected architecture "FraudDetectionNN"
@@ -1230,7 +1300,9 @@ class TestModule01ACompletionPatch:
         ).hex()
 
         state_dict, raw_bytes, sha256 = _create_mock_checkpoint()
-        issuer = TrainingReceiptIssuer(private_key=priv, key_id="prov_a7_key", require_authenticated_job=False)
+        issuer = TrainingReceiptIssuer(
+            private_key=priv, key_id="prov_a7_key", require_authenticated_job=False
+        )
         receipt = issuer.issue_receipt(
             job_id="job_a7",
             training_run_id="run_a7",
@@ -1254,11 +1326,12 @@ class TestModule01ACompletionPatch:
         if "CFI_TRAINING_RECEIPT_PRIVATE_KEY" in os.environ:
             del os.environ["CFI_TRAINING_RECEIPT_PRIVATE_KEY"]
 
-        with patch.dict(os.environ, env_serving), \
-             patch.object(get_settings(), "app_env", "production"), \
-             patch.object(get_settings(), "training_receipt_public_key", pub_hex), \
-             patch.object(get_settings(), "training_receipt_key_id", "prov_a7_key"):
-
+        with (
+            patch.dict(os.environ, env_serving),
+            patch.object(get_settings(), "app_env", "production"),
+            patch.object(get_settings(), "training_receipt_public_key", pub_hex),
+            patch.object(get_settings(), "training_receipt_key_id", "prov_a7_key"),
+        ):
             reset_default_training_verifier()
             verifier = get_default_training_verifier()
 
@@ -1277,7 +1350,9 @@ class TestModule01ACompletionPatch:
         pub = priv.public_key()
 
         state_dict, raw_bytes, sha256 = _create_mock_checkpoint()
-        issuer = TrainingReceiptIssuer(private_key=priv, key_id="cross_worker_key", require_authenticated_job=False)
+        issuer = TrainingReceiptIssuer(
+            private_key=priv, key_id="cross_worker_key", require_authenticated_job=False
+        )
         receipt = issuer.issue_receipt(
             job_id="job_a8",
             training_run_id="run_a8",
@@ -1296,8 +1371,12 @@ class TestModule01ACompletionPatch:
             shared_trust_file = os.path.join(tmp_dir, "shared_trust_registry.json")
             admin_tok = "admin_secret_token_a8"
 
-            store_worker_1 = DurableTrustStore(trust_file_path=shared_trust_file, admin_token=admin_tok)
-            store_worker_2 = DurableTrustStore(trust_file_path=shared_trust_file, admin_token=admin_tok)
+            store_worker_1 = DurableTrustStore(
+                trust_file_path=shared_trust_file, admin_token=admin_tok
+            )
+            store_worker_2 = DurableTrustStore(
+                trust_file_path=shared_trust_file, admin_token=admin_tok
+            )
 
             verifier_1 = TrainingReceiptVerifier(
                 trusted_keys={"cross_worker_key": pub},
@@ -1313,10 +1392,14 @@ class TestModule01ACompletionPatch:
             assert verifier_2.verify_receipt(receipt, candidate_artifact_sha256=sha256)[0] is True
 
             # Worker 1 revokes the key due to compromise
-            verifier_1.revoke_key("cross_worker_key", reason="compromised_by_adversary", admin_token=admin_tok)
+            verifier_1.revoke_key(
+                "cross_worker_key", reason="compromised_by_adversary", admin_token=admin_tok
+            )
 
             # Worker 2 must immediately reject without process restart via mtime reload contract
-            is_valid_2, reason_2 = verifier_2.verify_receipt(receipt, candidate_artifact_sha256=sha256)
+            is_valid_2, reason_2 = verifier_2.verify_receipt(
+                receipt, candidate_artifact_sha256=sha256
+            )
             assert is_valid_2 is False
             assert "Receipt key_id 'cross_worker_key' has been explicitly revoked" in reason_2
 
@@ -1325,12 +1408,20 @@ class TestModule01ACompletionPatch:
         priv_a = ed25519.Ed25519PrivateKey.generate()
         priv_b = ed25519.Ed25519PrivateKey.generate()
 
-        pub_a_hex = priv_a.public_key().public_bytes(
-            encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
-        ).hex()
-        pub_b_hex = priv_b.public_key().public_bytes(
-            encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
-        ).hex()
+        pub_a_hex = (
+            priv_a.public_key()
+            .public_bytes(
+                encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
+            )
+            .hex()
+        )
+        pub_b_hex = (
+            priv_b.public_key()
+            .public_bytes(
+                encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
+            )
+            .hex()
+        )
 
         store = DurableTrustStore(in_memory=True)
         store.register_approved_key("key_alpha", pub_a_hex)

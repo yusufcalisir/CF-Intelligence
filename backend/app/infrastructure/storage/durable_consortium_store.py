@@ -59,17 +59,21 @@ FORBIDDEN_AUTHORITY_SECRETS = {
     "cfi_dev_identity_store_authority_secret_2026_default",
 }
 
-_CONSORTIUM_FILE_LOCKS: dict[str, FileLock] = {}
+_CONSORTIUM_FILE_LOCKS: dict[tuple[str, int], FileLock] = {}
 _CONSORTIUM_LOCKS_GUARD = threading.Lock()
 
 
 def _get_consortium_file_lock(store_path: str) -> FileLock:
     """Return shared FileLock instance for store path to ensure process-local reentrancy."""
     abs_lock_path = os.path.abspath(store_path + ".lock")
+    current_pid = os.getpid()
+    cache_key = (abs_lock_path, current_pid)
     with _CONSORTIUM_LOCKS_GUARD:
-        if abs_lock_path not in _CONSORTIUM_FILE_LOCKS:
-            _CONSORTIUM_FILE_LOCKS[abs_lock_path] = FileLock(abs_lock_path, timeout=15)
-        return _CONSORTIUM_FILE_LOCKS[abs_lock_path]
+        lock = _CONSORTIUM_FILE_LOCKS.get(cache_key)
+        if lock is None or getattr(lock, "_pid", None) not in (None, current_pid):
+            lock = FileLock(abs_lock_path, timeout=15)
+            _CONSORTIUM_FILE_LOCKS[cache_key] = lock
+        return lock
 
 
 class DurableConsortiumStore:
@@ -110,7 +114,9 @@ class DurableConsortiumStore:
                 or getattr(settings, "consortium_store_path", None)
             )
             if not configured_path:
-                configured_path = os.path.join(get_storage_dir(), "consortium_governance_store.json")
+                configured_path = os.path.join(
+                    get_storage_dir(), "consortium_governance_store.json"
+                )
             self._store_path = os.path.abspath(configured_path)
             os.makedirs(os.path.dirname(self._store_path), exist_ok=True)
 
@@ -205,7 +211,9 @@ class DurableConsortiumStore:
                 "bank_id": m.bank_id,
                 "role": m.role.value if hasattr(m.role, "value") else str(m.role),
                 "voting_power": float(m.voting_power),
-                "joined_at": m.joined_at.isoformat() if hasattr(m.joined_at, "isoformat") else str(m.joined_at),
+                "joined_at": m.joined_at.isoformat()
+                if hasattr(m.joined_at, "isoformat")
+                else str(m.joined_at),
             }
 
         return {
@@ -217,7 +225,9 @@ class DurableConsortiumStore:
             "status": c.status.value if hasattr(c.status, "value") else str(c.status),
             "members": members_dict,
             "removed_members": c.removed_members,
-            "created_at": c.created_at.isoformat() if hasattr(c.created_at, "isoformat") else str(c.created_at),
+            "created_at": c.created_at.isoformat()
+            if hasattr(c.created_at, "isoformat")
+            else str(c.created_at),
         }
 
     def _deserialize_consortium(self, d: dict[str, Any]) -> Consortium:
@@ -256,7 +266,9 @@ class DurableConsortiumStore:
             "votes_for": sorted(list(p.votes_for)),
             "votes_against": sorted(list(p.votes_against)),
             "status": p.status.value if hasattr(p.status, "value") else str(p.status),
-            "created_at": p.created_at.isoformat() if hasattr(p.created_at, "isoformat") else str(p.created_at),
+            "created_at": p.created_at.isoformat()
+            if hasattr(p.created_at, "isoformat")
+            else str(p.created_at),
             "ttl_seconds": p.ttl_seconds,
             "expires_at": p.expires_at.isoformat() if p.expires_at else None,
             "cancelled_at": p.cancelled_at.isoformat() if p.cancelled_at else None,
@@ -297,7 +309,12 @@ class DurableConsortiumStore:
 
         if not os.path.exists(self._store_path):
             marker = self._store_path + ".established"
-            if self._is_prod and (os.path.exists(marker) or self._is_established or self._last_mtime_ns > 0 or len(self._consortia) > 0):
+            if self._is_prod and (
+                os.path.exists(marker)
+                or self._is_established
+                or self._last_mtime_ns > 0
+                or len(self._consortia) > 0
+            ):
                 self._is_corrupted = True
                 self._consortia.clear()
                 self._proposals.clear()
@@ -314,7 +331,11 @@ class DurableConsortiumStore:
 
         try:
             stat = os.stat(self._store_path)
-            if not force and stat.st_mtime_ns == self._last_mtime_ns and stat.st_size == self._last_size:
+            if (
+                not force
+                and stat.st_mtime_ns == self._last_mtime_ns
+                and stat.st_size == self._last_size
+            ):
                 return
 
             if stat.st_size == 0:
@@ -355,7 +376,9 @@ class DurableConsortiumStore:
                     f"Durable consortium store at '{self._store_path}' is malformed: consortia or proposals schema invalid."
                 )
 
-            canonical_bytes = json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            canonical_bytes = json.dumps(data, sort_keys=True, separators=(",", ":")).encode(
+                "utf-8"
+            )
             computed_sha = hashlib.sha256(canonical_bytes).hexdigest()
 
             # Layer 1: Check SHA-256 digest
@@ -475,12 +498,10 @@ class DurableConsortiumStore:
             return
 
         serialized_consortia = {
-            cid: self._serialize_consortium(c)
-            for cid, c in self._consortia.items()
+            cid: self._serialize_consortium(c) for cid, c in self._consortia.items()
         }
         serialized_proposals = {
-            pid: self._serialize_proposal(p)
-            for pid, p in self._proposals.items()
+            pid: self._serialize_proposal(p) for pid, p in self._proposals.items()
         }
 
         data = {
@@ -582,7 +603,9 @@ class DurableConsortiumStore:
     def clear(self) -> None:
         """Clear store contents (non-production only)."""
         if self._is_prod:
-            raise ConsortiumSecurityError("Clear operation is strictly prohibited in production mode.")
+            raise ConsortiumSecurityError(
+                "Clear operation is strictly prohibited in production mode."
+            )
         with self._lock, self._file_lock_context():
             self._consortia.clear()
             self._proposals.clear()
