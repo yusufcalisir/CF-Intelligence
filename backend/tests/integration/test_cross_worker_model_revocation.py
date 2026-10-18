@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import io
 import os
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
@@ -41,7 +42,7 @@ from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChai
 
 
 @pytest.fixture
-def revocation_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+def revocation_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[dict[str, Any], None, None]:
     """Sets up a complete production-parity environment for cross-worker revocation tests."""
     audit_file = str(tmp_path / "security" / "audit_chain.json")
     account_file = str(tmp_path / "security" / "accounts.json")

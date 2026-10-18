@@ -21,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import io
 import os
+from collections.abc import Generator
 from typing import Any
 
 import pytest
@@ -53,7 +54,7 @@ from app.presentation.routers.predict import (
 
 
 @pytest.fixture
-def lifecycle_env(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+def lifecycle_env(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> Generator[dict[str, Any], None, None]:
     """Isolated environment with production security settings and genuine cryptographic keys."""
     audit_file = str(tmp_path / "security" / "audit_chain.json")
     account_file = str(tmp_path / "security" / "accounts.json")
