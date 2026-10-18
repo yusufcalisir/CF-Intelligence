@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Header, HTTPException, Path, Query, status
-
 from starlette.concurrency import run_in_threadpool
 
 from app.application.schemas.simulation import (
@@ -21,18 +20,17 @@ from app.application.schemas.simulation import (
     TrainingProgressResponse,
     TrainingRoundResponse,
 )
+from app.application.services.consortium_service import ConsortiumGovernanceService
 from app.application.services.operational_federation_service import OperationalFederationService
 from app.application.services.training_provenance_service import (
     TrainingProvenanceConfigurationError,
     TrainingProvenanceSecurityError,
 )
+from app.domain.consortium_governance import ConsortiumStatus, MemberRole
 from app.presentation.routers.model_registry import _authenticate_and_authorize_operator
 from app.presentation.routers.simulation import _simulation_events, _simulation_results
 
 logger = logging.getLogger(__name__)
-
-from app.application.services.consortium_service import ConsortiumGovernanceService
-from app.domain.consortium_governance import ConsortiumStatus, MemberRole
 
 router = APIRouter(prefix="/api/v1/training", tags=["training"])
 api_router = APIRouter(prefix="/v1/training", tags=["training"])
