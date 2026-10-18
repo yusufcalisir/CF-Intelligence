@@ -926,6 +926,13 @@ def _run_isolated_issuer_worker(
                     })
                     continue
 
+                if app_env.lower() == "production" and not getattr(completed_record, "consortium_id", None):
+                    outbox.put({
+                        "status": "ERROR",
+                        "error": f"Receipt issuance denied: Job '{job_id}' lacks required authoritative consortium binding in production.",
+                    })
+                    continue
+
                 evidence = TrainingExecutionEvidence(
                     training_run_id=completed_record.training_run_id,
                     job_id=completed_record.job_id,
@@ -941,6 +948,7 @@ def _run_isolated_issuer_worker(
                     feature_schema_version=completed_record.feature_schema_version,
                     feature_names=list(completed_record.feature_names),
                     producer_id=completed_record.worker_id,
+                    consortium_id=completed_record.consortium_id,
                 )
                 receipt = issuer.issue_receipt(evidence=evidence, model_bytes=artifact_bytes)
                 issued_jobs.add(job_id)
@@ -2740,6 +2748,7 @@ def _run_isolated_completion_service_worker(
                     worker_id=worker_id,
                     git_commit_hash=git_commit_hash,
                     dataset_manifest_id=dataset_manifest_id,
+                    consortium_id=req.get("consortium_id"),
                     enforce_lifecycle=True,
                     simulate_failure_before_commit=simulate_failure,
                     pause_checkpoint_marker_file=pause_marker,
@@ -2764,6 +2773,7 @@ def _run_isolated_completion_service_worker(
                     "status": completed_record.status,
                     "git_commit_hash": completed_record.git_commit_hash,
                     "dataset_manifest_id": completed_record.dataset_manifest_id,
+                    "consortium_id": completed_record.consortium_id,
                 }
                 conn.send({
                     "status": "SUCCESS",
@@ -2953,6 +2963,7 @@ class IsolatedTrainingCompletionAuthority:
         coordinator_token: str | None = None,
         git_commit_hash: str | None = None,
         dataset_manifest_id: str | None = None,
+        consortium_id: str | None = None,
         simulate_failure_before_commit: bool = False,
         pause_checkpoint_marker_file: str | None = None,
         pause_after_commit_marker_file: str | None = None,
@@ -2988,6 +2999,7 @@ class IsolatedTrainingCompletionAuthority:
                 "coordinator_token": token,
                 "git_commit_hash": git_commit_hash,
                 "dataset_manifest_id": dataset_manifest_id,
+                "consortium_id": consortium_id,
                 "simulate_failure_before_commit": simulate_failure_before_commit,
                 "pause_checkpoint_marker_file": pause_checkpoint_marker_file,
                 "pause_after_commit_marker_file": pause_after_commit_marker_file,
@@ -3976,6 +3988,7 @@ class DistributedFederatedTrainingManager:
             input_dim=NUM_FEATURES,
             feature_names=list(FEATURE_NAMES),
             permitted_workers=banks,
+            consortium_id=consortium_id,
         )
 
         inboxes = {b: endpoints[b]["inbox"] for b in banks}
@@ -4181,6 +4194,7 @@ class DistributedFederatedTrainingManager:
                     artifact_sha256=final_artifact_sha256,
                     worker_id="FEDERATED_COORDINATOR",
                     coordinator_token=self.coordinator_token,
+                    consortium_id=consortium_id,
                 )
             else:
                 if is_prod:
@@ -4201,6 +4215,7 @@ class DistributedFederatedTrainingManager:
                     artifact_sha256=final_artifact_sha256,
                     worker_id="FEDERATED_COORDINATOR",
                     coordinator_token=self.coordinator_token,
+                    consortium_id=consortium_id,
                     enforce_lifecycle=True,
                 )
 

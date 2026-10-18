@@ -96,6 +96,29 @@ class TrustedWorkerEndpoint:
     registered_by: str = "provisioner"
 
 
+def resolve_authoritative_bank_tokens(settings: Any | None = None, app_env: str | None = None) -> dict[str, str]:
+    """Resolve authoritative bank institutional tokens strictly from server configuration and environment."""
+    if settings is None:
+        settings = get_settings()
+    tokens: dict[str, str] = {}
+    config_tokens = getattr(settings, "training_bank_tokens", None)
+    if isinstance(config_tokens, dict):
+        for k, v in config_tokens.items():
+            if isinstance(k, str) and isinstance(v, str) and v.strip():
+                tokens[k.strip().upper()] = v.strip()
+    env_toks = os.environ.get("CFI_TRAINING_BANK_TOKENS")
+    if env_toks:
+        try:
+            parsed = json.loads(env_toks)
+            if isinstance(parsed, dict):
+                for k, v in parsed.items():
+                    if isinstance(k, str) and isinstance(v, str) and v.strip():
+                        tokens[k.strip().upper()] = v.strip()
+        except Exception:
+            pass
+    return tokens
+
+
 class WorkerEndpointRegistry:
     """Thread-safe registry of authenticated, provisioned bank worker communication endpoints.
 
@@ -154,6 +177,7 @@ class WorkerEndpointRegistry:
         settings = get_settings()
         env = (app_env or settings.app_env).strip().lower()
         is_prod = env == "production"
+        authoritative_bank_tokens = resolve_authoritative_bank_tokens(settings, env)
 
         attestation_type = "unauthenticated"
         # Verify institutional authority: registration_token or trusted_context
@@ -183,18 +207,14 @@ class WorkerEndpointRegistry:
                 )
 
             # 2. Strict bank-specific authorization without fallback to generic worker token
-            active_bank_tokens = dict(bank_tokens) if bank_tokens is not None else dict(getattr(settings, "training_bank_tokens", {}))
-            if clean_id not in active_bank_tokens:
-                env_toks = os.environ.get("CFI_TRAINING_BANK_TOKENS")
-                if env_toks:
-                    try:
-                        parsed = json.loads(env_toks)
-                        if isinstance(parsed, dict):
-                            active_bank_tokens.update(parsed)
-                    except Exception:
-                        pass
+            # In production, expected token must resolve strictly from authoritative server configuration
+            if is_prod:
+                expected_token = authoritative_bank_tokens.get(clean_id)
+            else:
+                expected_token = authoritative_bank_tokens.get(clean_id)
+                if not expected_token and bank_tokens is not None:
+                    expected_token = bank_tokens.get(clean_id) or bank_tokens.get(bank_id)
 
-            expected_token = active_bank_tokens.get(clean_id) or active_bank_tokens.get(bank_id)
             if not expected_token:
                 raise TrainingProvenanceSecurityError(
                     f"Registration rejected for bank [{clean_id}]: no authorized institutional credential configured for this bank."
@@ -274,7 +294,15 @@ class WorkerEndpointRegistry:
         allow_replacement: bool = True,
     ) -> None:
         """Batch registration helper for the legitimate bank worker provisioner (e.g. spawn_bank_workers)."""
-        tokens = bank_tokens or {}
+        settings = get_settings()
+        env = (app_env or settings.app_env).strip().lower()
+        is_prod = env == "production"
+
+        if is_prod:
+            effective_tokens = resolve_authoritative_bank_tokens(settings, env)
+        else:
+            effective_tokens = dict(bank_tokens) if bank_tokens is not None else resolve_authoritative_bank_tokens(settings, env)
+
         for b_id, ep in endpoints.items():
             clean_b = b_id.strip().upper()
             pid = None
@@ -283,7 +311,7 @@ class WorkerEndpointRegistry:
             elif processes and clean_b in processes:
                 proc = processes[clean_b]
                 pid = getattr(proc, "pid", None) if not isinstance(proc, int) else proc
-            token = tokens.get(clean_b) or tokens.get(b_id)
+            token = effective_tokens.get(clean_b) or effective_tokens.get(b_id)
             cls.register_worker_endpoint(
                 bank_id=clean_b,
                 endpoint=ep,
@@ -291,7 +319,7 @@ class WorkerEndpointRegistry:
                 registration_token=token,
                 registered_by="spawn_bank_workers",
                 app_env=app_env,
-                bank_tokens=tokens,
+                bank_tokens=effective_tokens if not is_prod else None,
                 allow_replacement=allow_replacement,
             )
 
@@ -308,6 +336,9 @@ class WorkerEndpointRegistry:
     ) -> None:
         """Enforce authentic institutional authorization for worker lifecycle mutations (revocation/unregistration)."""
         settings = get_settings()
+        env = "production" if is_prod else (getattr(settings, "app_env", "development")).strip().lower()
+        authoritative_bank_tokens = resolve_authoritative_bank_tokens(settings, env)
+
         if trusted_context is not None:
             from app.application.services.model_registry import verify_trusted_internal_context
 
@@ -332,17 +363,14 @@ class WorkerEndpointRegistry:
                     f"Lifecycle action '{action_name}' rejected for bank [{clean_id}]: "
                     "generic shared worker credentials cannot authorize endpoint lifecycle mutations."
                 )
-            active_bank_tokens = dict(bank_tokens) if bank_tokens is not None else dict(getattr(settings, "training_bank_tokens", {}))
-            if clean_id not in active_bank_tokens:
-                env_toks = os.environ.get("CFI_TRAINING_BANK_TOKENS")
-                if env_toks:
-                    try:
-                        parsed = json.loads(env_toks)
-                        if isinstance(parsed, dict):
-                            active_bank_tokens.update(parsed)
-                    except Exception:
-                        pass
-            expected_token = active_bank_tokens.get(clean_id)
+
+            if is_prod:
+                expected_token = authoritative_bank_tokens.get(clean_id)
+            else:
+                expected_token = authoritative_bank_tokens.get(clean_id)
+                if not expected_token and bank_tokens is not None:
+                    expected_token = bank_tokens.get(clean_id)
+
             if not expected_token:
                 raise TrainingProvenanceSecurityError(
                     f"Lifecycle action '{action_name}' rejected for bank [{clean_id}]: no authorized institutional token configured."
@@ -545,7 +573,12 @@ class SingleHostBankWorkerProvisioner:
     ) -> None:
         self.db_url = db_url
         self.app_env = app_env.strip().lower()
-        self.bank_tokens = dict(bank_tokens) if bank_tokens is not None else dict(getattr(get_settings(), "training_bank_tokens", {}))
+        is_prod = self.app_env == "production"
+        authoritative = resolve_authoritative_bank_tokens(get_settings(), self.app_env)
+        if is_prod:
+            self.bank_tokens = authoritative
+        else:
+            self.bank_tokens = dict(bank_tokens) if bank_tokens is not None else authoritative
         self.bank_db_urls = bank_db_urls
         self.bank_data_paths = bank_data_paths
         self.bank_partitions = bank_partitions
@@ -628,12 +661,11 @@ class SingleHostBankWorkerProvisioner:
             if hasattr(proc, "terminate"):
                 with contextlib.suppress(Exception):
                     proc.terminate()
-            elif isinstance(proc, int) and _is_process_alive(proc):
-                if os.name == "nt":
-                    with contextlib.suppress(Exception):
-                        import win32process
+            elif isinstance(proc, int) and _is_process_alive(proc) and os.name == "nt":
+                with contextlib.suppress(Exception):
+                    import win32process
 
-                        win32process.TerminateProcess(proc, 1)
+                    win32process.TerminateProcess(proc, 1)
         self._processes.clear()
         self._endpoints.clear()
         self._is_provisioned = False

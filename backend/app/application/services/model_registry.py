@@ -1197,6 +1197,7 @@ class ModelRegistry:
                 is_valid_rcpt, rcpt_reason = verifier.verify_receipt(
                     receipt_obj,
                     simulation_id=simulation_id,
+                    expected_consortium_id=clean_consortium,
                 )
                 if is_valid_rcpt:
                     # ONLY read verified claims from the reconstructed TrainingExecutionReceipt object.
@@ -1949,7 +1950,38 @@ class ModelRegistry:
                 expected_feature_schema_version=exp_schema_ver,
                 expected_input_dim=exp_dim,
                 expected_feature_names=exp_names,
+                expected_consortium_id=effective_consortium,
             )
+
+            rcpt_consortium = None
+            if receipt_obj is not None:
+                rcpt_consortium = receipt_obj.consortium_id
+            elif isinstance(receipt_dict, dict):
+                rcpt_consortium = receipt_dict.get("consortium_id")
+            if rcpt_consortium:
+                rcpt_consortium = rcpt_consortium.strip()
+
+            if effective_consortium is not None:
+                if not rcpt_consortium:
+                    raise ModelAuthorizationError(
+                        f"Receipt rejected for model '{simulation_id}': Receipt omits required consortium claim "
+                        f"for consortium-bound scope '{effective_consortium}'."
+                    )
+                if rcpt_consortium != effective_consortium:
+                    raise ModelAuthorizationError(
+                        f"Receipt rejected for model '{simulation_id}': Receipt binds consortium '{rcpt_consortium}', "
+                        f"which does not match authorized scope '{effective_consortium}'."
+                    )
+                if not is_valid_rcpt:
+                    raise ModelAuthorizationError(
+                        f"Receipt rejected for model '{simulation_id}': Receipt verification failed: {rcpt_reason}"
+                    )
+            elif rcpt_consortium:
+                raise ModelAuthorizationError(
+                    f"Receipt rejected for model '{simulation_id}': Receipt binds consortium '{rcpt_consortium}', "
+                    f"but model ownership scope is unbound or not configured for this consortium."
+                )
+
             if is_valid_rcpt:
                 has_valid_receipt = True
                 final_provenance = "TRAINING_RECORDED"
@@ -2036,6 +2068,18 @@ class ModelRegistry:
                 effective_owning_bank = est_bank
                 effective_consortium = est_consortium
                 should_bind_initial = False
+
+                if target_rcpt is not None and est_consortium is not None:
+                    if not rcpt_consortium:
+                        raise ModelAuthorizationError(
+                            f"Receipt rejected for model '{simulation_id}': Receipt omits required consortium claim "
+                            f"for consortium-bound scope '{est_consortium}'."
+                        )
+                    if rcpt_consortium != est_consortium:
+                        raise ModelAuthorizationError(
+                            f"Receipt rejected for model '{simulation_id}': Receipt binds consortium '{rcpt_consortium}', "
+                            f"which does not match authorized scope '{est_consortium}'."
+                        )
 
                 # Enforce institutional governance authority for already-bound models
                 if auth_token is not None:
@@ -2154,6 +2198,7 @@ class ModelRegistry:
                         expected_feature_schema_version=exp_schema_ver,
                         expected_input_dim=exp_dim,
                         expected_feature_names=exp_names,
+                        expected_consortium_id=effective_consortium,
                     )
                     if not is_valid_binding:
                         raise ModelIntegrityError(
@@ -2583,6 +2628,7 @@ class ModelRegistry:
                     expected_feature_schema_version=entry.get("feature_schema_version"),
                     expected_input_dim=entry.get("input_dim"),
                     expected_feature_names=entry.get("feature_names"),
+                    expected_consortium_id=entry.get("consortium_id"),
                 )
                 if not is_valid_rcpt:
                     raise ModelIntegrityError(
@@ -2879,6 +2925,7 @@ class ModelRegistry:
                     expected_feature_schema_version=entry.get("feature_schema_version"),
                     expected_input_dim=entry.get("input_dim"),
                     expected_feature_names=entry.get("feature_names"),
+                    expected_consortium_id=entry.get("consortium_id"),
                 )
                 if not is_valid_rcpt:
                     raise ModelIntegrityError(
@@ -3537,6 +3584,7 @@ class ModelRegistry:
                     expected_feature_schema_version=target_entry.get("feature_schema_version"),
                     expected_input_dim=target_entry.get("input_dim"),
                     expected_feature_names=target_entry.get("feature_names"),
+                    expected_consortium_id=target_entry.get("consortium_id"),
                 )
                 if not is_valid_rcpt:
                     raise ModelIntegrityError(
@@ -3914,6 +3962,7 @@ class ModelRegistry:
                     expected_feature_schema_version=target_entry.get("feature_schema_version"),
                     expected_input_dim=target_entry.get("input_dim"),
                     expected_feature_names=target_entry.get("feature_names"),
+                    expected_consortium_id=target_entry.get("consortium_id"),
                 )
                 if not is_valid_rcpt:
                     raise ModelIntegrityError(

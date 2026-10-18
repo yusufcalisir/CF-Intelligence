@@ -12,6 +12,7 @@ H. Genuine completion preserves verified evidence and inactive registry status.
 I. No valid receipt, completion record, or production candidate is fabricated when execution fails.
 """
 
+import hashlib
 import multiprocessing as mp
 import os
 import shutil
@@ -25,18 +26,25 @@ import numpy as np
 import pandas as pd
 import pytest
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 from fastapi.testclient import TestClient
 
 from app.application.schemas.simulation import (
     OperationalFederationRequest,
 )
+from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.distributed_fl_service import (
     DistributedFederatedTrainingManager,
+    IsolatedReceiptSigningAuthority,
     setup_bank_private_storage,
     spawn_bank_workers,
 )
-from app.application.services.data_generator import FEATURE_NAMES
-from app.application.services.model_registry import ModelRegistry
+from app.application.services.model_registry import (
+    ModelAuthorizationError,
+    ModelIntegrityError,
+    ModelRegistry,
+)
 from app.application.services.model_service import NUM_FEATURES
 from app.application.services.operational_federation_service import (
     OperationalFederationService,
@@ -46,8 +54,13 @@ from app.application.services.operational_federation_service import (
 )
 from app.application.services.simulation_service import SimulationService
 from app.application.services.training_provenance_service import (
+    TrainingExecutionEvidence,
     TrainingProvenanceConfigurationError,
     TrainingProvenanceSecurityError,
+    TrainingReceiptIssuer,
+    TrustedTrainingJobRecordSource,
+    get_default_training_issuer,
+    get_default_training_verifier,
 )
 from app.infrastructure.database.training_authority_backends import SQLiteTrainingJobAuthority
 from app.infrastructure.security.auth_service import AuthenticationService
@@ -392,7 +405,6 @@ class TestOperationalFederationIntegration:
         import torch
 
         from app.application.services.model_registry import (
-            ModelIntegrityError,
             ModelRegistry,
             validate_production_admission,
         )
@@ -1010,8 +1022,8 @@ class TestOperationalFederationIntegration:
     def test_operational_federation_service_real_adapter_execution(self, clean_test_environment: str, tmp_path: Any) -> None:
         """Criteria G & H: Real execution through OperationalFederationService without mocking execute_operational_federation."""
         from cryptography.fernet import Fernet
+
         from app.application.services.distributed_fl_service import (
-            spawn_bank_workers,
             setup_bank_private_storage,
         )
 
@@ -1170,40 +1182,47 @@ class TestOperationalFederationIntegration:
         q_out2: mp.Queue[Any] = mp.Queue()
         tokens = {"BANK_A": "bank_a_active_token_1234"}
 
-        # 1. Register active worker with live PID
-        WorkerEndpointRegistry.register_worker_endpoint(
-            bank_id="BANK_A",
-            endpoint={"inbox": q_in1, "outbox": q_out1},
-            pid=os.getpid(),
-            registration_token="bank_a_active_token_1234",
-            app_env="production",
-            bank_tokens=tokens,
-        )
-        assert WorkerEndpointRegistry.is_registered("BANK_A")
+        with mock.patch("app.application.services.operational_federation_service.get_settings") as mock_set:
+            mock_s = mock.MagicMock()
+            mock_s.app_env = "production"
+            mock_s.training_bank_tokens = tokens
+            mock_s.training_worker_token = "generic_shared_training_worker_credential_999"
+            mock_set.return_value = mock_s
 
-        # 2. Overwrite attempt on active live worker without allow_replacement=True fails closed
-        with pytest.raises(TrainingProvenanceSecurityError) as exc_no_replace:
+            # 1. Register active worker with live PID
             WorkerEndpointRegistry.register_worker_endpoint(
                 bank_id="BANK_A",
-                endpoint={"inbox": q_in2, "outbox": q_out2},
+                endpoint={"inbox": q_in1, "outbox": q_out1},
                 pid=os.getpid(),
                 registration_token="bank_a_active_token_1234",
                 app_env="production",
                 bank_tokens=tokens,
-                allow_replacement=False,
             )
-        assert "Cannot overwrite active live worker" in str(exc_no_replace.value)
+            assert WorkerEndpointRegistry.is_registered("BANK_A")
 
-        # 3. Unauthenticated development_direct attempt to replace verified institutional worker fails closed
-        with pytest.raises(TrainingProvenanceSecurityError) as exc_unauth_downgrade:
-            WorkerEndpointRegistry.register_worker_endpoint(
-                bank_id="BANK_A",
-                endpoint={"inbox": q_in2, "outbox": q_out2},
-                pid=os.getpid(),
-                app_env="development",
-                allow_replacement=True,
-            )
-        assert "Cannot overwrite active verified worker" in str(exc_unauth_downgrade.value)
+            # 2. Overwrite attempt on active live worker without allow_replacement=True fails closed
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_no_replace:
+                WorkerEndpointRegistry.register_worker_endpoint(
+                    bank_id="BANK_A",
+                    endpoint={"inbox": q_in2, "outbox": q_out2},
+                    pid=os.getpid(),
+                    registration_token="bank_a_active_token_1234",
+                    app_env="production",
+                    bank_tokens=tokens,
+                    allow_replacement=False,
+                )
+            assert "Cannot overwrite active live worker" in str(exc_no_replace.value)
+
+            # 3. Unauthenticated development_direct attempt to replace verified institutional worker fails closed
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_unauth_downgrade:
+                WorkerEndpointRegistry.register_worker_endpoint(
+                    bank_id="BANK_A",
+                    endpoint={"inbox": q_in2, "outbox": q_out2},
+                    pid=os.getpid(),
+                    app_env="development",
+                    allow_replacement=True,
+                )
+            assert "Cannot overwrite active verified worker" in str(exc_unauth_downgrade.value)
 
     def test_boundary_proof_c_worker_revocation_and_legitimate_reregistration(self) -> None:
         """Targeted Proof C: Worker revocation and legitimate re-registration lifecycle."""
@@ -1212,54 +1231,64 @@ class TestOperationalFederationIntegration:
         q_out: mp.Queue[Any] = mp.Queue()
         tokens = {"BANK_A": "token_lifecycle_bank_a_555"}
 
-        WorkerEndpointRegistry.register_worker_endpoint(
-            bank_id="BANK_A",
-            endpoint={"inbox": q_in, "outbox": q_out},
-            pid=os.getpid(),
-            registration_token="token_lifecycle_bank_a_555",
-            app_env="production",
-            bank_tokens=tokens,
-        )
+        with mock.patch("app.application.services.operational_federation_service.get_settings") as mock_set:
+            mock_s = mock.MagicMock()
+            mock_s.app_env = "production"
+            mock_s.training_bank_tokens = tokens
+            mock_s.training_worker_token = "generic_shared_training_worker_credential_999"
+            mock_set.return_value = mock_s
 
-        # 1. Unauthenticated revocation attempt is rejected
-        with pytest.raises(TrainingProvenanceSecurityError) as exc_unauth:
-            WorkerEndpointRegistry.revoke_worker_endpoint("BANK_A", reason="Unauthorized attempt")
-        assert "without valid credential" in str(exc_unauth.value)
-
-        # 2. Revocation with mismatched token is rejected
-        with pytest.raises(TrainingProvenanceSecurityError) as exc_mismatch:
-            WorkerEndpointRegistry.revoke_worker_endpoint(
-                "BANK_A",
-                reason="Wrong token attempt",
-                token="wrong_token_777",
+            WorkerEndpointRegistry.register_worker_endpoint(
+                bank_id="BANK_A",
+                endpoint={"inbox": q_in, "outbox": q_out},
+                pid=os.getpid(),
+                registration_token="token_lifecycle_bank_a_555",
+                app_env="production",
                 bank_tokens=tokens,
             )
-        assert "invalid institutional token" in str(exc_mismatch.value)
 
-        # 3. Authentic revocation with Bank A token succeeds
-        WorkerEndpointRegistry.revoke_worker_endpoint(
-            "BANK_A",
-            reason="Authorized key rotation",
-            token="token_lifecycle_bank_a_555",
-            bank_tokens=tokens,
-        )
-        assert not WorkerEndpointRegistry.is_registered("BANK_A")
-        assert WorkerEndpointRegistry.get_worker_endpoint("BANK_A") is None
+            # 1. Unauthenticated revocation attempt is rejected
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_unauth:
+                WorkerEndpointRegistry.revoke_worker_endpoint("BANK_A", reason="Unauthorized attempt")
+            assert (
+                "requires authentic institutional token" in str(exc_unauth.value)
+                or "without valid credential" in str(exc_unauth.value)
+            )
 
-        # 4. Legitimate re-registration with authentic token and allow_replacement=True succeeds
-        WorkerEndpointRegistry.register_worker_endpoint(
-            bank_id="BANK_A",
-            endpoint={"inbox": q_in, "outbox": q_out},
-            pid=os.getpid(),
-            registration_token="token_lifecycle_bank_a_555",
-            app_env="production",
-            bank_tokens=tokens,
-            allow_replacement=True,
-        )
-        assert WorkerEndpointRegistry.is_registered("BANK_A")
-        ep_re = WorkerEndpointRegistry.get_trusted_endpoint("BANK_A")
-        assert ep_re is not None
-        assert ep_re.state == "ACTIVE"
+            # 2. Revocation with mismatched token is rejected
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_mismatch:
+                WorkerEndpointRegistry.revoke_worker_endpoint(
+                    "BANK_A",
+                    reason="Wrong token attempt",
+                    token="wrong_token_777",
+                    bank_tokens=tokens,
+                )
+            assert "invalid institutional token" in str(exc_mismatch.value)
+
+            # 3. Authentic revocation with Bank A token succeeds
+            WorkerEndpointRegistry.revoke_worker_endpoint(
+                "BANK_A",
+                reason="Authorized key rotation",
+                token="token_lifecycle_bank_a_555",
+                bank_tokens=tokens,
+            )
+            assert not WorkerEndpointRegistry.is_registered("BANK_A")
+            assert WorkerEndpointRegistry.get_worker_endpoint("BANK_A") is None
+
+            # 4. Legitimate re-registration with authentic token and allow_replacement=True succeeds
+            WorkerEndpointRegistry.register_worker_endpoint(
+                bank_id="BANK_A",
+                endpoint={"inbox": q_in, "outbox": q_out},
+                pid=os.getpid(),
+                registration_token="token_lifecycle_bank_a_555",
+                app_env="production",
+                bank_tokens=tokens,
+                allow_replacement=True,
+            )
+            assert WorkerEndpointRegistry.is_registered("BANK_A")
+            ep_re = WorkerEndpointRegistry.get_trusted_endpoint("BANK_A")
+            assert ep_re is not None
+            assert ep_re.state == "ACTIVE"
 
     def test_boundary_proof_d_single_host_worker_provisioner_lifecycle(self, tmp_path: Any) -> None:
         """Targeted Proof D: Authenticated single-host worker provisioning through supported runtime owner."""
@@ -1441,6 +1470,620 @@ class TestOperationalFederationIntegration:
         assert reg.resolve_and_verify_champion("job_fail_closed_999") is None
         assert reg._load_manifest("job_fail_closed_999") == []
         assert not os.path.exists(os.path.join(reg.registry_root, "job_fail_closed_999"))
+
+
+class TestFederationProvenanceFinalizationTargetedCriteria:
+    """Rigorous verification of Criteria A through J for Authenticated Federation Provenance."""
+
+    def test_criterion_a_bank_token_verification_against_independent_authoritative_source(self) -> None:
+        """Criterion A: Bank token verification checks against independent authoritative configuration source."""
+        WorkerEndpointRegistry.clear_for_testing()
+        q_in: mp.Queue[Any] = mp.Queue()
+        q_out: mp.Queue[Any] = mp.Queue()
+
+        server_tokens = {"BANK_A": "auth_token_bank_a_canonical_123"}
+
+        with mock.patch("app.application.services.operational_federation_service.get_settings") as mock_set:
+            mock_s = mock.MagicMock()
+            mock_s.app_env = "production"
+            mock_s.training_bank_tokens = server_tokens
+            mock_s.training_worker_token = "generic_worker_tok_999"
+            mock_set.return_value = mock_s
+
+            # 1. Bank A with wrong token fails authentication
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_bad_tok:
+                WorkerEndpointRegistry.register_worker_endpoint(
+                    bank_id="BANK_A",
+                    endpoint={"inbox": q_in, "outbox": q_out},
+                    pid=os.getpid(),
+                    registration_token="wrong_token_456",
+                    app_env="production",
+                )
+            assert "invalid institutional token" in str(exc_bad_tok.value)
+
+            # 2. Bank B not present in server tokens is rejected
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_unreg:
+                WorkerEndpointRegistry.register_worker_endpoint(
+                    bank_id="BANK_B",
+                    endpoint={"inbox": q_in, "outbox": q_out},
+                    pid=os.getpid(),
+                    registration_token="some_token_999",
+                    app_env="production",
+                )
+            assert "no authorized institutional credential configured for this bank" in str(exc_unreg.value)
+
+    def test_criterion_b_caller_replacement_credential_maps_cannot_authenticate_arbitrary_banks(self) -> None:
+        """Criterion B: Caller-supplied replacement credential maps cannot authenticate arbitrary banks in production."""
+        WorkerEndpointRegistry.clear_for_testing()
+        q_in: mp.Queue[Any] = mp.Queue()
+        q_out: mp.Queue[Any] = mp.Queue()
+
+        server_tokens = {"BANK_A": "legit_server_token_111"}
+        attacker_tokens = {
+            "BANK_ATTACKER": "attacker_supplied_token_666",
+            "BANK_A": "attacker_override_token_777",
+        }
+
+        with mock.patch("app.application.services.operational_federation_service.get_settings") as mock_set:
+            mock_s = mock.MagicMock()
+            mock_s.app_env = "production"
+            mock_s.training_bank_tokens = server_tokens
+            mock_s.training_worker_token = "generic_worker_tok_999"
+            mock_set.return_value = mock_s
+
+            # Caller passes attacker_tokens mapping to register_worker_endpoint
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_arb:
+                WorkerEndpointRegistry.register_worker_endpoint(
+                    bank_id="BANK_ATTACKER",
+                    endpoint={"inbox": q_in, "outbox": q_out},
+                    pid=os.getpid(),
+                    registration_token="attacker_supplied_token_666",
+                    app_env="production",
+                    bank_tokens=attacker_tokens,
+                )
+            assert "no authorized institutional credential configured for this bank" in str(exc_arb.value)
+
+            # Caller tries to override BANK_A token with their attacker map
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_override:
+                WorkerEndpointRegistry.register_worker_endpoint(
+                    bank_id="BANK_A",
+                    endpoint={"inbox": q_in, "outbox": q_out},
+                    pid=os.getpid(),
+                    registration_token="attacker_override_token_777",
+                    app_env="production",
+                    bank_tokens=attacker_tokens,
+                )
+            assert "invalid institutional token" in str(exc_override.value)
+
+    def test_criterion_c_batch_provisioner_cannot_bypass_institutional_credential_checks(self) -> None:
+        """Criterion C: Batch provisioner cannot bypass single-worker institutional credential verification."""
+        WorkerEndpointRegistry.clear_for_testing()
+        q_in: mp.Queue[Any] = mp.Queue()
+        q_out: mp.Queue[Any] = mp.Queue()
+
+        server_tokens = {"BANK_A": "valid_token_a"}
+        endpoints = {
+            "BANK_A": {"inbox": q_in, "outbox": q_out},
+            "BANK_MALICIOUS": {"inbox": q_in, "outbox": q_out},
+        }
+
+        with mock.patch("app.application.services.operational_federation_service.get_settings") as mock_set:
+            mock_s = mock.MagicMock()
+            mock_s.app_env = "production"
+            mock_s.training_bank_tokens = server_tokens
+            mock_s.training_worker_token = "generic_worker_tok_999"
+            mock_set.return_value = mock_s
+
+            with pytest.raises(TrainingProvenanceSecurityError) as exc_batch:
+                WorkerEndpointRegistry.register_provisioned_workers(
+                    endpoints=endpoints,
+                    bank_tokens={"BANK_MALICIOUS": "self_attested_fake"},
+                    app_env="production",
+                )
+            assert (
+                "production requires authentic institutional registration token" in str(exc_batch.value)
+                or "no authorized institutional credential configured" in str(exc_batch.value)
+            )
+
+    def test_criterion_d_valid_authenticated_institutional_worker_registration_continues_working(self) -> None:
+        """Criterion D: Valid authenticated institutional worker registration continues working."""
+        WorkerEndpointRegistry.clear_for_testing()
+        q_in: mp.Queue[Any] = mp.Queue()
+        q_out: mp.Queue[Any] = mp.Queue()
+
+        server_tokens = {"BANK_A": "valid_token_a"}
+
+        with mock.patch("app.application.services.operational_federation_service.get_settings") as mock_set:
+            mock_s = mock.MagicMock()
+            mock_s.app_env = "production"
+            mock_s.training_bank_tokens = server_tokens
+            mock_s.training_worker_token = "generic_worker_tok_999"
+            mock_set.return_value = mock_s
+
+            WorkerEndpointRegistry.register_worker_endpoint(
+                bank_id="BANK_A",
+                endpoint={"inbox": q_in, "outbox": q_out},
+                pid=os.getpid(),
+                registration_token="valid_token_a",
+                app_env="production",
+            )
+            assert WorkerEndpointRegistry.is_registered("BANK_A")
+            ep = WorkerEndpointRegistry.get_trusted_endpoint("BANK_A")
+            assert ep is not None
+            assert ep.bank_id == "BANK_A"
+            assert ep.attestation_type == "institutional_token"
+            assert ep.state == "ACTIVE"
+
+    def test_criterion_e_signed_development_receipt_contains_exact_intended_consortium(self) -> None:
+        """Criterion E: Signed development receipt contains exact intended consortium."""
+        issuer = get_default_training_issuer()
+        verifier = get_default_training_verifier()
+        artifact_bytes = b"sample_model_weights_bytes_criterion_e"
+        sha = hashlib.sha256(artifact_bytes).hexdigest()
+
+        evidence = TrainingExecutionEvidence(
+            training_run_id="run_crit_e",
+            job_id="job_crit_e",
+            simulation_id="sim_crit_e",
+            completed_at="2026-10-18T10:00:00Z",
+            executed_rounds=2,
+            executed_epochs=2,
+            sample_count=500,
+            observed_metrics={"loss": 0.35, "auc_roc": 0.88},
+            artifact_sha256=sha,
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="FEDERATED_COORDINATOR",
+            consortium_id="cfi-consortium",
+        )
+        receipt = issuer.issue_receipt(evidence=evidence, model_bytes=artifact_bytes)
+        assert receipt.consortium_id == "cfi-consortium"
+
+        # Verifier with matching consortium succeeds
+        ok, reason = verifier.verify_receipt(
+            receipt,
+            candidate_artifact_bytes=artifact_bytes,
+            expected_consortium_id="cfi-consortium",
+        )
+        assert ok is True
+        assert "verified successfully" in reason
+
+        # Verifier with mismatched consortium fails
+        mismatch_ok, mismatch_reason = verifier.verify_receipt(
+            receipt,
+            candidate_artifact_bytes=artifact_bytes,
+            expected_consortium_id="other-consortium",
+        )
+        assert mismatch_ok is False
+        assert "Consortium scope mismatch" in mismatch_reason
+
+    def test_criterion_f_independent_signing_authority_receives_consortium_scope_from_authenticated_durable_job_evidence(
+        self, tmp_path: Any
+    ) -> None:
+        """Criterion F: Independent signing authority receives consortium scope from authenticated durable job evidence."""
+        db_file = os.path.join(str(tmp_path), "test_crit_f.db")
+        coord_tok = "test_coord_secret_f"
+        bank_tok = "test_bank_a_secret_f"
+        record_source = TrustedTrainingJobRecordSource(
+            coordinator_token=coord_tok,
+            bank_tokens={"BANK_A": bank_tok},
+            db_url=db_file,
+            enforce_lifecycle=True,
+            app_env="development",
+        )
+
+        artifact_bytes = b"model_f_bytes_123"
+        sha = hashlib.sha256(artifact_bytes).hexdigest()
+
+        # 1. Schedule with consortium_id
+        record_source.schedule_training_job(
+            job_id="job_f_1",
+            training_run_id="run_f_1",
+            simulation_id="sim_f_1",
+            coordinator_token=coord_tok,
+            permitted_workers=["BANK_A"],
+            consortium_id="cfi-consortium",
+        )
+        record_source.start_training_job(job_id="job_f_1", worker_token=bank_tok)
+        record_source.record_round_observation(
+            job_id="job_f_1",
+            round_number=1,
+            sample_count=100,
+            actual_executed_epochs=1,
+            observed_loss=0.32,
+            worker_token=bank_tok,
+            bank_id="BANK_A",
+            model_update_digest=sha,
+        )
+        record_source.record_global_aggregation(
+            job_id="job_f_1",
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=[sha],
+            aggregated_global_model_digest=sha,
+            coordinator_token=coord_tok,
+        )
+        record_source.record_evaluation_observation(
+            job_id="job_f_1",
+            metric_name="loss",
+            metric_value=0.32,
+            evaluated_artifact_digest=sha,
+            coordinator_token=coord_tok,
+        )
+        completed_rec = record_source.complete_training_job(
+            job_id="job_f_1",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"loss": 0.32},
+            artifact_sha256=sha,
+            worker_id="FEDERATED_COORDINATOR",
+            coordinator_token=coord_tok,
+            enforce_lifecycle=True,
+            consortium_id="cfi-consortium",
+        )
+        assert completed_rec.consortium_id == "cfi-consortium"
+
+        # 2. Test isolated signing worker process receives and signs exact consortium from durable job evidence
+        signing_key = ed25519.Ed25519PrivateKey.generate()
+        key_raw = signing_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption(),
+        ).hex()
+
+        signing_auth = IsolatedReceiptSigningAuthority(
+            signing_key_hex=key_raw,
+            db_url=db_file,
+            key_id="test_key_f_isolated",
+            app_env="development",
+        )
+        try:
+            signed_rcpt = signing_auth.sign_completed_job_receipt(
+                job_id="job_f_1",
+                artifact_bytes=artifact_bytes,
+                caller_identity="COORDINATOR",
+            )
+            # Verify signed receipt contains exact consortium claim from database record
+            assert signed_rcpt.consortium_id == "cfi-consortium"
+        finally:
+            signing_auth.terminate()
+
+        # 3. Verify coordinator cannot override consortium claim in signed receipt
+        issuer = TrainingReceiptIssuer(
+            signing_key_hex=key_raw,
+            key_id="test_key_f_isolated",
+            job_record_source=record_source,
+            enforce_job_records=True,
+            app_env="development",
+        )
+        ev_override = TrainingExecutionEvidence(
+            training_run_id="run_f_1",
+            job_id="job_f_1",
+            simulation_id="sim_f_1",
+            completed_at=completed_rec.completed_at,
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"loss": 0.32},
+            artifact_sha256=sha,
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="FEDERATED_COORDINATOR",
+            consortium_id="malicious_coordinator_override_consortium",
+        )
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_override:
+            issuer.issue_receipt(evidence=ev_override, model_bytes=artifact_bytes)
+        assert "Consortium mismatch" in str(exc_override.value)
+
+        # 4. In production mode, job evidence lacking authoritative consortium claim is rejected fail-closed
+        record_source.schedule_training_job(
+            job_id="job_f_no_consortium",
+            training_run_id="run_f_2",
+            simulation_id="sim_f_2",
+            coordinator_token=coord_tok,
+            permitted_workers=["BANK_A"],
+            consortium_id=None,
+        )
+        record_source.start_training_job(job_id="job_f_no_consortium", worker_token=bank_tok)
+        record_source.record_round_observation(
+            job_id="job_f_no_consortium",
+            round_number=1,
+            sample_count=100,
+            actual_executed_epochs=1,
+            observed_loss=0.32,
+            worker_token=bank_tok,
+            bank_id="BANK_A",
+            model_update_digest=sha,
+        )
+        record_source.record_global_aggregation(
+            job_id="job_f_no_consortium",
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=[sha],
+            aggregated_global_model_digest=sha,
+            coordinator_token=coord_tok,
+        )
+        record_source.complete_training_job(
+            job_id="job_f_no_consortium",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"loss": 0.32},
+            artifact_sha256=sha,
+            worker_id="BANK_A",
+            coordinator_token=coord_tok,
+            enforce_lifecycle=True,
+            consortium_id=None,
+        )
+
+        prod_issuer = TrainingReceiptIssuer(
+            signing_key_hex=key_raw,
+            key_id="test_key_f_isolated",
+            job_record_source=record_source,
+            enforce_job_records=True,
+            app_env="production",
+        )
+        ev_no_consortium = TrainingExecutionEvidence(
+            training_run_id="run_f_2",
+            job_id="job_f_no_consortium",
+            simulation_id="sim_f_2",
+            completed_at="2026-10-18T10:00:00Z",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"loss": 0.32},
+            artifact_sha256=sha,
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="BANK_A",
+            consortium_id=None,
+        )
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_no_cons:
+            prod_issuer.issue_receipt(evidence=ev_no_consortium, model_bytes=artifact_bytes)
+        assert "lacks authoritative consortium binding" in str(exc_no_cons.value)
+
+    def test_criterion_g_missing_modified_or_mismatched_consortium_claim_cannot_establish_production_candidate_ownership(
+        self, tmp_path: Any
+    ) -> None:
+        """Criterion G: Missing, modified, or mismatched consortium claim cannot establish production candidate ownership."""
+        reg_dir = os.path.join(str(tmp_path), "reg_crit_g")
+        reg = ModelRegistry(storage_dir=reg_dir)
+        issuer = get_default_training_issuer()
+        artifact_bytes = b"model_g_artifact_bytes"
+        sha = hashlib.sha256(artifact_bytes).hexdigest()
+
+        # 1. Receipt omitting consortium_id rejected for consortium-bound scope
+        ev_no_consortium = TrainingExecutionEvidence(
+            training_run_id="run_g_1",
+            job_id="job_g_1",
+            simulation_id="sim_g_1",
+            completed_at="2026-10-18T10:00:00Z",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"loss": 0.25},
+            artifact_sha256=sha,
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="FEDERATED_COORDINATOR",
+            consortium_id=None,
+        )
+        rcpt_no_consortium = issuer.issue_receipt(evidence=ev_no_consortium, model_bytes=artifact_bytes)
+
+        with pytest.raises(ModelAuthorizationError) as exc_omit:
+            reg.save_version(
+                simulation_id="sim_g_1",
+                artifact_bytes=artifact_bytes,
+                consortium_id="cfi-consortium",
+                training_receipt=rcpt_no_consortium,
+            )
+        assert "Receipt omits required consortium claim" in str(exc_omit.value)
+
+        # 2. Receipt binding mismatched consortium rejected
+        ev_mismatched = TrainingExecutionEvidence(
+            training_run_id="run_g_2",
+            job_id="job_g_2",
+            simulation_id="sim_g_2",
+            completed_at="2026-10-18T10:00:00Z",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"loss": 0.25},
+            artifact_sha256=sha,
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="FEDERATED_COORDINATOR",
+            consortium_id="other-consortium",
+        )
+        rcpt_mismatched = issuer.issue_receipt(evidence=ev_mismatched, model_bytes=artifact_bytes)
+
+        with pytest.raises(ModelAuthorizationError) as exc_diff:
+            reg.save_version(
+                simulation_id="sim_g_2",
+                artifact_bytes=artifact_bytes,
+                consortium_id="cfi-consortium",
+                training_receipt=rcpt_mismatched,
+            )
+        assert "does not match authorized scope" in str(exc_diff.value)
+
+        # 3. Receipt with tampered claims/signature rejected
+        tampered_dict = rcpt_mismatched.to_dict()
+        tampered_dict["consortium_id"] = "cfi-consortium"  # Modified without updating signature
+        with pytest.raises(ModelAuthorizationError) as exc_tamper:
+            reg.save_version(
+                simulation_id="sim_g_3",
+                artifact_bytes=artifact_bytes,
+                consortium_id="cfi-consortium",
+                training_receipt=tampered_dict,
+            )
+        assert "Receipt verification failed" in str(exc_tamper.value)
+
+    def test_criterion_h_preexisting_model_ownership_does_not_permit_saving_receipt_for_different_consortium(
+        self, tmp_path: Any
+    ) -> None:
+        """Criterion H: Pre-existing model ownership does not permit saving receipt for different consortium."""
+        reg_dir = os.path.join(str(tmp_path), "reg_crit_h")
+        reg = ModelRegistry(storage_dir=reg_dir)
+        issuer = get_default_training_issuer()
+        artifact_bytes = b"model_h_bytes"
+        sha = hashlib.sha256(artifact_bytes).hexdigest()
+
+        # Step 1: Establish ownership under consortium_alpha
+        ev_alpha = TrainingExecutionEvidence(
+            training_run_id="run_h_1",
+            job_id="job_h_1",
+            simulation_id="sim_h_shared",
+            completed_at="2026-10-18T10:00:00Z",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"loss": 0.25},
+            artifact_sha256=sha,
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="FEDERATED_COORDINATOR",
+            consortium_id="consortium_alpha",
+        )
+        rcpt_alpha = issuer.issue_receipt(evidence=ev_alpha, model_bytes=artifact_bytes)
+        v1 = reg.save_version(
+            simulation_id="sim_h_shared",
+            artifact_bytes=artifact_bytes,
+            consortium_id="consortium_alpha",
+            training_receipt=rcpt_alpha,
+        )
+        assert v1["version"] == 1
+        assert v1["consortium_id"] == "consortium_alpha"
+
+        # Step 2: Attempt to save version 2 using a receipt signed for consortium_beta
+        ev_beta = TrainingExecutionEvidence(
+            training_run_id="run_h_2",
+            job_id="job_h_2",
+            simulation_id="sim_h_shared",
+            completed_at="2026-10-18T10:00:00Z",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"loss": 0.22},
+            artifact_sha256=sha,
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="FEDERATED_COORDINATOR",
+            consortium_id="consortium_beta",
+        )
+        rcpt_beta = issuer.issue_receipt(evidence=ev_beta, model_bytes=artifact_bytes)
+
+        with pytest.raises(ModelAuthorizationError) as exc_clash:
+            reg.save_version(
+                simulation_id="sim_h_shared",
+                artifact_bytes=artifact_bytes,
+                training_receipt=rcpt_beta,
+            )
+        assert "does not match authorized scope" in str(exc_clash.value)
+
+    def test_criterion_i_real_operational_federation_service_multiprocess_execution_produces_verified_inactive_candidate_with_consistent_scope(
+        self, tmp_path: Any
+    ) -> None:
+        """Criterion I: Real OperationalFederationService multi-process execution produces verified inactive candidate with consistent scope."""
+        WorkerEndpointRegistry.clear_for_testing()
+        db_file = os.path.join(str(tmp_path), "test_crit_i.db")
+        registry_dir = os.path.join(str(tmp_path), "registry_crit_i")
+        vault_root = os.path.join(str(tmp_path), "vaults_crit_i")
+        SQLiteTrainingJobAuthority(db_target=db_file)
+
+        banks = ["BANK_A", "BANK_B"]
+        tokens = {b: f"token_crit_i_{b}" for b in banks}
+        enc_keys = {b: Fernet.generate_key() for b in banks}
+        data_paths = {}
+
+        np.random.seed(123)
+        for b_id in banks:
+            X_part = np.random.randn(25, NUM_FEATURES).astype(np.float32)
+            y_part = np.random.randint(0, 2, size=25).astype(np.float32)
+            data_paths[b_id] = setup_bank_private_storage(
+                bank_storage_dir=vault_root,
+                bank_id=b_id,
+                X_partition=X_part,
+                y_partition=y_part,
+                bank_token=tokens[b_id],
+                bank_encryption_key=enc_keys[b_id],
+            )
+
+        provisioner = SingleHostBankWorkerProvisioner(
+            bank_tokens=tokens,
+            db_url=db_file,
+            bank_data_paths=data_paths,
+            bank_encryption_keys=enc_keys,
+            app_env="development",
+        )
+
+        with provisioner:
+            provisioner.provision_bank_workers(banks)
+
+            svc = OperationalFederationService(
+                db_url=db_file,
+                registry_storage_dir=registry_dir,
+                app_env="development",
+            )
+
+            result = svc.execute_operational_federation(
+                job_id="job_crit_i_multi",
+                participating_banks=banks,
+                num_rounds=1,
+                consortium_id="cfi-consortium",
+            )
+
+            assert result["status"] == "COMPLETED"
+            assert result["consortium_id"] == "cfi-consortium"
+            assert result["is_verified"] is True
+            assert result["saved_version"]["consortium_id"] == "cfi-consortium"
+            assert result["saved_version"]["status"] == "inactive"
+            assert result["is_promoted_champion"] is False
+            assert result["saved_version"]["is_production_eligible"] is True
+            assert result["saved_version"]["provenance_type"] == "TRAINING_RECORDED"
+
+            # Check model manifest
+            reg = ModelRegistry(storage_dir=registry_dir)
+            manifest = reg._load_manifest(result["simulation_id"])
+            assert len(manifest) == 1
+            assert manifest[0]["consortium_id"] == "cfi-consortium"
+            assert manifest[0]["is_production_eligible"] is True
+            assert manifest[0]["status"] == "inactive"
+
+    def test_criterion_j_failure_to_establish_authoritative_consortium_scope_produces_no_falsely_verified_receipt_or_candidate(
+        self, tmp_path: Any
+    ) -> None:
+        """Criterion J: Failure to establish authoritative consortium scope produces no falsely verified receipt or candidate."""
+        registry_dir = os.path.join(str(tmp_path), "reg_crit_j")
+        reg = ModelRegistry(storage_dir=registry_dir)
+        artifact_bytes = b"model_j_bytes"
+
+        # Attempt to save a candidate with mismatched consortium scope
+        with pytest.raises(ModelAuthorizationError):
+            reg.save_version(
+                simulation_id="sim_crit_j_unauth",
+                artifact_bytes=artifact_bytes,
+                consortium_id="cfi-consortium",
+                training_receipt={
+                    "receipt_id": "fake_rcpt",
+                    "consortium_id": "unauthorized_consortium",
+                    "signature": "bad",
+                },
+            )
+
+        # Verify no production-eligible candidate was created in registry
+        assert reg.resolve_and_verify_champion("sim_crit_j_unauth") is None
+        assert reg._load_manifest("sim_crit_j_unauth") == []
+
 
 
 

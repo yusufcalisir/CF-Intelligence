@@ -110,6 +110,7 @@ class ScheduledTrainingJob:
     config_fingerprint: str = ""
     scheduled_at: str = ""
     status: str = "SCHEDULED"
+    consortium_id: str | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.feature_names, (list, tuple)):
@@ -312,6 +313,7 @@ class CompletedJobExecutionRecord:
     status: str = "COMPLETED"
     git_commit_hash: str | None = None
     dataset_manifest_id: str | None = None
+    consortium_id: str | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.observed_metrics, dict):
@@ -359,6 +361,7 @@ def compute_config_fingerprint(
     permitted_workers: Sequence[str] = (),
     min_quorum: int | None = None,
     training_configuration: dict[str, Any] | None = None,
+    consortium_id: str | None = None,
 ) -> str:
     """Computes deterministic canonical SHA-256 fingerprint binding all security-critical scheduled parameters.
 
@@ -380,6 +383,7 @@ def compute_config_fingerprint(
         "permitted_workers": sorted(pw.strip() for pw in permitted_workers),
         "min_quorum": min_quorum if min_quorum is not None else len(permitted_workers),
         "training_configuration": training_configuration or {},
+        "consortium_id": consortium_id.strip() if consortium_id else None,
     }
     canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
@@ -397,6 +401,7 @@ def compute_evidence_fingerprint(
     input_dim: int,
     feature_names: Sequence[str],
     observed_metrics: dict[str, float],
+    consortium_id: str | None = None,
 ) -> str:
     h = hashlib.sha256()
     h.update(training_run_id.strip().encode())
@@ -412,6 +417,8 @@ def compute_evidence_fingerprint(
         h.update(fn.strip().encode())
     for k in sorted(observed_metrics.keys()):
         h.update(f"{k}:{float(observed_metrics[k]):.8f}".encode())
+    if consortium_id:
+        h.update(consortium_id.strip().encode())
     return h.hexdigest()
 
 
@@ -448,6 +455,7 @@ class TrainingJobAuthorityBackend(abc.ABC):
         feature_names: Sequence[str],
         coordinator_id: str = "COORDINATOR",
         permitted_workers: Sequence[str] = (),
+        consortium_id: str | None = None,
     ) -> ScheduledTrainingJob: ...
 
     @abc.abstractmethod
@@ -497,6 +505,7 @@ class TrainingJobAuthorityBackend(abc.ABC):
         simulate_failure_before_commit: bool = False,
         pause_checkpoint_marker_file: str | None = None,
         pause_after_commit_marker_file: str | None = None,
+        consortium_id: str | None = None,
     ) -> CompletedJobExecutionRecord: ...
 
     @abc.abstractmethod
@@ -1231,10 +1240,12 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 permitted_workers_json TEXT,
                                 config_fingerprint VARCHAR(64) NOT NULL,
                                 scheduled_at VARCHAR(64) NOT NULL,
-                                status VARCHAR(32) NOT NULL DEFAULT 'SCHEDULED'
+                                status VARCHAR(32) NOT NULL DEFAULT 'SCHEDULED',
+                                consortium_id VARCHAR(128)
                             );
                             """
                         )
+                        cur.execute("ALTER TABLE cfi_scheduled_jobs ADD COLUMN IF NOT EXISTS consortium_id VARCHAR(128);")
                         cur.execute(
                             """
                             CREATE TABLE IF NOT EXISTS cfi_started_jobs (
@@ -1325,10 +1336,12 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 status VARCHAR(32) NOT NULL DEFAULT 'COMPLETED',
                                 git_commit_hash VARCHAR(128),
                                 dataset_manifest_id TEXT,
-                                evidence_fingerprint VARCHAR(64) NOT NULL
+                                evidence_fingerprint VARCHAR(64) NOT NULL,
+                                consortium_id VARCHAR(128)
                             );
                             """
                         )
+                        cur.execute("ALTER TABLE cfi_completed_jobs ADD COLUMN IF NOT EXISTS consortium_id VARCHAR(128);")
                         cur.execute(pg_sql.SQL(AUTHENTIC_EVIDENCE_TRIGGERS_SQL) if pg_sql else AUTHENTIC_EVIDENCE_TRIGGERS_SQL)
         except Exception as e:
             sanitized = str(e)
@@ -1370,10 +1383,12 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         feature_names: Sequence[str],
         coordinator_id: str = "COORDINATOR",
         permitted_workers: Sequence[str] = (),
+        consortium_id: str | None = None,
     ) -> ScheduledTrainingJob:
         clean_job_id = job_id.strip()
         clean_run_id = training_run_id.strip()
         clean_sim_id = simulation_id.strip()
+        clean_consortium_id = consortium_id.strip() if consortium_id else None
         fnames_tuple = tuple(feature_names)
         perm_workers_tuple = tuple(permitted_workers)
         now_str = datetime.now(UTC).isoformat()
@@ -1390,6 +1405,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             fnames_tuple,
             coordinator_id=coordinator_id,
             permitted_workers=perm_workers_tuple,
+            consortium_id=clean_consortium_id,
         )
 
         with self._connect() as conn:
@@ -1414,6 +1430,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 config_fingerprint=existing["config_fingerprint"],
                                 scheduled_at=existing["scheduled_at"],
                                 status=existing["status"],
+                                consortium_id=existing.get("consortium_id"),
                             )
                         else:
                             raise TrainingProvenanceSecurityError(
@@ -1436,8 +1453,9 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             job_id, training_run_id, simulation_id, coordinator_id,
                             architecture, feature_schema_version, expected_rounds,
                             expected_epochs, input_dim, feature_names_json,
-                            permitted_workers_json, config_fingerprint, scheduled_at, status
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            permitted_workers_json, config_fingerprint, scheduled_at, status,
+                            consortium_id
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             clean_job_id,
@@ -1454,6 +1472,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                             cfg_fingerprint,
                             now_str,
                             "SCHEDULED",
+                            clean_consortium_id,
                         ),
                     )
 
@@ -1472,6 +1491,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             config_fingerprint=cfg_fingerprint,
             scheduled_at=now_str,
             status="SCHEDULED",
+            consortium_id=clean_consortium_id,
         )
 
     def start_job(self, job_id: str, worker_id: str = "TRAINING_EXECUTOR") -> StartedTrainingJob:
@@ -1892,6 +1912,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         simulate_failure_before_commit: bool = False,
         pause_checkpoint_marker_file: str | None = None,
         pause_after_commit_marker_file: str | None = None,
+        consortium_id: str | None = None,
     ) -> CompletedJobExecutionRecord:
         clean_job_id = job_id.strip()
         if not enforce_lifecycle:
@@ -1940,6 +1961,21 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                     sched_schema_ver = sched_row["feature_schema_version"]
                     sched_input_dim = sched_row["input_dim"]
                     sched_feature_names = tuple(json.loads(sched_row["feature_names_json"]))
+                    sched_consortium = sched_row.get("consortium_id")
+
+                    if (
+                        consortium_id is not None
+                        and sched_consortium is not None
+                        and consortium_id.strip() != sched_consortium.strip()
+                    ):
+                        raise TrainingProvenanceSecurityError(
+                            f"Consortium ID mismatch for job '{clean_job_id}': scheduled '{sched_consortium}', got '{consortium_id}'."
+                        )
+                    effective_consortium = (consortium_id.strip() if consortium_id else None) or sched_consortium
+                    if self._is_prod and not effective_consortium:
+                        raise TrainingProvenanceSecurityError(
+                            f"Cannot complete job '{clean_job_id}': production completed training jobs require an authoritative bound consortium."
+                        )
 
                     # Strict metadata & feature contract enforcement
                     if simulation_id and simulation_id.strip() != sched_sim_id:
@@ -1983,6 +2019,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                         sched_input_dim,
                         target_fnames,
                         target_metrics,
+                        consortium_id=effective_consortium,
                     )
 
                     # Check existing completion for idempotency vs conflict
@@ -2008,6 +2045,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 status=existing_comp["status"],
                                 git_commit_hash=existing_comp["git_commit_hash"],
                                 dataset_manifest_id=existing_comp["dataset_manifest_id"],
+                                consortium_id=existing_comp.get("consortium_id"),
                             )
                         raise TrainingProvenanceSecurityError(
                             f"Conflicting completion record for job '{clean_job_id}': cannot overwrite existing completed execution record with conflicting evidence."
@@ -2114,6 +2152,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                         status="COMPLETED",
                         git_commit_hash=git_commit_hash,
                         dataset_manifest_id=dataset_manifest_id,
+                        consortium_id=effective_consortium,
                     )
                     record.validate()
 
@@ -2131,8 +2170,8 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 observed_metrics_json, artifact_sha256, architecture,
                                 feature_schema_version, input_dim, feature_names_json,
                                 worker_id, status, git_commit_hash, dataset_manifest_id,
-                                evidence_fingerprint
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                evidence_fingerprint, consortium_id
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """,
                             (
                                 clean_job_id,
@@ -2153,6 +2192,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 git_commit_hash,
                                 dataset_manifest_id,
                                 evidence_fp,
+                                effective_consortium,
                             ),
                         )
                     except Exception as insert_err:
@@ -2179,6 +2219,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                                     status=concurrent_comp["status"],
                                     git_commit_hash=concurrent_comp["git_commit_hash"],
                                     dataset_manifest_id=concurrent_comp["dataset_manifest_id"],
+                                    consortium_id=concurrent_comp.get("consortium_id"),
                                 )
                             raise TrainingProvenanceSecurityError(
                                 f"Conflicting completion record for job '{clean_job_id}': cannot overwrite existing completed execution record with conflicting evidence."
@@ -2225,6 +2266,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                 status=r["status"],
                 git_commit_hash=r["git_commit_hash"],
                 dataset_manifest_id=r["dataset_manifest_id"],
+                consortium_id=r.get("consortium_id"),
             )
 
     def get_completed_job_by_run_id(self, run_id: str) -> CompletedJobExecutionRecord | None:
@@ -2253,6 +2295,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                     status=r["status"],
                     git_commit_hash=r["git_commit_hash"],
                     dataset_manifest_id=r["dataset_manifest_id"],
+                    consortium_id=r.get("consortium_id"),
                 )
 
     def get_scheduled_job(self, job_id: str) -> ScheduledTrainingJob | None:
@@ -2277,6 +2320,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                 config_fingerprint=r["config_fingerprint"],
                 scheduled_at=r["scheduled_at"],
                 status=r["status"],
+                consortium_id=r.get("consortium_id"),
             )
 
     def get_started_job(self, job_id: str) -> StartedTrainingJob | None:
@@ -2402,10 +2446,13 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 permitted_workers_json TEXT,
                 config_fingerprint TEXT NOT NULL,
                 scheduled_at TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'SCHEDULED'
+                status TEXT NOT NULL DEFAULT 'SCHEDULED',
+                consortium_id TEXT
             )
             """
         )
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE cfi_scheduled_jobs ADD COLUMN consortium_id TEXT")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS cfi_started_jobs (
@@ -2496,10 +2543,13 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 status TEXT NOT NULL DEFAULT 'COMPLETED',
                 git_commit_hash TEXT,
                 dataset_manifest_id TEXT,
-                evidence_fingerprint TEXT NOT NULL
+                evidence_fingerprint TEXT NOT NULL,
+                consortium_id TEXT
             )
             """
         )
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE cfi_completed_jobs ADD COLUMN consortium_id TEXT")
 
     def schedule_job(
         self,
@@ -2514,10 +2564,12 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         feature_names: Sequence[str],
         coordinator_id: str = "COORDINATOR",
         permitted_workers: Sequence[str] = (),
+        consortium_id: str | None = None,
     ) -> ScheduledTrainingJob:
         clean_job_id = job_id.strip()
         clean_run_id = training_run_id.strip()
         clean_sim_id = simulation_id.strip()
+        clean_consortium_id = consortium_id.strip() if consortium_id else None
         fnames_tuple = tuple(feature_names)
         perm_workers_tuple = tuple(permitted_workers)
         now_str = datetime.now(UTC).isoformat()
@@ -2534,6 +2586,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
             fnames_tuple,
             coordinator_id=coordinator_id,
             permitted_workers=perm_workers_tuple,
+            consortium_id=clean_consortium_id,
         )
 
         with self._connect() as conn:
@@ -2563,6 +2616,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 config_fingerprint=existing["config_fingerprint"],
                                 scheduled_at=existing["scheduled_at"],
                                 status=existing["status"],
+                                consortium_id=existing["consortium_id"] if "consortium_id" in set(existing.keys()) else None,
                             )
                         else:
                             raise TrainingProvenanceSecurityError(
@@ -2585,8 +2639,9 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                             job_id, training_run_id, simulation_id, coordinator_id,
                             architecture, feature_schema_version, expected_rounds,
                             expected_epochs, input_dim, feature_names_json,
-                            permitted_workers_json, config_fingerprint, scheduled_at, status
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            permitted_workers_json, config_fingerprint, scheduled_at, status,
+                            consortium_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             clean_job_id,
@@ -2603,6 +2658,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                             cfg_fingerprint,
                             now_str,
                             "SCHEDULED",
+                            clean_consortium_id,
                         ),
                     )
                     conn.execute("COMMIT")
@@ -2625,6 +2681,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
             config_fingerprint=cfg_fingerprint,
             scheduled_at=now_str,
             status="SCHEDULED",
+            consortium_id=clean_consortium_id,
         )
 
     def start_job(self, job_id: str, worker_id: str = "TRAINING_EXECUTOR") -> StartedTrainingJob:
@@ -3067,6 +3124,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         simulate_failure_before_commit: bool = False,
         pause_checkpoint_marker_file: str | None = None,
         pause_after_commit_marker_file: str | None = None,
+        consortium_id: str | None = None,
     ) -> CompletedJobExecutionRecord:
         clean_job_id = job_id.strip()
         if self._is_prod and not enforce_lifecycle:
@@ -3101,6 +3159,17 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                     sched_schema_ver = sched_row["feature_schema_version"]
                     sched_input_dim = sched_row["input_dim"]
                     sched_feature_names = tuple(json.loads(sched_row["feature_names_json"]))
+                    sched_consortium = sched_row["consortium_id"] if "consortium_id" in set(sched_row.keys()) else None
+
+                    if (
+                        consortium_id is not None
+                        and sched_consortium is not None
+                        and consortium_id.strip() != sched_consortium.strip()
+                    ):
+                        raise TrainingProvenanceSecurityError(
+                            f"Consortium ID mismatch for job '{clean_job_id}': scheduled '{sched_consortium}', got '{consortium_id}'."
+                        )
+                    effective_consortium = (consortium_id.strip() if consortium_id else None) or sched_consortium
 
                     if simulation_id and simulation_id.strip() != sched_sim_id:
                         raise TrainingProvenanceSecurityError(
@@ -3143,6 +3212,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                         sched_input_dim,
                         target_fnames,
                         target_metrics,
+                        consortium_id=effective_consortium,
                     )
 
                     cur = conn.execute("SELECT * FROM cfi_completed_jobs WHERE job_id = ?", (clean_job_id,))
@@ -3168,6 +3238,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 status=existing_comp["status"],
                                 git_commit_hash=existing_comp["git_commit_hash"],
                                 dataset_manifest_id=existing_comp["dataset_manifest_id"],
+                                consortium_id=existing_comp["consortium_id"] if "consortium_id" in set(existing_comp.keys()) else None,
                             )
                         raise TrainingProvenanceSecurityError(
                             f"Conflicting completion record for job '{clean_job_id}': cannot overwrite existing completed execution record with conflicting evidence."
@@ -3273,6 +3344,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                         status="COMPLETED",
                         git_commit_hash=git_commit_hash,
                         dataset_manifest_id=dataset_manifest_id,
+                        consortium_id=effective_consortium,
                     )
                     record.validate()
 
@@ -3290,8 +3362,8 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                             observed_metrics_json, artifact_sha256, architecture,
                             feature_schema_version, input_dim, feature_names_json,
                             worker_id, status, git_commit_hash, dataset_manifest_id,
-                            evidence_fingerprint
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            evidence_fingerprint, consortium_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             clean_job_id,
@@ -3312,6 +3384,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                             git_commit_hash,
                             dataset_manifest_id,
                             evidence_fp,
+                            effective_consortium,
                         ),
                     )
                     conn.execute("COMMIT")
@@ -3355,6 +3428,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 status=r["status"],
                 git_commit_hash=r["git_commit_hash"],
                 dataset_manifest_id=r["dataset_manifest_id"],
+                consortium_id=r["consortium_id"] if "consortium_id" in set(r.keys()) else None,
             )
 
     def get_completed_job_by_run_id(self, run_id: str) -> CompletedJobExecutionRecord | None:
@@ -3382,6 +3456,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 status=r["status"],
                 git_commit_hash=r["git_commit_hash"],
                 dataset_manifest_id=r["dataset_manifest_id"],
+                consortium_id=r["consortium_id"] if "consortium_id" in set(r.keys()) else None,
             )
 
     def get_scheduled_job(self, job_id: str) -> ScheduledTrainingJob | None:
@@ -3406,6 +3481,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 config_fingerprint=r["config_fingerprint"],
                 scheduled_at=r["scheduled_at"],
                 status=r["status"],
+                consortium_id=r["consortium_id"] if "consortium_id" in set(r.keys()) else None,
             )
 
     def get_started_job(self, job_id: str) -> StartedTrainingJob | None:

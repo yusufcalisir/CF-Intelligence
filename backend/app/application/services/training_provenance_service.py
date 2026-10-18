@@ -228,6 +228,7 @@ class TrainingJobAuthorityDatabase:
         feature_names: Sequence[str],
         coordinator_id: str = "COORDINATOR",
         permitted_workers: Sequence[str] = (),
+        consortium_id: str | None = None,
     ) -> ScheduledTrainingJob:
         return self._backend.schedule_job(
             job_id=job_id,
@@ -241,6 +242,7 @@ class TrainingJobAuthorityDatabase:
             feature_names=feature_names,
             coordinator_id=coordinator_id,
             permitted_workers=permitted_workers,
+            consortium_id=consortium_id,
         )
 
     def start_job(self, job_id: str, worker_id: str = "TRAINING_EXECUTOR") -> StartedTrainingJob:
@@ -286,6 +288,7 @@ class TrainingJobAuthorityDatabase:
         feature_names: Sequence[str] | list[str] | tuple[str, ...] | None = None,
         enforce_lifecycle: bool = True,
         simulate_failure_before_commit: bool = False,
+        consortium_id: str | None = None,
     ) -> CompletedJobExecutionRecord:
         return self._backend.complete_job(
             job_id=job_id,
@@ -305,6 +308,7 @@ class TrainingJobAuthorityDatabase:
             feature_names=feature_names,
             enforce_lifecycle=enforce_lifecycle,
             simulate_failure_before_commit=simulate_failure_before_commit,
+            consortium_id=consortium_id,
         )
 
     def get_completed_job_by_id(self, job_id: str) -> CompletedJobExecutionRecord | None:
@@ -656,6 +660,7 @@ class TrustedTrainingJobRecordSource:
         coordinator_token: str | None = None,
         coordinator_id: str = "COORDINATOR",
         permitted_workers: Sequence[str] = (),
+        consortium_id: str | None = None,
     ) -> ScheduledTrainingJob:
         """Schedule a training job through the authorized training coordinator."""
         self._validate_coordinator_token(coordinator_token)
@@ -682,6 +687,7 @@ class TrustedTrainingJobRecordSource:
             feature_names=fnames,
             coordinator_id=coordinator_id,
             permitted_workers=permitted_workers,
+            consortium_id=consortium_id,
         )
 
     def start_training_job(
@@ -987,6 +993,7 @@ class TrustedTrainingJobRecordSource:
         training_run_id: str | None = None,
         enforce_lifecycle: bool | None = None,
         simulate_failure_before_commit: bool = False,
+        consortium_id: str | None = None,
     ) -> CompletedJobExecutionRecord:
         """Register completion of an authorized training job with observed execution evidence."""
         if coordinator_token is not None:
@@ -1031,6 +1038,7 @@ class TrustedTrainingJobRecordSource:
             feature_names=feature_names,
             enforce_lifecycle=enforce,
             simulate_failure_before_commit=simulate_failure_before_commit,
+            consortium_id=consortium_id,
         )
 
     def record_job_completion(
@@ -1054,6 +1062,7 @@ class TrustedTrainingJobRecordSource:
         worker_id: str = "TRAINING_EXECUTOR",
         git_commit_hash: str | None = None,
         dataset_manifest_id: str | None = None,
+        consortium_id: str | None = None,
     ) -> CompletedJobExecutionRecord:
         """Register an authenticated completed job record."""
         if record is not None:
@@ -1075,6 +1084,7 @@ class TrustedTrainingJobRecordSource:
                 dataset_manifest_id=record.dataset_manifest_id,
                 simulation_id=record.simulation_id,
                 training_run_id=record.training_run_id,
+                consortium_id=record.consortium_id or consortium_id,
             )
         if not job_id or not training_run_id:
             raise ValueError("Either 'record' or both 'job_id' and 'training_run_id' must be provided.")
@@ -1090,6 +1100,7 @@ class TrustedTrainingJobRecordSource:
                 feature_names=feature_names,
                 architecture=architecture,
                 feature_schema_version=feature_schema_version,
+                consortium_id=consortium_id,
             )
             self.start_training_job(job_id=job_id, worker_token=worker_token)
 
@@ -1111,6 +1122,7 @@ class TrustedTrainingJobRecordSource:
             dataset_manifest_id=dataset_manifest_id,
             simulation_id=simulation_id,
             training_run_id=training_run_id,
+            consortium_id=consortium_id,
         )
 
     def get_completed_job(self, identifier: str) -> CompletedJobExecutionRecord | None:
@@ -2287,6 +2299,7 @@ class TrainingReceiptIssuer:
             require_authenticated_job = enforce_job_records
 
         self.key_id = key_id
+        self._app_env = app_env
         self._job_record_source = job_record_source or get_default_training_job_record_source()
         self._trust_store = trust_store or get_default_trust_store()
         settings = get_settings()
@@ -2392,7 +2405,7 @@ class TrainingReceiptIssuer:
     ) -> TrainingExecutionReceipt:
         """Issue an authenticated training execution receipt signed with Ed25519 private key."""
         settings = get_settings()
-        is_prod = settings.app_env.lower() == "production"
+        is_prod = (self._app_env.lower() == "production") if self._app_env is not None else (settings.app_env.lower() == "production")
 
         target_owning_bank = owning_bank_id
         target_consortium = consortium_id
@@ -2601,6 +2614,16 @@ class TrainingReceiptIssuer:
             if rec.git_commit_hash and target_git and target_git != rec.git_commit_hash:
                 raise TrainingProvenanceSecurityError(
                     f"Git commit hash mismatch: caller claimed '{target_git}', but trusted record observed '{rec.git_commit_hash}'."
+                )
+            if rec.consortium_id is not None:
+                if target_consortium is not None and target_consortium != rec.consortium_id:
+                    raise TrainingProvenanceSecurityError(
+                        f"Consortium mismatch: caller claimed '{target_consortium}', but trusted record observed '{rec.consortium_id}'."
+                    )
+                target_consortium = rec.consortium_id
+            elif is_prod:
+                raise TrainingProvenanceSecurityError(
+                    f"Production receipt issuance rejected: job '{target_job}' lacks authoritative consortium binding."
                 )
 
             # Finding SIGN-TRUST-01: Issuer independently reconciles underlying evidence chain
@@ -2953,6 +2976,7 @@ class TrainingReceiptVerifier:
         expected_sha256: str | None = None,
         simulation_id: str | None = None,
         expected_key_id: str | None = None,
+        expected_consortium_id: str | None = None,
     ) -> tuple[bool, str]:
         """Alias for verify_receipt."""
         return self.verify_receipt(
@@ -2960,6 +2984,7 @@ class TrainingReceiptVerifier:
             candidate_artifact_sha256=expected_sha256,
             simulation_id=simulation_id,
             expected_key_id=expected_key_id,
+            expected_consortium_id=expected_consortium_id,
         )
 
     def verify_receipt(
@@ -2976,6 +3001,7 @@ class TrainingReceiptVerifier:
         expected_simulation_id: str | None = None,
         expected_artifact_sha256: str | None = None,
         actual_artifact_bytes: bytes | None = None,
+        expected_consortium_id: str | None = None,
     ) -> tuple[bool, str]:
         """Verify an execution receipt against candidate artifact bytes and declared scope."""
         if expected_simulation_id is not None:
@@ -3101,6 +3127,16 @@ class TrainingReceiptVerifier:
                 f"Feature names or ordering mismatch: receipt binds {receipt_obj.feature_names}, "
                 f"expected {list(expected_feature_names)}."
             )
+
+        # Consortium scope binding
+        if expected_consortium_id is not None:
+            if not receipt_obj.consortium_id:
+                return False, f"Consortium claim missing: receipt does not bind required consortium '{expected_consortium_id}'."
+            if receipt_obj.consortium_id != expected_consortium_id:
+                return False, (
+                    f"Consortium scope mismatch: receipt binds '{receipt_obj.consortium_id}', "
+                    f"expected '{expected_consortium_id}'."
+                )
 
         # Execution invariants
         if receipt_obj.status != "COMPLETED":
