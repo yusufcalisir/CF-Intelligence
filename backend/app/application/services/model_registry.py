@@ -1938,6 +1938,7 @@ class ModelRegistry:
         has_recorded_evidence = _validate_training_evidence(training_run_id, training_evidence)
 
         attestation_status = "NONE"
+        rcpt_consortium: str | None = None
         target_rcpt = receipt_obj if receipt_obj is not None else receipt_dict
         if target_rcpt is not None:
             verifier = self._verifier or get_default_training_verifier()

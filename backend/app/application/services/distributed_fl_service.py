@@ -4135,7 +4135,7 @@ def run_bank_worker_node(
                             continue
 
                         # Execute Opacus DP-SGD
-                        steps_per_epoch = int(math.ceil(len(X_train) / max(1, batch_size)))
+                        steps_per_epoch = math.ceil(len(X_train) / max(1, batch_size))
                         total_job_steps = max(1, expected_rounds * steps_per_epoch)
 
                         try:
