@@ -62,7 +62,11 @@ from app.application.services.training_provenance_service import (
     get_default_training_issuer,
     get_default_training_verifier,
 )
-from app.infrastructure.database.training_authority_backends import SQLiteTrainingJobAuthority
+from app.infrastructure.database.training_authority_backends import (
+    GlobalAggregationEvent,
+    RoundObservation,
+    SQLiteTrainingJobAuthority,
+)
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.main import app
 
@@ -2083,6 +2087,516 @@ class TestFederationProvenanceFinalizationTargetedCriteria:
         # Verify no production-eligible candidate was created in registry
         assert reg.resolve_and_verify_champion("sim_crit_j_unauth") is None
         assert reg._load_manifest("sim_crit_j_unauth") == []
+
+
+class TestImmutablePreTrainingConsortiumBinding:
+    """Rigorous verification of Cases A through G for immutable pre-training consortium binding."""
+
+    def test_case_a_scheduled_consortium_missing_completion_supplies_consortium_rejected_in_production(
+        self, tmp_path: Any
+    ) -> None:
+        """Case A: Scheduled consortium missing; completion supplies consortium: rejected under production authority."""
+        db_file = os.path.join(str(tmp_path), "case_a.db")
+        auth = SQLiteTrainingJobAuthority(db_target=db_file, app_env="production")
+
+        auth.schedule_job(
+            job_id="job_case_a",
+            training_run_id="run_case_a",
+            simulation_id="sim_case_a",
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            consortium_id=None,
+        )
+        auth.start_job(job_id="job_case_a")
+
+        sha = "a" * 64
+        obs = RoundObservation(
+            event_id="obs_case_a",
+            job_id="job_case_a",
+            training_run_id="run_case_a",
+            simulation_id="sim_case_a",
+            worker_id="BANK_A",
+            bank_id="BANK_A",
+            round_number=1,
+            attempt_number=1,
+            actual_sample_count=50,
+            actual_executed_epochs=1,
+            observed_loss=0.35,
+            metrics={"loss": 0.35},
+            model_update_digest=sha,
+            execution_timestamp="2026-10-18T12:00:00Z",
+        )
+        auth.record_observation(obs)
+        agg = GlobalAggregationEvent(
+            event_id="agg_case_a",
+            job_id="job_case_a",
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=[sha],
+            aggregation_configuration={"round": 1},
+            aggregated_global_model_digest=sha,
+            timestamp="2026-10-18T12:00:05Z",
+        )
+        auth.record_global_aggregation(agg)
+
+        # Attempt to complete supplying a consortium when scheduled lacked one
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_info:
+            auth.complete_job(
+                job_id="job_case_a",
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=50,
+                observed_metrics={"loss": 0.35},
+                artifact_sha256=sha,
+                worker_id="FEDERATED_COORDINATOR",
+                enforce_lifecycle=True,
+                consortium_id="cfi-consortium",
+            )
+        assert (
+            "authoritative scheduled job lacks a valid consortium binding" in str(exc_info.value)
+            or "Retroactive consortium binding is rejected" in str(exc_info.value)
+        )
+
+    def test_case_b_scheduled_consortium_exists_completion_supplies_different_consortium_rejected(
+        self, tmp_path: Any
+    ) -> None:
+        """Case B: Scheduled consortium exists; completion supplies different consortium: rejected."""
+        db_file = os.path.join(str(tmp_path), "case_b.db")
+        auth = SQLiteTrainingJobAuthority(db_target=db_file, app_env="development")
+        sha = "b" * 64
+
+        auth.schedule_job(
+            job_id="job_case_b",
+            training_run_id="run_case_b",
+            simulation_id="sim_case_b",
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            consortium_id="consortium_authorized",
+        )
+        auth.start_job(job_id="job_case_b")
+        obs = RoundObservation(
+            event_id="obs_case_b",
+            job_id="job_case_b",
+            training_run_id="run_case_b",
+            simulation_id="sim_case_b",
+            worker_id="BANK_A",
+            bank_id="BANK_A",
+            round_number=1,
+            attempt_number=1,
+            actual_sample_count=50,
+            actual_executed_epochs=1,
+            observed_loss=0.35,
+            metrics={"loss": 0.35},
+            model_update_digest=sha,
+            execution_timestamp="2026-10-18T12:00:00Z",
+        )
+        auth.record_observation(obs)
+        agg = GlobalAggregationEvent(
+            event_id="agg_case_b",
+            job_id="job_case_b",
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=[sha],
+            aggregation_configuration={"round": 1},
+            aggregated_global_model_digest=sha,
+            timestamp="2026-10-18T12:00:05Z",
+        )
+        auth.record_global_aggregation(agg)
+
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_info:
+            auth.complete_job(
+                job_id="job_case_b",
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=50,
+                observed_metrics={"loss": 0.35},
+                artifact_sha256=sha,
+                worker_id="FEDERATED_COORDINATOR",
+                consortium_id="consortium_foreign",
+            )
+        assert "Consortium ID mismatch" in str(exc_info.value)
+
+    def test_case_c_scheduled_consortium_exists_completion_omits_consortium_uses_authorized_scheduled_identity(
+        self, tmp_path: Any
+    ) -> None:
+        """Case C: Scheduled consortium exists; completion omits consortium: uses already-authorized scheduled identity."""
+        db_file = os.path.join(str(tmp_path), "case_c.db")
+        auth = SQLiteTrainingJobAuthority(db_target=db_file, app_env="development")
+        sha = "c" * 64
+
+        auth.schedule_job(
+            job_id="job_case_c",
+            training_run_id="run_case_c",
+            simulation_id="sim_case_c",
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            consortium_id="consortium_authorized_pre_training",
+        )
+        auth.start_job(job_id="job_case_c")
+        obs = RoundObservation(
+            event_id="obs_case_c",
+            job_id="job_case_c",
+            training_run_id="run_case_c",
+            simulation_id="sim_case_c",
+            worker_id="BANK_A",
+            bank_id="BANK_A",
+            round_number=1,
+            attempt_number=1,
+            actual_sample_count=50,
+            actual_executed_epochs=1,
+            observed_loss=0.35,
+            metrics={"loss": 0.35},
+            model_update_digest=sha,
+            execution_timestamp="2026-10-18T12:00:00Z",
+        )
+        auth.record_observation(obs)
+        agg = GlobalAggregationEvent(
+            event_id="agg_case_c",
+            job_id="job_case_c",
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=[sha],
+            aggregation_configuration={"round": 1},
+            aggregated_global_model_digest=sha,
+            timestamp="2026-10-18T12:00:05Z",
+        )
+        auth.record_global_aggregation(agg)
+
+        # Complete without passing consortium_id (consortium_id=None)
+        rec = auth.complete_job(
+            job_id="job_case_c",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=50,
+            observed_metrics={"loss": 0.35},
+            artifact_sha256=sha,
+            worker_id="FEDERATED_COORDINATOR",
+            consortium_id=None,
+        )
+        assert rec.consortium_id == "consortium_authorized_pre_training"
+
+    def test_case_d_scheduled_and_supplied_consortium_match_legitimate_completion_succeeds(
+        self, tmp_path: Any
+    ) -> None:
+        """Case D: Scheduled and supplied consortium match: legitimate completion succeeds."""
+        db_file = os.path.join(str(tmp_path), "case_d.db")
+        auth = SQLiteTrainingJobAuthority(db_target=db_file, app_env="development")
+        sha = "d" * 64
+
+        auth.schedule_job(
+            job_id="job_case_d",
+            training_run_id="run_case_d",
+            simulation_id="sim_case_d",
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            consortium_id="cfi-consortium",
+        )
+        auth.start_job(job_id="job_case_d")
+        obs = RoundObservation(
+            event_id="obs_case_d",
+            job_id="job_case_d",
+            training_run_id="run_case_d",
+            simulation_id="sim_case_d",
+            worker_id="BANK_A",
+            bank_id="BANK_A",
+            round_number=1,
+            attempt_number=1,
+            actual_sample_count=50,
+            actual_executed_epochs=1,
+            observed_loss=0.35,
+            metrics={"loss": 0.35},
+            model_update_digest=sha,
+            execution_timestamp="2026-10-18T12:00:00Z",
+        )
+        auth.record_observation(obs)
+        agg = GlobalAggregationEvent(
+            event_id="agg_case_d",
+            job_id="job_case_d",
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=[sha],
+            aggregation_configuration={"round": 1},
+            aggregated_global_model_digest=sha,
+            timestamp="2026-10-18T12:00:05Z",
+        )
+        auth.record_global_aggregation(agg)
+
+        rec = auth.complete_job(
+            job_id="job_case_d",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=50,
+            observed_metrics={"loss": 0.35},
+            artifact_sha256=sha,
+            worker_id="FEDERATED_COORDINATOR",
+            consortium_id="cfi-consortium",
+        )
+        assert rec.consortium_id == "cfi-consortium"
+        assert rec.status == "COMPLETED"
+
+    def test_case_e_existing_completed_record_cannot_be_relabeled_under_another_consortium(
+        self, tmp_path: Any
+    ) -> None:
+        """Case E: Existing completed record cannot be relabeled under another consortium."""
+        db_file = os.path.join(str(tmp_path), "case_e.db")
+        auth = SQLiteTrainingJobAuthority(db_target=db_file, app_env="development")
+        sha = "e" * 64
+
+        auth.schedule_job(
+            job_id="job_case_e",
+            training_run_id="run_case_e",
+            simulation_id="sim_case_e",
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            consortium_id="consortium_initial",
+        )
+        auth.start_job(job_id="job_case_e")
+        obs = RoundObservation(
+            event_id="obs_case_e",
+            job_id="job_case_e",
+            training_run_id="run_case_e",
+            simulation_id="sim_case_e",
+            worker_id="BANK_A",
+            bank_id="BANK_A",
+            round_number=1,
+            attempt_number=1,
+            actual_sample_count=50,
+            actual_executed_epochs=1,
+            observed_loss=0.35,
+            metrics={"loss": 0.35},
+            model_update_digest=sha,
+            execution_timestamp="2026-10-18T12:00:00Z",
+        )
+        auth.record_observation(obs)
+        agg = GlobalAggregationEvent(
+            event_id="agg_case_e",
+            job_id="job_case_e",
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=[sha],
+            aggregation_configuration={"round": 1},
+            aggregated_global_model_digest=sha,
+            timestamp="2026-10-18T12:00:05Z",
+        )
+        auth.record_global_aggregation(agg)
+
+        rec = auth.complete_job(
+            job_id="job_case_e",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=50,
+            observed_metrics={"loss": 0.35},
+            artifact_sha256=sha,
+            worker_id="FEDERATED_COORDINATOR",
+            consortium_id="consortium_initial",
+        )
+        assert rec.consortium_id == "consortium_initial"
+
+        # Re-attempting completion with different consortium fails closed
+        with pytest.raises(TrainingProvenanceSecurityError):
+            auth.complete_job(
+                job_id="job_case_e",
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=50,
+                observed_metrics={"loss": 0.35},
+                artifact_sha256=sha,
+                worker_id="FEDERATED_COORDINATOR",
+                consortium_id="consortium_relabel_attempt",
+            )
+
+    def test_case_f_repeated_scheduling_with_different_consortium_remains_rejected(
+        self, tmp_path: Any
+    ) -> None:
+        """Case F: Repeated scheduling with a different consortium remains rejected."""
+        db_file = os.path.join(str(tmp_path), "case_f.db")
+        auth = SQLiteTrainingJobAuthority(db_target=db_file, app_env="development")
+
+        auth.schedule_job(
+            job_id="job_case_f",
+            training_run_id="run_case_f",
+            simulation_id="sim_case_f",
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            consortium_id="consortium_original",
+        )
+
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_info:
+            auth.schedule_job(
+                job_id="job_case_f",
+                training_run_id="run_case_f",
+                simulation_id="sim_case_f",
+                architecture="FraudDetectionNN",
+                feature_schema_version="v1.0",
+                expected_rounds=1,
+                expected_epochs=1,
+                input_dim=NUM_FEATURES,
+                feature_names=list(FEATURE_NAMES),
+                consortium_id="consortium_different",
+            )
+        assert "Conflicting training job scheduling" in str(exc_info.value)
+
+    def test_case_g_failed_retroactive_binding_produces_no_signed_receipt_or_candidate(
+        self, tmp_path: Any
+    ) -> None:
+        """Case G: Failed retroactive binding cannot produce signed production receipt or production-eligible candidate."""
+        db_file = os.path.join(str(tmp_path), "case_g.db")
+        registry_dir = os.path.join(str(tmp_path), "registry_case_g")
+        model_bytes = b"model_bytes_case_g_payload"
+        sha = hashlib.sha256(model_bytes).hexdigest()
+        auth = SQLiteTrainingJobAuthority(db_target=db_file, app_env="development")
+
+        # Schedule job WITHOUT consortium in development
+        auth.schedule_job(
+            job_id="job_case_g",
+            training_run_id="run_case_g",
+            simulation_id="sim_case_g",
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            consortium_id=None,
+        )
+        auth.start_job(job_id="job_case_g")
+        obs = RoundObservation(
+            event_id="obs_case_g",
+            job_id="job_case_g",
+            training_run_id="run_case_g",
+            simulation_id="sim_case_g",
+            worker_id="BANK_A",
+            bank_id="BANK_A",
+            round_number=1,
+            attempt_number=1,
+            actual_sample_count=50,
+            actual_executed_epochs=1,
+            observed_loss=0.35,
+            metrics={"loss": 0.35},
+            model_update_digest=sha,
+            execution_timestamp="2026-10-18T12:00:00Z",
+        )
+        auth.record_observation(obs)
+        agg = GlobalAggregationEvent(
+            event_id="agg_case_g",
+            job_id="job_case_g",
+            round_number=1,
+            aggregation_algorithm="fed_avg_weighted",
+            accepted_participant_ids=["BANK_A"],
+            accepted_local_update_digests=[sha],
+            aggregation_configuration={"round": 1},
+            aggregated_global_model_digest=sha,
+            timestamp="2026-10-18T12:00:05Z",
+        )
+        auth.record_global_aggregation(agg)
+
+        # 1. Attempting retroactive assignment at completion is rejected
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_retro:
+            auth.complete_job(
+                job_id="job_case_g",
+                executed_rounds=1,
+                executed_epochs=1,
+                sample_count=50,
+                observed_metrics={"loss": 0.35},
+                artifact_sha256=sha,
+                worker_id="FEDERATED_COORDINATOR",
+                consortium_id="retroactive_consortium",
+            )
+        assert "Retroactive consortium binding is rejected" in str(exc_retro.value)
+
+        # 2. Complete with None (unbound legacy completion in development)
+        completed_rec = auth.complete_job(
+            job_id="job_case_g",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=50,
+            observed_metrics={"loss": 0.35},
+            artifact_sha256=sha,
+            worker_id="FEDERATED_COORDINATOR",
+            consortium_id=None,
+        )
+        assert completed_rec.consortium_id is None
+
+        # 3. Independent production receipt issuer refuses to sign receipt without authoritative consortium
+        signing_key = ed25519.Ed25519PrivateKey.generate()
+        key_raw = signing_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption(),
+        ).hex()
+        record_source = TrustedTrainingJobRecordSource(
+            db_url=db_file,
+            enforce_lifecycle=True,
+            app_env="development",
+        )
+        issuer = TrainingReceiptIssuer(
+            signing_key_hex=key_raw,
+            key_id="test_key_case_g",
+            job_record_source=record_source,
+            enforce_job_records=True,
+            app_env="production",
+        )
+        ev_retro = TrainingExecutionEvidence(
+            training_run_id="run_case_g",
+            job_id="job_case_g",
+            simulation_id="sim_case_g",
+            completed_at=completed_rec.completed_at,
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=50,
+            observed_metrics={"loss": 0.35},
+            artifact_sha256=sha,
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="FEDERATED_COORDINATOR",
+            consortium_id="retroactive_consortium",
+        )
+        with pytest.raises(TrainingProvenanceSecurityError) as exc_sign:
+            issuer.issue_receipt(evidence=ev_retro, model_bytes=model_bytes)
+        assert "lacks authoritative consortium binding" in str(exc_sign.value)
+
+        # 4. ModelRegistry rejects any candidate registration attempt
+        reg = ModelRegistry(storage_dir=registry_dir)
+        with pytest.raises(ModelAuthorizationError):
+            reg.save_version(
+                simulation_id="sim_case_g",
+                artifact_bytes=model_bytes,
+                consortium_id="retroactive_consortium",
+                training_receipt=None,
+            )
+        assert reg.resolve_and_verify_champion("sim_case_g") is None
+        assert reg._load_manifest("sim_case_g") == []
+
 
 
 

@@ -1961,21 +1961,33 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                     sched_schema_ver = sched_row["feature_schema_version"]
                     sched_input_dim = sched_row["input_dim"]
                     sched_feature_names = tuple(json.loads(sched_row["feature_names_json"]))
-                    sched_consortium = sched_row.get("consortium_id")
+                    sched_consortium_val = sched_row.get("consortium_id")
+                    clean_sched_consortium = sched_consortium_val.strip() if sched_consortium_val else None
+                    clean_supplied_consortium = (
+                        consortium_id.strip() if (consortium_id and consortium_id.strip()) else None
+                    )
 
-                    if (
-                        consortium_id is not None
-                        and sched_consortium is not None
-                        and consortium_id.strip() != sched_consortium.strip()
-                    ):
+                    # Production enforcement: scheduled job must have an authoritative bound consortium
+                    if self._is_prod and not clean_sched_consortium:
                         raise TrainingProvenanceSecurityError(
-                            f"Consortium ID mismatch for job '{clean_job_id}': scheduled '{sched_consortium}', got '{consortium_id}'."
+                            f"Cannot complete job '{clean_job_id}': authoritative scheduled job lacks a valid consortium binding. "
+                            "Production training jobs must establish an authoritative consortium binding before execution."
                         )
-                    effective_consortium = (consortium_id.strip() if consortium_id else None) or sched_consortium
-                    if self._is_prod and not effective_consortium:
-                        raise TrainingProvenanceSecurityError(
-                            f"Cannot complete job '{clean_job_id}': production completed training jobs require an authoritative bound consortium."
-                        )
+
+                    # Strict consortium matching and rejection of retroactive assignment
+                    if clean_supplied_consortium is not None:
+                        if clean_sched_consortium is None:
+                            raise TrainingProvenanceSecurityError(
+                                f"Consortium mismatch for job '{clean_job_id}': job was scheduled without a consortium binding, "
+                                f"but completion supplied '{clean_supplied_consortium}'. Retroactive consortium binding is rejected."
+                            )
+                        if clean_supplied_consortium != clean_sched_consortium:
+                            raise TrainingProvenanceSecurityError(
+                                f"Consortium ID mismatch for job '{clean_job_id}': scheduled '{clean_sched_consortium}', got '{clean_supplied_consortium}'."
+                            )
+
+                    # Derive effective consortium exclusively from the authoritative scheduled record
+                    effective_consortium = clean_sched_consortium
 
                     # Strict metadata & feature contract enforcement
                     if simulation_id and simulation_id.strip() != sched_sim_id:
@@ -2360,10 +2372,11 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
 class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
     """SQLite-backed authority implementing WAL mode and ACID transactions for development and tests."""
 
-    def __init__(self, db_target: str, in_memory: bool = False) -> None:
+    def __init__(self, db_target: str, in_memory: bool = False, app_env: str = "development") -> None:
         self._lock = threading.RLock()
         self._in_memory = in_memory
         self._db_target = db_target
+        self.app_env = app_env
         self._mem_conn: sqlite3.Connection | None = None
 
         if self._in_memory or db_target in (":memory:", ""):
@@ -2398,7 +2411,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
 
     @property
     def _is_prod(self) -> bool:
-        return False
+        return self.app_env.lower() == "production"
 
     @contextlib.contextmanager
     def _connect(self):
@@ -3159,17 +3172,35 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                     sched_schema_ver = sched_row["feature_schema_version"]
                     sched_input_dim = sched_row["input_dim"]
                     sched_feature_names = tuple(json.loads(sched_row["feature_names_json"]))
-                    sched_consortium = sched_row["consortium_id"] if "consortium_id" in set(sched_row.keys()) else None
+                    sched_consortium_val = (
+                        sched_row["consortium_id"] if "consortium_id" in set(sched_row.keys()) else None
+                    )
+                    clean_sched_consortium = sched_consortium_val.strip() if sched_consortium_val else None
+                    clean_supplied_consortium = (
+                        consortium_id.strip() if (consortium_id and consortium_id.strip()) else None
+                    )
 
-                    if (
-                        consortium_id is not None
-                        and sched_consortium is not None
-                        and consortium_id.strip() != sched_consortium.strip()
-                    ):
+                    # Production enforcement: scheduled job must have an authoritative bound consortium
+                    if self._is_prod and not clean_sched_consortium:
                         raise TrainingProvenanceSecurityError(
-                            f"Consortium ID mismatch for job '{clean_job_id}': scheduled '{sched_consortium}', got '{consortium_id}'."
+                            f"Cannot complete job '{clean_job_id}': authoritative scheduled job lacks a valid consortium binding. "
+                            "Production training jobs must establish an authoritative consortium binding before execution."
                         )
-                    effective_consortium = (consortium_id.strip() if consortium_id else None) or sched_consortium
+
+                    # Strict consortium matching and rejection of retroactive assignment
+                    if clean_supplied_consortium is not None:
+                        if clean_sched_consortium is None:
+                            raise TrainingProvenanceSecurityError(
+                                f"Consortium mismatch for job '{clean_job_id}': job was scheduled without a consortium binding, "
+                                f"but completion supplied '{clean_supplied_consortium}'. Retroactive consortium binding is rejected."
+                            )
+                        if clean_supplied_consortium != clean_sched_consortium:
+                            raise TrainingProvenanceSecurityError(
+                                f"Consortium ID mismatch for job '{clean_job_id}': scheduled '{clean_sched_consortium}', got '{clean_supplied_consortium}'."
+                            )
+
+                    # Derive effective consortium exclusively from the authoritative scheduled record
+                    effective_consortium = clean_sched_consortium
 
                     if simulation_id and simulation_id.strip() != sched_sim_id:
                         raise TrainingProvenanceSecurityError(

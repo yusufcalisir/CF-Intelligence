@@ -200,12 +200,12 @@ class TrainingJobAuthorityDatabase:
 
         if in_memory or clean in (":memory:", ""):
             self._backend: TrainingJobAuthorityBackend = SQLiteTrainingJobAuthority(
-                db_target=":memory:", in_memory=True
+                db_target=":memory:", in_memory=True, app_env=active_env
             )
         elif clean.startswith("postgresql://") or clean.startswith("postgres://"):
-            self._backend = PostgresTrainingJobAuthority(db_url=clean)
+            self._backend = PostgresTrainingJobAuthority(db_url=clean, app_env=active_env)
         elif clean.startswith("sqlite://") or "://" not in clean:
-            self._backend = SQLiteTrainingJobAuthority(db_target=clean, in_memory=False)
+            self._backend = SQLiteTrainingJobAuthority(db_target=clean, in_memory=False, app_env=active_env)
         else:
             raise TrainingProvenanceConfigurationError(
                 f"Unsupported database URL scheme: '{clean}'. Only PostgreSQL ('postgresql://...') and SQLite ('sqlite://...') backends are supported."
