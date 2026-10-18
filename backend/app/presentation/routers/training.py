@@ -7,6 +7,7 @@ and simulation history. Reads from Redis-backed event and result stores with in-
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Path, Query, status
 from starlette.concurrency import run_in_threadpool
@@ -219,15 +220,20 @@ async def start_operational_federation_job(
             }
 
         # Offload synchronous execution to threadpool to avoid blocking async event loop
+        exec_kwargs: dict[str, Any] = {
+            "job_id": payload.job_id,
+            "simulation_id": payload.simulation_id,
+            "participating_banks": normalized_banks,
+            "num_rounds": payload.num_rounds,
+            "expected_unique_samples": payload.expected_unique_samples,
+            "consortium_id": target_consortium_id,
+        }
+        if dp_config is not None:
+            exec_kwargs["dp_config"] = dp_config
+
         result = await run_in_threadpool(
             svc.execute_operational_federation,
-            job_id=payload.job_id,
-            simulation_id=payload.simulation_id,
-            participating_banks=normalized_banks,
-            num_rounds=payload.num_rounds,
-            expected_unique_samples=payload.expected_unique_samples,
-            consortium_id=target_consortium_id,
-            dp_config=dp_config,
+            **exec_kwargs,
         )
 
         exec_status = result.get("status")

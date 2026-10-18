@@ -915,23 +915,21 @@ def reconcile_job_completion_evidence(
     # 5. Training Loss Verification
     if "loss" in target_metrics:
         claimed_loss = float(target_metrics["loss"])
-        final_round_obs = [r for r in completed_obs if r.round_number == latest_round]
-        final_losses = [float(r.observed_loss) for r in final_round_obs]
-        tot_s = sum(r.actual_sample_count for r in final_round_obs) or 1
-        weighted_final_loss = (
-            sum(float(r.observed_loss) * r.actual_sample_count for r in final_round_obs)
-            / tot_s
-        )
-        unweighted_final_loss = (
-            sum(final_losses) / len(final_losses)
-            if final_losses
-            else 0.0
-        )
-        valid_losses = [*final_losses, weighted_final_loss, unweighted_final_loss]
-        if not any(math.isclose(claimed_loss, loss_val, rel_tol=1e-3, abs_tol=1e-3) for loss_val in valid_losses):
-            raise TrainingProvenanceSecurityError(
-                f"Observed loss mismatch for job '{clean_job_id}': claimed {claimed_loss}, but observed final loss is {final_losses[-1]}."
-            )
+        obs_losses: list[tuple[float, float]] = [
+            (float(r.observed_loss), float(r.actual_sample_count))
+            for r in completed_obs
+            if r.round_number == latest_round and r.observed_loss is not None
+        ]
+        if obs_losses:
+            final_losses = [lw[0] for lw in obs_losses]
+            tot_s = sum(lw[1] for lw in obs_losses) or 1.0
+            weighted_final_loss = sum(lw[0] * lw[1] for lw in obs_losses) / tot_s
+            unweighted_final_loss = sum(final_losses) / len(final_losses)
+            valid_losses = [*final_losses, weighted_final_loss, unweighted_final_loss]
+            if not any(math.isclose(claimed_loss, loss_val, rel_tol=1e-3, abs_tol=1e-3) for loss_val in valid_losses):
+                raise TrainingProvenanceSecurityError(
+                    f"Observed loss mismatch for job '{clean_job_id}': claimed {claimed_loss}, but observed final loss is {final_losses[-1]}."
+                )
 
     # 6. Evaluation Metrics Provenance Verification (ROC-AUC, validation loss, etc.)
     eval_metrics = {
@@ -2689,7 +2687,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         clean_bank = bank_id.strip()
         clean_tag = canonicalize_dataset_tag(clean_bank, dataset_tag)
         clean_job = job_id.strip()
-        clean_attempt = str(attempt_id).strip() if attempt_id is not None else None
+        clean_attempt = attempt_id.strip() if attempt_id is not None else None
         if requested_epsilon <= 0.0 or not math.isfinite(requested_epsilon):
             raise ValueError(f"requested_epsilon must be positive finite float, got {requested_epsilon}")
         if requested_delta < 0.0 or not math.isfinite(requested_delta):
@@ -2776,7 +2774,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         clean_bank = bank_id.strip()
         clean_tag = canonicalize_dataset_tag(clean_bank, dataset_tag)
         clean_job = job_id.strip()
-        clean_attempt = str(attempt_id).strip() if attempt_id is not None else None
+        clean_attempt = attempt_id.strip() if attempt_id is not None else None
         if spent_epsilon < 0.0 or not math.isfinite(spent_epsilon):
             raise ValueError(f"spent_epsilon must be non-negative finite float, got {spent_epsilon}")
         if spent_delta < 0.0 or not math.isfinite(spent_delta):
@@ -4346,7 +4344,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         clean_bank = bank_id.strip()
         clean_tag = canonicalize_dataset_tag(clean_bank, dataset_tag)
         clean_job = job_id.strip()
-        clean_attempt = str(attempt_id).strip() if attempt_id is not None else None
+        clean_attempt = attempt_id.strip() if attempt_id is not None else None
         if requested_epsilon <= 0.0 or not math.isfinite(requested_epsilon):
             raise ValueError(f"requested_epsilon must be positive finite float, got {requested_epsilon}")
         if requested_delta < 0.0 or not math.isfinite(requested_delta):
@@ -4442,7 +4440,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
         clean_bank = bank_id.strip()
         clean_tag = canonicalize_dataset_tag(clean_bank, dataset_tag)
         clean_job = job_id.strip()
-        clean_attempt = str(attempt_id).strip() if attempt_id is not None else None
+        clean_attempt = attempt_id.strip() if attempt_id is not None else None
         if spent_epsilon < 0.0 or not math.isfinite(spent_epsilon):
             raise ValueError(f"spent_epsilon must be non-negative finite float, got {spent_epsilon}")
         if spent_delta < 0.0 or not math.isfinite(spent_delta):
