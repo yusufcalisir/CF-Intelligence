@@ -5960,7 +5960,7 @@ class DistributedFederatedTrainingManager:
                 metrics_dict = dict(pre_completed_rec.observed_metrics)
                 completed_record = pre_completed_rec
 
-                loaded_state = torch.load(io.BytesIO(final_model_bytes), map_location="cpu")
+                loaded_state = torch.load(io.BytesIO(final_model_bytes), map_location="cpu", weights_only=True)
                 try:
                     global_model = self.model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
                     global_model.load_state_dict(loaded_state)

@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import json
 import zlib
+from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 
 from app.application.services.automated_retraining import (
     DriftTriggeredRetrainingService,
@@ -148,9 +150,6 @@ class TestDriftRetrainingPipelineIntegration:
         assert fetched_job.job_id == job.job_id
 
         # Execute retraining pipeline without operational service fails closed
-        import pytest
-        from unittest.mock import MagicMock
-
         with pytest.raises(RuntimeError, match=r"(?i)no authorized OperationalFederationService provided"):
             service.execute_retraining_pipeline(job.job_id)
         assert job.status == "FAILED"
@@ -159,6 +158,7 @@ class TestDriftRetrainingPipelineIntegration:
         mock_op = MagicMock()
         mock_op.execute_operational_federation.return_value = {
             "status": "COMPLETED",
+            "is_verified": True,
             "candidate_model_version": "model_v1.0.1",
             "evaluation_metrics": {"pr_auc": 0.88, "precision": 0.84, "recall": 0.81},
             "receipt_id": "rcpt_pipeline_test",
