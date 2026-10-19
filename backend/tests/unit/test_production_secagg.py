@@ -637,3 +637,457 @@ def test_secagg_with_opacus_dp_sgd_preserves_budget(clean_test_environment):
     assert budget_a is not None
     assert budget_a.spent_epsilon > 0.0
     assert budget_a.remaining_epsilon < 5.0
+
+
+# ---------------------------------------------------------------------------
+# Test: Malicious Coordinator Peer-Key Substitution Rejected (Real 2-Bank Multi-Process)
+# ---------------------------------------------------------------------------
+
+
+def test_malicious_coordinator_peer_key_substitution_rejected(clean_test_environment):
+    """Test Requirement 1: A malicious coordinator attempts to substitute an institutional identity.
+
+    Negative Test:
+    1. A malicious coordinator supplies its own Ed25519 identity key as Bank B in SECAGG_SETUP.
+       Bank A MUST independently detect key substitution against authoritative trust material
+       and reject setup before private computation.
+    2. Even if setup succeeds with authentic keys, if coordinator provides a forged peer bundle
+       in SECAGG_TRAIN_AND_MASK signed by coordinator's forged key, Bank A rejects verification
+       before training or masked release.
+    Tested with real independent worker processes across a 2-bank federation.
+    """
+    from cryptography.hazmat.primitives import serialization
+
+    from app.infrastructure.security.p2p_secagg_driver import canonical_bundle_message
+
+    tmp_dir = clean_test_environment
+    db_path = os.path.join(tmp_dir, "authority_peer_trust.db")
+    db_url = f"sqlite:///{db_path}"
+
+    coordinator_token = "coord_malicious_test"
+    bank_tokens = {
+        "BANK_A": "token_a_trust_auth",
+        "BANK_B": "token_b_trust_auth",
+    }
+
+    auth_source = TrustedTrainingJobRecordSource(
+        db_url=db_url,
+        coordinator_token=coordinator_token,
+        app_env="development",
+    )
+
+    gen = DataGenerator(seed=42)
+    bank_datasets = gen.generate_bank_datasets(bank_a_size=50, bank_b_size=50, bank_c_size=50)
+    bank_partitions = {
+        b_id: (
+            np.asarray(DataGenerator.encode_features(bank_datasets[b_id.lower()][0]), dtype=np.float32),
+            np.asarray(bank_datasets[b_id.lower()][1].to_numpy(dtype=np.float32), dtype=np.float32),
+        )
+        for b_id in ("BANK_A", "BANK_B")
+    }
+
+    procs, endpoints = spawn_bank_workers(
+        participating_banks=["BANK_A", "BANK_B"],
+        db_url=db_url,
+        bank_tokens=bank_tokens,
+        bank_partitions=bank_partitions,
+        app_env="development",
+    )
+
+    try:
+        job_id = "job_coord_subst_test_001"
+        consortium_id = "cfi-consortium"
+
+        # Schedule job with permitted workers
+        auth_source.schedule_training_job(
+            job_id=job_id,
+            training_run_id=f"run_{job_id}",
+            simulation_id=f"sim_{job_id}",
+            coordinator_token=coordinator_token,
+            expected_rounds=1,
+            expected_epochs=1,
+            permitted_workers=["BANK_A", "BANK_B"],
+            consortium_id=consortium_id,
+        )
+
+        # Register authentic institutional keys for both banks
+        auth_source.register_institutional_identity(
+            bank_id="BANK_A",
+            public_key_hex=endpoints["BANK_A"]["institutional_public_key"],
+            token=coordinator_token,
+        )
+        auth_source.register_institutional_identity(
+            bank_id="BANK_B",
+            public_key_hex=endpoints["BANK_B"]["institutional_public_key"],
+            token=coordinator_token,
+        )
+
+        inbox_a = endpoints["BANK_A"]["inbox"]
+        outbox_a = endpoints["BANK_A"]["outbox"]
+
+        # Malicious coordinator generates its own forged Ed25519 identity key
+        forged_coord_priv = ed25519.Ed25519PrivateKey.generate()
+        forged_coord_pub_hex = forged_coord_priv.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        ).hex()
+
+        # Part 1: Coordinator supplies forged Bank B identity in SECAGG_SETUP
+        forged_setup = {
+            "command": "SECAGG_SETUP",
+            "job_id": job_id,
+            "round_number": 1,
+            "session_id": "sess_malicious_setup_001",
+            "consortium_id": consortium_id,
+            "roster": ["BANK_A", "BANK_B"],
+            "institutional_public_keys": {
+                "BANK_A": endpoints["BANK_A"]["institutional_public_key"],
+                "BANK_B": forged_coord_pub_hex,  # FORGED!
+            },
+            "secagg_config": {"quantization_scale": 1e7, "modulus": 2**64},
+        }
+
+        inbox_a.put(forged_setup)
+        resp = outbox_a.get(timeout=10)
+
+        # Bank A MUST reject the setup before any private computation or masked release
+        assert resp["status"] == "ERROR"
+        assert "key substitution" in resp["error"].lower() or "mismatch" in resp["error"].lower()
+
+        # Part 2: Genuine setup succeeds, but coordinator attempts forged peer bundle in TRAIN_AND_MASK
+        clean_session_id = "sess_clean_setup_002"
+        genuine_setup = {
+            "command": "SECAGG_SETUP",
+            "job_id": job_id,
+            "round_number": 1,
+            "session_id": clean_session_id,
+            "consortium_id": consortium_id,
+            "roster": ["BANK_A", "BANK_B"],
+            "institutional_public_keys": {
+                "BANK_A": endpoints["BANK_A"]["institutional_public_key"],
+                "BANK_B": endpoints["BANK_B"]["institutional_public_key"],
+            },
+            "secagg_config": {"quantization_scale": 1e7, "modulus": 2**64},
+        }
+
+        inbox_a.put(genuine_setup)
+        resp_setup = outbox_a.get(timeout=10)
+        assert resp_setup["status"] == "SUCCESS"
+
+        # Coordinator constructs a forged bundle signed by its forged private key
+        forged_ephemeral_x25519 = os.urandom(32)
+        bundle_msg = canonical_bundle_message(
+            bank_id="BANK_B",
+            round_id=1,
+            public_key_bytes=forged_ephemeral_x25519,
+            job_id=job_id,
+            consortium_id=consortium_id,
+            session_id=clean_session_id,
+            roster=["BANK_A", "BANK_B"],
+        )
+        forged_sig = forged_coord_priv.sign(bundle_msg)
+        forged_bundle_dict = {
+            "bank_id": "BANK_B",
+            "round_id": 1,
+            "public_key_bytes": forged_ephemeral_x25519.hex(),
+            "hmac_signature": forged_sig.hex(),
+            "auth_scheme": "ed25519",
+            "job_id": job_id,
+            "consortium_id": consortium_id,
+            "session_id": clean_session_id,
+            "roster": ["BANK_A", "BANK_B"],
+        }
+
+        forged_train_payload = {
+            "command": "SECAGG_TRAIN_AND_MASK",
+            "job_id": job_id,
+            "consortium_id": consortium_id,
+            "round_number": 1,
+            "session_id": clean_session_id,
+            "peer_bundles": {"BANK_B": forged_bundle_dict},
+        }
+
+        inbox_a.put(forged_train_payload)
+        resp_train = outbox_a.get(timeout=10)
+
+        # Bank A MUST reject peer bundle signature verification against authoritative Bank B key
+        assert resp_train["status"] == "ERROR"
+        assert "rejected peer bundle" in resp_train["error"].lower() or "signature" in resp_train["error"].lower()
+
+    finally:
+        for p in procs.values():
+            if hasattr(p, "terminate"):
+                p.terminate()
+
+
+# ---------------------------------------------------------------------------
+# Test: Single-Use Cryptographic Sessions & Replay Rejection
+# ---------------------------------------------------------------------------
+
+
+def test_single_use_cryptographic_sessions_and_replay_rejection(clean_test_environment):
+    """Test Requirement 2: Strict single-use session enforcement.
+
+    Negative Tests:
+    - Replaying the same SECAGG_TRAIN_AND_MASK command must be rejected without second release.
+    - Replaying with altered model weights must be rejected.
+    - Replaying with altered job/round/consortium must be rejected.
+    - Session state transitions to CONSUMED after first release and ABORTED after context mismatch.
+    """
+    from app.domain.value_objects import ModelWeights
+
+    tmp_dir = clean_test_environment
+    db_path = os.path.join(tmp_dir, "authority_single_use.db")
+    db_url = f"sqlite:///{db_path}"
+
+    coordinator_token = "coord_single_use"
+    bank_tokens = {
+        "BANK_A": "token_a_su",
+        "BANK_B": "token_b_su",
+    }
+
+    auth_source = TrustedTrainingJobRecordSource(
+        db_url=db_url,
+        coordinator_token=coordinator_token,
+        app_env="development",
+    )
+
+    gen = DataGenerator(seed=42)
+    bank_datasets = gen.generate_bank_datasets(bank_a_size=50, bank_b_size=50, bank_c_size=50)
+    bank_partitions = {
+        b_id: (
+            np.asarray(DataGenerator.encode_features(bank_datasets[b_id.lower()][0]), dtype=np.float32),
+            np.asarray(bank_datasets[b_id.lower()][1].to_numpy(dtype=np.float32), dtype=np.float32),
+        )
+        for b_id in ("BANK_A", "BANK_B")
+    }
+
+    procs, endpoints = spawn_bank_workers(
+        participating_banks=["BANK_A", "BANK_B"],
+        db_url=db_url,
+        bank_tokens=bank_tokens,
+        bank_partitions=bank_partitions,
+        app_env="development",
+    )
+
+    try:
+        job_id = "job_single_use_001"
+        consortium_id = "cfi-consortium"
+        session_id = "session_single_use_alpha"
+
+        auth_source.schedule_training_job(
+            job_id=job_id,
+            training_run_id=f"run_{job_id}",
+            simulation_id=f"sim_{job_id}",
+            coordinator_token=coordinator_token,
+            expected_rounds=1,
+            expected_epochs=1,
+            permitted_workers=["BANK_A", "BANK_B"],
+            consortium_id=consortium_id,
+        )
+
+        auth_source.register_institutional_identity("BANK_A", endpoints["BANK_A"]["institutional_public_key"], token=coordinator_token)
+        auth_source.register_institutional_identity("BANK_B", endpoints["BANK_B"]["institutional_public_key"], token=coordinator_token)
+
+        setup_payload = {
+            "command": "SECAGG_SETUP",
+            "job_id": job_id,
+            "round_number": 1,
+            "session_id": session_id,
+            "consortium_id": consortium_id,
+            "roster": ["BANK_A", "BANK_B"],
+            "institutional_public_keys": {
+                "BANK_A": endpoints["BANK_A"]["institutional_public_key"],
+                "BANK_B": endpoints["BANK_B"]["institutional_public_key"],
+            },
+            "secagg_config": {"quantization_scale": 1e7, "modulus": 2**64},
+        }
+
+        endpoints["BANK_A"]["inbox"].put(setup_payload)
+        endpoints["BANK_B"]["inbox"].put(setup_payload)
+
+        res_a = endpoints["BANK_A"]["outbox"].get(timeout=10)
+        res_b = endpoints["BANK_B"]["outbox"].get(timeout=10)
+        assert res_a["status"] == "SUCCESS"
+        assert res_b["status"] == "SUCCESS"
+
+        bundle_b = res_b["bundle"]
+
+        train_payload_a = {
+            "command": "SECAGG_TRAIN_AND_MASK",
+            "job_id": job_id,
+            "consortium_id": consortium_id,
+            "round_number": 1,
+            "session_id": session_id,
+            "peer_bundles": {"BANK_B": bundle_b},
+        }
+
+        # 1. First execution succeeds and returns masked vector
+        endpoints["BANK_A"]["inbox"].put(train_payload_a)
+        res_train_1 = endpoints["BANK_A"]["outbox"].get(timeout=20)
+        assert res_train_1["status"] == "SUCCESS"
+        assert "masked_vector_bytes" in res_train_1
+
+        # 2. Replay of identical command on same session MUST fail closed (session CONSUMED)
+        endpoints["BANK_A"]["inbox"].put(train_payload_a)
+        res_replay_identical = endpoints["BANK_A"]["outbox"].get(timeout=10)
+        assert res_replay_identical["status"] == "ERROR"
+        assert "cannot be reused" in res_replay_identical["error"].lower() or "terminal state" in res_replay_identical["error"].lower()
+
+        # 3. Replay with altered weights on same session MUST fail closed
+        dummy_weights = ModelWeights(layer_shapes=[(10,)], flat_weights=[1.0] * 10)
+        train_payload_altered_weights = dict(train_payload_a)
+        train_payload_altered_weights["global_weights"] = dummy_weights
+        endpoints["BANK_A"]["inbox"].put(train_payload_altered_weights)
+        res_replay_weights = endpoints["BANK_A"]["outbox"].get(timeout=10)
+        assert res_replay_weights["status"] == "ERROR"
+
+        # 4. Replay with altered job/round/consortium on a fresh session fails context binding
+        fresh_session_id = "session_single_use_beta"
+        setup_payload_2 = dict(setup_payload)
+        setup_payload_2["session_id"] = fresh_session_id
+        endpoints["BANK_A"]["inbox"].put(setup_payload_2)
+        res_setup_2 = endpoints["BANK_A"]["outbox"].get(timeout=10)
+        assert res_setup_2["status"] == "SUCCESS"
+
+        train_payload_mismatched_context = {
+            "command": "SECAGG_TRAIN_AND_MASK",
+            "job_id": "job_altered_mismatch",
+            "consortium_id": consortium_id,
+            "round_number": 1,
+            "session_id": fresh_session_id,
+            "peer_bundles": {"BANK_B": bundle_b},
+        }
+        endpoints["BANK_A"]["inbox"].put(train_payload_mismatched_context)
+        res_mismatch = endpoints["BANK_A"]["outbox"].get(timeout=10)
+        assert res_mismatch["status"] == "ERROR"
+        assert "context mismatch" in res_mismatch["error"].lower()
+
+    finally:
+        for p in procs.values():
+            if hasattr(p, "terminate"):
+                p.terminate()
+
+
+# ---------------------------------------------------------------------------
+# Test: Fixed-Point Encoding Bounds & Overflow Protection
+# ---------------------------------------------------------------------------
+
+
+def test_fixed_point_encoding_bounds_and_overflow_protection():
+    """Test Requirement 3: Validate fixed-point encoding bounds before casting.
+
+    Enforces:
+    - Reject non-finite or non-positive quantization scales.
+    - Reject scales outside authorized representation bounds [1.0, 1e12].
+    - Reject unsupported modulus (only 2^64 supported).
+    - Reject invalid or non-integer or huge sample counts.
+    - Reject out-of-range weight coordinate magnitudes (> 10,000).
+    - Reject scaled coordinates exceeding 2^57 to prevent int64 and aggregate overflow.
+    - Preserve negative values and sample-weighted FedAvg mathematics.
+    """
+    priv, pub = derive_institutional_identity_keypair("BANK_A", "tok_fixed_point")
+    driver = P2PSecAggDriver("BANK_A", institutional_private_key=priv, institutional_public_key=pub)
+    driver.generate_round_keypair(1, "job_fp", "cfi-consortium", "sess_fp_1", ["BANK_A", "BANK_B"])
+
+    priv_b, pub_b = derive_institutional_identity_keypair("BANK_B", "tok_b_fp")
+    driver_b = P2PSecAggDriver("BANK_B", institutional_private_key=priv_b, institutional_public_key=pub_b)
+    bundle_b = driver_b.generate_round_keypair(1, "job_fp", "cfi-consortium", "sess_fp_1", ["BANK_A", "BANK_B"])
+    driver.receive_peer_bundle(bundle_b, peer_institutional_public_key=pub_b)
+
+    valid_weights = [0.1, -0.5, 1.25, -2.0]
+
+    # 1. Non-positive or non-finite quantization scale
+    for bad_scale in (0.0, -100.0, float("nan"), float("inf"), 0.5, 1e13, "1e7"):
+        with pytest.raises(ValueError):
+            driver.compute_weighted_masked_vector(valid_weights, sample_count=100, quantization_scale=bad_scale)
+
+    # 2. Unsupported modulus
+    for bad_mod in (2**32, 2**63, 1000):
+        with pytest.raises(ValueError, match="Unsupported modulus"):
+            driver.compute_weighted_masked_vector(valid_weights, sample_count=100, modulus=bad_mod)
+
+    # 3. Invalid or non-integer or negative sample counts
+    for bad_sample in (0, -1, 150_000_000, True, 10.5):
+        with pytest.raises(ValueError, match="sample_count"):
+            driver.compute_weighted_masked_vector(valid_weights, sample_count=bad_sample)
+
+    # 4. Out of range weight magnitude (> 10_000)
+    huge_weights = [0.1, 15_000.0, -0.5]
+    with pytest.raises(ValueError, match="magnitude out of bounds"):
+        driver.compute_weighted_masked_vector(huge_weights, sample_count=100, quantization_scale=1e7)
+
+    # 5. Scaled coordinate overflow (> 2^57)
+    with pytest.raises(ValueError, match="exceeds maximum representation bound"):
+        driver.compute_weighted_masked_vector([5000.0], sample_count=50_000_000, quantization_scale=1e9)
+
+    # 6. Correctness: Negative values and sample-weighted FedAvg math preserved
+    driver_1 = P2PSecAggDriver("BANK_A", institutional_private_key=priv, institutional_public_key=pub)
+    driver_1.generate_round_keypair(1, "job_math", "cfi-consortium", "sess_math_1", ["BANK_A", "BANK_B"])
+    driver_2 = P2PSecAggDriver("BANK_B", institutional_private_key=priv_b, institutional_public_key=pub_b)
+    bundle_2 = driver_2.generate_round_keypair(1, "job_math", "cfi-consortium", "sess_math_1", ["BANK_A", "BANK_B"])
+    bundle_1 = driver_1.generate_round_keypair(1, "job_math", "cfi-consortium", "sess_math_1", ["BANK_A", "BANK_B"])
+
+    driver_1.receive_peer_bundle(bundle_2, peer_institutional_public_key=pub_b)
+    driver_2.receive_peer_bundle(bundle_1, peer_institutional_public_key=pub)
+
+    w_a = [-0.75, 1.5, -3.2, 0.0]
+    n_a = 200
+    w_b = [0.25, -2.0, 1.8, -0.5]
+    n_b = 600
+
+    masked_a = driver_1.compute_weighted_masked_vector(w_a, sample_count=n_a, quantization_scale=1e7)
+    masked_b = driver_2.compute_weighted_masked_vector(w_b, sample_count=n_b, quantization_scale=1e7)
+
+    # Verify driver is consumed after single compute
+    with pytest.raises(SecAggSecurityError, match="already been consumed"):
+        driver_1.compute_weighted_masked_vector(w_a, sample_count=n_a, quantization_scale=1e7)
+
+    agg = P2PSecAggDriver.aggregate_weighted_masked_vectors(
+        masked_vectors={"BANK_A": masked_a, "BANK_B": masked_b},
+        sample_counts={"BANK_A": n_a, "BANK_B": n_b},
+        quantization_scale=1e7,
+    )
+
+    # Ground truth FedAvg: (n_a * w_a + n_b * w_b) / (n_a + n_b)
+    expected = (n_a * np.array(w_a) + n_b * np.array(w_b)) / (n_a + n_b)
+    np.testing.assert_allclose(agg, expected, atol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Test: Operational API SecAgg Wiring & Validation
+# ---------------------------------------------------------------------------
+
+
+def test_operational_api_secagg_wiring_and_validation():
+    """Test Requirement 4: Operational API SecAgg schema validation and fail-closed checks."""
+    from app.application.schemas.simulation import (
+        OperationalFederationRequest,
+        OperationalFederationResponse,
+    )
+
+    # 1. Valid request accepts SecAgg configuration
+    req = OperationalFederationRequest(
+        participating_banks=["BANK_A", "BANK_B"],
+        num_rounds=2,
+        secagg_enabled=True,
+        secagg_quantization_scale=1e7,
+        secagg_modulus=2**64,
+    )
+    assert req.secagg_enabled is True
+    assert req.secagg_quantization_scale == 1e7
+    assert req.secagg_modulus == 2**64
+
+    # 2. Response exposes secagg_enabled and secagg_provenance
+    resp = OperationalFederationResponse(
+        job_id="job_api_test",
+        training_run_id="run_api_test",
+        simulation_id="sim_api_test",
+        status="COMPLETED",
+        is_verified=True,
+        secagg_enabled=True,
+        secagg_provenance={"enabled": True, "rounds": {}},
+    )
+    assert resp.secagg_enabled is True
+    assert resp.secagg_provenance is not None
+

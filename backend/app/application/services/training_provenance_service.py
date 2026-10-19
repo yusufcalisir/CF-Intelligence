@@ -523,6 +523,19 @@ class TrainingJobAuthorityDatabase:
             attempt_id=attempt_id,
         )
 
+    def register_institutional_identity(
+        self,
+        bank_id: str,
+        public_key_hex: str,
+    ) -> None:
+        self._backend.register_institutional_identity(bank_id=bank_id, public_key_hex=public_key_hex)
+
+    def get_institutional_identity(self, bank_id: str) -> str | None:
+        return self._backend.get_institutional_identity(bank_id=bank_id)
+
+    def get_institutional_identities(self, bank_ids: Sequence[str]) -> dict[str, str]:
+        return self._backend.get_institutional_identities(bank_ids=bank_ids)
+
     def clear(self) -> None:
         self._backend.clear()
 
@@ -1666,6 +1679,68 @@ class TrustedTrainingJobRecordSource:
             steps_executed=steps_executed,
             attempt_id=attempt_id,
         )
+
+    def register_institutional_identity(
+        self,
+        bank_id: str,
+        public_key_hex: str,
+        token: str | None = None,
+    ) -> None:
+        clean_bank = bank_id.strip().upper()
+        clean_key = public_key_hex.strip().lower()
+        if not clean_bank or not clean_key:
+            raise ValueError("bank_id and public_key_hex must be non-empty.")
+
+        active_env = self._app_env or get_settings().app_env
+        is_prod = active_env.lower() == "production"
+        effective_token = token or self._worker_token
+        if is_prod and not effective_token:
+            raise TrainingProvenanceSecurityError(
+                f"Unauthenticated attempt to register institutional identity for bank '{clean_bank}' rejected in production."
+            )
+        if effective_token:
+            is_coord = bool(self._coordinator_token and hmac.compare_digest(effective_token.strip(), self._coordinator_token.strip()))
+            if not is_coord and self._bank_tokens:
+                expected_tok = self._bank_tokens.get(clean_bank) or self._bank_tokens.get(bank_id)
+                if expected_tok and not hmac.compare_digest(effective_token.strip(), expected_tok.strip()):
+                    raise TrainingProvenanceSecurityError(
+                        f"Registration authentication failed for bank '{clean_bank}': invalid token."
+                    )
+        self._db.register_institutional_identity(bank_id=clean_bank, public_key_hex=clean_key)
+
+    def get_institutional_identity(self, bank_id: str) -> str | None:
+        clean_bank = bank_id.strip().upper()
+        db_key = self._db.get_institutional_identity(clean_bank)
+        if db_key:
+            return db_key
+        try:
+            from app.application.services.operational_federation_service import (
+                WorkerEndpointRegistry,
+            )
+
+            reg_key = WorkerEndpointRegistry.get_institutional_public_key(clean_bank)
+            if reg_key:
+                return reg_key
+        except Exception:
+            pass
+        return None
+
+    def get_institutional_identities(self, bank_ids: Sequence[str]) -> dict[str, str]:
+        clean_banks = [b.strip().upper() for b in bank_ids if b]
+        db_keys = self._db.get_institutional_identities(clean_banks)
+        for b in clean_banks:
+            if b not in db_keys:
+                try:
+                    from app.application.services.operational_federation_service import (
+                        WorkerEndpointRegistry,
+                    )
+
+                    reg_key = WorkerEndpointRegistry.get_institutional_public_key(b)
+                    if reg_key:
+                        db_keys[b] = reg_key
+                except Exception:
+                    pass
+        return db_keys
 
     def clear(self) -> None:
         self._db.clear()

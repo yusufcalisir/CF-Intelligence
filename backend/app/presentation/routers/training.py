@@ -7,6 +7,7 @@ and simulation history. Reads from Redis-backed event and result stores with in-
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Path, Query, status
@@ -231,6 +232,37 @@ async def start_operational_federation_job(
         if dp_config is not None:
             exec_kwargs["dp_config"] = dp_config
 
+        secagg_config = None
+        if payload.secagg_enabled:
+            if len(normalized_banks) < 2:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Secure Aggregation (SecAgg) requires at least 2 participating banks.",
+                )
+            scale = payload.secagg_quantization_scale if payload.secagg_quantization_scale is not None else 1e7
+            if not isinstance(scale, (int, float)) or not math.isfinite(scale) or scale <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="secagg_quantization_scale must be a finite positive number.",
+                )
+            if scale < 1.0 or scale > 1e12:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="secagg_quantization_scale outside authorized bounds [1.0, 1e12].",
+                )
+            modulus = payload.secagg_modulus if payload.secagg_modulus is not None else 2**64
+            if modulus != 2**64:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Unsupported secagg_modulus: only 2^64 (18446744073709551616) is supported.",
+                )
+            secagg_config = {
+                "quantization_scale": scale,
+                "modulus": modulus,
+            }
+            exec_kwargs["secagg_enabled"] = True
+            exec_kwargs["secagg_config"] = secagg_config
+
         result = await run_in_threadpool(
             svc.execute_operational_federation,
             **exec_kwargs,
@@ -291,6 +323,14 @@ async def start_operational_federation_job(
                 detail="Federation execution produced no verified artifact digest (SHA-256).",
             )
 
+        # Never silently downgrade an explicitly requested SecAgg job to plaintext aggregation
+        if payload.secagg_enabled and not bool(result.get("secagg_enabled", False)):
+            logger.error("Federation silently failed to execute requested SecAgg protocol")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Explicitly requested Secure Aggregation (SecAgg) was not executed by worker topology.",
+            )
+
         return OperationalFederationResponse(
             job_id=result["job_id"],
             training_run_id=result.get("training_run_id", ""),
@@ -306,6 +346,8 @@ async def start_operational_federation_job(
             worker_pids=result.get("worker_pids", {}),
             dp_enabled=bool(result.get("dp_enabled", False)),
             dp_provenance=result.get("dp_provenance", {}),
+            secagg_enabled=bool(result.get("secagg_enabled", False)),
+            secagg_provenance=result.get("secagg_provenance"),
         )
     except TrainingProvenanceSecurityError as exc:
         logger.error("Operational federation rejected due to security policy violation: %s", exc)

@@ -766,6 +766,22 @@ class TrainingJobAuthorityBackend(abc.ABC):
     ) -> InstitutionalPrivacyBudget: ...
 
     @abc.abstractmethod
+    def register_institutional_identity(
+        self,
+        bank_id: str,
+        public_key_hex: str,
+    ) -> None: ...
+
+    @abc.abstractmethod
+    def get_institutional_identity(self, bank_id: str) -> str | None: ...
+
+    @abc.abstractmethod
+    def get_institutional_identities(
+        self,
+        bank_ids: Sequence[str],
+    ) -> dict[str, str]: ...
+
+    @abc.abstractmethod
     def clear(self) -> None: ...
 
     @abc.abstractmethod
@@ -1519,6 +1535,15 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                                 authoritative_dataset_tag VARCHAR(128) NOT NULL,
                                 created_at VARCHAR(64) NOT NULL,
                                 PRIMARY KEY (bank_id, alias_tag)
+                            );
+                            """
+                        )
+                        cur.execute(
+                            """
+                            CREATE TABLE IF NOT EXISTS cfi_institutional_identities (
+                                bank_id VARCHAR(128) PRIMARY KEY,
+                                public_key_hex VARCHAR(128) NOT NULL,
+                                registered_at VARCHAR(64) NOT NULL
                             );
                             """
                         )
@@ -3358,8 +3383,71 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                         updated_at=now_str,
                     )
 
+    def register_institutional_identity(
+        self,
+        bank_id: str,
+        public_key_hex: str,
+    ) -> None:
+        clean_bank = bank_id.strip().upper()
+        clean_key = public_key_hex.strip().lower()
+        if not clean_bank or not clean_key:
+            raise ValueError("bank_id and public_key_hex must be non-empty.")
+        now = datetime.now(UTC).isoformat()
+        with self._connect() as conn, conn.transaction(), conn.cursor() as cur:
+            cur.execute(
+                "SELECT public_key_hex FROM cfi_institutional_identities WHERE bank_id = %s FOR UPDATE;",
+                (clean_bank,),
+            )
+            row = cur.fetchone()
+            if row:
+                existing_key = (row.get("public_key_hex") if isinstance(row, dict) else row[0]).strip().lower()
+                if existing_key != clean_key:
+                    raise TrainingProvenanceSecurityError(
+                        f"Institutional identity conflict for bank '{clean_bank}': existing key '{existing_key}' "
+                        f"does not match new key '{clean_key}'."
+                    )
+                return
+            cur.execute(
+                "INSERT INTO cfi_institutional_identities (bank_id, public_key_hex, registered_at) VALUES (%s, %s, %s);",
+                (clean_bank, clean_key, now),
+            )
+
+    def get_institutional_identity(self, bank_id: str) -> str | None:
+        clean_bank = bank_id.strip().upper()
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT public_key_hex FROM cfi_institutional_identities WHERE bank_id = %s;",
+                (clean_bank,),
+            )
+            row = cur.fetchone()
+            if row:
+                val = row.get("public_key_hex") if isinstance(row, dict) else row[0]
+                return val.strip().lower()
+            return None
+
+    def get_institutional_identities(
+        self,
+        bank_ids: Sequence[str],
+    ) -> dict[str, str]:
+        clean_banks = [b.strip().upper() for b in bank_ids if b]
+        if not clean_banks:
+            return {}
+        res: dict[str, str] = {}
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT bank_id, public_key_hex FROM cfi_institutional_identities WHERE bank_id = ANY(%s);",
+                (clean_banks,),
+            )
+            rows = cur.fetchall()
+            for r in rows:
+                b_id = (r.get("bank_id") if isinstance(r, dict) else r[0]).strip().upper()
+                pk = (r.get("public_key_hex") if isinstance(r, dict) else r[1]).strip().lower()
+                res[b_id] = pk
+        return res
+
     def clear(self) -> None:
         with self._connect() as conn, conn.transaction(), conn.cursor() as cur:
+            cur.execute("DELETE FROM cfi_institutional_identities")
             cur.execute("DELETE FROM cfi_institutional_dataset_aliases")
             cur.execute("DELETE FROM cfi_institutional_privacy_budgets")
             cur.execute("DELETE FROM cfi_completed_jobs")
@@ -3512,6 +3600,15 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 authoritative_dataset_tag TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 PRIMARY KEY (bank_id, alias_tag)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cfi_institutional_identities (
+                bank_id TEXT PRIMARY KEY,
+                public_key_hex TEXT NOT NULL,
+                registered_at TEXT NOT NULL
             )
             """
         )
@@ -5345,10 +5442,74 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                     conn.execute("ROLLBACK")
                 raise
 
+    def register_institutional_identity(
+        self,
+        bank_id: str,
+        public_key_hex: str,
+    ) -> None:
+        clean_bank = bank_id.strip().upper()
+        clean_key = public_key_hex.strip().lower()
+        if not clean_bank or not clean_key:
+            raise ValueError("bank_id and public_key_hex must be non-empty.")
+        now = datetime.now(UTC).isoformat()
+        with self._connect() as conn, self._lock:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    "SELECT public_key_hex FROM cfi_institutional_identities WHERE bank_id = ?",
+                    (clean_bank,),
+                ).fetchone()
+                if row:
+                    existing_key = row[0].strip().lower()
+                    if existing_key != clean_key:
+                        raise TrainingProvenanceSecurityError(
+                            f"Institutional identity conflict for bank '{clean_bank}': existing key '{existing_key}' "
+                            f"does not match new key '{clean_key}'."
+                        )
+                    conn.execute("COMMIT")
+                    return
+                conn.execute(
+                    "INSERT INTO cfi_institutional_identities (bank_id, public_key_hex, registered_at) VALUES (?, ?, ?)",
+                    (clean_bank, clean_key, now),
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                with contextlib.suppress(Exception):
+                    conn.execute("ROLLBACK")
+                raise
+
+    def get_institutional_identity(self, bank_id: str) -> str | None:
+        clean_bank = bank_id.strip().upper()
+        with self._connect() as conn, self._lock:
+            row = conn.execute(
+                "SELECT public_key_hex FROM cfi_institutional_identities WHERE bank_id = ?",
+                (clean_bank,),
+            ).fetchone()
+            return row[0].strip().lower() if row else None
+
+    def get_institutional_identities(
+        self,
+        bank_ids: Sequence[str],
+    ) -> dict[str, str]:
+        clean_banks = [b.strip().upper() for b in bank_ids if b]
+        if not clean_banks:
+            return {}
+        res: dict[str, str] = {}
+        with self._connect() as conn, self._lock:
+            placeholders = ",".join("?" for _ in clean_banks)
+            rows = conn.execute(
+                f"SELECT bank_id, public_key_hex FROM cfi_institutional_identities WHERE bank_id IN ({placeholders})",
+                clean_banks,
+            ).fetchall()
+            for r in rows:
+                res[r[0].strip().upper()] = r[1].strip().lower()
+        return res
+
     def clear(self) -> None:
         with self._connect() as conn, self._lock:
             conn.execute("BEGIN IMMEDIATE")
             try:
+                conn.execute("DELETE FROM cfi_institutional_identities")
                 conn.execute("DELETE FROM cfi_institutional_dataset_aliases")
                 conn.execute("DELETE FROM cfi_institutional_privacy_budgets")
                 conn.execute("DELETE FROM cfi_completed_jobs")

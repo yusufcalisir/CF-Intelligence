@@ -503,6 +503,18 @@ class WorkerEndpointRegistry:
             return res
 
     @classmethod
+    def get_institutional_public_key(cls, bank_id: str) -> str | None:
+        """Retrieve authentic institutional Ed25519 public key hex for an active worker."""
+        clean_id = bank_id.strip().upper()
+        with cls._lock:
+            rec = cls._registry.get(clean_id)
+            if rec and rec.state == "ACTIVE" and isinstance(rec.endpoint, dict):
+                pub = rec.endpoint.get("institutional_public_key")
+                if pub:
+                    return str(pub).strip().lower()
+            return None
+
+    @classmethod
     def unregister_worker_endpoint(
         cls,
         bank_id: str,

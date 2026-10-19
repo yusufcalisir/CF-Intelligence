@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
 import os
 import struct
 from collections.abc import Mapping, Sequence
@@ -47,6 +48,19 @@ from app.infrastructure.security.shamir_engine import (
 
 class SecAggSecurityError(Exception):
     """Raised when Secure Aggregation cryptographic validation or protocol invariant fails."""
+
+
+# ---------------------------------------------------------------------------
+# Numerical & Fixed-Point Encoding Bounds Constants
+# ---------------------------------------------------------------------------
+
+MAX_QUANTIZATION_SCALE: float = 1e12
+MIN_QUANTIZATION_SCALE: float = 1.0
+MAX_SAMPLE_COUNT: int = 100_000_000
+MAX_WEIGHT_MAGNITUDE: float = 10_000.0
+# Upper bound on single-client scaled weighted coordinate |w| * n * S before int64 cast.
+# 2^57 allows sum of up to 32 clients in FedAvg without overflowing signed int64 (2^63 - 1).
+MAX_CLIENT_SCALED_COORDINATE: int = 2**57
 
 
 def derive_institutional_identity_keypair(
@@ -278,6 +292,7 @@ class P2PSecAggDriver:
         self._roster: tuple[str, ...] = ()
         self._self_mask_seed: bytes | None = None
         self._received_peer_bundles: dict[str, ECDHPublicKeyBundle] = {}
+        self._is_consumed: bool = False
 
     # ------------------------------------------------------------------
     # Phase 1: Ephemeral Keypair Generation
@@ -312,6 +327,7 @@ class P2PSecAggDriver:
         self._public_key_bytes = self._private_key.public_key().public_bytes_raw()
         self._self_mask_seed = os.urandom(32)
         self._received_peer_bundles.clear()
+        self._is_consumed = False
 
         msg = canonical_bundle_message(
             bank_id=self.bank_id,
@@ -591,10 +607,31 @@ class P2PSecAggDriver:
             q_u = round(v_u * S)  (mod 2^64)
             y_u = q_u + Σ_{v > u} s_{u,v} - Σ_{v < u} s_{v,u}  (mod 2^64)
         """
+        if self._is_consumed:
+            raise SecAggSecurityError(
+                "P2PSecAggDriver instance has already been consumed for this round. "
+                "Replay or reuse of ephemeral key material is strictly prohibited."
+            )
+
         if not weights:
             raise ValueError("weights must be non-empty.")
-        if sample_count <= 0:
-            raise ValueError("sample_count must be positive.")
+
+        if not isinstance(quantization_scale, (int, float)) or isinstance(quantization_scale, bool):
+            raise ValueError(f"quantization_scale must be a float or int, got {type(quantization_scale).__name__}.")
+        if not math.isfinite(quantization_scale) or quantization_scale <= 0.0:
+            raise ValueError(f"quantization_scale must be positive and finite, got {quantization_scale}.")
+        if quantization_scale < MIN_QUANTIZATION_SCALE or quantization_scale > MAX_QUANTIZATION_SCALE:
+            raise ValueError(
+                f"quantization_scale {quantization_scale} outside authorized bounds [{MIN_QUANTIZATION_SCALE}, {MAX_QUANTIZATION_SCALE}]."
+            )
+
+        if modulus != 2**64:
+            raise ValueError(f"Unsupported modulus: {modulus}. Only 2^64 is supported for weighted SecAgg.")
+
+        if not isinstance(sample_count, (int, np.integer)) or isinstance(sample_count, bool):
+            raise ValueError(f"sample_count must be an integer, got {type(sample_count).__name__}.")
+        if sample_count <= 0 or sample_count > MAX_SAMPLE_COUNT:
+            raise ValueError(f"sample_count must be a positive integer <= {MAX_SAMPLE_COUNT}, got {sample_count}.")
 
         bundles = peer_bundles if peer_bundles is not None else list(self._received_peer_bundles.values())
         if not bundles:
@@ -604,10 +641,27 @@ class P2PSecAggDriver:
         if not np.all(np.isfinite(arr_w)):
             raise ValueError("weights vector contains non-finite values (NaN or Inf).")
 
-        d = len(weights)
+        # Validate coordinate magnitude before scaling
+        max_abs_w = float(np.max(np.abs(arr_w)))
+        if max_abs_w > MAX_WEIGHT_MAGNITUDE:
+            raise ValueError(
+                f"Weight coordinate magnitude out of bounds: {max_abs_w} exceeds maximum allowed {MAX_WEIGHT_MAGNITUDE}."
+            )
 
-        # Scale by sample_count and quantization_scale
-        scaled_weighted = arr_w * (float(sample_count) * float(quantization_scale))
+        d = len(weights)
+        scale_factor = float(sample_count) * float(quantization_scale)
+        scaled_weighted = arr_w * scale_factor
+
+        # Pre-cast coordinate magnitude validation to prevent int64 and aggregate overflow
+        max_scaled_coord = float(np.max(np.abs(scaled_weighted)))
+        if max_scaled_coord > MAX_CLIENT_SCALED_COORDINATE:
+            raise ValueError(
+                f"Fixed-point scaled coordinate magnitude out of bounds: {max_scaled_coord} "
+                f"exceeds maximum representation bound {MAX_CLIENT_SCALED_COORDINATE}. "
+                "Casting would risk integer overflow in client encoding or aggregate sum."
+            )
+
+        # Exact round to int64, then view as modular uint64 (two's complement)
         quantized = np.round(scaled_weighted).astype(np.int64).astype(np.uint64)
         masked = np.array(quantized, copy=True)
 
@@ -616,6 +670,11 @@ class P2PSecAggDriver:
             mask = np.asarray(self.expand_mask(seed, d, modulus=modulus), dtype=np.uint64)
 
             masked = masked + mask if self.bank_id < bundle.bank_id else masked - mask
+
+        # Mark driver consumed for this session to prevent replay
+        self._is_consumed = True
+        self._private_key = None
+        self._self_mask_seed = None
 
         return masked.tolist()
 
@@ -700,6 +759,16 @@ class P2PSecAggDriver:
         Computes coordinate-wise sum mod 2^64 (masks cancel identically with zero-sum),
         interprets signed two's complement integer, and dequantizes by (quantization_scale * total_samples).
         """
+        if not isinstance(quantization_scale, (int, float)) or isinstance(quantization_scale, bool):
+            raise ValueError("quantization_scale must be a float or int.")
+        if not math.isfinite(quantization_scale) or quantization_scale <= 0.0:
+            raise ValueError(f"quantization_scale must be positive and finite, got {quantization_scale}.")
+        if quantization_scale < MIN_QUANTIZATION_SCALE or quantization_scale > MAX_QUANTIZATION_SCALE:
+            raise ValueError(f"quantization_scale {quantization_scale} outside authorized bounds.")
+
+        if modulus != 2**64:
+            raise ValueError(f"Unsupported modulus: {modulus}. Only 2^64 is supported for weighted SecAgg.")
+
         if not masked_vectors:
             raise ValueError("masked_vectors must be non-empty.")
         if len(masked_vectors) < 2:
@@ -709,11 +778,18 @@ class P2PSecAggDriver:
         if set(bank_ids) != set(sample_counts.keys()):
             raise ValueError("sample_counts keys must match masked_vectors keys.")
 
+        for b_id, sc in sample_counts.items():
+            if not isinstance(sc, (int, np.integer)) or isinstance(sc, bool) or sc <= 0 or sc > MAX_SAMPLE_COUNT:
+                raise ValueError(f"sample_count for bank {b_id} must be a positive integer <= {MAX_SAMPLE_COUNT}, got {sc}.")
+
         total_samples = sum(sample_counts.values())
         if total_samples <= 0:
             raise ValueError("Total sample count must be positive.")
 
         d = len(masked_vectors[bank_ids[0]])
+        if d == 0:
+            raise ValueError("Vector dimension must be non-zero.")
+
         for b_id in bank_ids:
             if len(masked_vectors[b_id]) != d:
                 raise ValueError(
@@ -731,10 +807,18 @@ class P2PSecAggDriver:
 
         # Dequantize: signed_sum / (quantization_scale * total_samples)
         denominator = float(quantization_scale) * float(total_samples)
+        if denominator <= 0 or not math.isfinite(denominator):
+            raise ValueError("Invalid denominator in dequantization.")
+
         result_arr = signed_sum.astype(np.float64) / denominator
 
         if not np.all(np.isfinite(result_arr)):
             raise ValueError("Reconstructed weights contain non-finite values.")
+
+        if float(np.max(np.abs(result_arr))) > MAX_WEIGHT_MAGNITUDE:
+            raise ValueError(
+                f"Reconstructed weights exceed physical bound {MAX_WEIGHT_MAGNITUDE}: possible modular overflow in aggregation."
+            )
 
         return result_arr.tolist()
 

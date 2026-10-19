@@ -519,6 +519,19 @@ class OperationalFederationRequest(BaseModel):
         default=False,
         description="Whether to require CSPRNG backing for Opacus DP noise generation",
     )
+    secagg_enabled: bool = Field(
+        default=False,
+        description="Whether to enable cryptographically authenticated Secure Aggregation (SecAgg) across bank workers",
+    )
+    secagg_quantization_scale: float | None = Field(
+        default=1e7,
+        gt=0.0,
+        description="Quantization scale for fixed-point integer encoding in SecAgg",
+    )
+    secagg_modulus: int | None = Field(
+        default=2**64,
+        description="Modular arithmetic base for pairwise masking (must be 2^64)",
+    )
 
 
 class OperationalFederationResponse(BaseModel):
@@ -538,6 +551,8 @@ class OperationalFederationResponse(BaseModel):
     worker_pids: dict[str, int] = Field(default_factory=dict)
     dp_enabled: bool = False
     dp_provenance: dict[str, Any] = Field(default_factory=dict)
+    secagg_enabled: bool = False
+    secagg_provenance: dict[str, Any] | None = None
     error: str | None = None
 
 

@@ -3858,6 +3858,17 @@ def run_bank_worker_node(
             app_env=app_env,
         )
 
+        clean_worker_bank = bank_id.strip().upper()
+        try:
+            _, local_pub_hex = derive_institutional_identity_hex(clean_worker_bank, worker_token)
+            authority_source.register_institutional_identity(
+                bank_id=clean_worker_bank,
+                public_key_hex=local_pub_hex,
+                token=worker_token,
+            )
+        except Exception as reg_err:
+            logger.debug("Bank worker [%s] auto-registration of institutional identity: %s", bank_id, reg_err)
+
         # Load local training data from isolated bank storage if path provided
         vault_handle: BankPrivateStorageVault | None = None
         if local_partition is not None:
@@ -4493,10 +4504,16 @@ def run_bank_worker_node(
                     session_id = str(msg["session_id"]).strip()
                     round_number = int(msg["round_number"])
                     roster = [str(r).strip().upper() for r in msg.get("roster", []) if r]
-                    peer_identities = dict(msg.get("peer_identities") or msg.get("institutional_public_keys") or {})
+                    relayed_peer_identities = dict(msg.get("peer_identities") or msg.get("institutional_public_keys") or {})
                     secagg_config = dict(msg.get("secagg_config") or {})
 
                     clean_bank = bank_id.strip().upper()
+                    if session_id in secagg_worker_sessions:
+                        err_msg = f"Bank worker [{bank_id}] rejected SecAgg setup: duplicate session_id '{session_id}'."
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
                     if clean_bank not in roster:
                         err_msg = f"Bank worker [{bank_id}] received SecAgg setup but is not in authorized roster: {roster}"
                         logger.error(err_msg)
@@ -4509,6 +4526,35 @@ def run_bank_worker_node(
                         outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
                         continue
 
+                    # 1. Independently authenticate scheduled job, roster, and consortium against authoritative record
+                    sched = authority_source.get_scheduled_job(job_id)
+                    if sched is None:
+                        err_msg = f"Bank worker [{bank_id}] rejected SecAgg setup: job [{job_id}] is not scheduled in authoritative record."
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    sched_workers = {w.strip().upper() for w in sched.permitted_workers}
+                    roster_set = {r.strip().upper() for r in roster}
+                    if sched_workers != roster_set:
+                        err_msg = (
+                            f"Bank worker [{bank_id}] rejected SecAgg setup: coordinator roster {sorted(roster_set)} "
+                            f"does not match authoritative permitted workers {sorted(sched_workers)}."
+                        )
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    if sched.consortium_id and sched.consortium_id.strip().lower() != consortium_id:
+                        err_msg = (
+                            f"Bank worker [{bank_id}] rejected SecAgg setup: coordinator consortium [{consortium_id}] "
+                            f"does not match authoritative job consortium [{sched.consortium_id}]."
+                        )
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    # 2. Derive bank-owned institutional keypair
                     try:
                         priv_hex, pub_hex = derive_institutional_identity_hex(clean_bank, worker_token)
                     except Exception as k_err:
@@ -4517,22 +4563,45 @@ def run_bank_worker_node(
                         outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
                         continue
 
-                    expected_self_pub = peer_identities.get(clean_bank) or peer_identities.get(bank_id)
-                    if expected_self_pub and expected_self_pub != pub_hex:
+                    # 3. Independently verify peer public keys against authoritative trust material outside coordinator control
+                    authoritative_peer_keys = authority_source.get_institutional_identities(roster)
+                    missing_auth_keys = [r for r in roster if r not in authoritative_peer_keys or not authoritative_peer_keys[r]]
+                    if missing_auth_keys:
                         err_msg = (
-                            f"Institutional identity mismatch for bank [{bank_id}]: "
-                            f"derived '{pub_hex}' != roster registration '{expected_self_pub}'."
+                            f"Bank worker [{bank_id}] rejected SecAgg setup: missing authoritative institutional keys for {missing_auth_keys}."
                         )
                         logger.error(err_msg)
                         outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
                         continue
 
-                    # Verify that all roster participants have registered institutional identities
-                    missing_roster_keys = [r for r in roster if r not in peer_identities]
-                    if missing_roster_keys:
-                        err_msg = f"Bank worker [{bank_id}] rejected SecAgg setup: missing institutional keys for peers {missing_roster_keys}."
+                    # Local bank's derived public key must match authoritative record
+                    local_auth_key = authoritative_peer_keys.get(clean_bank, "").strip().lower()
+                    if local_auth_key != pub_hex.strip().lower():
+                        err_msg = (
+                            f"Institutional identity mismatch for bank [{bank_id}]: "
+                            f"derived '{pub_hex}' != authoritative record '{local_auth_key}'."
+                        )
                         logger.error(err_msg)
                         outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    # Treat coordinator-relayed public keys as untrusted transport data, never as a trust anchor!
+                    # Reject any key substitution attempt immediately!
+                    substitution_detected = False
+                    for p_id, r_key in relayed_peer_identities.items():
+                        clean_p = p_id.strip().upper()
+                        if clean_p in authoritative_peer_keys:
+                            expected_key = authoritative_peer_keys[clean_p].strip().lower()
+                            if r_key.strip().lower() != expected_key:
+                                err_msg = (
+                                    f"Bank worker [{bank_id}] detected institutional key substitution by coordinator for [{clean_p}]: "
+                                    f"relayed '{r_key}' != authoritative '{expected_key}'. Rejecting setup."
+                                )
+                                logger.error(err_msg)
+                                outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                                substitution_detected = True
+                                break
+                    if substitution_detected:
                         continue
 
                     modulus = int(secagg_config.get("modulus", 2**64))
@@ -4560,14 +4629,16 @@ def run_bank_worker_node(
                         continue
 
                     secagg_worker_sessions[session_id] = {
+                        "state": "ACTIVE",
                         "driver": driver,
                         "job_id": job_id,
                         "consortium_id": consortium_id,
                         "session_id": session_id,
                         "round_number": round_number,
-                        "roster": roster,
-                        "peer_identities": peer_identities,
+                        "roster": tuple(roster),
+                        "authoritative_peer_keys": authoritative_peer_keys,
                         "secagg_config": secagg_config,
+                        "bank_id": clean_bank,
                     }
 
                     bundle_dict = bundle.to_dict()
@@ -4582,13 +4653,15 @@ def run_bank_worker_node(
                     continue
 
                 if msg.get("command") == "SECAGG_TRAIN_AND_MASK":
-                    job_id = msg["job_id"]
-                    round_number = msg["round_number"]
-                    session_id = msg["session_id"]
+                    job_id = str(msg.get("job_id", "")).strip()
+                    round_number = int(msg.get("round_number", 0))
+                    session_id = str(msg.get("session_id", "")).strip()
+                    consortium_id = str(msg.get("consortium_id") or "cfi-consortium").strip().lower()
                     peer_bundles_raw = dict(msg.get("peer_bundles") or {})
                     global_weights_obj = msg.get("global_weights")
                     attempt_id = str(msg.get("attempt_id") or f"att_{job_id}_r{round_number}_{uuid.uuid4().hex[:8]}")
 
+                    clean_bank = bank_id.strip().upper()
                     sess = secagg_worker_sessions.get(session_id)
                     if sess is None:
                         err_msg = f"Bank worker [{bank_id}] received SECAGG_TRAIN_AND_MASK for unknown session '{session_id}'"
@@ -4596,18 +4669,46 @@ def run_bank_worker_node(
                         outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
                         continue
 
+                    # Single-use session state check: prevent replay of ephemeral key material
+                    if sess["state"] != "ACTIVE":
+                        err_msg = (
+                            f"Bank worker [{bank_id}] rejected SECAGG_TRAIN_AND_MASK: session '{session_id}' "
+                            f"is in terminal state '{sess['state']}'. Single-use cryptographic session cannot be reused."
+                        )
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    # Context binding check: bind to stored job_id, consortium_id, round_number, bank_id
+                    if (
+                        sess["job_id"] != job_id
+                        or sess["round_number"] != round_number
+                        or sess["consortium_id"] != consortium_id
+                        or sess["bank_id"] != clean_bank
+                    ):
+                        sess["state"] = "ABORTED"
+                        err_msg = (
+                            f"Bank worker [{bank_id}] rejected SECAGG_TRAIN_AND_MASK: context mismatch for session '{session_id}'. "
+                            f"Expected (job={sess['job_id']}, round={sess['round_number']}, consortium={sess['consortium_id']}, bank={sess['bank_id']}), "
+                            f"got (job={job_id}, round={round_number}, consortium={consortium_id}, bank={clean_bank}). Session invalidated."
+                        )
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
                     driver = sess["driver"]
                     roster = sess["roster"]
-                    peer_identities = sess["peer_identities"]
+                    authoritative_peer_keys = sess["authoritative_peer_keys"]
                     secagg_config = sess["secagg_config"]
 
-                    # 1. Ingest and verify all required peer bundles
+                    # 1. Ingest and verify all required peer bundles using AUTHORITATIVE peer keys
                     bundle_verification_failed = False
                     for p_id in roster:
                         clean_p = p_id.strip().upper()
-                        if clean_p == bank_id.strip().upper():
+                        if clean_p == clean_bank:
                             continue
                         if clean_p not in peer_bundles_raw:
+                            sess["state"] = "ABORTED"
                             err_msg = f"Bank worker [{bank_id}] missing peer bundle for required participant [{clean_p}]."
                             logger.error(err_msg)
                             outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
@@ -4617,9 +4718,12 @@ def run_bank_worker_node(
                         raw_bundle_dict = peer_bundles_raw[clean_p]
                         try:
                             bundle_obj = ECDHPublicKeyBundle.from_dict(raw_bundle_dict)
-                            peer_pub_hex = peer_identities.get(clean_p)
+                            peer_pub_hex = authoritative_peer_keys.get(clean_p)
+                            if not peer_pub_hex:
+                                raise SecAggSecurityError(f"Missing authoritative institutional key for peer [{clean_p}].")
                             driver.receive_peer_bundle(bundle_obj, peer_institutional_public_key=peer_pub_hex)
                         except (SecAggSecurityError, Exception) as bv_err:
+                            sess["state"] = "ABORTED"
                             err_msg = f"Bank worker [{bank_id}] rejected peer bundle from [{clean_p}]: {bv_err}"
                             logger.error(err_msg)
                             outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
@@ -4638,6 +4742,7 @@ def run_bank_worker_node(
                                 worker_token=worker_token,
                             )
                         except Exception as start_err:
+                            sess["state"] = "ABORTED"
                             logger.error("Bank worker [%s] failed to start training job %s: %s", bank_id, job_id, start_err)
                             outbox.put({"status": "ERROR", "bank_id": bank_id, "error": str(start_err), "pid": pid})
                             continue
@@ -4670,6 +4775,7 @@ def run_bank_worker_node(
                                 is_prod=is_prod,
                             )
                         except Exception as tag_err:
+                            sess["state"] = "ABORTED"
                             outbox.put({"status": "ERROR", "bank_id": bank_id, "error": f"Unauthorized dataset: {tag_err}", "pid": pid})
                             continue
 
@@ -4687,6 +4793,7 @@ def run_bank_worker_node(
                                             f"Unauthorized dataset substitution: requested resolves to '{auth_dataset_tag}', vault is '{resolved_vault}'."
                                         )
                                 except Exception as subst_err:
+                                    sess["state"] = "ABORTED"
                                     outbox.put({"status": "ERROR", "bank_id": bank_id, "error": str(subst_err), "pid": pid})
                                     continue
 
@@ -4707,6 +4814,7 @@ def run_bank_worker_node(
                             bank_id, auth_dataset_tag, token=worker_token
                         )
                         if budget_record is None:
+                            sess["state"] = "ABORTED"
                             outbox.put({"status": "ERROR", "bank_id": bank_id, "error": "Privacy budget missing", "pid": pid})
                             continue
 
@@ -4726,6 +4834,7 @@ def run_bank_worker_node(
                         needed_del = max(0.0, target_delta - prior_job_spent_del)
 
                         if budget_record.remaining_epsilon < (needed_eps - 1e-9):
+                            sess["state"] = "ABORTED"
                             outbox.put({"status": "ERROR", "bank_id": bank_id, "error": "Privacy budget exhausted", "pid": pid})
                             continue
 
@@ -4758,10 +4867,12 @@ def run_bank_worker_node(
                                 worker_token=worker_token,
                             )
                         except TrainingProvenanceSecurityError as pse:
+                            sess["state"] = "ABORTED"
                             outbox.put({"status": "ERROR", "bank_id": bank_id, "error": str(pse), "pid": pid})
                             continue
 
                         if admission.status != "ADMITTED":
+                            sess["state"] = "ABORTED"
                             outbox.put({"status": "ERROR", "bank_id": bank_id, "error": f"Attempt rejected: {admission.reason}", "pid": pid})
                             continue
 
@@ -4792,6 +4903,7 @@ def run_bank_worker_node(
                             session["steps_executed"] += steps_per_epoch
                             dp_info = getattr(local_model, "dp_provenance", {})
                         except Exception as dp_err:
+                            sess["state"] = "ABORTED"
                             logger.error("Bank worker [%s] Opacus DP-SGD failed: %s", bank_id, dp_err)
                             outbox.put({"status": "ERROR", "bank_id": bank_id, "error": f"Opacus DP-SGD failed: {dp_err}", "pid": pid})
                             continue
@@ -4825,6 +4937,7 @@ def run_bank_worker_node(
                     sample_count = len(X_train)
 
                     if not loss_history:
+                        sess["state"] = "ABORTED"
                         outbox.put({"status": "ERROR", "bank_id": bank_id, "error": "No loss history produced", "pid": pid})
                         continue
 
@@ -4852,12 +4965,14 @@ def run_bank_worker_node(
                         raw_bytes = serialize_masked_vector(masked_vec)
                         masked_digest = hashlib.sha256(raw_bytes).hexdigest()
                     except Exception as mask_err:
+                        sess["state"] = "ABORTED"
                         err_msg = f"Bank worker [{bank_id}] failed to construct masked update: {mask_err}"
                         logger.error(err_msg)
                         outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
                         continue
 
                     if fail_observation:
+                        sess["state"] = "ABORTED"
                         logger.warning("Bank worker [%s] simulated observation persistence failure for round %d", bank_id, round_number)
                         outbox.put({"status": "OBSERVATION_FAILED", "bank_id": bank_id, "round_number": round_number, "pid": pid})
                         continue
@@ -4878,9 +4993,13 @@ def run_bank_worker_node(
                         )
                         logger.info("Bank worker [%s] persisted SecAgg observation event %s for round %d", bank_id, obs.event_id, round_number)
                     except Exception as obs_err:
+                        sess["state"] = "ABORTED"
                         logger.error("Bank worker [%s] failed to record SecAgg observation: %s", bank_id, obs_err)
                         outbox.put({"status": "ERROR", "bank_id": bank_id, "error": str(obs_err), "pid": pid})
                         continue
+
+                    # Mark session state as CONSUMED to strictly prevent reuse of ephemeral key material
+                    sess["state"] = "CONSUMED"
 
                     # Transmit masked payload ONLY (zero plaintext weights!)
                     success_payload = {
@@ -5101,6 +5220,17 @@ class DistributedFederatedTrainingManager:
                         authority_token=self.coordinator_token,
                     )
 
+        for b in banks:
+            clean_b = b.strip().upper()
+            inst_pk = endpoints[clean_b].get("institutional_public_key") if clean_b in endpoints else None
+            if inst_pk:
+                with contextlib.suppress(Exception):
+                    self.authority_source.register_institutional_identity(
+                        bank_id=clean_b,
+                        public_key_hex=inst_pk,
+                        token=self.coordinator_token,
+                    )
+
         inboxes = {b: endpoints[b]["inbox"] for b in banks}
         outboxes = {b: endpoints[b]["outbox"] for b in banks}
         worker_pids: dict[str, int] = {
@@ -5201,6 +5331,7 @@ class DistributedFederatedTrainingManager:
                     train_mask_payload = {
                         "command": "SECAGG_TRAIN_AND_MASK",
                         "job_id": job_id,
+                        "consortium_id": consortium_id,
                         "round_number": round_num,
                         "session_id": session_id,
                         "global_weights": global_weights,
