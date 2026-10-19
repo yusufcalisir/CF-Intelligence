@@ -4650,12 +4650,22 @@ def run_bank_worker_node(
                         continue
 
                     # 3. Independently verify peer public keys against authoritative trust material outside coordinator control
-                    authoritative_peer_keys = authority_source.get_institutional_identities(roster)
-                    missing_auth_keys = [
-                        r
-                        for r in roster
-                        if r not in authoritative_peer_keys or not authoritative_peer_keys[r]
-                    ]
+                    # In asynchronous multi-process environments, allow up to 3.0s for concurrent peer worker processes to complete registration
+                    authoritative_peer_keys: dict[str, str] = {}
+                    wait_start = time.time()
+                    while time.time() - wait_start < 3.0:
+                        authoritative_peer_keys = authority_source.get_institutional_identities(
+                            roster
+                        )
+                        missing_auth_keys = [
+                            r
+                            for r in roster
+                            if r not in authoritative_peer_keys or not authoritative_peer_keys[r]
+                        ]
+                        if not missing_auth_keys:
+                            break
+                        time.sleep(0.05)
+
                     if missing_auth_keys:
                         err_msg = f"Bank worker [{bank_id}] rejected SecAgg setup: missing authoritative institutional keys for {missing_auth_keys}."
                         logger.error(err_msg)
@@ -5500,6 +5510,8 @@ class DistributedFederatedTrainingManager:
                     f"Trimmed Mean theoretical precondition violated: requires n > 2k participants. With k={trim_k_check}, requires at least {2 * trim_k_check + 1} banks, but got {n_banks}."
                 )
 
+        executed_algo_name: str
+        target_method: AggregationMethod
         trim_k: int | None = None
         if secagg_enabled:
             executed_algo_name = "secagg_fed_avg_weighted"
@@ -5520,6 +5532,8 @@ class DistributedFederatedTrainingManager:
         elif defense_norm == "bulyan":
             executed_algo_name = "bulyan"
             target_method = AggregationMethod.BULYAN
+        else:
+            raise ValueError(f"Unsupported Byzantine defense '{byzantine_defense}'")
 
         # Spawn workers if endpoints were not directly provided
         spawned_procs = worker_processes or {}
@@ -5887,6 +5901,12 @@ class DistributedFederatedTrainingManager:
                         s_count = res.get("sample_count")
                         if "dp_provenance" in res:
                             latest_dp_provenance[b_id] = res["dp_provenance"]
+
+                        # Verify update digest is a valid non-empty string
+                        if not isinstance(w_digest, str) or not w_digest.strip():
+                            raise TrainingProvenanceSecurityError(
+                                f"Worker [{b_id}] provided invalid update_digest: {w_digest}"
+                            )
 
                         # Verify sample counts
                         if not isinstance(s_count, int) or s_count <= 0:
