@@ -3866,6 +3866,9 @@ def run_bank_worker_node(
                 public_key_hex=local_pub_hex,
                 token=worker_token,
             )
+        except TrainingProvenanceSecurityError as sec_err:
+            logger.error("Bank worker [%s] institutional identity registration security error: %s", bank_id, sec_err)
+            raise
         except Exception as reg_err:
             logger.debug("Bank worker [%s] auto-registration of institutional identity: %s", bank_id, reg_err)
 
@@ -5218,17 +5221,6 @@ class DistributedFederatedTrainingManager:
                         allocated_delta=target_del,
                         aliases=[f"{b}_dataset", f"{b}_protected_dataset", "primary_vault", "default_vault"],
                         authority_token=self.coordinator_token,
-                    )
-
-        for b in banks:
-            clean_b = b.strip().upper()
-            inst_pk = endpoints[clean_b].get("institutional_public_key") if clean_b in endpoints else None
-            if inst_pk:
-                with contextlib.suppress(Exception):
-                    self.authority_source.register_institutional_identity(
-                        bank_id=clean_b,
-                        public_key_hex=inst_pk,
-                        token=self.coordinator_token,
                     )
 
         inboxes = {b: endpoints[b]["inbox"] for b in banks}

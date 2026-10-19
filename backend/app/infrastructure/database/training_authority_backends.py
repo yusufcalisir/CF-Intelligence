@@ -1314,43 +1314,43 @@ def provision_runtime_service_roles(
 
             # 3. Coordinator Role (cfi_coord_role)
             # Can schedule jobs, record global aggregations (subject to authenticity trigger).
-            # Strictly CANNOT insert into completed_jobs, model_evaluations, or round observations!
+            # Strictly CANNOT insert into completed_jobs, model_evaluations, round observations, or institutional identities!
             cur.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO cfi_coord_role")
             cur.execute("GRANT INSERT ON cfi_scheduled_jobs, cfi_global_aggregations TO cfi_coord_role")
-            cur.execute("REVOKE INSERT ON cfi_completed_jobs, cfi_model_evaluations, cfi_started_jobs, cfi_round_observations FROM cfi_coord_role")
+            cur.execute("REVOKE INSERT ON cfi_completed_jobs, cfi_model_evaluations, cfi_started_jobs, cfi_round_observations, cfi_institutional_identities FROM cfi_coord_role")
             cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_coord_role")
 
             # 4. Completion Authority Role (cfi_completion_role)
             # Dedicated role with exclusive authorization to write reconciled completion records to cfi_completed_jobs and evaluations.
             cur.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO cfi_completion_role")
             cur.execute("GRANT INSERT ON cfi_completed_jobs, cfi_model_evaluations TO cfi_completion_role")
-            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_global_aggregations FROM cfi_completion_role")
+            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_global_aggregations, cfi_institutional_identities FROM cfi_completion_role")
             cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_completion_role")
 
             # 4b. Dedicated Model Evaluator Role (cfi_evaluator_role)
             # Dedicated role holding exclusive authorization to record model evaluations.
             cur.execute("GRANT SELECT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs TO cfi_evaluator_role")
             cur.execute("GRANT INSERT ON cfi_model_evaluations TO cfi_evaluator_role")
-            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_global_aggregations, cfi_completed_jobs FROM cfi_evaluator_role")
+            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_global_aggregations, cfi_completed_jobs, cfi_institutional_identities FROM cfi_evaluator_role")
             cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_evaluator_role")
 
             # 5. Worker Roles
             # 5a. Bank-Specific Worker Roles (cfi_bank_a_role, cfi_bank_b_role, cfi_bank_c_role)
-            # Dedicated per-bank roles holding exclusive authorization to write observations for their respective bank.
+            # Dedicated per-bank roles holding exclusive authorization to write observations and institutional identities for their respective bank.
             bank_roles = ["cfi_bank_a_role", "cfi_bank_b_role", "cfi_bank_c_role"]
             for br in bank_roles:
-                cur.execute(pg_sql.SQL("GRANT SELECT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_completed_jobs TO {role}").format(role=pg_sql.Identifier(br)))
-                cur.execute(pg_sql.SQL("GRANT INSERT ON cfi_started_jobs, cfi_round_observations TO {role}").format(role=pg_sql.Identifier(br)))
+                cur.execute(pg_sql.SQL("GRANT SELECT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_round_observations, cfi_completed_jobs, cfi_institutional_identities TO {role}").format(role=pg_sql.Identifier(br)))
+                cur.execute(pg_sql.SQL("GRANT INSERT ON cfi_started_jobs, cfi_round_observations, cfi_institutional_identities TO {role}").format(role=pg_sql.Identifier(br)))
                 cur.execute(pg_sql.SQL("REVOKE INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs FROM {role}").format(role=pg_sql.Identifier(br)))
                 cur.execute(pg_sql.SQL("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM {role}").format(role=pg_sql.Identifier(br)))
 
             # 5b. Shared Generic Worker Role (cfi_worker_role)
-            # Strictly FORBIDDEN from inserting into cfi_round_observations (BANKDB-04).
-            # No shared worker role may persist authoritative observations for any participating bank.
-            cur.execute("GRANT SELECT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_completed_jobs TO cfi_worker_role")
+            # Strictly FORBIDDEN from inserting into cfi_round_observations (BANKDB-04) or cfi_institutional_identities.
+            # No shared worker role may persist authoritative observations or institutional identities for any participating bank.
+            cur.execute("GRANT SELECT ON cfi_scheduled_jobs, cfi_started_jobs, cfi_completed_jobs, cfi_institutional_identities TO cfi_worker_role")
             cur.execute("GRANT INSERT ON cfi_started_jobs TO cfi_worker_role")
             cur.execute("REVOKE ALL ON cfi_round_observations FROM cfi_worker_role")
-            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs FROM cfi_worker_role")
+            cur.execute("REVOKE INSERT ON cfi_scheduled_jobs, cfi_global_aggregations, cfi_model_evaluations, cfi_completed_jobs, cfi_institutional_identities FROM cfi_worker_role")
             cur.execute("REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM cfi_worker_role")
 
             # 6. Row-Level Security on cfi_round_observations for bank isolation
@@ -1389,6 +1389,37 @@ def provision_runtime_service_roles(
             cur.execute("""
                 CREATE POLICY cfi_readers_obs_policy ON cfi_round_observations
                 FOR SELECT TO cfi_coord_role, cfi_completion_role, cfi_evaluator_role, cfi_issuer_role
+                USING (true)
+            """)
+
+            # 6b. Row-Level Security on cfi_institutional_identities for institutional key isolation
+            cur.execute("ALTER TABLE cfi_institutional_identities ENABLE ROW LEVEL SECURITY")
+            cur.execute("ALTER TABLE cfi_institutional_identities FORCE ROW LEVEL SECURITY")
+            cur.execute("REVOKE ALL ON cfi_institutional_identities FROM PUBLIC")
+
+            cur.execute("DROP POLICY IF EXISTS cfi_bank_a_identity_policy ON cfi_institutional_identities")
+            cur.execute("DROP POLICY IF EXISTS cfi_bank_b_identity_policy ON cfi_institutional_identities")
+            cur.execute("DROP POLICY IF EXISTS cfi_bank_c_identity_policy ON cfi_institutional_identities")
+            cur.execute("DROP POLICY IF EXISTS cfi_readers_identity_policy ON cfi_institutional_identities")
+
+            cur.execute("""
+                CREATE POLICY cfi_bank_a_identity_policy ON cfi_institutional_identities
+                FOR INSERT TO cfi_bank_a_role
+                WITH CHECK (bank_id = 'BANK_A')
+            """)
+            cur.execute("""
+                CREATE POLICY cfi_bank_b_identity_policy ON cfi_institutional_identities
+                FOR INSERT TO cfi_bank_b_role
+                WITH CHECK (bank_id = 'BANK_B')
+            """)
+            cur.execute("""
+                CREATE POLICY cfi_bank_c_identity_policy ON cfi_institutional_identities
+                FOR INSERT TO cfi_bank_c_role
+                WITH CHECK (bank_id = 'BANK_C')
+            """)
+            cur.execute("""
+                CREATE POLICY cfi_readers_identity_policy ON cfi_institutional_identities
+                FOR SELECT TO cfi_bank_a_role, cfi_bank_b_role, cfi_bank_c_role, cfi_worker_role, cfi_coord_role, cfi_completion_role, cfi_evaluator_role, cfi_issuer_role
                 USING (true)
             """)
 
@@ -3395,7 +3426,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
         now = datetime.now(UTC).isoformat()
         with self._connect() as conn, conn.transaction(), conn.cursor() as cur:
             cur.execute(
-                "SELECT public_key_hex FROM cfi_institutional_identities WHERE bank_id = %s FOR UPDATE;",
+                "SELECT public_key_hex FROM cfi_institutional_identities WHERE bank_id = %s;",
                 (clean_bank,),
             )
             row = cur.fetchone()
@@ -3409,9 +3440,23 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
                     )
                 return
             cur.execute(
-                "INSERT INTO cfi_institutional_identities (bank_id, public_key_hex, registered_at) VALUES (%s, %s, %s);",
+                "INSERT INTO cfi_institutional_identities (bank_id, public_key_hex, registered_at) VALUES (%s, %s, %s) "
+                "ON CONFLICT (bank_id) DO NOTHING;",
                 (clean_bank, clean_key, now),
             )
+            cur.execute(
+                "SELECT public_key_hex FROM cfi_institutional_identities WHERE bank_id = %s;",
+                (clean_bank,),
+            )
+            row = cur.fetchone()
+            if row:
+                raw_val = row.get("public_key_hex") if isinstance(row, dict) else row[0]
+                existing_key = str(raw_val).strip().lower() if raw_val is not None else ""
+                if existing_key != clean_key:
+                    raise TrainingProvenanceSecurityError(
+                        f"Institutional identity conflict for bank '{clean_bank}': existing key '{existing_key}' "
+                        f"does not match new key '{clean_key}'."
+                    )
 
     def get_institutional_identity(self, bank_id: str) -> str | None:
         clean_bank = bank_id.strip().upper()

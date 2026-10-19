@@ -710,16 +710,16 @@ def test_malicious_coordinator_peer_key_substitution_rejected(clean_test_environ
             consortium_id=consortium_id,
         )
 
-        # Register authentic institutional keys for both banks
+        # Register authentic institutional keys for both banks using bank credentials
         auth_source.register_institutional_identity(
             bank_id="BANK_A",
             public_key_hex=endpoints["BANK_A"]["institutional_public_key"],
-            token=coordinator_token,
+            token=bank_tokens["BANK_A"],
         )
         auth_source.register_institutional_identity(
             bank_id="BANK_B",
             public_key_hex=endpoints["BANK_B"]["institutional_public_key"],
-            token=coordinator_token,
+            token=bank_tokens["BANK_B"],
         )
 
         inbox_a = endpoints["BANK_A"]["inbox"]
@@ -886,8 +886,8 @@ def test_single_use_cryptographic_sessions_and_replay_rejection(clean_test_envir
             consortium_id=consortium_id,
         )
 
-        auth_source.register_institutional_identity("BANK_A", endpoints["BANK_A"]["institutional_public_key"], token=coordinator_token)
-        auth_source.register_institutional_identity("BANK_B", endpoints["BANK_B"]["institutional_public_key"], token=coordinator_token)
+        auth_source.register_institutional_identity("BANK_A", endpoints["BANK_A"]["institutional_public_key"], token=bank_tokens["BANK_A"])
+        auth_source.register_institutional_identity("BANK_B", endpoints["BANK_B"]["institutional_public_key"], token=bank_tokens["BANK_B"])
 
         setup_payload = {
             "command": "SECAGG_SETUP",
@@ -1090,4 +1090,286 @@ def test_operational_api_secagg_wiring_and_validation():
     )
     assert resp.secagg_enabled is True
     assert resp.secagg_provenance is not None
+
+
+# ---------------------------------------------------------------------------
+# Tests: Institutional Identity Bootstrap & Authorization (Requirements A-G)
+# ---------------------------------------------------------------------------
+
+
+def test_coordinator_cannot_first_register_bank_identity():
+    """Negative Test A: Malicious coordinator attempts to FIRST-register its own public key
+
+    as BANK_B before BANK_B has any authority record. Must fail closed.
+    """
+    tmp_dir = tempfile.mkdtemp(prefix="cfi_secagg_boot_a_")
+    db_file = os.path.join(tmp_dir, "authority.db")
+    coord_token = "coord_secret_token_bootstrap_99"
+    bank_tokens = {"BANK_A": "token_bank_a_99", "BANK_B": "token_bank_b_99"}
+
+    auth_source = TrustedTrainingJobRecordSource(
+        db_url=f"sqlite:///{db_file}",
+        coordinator_token=coord_token,
+        bank_tokens=bank_tokens,
+        app_env="development",
+    )
+
+    forged_priv = ed25519.Ed25519PrivateKey.generate()
+    forged_pub_hex = forged_priv.public_key().public_bytes_raw().hex()
+
+    # Coordinator attempts first-registration for BANK_B
+    with pytest.raises(TrainingProvenanceSecurityError, match="Coordinator credentials cannot register"):
+        auth_source.register_institutional_identity(
+            bank_id="BANK_B",
+            public_key_hex=forged_pub_hex,
+            token=coord_token,
+        )
+
+    # Verify no identity was stored for BANK_B
+    assert auth_source.get_institutional_identity("BANK_B") is None
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def test_coordinator_cannot_replace_existing_bank_identity():
+    """Negative Test B: Coordinator attempts to replace an existing BANK_B key. Must fail closed."""
+    tmp_dir = tempfile.mkdtemp(prefix="cfi_secagg_boot_b_")
+    db_file = os.path.join(tmp_dir, "authority.db")
+    coord_token = "coord_secret_token_bootstrap_99"
+    bank_tokens = {"BANK_A": "token_bank_a_99", "BANK_B": "token_bank_b_99"}
+
+    auth_source = TrustedTrainingJobRecordSource(
+        db_url=f"sqlite:///{db_file}",
+        coordinator_token=coord_token,
+        bank_tokens=bank_tokens,
+        app_env="development",
+    )
+
+    # 1. Authentic BANK_B registers its key
+    priv_b = ed25519.Ed25519PrivateKey.generate()
+    pub_b_hex = priv_b.public_key().public_bytes_raw().hex()
+    auth_source.register_institutional_identity(
+        bank_id="BANK_B",
+        public_key_hex=pub_b_hex,
+        token=bank_tokens["BANK_B"],
+    )
+    assert auth_source.get_institutional_identity("BANK_B") == pub_b_hex
+
+    # 2. Coordinator attempts to replace existing BANK_B key
+    forged_priv = ed25519.Ed25519PrivateKey.generate()
+    forged_pub_hex = forged_priv.public_key().public_bytes_raw().hex()
+    with pytest.raises(TrainingProvenanceSecurityError, match="Coordinator credentials cannot register"):
+        auth_source.register_institutional_identity(
+            bank_id="BANK_B",
+            public_key_hex=forged_pub_hex,
+            token=coord_token,
+        )
+
+    # Verify authentic key remains unchanged
+    assert auth_source.get_institutional_identity("BANK_B") == pub_b_hex
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def test_cross_bank_identity_registration_rejected():
+    """Negative Test C: BANK_A attempts to register BANK_B's public key. Must fail closed."""
+    tmp_dir = tempfile.mkdtemp(prefix="cfi_secagg_boot_c_")
+    db_file = os.path.join(tmp_dir, "authority.db")
+    coord_token = "coord_secret_token_bootstrap_99"
+    bank_tokens = {"BANK_A": "token_bank_a_99", "BANK_B": "token_bank_b_99"}
+
+    auth_source = TrustedTrainingJobRecordSource(
+        db_url=f"sqlite:///{db_file}",
+        coordinator_token=coord_token,
+        bank_tokens=bank_tokens,
+        app_env="development",
+    )
+
+    priv_a = ed25519.Ed25519PrivateKey.generate()
+    pub_a_hex = priv_a.public_key().public_bytes_raw().hex()
+
+    # BANK_A attempts to register as BANK_B
+    with pytest.raises(TrainingProvenanceSecurityError, match="Identity spoofing rejected"):
+        auth_source.register_institutional_identity(
+            bank_id="BANK_B",
+            public_key_hex=pub_a_hex,
+            token=bank_tokens["BANK_A"],
+        )
+
+    assert auth_source.get_institutional_identity("BANK_B") is None
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def test_authentic_bank_identity_provisioning_and_immutability():
+    """Test D: Authentic BANK_B successfully completes its authorized initial identity provisioning
+
+    and bindings remain immutable against subsequent conflicting registrations.
+    """
+    tmp_dir = tempfile.mkdtemp(prefix="cfi_secagg_boot_d_")
+    db_file = os.path.join(tmp_dir, "authority.db")
+    coord_token = "coord_secret_token_bootstrap_99"
+    bank_tokens = {"BANK_A": "token_bank_a_99", "BANK_B": "token_bank_b_99"}
+
+    auth_source = TrustedTrainingJobRecordSource(
+        db_url=f"sqlite:///{db_file}",
+        coordinator_token=coord_token,
+        bank_tokens=bank_tokens,
+        app_env="development",
+    )
+
+    priv_b = ed25519.Ed25519PrivateKey.generate()
+    pub_b_hex = priv_b.public_key().public_bytes_raw().hex()
+
+    # 1. Authentic initial provisioning succeeds
+    auth_source.register_institutional_identity(
+        bank_id="BANK_B",
+        public_key_hex=pub_b_hex,
+        token=bank_tokens["BANK_B"],
+    )
+    assert auth_source.get_institutional_identity("BANK_B") == pub_b_hex
+
+    # 2. Re-registering the same key is idempotent and succeeds
+    auth_source.register_institutional_identity(
+        bank_id="BANK_B",
+        public_key_hex=pub_b_hex,
+        token=bank_tokens["BANK_B"],
+    )
+    assert auth_source.get_institutional_identity("BANK_B") == pub_b_hex
+
+    # 3. Registering a conflicting key for BANK_B fails closed
+    different_priv = ed25519.Ed25519PrivateKey.generate()
+    different_pub_hex = different_priv.public_key().public_bytes_raw().hex()
+    with pytest.raises(TrainingProvenanceSecurityError, match="Institutional identity conflict"):
+        auth_source.register_institutional_identity(
+            bank_id="BANK_B",
+            public_key_hex=different_pub_hex,
+            token=bank_tokens["BANK_B"],
+        )
+
+    # Key remains original
+    assert auth_source.get_institutional_identity("BANK_B") == pub_b_hex
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def test_independent_workers_retrieve_identical_peer_trust_anchors():
+    """Test E: Independent BANK_A and BANK_B workers retrieve the same authenticated peer trust anchors."""
+    tmp_dir = tempfile.mkdtemp(prefix="cfi_secagg_boot_e_")
+    db_file = os.path.join(tmp_dir, "authority.db")
+    bank_tokens = {"BANK_A": "token_bank_a_99", "BANK_B": "token_bank_b_99"}
+
+    # Separate worker connection instances representing separate processes
+    worker_a_source = TrustedTrainingJobRecordSource(
+        db_url=f"sqlite:///{db_file}",
+        worker_token=bank_tokens["BANK_A"],
+        bank_tokens={"BANK_A": bank_tokens["BANK_A"]},
+        app_env="development",
+    )
+    worker_b_source = TrustedTrainingJobRecordSource(
+        db_url=f"sqlite:///{db_file}",
+        worker_token=bank_tokens["BANK_B"],
+        bank_tokens={"BANK_B": bank_tokens["BANK_B"]},
+        app_env="development",
+    )
+
+    priv_a = ed25519.Ed25519PrivateKey.generate()
+    pub_a_hex = priv_a.public_key().public_bytes_raw().hex()
+    priv_b = ed25519.Ed25519PrivateKey.generate()
+    pub_b_hex = priv_b.public_key().public_bytes_raw().hex()
+
+    # Bank A registers its own key
+    worker_a_source.register_institutional_identity("BANK_A", pub_a_hex, token=bank_tokens["BANK_A"])
+    # Bank B registers its own key
+    worker_b_source.register_institutional_identity("BANK_B", pub_b_hex, token=bank_tokens["BANK_B"])
+
+    # Both retrieve peer trust anchors
+    roster = ["BANK_A", "BANK_B"]
+    anchors_a = worker_a_source.get_institutional_identities(roster)
+    anchors_b = worker_b_source.get_institutional_identities(roster)
+
+    assert anchors_a == {"BANK_A": pub_a_hex, "BANK_B": pub_b_hex}
+    assert anchors_b == {"BANK_A": pub_a_hex, "BANK_B": pub_b_hex}
+    assert anchors_a == anchors_b
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def test_missing_authoritative_peer_keys_fails_closed():
+    """Negative Test G: Missing authoritative peer keys cause fail-closed SecAgg setup."""
+    import contextlib
+
+    tmp_dir = tempfile.mkdtemp(prefix="cfi_secagg_boot_g_")
+    db_file = os.path.join(tmp_dir, "authority.db")
+    coordinator_token = "coord_secret_token_secagg_missing_99"
+    bank_tokens = {"BANK_A": "token_bank_a_99", "BANK_B": "token_bank_b_99"}
+    consortium_id = "consortium_test_missing_auth"
+    session_id = "sess_missing_auth_01"
+
+    auth_source = TrustedTrainingJobRecordSource(
+        db_url=f"sqlite:///{db_file}",
+        coordinator_token=coordinator_token,
+        bank_tokens=bank_tokens,
+        app_env="development",
+    )
+
+    job_id = "job_missing_auth_01"
+    auth_source.schedule_training_job(
+        job_id=job_id,
+        training_run_id=f"run_{job_id}",
+        simulation_id=f"sim_{job_id}",
+        coordinator_token=coordinator_token,
+        expected_rounds=1,
+        expected_epochs=1,
+        permitted_workers=["BANK_A", "BANK_B"],
+        consortium_id=consortium_id,
+    )
+
+    gen = DataGenerator(seed=42)
+    bank_datasets = gen.generate_bank_datasets(bank_a_size=50, bank_b_size=50, bank_c_size=50)
+    bank_partitions = {
+        b_id: (
+            np.asarray(DataGenerator.encode_features(bank_datasets[b_id.lower()][0]), dtype=np.float32),
+            np.asarray(bank_datasets[b_id.lower()][1].to_numpy(dtype=np.float32), dtype=np.float32),
+        )
+        for b_id in ("BANK_A", "BANK_B")
+    }
+
+    spawned_procs, endpoints = spawn_bank_workers(
+        participating_banks=["BANK_A"],
+        db_url=f"sqlite:///{db_file}",
+        bank_tokens=bank_tokens,
+        bank_partitions=bank_partitions,
+        app_env="development",
+    )
+
+    try:
+        inbox_a = endpoints["BANK_A"]["inbox"]
+        outbox_a = endpoints["BANK_A"]["outbox"]
+
+        fake_pub_b = "b" * 64
+        # Send SECAGG_SETUP to BANK_A with roster ["BANK_A", "BANK_B"]
+        setup_payload = {
+            "command": "SECAGG_SETUP",
+            "job_id": job_id,
+            "round_number": 1,
+            "session_id": session_id,
+            "consortium_id": consortium_id,
+            "roster": ["BANK_A", "BANK_B"],
+            "institutional_public_keys": {
+                "BANK_A": endpoints["BANK_A"]["institutional_public_key"],
+                "BANK_B": fake_pub_b,
+            },
+            "secagg_config": {"quantization_scale": 1e7, "modulus": 2**64},
+        }
+        inbox_a.put(setup_payload)
+
+        # Worker A must reject setup because BANK_B has no authoritative key
+        resp = outbox_a.get(timeout=10.0)
+        assert resp["status"] == "ERROR"
+        assert "missing authoritative institutional keys" in resp["error"].lower()
+    finally:
+        with contextlib.suppress(Exception):
+            endpoints["BANK_A"]["inbox"].put({"command": "SHUTDOWN"})
+        for p in spawned_procs.values():
+            p.join(timeout=2.0)
+            if p.is_alive():
+                p.terminate()
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
 

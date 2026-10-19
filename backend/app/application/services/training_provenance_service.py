@@ -1691,56 +1691,31 @@ class TrustedTrainingJobRecordSource:
         if not clean_bank or not clean_key:
             raise ValueError("bank_id and public_key_hex must be non-empty.")
 
-        active_env = self._app_env or get_settings().app_env
-        is_prod = active_env.lower() == "production"
         effective_token = token or self._worker_token
-        if is_prod and not effective_token:
+
+        # 1. Strictly forbid coordinator credentials from registering or modifying bank identities
+        expected_coord = self._resolve_expected_coordinator_token()
+        if effective_token and (
+            (self._coordinator_token and hmac.compare_digest(effective_token.strip(), self._coordinator_token.strip()))
+            or (expected_coord and hmac.compare_digest(effective_token.strip(), expected_coord.strip()))
+        ):
             raise TrainingProvenanceSecurityError(
-                f"Unauthenticated attempt to register institutional identity for bank '{clean_bank}' rejected in production."
+                f"Coordinator credentials cannot register or alter institutional identity for bank '{clean_bank}'."
             )
-        if effective_token:
-            is_coord = bool(self._coordinator_token and hmac.compare_digest(effective_token.strip(), self._coordinator_token.strip()))
-            if not is_coord and self._bank_tokens:
-                expected_tok = self._bank_tokens.get(clean_bank) or self._bank_tokens.get(bank_id)
-                if expected_tok and not hmac.compare_digest(effective_token.strip(), expected_tok.strip()):
-                    raise TrainingProvenanceSecurityError(
-                        f"Registration authentication failed for bank '{clean_bank}': invalid token."
-                    )
-        self._db.register_institutional_identity(bank_id=clean_bank, public_key_hex=clean_key)
+
+        # 2. Authenticate the caller as the claimed bank workload identity
+        auth_bank = self.authenticate_bank_worker(effective_token, claimed_bank_id=clean_bank)
+
+        # 3. Persist immutably in authoritative database (fails closed on conflict)
+        self._db.register_institutional_identity(bank_id=auth_bank, public_key_hex=clean_key)
 
     def get_institutional_identity(self, bank_id: str) -> str | None:
         clean_bank = bank_id.strip().upper()
-        db_key = self._db.get_institutional_identity(clean_bank)
-        if db_key:
-            return db_key
-        try:
-            from app.application.services.operational_federation_service import (
-                WorkerEndpointRegistry,
-            )
-
-            reg_key = WorkerEndpointRegistry.get_institutional_public_key(clean_bank)
-            if reg_key:
-                return reg_key
-        except Exception:
-            pass
-        return None
+        return self._db.get_institutional_identity(clean_bank)
 
     def get_institutional_identities(self, bank_ids: Sequence[str]) -> dict[str, str]:
         clean_banks = [b.strip().upper() for b in bank_ids if b]
-        db_keys = self._db.get_institutional_identities(clean_banks)
-        for b in clean_banks:
-            if b not in db_keys:
-                try:
-                    from app.application.services.operational_federation_service import (
-                        WorkerEndpointRegistry,
-                    )
-
-                    reg_key = WorkerEndpointRegistry.get_institutional_public_key(b)
-                    if reg_key:
-                        db_keys[b] = reg_key
-                except Exception:
-                    pass
-        return db_keys
+        return self._db.get_institutional_identities(clean_banks)
 
     def clear(self) -> None:
         self._db.clear()

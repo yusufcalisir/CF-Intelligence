@@ -90,6 +90,7 @@ def helper_setup_prerequisite_job(
     run_id: str,
     sim_id: str,
     permitted_workers: tuple[str, ...] = ("BANK_A", "BANK_B", "BANK_C"),
+    consortium_id: str = "cfi-consortium",
 ) -> None:
     """Ensure a valid scheduled and started job exists so tests evaluate authorization, not missing prerequisites."""
     fnames = list(FEATURE_NAMES)
@@ -106,6 +107,7 @@ def helper_setup_prerequisite_job(
         input_dim=len(fnames),
         feature_names=fnames,
         permitted_workers=list(permitted_workers),
+        consortium_id=consortium_id,
     )
     admin_auth.start_job(job_id=job_id, worker_id=permitted_workers[0])
 
@@ -551,11 +553,33 @@ class TestBankDatabaseAuthorization:
             cur.execute("SELECT has_table_privilege('cfi_bank_a_role', 'cfi_round_observations', 'DELETE')")
             assert cur.fetchone()[0] is False  # type: ignore[index]
 
-            # Generic worker role: CANNOT insert into round observations
-            cur.execute("SELECT has_table_privilege('cfi_worker_role', 'cfi_round_observations', 'INSERT')")
+            # Bank A role: can SELECT and INSERT into cfi_institutional_identities, cannot update or delete
+            cur.execute("SELECT has_table_privilege('cfi_bank_a_role', 'cfi_institutional_identities', 'SELECT')")
+            assert cur.fetchone()[0] is True  # type: ignore[index]
+            cur.execute("SELECT has_table_privilege('cfi_bank_a_role', 'cfi_institutional_identities', 'INSERT')")
+            assert cur.fetchone()[0] is True  # type: ignore[index]
+            cur.execute("SELECT has_table_privilege('cfi_bank_a_role', 'cfi_institutional_identities', 'UPDATE')")
+            assert cur.fetchone()[0] is False  # type: ignore[index]
+            cur.execute("SELECT has_table_privilege('cfi_bank_a_role', 'cfi_institutional_identities', 'DELETE')")
             assert cur.fetchone()[0] is False  # type: ignore[index]
 
-            # Verify RLS is enabled AND forced on cfi_round_observations
+            # Coordinator role: can SELECT cfi_institutional_identities, cannot INSERT, UPDATE, or DELETE
+            cur.execute("SELECT has_table_privilege('cfi_coord_role', 'cfi_institutional_identities', 'SELECT')")
+            assert cur.fetchone()[0] is True  # type: ignore[index]
+            cur.execute("SELECT has_table_privilege('cfi_coord_role', 'cfi_institutional_identities', 'INSERT')")
+            assert cur.fetchone()[0] is False  # type: ignore[index]
+            cur.execute("SELECT has_table_privilege('cfi_coord_role', 'cfi_institutional_identities', 'UPDATE')")
+            assert cur.fetchone()[0] is False  # type: ignore[index]
+            cur.execute("SELECT has_table_privilege('cfi_coord_role', 'cfi_institutional_identities', 'DELETE')")
+            assert cur.fetchone()[0] is False  # type: ignore[index]
+
+            # Generic worker role: CANNOT insert into round observations or institutional identities
+            cur.execute("SELECT has_table_privilege('cfi_worker_role', 'cfi_round_observations', 'INSERT')")
+            assert cur.fetchone()[0] is False  # type: ignore[index]
+            cur.execute("SELECT has_table_privilege('cfi_worker_role', 'cfi_institutional_identities', 'INSERT')")
+            assert cur.fetchone()[0] is False  # type: ignore[index]
+
+            # Verify RLS is enabled AND forced on cfi_round_observations and cfi_institutional_identities
             cur.execute(
                 """
                 SELECT relrowsecurity, relforcerowsecurity
@@ -566,6 +590,17 @@ class TestBankDatabaseAuthorization:
             rls_enabled, rls_forced = cur.fetchone()  # type: ignore[misc]
             assert rls_enabled is True
             assert rls_forced is True
+
+            cur.execute(
+                """
+                SELECT relrowsecurity, relforcerowsecurity
+                FROM pg_class
+                WHERE relname = 'cfi_institutional_identities'
+                """
+            )
+            id_rls_enabled, id_rls_forced = cur.fetchone()  # type: ignore[misc]
+            assert id_rls_enabled is True
+            assert id_rls_forced is True
 
         # Verify role-switching bypass attempts fail with SQLSTATE 42501
         with psycopg.connect(pg_roles["worker_bank_a"]) as conn:
@@ -762,6 +797,7 @@ class TestBankDatabaseAuthorization:
                 comp_service_endpoint=comp_endpoint,
                 signing_authority=signing_auth,
                 worker_pids=worker_pids,
+                consortium_id="cfi-consortium",
             )
 
             assert result["completed_record"].job_id == job_id
