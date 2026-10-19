@@ -245,6 +245,9 @@ class TestOperationalFederationIntegration:
                 num_rounds=2,
                 expected_unique_samples=None,
                 consortium_id="cfi-consortium",
+                byzantine_defense="none",
+                byzantine_f_max=1,
+                trimmed_mean_trim_count=None,
             )
 
             assert data["job_id"] == "job_op_test_101"

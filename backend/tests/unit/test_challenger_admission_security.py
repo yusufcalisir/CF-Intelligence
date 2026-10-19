@@ -513,6 +513,8 @@ def test_existing_champion_and_legitimate_challenger_inference_correct():
 
         state_dict, raw_bytes, sha256 = _create_mock_checkpoint()
         rcpt = _create_genuine_signed_receipt(priv, "auth_chall_08", "sim_both_ok", raw_bytes, sha256)
+        state_dict_v2, raw_bytes_v2, sha256_v2 = _create_mock_checkpoint()
+        rcpt_v2 = _create_genuine_signed_receipt(priv, "auth_chall_08", "sim_both_ok", raw_bytes_v2, sha256_v2)
 
         reg = ModelRegistry(storage_dir=tmp_dir, verifier=verifier)
 
@@ -545,7 +547,7 @@ def test_existing_champion_and_legitimate_challenger_inference_correct():
             reg._save_manifest("sim_both_ok", manifest)
 
             # Challenger v2
-            v2 = reg.save_version("sim_both_ok", state_dict, metrics={"auc": 0.90}, is_promoted=False, training_receipt=rcpt, artifact_bytes=raw_bytes)
+            v2 = reg.save_version("sim_both_ok", state_dict_v2, metrics={"auc": 0.90}, is_promoted=False, training_receipt=rcpt_v2, artifact_bytes=raw_bytes_v2)
             user_eng = auth_svc.get_user("eng_ml")
             assert user_eng is not None
             token_ml = auth_svc.create_token_bundle(user_eng).access_token
@@ -617,7 +619,8 @@ def test_existing_champion_and_legitimate_challenger_inference_correct():
                     assert res is not None
                     mock_log.assert_called_once()
                     call_kwargs = mock_log.call_args.kwargs
-                    assert call_kwargs["routed_to"] == "challenger"
+                    assert call_kwargs["routed_to"] == "champion"
+                    assert call_kwargs["champion_version"] == 1
                     assert call_kwargs["challenger_version"] == 2
                     assert call_kwargs["challenger_prob"] is not None
 

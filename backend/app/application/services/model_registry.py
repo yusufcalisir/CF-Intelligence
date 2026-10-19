@@ -2156,6 +2156,11 @@ class ModelRegistry:
                 candidate_sha256 = hashlib.sha256(source_bytes).hexdigest()
 
             if manifest and candidate_sha256:
+                # If a receipt was provided but failed verification (tampered bytes or revoked key),
+                # the candidate is unverified and cannot collide with or reconcile verified registrations.
+                # Such invalid submissions must be recorded as unverified without triggering conflict errors.
+                is_invalid_receipt_submission = bool(target_rcpt is not None and not has_valid_receipt)
+
                 for m_entry in manifest:
                     entry_sha256 = m_entry.get("sha256")
                     entry_receipt = m_entry.get("training_receipt") or {}
@@ -2163,36 +2168,43 @@ class ModelRegistry:
                     entry_job_id = entry_receipt.get("job_id")
                     entry_run_id = m_entry.get("training_run_id")
 
-                    # Check for conflicting registrations
-                    # 1. Receipt ID collision with conflicting digest
-                    if incoming_receipt_id and entry_receipt_id and incoming_receipt_id == entry_receipt_id:
-                        if entry_sha256 != candidate_sha256:
-                            raise ModelIntegrityError(
-                                f"Conflicting registration: receipt_id '{incoming_receipt_id}' was already registered with artifact digest {entry_sha256}, differing from incoming {candidate_sha256}."
-                            )
-                        if effective_consortium and m_entry.get("consortium_id") and m_entry.get("consortium_id") != effective_consortium:
-                            raise ModelIntegrityError(
-                                f"Conflicting consortium for receipt '{incoming_receipt_id}': registered={m_entry.get('consortium_id')}, incoming={effective_consortium}."
-                            )
+                    if not is_invalid_receipt_submission:
+                        # Check for conflicting registrations
+                        # 1. Receipt ID collision with conflicting digest
+                        if incoming_receipt_id and entry_receipt_id and incoming_receipt_id == entry_receipt_id:
+                            if entry_sha256 != candidate_sha256:
+                                raise ModelIntegrityError(
+                                    f"Conflicting registration: receipt_id '{incoming_receipt_id}' was already registered with artifact digest {entry_sha256}, differing from incoming {candidate_sha256}."
+                                )
+                            if effective_consortium and m_entry.get("consortium_id") and m_entry.get("consortium_id") != effective_consortium:
+                                raise ModelIntegrityError(
+                                    f"Conflicting consortium for receipt '{incoming_receipt_id}': registered={m_entry.get('consortium_id')}, incoming={effective_consortium}."
+                                )
 
-                    # 2. Training Run ID collision with conflicting digest
-                    if incoming_run_id and entry_run_id and incoming_run_id == entry_run_id:
-                        if entry_sha256 != candidate_sha256:
-                            raise ModelIntegrityError(
-                                f"Conflicting registration: training_run_id '{incoming_run_id}' was already registered with artifact digest {entry_sha256}, differing from incoming {candidate_sha256}."
-                            )
-                        if effective_consortium and m_entry.get("consortium_id") and m_entry.get("consortium_id") != effective_consortium:
-                            raise ModelIntegrityError(
-                                f"Conflicting consortium for training_run_id '{incoming_run_id}': registered={m_entry.get('consortium_id')}, incoming={effective_consortium}."
-                            )
+                        # 2. Training Run ID collision with conflicting digest
+                        if incoming_run_id and entry_run_id and incoming_run_id == entry_run_id:
+                            if entry_sha256 != candidate_sha256:
+                                raise ModelIntegrityError(
+                                    f"Conflicting registration: training_run_id '{incoming_run_id}' was already registered with artifact digest {entry_sha256}, differing from incoming {candidate_sha256}."
+                                )
+                            if effective_consortium and m_entry.get("consortium_id") and m_entry.get("consortium_id") != effective_consortium:
+                                raise ModelIntegrityError(
+                                    f"Conflicting consortium for training_run_id '{incoming_run_id}': registered={m_entry.get('consortium_id')}, incoming={effective_consortium}."
+                                )
 
                     # 3. Exact match reconciliation:
                     # Same SHA-256 AND matching receipt_id or matching run_id or matching job_id
+                    # Only reconcile if receipt is valid and candidate is production eligible
                     is_exact_match = False
-                    if entry_sha256 == candidate_sha256 and (
-                        (incoming_receipt_id and entry_receipt_id and incoming_receipt_id == entry_receipt_id)
-                        or (incoming_run_id and entry_run_id and incoming_run_id == entry_run_id)
-                        or (incoming_job_id and entry_job_id and incoming_job_id == entry_job_id)
+                    if (
+                        entry_sha256 == candidate_sha256
+                        and has_valid_receipt
+                        and m_entry.get("is_production_eligible") is True
+                        and (
+                            (incoming_receipt_id and entry_receipt_id and incoming_receipt_id == entry_receipt_id)
+                            or (incoming_run_id and entry_run_id and incoming_run_id == entry_run_id)
+                            or (incoming_job_id and entry_job_id and incoming_job_id == entry_job_id)
+                        )
                     ):
                         is_exact_match = True
 
