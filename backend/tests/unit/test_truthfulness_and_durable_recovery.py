@@ -16,9 +16,12 @@ K. Existing DP, SecAgg, Byzantine, training receipt, registry, and Four-Eyes inv
 
 from __future__ import annotations
 
+import copy
 import hashlib
+import json
 import os
 import shutil
+import sqlite3
 import tempfile
 import uuid
 from datetime import UTC, datetime
@@ -1404,4 +1407,401 @@ def test_retraining_rejects_unverified_or_incomplete_operational_results() -> No
     }
     with pytest.raises(RuntimeError, match="cannot automatically promote candidate to champion"):
         service.execute_retraining_pipeline(job.job_id)
+
+
+# ---------------------------------------------------------------------------
+# Test Gates for Final Recovery Verification & Historical Aggregation Truth
+# ---------------------------------------------------------------------------
+
+
+def test_candidate_missing_receipt_not_verified_and_preserves_staging() -> None:
+    """B & E. Candidate with matching digest but missing receipt is NOT verified, and staged evidence is preserved."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_gate_be_")
+    db_path = os.path.join(temp_dir, "authority.db")
+    db_file = f"sqlite:///{db_path}"
+    registry_dir = os.path.join(temp_dir, "models")
+    staging_dir = os.path.join(registry_dir, ".recovery_staging")
+    os.makedirs(registry_dir, exist_ok=True)
+
+    try:
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_token_gate_be",
+            db_url=db_file,
+            app_env="development",
+        )
+
+        rng = np.random.default_rng(201)
+        val_X = rng.normal(size=(20, NUM_FEATURES)).astype(np.float32)
+        val_y = rng.choice([0.0, 1.0], size=20).astype(np.float32)
+        partitions = {
+            "BANK_A": (
+                rng.normal(size=(25, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=25).astype(np.float32),
+            ),
+        }
+
+        job_id = f"job_gate_be_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_{job_id}"
+        run_id = f"run_{job_id}"
+
+        # 1. Complete initial training
+        res1 = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+        )
+        assert res1["status"] == "COMPLETED"
+        assert res1["is_verified"] is True
+
+        # Read registered candidate artifact bytes to prepare staging test
+        registry = ModelRegistry(registry_dir)
+        sim_dir = registry._get_sim_dir(sim_id)
+        manifest_file = os.path.join(sim_dir, "registry.json")
+        with open(manifest_file, encoding="utf-8") as f:
+            manifest_data = json.load(f)
+        assert len(manifest_data) == 1
+        model_file = os.path.join(sim_dir, manifest_data[0]["filename"])
+        with open(model_file, "rb") as f:
+            model_bytes = f.read()
+
+        # Subcase 1 (Test B): Candidate has NO receipt and NO staged artifact exists -> Must FAIL CLOSED
+        manifest_data[0]["training_receipt"] = None
+        with open(manifest_file, "w", encoding="utf-8") as f:
+            json.dump(manifest_data, f)
+        ModelRegistry._shared_manifest_cache.clear()
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="Non-recoverable post-completion state"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                registry_storage_dir=registry_dir,
+            )
+
+        # Subcase 2 (Test E): Staged artifact IS present.
+        # Candidate reconciliation must skip the unverified candidate without deleting staging,
+        # allowing Step D to safely recover from staging.
+        staging_mgr = DurableArtifactStagingManager(staging_dir)
+        staging_mgr.stage_artifact(
+            job_id=job_id,
+            simulation_id=sim_id,
+            consortium_id=None,
+            artifact_bytes=model_bytes,
+        )
+        assert staging_mgr.has_staged_artifact(job_id)
+
+        recovery_res = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+        )
+        assert recovery_res["status"] == "COMPLETED"
+        assert recovery_res["is_verified"] is True
+        assert recovery_res["recovered_from_staging"] is True
+        assert recovery_res["recovered_from_registered_candidate"] is False
+        # Staging is cleaned up only AFTER successful verified recovery
+        assert not staging_mgr.has_staged_artifact(job_id)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_malformed_or_invalid_receipt_cannot_authorize_recovery() -> None:
+    """C. Malformed or invalid receipt cannot authorize candidate recovery."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_gate_c_")
+    db_path = os.path.join(temp_dir, "authority.db")
+    db_file = f"sqlite:///{db_path}"
+    registry_dir = os.path.join(temp_dir, "models")
+    os.makedirs(registry_dir, exist_ok=True)
+
+    try:
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_token_gate_c",
+            db_url=db_file,
+            app_env="development",
+        )
+
+        rng = np.random.default_rng(202)
+        val_X = rng.normal(size=(20, NUM_FEATURES)).astype(np.float32)
+        val_y = rng.choice([0.0, 1.0], size=20).astype(np.float32)
+        partitions = {
+            "BANK_A": (
+                rng.normal(size=(25, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=25).astype(np.float32),
+            ),
+        }
+
+        job_id = f"job_gate_c_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_{job_id}"
+        run_id = f"run_{job_id}"
+
+        res1 = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+        )
+        assert res1["status"] == "COMPLETED"
+
+        registry = ModelRegistry(registry_dir)
+        sim_dir = registry._get_sim_dir(sim_id)
+        manifest_file = os.path.join(sim_dir, "registry.json")
+        with open(manifest_file, encoding="utf-8") as f:
+            manifest_data = json.load(f)
+
+        # Corrupt signature in candidate receipt
+        manifest_data[0]["training_receipt"]["signature"] = "deadbeef" * 16
+        with open(manifest_file, "w", encoding="utf-8") as f:
+            json.dump(manifest_data, f)
+        ModelRegistry._shared_manifest_cache.clear()
+
+        # Must fail closed with no valid candidate and no staging
+        with pytest.raises(TrainingProvenanceSecurityError, match="Non-recoverable post-completion state"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                registry_storage_dir=registry_dir,
+            )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_receipt_identity_mismatches_rejected() -> None:
+    """D. Receipts with mismatched job, simulation, consortium, or run are rejected."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_gate_d_")
+    db_path = os.path.join(temp_dir, "authority.db")
+    db_file = f"sqlite:///{db_path}"
+    registry_dir = os.path.join(temp_dir, "models")
+    os.makedirs(registry_dir, exist_ok=True)
+
+    try:
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_token_gate_d",
+            db_url=db_file,
+            app_env="development",
+        )
+
+        rng = np.random.default_rng(203)
+        val_X = rng.normal(size=(20, NUM_FEATURES)).astype(np.float32)
+        val_y = rng.choice([0.0, 1.0], size=20).astype(np.float32)
+        partitions = {
+            "BANK_A": (
+                rng.normal(size=(25, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=25).astype(np.float32),
+            ),
+        }
+
+        job_id = f"job_gate_d_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_{job_id}"
+        run_id = f"run_{job_id}"
+        consortium_id = "consortium_alpha"
+
+        res1 = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            consortium_id=consortium_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+        )
+        assert res1["status"] == "COMPLETED"
+
+        registry = ModelRegistry(registry_dir)
+        sim_dir = registry._get_sim_dir(sim_id)
+        manifest_file = os.path.join(sim_dir, "registry.json")
+        with open(manifest_file, encoding="utf-8") as f:
+            original_manifest = json.load(f)
+
+        # Mismatch cases to test
+        mismatch_cases = [
+            ("job_id", "job_wrong_12345"),
+            ("simulation_id", "sim_wrong_67890"),
+            ("training_run_id", "run_wrong_abcde"),
+            ("consortium_id", "consortium_bravo"),
+            ("model_artifact_sha256", "0" * 64),
+        ]
+
+        for field_name, wrong_value in mismatch_cases:
+            tampered = copy.deepcopy(original_manifest)
+            tampered[0]["training_receipt"][field_name] = wrong_value
+            with open(manifest_file, "w", encoding="utf-8") as f:
+                json.dump(tampered, f)
+            ModelRegistry._shared_manifest_cache.clear()
+
+            with pytest.raises(TrainingProvenanceSecurityError, match="Non-recoverable post-completion state"):
+                manager.execute_distributed_federation(
+                    job_id=job_id,
+                    training_run_id=run_id,
+                    simulation_id=sim_id,
+                    consortium_id=consortium_id,
+                    holdout_val_data=(val_X, val_y),
+                    participating_banks=["BANK_A"],
+                    bank_partitions=partitions,
+                    num_rounds=1,
+                    registry_storage_dir=registry_dir,
+                )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_missing_or_corrupt_aggregation_evidence_cannot_be_replaced_by_retry_parameters() -> None:
+    """F. Missing or unreadable authoritative aggregation evidence cannot be replaced with retry algorithm."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_gate_f_")
+    db_path = os.path.join(temp_dir, "authority.db")
+    db_file = f"sqlite:///{db_path}"
+    registry_dir = os.path.join(temp_dir, "models")
+    os.makedirs(registry_dir, exist_ok=True)
+
+    try:
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_token_gate_f",
+            db_url=db_file,
+            app_env="development",
+        )
+
+        rng = np.random.default_rng(204)
+        val_X = rng.normal(size=(20, NUM_FEATURES)).astype(np.float32)
+        val_y = rng.choice([0.0, 1.0], size=20).astype(np.float32)
+        partitions = {
+            "BANK_A": (
+                rng.normal(size=(25, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=25).astype(np.float32),
+            ),
+        }
+
+        job_id = f"job_gate_f_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_{job_id}"
+        run_id = f"run_{job_id}"
+
+        res1 = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+        )
+        assert res1["status"] == "COMPLETED"
+
+        # Case 1: Missing aggregation records entirely
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("DELETE FROM cfi_global_aggregations WHERE job_id = ?", (job_id,))
+            conn.commit()
+
+        # Retry with caller-supplied Byzantine defense MUST NOT fabricate provenance
+        with pytest.raises(TrainingProvenanceSecurityError, match="Missing authoritative global aggregation records"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                registry_storage_dir=registry_dir,
+                byzantine_defense="coordinate_wise_median",
+            )
+
+        # Case 2: Round continuity broken in authoritative aggregation records
+        payload_digest = hashlib.sha256(b"dummy_payload_gate_f").hexdigest()
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """INSERT INTO cfi_global_aggregations
+                   (event_id, job_id, round_number, aggregation_algorithm, accepted_participants_json,
+                    accepted_digests_json, aggregation_config_json, aggregated_model_digest, timestamp, aggregation_status, payload_digest)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    f"agg_broken_{uuid.uuid4().hex[:6]}",
+                    job_id,
+                    2,  # round 2 instead of expected round 1
+                    "fed_avg_weighted",
+                    json.dumps(["BANK_A"]),
+                    json.dumps(["digest1"]),
+                    "{}",
+                    res1["final_artifact_sha256"],
+                    "2026-10-19T00:00:00Z",
+                    "COMPLETED",
+                    payload_digest,
+                ),
+            )
+            conn.commit()
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="fail round continuity"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                registry_storage_dir=registry_dir,
+            )
+
+        # Case 3: Conflicting aggregation algorithms across rounds
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("DELETE FROM cfi_global_aggregations WHERE job_id = ?", (job_id,))
+            conn.execute(
+                """INSERT INTO cfi_global_aggregations
+                   (event_id, job_id, round_number, aggregation_algorithm, accepted_participants_json,
+                    accepted_digests_json, aggregation_config_json, aggregated_model_digest, timestamp, aggregation_status, payload_digest)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    f"agg_r1_{uuid.uuid4().hex[:6]}",
+                    job_id,
+                    1,
+                    "krum",
+                    json.dumps(["BANK_A"]),
+                    json.dumps(["digest1"]),
+                    "{}",
+                    res1["final_artifact_sha256"],
+                    "2026-10-19T00:00:00Z",
+                    "COMPLETED",
+                    payload_digest,
+                ),
+            )
+            conn.commit()
+
+        with pytest.raises(TrainingProvenanceSecurityError, match="Incompatible retry Byzantine defense"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                registry_storage_dir=registry_dir,
+                byzantine_defense="trimmed_mean",
+            )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
 

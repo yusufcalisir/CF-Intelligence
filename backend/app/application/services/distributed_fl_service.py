@@ -5794,58 +5794,122 @@ class DistributedFederatedTrainingManager:
                 )
 
             # Step 2: Recover actual executed aggregation algorithm from authoritative global aggregation records
-            actual_executed_algo: str | None = None
-            actual_f_max = getattr(pre_completed_rec, "byzantine_f_max", None)
-            try:
-                aggs = self.authority_source.get_global_aggregations(job_id)
-                if aggs:
-                    sorted_aggs = sorted(aggs, key=lambda a: getattr(a, "round_number", 0))
-                    actual_executed_algo = sorted_aggs[-1].aggregation_algorithm
-            except Exception as e:
-                logger.debug("Failed retrieving global aggregations for job %s: %s", job_id, e)
-
-            # Reconcile DP and SecAgg from authoritative records
-            sched_job = None
-            try:
-                sched_job = self.authority_source.get_scheduled_job(job_id)
-            except Exception as e:
-                logger.debug("Failed retrieving scheduled job for %s: %s", job_id, e)
-
-            auth_dp_config = getattr(sched_job, "dp_config", None) if sched_job else None
-            auth_dp_enabled = (
-                bool(auth_dp_config.get("dp_enabled", False))
-                if isinstance(auth_dp_config, dict)
-                else (bool(dp_config.get("dp_enabled", False)) if dp_config else False)
-            )
-            req_dp_enabled = bool(dp_config.get("dp_enabled", False)) if dp_config else False
-            if auth_dp_config is not None and req_dp_enabled != auth_dp_enabled:
+            if not self.authority_source or not hasattr(self.authority_source, "get_global_aggregations"):
                 raise TrainingProvenanceSecurityError(
-                    f"Incompatible retry DP configuration for job '{job_id}': requested dp_enabled={req_dp_enabled} "
-                    f"conflicts with authoritative scheduled dp_enabled={auth_dp_enabled}."
+                    f"Authoritative backend source is unavailable to verify aggregation records for completed job '{job_id}'."
                 )
 
-            if actual_executed_algo:
-                actual_secagg = (actual_executed_algo == "secagg_fed_avg_weighted")
-                if secagg_enabled != actual_secagg:
+            try:
+                aggs = self.authority_source.get_global_aggregations(job_id)
+            except Exception as e:
+                raise TrainingProvenanceSecurityError(
+                    f"Failed retrieving authoritative global aggregation records for completed job '{job_id}': {e}"
+                ) from e
+
+            if not aggs:
+                raise TrainingProvenanceSecurityError(
+                    f"Missing authoritative global aggregation records for completed job '{job_id}'. "
+                    "Cannot verify historical aggregation provenance."
+                )
+
+            # Verify every aggregation record is readable and complete
+            for a in aggs:
+                r_num = getattr(a, "round_number", None)
+                algo = getattr(a, "aggregation_algorithm", None)
+                digest = getattr(a, "aggregated_global_model_digest", None)
+                status = getattr(a, "aggregation_status", None)
+                if r_num is None or r_num < 1:
                     raise TrainingProvenanceSecurityError(
-                        f"Incompatible retry SecAgg configuration for job '{job_id}': requested secagg_enabled={secagg_enabled} "
-                        f"conflicts with authoritative executed algorithm '{actual_executed_algo}'."
+                        f"Incomplete or unreadable aggregation record for job '{job_id}': invalid round_number {r_num}."
                     )
-                req_defense = (byzantine_defense or "none").lower()
-                if req_defense in ("fed_avg", "fedavg", "fed_avg_weighted"):
-                    req_defense = "none"
-                if req_defense != "none" and actual_executed_algo.lower() != req_defense:
+                if not algo or not str(algo).strip():
                     raise TrainingProvenanceSecurityError(
-                        f"Incompatible retry Byzantine defense for job '{job_id}': requested '{req_defense}' "
-                        f"conflicts with authoritative executed algorithm '{actual_executed_algo}'."
+                        f"Incomplete or unreadable aggregation record for job '{job_id}': missing aggregation_algorithm."
                     )
+                if not digest or not str(digest).strip():
+                    raise TrainingProvenanceSecurityError(
+                        f"Incomplete or unreadable aggregation record for job '{job_id}': missing aggregated_global_model_digest."
+                    )
+                if status and status != "COMPLETED":
+                    raise TrainingProvenanceSecurityError(
+                        f"Aggregation record for job '{job_id}' at round {r_num} has non-completed status '{status}'."
+                    )
+
+            # Verify round continuity
+            expected_rounds_count = rec_rounds if (rec_rounds is not None and rec_rounds > 0) else num_rounds
+            sorted_aggs = sorted(aggs, key=lambda a: getattr(a, "round_number", 0))
+            observed_rounds = [getattr(a, "round_number", None) for a in sorted_aggs]
+            expected_rounds_seq = list(range(1, expected_rounds_count + 1))
+            if observed_rounds != expected_rounds_seq:
+                raise TrainingProvenanceSecurityError(
+                    f"Authoritative aggregation records for job '{job_id}' fail round continuity: "
+                    f"observed rounds {observed_rounds} != expected {expected_rounds_seq}."
+                )
+
+            # Verify executed algorithm consistency across rounds
+            observed_algos = {str(getattr(a, "aggregation_algorithm", "")).strip() for a in sorted_aggs}
+            if len(observed_algos) != 1 or "" in observed_algos:
+                raise TrainingProvenanceSecurityError(
+                    f"Conflicting or empty aggregation algorithms across rounds for completed job '{job_id}': {observed_algos}."
+                )
+            actual_executed_algo = sorted_aggs[-1].aggregation_algorithm.strip()
+
+            # Verify final aggregation digest matches the authoritative completed artifact SHA-256
+            final_agg_digest = str(sorted_aggs[-1].aggregated_global_model_digest).strip().lower()
+            if final_agg_digest != expected_digest:
+                raise TrainingProvenanceSecurityError(
+                    f"Final global aggregation digest mismatch for job '{job_id}': "
+                    f"aggregation digest '{final_agg_digest}' != completed record SHA-256 '{expected_digest}'."
+                )
+
+            # Retrieve scheduled job to authenticate DP configuration
+            sched_job = None
+            try:
+                if hasattr(self.authority_source, "get_scheduled_job"):
+                    sched_job = self.authority_source.get_scheduled_job(job_id)
+            except Exception as e:
+                raise TrainingProvenanceSecurityError(
+                    f"Failed retrieving authoritative scheduled job record for '{job_id}': {e}"
+                ) from e
+
+            # Report only historically supported DP claims
+            if sched_job is not None and getattr(sched_job, "dp_config", None) is not None:
+                auth_dp_cfg = sched_job.dp_config
+                auth_dp_enabled = bool(auth_dp_cfg.get("dp_enabled", False)) if isinstance(auth_dp_cfg, dict) else False
             else:
-                if secagg_enabled:
-                    actual_executed_algo = "secagg_fed_avg_weighted"
-                elif byzantine_defense and byzantine_defense.lower() not in ("none", "fed_avg", "fedavg", "fed_avg_weighted"):
-                    actual_executed_algo = byzantine_defense.lower()
-                else:
-                    actual_executed_algo = "fed_avg_weighted"
+                auth_dp_enabled = False
+
+            req_dp_enabled = bool(dp_config.get("dp_enabled", False)) if dp_config else False
+            if req_dp_enabled != auth_dp_enabled:
+                raise TrainingProvenanceSecurityError(
+                    f"Incompatible retry DP configuration for job '{job_id}': requested dp_enabled={req_dp_enabled} "
+                    f"conflicts with authoritative historical dp_enabled={auth_dp_enabled}."
+                )
+
+            # Compare retry configuration against authenticated historical aggregation contract
+            actual_secagg = (actual_executed_algo == "secagg_fed_avg_weighted")
+            if secagg_enabled != actual_secagg:
+                raise TrainingProvenanceSecurityError(
+                    f"Incompatible retry SecAgg configuration for job '{job_id}': requested secagg_enabled={secagg_enabled} "
+                    f"conflicts with authoritative executed algorithm '{actual_executed_algo}'."
+                )
+
+            req_defense = (byzantine_defense or "none").lower()
+            if req_defense in ("fed_avg", "fedavg", "fed_avg_weighted"):
+                req_defense = "none"
+
+            actual_defense = (
+                "none"
+                if actual_executed_algo.lower() in ("fed_avg", "fedavg", "fed_avg_weighted", "secagg_fed_avg_weighted")
+                else actual_executed_algo.lower()
+            )
+            if req_defense != actual_defense:
+                raise TrainingProvenanceSecurityError(
+                    f"Incompatible retry Byzantine defense for job '{job_id}': requested '{req_defense}' "
+                    f"conflicts with authoritative executed algorithm '{actual_executed_algo}'."
+                )
+
+            actual_f_max = getattr(pre_completed_rec, "byzantine_f_max", None)
 
             # Prepare verifier and registry
             active_verifier = receipt_verifier or get_default_training_verifier()
@@ -5856,6 +5920,7 @@ class DistributedFederatedTrainingManager:
 
             # Step B & C: Check for already registered candidate in ModelRegistry
             matching_candidate = None
+            verified_candidate_receipt = None
             sim_dir = active_registry._get_sim_dir(simulation_id, create=False)
             if os.path.isdir(sim_dir):
                 manifest = active_registry._load_manifest(simulation_id)
@@ -5873,37 +5938,113 @@ class DistributedFederatedTrainingManager:
                     if compute_file_sha256(c_path).lower() != expected_digest:
                         continue
 
-                    # Check candidate receipt and identity bindings
+                    # Step C1: Check candidate receipt - mandatory Ed25519 training receipt
                     c_receipt = candidate_entry.get("training_receipt")
+                    if not c_receipt:
+                        logger.warning(
+                            "Candidate entry version %s lacks training receipt for completed job %s. "
+                            "Unverified candidate cannot authorize recovery.",
+                            candidate_entry.get("version"),
+                            job_id,
+                        )
+                        continue
+
                     c_receipt_obj = None
                     if isinstance(c_receipt, TrainingExecutionReceipt):
                         c_receipt_obj = c_receipt
                     elif isinstance(c_receipt, dict):
                         try:
                             c_receipt_obj = TrainingExecutionReceipt.from_dict(c_receipt)
-                        except Exception:
-                            c_receipt_obj = None
+                        except Exception as e:
+                            logger.warning(
+                                "Candidate receipt for version %s is malformed and cannot be parsed: %s",
+                                candidate_entry.get("version"),
+                                e,
+                            )
+                            continue
+                    else:
+                        continue
 
-                    if c_receipt_obj is not None:
-                        if c_receipt_obj.job_id != job_id:
-                            continue
-                        if c_receipt_obj.simulation_id != simulation_id:
-                            continue
-                        if req_consortium and c_receipt_obj.consortium_id and c_receipt_obj.consortium_id != req_consortium:
-                            continue
+                    if c_receipt_obj is None:
+                        continue
 
+                    # Step C2: Verify exact identity bindings against authoritative COMPLETED record
+                    if c_receipt_obj.job_id != job_id:
+                        logger.warning(
+                            "Candidate receipt job_id mismatch: receipt has '%s', expected '%s'.",
+                            c_receipt_obj.job_id,
+                            job_id,
+                        )
+                        continue
+
+                    if c_receipt_obj.simulation_id != simulation_id:
+                        logger.warning(
+                            "Candidate receipt simulation_id mismatch: receipt has '%s', expected '%s'.",
+                            c_receipt_obj.simulation_id,
+                            simulation_id,
+                        )
+                        continue
+
+                    expected_run_id = rec_run_id or training_run_id
+                    if expected_run_id and c_receipt_obj.training_run_id != expected_run_id.strip():
+                        logger.warning(
+                            "Candidate receipt training_run_id mismatch: receipt has '%s', expected '%s'.",
+                            c_receipt_obj.training_run_id,
+                            expected_run_id.strip(),
+                        )
+                        continue
+
+                    expected_consortium = rec_consortium or req_consortium
+                    if expected_consortium and (
+                        not c_receipt_obj.consortium_id
+                        or c_receipt_obj.consortium_id.strip() != expected_consortium.strip()
+                    ):
+                        logger.warning(
+                            "Candidate receipt consortium_id mismatch: receipt has '%s', expected '%s'.",
+                            c_receipt_obj.consortium_id,
+                            expected_consortium.strip(),
+                        )
+                        continue
+
+                    receipt_sha = getattr(c_receipt_obj, "model_artifact_sha256", None) or getattr(c_receipt_obj, "artifact_sha256", None)
+                    if (receipt_sha or "").strip().lower() != expected_digest:
+                        logger.warning(
+                            "Candidate receipt artifact SHA-256 mismatch: receipt has '%s', expected '%s'.",
+                            receipt_sha,
+                            expected_digest,
+                        )
+                        continue
+
+                    # Step C3: Verify cryptographic signature and required model schema
+                    try:
                         with open(c_path, "rb") as cf:
                             c_bytes = cf.read()
-                        is_valid_rcpt, _ = active_verifier.verify_receipt(
-                            receipt=c_receipt_obj,
-                            expected_simulation_id=simulation_id,
-                            actual_artifact_bytes=c_bytes,
-                            expected_consortium_id=req_consortium,
-                        )
-                        if not is_valid_rcpt:
-                            continue
+                    except Exception as e:
+                        logger.warning("Failed to read candidate artifact %s: %s", c_path, e)
+                        continue
 
+                    is_valid_rcpt, rcpt_reason = active_verifier.verify_receipt(
+                        receipt=c_receipt_obj,
+                        expected_simulation_id=simulation_id,
+                        expected_architecture="FraudDetectionNN",
+                        expected_feature_schema_version="v1.0",
+                        expected_input_dim=NUM_FEATURES,
+                        expected_feature_names=list(FEATURE_NAMES),
+                        actual_artifact_bytes=c_bytes,
+                        expected_consortium_id=expected_consortium,
+                    )
+                    if not is_valid_rcpt:
+                        logger.warning(
+                            "Registered candidate version %s rejected during recovery for job %s: %s",
+                            candidate_entry.get("version"),
+                            job_id,
+                            rcpt_reason,
+                        )
+                        continue
+
+                    # Candidate is cryptographically verified and reconciled with authority
                     matching_candidate = candidate_entry
+                    verified_candidate_receipt = c_receipt_obj
                     break
 
             if matching_candidate is not None:
@@ -5928,7 +6069,7 @@ class DistributedFederatedTrainingManager:
                     "coordinator_pid": coordinator_pid,
                     "worker_pids": {},
                     "completed_record": pre_completed_rec,
-                    "receipt": matching_candidate.get("training_receipt"),
+                    "receipt": verified_candidate_receipt,
                     "is_verified": True,
                     "saved_version": matching_candidate,
                     "is_promoted_champion": is_promoted_champion,
