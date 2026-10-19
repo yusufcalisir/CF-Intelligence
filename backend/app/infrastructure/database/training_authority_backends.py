@@ -5543,14 +5543,13 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
             return {}
         res: dict[str, str] = {}
         with self._connect() as conn, self._lock:
-            placeholders = ",".join("?" for _ in clean_banks)
-            rows = conn.execute(
-                f"SELECT bank_id, public_key_hex FROM cfi_institutional_identities WHERE bank_id IN ({placeholders})",
-                clean_banks,
-            ).fetchall()
-            for r in rows:
-                if r[0] is not None and r[1] is not None:
-                    res[str(r[0]).strip().upper()] = str(r[1]).strip().lower()
+            for b in clean_banks:
+                row = conn.execute(
+                    "SELECT public_key_hex FROM cfi_institutional_identities WHERE bank_id = ?",
+                    (b,),
+                ).fetchone()
+                if row and row[0] is not None:
+                    res[b] = str(row[0]).strip().lower()
         return res
 
     def clear(self) -> None:
