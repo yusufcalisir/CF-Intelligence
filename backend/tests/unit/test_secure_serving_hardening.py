@@ -564,3 +564,186 @@ def test_scoped_redis_cache_does_not_overwrite_global_alias(monkeypatch: pytest.
     # Now reset the default simulation -> global alias is cleared
     rt_inference_module.reset_model_cache(simulation_id="sim_default")
     assert "cfi:champion_model" not in stored_keys
+
+
+# ---------------------------------------------------------------------------
+# Test N: Production Feature Truthfulness — ScoreTransaction Country Enforcement
+# ---------------------------------------------------------------------------
+def test_production_score_transaction_without_country_fails_422(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Requirement A: Production /api/v1/score-transaction without country fails HTTP 422."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "app_env", "production")
+    monkeypatch.setattr(predict_module._settings, "app_env", "production")
+    monkeypatch.setattr(settings, "feature_store_enabled", False)
+    monkeypatch.setattr(predict_module._settings, "feature_store_enabled", False)
+
+    payload = {
+        "transaction_id": "tx_no_country_01",
+        "account_id": "acc_001",
+        "amount": 250.0,
+        "merchant_id": "merch_crypto_01",
+        "device_id": "fp_dev_01",
+        "merchant_category": "crypto",
+        "device_type": "web_browser",
+        "velocity": 2.0,
+        "customer_history_score": 0.95,
+        "chargeback_count": 0,
+        "account_age_days": 400,
+        "merchant_risk_score": 0.05,
+        "hour_of_day": 14,
+        # 'country' and 'country_code' omitted!
+    }
+
+    res = client.post("/api/v1/score-transaction", json=payload)
+    assert res.status_code == 422, res.text
+    assert "missing required model features" in res.text
+    assert "country" in res.text
+
+
+def test_production_score_transaction_aliases_behave_identically_on_missing_country(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Requirement B: /transactions/score and /predict/score aliases fail HTTP 422 identically when country is omitted."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "app_env", "production")
+    monkeypatch.setattr(predict_module._settings, "app_env", "production")
+    monkeypatch.setattr(settings, "feature_store_enabled", False)
+    monkeypatch.setattr(predict_module._settings, "feature_store_enabled", False)
+
+    payload = {
+        "transaction_id": "tx_alias_no_country_02",
+        "account_id": "acc_002",
+        "amount": 100.0,
+        "merchant_id": "merch_grocery_01",
+        "device_id": "fp_dev_02",
+        "merchant_category": "grocery",
+        "device_type": "web_browser",
+        "velocity": 1.0,
+        "customer_history_score": 0.90,
+        "chargeback_count": 0,
+        "account_age_days": 365,
+        "merchant_risk_score": 0.05,
+        "hour_of_day": 12,
+    }
+
+    for path in ("/api/v1/score-transaction", "/api/v1/transactions/score", "/api/v1/predict/score"):
+        res = client.post(path, json=payload)
+        assert res.status_code == 422, f"Failed on {path}: {res.text}"
+        data = res.json()
+        assert "missing required model features" in data["detail"]
+        assert "country" in data["detail"]
+
+
+def test_production_score_transaction_explicit_valid_country_produces_canonical_feature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Requirement C: Explicit valid country produces expected canonical ML feature without fallback."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "app_env", "production")
+    monkeypatch.setattr(predict_module._settings, "app_env", "production")
+    monkeypatch.setattr(settings, "feature_store_enabled", False)
+    monkeypatch.setattr(predict_module._settings, "feature_store_enabled", False)
+
+    captured_tensors = []
+
+    class MockModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.network = torch.nn.Sequential(torch.nn.Linear(NUM_FEATURES, 1))
+
+        def forward(self, x):
+            captured_tensors.append(x.clone())
+            return torch.tensor([0.15])
+
+    monkeypatch.setattr(
+        predict_module,
+        "_get_cached_serving_model_with_ident",
+        lambda sim_id: (MockModel(), {"version": 1, "sha256": "sha_v1", "simulation_id": "sim_valid"}),
+    )
+
+    # 1. Supply explicit country="DE"
+    payload_de = {
+        "transaction_id": "tx_valid_country_de",
+        "account_id": "acc_de_01",
+        "amount": 100.0,
+        "merchant_id": "merch_de",
+        "device_id": "fp_dev_de",
+        "country": "DE",
+        "merchant_category": "grocery",
+        "device_type": "web_browser",
+        "velocity": 1.0,
+        "customer_history_score": 0.90,
+        "chargeback_count": 0,
+        "account_age_days": 365,
+        "merchant_risk_score": 0.05,
+        "hour_of_day": 12,
+    }
+
+    res = client.post("/api/v1/score-transaction", json=payload_de)
+    assert res.status_code == 200, res.text
+    assert len(captured_tensors) == 1
+
+    # Canonical DE feature in data_generator.COUNTRIES is index 2.0 -> scaled
+    from app.application.services.data_generator import COUNTRIES, REFERENCE_BOUNDS
+
+    de_index = float(COUNTRIES.index("DE"))
+    c_min, c_max = REFERENCE_BOUNDS["country_code"]
+    expected_de_scaled = (de_index - c_min) / (c_max - c_min)
+    # country_code is at index 2 in FEATURE_NAMES (0: amount, 1: category, 2: country)
+    assert abs(captured_tensors[0][0, 2].item() - expected_de_scaled) < 1e-5
+
+    # 2. Also verify country_code alias produces identical canonical feature
+    captured_tensors.clear()
+    payload_alias = dict(payload_de)
+    del payload_alias["country"]
+    payload_alias["country_code"] = "DE"
+    res_alias = client.post("/api/v1/score-transaction", json=payload_alias)
+    assert res_alias.status_code == 200, res_alias.text
+    assert len(captured_tensors) == 1
+    assert abs(captured_tensors[0][0, 2].item() - expected_de_scaled) < 1e-5
+
+
+def test_omitted_country_never_fabricates_ee_in_production_but_preserves_demo_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Requirement D: An omitted country cannot silently produce an 'EE' ML feature or jurisdiction decision in production,
+    but preserves the 'EE' development fallback in non-production.
+    """
+    settings = get_settings()
+
+    # 1. In production: omitted country must NEVER fall back to EE
+    monkeypatch.setattr(settings, "app_env", "production")
+    monkeypatch.setattr(predict_module._settings, "app_env", "production")
+    monkeypatch.setattr(settings, "feature_store_enabled", False)
+    monkeypatch.setattr(predict_module._settings, "feature_store_enabled", False)
+
+    payload = {
+        "transaction_id": "tx_no_ee_prod",
+        "account_id": "acc_003",
+        "amount": 100.0,
+        "merchant_id": "merch_crypto",
+        "device_id": "fp_dev_03",
+        "merchant_category": "crypto",
+        "device_type": "web_browser",
+        "velocity": 5.0,
+        "customer_history_score": 0.85,
+        "chargeback_count": 0,
+        "account_age_days": 100,
+        "merchant_risk_score": 0.40,
+        "hour_of_day": 10,
+    }
+
+    res_prod = client.post("/api/v1/score-transaction", json=payload)
+    assert res_prod.status_code == 422
+    assert "country" in res_prod.json()["detail"]
+
+    # 2. In non-production (development): omitted country preserves EE demo fallback
+    monkeypatch.setattr(settings, "app_env", "development")
+    monkeypatch.setattr(predict_module._settings, "app_env", "development")
+
+    res_dev = client.post("/api/v1/score-transaction", json=payload)
+    assert res_dev.status_code == 200, res_dev.text
+    data_dev = res_dev.json()
+    assert "risk_score" in data_dev
+    assert data_dev["decision"] in ("ALLOW", "REVIEW", "BLOCK")
+

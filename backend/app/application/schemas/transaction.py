@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class SignalBreakdown(BaseModel):
@@ -248,7 +248,12 @@ class ScoreTransactionRequest(BaseModel):
     amount: float = Field(..., ge=0.0, description="Transaction amount")
     currency: str = Field("EUR", max_length=16, description="ISO 4217 currency code")
     merchant_id: str = Field(..., max_length=256, description="Target merchant identifier")
-    country: str = Field("EE", max_length=16, description="ISO 3166-1 alpha-2 origin country code")
+    country: str | None = Field(
+        None, max_length=16, description="ISO 3166-1 alpha-2 origin country code"
+    )
+    country_code: str | None = Field(
+        None, max_length=16, description="Optional alias for origin country code"
+    )
     device_id: str = Field(..., max_length=256, description="Device fingerprint identifier")
     merchant_category: str | None = Field(
         None, max_length=256, description="Explicit merchant category (e.g. grocery, crypto, dining)"
@@ -298,6 +303,14 @@ class ScoreTransactionRequest(BaseModel):
                 raise ValueError("Numeric fields must be finite numbers (NaN, +Inf, -Inf rejected)")
             return val
         return v
+
+    @model_validator(mode="after")
+    def _normalize_country(self) -> ScoreTransactionRequest:
+        if self.country is None and self.country_code is not None:
+            self.country = self.country_code
+        elif self.country is not None and self.country_code is None:
+            self.country_code = self.country
+        return self
 
 
 class FeatureContributionItem(BaseModel):

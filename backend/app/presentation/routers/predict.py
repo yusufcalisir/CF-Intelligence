@@ -1310,6 +1310,7 @@ async def score_transaction(
     account_age_days = payload.account_age_days
     merchant_risk_score = payload.merchant_risk_score
     hour_of_day = payload.hour_of_day
+    country = payload.country or payload.country_code
 
     # Online Feature Store: query real customer and merchant historical features if enabled
     fs_enabled = getattr(_settings, "feature_store_enabled", False) or settings.feature_store_enabled
@@ -1332,6 +1333,7 @@ async def score_transaction(
                     "merchant_risk_score",
                     "merchant_category",
                     "device_type",
+                    "country_code",
                 ],
                 tenant_id=tenant_scope,
             )
@@ -1351,12 +1353,19 @@ async def score_transaction(
                     merchant_category = feats["merchant_category"]
                 if device_type is None and feats.get("device_type") is not None:
                     device_type = feats["device_type"]
+                if country is None:
+                    if feats.get("country_code") is not None:
+                        country = str(feats["country_code"]).strip()
+                    elif feats.get("country") is not None:
+                        country = str(feats["country"]).strip()
         except Exception as exc:
             logger.debug("Feature Store online query failed in score_transaction: %s", exc)
 
     if is_production:
         # Strict Production Feature Contract: do not fabricate or guess features in production
         missing = []
+        if country is None or not str(country).strip():
+            missing.append("country")
         if merchant_category is None:
             missing.append("merchant_category")
         if device_type is None:
@@ -1381,8 +1390,20 @@ async def score_transaction(
                     f"Features must be explicitly supplied or observed in online feature store."
                 ),
             )
+
+        # Validate country code format if provided
+        if country is not None:
+            c_str = str(country).strip().upper()
+            if len(c_str) != 2 or not c_str.isalpha():
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Production scoring rejected: invalid country code format '{country}'. Must be ISO 3166-1 alpha-2.",
+                )
     else:
-        # Non-production demo/development fallback logic
+        # Non-production demo/development fallback logic: preserve EE backward compatibility default only outside production
+        if country is None or not str(country).strip():
+            country = "EE"
+
         if merchant_category is None:
             _merchant_id_lower = payload.merchant_id.lower()
             if "crypto" in _merchant_id_lower or "bitcoin" in _merchant_id_lower or "exchange" in _merchant_id_lower:
@@ -1427,7 +1448,7 @@ async def score_transaction(
     # FATF high-risk jurisdiction supplement: countries not in engine's lookup table
     _HIGH_RISK_COUNTRIES = {"KP", "IR", "MM", "SY", "YE", "LY", "SS", "SO", "CF", "ER"}
     _ELEVATED_RISK_COUNTRIES = {"PK", "TZ", "VU", "NG", "HT", "PH", "AO", "RU", "BY"}
-    country_upper = payload.country.upper()
+    country_upper = str(country).strip().upper() if country else ""
     is_fatf_blacklist = country_upper in _HIGH_RISK_COUNTRIES
     is_fatf_greylist = country_upper in _ELEVATED_RISK_COUNTRIES
     country_risk_override = (
@@ -1439,7 +1460,7 @@ async def score_transaction(
     txn_dict = {
         "transaction_amount": payload.amount,
         "merchant_category": merchant_category,
-        "country_code": payload.country,
+        "country_code": country,
         "device_type": device_type,
         "velocity": velocity,
         "hour_of_day": hour_of_day,
