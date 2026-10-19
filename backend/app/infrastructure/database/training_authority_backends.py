@@ -3400,7 +3400,8 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             )
             row = cur.fetchone()
             if row:
-                existing_key = (row.get("public_key_hex") if isinstance(row, dict) else row[0]).strip().lower()
+                raw_val = row.get("public_key_hex") if isinstance(row, dict) else row[0]
+                existing_key = str(raw_val).strip().lower() if raw_val is not None else ""
                 if existing_key != clean_key:
                     raise TrainingProvenanceSecurityError(
                         f"Institutional identity conflict for bank '{clean_bank}': existing key '{existing_key}' "
@@ -3422,7 +3423,7 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             row = cur.fetchone()
             if row:
                 val = row.get("public_key_hex") if isinstance(row, dict) else row[0]
-                return val.strip().lower()
+                return str(val).strip().lower() if val is not None else None
             return None
 
     def get_institutional_identities(
@@ -3440,9 +3441,10 @@ class PostgresTrainingJobAuthority(TrainingJobAuthorityBackend):
             )
             rows = cur.fetchall()
             for r in rows:
-                b_id = (r.get("bank_id") if isinstance(r, dict) else r[0]).strip().upper()
-                pk = (r.get("public_key_hex") if isinstance(r, dict) else r[1]).strip().lower()
-                res[b_id] = pk
+                raw_b_id = r.get("bank_id") if isinstance(r, dict) else r[0]
+                raw_pk = r.get("public_key_hex") if isinstance(r, dict) else r[1]
+                if raw_b_id is not None and raw_pk is not None:
+                    res[str(raw_b_id).strip().upper()] = str(raw_pk).strip().lower()
         return res
 
     def clear(self) -> None:
@@ -5460,7 +5462,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                     (clean_bank,),
                 ).fetchone()
                 if row:
-                    existing_key = row[0].strip().lower()
+                    existing_key = str(row[0]).strip().lower() if row[0] is not None else ""
                     if existing_key != clean_key:
                         raise TrainingProvenanceSecurityError(
                             f"Institutional identity conflict for bank '{clean_bank}': existing key '{existing_key}' "
@@ -5485,7 +5487,7 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 "SELECT public_key_hex FROM cfi_institutional_identities WHERE bank_id = ?",
                 (clean_bank,),
             ).fetchone()
-            return row[0].strip().lower() if row else None
+            return str(row[0]).strip().lower() if row and row[0] is not None else None
 
     def get_institutional_identities(
         self,
@@ -5502,7 +5504,8 @@ class SQLiteTrainingJobAuthority(TrainingJobAuthorityBackend):
                 clean_banks,
             ).fetchall()
             for r in rows:
-                res[r[0].strip().upper()] = r[1].strip().lower()
+                if r[0] is not None and r[1] is not None:
+                    res[str(r[0]).strip().upper()] = str(r[1]).strip().lower()
         return res
 
     def clear(self) -> None:
