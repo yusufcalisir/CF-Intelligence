@@ -1036,6 +1036,8 @@ class OperationalFederationService:
         expected_unique_samples: int | None = None,
         consortium_id: str = "cfi-consortium",
         dp_config: Mapping[str, Any] | None = None,
+        secagg_enabled: bool = False,
+        secagg_config: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute operational federated learning lifecycle with complete authority verification and lifecycle ownership."""
         settings = get_settings()
@@ -1063,13 +1065,14 @@ class OperationalFederationService:
             holdout_data = self.resolve_holdout_data(is_prod)
 
             logger.info(
-                "Executing operational federation: job_id=%s, simulation_id=%s, consortium_id=%s, env=%s, banks=%s, rounds=%d",
+                "Executing operational federation: job_id=%s, simulation_id=%s, consortium_id=%s, env=%s, banks=%s, rounds=%d, secagg=%s",
                 clean_job_id,
                 clean_sim_id,
                 clean_consortium_id,
                 active_env,
                 banks,
                 num_rounds,
+                secagg_enabled,
             )
 
             # 2. Invoke canonical runner with explicit consortium_id
@@ -1096,6 +1099,8 @@ class OperationalFederationService:
                     app_env=active_env,
                     consortium_id=clean_consortium_id,
                     dp_config=dp_config,
+                    secagg_enabled=secagg_enabled,
+                    secagg_config=secagg_config,
                 )
             else:
                 # Non-production path: direct execution through manager
@@ -1119,6 +1124,8 @@ class OperationalFederationService:
                     model_registry=self._model_registry,
                     consortium_id=clean_consortium_id,
                     dp_config=dp_config,
+                    secagg_enabled=secagg_enabled,
+                    secagg_config=secagg_config,
                 )
 
             # 3. Truthful execution status and evidence validation
@@ -1160,6 +1167,8 @@ class OperationalFederationService:
                 "receipt": result.get("receipt"),
                 "dp_enabled": bool(result.get("dp_enabled", False)),
                 "dp_provenance": result.get("dp_provenance") or {},
+                "secagg_enabled": bool(result.get("secagg_enabled", False)),
+                "secagg_provenance": result.get("secagg_provenance"),
             }
 
         finally:

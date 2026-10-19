@@ -21,9 +21,14 @@ import hashlib
 import hmac
 import os
 import struct
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
-from cryptography.hazmat.primitives import hashes
+import numpy as np
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives.asymmetric.x25519 import (
     X25519PrivateKey,
     X25519PublicKey,
@@ -36,6 +41,88 @@ from app.infrastructure.security.shamir_engine import (
 )
 
 # ---------------------------------------------------------------------------
+# Cryptographic Helpers & Transcript Serialization
+# ---------------------------------------------------------------------------
+
+
+class SecAggSecurityError(Exception):
+    """Raised when Secure Aggregation cryptographic validation or protocol invariant fails."""
+
+
+def derive_institutional_identity_keypair(
+    bank_id: str,
+    institutional_token: str,
+) -> tuple[ed25519.Ed25519PrivateKey, ed25519.Ed25519PublicKey]:
+    """Derive an authoritative institutional Ed25519 identity keypair bound to bank_id and token."""
+    clean_id = bank_id.strip().upper()
+    clean_token = institutional_token.strip()
+    if not clean_id or not clean_token:
+        raise ValueError("bank_id and institutional_token must be non-empty.")
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=b"cfi:secagg:institutional:identity:v1",
+        info=f"institutional_identity:{clean_id}".encode(),
+    )
+    seed = hkdf.derive(clean_token.encode("utf-8"))
+    priv_key = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
+    return priv_key, priv_key.public_key()
+
+
+def derive_institutional_identity_hex(
+    bank_id: str,
+    institutional_token: str,
+) -> tuple[str, str]:
+    """Derive hex-encoded authoritative institutional Ed25519 identity keypair (private_hex, public_hex)."""
+    priv, pub = derive_institutional_identity_keypair(bank_id, institutional_token)
+    priv_raw = priv.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    pub_raw = pub.public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    return priv_raw.hex(), pub_raw.hex()
+
+
+def canonical_bundle_message(
+    bank_id: str,
+    round_id: int,
+    public_key_bytes: bytes,
+    job_id: str = "",
+    consortium_id: str = "",
+    session_id: str = "",
+    roster: Sequence[str] = (),
+) -> bytes:
+    """Canonical deterministic transcript binding for bundle signing and replay prevention."""
+    roster_clean = ",".join(sorted(r.strip().upper() for r in roster if r))
+    if job_id or consortium_id or session_id or roster_clean:
+        prefix = f"{job_id}:{consortium_id}:{session_id}:{roster_clean}:".encode()
+    else:
+        prefix = b""
+    return (
+        prefix
+        + bank_id.encode("utf-8")
+        + struct.pack(">Q", round_id)
+        + public_key_bytes
+    )
+
+
+def serialize_masked_vector(masked_vector: Sequence[int] | np.ndarray) -> bytes:
+    """Deterministically serialize masked vector to uint64 little-endian bytes."""
+    arr = np.asarray(masked_vector, dtype=np.uint64)
+    return arr.tobytes()
+
+
+def deserialize_masked_vector(data: bytes) -> list[int]:
+    """Deterministically deserialize uint64 little-endian bytes to integer list."""
+    arr = np.frombuffer(data, dtype=np.uint64)
+    return arr.tolist()
+
+
+# ---------------------------------------------------------------------------
 # Domain Value Objects
 # ---------------------------------------------------------------------------
 
@@ -44,14 +131,53 @@ from app.infrastructure.security.shamir_engine import (
 class ECDHPublicKeyBundle:
     """Ephemeral X25519 public key advertised by a bank node for one FL round.
 
-    Signed with a per-bank HMAC derived from the node's mTLS identity to
-    prevent Sybil key injection.
+    Signed with an institutional Ed25519 key or HMAC bound to the exact round transcript
+    (job_id, consortium_id, session_id, round_id, roster) to prevent key substitution,
+    replay, reflection, and cross-session attacks.
     """
 
     bank_id: str
     round_id: int
     public_key_bytes: bytes  # 32-byte raw X25519 public key
-    hmac_signature: bytes  # HMAC-SHA256(identity_secret, bank_id || round_id || pk)
+    hmac_signature: bytes  # Signature bytes (HMAC-SHA256 or Ed25519)
+    job_id: str = ""
+    consortium_id: str = ""
+    session_id: str = ""
+    roster: tuple[str, ...] = ()
+    auth_scheme: str = "hmac"  # "hmac" or "ed25519"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize bundle to JSON/IPC-safe dictionary."""
+        return {
+            "bank_id": self.bank_id,
+            "round_id": self.round_id,
+            "public_key_bytes": self.public_key_bytes.hex(),
+            "hmac_signature": self.hmac_signature.hex(),
+            "job_id": self.job_id,
+            "consortium_id": self.consortium_id,
+            "session_id": self.session_id,
+            "roster": list(self.roster),
+            "auth_scheme": self.auth_scheme,
+        }
+
+    @classmethod
+    def from_dict(cls, d: Mapping[str, Any]) -> ECDHPublicKeyBundle:
+        """Reconstruct bundle from dictionary."""
+        raw_pk = d["public_key_bytes"]
+        pk_bytes = bytes.fromhex(raw_pk) if isinstance(raw_pk, str) else bytes(raw_pk)
+        raw_sig = d["hmac_signature"]
+        sig_bytes = bytes.fromhex(raw_sig) if isinstance(raw_sig, str) else bytes(raw_sig)
+        return cls(
+            bank_id=str(d["bank_id"]),
+            round_id=int(d["round_id"]),
+            public_key_bytes=pk_bytes,
+            hmac_signature=sig_bytes,
+            job_id=str(d.get("job_id", "")),
+            consortium_id=str(d.get("consortium_id", "")),
+            session_id=str(d.get("session_id", "")),
+            roster=tuple(str(r) for r in d.get("roster", ())),
+            auth_scheme=str(d.get("auth_scheme", "hmac")),
+        )
 
 
 @dataclass(frozen=True)
@@ -85,83 +211,250 @@ class P2PSecAggDriver:
     """
 
     _MASK_MODULUS: int = 2**32
+    _DEFAULT_MODULUS_64: int = 2**64
 
-    def __init__(self, bank_id: str, identity_secret: bytes | None = None) -> None:
-        """
-        Args:
+    def __init__(
+        self,
+        bank_id: str,
+        identity_secret: bytes | None = None,
+        institutional_private_key: ed25519.Ed25519PrivateKey | None = None,
+        institutional_public_key: ed25519.Ed25519PublicKey | None = None,
+        institutional_identity_hex: str | None = None,
+        app_env: str = "production",
+        require_authentic_identity: bool = False,
+        modulus: int = 2**64,
+    ) -> None:
+        """Args:
             bank_id: Unique institution identifier (e.g., "bank_alpha").
-            identity_secret: 32-byte symmetric secret shared out-of-band
-                during bank onboarding, used to authenticate public key bundles.
-                If None, a deterministic test secret is derived from bank_id.
+            identity_secret: 32-byte symmetric secret shared out-of-band.
+            institutional_private_key: Optional Ed25519 institutional private key.
+            institutional_public_key: Optional Ed25519 institutional public key.
+            institutional_identity_hex: Hex-encoded Ed25519 private key seed.
+            app_env: Operating environment ("production", "development", "testing").
+            require_authentic_identity: If True, strictly forbids test fallback secrets.
+            modulus: Integer arithmetic modulus (2**64 or 2**32).
         """
-        self.bank_id = bank_id
-        self._identity_secret: bytes = (
-            identity_secret or hashlib.sha256(f"identity:{bank_id}".encode()).digest()
-        )
+        self.bank_id = bank_id.strip().upper() if bank_id.startswith("BANK_") else bank_id
+        self.app_env = app_env.strip().lower()
+        self.modulus = modulus
+
+        if institutional_identity_hex is not None and institutional_private_key is None:
+            institutional_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+                bytes.fromhex(institutional_identity_hex)
+            )
+
+        if require_authentic_identity and identity_secret is None and institutional_private_key is None:
+            raise ValueError(
+                f"SecAgg driver for bank [{self.bank_id}] cannot execute without authentic institutional "
+                "key material. Deterministic test identity secret fallback is strictly prohibited (SECRETS-PROD-01)."
+            )
+
+        if institutional_private_key is not None:
+            self._institutional_private_key: ed25519.Ed25519PrivateKey | None = institutional_private_key
+            self._institutional_public_key: ed25519.Ed25519PublicKey | None = (
+                institutional_public_key or institutional_private_key.public_key()
+            )
+            self._identity_secret: bytes = b""
+            self._auth_scheme: str = "ed25519"
+        elif identity_secret is not None:
+            self._identity_secret = identity_secret
+            self._institutional_private_key = None
+            self._institutional_public_key = None
+            self._auth_scheme = "hmac"
+        else:
+            # Standalone test/verification fallback only
+            self._identity_secret = hashlib.sha256(f"identity:{bank_id}".encode()).digest()
+            self._institutional_private_key = None
+            self._institutional_public_key = None
+            self._auth_scheme = "hmac"
 
         # Per-round ephemeral state (reset on each new round)
         self._private_key: X25519PrivateKey | None = None
         self._public_key_bytes: bytes | None = None
         self._round_id: int | None = None
+        self._job_id: str = ""
+        self._consortium_id: str = ""
+        self._session_id: str = ""
+        self._roster: tuple[str, ...] = ()
         self._self_mask_seed: bytes | None = None
+        self._received_peer_bundles: dict[str, ECDHPublicKeyBundle] = {}
 
     # ------------------------------------------------------------------
     # Phase 1: Ephemeral Keypair Generation
     # ------------------------------------------------------------------
 
-    def generate_round_keypair(self, round_id: int) -> ECDHPublicKeyBundle:
+    def generate_round_keypair(
+        self,
+        round_id: int,
+        job_id: str = "",
+        consortium_id: str = "",
+        session_id: str = "",
+        roster: Sequence[str] = (),
+    ) -> ECDHPublicKeyBundle:
         """Generate a fresh X25519 keypair and self-mask seed for an FL round.
 
         Args:
             round_id: Monotonically increasing FL round counter.
+            job_id: Unique federated training job identifier.
+            consortium_id: Target consortium identifier.
+            session_id: Session identifier.
+            roster: Participating bank institution identifiers.
 
         Returns:
-            Authenticated ECDHPublicKeyBundle signed with the node's identity secret.
+            Authenticated ECDHPublicKeyBundle bound to the round transcript.
         """
         self._round_id = round_id
+        self._job_id = job_id
+        self._consortium_id = consortium_id
+        self._session_id = session_id
+        self._roster = tuple(sorted(r.strip().upper() for r in roster if r))
         self._private_key = X25519PrivateKey.generate()
         self._public_key_bytes = self._private_key.public_key().public_bytes_raw()
         self._self_mask_seed = os.urandom(32)
+        self._received_peer_bundles.clear()
 
-        signature = self._sign_bundle(
-            self.bank_id,
-            round_id,
-            self._public_key_bytes,
+        msg = canonical_bundle_message(
+            bank_id=self.bank_id,
+            round_id=round_id,
+            public_key_bytes=self._public_key_bytes,
+            job_id=job_id,
+            consortium_id=consortium_id,
+            session_id=session_id,
+            roster=self._roster,
         )
+
+        if self._auth_scheme == "ed25519":
+            assert self._institutional_private_key is not None
+            signature = self._institutional_private_key.sign(msg)
+        else:
+            signature = hmac.new(self._identity_secret, msg, hashlib.sha256).digest()
 
         return ECDHPublicKeyBundle(
             bank_id=self.bank_id,
             round_id=round_id,
             public_key_bytes=self._public_key_bytes,
             hmac_signature=signature,
+            job_id=job_id,
+            consortium_id=consortium_id,
+            session_id=session_id,
+            roster=self._roster,
+            auth_scheme=self._auth_scheme,
         )
 
     # ------------------------------------------------------------------
-    # Phase 2: Peer Bundle Verification
+    # Phase 2: Peer Bundle Verification & Ingestion
     # ------------------------------------------------------------------
+
+    def receive_peer_bundle(
+        self,
+        peer_bundle: ECDHPublicKeyBundle,
+        peer_institutional_public_key: str | bytes | ed25519.Ed25519PublicKey | None = None,
+        peer_identity_secret: bytes | None = None,
+    ) -> None:
+        """Verify and record an authentic peer bundle for the active round.
+
+        Raises:
+            SecAggSecurityError: If bundle verification fails or transcript parameters mismatch.
+        """
+        if self._round_id is None:
+            raise RuntimeError("generate_round_keypair() must be called first.")
+
+        if peer_bundle.bank_id == self.bank_id:
+            return
+
+        if self._roster and peer_bundle.bank_id not in self._roster:
+            raise SecAggSecurityError(
+                f"Peer [{peer_bundle.bank_id}] is not in authorized roster: {self._roster}"
+            )
+
+        pub_key_arg: bytes | ed25519.Ed25519PublicKey | None = None
+        if isinstance(peer_institutional_public_key, str):
+            pub_key_arg = bytes.fromhex(peer_institutional_public_key)
+        else:
+            pub_key_arg = peer_institutional_public_key
+
+        is_valid = self.verify_peer_bundle(
+            bundle=peer_bundle,
+            peer_identity_secret=peer_identity_secret,
+            peer_public_key=pub_key_arg,
+            expected_job_id=self._job_id,
+            expected_consortium_id=self._consortium_id,
+            expected_session_id=self._session_id,
+            expected_roster=self._roster,
+            expected_round_id=self._round_id,
+        )
+        if not is_valid:
+            raise SecAggSecurityError(
+                f"Rejected forged, tampered, or mismatched bundle from peer [{peer_bundle.bank_id}]."
+            )
+        self._received_peer_bundles[peer_bundle.bank_id] = peer_bundle
 
     @staticmethod
     def verify_peer_bundle(
         bundle: ECDHPublicKeyBundle,
-        peer_identity_secret: bytes,
+        peer_identity_secret: bytes | None = None,
+        peer_public_key: ed25519.Ed25519PublicKey | bytes | None = None,
+        expected_job_id: str = "",
+        expected_consortium_id: str = "",
+        expected_session_id: str = "",
+        expected_roster: Sequence[str] = (),
+        expected_round_id: int | None = None,
     ) -> bool:
-        """Verify that a received ECDHPublicKeyBundle is authentically signed.
+        """Verify that a received ECDHPublicKeyBundle is authentically signed and transcript-matched.
 
         Args:
             bundle: Received bundle from a peer node.
-            peer_identity_secret: The verifying node's copy of the peer's
-                out-of-band identity secret (distributed during onboarding).
+            peer_identity_secret: Symmetric HMAC secret if HMAC is used.
+            peer_public_key: Institutional Ed25519 public key if Ed25519 is used.
+            expected_job_id: Expected job identifier.
+            expected_consortium_id: Expected consortium identifier.
+            expected_session_id: Expected session identifier.
+            expected_roster: Expected roster of participant institutions.
+            expected_round_id: Expected round counter.
 
         Returns:
-            True if the HMAC signature is valid; False otherwise.
+            True if signature and transcript parameters are valid; False otherwise.
         """
-        expected = P2PSecAggDriver._sign_bundle_static(
-            peer_identity_secret,
-            bundle.bank_id,
-            bundle.round_id,
-            bundle.public_key_bytes,
+        if expected_round_id is not None and bundle.round_id != expected_round_id:
+            return False
+        if expected_job_id and bundle.job_id != expected_job_id:
+            return False
+        if expected_consortium_id and bundle.consortium_id != expected_consortium_id:
+            return False
+        if expected_session_id and bundle.session_id != expected_session_id:
+            return False
+        if expected_roster:
+            clean_exp_roster = tuple(sorted(r.strip().upper() for r in expected_roster if r))
+            if bundle.roster != clean_exp_roster:
+                return False
+
+        msg = canonical_bundle_message(
+            bank_id=bundle.bank_id,
+            round_id=bundle.round_id,
+            public_key_bytes=bundle.public_key_bytes,
+            job_id=bundle.job_id,
+            consortium_id=bundle.consortium_id,
+            session_id=bundle.session_id,
+            roster=bundle.roster,
         )
-        return hmac.compare_digest(expected, bundle.hmac_signature)
+
+        if bundle.auth_scheme == "ed25519" or peer_public_key is not None:
+            if peer_public_key is None:
+                return False
+            try:
+                if isinstance(peer_public_key, bytes):
+                    pub = ed25519.Ed25519PublicKey.from_public_bytes(peer_public_key)
+                else:
+                    pub = peer_public_key
+                pub.verify(bundle.hmac_signature, msg)
+                return True
+            except (InvalidSignature, Exception):
+                return False
+        else:
+            if peer_identity_secret is None:
+                return False
+            expected = hmac.new(peer_identity_secret, msg, hashlib.sha256).digest()
+            return hmac.compare_digest(expected, bundle.hmac_signature)
 
     # ------------------------------------------------------------------
     # Phase 3: Pairwise HKDF Seed Derivation
@@ -173,19 +466,9 @@ class P2PSecAggDriver:
     ) -> bytes:
         """Execute X25519 ECDH and derive a 32-byte HKDF seed with the peer.
 
-        The HKDF info string encodes the round_id and both participant IDs in
-        lexicographic order, making the seed unique per (round, pair) and
+        The HKDF salt and info strings encode transcript variables and participant IDs
+        in lexicographical order, making the seed unique per (round, session, pair) and
         preventing cross-round replay.
-
-        Args:
-            peer_bundle: Authenticated ECDHPublicKeyBundle from the peer.
-
-        Returns:
-            32-byte deterministic seed, identical on both sides of the exchange.
-
-        Raises:
-            RuntimeError: If called before generate_round_keypair().
-            ValueError: If round_id mismatch is detected.
         """
         if self._private_key is None or self._round_id is None:
             raise RuntimeError("generate_round_keypair() must be called first.")
@@ -199,14 +482,18 @@ class P2PSecAggDriver:
         peer_public_key = X25519PublicKey.from_public_bytes(peer_bundle.public_key_bytes)
         shared_secret = self._private_key.exchange(peer_public_key)
 
-        # Canonical pair ordering: sort IDs so both sides produce identical info
         pair = sorted([self.bank_id, peer_bundle.bank_id])
-        info = f"secagg:r{self._round_id}:{pair[0]}:{pair[1]}".encode()
+        if peer_bundle.job_id or peer_bundle.session_id:
+            salt = f"cfi:secagg:job:{peer_bundle.job_id}:r{self._round_id}:s:{peer_bundle.session_id}".encode()
+            info = f"secagg:c:{peer_bundle.consortium_id}:r{self._round_id}:{pair[0]}:{pair[1]}".encode()
+        else:
+            salt = f"cfi:secagg:round:{self._round_id}".encode()
+            info = f"secagg:r{self._round_id}:{pair[0]}:{pair[1]}".encode()
 
         hkdf = HKDF(
             algorithm=hashes.SHA256(),
             length=32,
-            salt=f"cfi:secagg:round:{self._round_id}".encode(),
+            salt=salt,
             info=info,
         )
         return hkdf.derive(shared_secret)
@@ -216,85 +503,121 @@ class P2PSecAggDriver:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def expand_mask(seed: bytes, dimension: int) -> list[int]:
+    def expand_mask(seed: bytes, dimension: int, modulus: int = 2**32) -> list[int]:
         """Expand a 32-byte HKDF seed into a pseudo-random integer mask vector.
 
-        Uses HMAC-SHA256 in counter mode (PRNG). Each 4-byte block of the
-        output is interpreted as a little-endian unsigned 32-bit integer,
-        matching the modular arithmetic in the zero-sum cancellation proof.
-
-        Args:
-            seed: 32-byte HKDF-derived seed.
-            dimension: Number of parameters d to mask.
-
-        Returns:
-            List of d integers in Z_{2^32}.
+        Uses HMAC-SHA256 in counter mode (PRNG).
+        If modulus > 2**32 (e.g. 2**64), unpacks 8-byte little-endian uint64 (<Q).
+        If modulus <= 2**32 (e.g. 2**32), unpacks 4-byte little-endian uint32 (<I).
         """
         mask: list[int] = []
         counter = 0
+        is_64 = modulus > 2**32
+        step = 8 if is_64 else 4
+        fmt = "<Q" if is_64 else "<I"
+
         while len(mask) < dimension:
             block = hmac.new(
                 seed,
                 struct.pack(">I", counter),
                 hashlib.sha256,
             ).digest()
-            # Each SHA-256 output gives 8 x 4-byte integers
-            for i in range(0, len(block), 4):
+            for i in range(0, len(block), step):
                 if len(mask) >= dimension:
                     break
-                mask.append(struct.unpack_from("<I", block, i)[0])
+                val = struct.unpack_from(fmt, block, i)[0]
+                mask.append(val % modulus)
             counter += 1
         return mask
 
     # ------------------------------------------------------------------
-    # Phase 5: Masked Weight Vector Assembly
+    # Phase 5: Masked Weight Vector Assembly (Standard Uniform & Weighted)
     # ------------------------------------------------------------------
 
     def compute_masked_vector(
         self,
         weights: list[float],
-        peer_bundles: list[ECDHPublicKeyBundle],
+        peer_bundles: list[ECDHPublicKeyBundle] | None = None,
         quantization_scale: float = 1e6,
         use_self_mask: bool = False,
     ) -> list[int]:
-        """Produce the masked weight vector y_u for coordinator submission.
+        """Produce the masked weight vector y_u for coordinator submission (uniform averaging).
 
         Quantizes float weights to 32-bit integers, then applies pairwise
         masks following the zero-sum additive protocol:
 
-            y_u = w_u + Σ_{v > u} s_{u,v}  -  %_{v < u} s_{v,u}  (mod 2^32)
-
-        Optionally adds self-mask PRG(b_u) when Shamir threshold secret sharing is enabled.
+            y_u = w_u + Σ_{v > u} s_{u,v}  -  Σ_{v < u} s_{v,u}  (mod 2^32)
         """
         if not weights:
             raise ValueError("weights must be non-empty.")
 
+        bundles = peer_bundles if peer_bundles is not None else list(self._received_peer_bundles.values())
         d = len(weights)
+        modulus = self._MASK_MODULUS
 
         # Quantize: float → int via fixed-point scaling
-        quantized: list[int] = [round(w * quantization_scale) % self._MASK_MODULUS for w in weights]
-        masked = list(quantized)  # copy to apply masks in-place
+        quantized: list[int] = [round(w * quantization_scale) % modulus for w in weights]
+        masked = list(quantized)
 
-        for bundle in peer_bundles:
+        for bundle in bundles:
             seed = self.derive_pairwise_seed(bundle)
-            mask = self.expand_mask(seed, d)
+            mask = self.expand_mask(seed, d, modulus=modulus)
 
             if self.bank_id < bundle.bank_id:
-                # We are u < v: add the mask
                 for i in range(d):
-                    masked[i] = (masked[i] + mask[i]) % self._MASK_MODULUS
+                    masked[i] = (masked[i] + mask[i]) % modulus
             else:
-                # We are u > v: subtract the mask
                 for i in range(d):
-                    masked[i] = (masked[i] - mask[i]) % self._MASK_MODULUS
+                    masked[i] = (masked[i] - mask[i]) % modulus
 
-        # Apply self-mask seed b_u if enabled and present
         if use_self_mask and self._self_mask_seed is not None:
-            self_mask = self.expand_mask(self._self_mask_seed, d)
+            self_mask = self.expand_mask(self._self_mask_seed, d, modulus=modulus)
             for i in range(d):
-                masked[i] = (masked[i] + self_mask[i]) % self._MASK_MODULUS
+                masked[i] = (masked[i] + self_mask[i]) % modulus
 
         return masked
+
+    def compute_weighted_masked_vector(
+        self,
+        weights: list[float],
+        sample_count: int,
+        peer_bundles: list[ECDHPublicKeyBundle] | None = None,
+        quantization_scale: float = 1e7,
+        modulus: int = 2**64,
+    ) -> list[int]:
+        """Produce bank-local weighted masked vector y_u for weighted FedAvg:
+
+            v_u = n_u * w_u
+            q_u = round(v_u * S)  (mod 2^64)
+            y_u = q_u + Σ_{v > u} s_{u,v} - Σ_{v < u} s_{v,u}  (mod 2^64)
+        """
+        if not weights:
+            raise ValueError("weights must be non-empty.")
+        if sample_count <= 0:
+            raise ValueError("sample_count must be positive.")
+
+        bundles = peer_bundles if peer_bundles is not None else list(self._received_peer_bundles.values())
+        if not bundles:
+            raise ValueError("No peer bundles provided or received for masked vector calculation.")
+
+        arr_w = np.asarray(weights, dtype=np.float64)
+        if not np.all(np.isfinite(arr_w)):
+            raise ValueError("weights vector contains non-finite values (NaN or Inf).")
+
+        d = len(weights)
+
+        # Scale by sample_count and quantization_scale
+        scaled_weighted = arr_w * (float(sample_count) * float(quantization_scale))
+        quantized = np.round(scaled_weighted).astype(np.int64).astype(np.uint64)
+        masked = np.array(quantized, copy=True)
+
+        for bundle in bundles:
+            seed = self.derive_pairwise_seed(bundle)
+            mask = np.asarray(self.expand_mask(seed, d, modulus=modulus), dtype=np.uint64)
+
+            masked = masked + mask if self.bank_id < bundle.bank_id else masked - mask
+
+        return masked.tolist()
 
     # ------------------------------------------------------------------
     # Shamir (t, n) Secret Sharing & Share Split
@@ -360,6 +683,60 @@ class P2PSecAggDriver:
             result.append((signed / quantization_scale) / n)
 
         return result
+
+    @classmethod
+    def aggregate_weighted_masked_vectors(
+        cls,
+        masked_vectors: dict[str, list[int]],
+        sample_counts: dict[str, int],
+        quantization_scale: float = 1e7,
+        modulus: int = 2**64,
+    ) -> list[float]:
+        """Coordinator unmasked weighted aggregation (sample-weighted FedAvg).
+
+        Reconstructs global model weights:
+            w_global = Σ_k (n_k * w_k) / Σ_k n_k
+
+        Computes coordinate-wise sum mod 2^64 (masks cancel identically with zero-sum),
+        interprets signed two's complement integer, and dequantizes by (quantization_scale * total_samples).
+        """
+        if not masked_vectors:
+            raise ValueError("masked_vectors must be non-empty.")
+        if len(masked_vectors) < 2:
+            raise ValueError("SecAgg requires at least 2 participants for zero-sum cancellation.")
+
+        bank_ids = sorted(masked_vectors.keys())
+        if set(bank_ids) != set(sample_counts.keys()):
+            raise ValueError("sample_counts keys must match masked_vectors keys.")
+
+        total_samples = sum(sample_counts.values())
+        if total_samples <= 0:
+            raise ValueError("Total sample count must be positive.")
+
+        d = len(masked_vectors[bank_ids[0]])
+        for b_id in bank_ids:
+            if len(masked_vectors[b_id]) != d:
+                raise ValueError(
+                    f"Dimension mismatch in masked vector for bank {b_id}: "
+                    f"expected {d}, got {len(masked_vectors[b_id])}"
+                )
+
+        # Coordinate-wise modular accumulation in uint64
+        coord_sum = np.zeros(d, dtype=np.uint64)
+        for b_id in bank_ids:
+            coord_sum = coord_sum + np.asarray(masked_vectors[b_id], dtype=np.uint64)
+
+        # Two's complement signed integer
+        signed_sum = coord_sum.astype(np.int64)
+
+        # Dequantize: signed_sum / (quantization_scale * total_samples)
+        denominator = float(quantization_scale) * float(total_samples)
+        result_arr = signed_sum.astype(np.float64) / denominator
+
+        if not np.all(np.isfinite(result_arr)):
+            raise ValueError("Reconstructed weights contain non-finite values.")
+
+        return result_arr.tolist()
 
     @classmethod
     def reconstruct_aggregate_with_dropouts(

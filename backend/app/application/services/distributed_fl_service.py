@@ -73,6 +73,14 @@ from app.infrastructure.database.training_authority_backends import (
     ModelEvaluationEvent,
     PostgresTrainingJobAuthority,
 )
+from app.infrastructure.security.p2p_secagg_driver import (
+    ECDHPublicKeyBundle,
+    P2PSecAggDriver,
+    SecAggSecurityError,
+    derive_institutional_identity_hex,
+    deserialize_masked_vector,
+    serialize_masked_vector,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1999,6 +2007,8 @@ class IsolatedCoordinatorClient:
         pause_aggregation_checkpoint_file: str | None = None,
         consortium_id: str | None = None,
         dp_config: Mapping[str, Any] | None = None,
+        secagg_enabled: bool = False,
+        secagg_config: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         req = {
             "command": "EXECUTE_FEDERATION",
@@ -2023,6 +2033,8 @@ class IsolatedCoordinatorClient:
             "has_worker_endpoints": bool(worker_endpoints),
             "consortium_id": consortium_id,
             "dp_config": dp_config,
+            "secagg_enabled": secagg_enabled,
+            "secagg_config": secagg_config,
         }
         try:
             self._conn.send(req)
@@ -2388,6 +2400,8 @@ def _run_isolated_coordinator_worker(
                     pause_aggregation_checkpoint_file=req.get("pause_aggregation_checkpoint_file"),
                     consortium_id=req.get("consortium_id"),
                     dp_config=req.get("dp_config"),
+                    secagg_enabled=bool(req.get("secagg_enabled", False)),
+                    secagg_config=req.get("secagg_config"),
                 )
 
                 if "worker_pids" in req:
@@ -2589,6 +2603,8 @@ def run_production_federation(
     app_env: str = "production",
     consortium_id: str | None = None,
     dp_config: Mapping[str, Any] | None = None,
+    secagg_enabled: bool = False,
+    secagg_config: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Canonical production entry point executing distributed federation under the mandatory restricted coordinator boundary."""
     proc, client = spawn_isolated_coordinator_process(app_env=app_env)
@@ -2610,6 +2626,8 @@ def run_production_federation(
             worker_pids=worker_pids,
             consortium_id=consortium_id,
             dp_config=dp_config,
+            secagg_enabled=secagg_enabled,
+            secagg_config=secagg_config,
         )
     finally:
         client.terminate()
@@ -3721,9 +3739,11 @@ def spawn_bank_workers(
                     pid=pid, proc_handle=hProc, conn=conn, bank_id=b_id
                 )
                 processes[b_id] = proc_proxy
+                _, pub_hex = derive_institutional_identity_hex(b_id, bank_tokens[b_id])
                 endpoints[b_id] = {
                     "inbox": IsolatedWorkerInboxProxy(conn),
                     "outbox": IsolatedWorkerOutboxProxy(conn),
+                    "institutional_public_key": pub_hex,
                 }
             except Exception:
                 listener.close()
@@ -3761,7 +3781,12 @@ def spawn_bank_workers(
             proc.daemon = True
             proc.start()
             processes[b_id] = proc
-            endpoints[b_id] = {"inbox": in_q, "outbox": out_q}
+            _, pub_hex = derive_institutional_identity_hex(b_id, bank_tokens[b_id])
+            endpoints[b_id] = {
+                "inbox": in_q,
+                "outbox": out_q,
+                "institutional_public_key": pub_hex,
+            }
     return processes, endpoints
 
 
@@ -3861,6 +3886,7 @@ def run_bank_worker_node(
             )
 
         dp_sessions: dict[str, dict[str, Any]] = {}
+        secagg_worker_sessions: dict[str, dict[str, Any]] = {}
 
         try:
             while True:
@@ -4458,6 +4484,421 @@ def run_bank_worker_node(
                     if is_dp_enabled:
                         session[f"attempt_{attempt_id}"] = success_payload
                     outbox.put(success_payload)
+                    continue
+
+                if msg.get("command") == "SECAGG_SETUP":
+                    job_id = str(msg["job_id"]).strip()
+                    consortium_id = str(msg.get("consortium_id") or "cfi-consortium").strip().lower()
+                    session_id = str(msg["session_id"]).strip()
+                    round_number = int(msg["round_number"])
+                    roster = [str(r).strip().upper() for r in msg.get("roster", []) if r]
+                    peer_identities = dict(msg.get("peer_identities") or msg.get("institutional_public_keys") or {})
+                    secagg_config = dict(msg.get("secagg_config") or {})
+
+                    clean_bank = bank_id.strip().upper()
+                    if clean_bank not in roster:
+                        err_msg = f"Bank worker [{bank_id}] received SecAgg setup but is not in authorized roster: {roster}"
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    if len(roster) < 2:
+                        err_msg = f"Bank worker [{bank_id}] rejected SecAgg setup: insufficient participants in roster ({len(roster)} < 2)."
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    try:
+                        priv_hex, pub_hex = derive_institutional_identity_hex(clean_bank, worker_token)
+                    except Exception as k_err:
+                        err_msg = f"Failed to derive institutional keypair for bank [{bank_id}]: {k_err}"
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    expected_self_pub = peer_identities.get(clean_bank) or peer_identities.get(bank_id)
+                    if expected_self_pub and expected_self_pub != pub_hex:
+                        err_msg = (
+                            f"Institutional identity mismatch for bank [{bank_id}]: "
+                            f"derived '{pub_hex}' != roster registration '{expected_self_pub}'."
+                        )
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    # Verify that all roster participants have registered institutional identities
+                    missing_roster_keys = [r for r in roster if r not in peer_identities]
+                    if missing_roster_keys:
+                        err_msg = f"Bank worker [{bank_id}] rejected SecAgg setup: missing institutional keys for peers {missing_roster_keys}."
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    modulus = int(secagg_config.get("modulus", 2**64))
+                    is_prod_env = app_env.lower() == "production"
+
+                    try:
+                        driver = P2PSecAggDriver(
+                            bank_id=clean_bank,
+                            institutional_identity_hex=priv_hex,
+                            app_env=app_env,
+                            require_authentic_identity=is_prod_env,
+                            modulus=modulus,
+                        )
+                        bundle = driver.generate_round_keypair(
+                            round_id=round_number,
+                            job_id=job_id,
+                            consortium_id=consortium_id,
+                            session_id=session_id,
+                            roster=roster,
+                        )
+                    except Exception as init_err:
+                        err_msg = f"Bank worker [{bank_id}] failed SecAgg driver initialization: {init_err}"
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    secagg_worker_sessions[session_id] = {
+                        "driver": driver,
+                        "job_id": job_id,
+                        "consortium_id": consortium_id,
+                        "session_id": session_id,
+                        "round_number": round_number,
+                        "roster": roster,
+                        "peer_identities": peer_identities,
+                        "secagg_config": secagg_config,
+                    }
+
+                    bundle_dict = bundle.to_dict()
+                    outbox.put({
+                        "status": "SUCCESS",
+                        "bank_id": bank_id,
+                        "pid": pid,
+                        "session_id": session_id,
+                        "bundle": bundle_dict,
+                        "public_bundle": bundle_dict,
+                    })
+                    continue
+                    continue
+
+                if msg.get("command") == "SECAGG_TRAIN_AND_MASK":
+                    job_id = msg["job_id"]
+                    round_number = msg["round_number"]
+                    session_id = msg["session_id"]
+                    peer_bundles_raw = dict(msg.get("peer_bundles") or {})
+                    global_weights_obj = msg.get("global_weights")
+                    attempt_id = str(msg.get("attempt_id") or f"att_{job_id}_r{round_number}_{uuid.uuid4().hex[:8]}")
+
+                    sess = secagg_worker_sessions.get(session_id)
+                    if sess is None:
+                        err_msg = f"Bank worker [{bank_id}] received SECAGG_TRAIN_AND_MASK for unknown session '{session_id}'"
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    driver = sess["driver"]
+                    roster = sess["roster"]
+                    peer_identities = sess["peer_identities"]
+                    secagg_config = sess["secagg_config"]
+
+                    # 1. Ingest and verify all required peer bundles
+                    bundle_verification_failed = False
+                    for p_id in roster:
+                        clean_p = p_id.strip().upper()
+                        if clean_p == bank_id.strip().upper():
+                            continue
+                        if clean_p not in peer_bundles_raw:
+                            err_msg = f"Bank worker [{bank_id}] missing peer bundle for required participant [{clean_p}]."
+                            logger.error(err_msg)
+                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                            bundle_verification_failed = True
+                            break
+
+                        raw_bundle_dict = peer_bundles_raw[clean_p]
+                        try:
+                            bundle_obj = ECDHPublicKeyBundle.from_dict(raw_bundle_dict)
+                            peer_pub_hex = peer_identities.get(clean_p)
+                            driver.receive_peer_bundle(bundle_obj, peer_institutional_public_key=peer_pub_hex)
+                        except (SecAggSecurityError, Exception) as bv_err:
+                            err_msg = f"Bank worker [{bank_id}] rejected peer bundle from [{clean_p}]: {bv_err}"
+                            logger.error(err_msg)
+                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                            bundle_verification_failed = True
+                            break
+
+                    if bundle_verification_failed:
+                        continue
+
+                    # 2. Local Training (Opacus DP-SGD or non-DP standard training)
+                    if round_number == 1:
+                        try:
+                            authority_source.start_training_job(
+                                job_id=job_id,
+                                worker_id=bank_id,
+                                worker_token=worker_token,
+                            )
+                        except Exception as start_err:
+                            logger.error("Bank worker [%s] failed to start training job %s: %s", bank_id, job_id, start_err)
+                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": str(start_err), "pid": pid})
+                            continue
+
+                    sched = authority_source.get_scheduled_job(job_id)
+                    dp_config = sched.dp_config if sched and sched.dp_config else None
+                    is_dp_enabled = bool(dp_config and dp_config.get("dp_enabled", False))
+
+                    local_model = model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+                    if global_weights_obj is not None:
+                        model_service.set_parameters(local_model, global_weights_obj)
+
+                    dp_info = None
+                    if is_dp_enabled:
+                        assert dp_config is not None
+                        target_epsilon = float(dp_config["target_epsilon"])
+                        target_delta = float(dp_config["target_delta"])
+                        max_grad_norm = float(dp_config.get("max_grad_norm", 1.0))
+                        noise_multiplier = (
+                            float(dp_config["noise_multiplier"])
+                            if "noise_multiplier" in dp_config and dp_config["noise_multiplier"] is not None
+                            else None
+                        )
+                        raw_dataset_tag = str(dp_config.get("dataset_tag", "primary_vault")).strip()
+                        is_prod = app_env.lower() == "production"
+                        try:
+                            auth_dataset_tag = authority_source.resolve_authoritative_dataset_identity(
+                                bank_id=bank_id,
+                                dataset_tag=raw_dataset_tag,
+                                is_prod=is_prod,
+                            )
+                        except Exception as tag_err:
+                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": f"Unauthorized dataset: {tag_err}", "pid": pid})
+                            continue
+
+                        if vault_handle is not None:
+                            vault_tag = vault_handle.get_authoritative_dataset_identity()
+                            if is_prod and auth_dataset_tag != vault_tag:
+                                try:
+                                    resolved_vault = authority_source.resolve_authoritative_dataset_identity(
+                                        bank_id=bank_id,
+                                        dataset_tag=vault_tag,
+                                        is_prod=True,
+                                    )
+                                    if resolved_vault != auth_dataset_tag:
+                                        raise TrainingProvenanceSecurityError(
+                                            f"Unauthorized dataset substitution: requested resolves to '{auth_dataset_tag}', vault is '{resolved_vault}'."
+                                        )
+                                except Exception as subst_err:
+                                    outbox.put({"status": "ERROR", "bank_id": bank_id, "error": str(subst_err), "pid": pid})
+                                    continue
+
+                        accountant_type = str(
+                            dp_config.get("accountant_type")
+                            or dp_config.get("accountant")
+                            or "prv"
+                        ).strip().lower().replace("opacus_", "")
+                        require_secure_rng = bool(dp_config.get("require_secure_rng", False))
+                        batch_size = int(dp_config.get("batch_size", 32))
+                        learning_rate = float(dp_config.get("learning_rate", 0.01))
+                        expected_rounds = sched.expected_rounds if sched else 1
+
+                        session = dp_sessions.setdefault(job_id, {"privacy_engine": None, "steps_executed": 0})
+                        existing_engine = session.get("privacy_engine")
+
+                        budget_record = authority_source.get_institutional_privacy_budget(
+                            bank_id, auth_dataset_tag, token=worker_token
+                        )
+                        if budget_record is None:
+                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": "Privacy budget missing", "pid": pid})
+                            continue
+
+                        history_job_eps = 0.0
+                        history_job_del = 0.0
+                        prior_steps = 0
+                        if budget_record.history:
+                            for entry in budget_record.history:
+                                if isinstance(entry, dict) and entry.get("job_id") == job_id and entry.get("status") == "COMMITTED":
+                                    history_job_eps = max(history_job_eps, float(entry.get("spent_epsilon", 0.0)))
+                                    history_job_del = max(history_job_del, float(entry.get("spent_delta", 0.0)))
+                                    prior_steps += int(entry.get("steps_executed", 0))
+
+                        prior_job_spent_eps = max(history_job_eps, float(session.get("last_committed_eps", 0.0)))
+                        prior_job_spent_del = max(history_job_del, float(session.get("last_committed_del", 0.0)))
+                        needed_eps = max(0.001, target_epsilon - prior_job_spent_eps)
+                        needed_del = max(0.0, target_delta - prior_job_spent_del)
+
+                        if budget_record.remaining_epsilon < (needed_eps - 1e-9):
+                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": "Privacy budget exhausted", "pid": pid})
+                            continue
+
+                        params_digest_dict = {
+                            "bank_id": bank_id,
+                            "dataset_tag": auth_dataset_tag,
+                            "job_id": job_id,
+                            "round_number": round_number,
+                            "target_epsilon": target_epsilon,
+                            "target_delta": target_delta,
+                            "max_grad_norm": max_grad_norm,
+                            "batch_size": batch_size,
+                            "learning_rate": learning_rate,
+                            "accountant_type": accountant_type,
+                        }
+                        params_digest = hashlib.sha256(
+                            json.dumps(params_digest_dict, sort_keys=True).encode("utf-8")
+                        ).hexdigest()
+
+                        try:
+                            admission = authority_source.admit_training_attempt(
+                                bank_id=bank_id,
+                                dataset_tag=auth_dataset_tag,
+                                job_id=job_id,
+                                round_number=round_number,
+                                attempt_id=attempt_id,
+                                parameters_digest=params_digest,
+                                requested_epsilon=needed_eps,
+                                requested_delta=needed_del,
+                                worker_token=worker_token,
+                            )
+                        except TrainingProvenanceSecurityError as pse:
+                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": str(pse), "pid": pid})
+                            continue
+
+                        if admission.status != "ADMITTED":
+                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": f"Attempt rejected: {admission.reason}", "pid": pid})
+                            continue
+
+                        steps_per_epoch = math.ceil(len(X_train) / max(1, batch_size))
+                        total_job_steps = max(1, expected_rounds * steps_per_epoch)
+
+                        try:
+                            local_model, loss_history, actual_epsilon = (
+                                model_service.train_local_with_opacus(
+                                    model=local_model,
+                                    X_train=X_train,
+                                    y_train=y_train,
+                                    epochs=1,
+                                    batch_size=batch_size,
+                                    learning_rate=learning_rate,
+                                    target_epsilon=target_epsilon,
+                                    target_delta=target_delta,
+                                    max_grad_norm=max_grad_norm,
+                                    noise_multiplier=noise_multiplier,
+                                    total_steps=total_job_steps,
+                                    accountant_type=accountant_type,
+                                    require_secure_rng=require_secure_rng,
+                                    privacy_engine=existing_engine,
+                                    prior_steps=prior_steps if existing_engine is None else 0,
+                                )
+                            )
+                            session["privacy_engine"] = getattr(local_model, "_privacy_engine", None)
+                            session["steps_executed"] += steps_per_epoch
+                            dp_info = getattr(local_model, "dp_provenance", {})
+                        except Exception as dp_err:
+                            logger.error("Bank worker [%s] Opacus DP-SGD failed: %s", bank_id, dp_err)
+                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": f"Opacus DP-SGD failed: {dp_err}", "pid": pid})
+                            continue
+
+                        spent_eps = float(dp_info.get("epsilon", needed_eps)) if dp_info else needed_eps
+                        spent_del = float(dp_info.get("delta", target_delta)) if dp_info else target_delta
+                        authority_source.commit_institutional_privacy_expenditure(
+                            bank_id=bank_id,
+                            dataset_tag=auth_dataset_tag,
+                            job_id=job_id,
+                            round_number=round_number,
+                            spent_epsilon=spent_eps,
+                            spent_delta=spent_del,
+                            steps_executed=steps_per_epoch,
+                            worker_token=worker_token,
+                            attempt_id=attempt_id,
+                        )
+                        session["last_committed_eps"] = spent_eps
+                        session["last_committed_del"] = spent_del
+                    else:
+                        local_model, loss_history, _ = model_service.train_local(
+                            model=local_model,
+                            X_train=X_train,
+                            y_train=y_train,
+                            epochs=1,
+                            learning_rate=0.01,
+                            batch_size=32,
+                        )
+
+                    local_weights = model_service.get_parameters(local_model)
+                    sample_count = len(X_train)
+
+                    if not loss_history:
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": "No loss history produced", "pid": pid})
+                        continue
+
+                    if is_dp_enabled:
+                        observed_loss = None
+                        obs_metrics = {
+                            "dp_epsilon": float(dp_info.get("epsilon", 0.0)) if dp_info else 0.0,
+                            "dp_delta": float(dp_info.get("delta", 0.0)) if dp_info else 0.0,
+                            "dp_noise_multiplier": float(dp_info.get("noise_multiplier", 0.0)) if dp_info else 0.0,
+                        }
+                    else:
+                        observed_loss = float(loss_history[-1])
+                        obs_metrics = {"loss": observed_loss}
+
+                    # 3. Bank-Local Construction of Masked Update
+                    modulus = int(secagg_config.get("modulus", 2**64))
+                    scale = float(secagg_config.get("quantization_scale", 1e7))
+                    try:
+                        masked_vec = driver.compute_weighted_masked_vector(
+                            weights=list(local_weights.flat_weights),
+                            sample_count=sample_count,
+                            quantization_scale=scale,
+                            modulus=modulus,
+                        )
+                        raw_bytes = serialize_masked_vector(masked_vec)
+                        masked_digest = hashlib.sha256(raw_bytes).hexdigest()
+                    except Exception as mask_err:
+                        err_msg = f"Bank worker [{bank_id}] failed to construct masked update: {mask_err}"
+                        logger.error(err_msg)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        continue
+
+                    if fail_observation:
+                        logger.warning("Bank worker [%s] simulated observation persistence failure for round %d", bank_id, round_number)
+                        outbox.put({"status": "OBSERVATION_FAILED", "bank_id": bank_id, "round_number": round_number, "pid": pid})
+                        continue
+
+                    # 4. Record round observation in PostgreSQL authority with masked digest
+                    try:
+                        obs = authority_source.record_round_observation(
+                            job_id=job_id,
+                            round_number=round_number,
+                            sample_count=sample_count,
+                            actual_executed_epochs=1,
+                            observed_loss=observed_loss,
+                            metrics=obs_metrics,
+                            worker_token=worker_token,
+                            bank_id=bank_id,
+                            model_update_digest=masked_digest,
+                            execution_status="COMPLETED",
+                        )
+                        logger.info("Bank worker [%s] persisted SecAgg observation event %s for round %d", bank_id, obs.event_id, round_number)
+                    except Exception as obs_err:
+                        logger.error("Bank worker [%s] failed to record SecAgg observation: %s", bank_id, obs_err)
+                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": str(obs_err), "pid": pid})
+                        continue
+
+                    # Transmit masked payload ONLY (zero plaintext weights!)
+                    success_payload = {
+                        "status": "SUCCESS",
+                        "bank_id": bank_id,
+                        "pid": pid,
+                        "round_number": round_number,
+                        "masked_vector_bytes": raw_bytes,
+                        "masked_digest": masked_digest,
+                        "sample_count": sample_count,
+                        "executed_epochs": 1,
+                    }
+                    if not is_dp_enabled and observed_loss is not None:
+                        success_payload["loss"] = observed_loss
+                    if dp_info is not None:
+                        success_payload["dp_provenance"] = dp_info
+                    outbox.put(success_payload)
+                    continue
         finally:
             if vault_handle is not None:
                 vault_handle.release_exclusive_os_boundary()
@@ -4553,6 +4994,8 @@ class DistributedFederatedTrainingManager:
         model_registry: ModelRegistry | None = None,
         consortium_id: str | None = None,
         dp_config: Mapping[str, Any] | None = None,
+        secagg_enabled: bool = False,
+        secagg_config: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute complete distributed E2E federated training lifecycle across independent processes.
 
@@ -4677,6 +5120,8 @@ class DistributedFederatedTrainingManager:
         aggregated_model_digest = ""
         final_model_bytes: bytes = b""
 
+        secagg_session_provenance: dict[str, Any] = {"enabled": secagg_enabled, "rounds": {}}
+
         try:
             for round_num in range(1, num_rounds + 1):
                 logger.info("--- Starting Federated Global Round %d ---", round_num)
@@ -4690,116 +5135,312 @@ class DistributedFederatedTrainingManager:
                     spawned_procs["BANK_B"].terminate()
                     spawned_procs["BANK_B"].join()
 
-                # Dispatch training task to all active workers
-                for b_id, in_q in inboxes.items():
-                    if b_id in spawned_procs and not spawned_procs[b_id].is_alive():
-                        continue
-                    in_q.put(
-                        {
-                            "command": "TRAIN_ROUND",
-                            "job_id": job_id,
-                            "round_number": round_num,
-                            "global_weights": global_weights,
-                            "dp_config": dp_config,
-                        }
-                    )
+                if secagg_enabled:
+                    # Secure Aggregation Multi-Phase Protocol
+                    session_id = f"secagg_{job_id}_{round_num}_{uuid.uuid4().hex[:12]}"
+                    inst_keys = {
+                        b: endpoints[b].get("institutional_public_key", "") for b in banks
+                    }
 
-                # Collect responses
-                accepted_participant_ids: list[str] = []
-                accepted_local_update_digests: list[str] = []
-                client_weights_list: list[ModelWeights] = []
-                client_samples_list: list[int] = []
+                    # Phase A & B: Round initialization, roster agreement, ephemeral keypair generation
+                    setup_payload = {
+                        "command": "SECAGG_SETUP",
+                        "job_id": job_id,
+                        "round_number": round_num,
+                        "session_id": session_id,
+                        "consortium_id": consortium_id,
+                        "roster": list(banks),
+                        "institutional_public_keys": inst_keys,
+                        "peer_identities": inst_keys,
+                        "secagg_config": secagg_config or {},
+                    }
+                    for b_id, in_q in inboxes.items():
+                        if b_id in spawned_procs and not spawned_procs[b_id].is_alive():
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} setup aborted: Bank worker [{b_id}] is dead / crashed."
+                            )
+                        try:
+                            in_q.put(setup_payload)
+                        except Exception as e:
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} setup aborted: Cannot communicate with Bank worker [{b_id}]: {e}"
+                            )
 
-                for b_id, out_q in outboxes.items():
-                    if b_id in spawned_procs and not spawned_procs[b_id].is_alive():
-                        logger.warning("Bank worker [%s] is dead / crashed.", b_id)
-                        continue
+                    peer_bundles_dict: dict[str, dict[str, Any]] = {}
+                    for b_id, out_q in outboxes.items():
+                        if b_id in spawned_procs and not spawned_procs[b_id].is_alive():
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} setup aborted: Bank worker [{b_id}] is dead / crashed."
+                            )
+                        try:
+                            res = out_q.get(timeout=60)
+                        except Exception as e:
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} setup timeout waiting for Bank [{b_id}]: {e}"
+                            )
+                        if res.get("status") != "SUCCESS":
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} setup failed for Bank [{b_id}]: {res.get('error')}"
+                            )
+                        worker_pids[b_id] = res.get("pid", worker_pids.get(b_id, 0))
+                        bundle_dict = res.get("bundle") or res.get("public_bundle")
+                        if not bundle_dict:
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} setup failed: Missing public key bundle from [{b_id}]."
+                            )
+                        peer_bundles_dict[b_id] = bundle_dict
 
-                    # Wait for worker response with timeout
-                    try:
-                        res = out_q.get(timeout=60)
-                    except Exception:
-                        logger.warning("Timeout waiting for response from Bank worker [%s]", b_id)
-                        continue
-
-                    if res.get("status") != "SUCCESS":
-                        logger.warning("Worker [%s] failed round execution: %s", b_id, res)
-                        continue
-
-                    worker_pids[b_id] = res["pid"]
-                    local_w = res["weights"]
-                    w_digest = res["update_digest"]
-                    s_count = res["sample_count"]
-                    if "dp_provenance" in res:
-                        latest_dp_provenance[b_id] = res["dp_provenance"]
-
-                    # Coordinator verifies update digest against received weight bytes
-                    calculated_digest = hashlib.sha256(
-                        _serialize_weights_to_bytes(local_w)
-                    ).hexdigest()
-                    if calculated_digest != w_digest:
+                    missing_setup = set(banks) - set(peer_bundles_dict.keys())
+                    if missing_setup:
                         raise TrainingProvenanceSecurityError(
-                            f"Coordinator detected tampered update digest from {b_id}: {w_digest} != {calculated_digest}"
+                            f"SecAgg round {round_num} setup aborted: Missing participant bundles from {sorted(missing_setup)}."
                         )
 
-                    accepted_participant_ids.append(b_id)
-                    accepted_local_update_digests.append(w_digest)
-                    client_weights_list.append(local_w)
-                    client_samples_list.append(s_count)
-
-                missing_participants = set(banks) - set(accepted_participant_ids)
-                if missing_participants:
-                    raise TrainingProvenanceSecurityError(
-                        f"Round {round_num} aborted: Required participant(s) {sorted(missing_participants)} failed to contribute valid observations."
-                    )
-                if not accepted_participant_ids:
-                    raise TrainingProvenanceSecurityError(
-                        f"Round {round_num} aborted: No valid worker contributions received."
-                    )
-
-                # Execute genuine FedAvg aggregation using production FederatedLearningEngine
-                global_weights = self.fl_engine.aggregate_parameters(
-                    client_weights=client_weights_list,
-                    client_samples=client_samples_list,
-                    method=AggregationMethod.FED_AVG_WEIGHTED,
-                    global_weights=global_weights,
-                )
-                self.model_service.set_parameters(global_model, global_weights)
-
-                # Derive exact serialized model artifact bytes and its SHA-256 digest
-                final_model_bytes = _serialize_model_state_dict(global_model)
-                aggregated_model_digest = hashlib.sha256(final_model_bytes).hexdigest()
-
-                if pause_aggregation_checkpoint_file:
-                    try:
-                        with open(pause_aggregation_checkpoint_file, "w", encoding="utf-8") as _pf:
-                            _pf.write(
-                                f"AGGREGATION_EXECUTED_ROUND_{round_num}:{aggregated_model_digest}\n"
+                    # Phase C, D, E, F: Relay peer bundles, execute bank-local training & masked update construction
+                    scale = float((secagg_config or {}).get("quantization_scale", 1e7))
+                    train_mask_payload = {
+                        "command": "SECAGG_TRAIN_AND_MASK",
+                        "job_id": job_id,
+                        "round_number": round_num,
+                        "session_id": session_id,
+                        "global_weights": global_weights,
+                        "dp_config": dp_config,
+                        "peer_bundles": peer_bundles_dict,
+                        "quantization_scale": scale,
+                    }
+                    for b_id, in_q in inboxes.items():
+                        if b_id in spawned_procs and not spawned_procs[b_id].is_alive():
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} training aborted: Bank worker [{b_id}] is dead / crashed."
                             )
-                            _pf.flush()
-                            os.fsync(_pf.fileno())
-                    except Exception as _e:
-                        logger.warning("Failed writing aggregation checkpoint file: %s", _e)
-                    _release_file = f"{pause_aggregation_checkpoint_file}.release"
-                    _wait_start = time.time()
-                    while not os.path.exists(_release_file) and (time.time() - _wait_start < 30.0):
-                        time.sleep(0.05)
+                        try:
+                            in_q.put(train_mask_payload)
+                        except Exception as e:
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} training aborted: Cannot communicate with Bank worker [{b_id}]: {e}"
+                            )
 
-                # Record global aggregation event in PostgreSQL authority
-                self.authority_source.record_global_aggregation(
-                    job_id=job_id,
-                    round_number=round_num,
-                    aggregation_algorithm="fed_avg_weighted",
-                    accepted_participant_ids=accepted_participant_ids,
-                    accepted_local_update_digests=accepted_local_update_digests,
-                    aggregated_global_model_digest=aggregated_model_digest,
-                    coordinator_token=self.coordinator_token,
-                )
-                logger.info(
-                    "Persisted GlobalAggregationEvent for round %d: digest=%s",
-                    round_num,
-                    aggregated_model_digest,
-                )
+                    accepted_participant_ids: list[str] = []
+                    accepted_local_update_digests: list[str] = []
+                    masked_vectors_map: dict[str, list[int]] = {}
+                    sample_counts_map: dict[str, int] = {}
+
+                    for b_id, out_q in outboxes.items():
+                        if b_id in spawned_procs and not spawned_procs[b_id].is_alive():
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} training aborted: Bank worker [{b_id}] died."
+                            )
+                        try:
+                            res = out_q.get(timeout=120)
+                        except Exception as e:
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} timeout waiting for masked vector from [{b_id}]: {e}"
+                            )
+                        if res.get("status") != "SUCCESS":
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} training/masking failed for [{b_id}]: {res.get('error')}"
+                            )
+
+                        # Coordinator invariant: MUST NEVER receive individual plaintext bank weights
+                        if "weights" in res:
+                            raise TrainingProvenanceSecurityError(
+                                f"Critical SecAgg security violation: Plaintext weights received from [{b_id}]."
+                            )
+
+                        raw_bytes = res.get("masked_vector_bytes")
+                        masked_digest = res.get("masked_digest")
+                        sample_count = res.get("sample_count")
+                        worker_pids[b_id] = res.get("pid", worker_pids.get(b_id, 0))
+
+                        if not raw_bytes or not masked_digest or sample_count is None:
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} invalid payload from [{b_id}]: Missing masked vector or digest."
+                            )
+
+                        calc_digest = hashlib.sha256(raw_bytes).hexdigest()
+                        if calc_digest != masked_digest:
+                            raise TrainingProvenanceSecurityError(
+                                f"SecAgg round {round_num} payload digest mismatch for [{b_id}]: {calc_digest} != {masked_digest}"
+                            )
+
+                        if "dp_provenance" in res:
+                            latest_dp_provenance[b_id] = res["dp_provenance"]
+
+                        masked_vec = deserialize_masked_vector(raw_bytes)
+                        masked_vectors_map[b_id] = masked_vec
+                        sample_counts_map[b_id] = sample_count
+                        accepted_participant_ids.append(b_id)
+                        accepted_local_update_digests.append(masked_digest)
+
+                    missing_participants = set(banks) - set(accepted_participant_ids)
+                    if missing_participants:
+                        raise TrainingProvenanceSecurityError(
+                            f"SecAgg round {round_num} aborted: Required participant(s) {sorted(missing_participants)} failed to contribute valid masked updates."
+                        )
+
+                    # Phase G: Reconstruct weighted global model without learning individual weights
+                    modulus = int((secagg_config or {}).get("modulus", 2**64))
+                    reconstructed_flat = P2PSecAggDriver.aggregate_weighted_masked_vectors(
+                        masked_vectors=masked_vectors_map,
+                        sample_counts=sample_counts_map,
+                        quantization_scale=scale,
+                        modulus=modulus,
+                    )
+                    global_weights = ModelWeights(
+                        layer_shapes=global_weights.layer_shapes,
+                        flat_weights=reconstructed_flat,
+                    )
+                    self.model_service.set_parameters(global_model, global_weights)
+
+                    final_model_bytes = _serialize_model_state_dict(global_model)
+                    aggregated_model_digest = hashlib.sha256(final_model_bytes).hexdigest()
+
+                    if pause_aggregation_checkpoint_file:
+                        try:
+                            with open(pause_aggregation_checkpoint_file, "w", encoding="utf-8") as _pf:
+                                _pf.write(
+                                    f"AGGREGATION_EXECUTED_ROUND_{round_num}:{aggregated_model_digest}\n"
+                                )
+                                _pf.flush()
+                                os.fsync(_pf.fileno())
+                        except Exception as _e:
+                            logger.warning("Failed writing aggregation checkpoint file: %s", _e)
+                        _release_file = f"{pause_aggregation_checkpoint_file}.release"
+                        _wait_start = time.time()
+                        while not os.path.exists(_release_file) and (time.time() - _wait_start < 30.0):
+                            time.sleep(0.05)
+
+                    self.authority_source.record_global_aggregation(
+                        job_id=job_id,
+                        round_number=round_num,
+                        aggregation_algorithm="secagg_fed_avg_weighted",
+                        accepted_participant_ids=accepted_participant_ids,
+                        accepted_local_update_digests=accepted_local_update_digests,
+                        aggregated_global_model_digest=aggregated_model_digest,
+                        coordinator_token=self.coordinator_token,
+                    )
+                    secagg_session_provenance["rounds"][round_num] = {
+                        "session_id": session_id,
+                        "participants": accepted_participant_ids,
+                        "masked_digests": accepted_local_update_digests,
+                        "aggregated_digest": aggregated_model_digest,
+                    }
+                    logger.info(
+                        "Persisted SecAgg GlobalAggregationEvent for round %d: digest=%s",
+                        round_num,
+                        aggregated_model_digest,
+                    )
+                else:
+                    # Dispatch training task to all active workers
+                    for b_id, in_q in inboxes.items():
+                        if b_id in spawned_procs and not spawned_procs[b_id].is_alive():
+                            continue
+                        in_q.put(
+                            {
+                                "command": "TRAIN_ROUND",
+                                "job_id": job_id,
+                                "round_number": round_num,
+                                "global_weights": global_weights,
+                                "dp_config": dp_config,
+                            }
+                        )
+
+                    # Collect responses
+                    accepted_participant_ids = []
+                    accepted_local_update_digests = []
+                    client_weights_list: list[ModelWeights] = []
+                    client_samples_list: list[int] = []
+
+                    for b_id, out_q in outboxes.items():
+                        if b_id in spawned_procs and not spawned_procs[b_id].is_alive():
+                            logger.warning("Bank worker [%s] is dead / crashed.", b_id)
+                            continue
+
+                        # Wait for worker response with timeout
+                        try:
+                            res = out_q.get(timeout=60)
+                        except Exception:
+                            logger.warning("Timeout waiting for response from Bank worker [%s]", b_id)
+                            continue
+
+                        if res.get("status") != "SUCCESS":
+                            logger.warning("Worker [%s] failed round execution: %s", b_id, res)
+                            continue
+
+                        worker_pids[b_id] = res["pid"]
+                        local_w = res["weights"]
+                        w_digest = res["update_digest"]
+                        s_count = res["sample_count"]
+                        if "dp_provenance" in res:
+                            latest_dp_provenance[b_id] = res["dp_provenance"]
+
+                        # Coordinator verifies update digest against received weight bytes
+                        calculated_digest = hashlib.sha256(
+                            _serialize_weights_to_bytes(local_w)
+                        ).hexdigest()
+                        if calculated_digest != w_digest:
+                            raise TrainingProvenanceSecurityError(
+                                f"Coordinator detected tampered update digest from {b_id}: {w_digest} != {calculated_digest}"
+                            )
+
+                        accepted_participant_ids.append(b_id)
+                        accepted_local_update_digests.append(w_digest)
+                        client_weights_list.append(local_w)
+                        client_samples_list.append(s_count)
+
+                    missing_participants = set(banks) - set(accepted_participant_ids)
+                    if missing_participants:
+                        raise TrainingProvenanceSecurityError(
+                            f"Round {round_num} aborted: Required participant(s) {sorted(missing_participants)} failed to contribute valid observations."
+                        )
+                    if not accepted_participant_ids:
+                        raise TrainingProvenanceSecurityError(
+                            f"Round {round_num} aborted: No valid worker contributions received."
+                        )
+
+                    # Execute genuine FedAvg aggregation using production FederatedLearningEngine
+                    global_weights = self.fl_engine.aggregate_parameters(
+                        client_weights=client_weights_list,
+                        client_samples=client_samples_list,
+                        method=AggregationMethod.FED_AVG_WEIGHTED,
+                        global_weights=global_weights,
+                    )
+                    self.model_service.set_parameters(global_model, global_weights)
+
+                    # Derive exact serialized model artifact bytes and its SHA-256 digest
+                    final_model_bytes = _serialize_model_state_dict(global_model)
+                    aggregated_model_digest = hashlib.sha256(final_model_bytes).hexdigest()
+
+                    if pause_aggregation_checkpoint_file:
+                        try:
+                            with open(pause_aggregation_checkpoint_file, "w", encoding="utf-8") as _pf:
+                                _pf.write(
+                                    f"AGGREGATION_EXECUTED_ROUND_{round_num}:{aggregated_model_digest}\n"
+                                )
+                                _pf.flush()
+                                os.fsync(_pf.fileno())
+                        except Exception as _e:
+                            logger.warning("Failed writing aggregation checkpoint file: %s", _e)
+                        _release_file = f"{pause_aggregation_checkpoint_file}.release"
+                        _wait_start = time.time()
+                        while not os.path.exists(_release_file) and (time.time() - _wait_start < 30.0):
+                            time.sleep(0.05)
+
+                    # Record global aggregation event in PostgreSQL authority
+                    self.authority_source.record_global_aggregation(
+                        job_id=job_id,
+                        round_number=round_num,
+                        aggregation_algorithm="fed_avg_weighted",
+                        accepted_participant_ids=accepted_participant_ids,
+                        accepted_local_update_digests=accepted_local_update_digests,
+                        aggregated_global_model_digest=aggregated_model_digest,
+                        coordinator_token=self.coordinator_token,
+                    )
+                    logger.info(
+                        "Persisted GlobalAggregationEvent for round %d: digest=%s",
+                        round_num,
+                        aggregated_model_digest,
+                    )
 
             # 4. Perform Genuine Model Evaluation on holdout dataset
             X_val, y_val = holdout_val_data
@@ -4915,12 +5556,34 @@ class DistributedFederatedTrainingManager:
 
             # 7. Issue Ed25519 Receipt in RECEIPT ISSUER DOMAIN
             if signing_authority is not None:
-                receipt = signing_authority.sign_completed_job_receipt(
-                    job_id=job_id,
-                    artifact_bytes=final_model_bytes,
-                    caller_identity="COORDINATOR",
-                    caller_token=self.coordinator_token,
-                )
+                if hasattr(signing_authority, "sign_completed_job_receipt"):
+                    receipt = signing_authority.sign_completed_job_receipt(
+                        job_id=job_id,
+                        artifact_bytes=final_model_bytes,
+                        caller_identity="COORDINATOR",
+                        caller_token=self.coordinator_token,
+                    )
+                else:
+                    evidence = TrainingExecutionEvidence(
+                        training_run_id=training_run_id,
+                        job_id=job_id,
+                        simulation_id=simulation_id,
+                        completed_at=completed_record.completed_at,
+                        status="COMPLETED",
+                        executed_rounds=num_rounds,
+                        executed_epochs=num_rounds,
+                        sample_count=unique_samples,
+                        observed_metrics=dict(completed_record.observed_metrics),
+                        artifact_sha256=final_artifact_sha256,
+                        architecture="FraudDetectionNN",
+                        feature_schema_version="v1.0",
+                        feature_names=list(FEATURE_NAMES),
+                        producer_id="FEDERATED_COORDINATOR",
+                        consortium_id=consortium_id,
+                    )
+                    receipt = signing_authority.issue_receipt(
+                        evidence=evidence, model_bytes=final_model_bytes
+                    )
             else:
                 if is_prod:
                     raise TrainingProvenanceSecurityError(
@@ -5021,6 +5684,8 @@ class DistributedFederatedTrainingManager:
                 "consortium_id": consortium_id,
                 "dp_enabled": bool(dp_config.get("dp_enabled", False)) if dp_config else False,
                 "dp_provenance": latest_dp_provenance,
+                "secagg_enabled": secagg_enabled,
+                "secagg_provenance": secagg_session_provenance if secagg_enabled else None,
             }
 
         finally:
