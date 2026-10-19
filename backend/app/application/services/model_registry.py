@@ -2159,7 +2159,7 @@ class ModelRegistry:
                 # If a receipt was provided but failed verification (tampered bytes or revoked key),
                 # the candidate is unverified and cannot collide with or reconcile verified registrations.
                 # Such invalid submissions must be recorded as unverified without triggering conflict errors.
-                is_invalid_receipt_submission = bool(target_rcpt is not None and not has_valid_receipt)
+                is_invalid_receipt_submission = target_rcpt is not None and not has_valid_receipt
 
                 for m_entry in manifest:
                     entry_sha256 = m_entry.get("sha256")
