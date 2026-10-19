@@ -5855,7 +5855,7 @@ class DistributedFederatedTrainingManager:
             actual_executed_algo = sorted_aggs[-1].aggregation_algorithm.strip()
 
             # Verify final aggregation digest matches the authoritative completed artifact SHA-256
-            final_agg_digest = str(sorted_aggs[-1].aggregated_global_model_digest).strip().lower()
+            final_agg_digest = sorted_aggs[-1].aggregated_global_model_digest.strip().lower()
             if final_agg_digest != expected_digest:
                 raise TrainingProvenanceSecurityError(
                     f"Final global aggregation digest mismatch for job '{job_id}': "
