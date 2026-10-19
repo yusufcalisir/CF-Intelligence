@@ -21,7 +21,7 @@ import hashlib
 import os
 import shutil
 import tempfile
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pytest
@@ -426,7 +426,10 @@ class TestOperationalByzantineIntegration:
     ) -> None:
         """Requirement G: SecAgg + any requested non-linear Byzantine defense fails closed through both API schema and service entry points."""
         # 1. API Schema level
-        for defense in ["coordinate_wise_median", "krum", "trimmed_mean", "bulyan"]:
+        non_linear_defenses: list[
+            Literal["coordinate_wise_median", "krum", "trimmed_mean", "bulyan"]
+        ] = ["coordinate_wise_median", "krum", "trimmed_mean", "bulyan"]
+        for defense in non_linear_defenses:
             with pytest.raises(ValidationError, match="mathematically incompatible"):
                 OperationalFederationRequest(
                     participating_banks=["BANK_A", "BANK_B", "BANK_C"],
