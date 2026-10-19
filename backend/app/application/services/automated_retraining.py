@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import math
 import threading
+import types
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -254,58 +255,110 @@ class DriftTriggeredRetrainingService:
                 participating_banks=participating_banks or ["BANK_A", "BANK_B", "BANK_C"],
                 consortium_id=consortium_id,
             )
-            if not isinstance(fed_result, dict) or fed_result.get("status") != "COMPLETED":
+            if not isinstance(fed_result, dict):
                 with self._lock:
                     record.status = "FAILED"
                     record.details["operational_result"] = fed_result
                 raise RuntimeError(
-                    f"Operational federation failed for retraining job '{job_id}': {fed_result}"
+                    f"Operational federation failed for retraining job '{job_id}': result must be a dict, got {type(fed_result)}."
                 )
 
-            saved_version = fed_result.get("saved_version", {})
-            candidate_version_num = (
-                saved_version.get("version")
-                if isinstance(saved_version, dict)
-                else getattr(saved_version, "version", None)
-            )
-            candidate_version = (
-                f"v{candidate_version_num}"
-                if candidate_version_num is not None
-                else (
-                    fed_result.get("candidate_model_version")
-                    or f"model_v{candidate_version_num}"
+            # Invariant 1: status == "COMPLETED"
+            if fed_result.get("status") != "COMPLETED":
+                with self._lock:
+                    record.status = "FAILED"
+                    record.details["operational_result"] = fed_result
+                raise RuntimeError(
+                    f"Operational federation failed for retraining job '{job_id}': status is not COMPLETED ({fed_result.get('status')})."
                 )
-            )
 
+            # Invariant 2: is_verified == True
+            if fed_result.get("is_verified") is not True:
+                with self._lock:
+                    record.status = "FAILED"
+                    record.details["operational_result"] = fed_result
+                raise RuntimeError(
+                    f"Operational federation failed for retraining job '{job_id}': execution evidence is unverified (is_verified is not True)."
+                )
+
+            # Invariant 3: real, valid candidate model version
+            saved_version = fed_result.get("saved_version")
+            candidate_version_str: str | None = None
+            if isinstance(saved_version, dict) and saved_version.get("version") is not None:
+                candidate_version_str = f"v{saved_version['version']}"
+            elif fed_result.get("candidate_model_version"):
+                candidate_version_str = str(fed_result["candidate_model_version"]).strip()
+            elif isinstance(saved_version, dict) and saved_version.get("filename"):
+                candidate_version_str = str(saved_version["filename"]).strip()
+
+            if (
+                not candidate_version_str
+                or candidate_version_str in ("None", "vNone", "model_vNone", "")
+                or "None" in candidate_version_str
+            ):
+                with self._lock:
+                    record.status = "FAILED"
+                    record.details["operational_result"] = fed_result
+                raise RuntimeError(
+                    f"Operational federation for retraining job '{job_id}' did not produce a valid candidate model version: {candidate_version_str!r}."
+                )
+
+            # Invariant 4: verified execution metrics (non-empty dict with finite numeric metrics)
             completed_rec = fed_result.get("completed_record")
-            observed_metrics = (
+            raw_metrics = (
                 getattr(completed_rec, "observed_metrics", None)
                 or fed_result.get("evaluation_metrics")
                 or fed_result.get("metrics")
-                or {}
             )
+            if not isinstance(raw_metrics, (dict, types.MappingProxyType)) or not raw_metrics:
+                with self._lock:
+                    record.status = "FAILED"
+                    record.details["operational_result"] = fed_result
+                raise RuntimeError(
+                    f"Operational federation for retraining job '{job_id}' missing verified execution metrics."
+                )
+
+            observed_metrics: dict[str, float] = {}
+            for k, v in raw_metrics.items():
+                if isinstance(v, (int, float)) and math.isfinite(v):
+                    observed_metrics[str(k)] = float(v)
+            if not observed_metrics:
+                with self._lock:
+                    record.status = "FAILED"
+                    record.details["operational_result"] = fed_result
+                raise RuntimeError(
+                    f"Operational federation for retraining job '{job_id}' produced no finite numeric metrics: {raw_metrics}."
+                )
+
+            # Invariant 5: no automatic champion promotion
+            is_promoted = fed_result.get("is_promoted_champion", False)
+            if is_promoted is True:
+                with self._lock:
+                    record.status = "FAILED"
+                    record.details["operational_result"] = fed_result
+                raise RuntimeError(
+                    f"Operational federation for retraining job '{job_id}' violated Four-Eyes governance: automated retraining cannot automatically promote candidate to champion."
+                )
 
             with self._lock:
                 record.status = "COMPLETED"
-                record.candidate_model_version = str(candidate_version)
+                record.candidate_model_version = candidate_version_str
                 record.details["metrics"] = dict(observed_metrics)
                 record.details["saved_version"] = saved_version
-                record.details["is_promoted_champion"] = fed_result.get(
-                    "is_promoted_champion", False
-                )
+                record.details["is_promoted_champion"] = False
 
             logger.info(
                 "Retraining job %s completed via OperationalFederationService. Candidate model: %s",
                 job_id,
-                candidate_version,
+                candidate_version_str,
             )
             return {
                 "job_id": job_id,
                 "status": "COMPLETED",
-                "candidate_model_version": str(candidate_version),
+                "candidate_model_version": candidate_version_str,
                 "metrics": dict(observed_metrics),
                 "evaluation_metrics": dict(observed_metrics),
-                "is_promoted_champion": fed_result.get("is_promoted_champion", False),
+                "is_promoted_champion": False,
             }
         except Exception as exc:
             with self._lock:

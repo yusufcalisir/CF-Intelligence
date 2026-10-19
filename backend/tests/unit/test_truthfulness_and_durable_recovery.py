@@ -21,6 +21,7 @@ import os
 import shutil
 import tempfile
 import uuid
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -54,6 +55,7 @@ from app.application.services.training_provenance_service import (
     TrainingProvenanceSecurityError,
     get_default_training_issuer,
 )
+from app.infrastructure.database.training_authority_backends import SQLiteTrainingJobAuthority
 
 NUM_FEATURES = len(FEATURE_NAMES)
 
@@ -87,14 +89,16 @@ def test_automated_retraining_cannot_fabricate_success() -> None:
 
 
 def test_automated_retraining_with_authorized_operational_service() -> None:
-    """A2. Retraining succeeds only when an authorized OperationalFederationService executes."""
+    """A2. Retraining succeeds only when an authorized OperationalFederationService executes and produces verified candidate."""
     mock_op = MagicMock()
     mock_op.execute_operational_federation.return_value = {
         "status": "COMPLETED",
+        "is_verified": True,
         "candidate_model_version": "model_v2.0.0",
         "evaluation_metrics": {"pr_auc": 0.895, "roc_auc": 0.920, "f1": 0.835},
         "receipt_id": "rcpt_verified_123",
         "saved_version": {"version": 2, "status": "INACTIVE"},
+        "is_promoted_champion": False,
     }
     service = DriftTriggeredRetrainingService(psi_threshold=0.20, operational_service=mock_op)
     job = service.evaluate_drift_and_trigger(psi_score=0.40)
@@ -104,8 +108,10 @@ def test_automated_retraining_with_authorized_operational_service() -> None:
     assert result["status"] == "COMPLETED"
     assert result["candidate_model_version"] == "v2"
     assert result["evaluation_metrics"]["pr_auc"] == 0.895
+    assert result["is_promoted_champion"] is False
     assert job.status == "COMPLETED"
     assert job.candidate_model_version == "v2"
+
 
 
 # ---------------------------------------------------------------------------
@@ -524,3 +530,878 @@ def test_development_holdout_independence() -> None:
             is_prod=True,
             holdout_data=None,
         )
+
+
+# ---------------------------------------------------------------------------
+# Required Tests A - J for Final Durable Recovery Correctness
+# ---------------------------------------------------------------------------
+
+
+def test_completed_job_retry_after_staging_cleanup_returns_original_candidate() -> None:
+    """A. Successful training followed by second identical request after staging cleanup returns original candidate without duplicate registration."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_req_a_")
+    db_file = f"sqlite:///{os.path.join(temp_dir, 'authority.db')}"
+    registry_dir = os.path.join(temp_dir, "models")
+    staging_dir = os.path.join(registry_dir, ".recovery_staging")
+    os.makedirs(registry_dir, exist_ok=True)
+
+    try:
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_token_req_a",
+            db_url=db_file,
+            app_env="development",
+        )
+
+        rng = np.random.default_rng(101)
+        val_X = rng.normal(size=(20, NUM_FEATURES)).astype(np.float32)
+        val_y = rng.choice([0.0, 1.0], size=20).astype(np.float32)
+        partitions = {
+            "BANK_A": (
+                rng.normal(size=(30, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=30).astype(np.float32),
+            ),
+            "BANK_B": (
+                rng.normal(size=(40, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=40).astype(np.float32),
+            ),
+        }
+
+        job_id = f"job_req_a_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_{job_id}"
+        run_id = f"run_{job_id}"
+
+        # 1. First execution: complete normal training & candidate registration
+        res1 = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A", "BANK_B"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+        )
+        assert res1["status"] == "COMPLETED"
+        assert res1["is_verified"] is True
+        assert res1["recovered_from_registered_candidate"] is False
+
+        # Staging directory must be cleaned up
+        staging_mgr = DurableArtifactStagingManager(staging_dir)
+        assert not staging_mgr.has_staged_artifact(job_id)
+
+        # Candidate is registered in ModelRegistry
+        registry = ModelRegistry(registry_dir)
+        manifest1 = registry._load_manifest(sim_id)
+        assert len(manifest1) == 1
+        assert manifest1[0]["version"] == 1
+
+        # 2. Second execution: retry with same job_id after staging cleanup
+        res2 = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A", "BANK_B"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+        )
+
+        # Must reconcile against the existing registered candidate
+        assert res2["status"] == "COMPLETED"
+        assert res2["is_verified"] is True
+        assert res2["recovered_from_registered_candidate"] is True
+        assert res2["recovered_from_staging"] is False
+        assert res2["saved_version"]["version"] == 1
+        assert res2["final_artifact_sha256"] == res1["final_artifact_sha256"]
+
+        # Crucial: No duplicate version created!
+        manifest2 = registry._load_manifest(sim_id)
+        assert len(manifest2) == 1
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_crash_after_completion_before_receipt_issuance_recovers() -> None:
+    """B. Crash after completion before receipt issuance recovers correctly."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_req_b_")
+    db_file = f"sqlite:///{os.path.join(temp_dir, 'authority.db')}"
+    registry_dir = os.path.join(temp_dir, "models")
+    staging_dir = os.path.join(registry_dir, ".recovery_staging")
+    os.makedirs(registry_dir, exist_ok=True)
+
+    try:
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_token_req_b",
+            db_url=db_file,
+            app_env="development",
+        )
+
+        rng = np.random.default_rng(107)
+        val_X = rng.normal(size=(20, NUM_FEATURES)).astype(np.float32)
+        val_y = rng.choice([0.0, 1.0], size=20).astype(np.float32)
+        partitions = {
+            "BANK_A": (
+                rng.normal(size=(30, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=30).astype(np.float32),
+            ),
+        }
+
+        job_id = f"job_req_b_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_{job_id}"
+        run_id = f"run_{job_id}"
+
+        # 1. Simulate crash after completion before receipt issuance
+        with pytest.raises(RuntimeError, match="Simulated coordinator process crash after completion"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                registry_storage_dir=registry_dir,
+                simulate_crash_after_completion=True,
+            )
+
+        # Staged artifact exists on disk
+        staging_mgr = DurableArtifactStagingManager(staging_dir)
+        assert staging_mgr.has_staged_artifact(job_id)
+
+        # 2. Re-invoking with the same job_id recovers staged artifact, issues receipt, and registers candidate
+        res = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+        )
+
+        assert res["status"] == "COMPLETED"
+        assert res["recovered_from_staging"] is True
+        assert res["is_verified"] is True
+        assert not staging_mgr.has_staged_artifact(job_id)
+
+        registry = ModelRegistry(registry_dir)
+        assert len(registry._load_manifest(sim_id)) == 1
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_crash_after_receipt_before_registry_recovers() -> None:
+    """C. Crash after receipt issuance before candidate registration recovers correctly from staging."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_req_c_")
+    db_file = f"sqlite:///{os.path.join(temp_dir, 'authority.db')}"
+    registry_dir = os.path.join(temp_dir, "models")
+    staging_dir = os.path.join(registry_dir, ".recovery_staging")
+    os.makedirs(registry_dir, exist_ok=True)
+
+    try:
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_token_req_c",
+            db_url=db_file,
+            app_env="development",
+        )
+
+        rng = np.random.default_rng(102)
+        val_X = rng.normal(size=(20, NUM_FEATURES)).astype(np.float32)
+        val_y = rng.choice([0.0, 1.0], size=20).astype(np.float32)
+        partitions = {
+            "BANK_A": (
+                rng.normal(size=(30, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=30).astype(np.float32),
+            ),
+        }
+
+        job_id = f"job_req_c_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_{job_id}"
+        run_id = f"run_{job_id}"
+
+        # 1. Simulate crash after receipt issuance before registry persistence
+        with pytest.raises(RuntimeError, match="Simulated coordinator process crash after receipt issuance"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                registry_storage_dir=registry_dir,
+                simulate_crash_after_receipt=True,
+            )
+
+        # Staged artifact must exist on disk
+        staging_mgr = DurableArtifactStagingManager(staging_dir)
+        assert staging_mgr.has_staged_artifact(job_id)
+
+        # 2. Resume execution on the same job_id
+        res = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+        )
+
+        assert res["status"] == "COMPLETED"
+        assert res["recovered_from_staging"] is True
+        assert res["is_verified"] is True
+        assert not staging_mgr.has_staged_artifact(job_id)
+
+        registry = ModelRegistry(registry_dir)
+        assert len(registry._load_manifest(sim_id)) == 1
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_retry_robust_aggregation_preserves_real_algorithm_and_passes_api() -> None:
+    """D. Retry after a successful robust-aggregation job preserves real algorithm and passes API validation."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_req_d_")
+    db_path = os.path.join(temp_dir, "authority.db")
+    db_file = f"sqlite:///{db_path}"
+    registry_dir = os.path.join(temp_dir, "models")
+    os.makedirs(registry_dir, exist_ok=True)
+
+    try:
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_token_req_d",
+            db_url=db_file,
+            app_env="development",
+        )
+
+        rng = np.random.default_rng(103)
+        val_X = rng.normal(size=(20, NUM_FEATURES)).astype(np.float32)
+        val_y = rng.choice([0.0, 1.0], size=20).astype(np.float32)
+        partitions = {
+            "BANK_A": (
+                rng.normal(size=(30, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=30).astype(np.float32),
+            ),
+            "BANK_B": (
+                rng.normal(size=(40, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=40).astype(np.float32),
+            ),
+            "BANK_C": (
+                rng.normal(size=(35, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=35).astype(np.float32),
+            ),
+        }
+
+        job_id = f"job_req_d_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_{job_id}"
+        run_id = f"run_{job_id}"
+
+        # 1. Run with coordinate_wise_median Byzantine defense (n=3, f=1 satisfies f < n/2)
+        res1 = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+            byzantine_defense="coordinate_wise_median",
+            byzantine_f_max=1,
+        )
+        assert res1["status"] == "COMPLETED"
+        assert res1["executed_aggregation_method"] == "coordinate_wise_median"
+
+        # 2. Retry with identical Byzantine defense
+        res2 = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A", "BANK_B", "BANK_C"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+            byzantine_defense="coordinate_wise_median",
+            byzantine_f_max=1,
+        )
+        assert res2["status"] == "COMPLETED"
+        assert res2["recovered_from_registered_candidate"] is True
+        # Real executed algorithm must be preserved (NOT "recovery_reconciled")
+        assert res2["executed_aggregation_method"] == "coordinate_wise_median"
+        assert res2["requested_aggregation_method"] == "coordinate_wise_median"
+
+        # Verify against operational HTTP router check logic (training.py lines 380-395)
+        req_defense = ("coordinate_wise_median").lower()
+        exec_agg = (res2.get("executed_aggregation_method") or "").lower()
+        assert exec_agg == req_defense, "Retry must not trigger HTTP 500 defense mismatch"
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_secagg_and_dp_retries_preserve_truthful_metadata() -> None:
+    """E. SecAgg and DP retries preserve or truthfully recover authenticated historical execution metadata."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_req_e_")
+    db_path = os.path.join(temp_dir, "authority.db")
+    db_file = f"sqlite:///{db_path}"
+    registry_dir = os.path.join(temp_dir, "models")
+    os.makedirs(registry_dir, exist_ok=True)
+
+    try:
+        # Pre-provision institutional privacy budget in SQLite authority
+        auth = SQLiteTrainingJobAuthority(db_file)
+        auth.provision_institutional_privacy_budget(
+            bank_id="BANK_A",
+            dataset_tag="primary_vault",
+            allocated_epsilon=20.0,
+            allocated_delta=1e-4,
+            aliases=[
+                "BANK_A_dataset",
+                "BANK_A_protected_dataset",
+                "primary_vault",
+                "default_vault",
+                "default",
+                "canonical_fraud_partition",
+            ],
+        )
+
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_token_req_e",
+            db_url=db_file,
+            app_env="development",
+        )
+
+        rng = np.random.default_rng(104)
+        val_X = rng.normal(size=(20, NUM_FEATURES)).astype(np.float32)
+        val_y = rng.choice([0.0, 1.0], size=20).astype(np.float32)
+        partitions = {
+            "BANK_A": (
+                rng.normal(size=(120, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=120).astype(np.float32),
+            ),
+        }
+
+        job_id = f"job_req_e_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_{job_id}"
+        run_id = f"run_{job_id}"
+
+        dp_cfg = {
+            "dp_enabled": True,
+            "target_epsilon": 8.0,
+            "target_delta": 1e-5,
+            "max_grad_norm": 1.0,
+            "dataset_tag": "primary_vault",
+        }
+        res1 = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+            dp_config=dp_cfg,
+        )
+        assert res1["status"] == "COMPLETED"
+        assert res1["dp_enabled"] is True
+
+        # Compatible retry succeeds with authentic DP status
+        res2 = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+            dp_config=dp_cfg,
+        )
+        assert res2["status"] == "COMPLETED"
+        assert res2["dp_enabled"] is True
+        assert res2["recovered_from_registered_candidate"] is True
+
+        # Conflicting DP retry is rejected
+        with pytest.raises(TrainingProvenanceSecurityError, match="Incompatible retry DP configuration"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                registry_storage_dir=registry_dir,
+                dp_config={"dp_enabled": False},
+            )
+
+        # Conflicting SecAgg retry is rejected
+        with pytest.raises(TrainingProvenanceSecurityError, match="Incompatible retry SecAgg configuration"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                registry_storage_dir=registry_dir,
+                dp_config=dp_cfg,
+                secagg_enabled=True,
+            )
+
+        # Now test SecAgg recovery reconciliation with authoritative SecAgg records
+        secagg_job_id = f"job_secagg_e_{uuid.uuid4().hex[:8]}"
+        secagg_sim_id = f"sim_{secagg_job_id}"
+        secagg_run_id = f"run_{secagg_job_id}"
+
+        # Register completed candidate and authoritative records for SecAgg
+        dummy_model = b"secagg_dummy_model_bytes_e"
+        dummy_sha = hashlib.sha256(dummy_model).hexdigest()
+        secagg_evidence = TrainingExecutionEvidence(
+            training_run_id=secagg_run_id,
+            job_id=secagg_job_id,
+            simulation_id=secagg_sim_id,
+            completed_at="2026-10-19T14:00:00Z",
+            status="COMPLETED",
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"roc_auc": 0.88, "loss": 0.38},
+            artifact_sha256=dummy_sha,
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            feature_names=list(FEATURE_NAMES),
+            producer_id="FEDERATED_COORDINATOR",
+            consortium_id="consortium_test",
+        )
+        issuer = get_default_training_issuer()
+        secagg_receipt = issuer.issue_receipt(evidence=secagg_evidence, model_bytes=dummy_model)
+
+        reg = ModelRegistry(registry_dir)
+        reg.save_version(
+            simulation_id=secagg_sim_id,
+            artifact_bytes=dummy_model,
+            metrics={"roc_auc": 0.88, "loss": 0.38},
+            consortium_id="consortium_test",
+            training_receipt=secagg_receipt,
+            training_run_id=secagg_run_id,
+            expected_architecture="FraudDetectionNN",
+            expected_feature_schema_version="v1.0",
+            expected_input_dim=NUM_FEATURES,
+            expected_feature_names=list(FEATURE_NAMES),
+        )
+
+        from app.infrastructure.database.training_authority_backends import (
+            GlobalAggregationEvent,
+            ModelEvaluationEvent,
+            RoundObservation,
+        )
+
+        auth.schedule_job(
+            job_id=secagg_job_id,
+            training_run_id=secagg_run_id,
+            simulation_id=secagg_sim_id,
+            architecture="FraudDetectionNN",
+            feature_schema_version="v1.0",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            permitted_workers=["TRAINING_EXECUTOR"],
+            consortium_id="consortium_test",
+        )
+        auth.start_job(job_id=secagg_job_id, worker_id="TRAINING_EXECUTOR")
+        auth.record_observation(
+            RoundObservation(
+                event_id=f"obs_{uuid.uuid4().hex[:8]}",
+                job_id=secagg_job_id,
+                training_run_id=secagg_run_id,
+                simulation_id=secagg_sim_id,
+                worker_id="TRAINING_EXECUTOR",
+                bank_id="BANK_A",
+                round_number=1,
+                attempt_number=1,
+                actual_sample_count=100,
+                actual_executed_epochs=1,
+                observed_loss=0.38,
+                model_update_digest="digest_a",
+                execution_status="COMPLETED",
+                execution_timestamp=datetime.now(UTC).isoformat(),
+            )
+        )
+        auth.record_global_aggregation(
+            GlobalAggregationEvent(
+                event_id=f"agg_{uuid.uuid4().hex[:8]}",
+                job_id=secagg_job_id,
+                round_number=1,
+                aggregation_algorithm="secagg_fed_avg_weighted",
+                accepted_participant_ids=("BANK_A",),
+                accepted_local_update_digests=("digest_a",),
+                aggregation_configuration={"quantization_scale": 1e7},
+                aggregated_global_model_digest=dummy_sha,
+                timestamp=datetime.now(UTC).isoformat(),
+            )
+        )
+        for m_name, m_val in [("roc_auc", 0.88), ("loss", 0.38)]:
+            auth.record_model_evaluation(
+                ModelEvaluationEvent(
+                    event_id=f"eval_{m_name}_{uuid.uuid4().hex[:8]}",
+                    job_id=secagg_job_id,
+                    evaluation_run_id=f"eval_run_{secagg_job_id}",
+                    metric_name=m_name,
+                    metric_value=m_val,
+                    evaluated_artifact_digest=dummy_sha,
+                    evaluator_identity="EVALUATOR",
+                    evaluation_timestamp=datetime.now(UTC).isoformat(),
+                    evaluation_dataset_manifest="manifest_test",
+                )
+            )
+        auth.complete_job(
+            job_id=secagg_job_id,
+            executed_rounds=1,
+            executed_epochs=1,
+            sample_count=100,
+            observed_metrics={"roc_auc": 0.88, "loss": 0.38},
+            artifact_sha256=dummy_sha,
+            simulation_id=secagg_sim_id,
+            training_run_id=secagg_run_id,
+            consortium_id="consortium_test",
+            enforce_lifecycle=False,
+        )
+
+        # Retry with secagg_enabled=True recovers truthful SecAgg execution method
+        res_sec = manager.execute_distributed_federation(
+            job_id=secagg_job_id,
+            training_run_id=secagg_run_id,
+            simulation_id=secagg_sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A"],
+            num_rounds=1,
+            registry_storage_dir=registry_dir,
+            secagg_enabled=True,
+            consortium_id="consortium_test",
+        )
+        assert res_sec["status"] == "COMPLETED"
+        assert res_sec["secagg_enabled"] is True
+        assert res_sec["executed_aggregation_method"] == "secagg_fed_avg_weighted"
+        assert res_sec["recovered_from_registered_candidate"] is True
+
+        # Retry with secagg_enabled=False fails closed on conflict with executed SecAgg
+        with pytest.raises(TrainingProvenanceSecurityError, match="Incompatible retry SecAgg configuration"):
+            manager.execute_distributed_federation(
+                job_id=secagg_job_id,
+                training_run_id=secagg_run_id,
+                simulation_id=secagg_sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                num_rounds=1,
+                registry_storage_dir=registry_dir,
+                secagg_enabled=False,
+                consortium_id="consortium_test",
+            )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_retry_with_incompatible_parameters_fails_closed() -> None:
+    """F. Same job_id with changed simulation, consortium, rounds, or algorithm is rejected."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_req_f_")
+    db_file = f"sqlite:///{os.path.join(temp_dir, 'authority.db')}"
+    registry_dir = os.path.join(temp_dir, "models")
+    os.makedirs(registry_dir, exist_ok=True)
+
+    try:
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_token_req_f",
+            db_url=db_file,
+            app_env="development",
+        )
+
+        rng = np.random.default_rng(105)
+        val_X = rng.normal(size=(20, NUM_FEATURES)).astype(np.float32)
+        val_y = rng.choice([0.0, 1.0], size=20).astype(np.float32)
+        partitions = {
+            "BANK_A": (
+                rng.normal(size=(30, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=30).astype(np.float32),
+            ),
+        }
+
+        job_id = f"job_req_f_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_{job_id}"
+        run_id = f"run_{job_id}"
+
+        res1 = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=run_id,
+            simulation_id=sim_id,
+            holdout_val_data=(val_X, val_y),
+            participating_banks=["BANK_A"],
+            bank_partitions=partitions,
+            num_rounds=1,
+            consortium_id="consortium_alpha",
+            registry_storage_dir=registry_dir,
+        )
+        assert res1["status"] == "COMPLETED"
+
+        # 1. Changed simulation_id
+        with pytest.raises(TrainingProvenanceSecurityError, match="simulation_id"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id="different_sim_id",
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                consortium_id="consortium_alpha",
+                registry_storage_dir=registry_dir,
+            )
+
+        # 2. Changed consortium_id
+        with pytest.raises(TrainingProvenanceSecurityError, match="consortium_id"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                consortium_id="consortium_beta",
+                registry_storage_dir=registry_dir,
+            )
+
+        # 3. Changed round count
+        with pytest.raises(TrainingProvenanceSecurityError, match="num_rounds"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=3,
+                consortium_id="consortium_alpha",
+                registry_storage_dir=registry_dir,
+            )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_missing_or_corrupted_staged_artifact_with_no_candidate_fails_closed() -> None:
+    """G. Missing or corrupted staged artifact with no registered candidate fails closed."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_req_g_")
+    db_path = os.path.join(temp_dir, "authority.db")
+    db_file = f"sqlite:///{db_path}"
+    registry_dir = os.path.join(temp_dir, "models")
+    staging_dir = os.path.join(registry_dir, ".recovery_staging")
+    os.makedirs(registry_dir, exist_ok=True)
+
+    try:
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_token_req_g",
+            db_url=db_file,
+            app_env="development",
+        )
+
+        rng = np.random.default_rng(106)
+        val_X = rng.normal(size=(20, NUM_FEATURES)).astype(np.float32)
+        val_y = rng.choice([0.0, 1.0], size=20).astype(np.float32)
+        partitions = {
+            "BANK_A": (
+                rng.normal(size=(30, NUM_FEATURES)).astype(np.float32),
+                rng.choice([0.0, 1.0], size=30).astype(np.float32),
+            ),
+        }
+
+        job_id = f"job_req_g_{uuid.uuid4().hex[:8]}"
+        sim_id = f"sim_{job_id}"
+        run_id = f"run_{job_id}"
+
+        # 1. Crash after completion before receipt (leaves staged file)
+        with pytest.raises(RuntimeError, match="Simulated coordinator process crash after completion"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                registry_storage_dir=registry_dir,
+                simulate_crash_after_completion=True,
+            )
+
+        staging_mgr = DurableArtifactStagingManager(staging_dir)
+        assert staging_mgr.has_staged_artifact(job_id)
+
+        # Manually delete staged files to simulate missing on disk
+        staging_mgr.cleanup_staged_artifact(job_id)
+        assert not staging_mgr.has_staged_artifact(job_id)
+
+        # Attempt to resume recovery: neither candidate nor staged artifact exists -> MUST fail closed!
+        with pytest.raises(TrainingProvenanceSecurityError, match="neither a verified candidate model version nor a valid staged recovery artifact exists"):
+            manager.execute_distributed_federation(
+                job_id=job_id,
+                training_run_id=run_id,
+                simulation_id=sim_id,
+                holdout_val_data=(val_X, val_y),
+                participating_banks=["BANK_A"],
+                bank_partitions=partitions,
+                num_rounds=1,
+                registry_storage_dir=registry_dir,
+            )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_staging_path_traversal_and_unsafe_identity_rejected() -> None:
+    """H. Job IDs containing traversal, absolute paths, separators, or unsafe path components cannot access files outside staging."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_req_h_")
+    try:
+        staging = DurableArtifactStagingManager(temp_dir)
+        sim_id = "sim_traversal_test"
+        dummy_data = b"some_bytes"
+
+        unsafe_job_ids = [
+            "../../escape",
+            "..\\..\\escape_win",
+            "/absolute/unix/path",
+            "C:\\absolute\\win\\path",
+            "job\x00nullbyte",
+            "job/with/slash",
+            "job\\with\\backslash",
+            "   ",
+        ]
+
+        for unsafe_id in unsafe_job_ids:
+            with pytest.raises(TrainingProvenanceSecurityError):
+                staging.stage_artifact(
+                    job_id=unsafe_id,
+                    simulation_id=sim_id,
+                    consortium_id=None,
+                    artifact_bytes=dummy_data,
+                )
+
+            with pytest.raises(TrainingProvenanceSecurityError):
+                staging.load_and_verify_staged_artifact(
+                    job_id=unsafe_id,
+                    simulation_id=sim_id,
+                    consortium_id=None,
+                    expected_sha256="abc",
+                )
+
+            # has_staged_artifact returns False safely
+            assert staging.has_staged_artifact(unsafe_id) is False
+
+        # Verify no files were created outside temp_dir
+        parent_dir = os.path.dirname(temp_dir)
+        escape_file = os.path.join(parent_dir, "escape")
+        assert not os.path.exists(escape_file)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_conflicting_staging_writes_rejected() -> None:
+    """I. Conflicting staging writes for one job cannot replace the prior valid artifact."""
+    temp_dir = tempfile.mkdtemp(prefix="cfi_test_req_i_")
+    try:
+        staging = DurableArtifactStagingManager(temp_dir)
+        job_id = "job_conflict_test_01"
+        sim_id = "sim_conflict_01"
+        bytes_a = b"legitimate_first_artifact_bytes"
+        bytes_b = b"conflicting_second_artifact_bytes"
+
+        # 1. First stage
+        path_a, _ = staging.stage_artifact(
+            job_id=job_id,
+            simulation_id=sim_id,
+            consortium_id=None,
+            artifact_bytes=bytes_a,
+        )
+
+        # 2. Re-staging exact same bytes succeeds idempotently
+        path_a_retry, _ = staging.stage_artifact(
+            job_id=job_id,
+            simulation_id=sim_id,
+            consortium_id=None,
+            artifact_bytes=bytes_a,
+        )
+        assert path_a == path_a_retry
+
+        # 3. Conflicting write for same job_id is rejected
+        with pytest.raises(TrainingProvenanceSecurityError, match="Conflicting staged artifact"):
+            staging.stage_artifact(
+                job_id=job_id,
+                simulation_id=sim_id,
+                consortium_id=None,
+                artifact_bytes=bytes_b,
+            )
+
+        # Original artifact bytes remain uncorrupted
+        loaded = staging.load_and_verify_staged_artifact(
+            job_id=job_id,
+            simulation_id=sim_id,
+            consortium_id=None,
+            expected_sha256=hashlib.sha256(bytes_a).hexdigest(),
+        )
+        assert loaded == bytes_a
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_retraining_rejects_unverified_or_incomplete_operational_results() -> None:
+    """J. Retraining rejects unverified or incomplete operational results and never invents candidate identifiers."""
+    service = DriftTriggeredRetrainingService(psi_threshold=0.20)
+    job = service.evaluate_drift_and_trigger(psi_score=0.45)
+    assert job is not None
+
+    # Case 1: unverified result (is_verified is not True)
+    mock_op = MagicMock()
+    mock_op.execute_operational_federation.return_value = {
+        "status": "COMPLETED",
+        "is_verified": False,
+        "candidate_model_version": "v1",
+        "metrics": {"roc_auc": 0.90},
+    }
+    service.operational_service = mock_op
+    with pytest.raises(RuntimeError, match="unverified"):
+        service.execute_retraining_pipeline(job.job_id)
+
+    # Case 2: invalid candidate model version (e.g. None or model_vNone)
+    mock_op.execute_operational_federation.return_value = {
+        "status": "COMPLETED",
+        "is_verified": True,
+        "candidate_model_version": "model_vNone",
+        "metrics": {"roc_auc": 0.90},
+    }
+    with pytest.raises(RuntimeError, match="valid candidate model version"):
+        service.execute_retraining_pipeline(job.job_id)
+
+    # Case 3: missing or non-finite metrics
+    mock_op.execute_operational_federation.return_value = {
+        "status": "COMPLETED",
+        "is_verified": True,
+        "candidate_model_version": "v1",
+        "metrics": {},
+    }
+    with pytest.raises(RuntimeError, match="metrics"):
+        service.execute_retraining_pipeline(job.job_id)
+
+    # Case 4: automated retraining claiming automatic champion promotion
+    mock_op.execute_operational_federation.return_value = {
+        "status": "COMPLETED",
+        "is_verified": True,
+        "candidate_model_version": "v1",
+        "metrics": {"roc_auc": 0.90},
+        "is_promoted_champion": True,
+    }
+    with pytest.raises(RuntimeError, match="cannot automatically promote candidate to champion"):
+        service.execute_retraining_pipeline(job.job_id)
+

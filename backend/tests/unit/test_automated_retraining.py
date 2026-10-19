@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from app.application.services.auto_rollback import AutoRollbackManager, RollbackCause
 from app.application.services.automated_retraining import (
@@ -39,6 +40,7 @@ def test_drift_triggered_retraining_evaluation_and_execution() -> None:
     mock_op_service = MagicMock()
     mock_op_service.execute_operational_federation.return_value = {
         "status": "COMPLETED",
+        "is_verified": True,
         "candidate_model_version": "model_v1.0.1",
         "evaluation_metrics": {"pr_auc": 0.892, "roc_auc": 0.915, "f1": 0.821},
         "receipt_id": "receipt_autoret_123",
