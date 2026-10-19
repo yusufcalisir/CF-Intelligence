@@ -76,7 +76,7 @@ AGGREGATION_METHODS: list[dict[str, Any]] = [
     {
         "id": "krum",
         "label": "Krum (Byzantine-Robust)",
-        "description": "Selects the single client update closest to all others. Defends against a single Byzantine attacker (f=1).",
+        "description": "Selects the single client update closest to all others. Requires n >= 2f + 3 participants (f=1 requires n >= 5; unsupported in 3-bank consortium). Plaintext only; SecAgg aggregate-only mode omits individual update filtering.",
         "byzantine_robust": True,
         "colluding_defense": False,
         "paper": "Blanchard et al. (2017)",
@@ -84,7 +84,7 @@ AGGREGATION_METHODS: list[dict[str, Any]] = [
     {
         "id": "coordinate_wise_median",
         "label": "Coordinate-wise Median",
-        "description": "Element-wise median across all client updates. Robust to outlier parameters from a single malicious node.",
+        "description": "Element-wise median across all client updates. Requires f < n/2 (supported in 3-bank consortium with f=1). Plaintext only; SecAgg aggregate-only mode omits individual update filtering.",
         "byzantine_robust": True,
         "colluding_defense": False,
         "paper": "Yin et al. (2018)",
@@ -92,7 +92,7 @@ AGGREGATION_METHODS: list[dict[str, Any]] = [
     {
         "id": "trimmed_mean",
         "label": "Trimmed Mean (Coordinate Byzantine)",
-        "description": "Drops the f largest and f smallest values per coordinate before averaging. Robust to a fraction of Byzantine workers.",
+        "description": "Drops the f largest and f smallest values per coordinate before averaging. Requires n > 2k (k >= 1). Plaintext only; SecAgg aggregate-only mode omits individual update filtering.",
         "byzantine_robust": True,
         "colluding_defense": True,
         "paper": "Yin et al. (2018)",
@@ -100,7 +100,7 @@ AGGREGATION_METHODS: list[dict[str, Any]] = [
     {
         "id": "bulyan",
         "label": "Bulyan (Multi-Byzantine Robust)",
-        "description": "Combines Krum selection (n-2f candidates) with coordinate-wise Trimmed Mean on the selected subset. Defeats colluding Byzantine attackers that evade single-step Krum.",
+        "description": "Combines Krum selection (n-2f candidates) with coordinate-wise Trimmed Mean. Requires n >= 4f + 3 participants (f=1 requires n >= 7; unsupported in 3-bank consortium). Plaintext only; SecAgg aggregate-only mode omits individual update filtering.",
         "byzantine_robust": True,
         "colluding_defense": True,
         "paper": "El Mhamdi et al. (2018)",

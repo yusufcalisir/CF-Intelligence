@@ -80,7 +80,8 @@ class FederatedLearningEngine:
 
     def verify_zero_leakage_contract(
         self,
-        client_train_datasets: dict[int, tuple[np.ndarray, np.ndarray]] | list[tuple[np.ndarray, np.ndarray]],
+        client_train_datasets: dict[int, tuple[np.ndarray, np.ndarray]]
+        | list[tuple[np.ndarray, np.ndarray]],
         test_dataset: tuple[np.ndarray, np.ndarray],
         client_indices: dict[int, Any] | list[Any] | None = None,
         test_indices: Any | None = None,
@@ -105,7 +106,8 @@ class FederatedLearningEngine:
 
     def gate_training_zero_leakage(
         self,
-        client_train_datasets: dict[int, tuple[np.ndarray, np.ndarray]] | list[tuple[np.ndarray, np.ndarray]],
+        client_train_datasets: dict[int, tuple[np.ndarray, np.ndarray]]
+        | list[tuple[np.ndarray, np.ndarray]],
         test_dataset: tuple[np.ndarray, np.ndarray],
         client_indices: dict[int, Any] | list[Any] | None = None,
         test_indices: Any | None = None,
@@ -133,6 +135,9 @@ class FederatedLearningEngine:
         method: AggregationMethod = AggregationMethod.FED_AVG_WEIGHTED,
         global_weights: ModelWeights | None = None,
         simulation_id: str | None = None,
+        f_byzantine: int | None = None,
+        trim_count: int | None = None,
+        strict_preconditions: bool = False,
     ) -> ModelWeights:
         """Aggregate model parameters from multiple clients.
 
@@ -250,7 +255,9 @@ class FederatedLearningEngine:
                 delta_t = w_avg - w_t  # pseudo-gradient
 
                 is_ephemeral = simulation_id is None
-                sim_id = simulation_id or f"_ephemeral_{id(client_weights)}_{time.perf_counter_ns()}"
+                sim_id = (
+                    simulation_id or f"_ephemeral_{id(client_weights)}_{time.perf_counter_ns()}"
+                )
                 with self._state_lock:
                     if sim_id not in self._server_m_by_sim:
                         self._server_m_by_sim[sim_id] = np.zeros_like(w_avg)
@@ -306,8 +313,12 @@ class FederatedLearningEngine:
             # Blanchard et al. (2017) invariant: 2f + 2 < n; standard Byzantine tolerance f = 1
             weights_array = np.array([w.flat_weights for w in client_weights])
             n = len(weights_array)
-            f = 1
+            f = f_byzantine if f_byzantine is not None else 1
             if n < 2 * f + 3:
+                if strict_preconditions:
+                    raise ValueError(
+                        f"Krum theoretical precondition violated: n={n} < 2f+3={2 * f + 3} (f={f})"
+                    )
                 logger.warning(
                     "Krum theoretical precondition violated: n=%d < 2f+3=%d (f=%d); executing with available neighbors",
                     n,
@@ -336,16 +347,29 @@ class FederatedLearningEngine:
             # median value across all clients. Robust to outlier parameters
             # injected by a Byzantine client.
             weights_array = np.array([w.flat_weights for w in client_weights])
+            n = len(weights_array)
+            f = f_byzantine if f_byzantine is not None else 1
+            if strict_preconditions and f >= n / 2.0:
+                raise ValueError(
+                    f"Coordinate-wise Median theoretical precondition violated: f={f} >= n/2={n / 2.0}"
+                )
             avg_weights = np.median(weights_array, axis=0).tolist()
 
         elif method == AggregationMethod.TRIMMED_MEAN:
             # Coordinate-wise Trimmed Mean: for each parameter coordinate,
             # drop the f largest and f smallest values then average the rest.
-            # Dynamic Byzantine tolerance: f = max(1, (n - 1) // 2).
             weights_array = np.array([w.flat_weights for w in client_weights])
             n = len(weights_array)
-            f = max(1, (n - 1) // 2)
+            f = (
+                trim_count
+                if trim_count is not None
+                else (f_byzantine if f_byzantine is not None else max(1, (n - 1) // 2))
+            )
             if n <= 2 * f:
+                if strict_preconditions:
+                    raise ValueError(
+                        f"Trimmed Mean theoretical precondition violated: n={n} <= 2*f={2 * f}"
+                    )
                 # Not enough clients for trimming — fall back to plain mean
                 logger.warning(
                     "Trimmed Mean: too few clients (%d <= 2*f=%d), falling back to FedAvg",
@@ -369,7 +393,7 @@ class FederatedLearningEngine:
             # Two-stage: recursive Krum candidate selection + coordinate-wise median-closest averaging.
             weights_array = np.array([w.flat_weights for w in client_weights])
             n = len(weights_array)
-            f = max(1, (n - 3) // 4) if n >= 7 else 1
+            f = f_byzantine if f_byzantine is not None else (max(1, (n - 3) // 4) if n >= 7 else 1)
 
             if n >= 4 * f + 3:
                 theta = n - 2 * f
@@ -390,7 +414,9 @@ class FederatedLearningEngine:
                         dists.sort()
                         scores.append(sum(dists[:k]))
 
-                    best_p = min(range(m), key=lambda p_idx: (scores[p_idx], tuple(pool[p_idx][1].tolist())))
+                    best_p = min(
+                        range(m), key=lambda p_idx: (scores[p_idx], tuple(pool[p_idx][1].tolist()))
+                    )
                     selected_tuples.append(pool[best_p])
                     pool.pop(best_p)
 
@@ -409,6 +435,10 @@ class FederatedLearningEngine:
                     beta,
                 )
             else:
+                if strict_preconditions:
+                    raise ValueError(
+                        f"Bulyan theoretical precondition violated: n={n} < 4f+3={4 * f + 3} (f={f})"
+                    )
                 logger.warning(
                     "Bulyan precondition violated: n=%d < 4f+3=%d (f=%d); executing small-consortium fallback",
                     n,
@@ -462,13 +492,17 @@ class FederatedLearningEngine:
                 delta_t = w_avg - w_t  # pseudo-gradient
 
                 is_ephemeral = simulation_id is None
-                sim_id = simulation_id or f"_ephemeral_{id(client_weights)}_{time.perf_counter_ns()}"
+                sim_id = (
+                    simulation_id or f"_ephemeral_{id(client_weights)}_{time.perf_counter_ns()}"
+                )
                 with self._state_lock:
                     if sim_id not in self._server_m_by_sim:
                         self._server_m_by_sim[sim_id] = np.zeros_like(w_avg)
                     if sim_id not in self._server_v_by_sim:
                         # Yogi initialises v as τ² to avoid zero-division
-                        self._server_v_by_sim[sim_id] = np.full_like(w_avg, self.settings.fedopt_tau**2)
+                        self._server_v_by_sim[sim_id] = np.full_like(
+                            w_avg, self.settings.fedopt_tau**2
+                        )
 
                     m_t = self._server_m_by_sim[sim_id].copy()
                     v_t = self._server_v_by_sim[sim_id].copy()
@@ -692,7 +726,9 @@ class FederatedLearningEngine:
                 seed_uv = drivers[u].derive_pairwise_seed(bundles[v])
                 raw_mask = P2PSecAggDriver.expand_mask(seed_uv, n_params)
                 # Exact power-of-two division in IEEE 754 float64 (zero mantissa precision loss)
-                float_mask = np.array([(val - 2147483648) / 2147483648.0 for val in raw_mask], dtype=np.float64)
+                float_mask = np.array(
+                    [(val - 2147483648) / 2147483648.0 for val in raw_mask], dtype=np.float64
+                )
 
                 if is_weighted:
                     p_u = proportions[u]

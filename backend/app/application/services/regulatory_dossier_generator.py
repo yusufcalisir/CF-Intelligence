@@ -81,7 +81,7 @@ STANDARD_BENCHMARKS: list[ModelBenchmarkComparison] = [
         roc_auc=0.942,
         f1_score=0.867,
         p99_latency_ms=38.5,
-        byzantine_tolerance="33.3% (Krum / Trimmed Mean / Bulyan)",
+        byzantine_tolerance="Configurable (f < n/2 Median; Krum n>=2f+3; Bulyan n>=4f+3; SecAgg aggregate-only lacks filtering)",
         differential_privacy_eps=1.0,
         zero_raw_pii_enforced=True,
         disparate_impact_ratio=0.962,
@@ -184,7 +184,7 @@ EU_AI_ACT_ARTICLES: list[dict[str, Any]] = [
         "title": "Accuracy, Robustness and Cybersecurity",
         "requirement": "Appropriate levels of accuracy, resilience against errors, faults, and adversarial attacks (data poisoning, model inversion, evasive manipulation).",
         "status": "COMPLIANT",
-        "evidence": "Byzantine fault-tolerant aggregation (Krum, Trimmed Mean, Bulyan 33% Byzantine tolerance), spectral graph poisoning defense, and EEOC 80% rule disparate impact parity (DI = 0.962 in [0.80, 1.25]).",
+        "evidence": "Configurable Byzantine-tolerant aggregation (Coordinate Median for n>=3, Krum for n>=2f+3, Bulyan for n>=4f+3; SecAgg aggregate-only mode omits individual filtering), spectral graph poisoning defense, and EEOC 80% rule disparate impact parity (DI = 0.962 in [0.80, 1.25]). Operational deployments must validate consortium size against algorithm preconditions.",
     },
 ]
 
@@ -247,8 +247,12 @@ class RegulatoryDossierGenerator:
     def _initialize_baseline_signoffs(self) -> None:
         """Seed certified baseline supervisory sign-offs."""
         now = datetime.now(UTC).isoformat()
-        h1 = hashlib.sha256(f"VALIDATION_SIGN_OFF|CHIEF_RISK_OFFICER|Dr. Elena Rostova|{now}".encode()).hexdigest()
-        h2 = hashlib.sha256(f"VALIDATION_SIGN_OFF|MODEL_RISK_VALIDATOR|Marcus Vance, CFA|{now}".encode()).hexdigest()
+        h1 = hashlib.sha256(
+            f"VALIDATION_SIGN_OFF|CHIEF_RISK_OFFICER|Dr. Elena Rostova|{now}".encode()
+        ).hexdigest()
+        h2 = hashlib.sha256(
+            f"VALIDATION_SIGN_OFF|MODEL_RISK_VALIDATOR|Marcus Vance, CFA|{now}".encode()
+        ).hexdigest()
 
         self._signoffs = [
             SupervisorySignoff(
@@ -277,7 +281,9 @@ class RegulatoryDossierGenerator:
         """Returns high-level executive regulatory dossier summary and metrics."""
         with self._lock:
             now = datetime.now(UTC).isoformat()
-            dossier_content = f"{model_id}|EU_AI_ACT_2024_1689|SR11_7|0.884|0.942|0.962|{len(self._signoffs)}"
+            dossier_content = (
+                f"{model_id}|EU_AI_ACT_2024_1689|SR11_7|0.884|0.942|0.962|{len(self._signoffs)}"
+            )
             dossier_hash = hashlib.sha256(dossier_content.encode("utf-8")).hexdigest()
 
             return {
@@ -303,7 +309,9 @@ class RegulatoryDossierGenerator:
                     "disparate_impact_ratio": 0.962,
                     "differential_privacy_epsilon": 1.0,
                     "differential_privacy_delta": 1e-5,
-                    "byzantine_fault_tolerance_pct": 33.3,
+                    "byzantine_fault_tolerance_pct": None,
+                    "byzantine_defense_status": "CONFIGURABLE_PLAINTEXT_ONLY",
+                    "byzantine_theoretical_preconditions": "Coordinate Median requires f < n/2; Krum requires n >= 2f+3; Bulyan requires n >= 4f+3. SecAgg aggregate-only mode omits individual Byzantine update filtering.",
                     "zero_raw_pii_enforced": True,
                 },
                 "drift_monitoring_limits": {
@@ -406,7 +414,7 @@ class RegulatoryDossierGenerator:
             f"| **ROC-AUC** | **{summary['primary_model_metrics']['roc_auc']:.3f}** | >= 0.900 | **COMPLIANT** |",
             f"| **Disparate Impact Ratio (EEOC)** | **{summary['primary_model_metrics']['disparate_impact_ratio']:.3f}** | $0.80 \\le \\mathrm{{DI}} \\le 1.25$ | **COMPLIANT** |",
             f"| **Rényi Differential Privacy** | **$\\varepsilon = {summary['primary_model_metrics']['differential_privacy_epsilon']:.1f}, \\delta = 10^{{-5}}$** | $\\varepsilon \\le 2.0, \\delta \\le 10^{{-5}}$ | **COMPLIANT** |",
-            f"| **Byzantine Adversarial Tolerance** | **{summary['primary_model_metrics']['byzantine_fault_tolerance_pct']:.1f}%** | >= 33.0% (Bulyan/Krum) | **COMPLIANT** |",
+            "| **Byzantine Robustness (Operational)** | **Configurable Precondition-Bounded** | Algorithmic preconditions enforced; SecAgg omits client filtering | **VERIFIED BOUNDS** |",
             f"| **P99 Scoring Latency** | **{summary['primary_model_metrics']['p99_latency_ms']:.1f} ms** | <= 100.0 ms | **COMPLIANT** |",
             "| **Zero Raw PII Transmission** | **ENFORCED** | HMAC-SHA256 Masking | **COMPLIANT** |",
             "",
@@ -425,71 +433,81 @@ class RegulatoryDossierGenerator:
                 f"| **{item['article']}** | {item['title']} | {item['requirement']} | {item['evidence']} | **{item['status']}** |"
             )
 
-        md_lines.extend([
-            "",
-            "---",
-            "",
-            "## 3. Federal Reserve SR 11-7 / OCC 2011-12 Model Risk Management",
-            "",
-            "### 3.1. Pillar I: Model Development & Conceptual Soundness",
-            f"- **Graph Topology Rationale**: {sr11_matrix['pillars'][0]['details']['topology_rationale']}",
-            f"- **Loss Formulation & Non-IID Robustness**: {sr11_matrix['pillars'][0]['details']['loss_formulation']}",
-            f"- **Differential Privacy Accounting**: {sr11_matrix['pillars'][0]['details']['privacy_guarantees']}",
-            f"- **Posterior Probability Calibration**: {sr11_matrix['pillars'][0]['details']['probability_calibration']}",
-            "",
-            "### 3.2. Pillar II: Independent Model Validation & 3 Lines of Defense",
-            f"- **1st Line of Defense (Developers)**: {sr11_matrix['pillars'][1]['details']['first_line']}",
-            f"- **2nd Line of Defense (Independent MRM)**: {sr11_matrix['pillars'][1]['details']['second_line']}",
-            f"- **3rd Line of Defense (Internal Audit)**: {sr11_matrix['pillars'][1]['details']['third_line']}",
-            f"- **Algorithmic Fairness Audit**: {sr11_matrix['pillars'][1]['details']['fairness_audit']}",
-            "",
-            "### 3.3. Pillar III: Ongoing Monitoring, Drift Triggers & Instant Rollback",
-            f"- **Feature Drift (Inputs)**: {sr11_matrix['pillars'][2]['details']['input_feature_drift']}",
-            f"- **Concept Drift (Outputs)**: {sr11_matrix['pillars'][2]['details']['concept_output_drift']}",
-            f"- **Covariance Shift**: {sr11_matrix['pillars'][2]['details']['covariance_drift']}",
-            f"- **Emergency Rollback SLA**: {sr11_matrix['pillars'][2]['details']['rollback_sla']}",
-            "",
-            "---",
-            "",
-            "## 4. Empirical Model Benchmarking Comparison",
-            "",
-            "The federated graph architecture was rigorously benchmarked against standard commercial algorithms on joint multi-bank fraud datasets:",
-            "",
-            "| Algorithm / Framework | Architecture & Parameters | PR-AUC | ROC-AUC | F1-Score | P99 Latency | Byzantine Tolerance | DP $\\varepsilon$ | Zero PII | Disparate Impact (DI) |",
-            "| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
-        ])
+        md_lines.extend(
+            [
+                "",
+                "---",
+                "",
+                "## 3. Federal Reserve SR 11-7 / OCC 2011-12 Model Risk Management",
+                "",
+                "### 3.1. Pillar I: Model Development & Conceptual Soundness",
+                f"- **Graph Topology Rationale**: {sr11_matrix['pillars'][0]['details']['topology_rationale']}",
+                f"- **Loss Formulation & Non-IID Robustness**: {sr11_matrix['pillars'][0]['details']['loss_formulation']}",
+                f"- **Differential Privacy Accounting**: {sr11_matrix['pillars'][0]['details']['privacy_guarantees']}",
+                f"- **Posterior Probability Calibration**: {sr11_matrix['pillars'][0]['details']['probability_calibration']}",
+                "",
+                "### 3.2. Pillar II: Independent Model Validation & 3 Lines of Defense",
+                f"- **1st Line of Defense (Developers)**: {sr11_matrix['pillars'][1]['details']['first_line']}",
+                f"- **2nd Line of Defense (Independent MRM)**: {sr11_matrix['pillars'][1]['details']['second_line']}",
+                f"- **3rd Line of Defense (Internal Audit)**: {sr11_matrix['pillars'][1]['details']['third_line']}",
+                f"- **Algorithmic Fairness Audit**: {sr11_matrix['pillars'][1]['details']['fairness_audit']}",
+                "",
+                "### 3.3. Pillar III: Ongoing Monitoring, Drift Triggers & Instant Rollback",
+                f"- **Feature Drift (Inputs)**: {sr11_matrix['pillars'][2]['details']['input_feature_drift']}",
+                f"- **Concept Drift (Outputs)**: {sr11_matrix['pillars'][2]['details']['concept_output_drift']}",
+                f"- **Covariance Shift**: {sr11_matrix['pillars'][2]['details']['covariance_drift']}",
+                f"- **Emergency Rollback SLA**: {sr11_matrix['pillars'][2]['details']['rollback_sla']}",
+                "",
+                "---",
+                "",
+                "## 4. Empirical Model Benchmarking Comparison",
+                "",
+                "The federated graph architecture was rigorously benchmarked against standard commercial algorithms on joint multi-bank fraud datasets:",
+                "",
+                "| Algorithm / Framework | Architecture & Parameters | PR-AUC | ROC-AUC | F1-Score | P99 Latency | Byzantine Tolerance | DP $\\varepsilon$ | Zero PII | Disparate Impact (DI) |",
+                "| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
+            ]
+        )
 
         for b in benchmarks:
-            eps_str = f"{b['differential_privacy_eps']:.1f}" if b['differential_privacy_eps'] is not None else "None"
-            pii_str = "YES" if b['zero_raw_pii_enforced'] else "NO"
+            eps_str = (
+                f"{b['differential_privacy_eps']:.1f}"
+                if b["differential_privacy_eps"] is not None
+                else "None"
+            )
+            pii_str = "YES" if b["zero_raw_pii_enforced"] else "NO"
             md_lines.append(
                 f"| **{b['model_name']}** | {b['architecture']} | {b['pr_auc']:.3f} | {b['roc_auc']:.3f} | {b['f1_score']:.3f} | {b['p99_latency_ms']:.1f}ms | {b['byzantine_tolerance']} | {eps_str} | {pii_str} | {b['disparate_impact_ratio']:.3f} |"
             )
 
-        md_lines.extend([
-            "",
-            "---",
-            "",
-            "## 5. Dual-Control Supervisory Sign-Off Register",
-            "",
-            "In adherence to dual-control operational standards, this dossier carries binding cryptographic attestation from certified officers:",
-            "",
-            "| Sign-Off ID | Authorized Officer | Supervisory Role | Timestamp (UTC) | SHA-256 Attestation Seal | Notes & Findings |",
-            "| :--- | :--- | :--- | :--- | :--- | :--- |",
-        ])
+        md_lines.extend(
+            [
+                "",
+                "---",
+                "",
+                "## 5. Dual-Control Supervisory Sign-Off Register",
+                "",
+                "In adherence to dual-control operational standards, this dossier carries binding cryptographic attestation from certified officers:",
+                "",
+                "| Sign-Off ID | Authorized Officer | Supervisory Role | Timestamp (UTC) | SHA-256 Attestation Seal | Notes & Findings |",
+                "| :--- | :--- | :--- | :--- | :--- | :--- |",
+            ]
+        )
 
         for s in signoffs:
             md_lines.append(
                 f"| `{s['signoff_id']}` | **{s['officer_name']}** | `{s['role']}` | `{s['timestamp']}` | `{s['sha256_attestation_hash'][:16]}...` | {s['notes']} |"
             )
 
-        md_lines.extend([
-            "",
-            "---",
-            "",
-            "**CONFIDENTIAL — PROPRIETARY REGULATORY VALIDATION DOSSIER**  ",
-            f"*Generated by Cross-Bank Federated Intelligence (CFI) Regulatory Engine · Cryptographic SHA-256 Seal: `{summary['sha256_dossier_seal']}`*",
-        ])
+        md_lines.extend(
+            [
+                "",
+                "---",
+                "",
+                "**CONFIDENTIAL — PROPRIETARY REGULATORY VALIDATION DOSSIER**  ",
+                f"*Generated by Cross-Bank Federated Intelligence (CFI) Regulatory Engine · Cryptographic SHA-256 Seal: `{summary['sha256_dossier_seal']}`*",
+            ]
+        )
 
         return "\n".join(md_lines)
 

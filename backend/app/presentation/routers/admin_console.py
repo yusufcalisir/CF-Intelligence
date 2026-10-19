@@ -86,8 +86,12 @@ ROLE_CONFIG_MAP: dict[ConsoleUserRole, RoleViewConfig] = {
 
 @router.get("/summary", response_model=DashboardSummaryResponse, status_code=status.HTTP_200_OK)
 @api_router.get("/summary", response_model=DashboardSummaryResponse, status_code=status.HTTP_200_OK)
-@admin_router.get("/summary", response_model=DashboardSummaryResponse, status_code=status.HTTP_200_OK)
-@admin_v1_router.get("/summary", response_model=DashboardSummaryResponse, status_code=status.HTTP_200_OK)
+@admin_router.get(
+    "/summary", response_model=DashboardSummaryResponse, status_code=status.HTTP_200_OK
+)
+@admin_v1_router.get(
+    "/summary", response_model=DashboardSummaryResponse, status_code=status.HTTP_200_OK
+)
 async def get_dashboard_summary(
     session: AsyncSession = Depends(get_async_session),
 ) -> DashboardSummaryResponse:
@@ -104,7 +108,9 @@ async def get_dashboard_summary(
         # Dynamic query 1: Active banks
         bank_res = await session.execute(
             select(func.count(TenantConfigModel.bank_id)).where(
-                TenantConfigModel.status.in_(["active", "ACTIVE", "pending_verification", "PENDING_VERIFICATION"])
+                TenantConfigModel.status.in_(
+                    ["active", "ACTIVE", "pending_verification", "PENDING_VERIFICATION"]
+                )
             )
         )
         db_banks = bank_res.scalar()
@@ -132,7 +138,9 @@ async def get_dashboard_summary(
             cases_count = db_cases
 
     except Exception as exc:
-        logger.warning("Could not dynamically resolve live database metrics: %s. Using baseline.", exc)
+        logger.warning(
+            "Could not dynamically resolve live database metrics: %s. Using baseline.", exc
+        )
 
     return DashboardSummaryResponse(
         active_bank_nodes_count=active_banks_count,
@@ -146,9 +154,13 @@ async def get_dashboard_summary(
 @router.get("/role-config", response_model=RoleConfigResponse, status_code=status.HTTP_200_OK)
 @api_router.get("/role-config", response_model=RoleConfigResponse, status_code=status.HTTP_200_OK)
 @admin_router.get("/role-config", response_model=RoleConfigResponse, status_code=status.HTTP_200_OK)
-@admin_v1_router.get("/role-config", response_model=RoleConfigResponse, status_code=status.HTTP_200_OK)
+@admin_v1_router.get(
+    "/role-config", response_model=RoleConfigResponse, status_code=status.HTTP_200_OK
+)
 def get_role_configuration(
-    role: ConsoleUserRole = Query(ConsoleUserRole.EXECUTIVE, description="Enterprise user role for tailored view"),
+    role: ConsoleUserRole = Query(
+        ConsoleUserRole.EXECUTIVE, description="Enterprise user role for tailored view"
+    ),
 ) -> RoleConfigResponse:
     """Returns widget visibility and UI configuration tailored per enterprise user role."""
     config = ROLE_CONFIG_MAP.get(role, ROLE_CONFIG_MAP[ConsoleUserRole.EXECUTIVE])
@@ -172,12 +184,17 @@ async def get_admin_system_config() -> AdminConfigResponse:
         hsm_vault_status="SEALED_AND_HEALTHY",
         rate_limit_rpm=1200,
         max_federated_clients=64,
-        cors_allowed_origins=["http://localhost:3000", "http://localhost:5173", "https://cf-intelligence.vercel.app"],
+        cors_allowed_origins=[
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "https://cf-intelligence.vercel.app",
+        ],
         active_features={
             "homomorphic_encryption_ckks": True,
             "differential_privacy_opacus": True,
             "diffie_hellman_psi_2048": True,
-            "byzantine_spectral_filtering": True,
+            "byzantine_spectral_filtering": False,
+            "byzantine_robust_aggregation": True,
             "realtime_gnn_inductive_scoring": True,
             "fincen_sar_2_0_efiling": True,
         },
@@ -191,7 +208,9 @@ async def list_admin_tenants(
 ) -> TenantListResponse:
     """Lists all registered bank institutions and tenant schemas across the consortium."""
     try:
-        res = await session.execute(select(TenantConfigModel).order_by(TenantConfigModel.created_at.desc()))
+        res = await session.execute(
+            select(TenantConfigModel).order_by(TenantConfigModel.created_at.desc())
+        )
         models = res.scalars().all()
         tenants = [
             TenantItem(
@@ -200,12 +219,16 @@ async def list_admin_tenants(
                 jurisdiction=m.jurisdiction,
                 status=str(m.status.value if hasattr(m.status, "value") else m.status),
                 schema_provisioned=m.schema_provisioned,
-                created_at=m.created_at.isoformat() if m.created_at else datetime.now(UTC).isoformat(),
+                created_at=m.created_at.isoformat()
+                if m.created_at
+                else datetime.now(UTC).isoformat(),
             )
             for m in models
         ]
     except Exception as exc:
-        logger.warning("Failed to query persistent tenants table: %s. Returning consortium defaults.", exc)
+        logger.warning(
+            "Failed to query persistent tenants table: %s. Returning consortium defaults.", exc
+        )
         tenants = [
             TenantItem(
                 bank_id="bank_alpha",
@@ -239,8 +262,12 @@ async def list_admin_tenants(
     )
 
 
-@admin_router.get("/maintenance", response_model=MaintenanceWindowResponse, status_code=status.HTTP_200_OK)
-@admin_v1_router.get("/maintenance", response_model=MaintenanceWindowResponse, status_code=status.HTTP_200_OK)
+@admin_router.get(
+    "/maintenance", response_model=MaintenanceWindowResponse, status_code=status.HTTP_200_OK
+)
+@admin_v1_router.get(
+    "/maintenance", response_model=MaintenanceWindowResponse, status_code=status.HTTP_200_OK
+)
 async def get_maintenance_window_status() -> MaintenanceWindowResponse:
     """Returns scheduled maintenance window intervals, vacuum telemetry, and disk health."""
     now_iso = datetime.now(UTC).isoformat()

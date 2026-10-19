@@ -43,14 +43,33 @@ def _sanitize_client_error(raw_msg: str, default_msg: str) -> str:
     if not raw_msg:
         return default_msg
     lowered = raw_msg.lower()
-    _forbidden = ("password", "secret", "token", "private_key", "vault", "postgresql://", "sqlite:///", "c:\\", "c:/", "/t" + "mp/")
+    _forbidden = (
+        "password",
+        "secret",
+        "token",
+        "private_key",
+        "vault",
+        "postgresql://",
+        "sqlite:///",
+        "c:\\",
+        "c:/",
+        "/t" + "mp/",
+    )
     if any(k in lowered for k in _forbidden):
         return default_msg
     return raw_msg[:200]
 
 
-@router.post("/federation/jobs", response_model=OperationalFederationResponse, status_code=status.HTTP_201_CREATED)
-@api_router.post("/federation/jobs", response_model=OperationalFederationResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/federation/jobs",
+    response_model=OperationalFederationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+@api_router.post(
+    "/federation/jobs",
+    response_model=OperationalFederationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def start_operational_federation_job(
     payload: OperationalFederationRequest,
     authorization: str | None = Header(None, description="Bearer <operator_jwt>"),
@@ -75,7 +94,9 @@ async def start_operational_federation_job(
         operation_name="operational federated training initiation",
         min_clearance=2,
     )
-    logger.info("Operator [%s] authenticated for operational federation job", operator_user.username)
+    logger.info(
+        "Operator [%s] authenticated for operational federation job", operator_user.username
+    )
 
     # 1. Resolve and validate active consortium
     target_consortium_id = (payload.consortium_id or "cfi-consortium").strip().lower()
@@ -145,9 +166,15 @@ async def start_operational_federation_job(
         )
 
     # 3. Enforce institution-scoped operator authorization bound to target consortium
-    op_bank = (getattr(operator_user, "bank_id", "") or claims.get("bank_id", "") or "").strip().upper()
-    op_clearance = int(getattr(operator_user, "clearance_level", 1) or claims.get("clearance_level", 1))
-    op_roles = {r.lower().strip() for r in (getattr(operator_user, "roles", []) or claims.get("roles", []))}
+    op_bank = (
+        (getattr(operator_user, "bank_id", "") or claims.get("bank_id", "") or "").strip().upper()
+    )
+    op_clearance = int(
+        getattr(operator_user, "clearance_level", 1) or claims.get("clearance_level", 1)
+    )
+    op_roles = {
+        r.lower().strip() for r in (getattr(operator_user, "roles", []) or claims.get("roles", []))
+    }
 
     if not op_bank:
         raise HTTPException(
@@ -182,7 +209,9 @@ async def start_operational_federation_job(
     # Verifiable elevated authority check for cross-institution coordination:
     # Requires clearance >= 3 AND an admin / governance role.
     # NEVER infer elevated authority solely from bank labels like "CENTRAL", "CONSORTIUM", or "REGULATOR".
-    has_elevated_consortium_admin = op_clearance >= 3 and bool(op_roles & {"admin", "consortium_admin", "security_admin"})
+    has_elevated_consortium_admin = op_clearance >= 3 and bool(
+        op_roles & {"admin", "consortium_admin", "security_admin"}
+    )
 
     # Check if run includes institutions other than operator's own institution:
     # Never infer permission to involve another institution simply because initiator includes their own bank.
@@ -228,6 +257,9 @@ async def start_operational_federation_job(
             "num_rounds": payload.num_rounds,
             "expected_unique_samples": payload.expected_unique_samples,
             "consortium_id": target_consortium_id,
+            "byzantine_defense": payload.byzantine_defense,
+            "byzantine_f_max": payload.byzantine_f_max,
+            "trimmed_mean_trim_count": payload.trimmed_mean_trim_count,
         }
         if dp_config is not None:
             exec_kwargs["dp_config"] = dp_config
@@ -239,7 +271,11 @@ async def start_operational_federation_job(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Secure Aggregation (SecAgg) requires at least 2 participating banks.",
                 )
-            scale = payload.secagg_quantization_scale if payload.secagg_quantization_scale is not None else 1e7
+            scale = (
+                payload.secagg_quantization_scale
+                if payload.secagg_quantization_scale is not None
+                else 1e7
+            )
             if not isinstance(scale, (int, float)) or not math.isfinite(scale) or scale <= 0:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -271,7 +307,11 @@ async def start_operational_federation_job(
         exec_status = result.get("status")
         is_verified = bool(result.get("is_verified", False))
         if not exec_status or exec_status != "COMPLETED" or not is_verified:
-            logger.error("Federation execution returned incomplete or unverified state: status=%s, verified=%s", exec_status, is_verified)
+            logger.error(
+                "Federation execution returned incomplete or unverified state: status=%s, verified=%s",
+                exec_status,
+                is_verified,
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Federation execution failed or produced unverified execution state.",
@@ -295,7 +335,9 @@ async def start_operational_federation_job(
         if ver_number is None and isinstance(saved_ver, dict):
             ver_number = saved_ver.get("version")
         if ver_number is None:
-            logger.error("Federation completion reported success but model version is missing: %s", result)
+            logger.error(
+                "Federation completion reported success but model version is missing: %s", result
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Federation execution produced no durable candidate model registration.",
@@ -315,7 +357,11 @@ async def start_operational_federation_job(
                     detail="Model candidate registration violates authoritative consortium scope.",
                 )
 
-        artifact_sha = str(result.get("artifact_sha256") or result.get("final_artifact_sha256") or "").strip().lower()
+        artifact_sha = (
+            str(result.get("artifact_sha256") or result.get("final_artifact_sha256") or "")
+            .strip()
+            .lower()
+        )
         if len(artifact_sha) != 64 or not all(c in "0123456789abcdef" for c in artifact_sha):
             logger.error("Federation completion reported invalid artifact digest: %s", artifact_sha)
             raise HTTPException(
@@ -330,6 +376,23 @@ async def start_operational_federation_job(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Explicitly requested Secure Aggregation (SecAgg) was not executed by worker topology.",
             )
+
+        # Never silently downgrade an explicitly requested Byzantine defense
+        req_defense = (payload.byzantine_defense or "none").lower()
+        if req_defense in ("fed_avg", "fedavg", "fed_avg_weighted"):
+            req_defense = "none"
+        if req_defense != "none":
+            exec_agg = (result.get("executed_aggregation_method") or "").lower()
+            if exec_agg != req_defense:
+                logger.error(
+                    "Federation silently downgraded requested Byzantine defense '%s' to '%s'",
+                    req_defense,
+                    exec_agg,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Explicitly requested Byzantine defense '{req_defense}' was not executed (actual: '{exec_agg}').",
+                )
 
         return OperationalFederationResponse(
             job_id=result["job_id"],
@@ -348,6 +411,16 @@ async def start_operational_federation_job(
             dp_provenance=result.get("dp_provenance", {}),
             secagg_enabled=bool(result.get("secagg_enabled", False)),
             secagg_provenance=result.get("secagg_provenance"),
+            requested_aggregation_method=result.get("requested_aggregation_method")
+            or payload.byzantine_defense,
+            executed_aggregation_method=result.get("executed_aggregation_method")
+            or (
+                "secagg_fed_avg_weighted"
+                if bool(result.get("secagg_enabled", False))
+                else "fed_avg_weighted"
+            ),
+            byzantine_defense=result.get("byzantine_defense") or payload.byzantine_defense,
+            byzantine_f_max=result.get("byzantine_f_max", payload.byzantine_f_max),
         )
     except TrainingProvenanceSecurityError as exc:
         logger.error("Operational federation rejected due to security policy violation: %s", exc)
@@ -383,7 +456,9 @@ async def start_operational_federation_job(
 @router.get("/progress", response_model=TrainingProgressResponse)
 @api_router.get("/progress", response_model=TrainingProgressResponse)
 async def get_latest_training_progress(
-    simulation_id: str | None = Query(default=None, description="Optional target simulation run ID"),
+    simulation_id: str | None = Query(
+        default=None, description="Optional target simulation run ID"
+    ),
 ) -> TrainingProgressResponse:
     """Retrieve real-time training progress for the specified or most recent simulation."""
     target_id = simulation_id
@@ -405,7 +480,9 @@ async def get_latest_training_progress(
 @router.get("/metrics", response_model=TrainingMetricsSummaryResponse)
 @api_router.get("/metrics", response_model=TrainingMetricsSummaryResponse)
 async def get_training_metrics(
-    simulation_id: str | None = Query(default=None, description="Optional target simulation run ID"),
+    simulation_id: str | None = Query(
+        default=None, description="Optional target simulation run ID"
+    ),
 ) -> TrainingMetricsSummaryResponse:
     """Retrieve training convergence loss and per-bank AUC progression."""
     target_id = simulation_id
@@ -462,7 +539,9 @@ async def get_training_metrics(
 @router.get("/history", response_model=TrainingHistoryResponse)
 @api_router.get("/history", response_model=TrainingHistoryResponse)
 async def get_training_history(
-    limit: int = Query(default=10, ge=1, le=100, description="Max historical simulation runs to return"),
+    limit: int = Query(
+        default=10, ge=1, le=100, description="Max historical simulation runs to return"
+    ),
 ) -> TrainingHistoryResponse:
     """Retrieve historical federated training simulation runs."""
     all_sims = list(_simulation_results.list_values())

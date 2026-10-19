@@ -45,7 +45,9 @@ def test_client() -> TestClient:
 class TestRegulatoryDossierService:
     """Tests core business logic of RegulatoryDossierGenerator."""
 
-    def test_get_dossier_summary_structure(self, dossier_service: RegulatoryDossierGenerator) -> None:
+    def test_get_dossier_summary_structure(
+        self, dossier_service: RegulatoryDossierGenerator
+    ) -> None:
         summary = dossier_service.get_dossier_summary("fedgnn-v4")
         assert summary["model_id"] == "fedgnn-v4"
         assert summary["dossier_id"] == "DOSSIER-FEDGNN-V4-2026"
@@ -61,8 +63,12 @@ class TestRegulatoryDossierService:
         assert metrics["p99_latency_ms"] <= 100.0
         assert 0.80 <= metrics["disparate_impact_ratio"] <= 1.25
         assert metrics["differential_privacy_epsilon"] == 1.0
-        assert metrics["differential_privacy_delta"] == 1e-5
-        assert metrics["byzantine_fault_tolerance_pct"] >= 33.0
+        assert metrics["byzantine_fault_tolerance_pct"] is None
+        assert metrics["byzantine_defense_status"] == "CONFIGURABLE_PLAINTEXT_ONLY"
+        assert (
+            "SecAgg aggregate-only mode omits individual Byzantine update filtering"
+            in metrics["byzantine_theoretical_preconditions"]
+        )
         assert metrics["zero_raw_pii_enforced"] is True
 
         limits = summary["drift_monitoring_limits"]
@@ -71,13 +77,17 @@ class TestRegulatoryDossierService:
         assert limits["covariance_frobenius_critical"] == 3.00
         assert limits["rollback_sla_seconds"] <= 5.0
 
-    def test_dossier_sha256_seal_consistency(self, dossier_service: RegulatoryDossierGenerator) -> None:
+    def test_dossier_sha256_seal_consistency(
+        self, dossier_service: RegulatoryDossierGenerator
+    ) -> None:
         summary1 = dossier_service.get_dossier_summary("fedgnn-test")
         summary2 = dossier_service.get_dossier_summary("fedgnn-test")
         assert summary1["sha256_dossier_seal"] == summary2["sha256_dossier_seal"]
         assert len(summary1["sha256_dossier_seal"]) == 64
 
-    def test_eu_ai_act_matrix_all_compliant(self, dossier_service: RegulatoryDossierGenerator) -> None:
+    def test_eu_ai_act_matrix_all_compliant(
+        self, dossier_service: RegulatoryDossierGenerator
+    ) -> None:
         matrix = dossier_service.get_eu_ai_act_matrix()
         assert matrix["overall_status"] == "COMPLIANT"
         assert matrix["compliance_rate_pct"] == 100.0
@@ -121,7 +131,9 @@ class TestRegulatoryDossierService:
         assert "concept_output_drift" in p3["details"]
         assert "rollback_sla" in p3["details"]
 
-    def test_benchmark_comparison_metrics(self, dossier_service: RegulatoryDossierGenerator) -> None:
+    def test_benchmark_comparison_metrics(
+        self, dossier_service: RegulatoryDossierGenerator
+    ) -> None:
         benchmarks = dossier_service.get_benchmark_comparison()
         assert len(benchmarks) == 5
 
@@ -137,10 +149,13 @@ class TestRegulatoryDossierService:
         # Privacy and Byzantine robustness invariants
         assert fedgnn["differential_privacy_eps"] == 1.0
         assert fedgnn["zero_raw_pii_enforced"] is True
-        assert "33.3%" in fedgnn["byzantine_tolerance"]
+        assert "Configurable" in fedgnn["byzantine_tolerance"]
+        assert "SecAgg aggregate-only lacks filtering" in fedgnn["byzantine_tolerance"]
         assert xgboost["zero_raw_pii_enforced"] is False
 
-    def test_supervisory_signoff_addition(self, dossier_service: RegulatoryDossierGenerator) -> None:
+    def test_supervisory_signoff_addition(
+        self, dossier_service: RegulatoryDossierGenerator
+    ) -> None:
         initial_count = len(dossier_service.list_supervisory_signoffs())
         record = dossier_service.add_supervisory_signoff(
             officer_name="Sarah Jenkins",
@@ -153,7 +168,9 @@ class TestRegulatoryDossierService:
         assert len(record["sha256_attestation_hash"]) == 64
         assert len(dossier_service.list_supervisory_signoffs()) == initial_count + 1
 
-    def test_supervisory_signoff_thread_safety(self, dossier_service: RegulatoryDossierGenerator) -> None:
+    def test_supervisory_signoff_thread_safety(
+        self, dossier_service: RegulatoryDossierGenerator
+    ) -> None:
         initial_count = len(dossier_service.list_supervisory_signoffs())
 
         def _add(idx: int) -> dict[str, Any]:
@@ -190,7 +207,9 @@ class TestRegulatoryDossierExport:
 
         # Verify KaTeX math compatibility (Rule 4: no unescaped underscores in \text{})
         text_underscore_matches = re.findall(r"\\text\{[^}]*_[^}]*\}", md)
-        assert len(text_underscore_matches) == 0, f"KaTeX invalid math found: {text_underscore_matches}"
+        assert len(text_underscore_matches) == 0, (
+            f"KaTeX invalid math found: {text_underscore_matches}"
+        )
 
     def test_export_json_structure(self, dossier_service: RegulatoryDossierGenerator) -> None:
         data = dossier_service.export_dossier_json("fedgnn-champion-v4")

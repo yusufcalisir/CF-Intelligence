@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime  # noqa: TC003
-from typing import Any
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.domain.enums import PrivacyMechanism, SimulationStatus
 
@@ -359,7 +359,6 @@ class SimulationDeleteResponse(BaseModel):
     message: str
 
 
-
 class TrainingRoundResponse(BaseModel):
     """Round-by-round training telemetry metrics."""
 
@@ -532,6 +531,61 @@ class OperationalFederationRequest(BaseModel):
         default=2**64,
         description="Modular arithmetic base for pairwise masking (must be 2^64)",
     )
+    byzantine_defense: Literal[
+        "none",
+        "coordinate_wise_median",
+        "trimmed_mean",
+        "krum",
+        "bulyan",
+    ] = Field(
+        default="none",
+        description="Operational Byzantine-robust aggregation strategy ('none' defaults to sample-weighted FedAvg)",
+    )
+    byzantine_f_max: int = Field(
+        default=1,
+        ge=0,
+        description="Declared upper bound of assumed faulty/colluding Byzantine participants",
+    )
+    trimmed_mean_trim_count: int | None = Field(
+        default=None,
+        ge=1,
+        description="Explicit number of extreme values to trim per tail in Trimmed Mean (k >= 1)",
+    )
+
+    @model_validator(mode="after")
+    def validate_operational_byzantine_and_secagg(self) -> Self:
+        clean_defense = (self.byzantine_defense or "none").strip().lower()
+        if self.secagg_enabled and clean_defense != "none":
+            raise ValueError(
+                f"Additive Secure Aggregation (SecAgg) is mathematically incompatible with non-linear Byzantine defense '{self.byzantine_defense}'. "
+                "SecAgg masks conceal individual updates, preventing coordinate sorting and distance computation."
+            )
+        n = len(self.participating_banks) if self.participating_banks else 3
+        f = self.byzantine_f_max
+        if clean_defense == "krum" and n < 2 * f + 3:
+            raise ValueError(
+                f"Krum theoretical precondition violated: requires n >= 2f + 3 (got n={n}, f={f}; required n >= {2 * f + 3}). "
+                "Default 3-bank consortium cannot support f >= 1."
+            )
+        if clean_defense == "bulyan" and n < 4 * f + 3:
+            raise ValueError(
+                f"Bulyan theoretical precondition violated: requires n >= 4f + 3 (got n={n}, f={f}; required n >= {4 * f + 3}). "
+                "Default 3-bank consortium cannot support f >= 1."
+            )
+        if clean_defense == "coordinate_wise_median" and f >= n / 2.0:
+            raise ValueError(
+                f"Coordinate-wise Median theoretical precondition violated: requires f < n/2 (got n={n}, f={f}; requires f <= {(n - 1) // 2})."
+            )
+        if clean_defense == "trimmed_mean":
+            k = self.trimmed_mean_trim_count if self.trimmed_mean_trim_count is not None else f
+            if k <= 0:
+                raise ValueError("Trimmed Mean requires trim count k >= 1.")
+            if n <= 2 * k:
+                raise ValueError(
+                    f"Trimmed Mean theoretical precondition violated: requires n > 2k (got n={n}, k={k}; required n >= {2 * k + 1}). "
+                    "Default 3-bank consortium with k=1 leaves 1 client (median); k >= 2 leaves 0 clients."
+                )
+        return self
 
 
 class OperationalFederationResponse(BaseModel):
@@ -553,6 +607,10 @@ class OperationalFederationResponse(BaseModel):
     dp_provenance: dict[str, Any] = Field(default_factory=dict)
     secagg_enabled: bool = False
     secagg_provenance: dict[str, Any] | None = None
+    requested_aggregation_method: str = "fed_avg_weighted"
+    executed_aggregation_method: str = "fed_avg_weighted"
+    byzantine_defense: str = "none"
+    byzantine_f_max: int = 0
     error: str | None = None
 
 

@@ -2009,6 +2009,9 @@ class IsolatedCoordinatorClient:
         dp_config: Mapping[str, Any] | None = None,
         secagg_enabled: bool = False,
         secagg_config: Mapping[str, Any] | None = None,
+        byzantine_defense: str = "none",
+        byzantine_f_max: int = 1,
+        trimmed_mean_trim_count: int | None = None,
     ) -> dict[str, Any]:
         req = {
             "command": "EXECUTE_FEDERATION",
@@ -2035,6 +2038,9 @@ class IsolatedCoordinatorClient:
             "dp_config": dp_config,
             "secagg_enabled": secagg_enabled,
             "secagg_config": secagg_config,
+            "byzantine_defense": byzantine_defense,
+            "byzantine_f_max": byzantine_f_max,
+            "trimmed_mean_trim_count": trimmed_mean_trim_count,
         }
         try:
             self._conn.send(req)
@@ -2402,6 +2408,9 @@ def _run_isolated_coordinator_worker(
                     dp_config=req.get("dp_config"),
                     secagg_enabled=bool(req.get("secagg_enabled", False)),
                     secagg_config=req.get("secagg_config"),
+                    byzantine_defense=req.get("byzantine_defense", "none"),
+                    byzantine_f_max=req.get("byzantine_f_max", 1),
+                    trimmed_mean_trim_count=req.get("trimmed_mean_trim_count"),
                 )
 
                 if "worker_pids" in req:
@@ -2605,6 +2614,9 @@ def run_production_federation(
     dp_config: Mapping[str, Any] | None = None,
     secagg_enabled: bool = False,
     secagg_config: Mapping[str, Any] | None = None,
+    byzantine_defense: str = "none",
+    byzantine_f_max: int = 1,
+    trimmed_mean_trim_count: int | None = None,
 ) -> dict[str, Any]:
     """Canonical production entry point executing distributed federation under the mandatory restricted coordinator boundary."""
     proc, client = spawn_isolated_coordinator_process(app_env=app_env)
@@ -2628,6 +2640,9 @@ def run_production_federation(
             dp_config=dp_config,
             secagg_enabled=secagg_enabled,
             secagg_config=secagg_config,
+            byzantine_defense=byzantine_defense,
+            byzantine_f_max=byzantine_f_max,
+            trimmed_mean_trim_count=trimmed_mean_trim_count,
         )
     finally:
         client.terminate()
@@ -3867,10 +3882,16 @@ def run_bank_worker_node(
                 token=worker_token,
             )
         except TrainingProvenanceSecurityError as sec_err:
-            logger.error("Bank worker [%s] institutional identity registration security error: %s", bank_id, sec_err)
+            logger.error(
+                "Bank worker [%s] institutional identity registration security error: %s",
+                bank_id,
+                sec_err,
+            )
             raise
         except Exception as reg_err:
-            logger.debug("Bank worker [%s] auto-registration of institutional identity: %s", bank_id, reg_err)
+            logger.debug(
+                "Bank worker [%s] auto-registration of institutional identity: %s", bank_id, reg_err
+            )
 
         # Load local training data from isolated bank storage if path provided
         vault_handle: BankPrivateStorageVault | None = None
@@ -4046,7 +4067,10 @@ def run_bank_worker_node(
                 if msg.get("command") == "TRAIN_ROUND":
                     job_id = msg["job_id"]
                     round_number = msg["round_number"]
-                    attempt_id = str(msg.get("attempt_id") or f"att_{job_id}_r{round_number}_{uuid.uuid4().hex[:8]}")
+                    attempt_id = str(
+                        msg.get("attempt_id")
+                        or f"att_{job_id}_r{round_number}_{uuid.uuid4().hex[:8]}"
+                    )
                     global_weights_obj: ModelWeights | None = msg.get("global_weights")
 
                     # On round 1, authorized worker initiates or verifies job start in PostgreSQL authority
@@ -4107,29 +4131,39 @@ def run_bank_worker_node(
                         raw_dataset_tag = str(dp_config.get("dataset_tag", "primary_vault")).strip()
                         is_prod = app_env.lower() == "production"
                         try:
-                            auth_dataset_tag = authority_source.resolve_authoritative_dataset_identity(
-                                bank_id=bank_id,
-                                dataset_tag=raw_dataset_tag,
-                                is_prod=is_prod,
+                            auth_dataset_tag = (
+                                authority_source.resolve_authoritative_dataset_identity(
+                                    bank_id=bank_id,
+                                    dataset_tag=raw_dataset_tag,
+                                    is_prod=is_prod,
+                                )
                             )
                         except Exception as tag_err:
-                            logger.error("Bank worker [%s] dataset identity resolution failed: %s", bank_id, tag_err)
-                            outbox.put({
-                                "status": "ERROR",
-                                "bank_id": bank_id,
-                                "error": f"Unauthorized dataset identity: {tag_err}",
-                                "pid": pid,
-                            })
+                            logger.error(
+                                "Bank worker [%s] dataset identity resolution failed: %s",
+                                bank_id,
+                                tag_err,
+                            )
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": f"Unauthorized dataset identity: {tag_err}",
+                                    "pid": pid,
+                                }
+                            )
                             continue
 
                         if vault_handle is not None:
                             vault_tag = vault_handle.get_authoritative_dataset_identity()
                             if is_prod and auth_dataset_tag != vault_tag:
                                 try:
-                                    resolved_vault = authority_source.resolve_authoritative_dataset_identity(
-                                        bank_id=bank_id,
-                                        dataset_tag=vault_tag,
-                                        is_prod=True,
+                                    resolved_vault = (
+                                        authority_source.resolve_authoritative_dataset_identity(
+                                            bank_id=bank_id,
+                                            dataset_tag=vault_tag,
+                                            is_prod=True,
+                                        )
                                     )
                                     if resolved_vault != auth_dataset_tag:
                                         raise TrainingProvenanceSecurityError(
@@ -4137,19 +4171,26 @@ def run_bank_worker_node(
                                             f"but local bank storage vault is bound to '{resolved_vault}'."
                                         )
                                 except Exception as subst_err:
-                                    outbox.put({
-                                        "status": "ERROR",
-                                        "bank_id": bank_id,
-                                        "error": str(subst_err),
-                                        "pid": pid,
-                                    })
+                                    outbox.put(
+                                        {
+                                            "status": "ERROR",
+                                            "bank_id": bank_id,
+                                            "error": str(subst_err),
+                                            "pid": pid,
+                                        }
+                                    )
                                     continue
 
-                        accountant_type = str(
-                            dp_config.get("accountant_type")
-                            or dp_config.get("accountant")
-                            or "prv"
-                        ).strip().lower().replace("opacus_", "")
+                        accountant_type = (
+                            str(
+                                dp_config.get("accountant_type")
+                                or dp_config.get("accountant")
+                                or "prv"
+                            )
+                            .strip()
+                            .lower()
+                            .replace("opacus_", "")
+                        )
                         require_secure_rng = bool(dp_config.get("require_secure_rng", False))
                         batch_size = int(dp_config.get("batch_size", 32))
                         learning_rate = float(dp_config.get("learning_rate", 0.01))
@@ -4171,12 +4212,14 @@ def run_bank_worker_node(
                                 f"Workers cannot allocate new budgets. Allocation must be explicitly provisioned by trusted authority."
                             )
                             logger.error("Bank worker [%s] %s", bank_id, err_msg)
-                            outbox.put({
-                                "status": "ERROR",
-                                "bank_id": bank_id,
-                                "error": f"Privacy budget missing: {err_msg}",
-                                "pid": pid,
-                            })
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": f"Privacy budget missing: {err_msg}",
+                                    "pid": pid,
+                                }
+                            )
                             continue
 
                         history_job_eps = 0.0
@@ -4214,12 +4257,14 @@ def run_bank_worker_node(
                                 f"exceeds remaining available budget ({budget_record.remaining_epsilon:.4f})."
                             )
                             logger.error("Bank worker [%s] %s", bank_id, err_msg)
-                            outbox.put({
-                                "status": "ERROR",
-                                "bank_id": bank_id,
-                                "error": f"Privacy budget exhausted: {err_msg}",
-                                "pid": pid,
-                            })
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": f"Privacy budget exhausted: {err_msg}",
+                                    "pid": pid,
+                                }
+                            )
                             continue
 
                         # Compute immutable parameter digest for attempt binding
@@ -4255,20 +4300,28 @@ def run_bank_worker_node(
                         except TrainingProvenanceSecurityError as pse:
                             logger.error(
                                 "Bank worker [%s] attempt admission security error for job %s round %d: %s",
-                                bank_id, job_id, round_number, pse,
+                                bank_id,
+                                job_id,
+                                round_number,
+                                pse,
                             )
-                            outbox.put({
-                                "status": "ERROR",
-                                "bank_id": bank_id,
-                                "error": f"Attempt admission security error: {pse}",
-                                "pid": pid,
-                            })
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": f"Attempt admission security error: {pse}",
+                                    "pid": pid,
+                                }
+                            )
                             continue
 
                         if admission.status == "ALREADY_COMPLETED":
                             logger.info(
                                 "Bank worker [%s] attempt %s for job %s round %d already completed. Replaying cached output without re-training.",
-                                bank_id, attempt_id, job_id, round_number,
+                                bank_id,
+                                attempt_id,
+                                job_id,
+                                round_number,
                             )
                             cached_res = session.get(f"attempt_{attempt_id}")
                             if cached_res is not None:
@@ -4276,47 +4329,54 @@ def run_bank_worker_node(
                                 continue
                             existing_obs = authority_source.get_round_observations(job_id)
                             cached_obs = [
-                                o for o in existing_obs
+                                o
+                                for o in existing_obs
                                 if o.bank_id == bank_id and o.round_number == round_number
                             ]
                             if cached_obs and cached_obs[0].model_update_digest:
-                                outbox.put({
-                                    "status": "SUCCESS",
-                                    "bank_id": bank_id,
-                                    "pid": pid,
-                                    "round_number": round_number,
-                                    "attempt_id": attempt_id,
-                                    "weights": None,
-                                    "update_digest": cached_obs[0].model_update_digest,
-                                    "sample_count": cached_obs[0].actual_sample_count,
-                                    "executed_epochs": cached_obs[0].actual_executed_epochs,
-                                    "dp_provenance": {"status": "ALREADY_COMPLETED"},
-                                })
+                                outbox.put(
+                                    {
+                                        "status": "SUCCESS",
+                                        "bank_id": bank_id,
+                                        "pid": pid,
+                                        "round_number": round_number,
+                                        "attempt_id": attempt_id,
+                                        "weights": None,
+                                        "update_digest": cached_obs[0].model_update_digest,
+                                        "sample_count": cached_obs[0].actual_sample_count,
+                                        "executed_epochs": cached_obs[0].actual_executed_epochs,
+                                        "dp_provenance": {"status": "ALREADY_COMPLETED"},
+                                    }
+                                )
                                 continue
                             else:
-                                outbox.put({
-                                    "status": "SUCCESS",
-                                    "bank_id": bank_id,
-                                    "pid": pid,
-                                    "round_number": round_number,
-                                    "attempt_id": attempt_id,
-                                    "weights": None,
-                                    "update_digest": "",
-                                    "sample_count": len(X_train),
-                                    "executed_epochs": 1,
-                                    "dp_provenance": {"status": "ALREADY_COMPLETED"},
-                                })
+                                outbox.put(
+                                    {
+                                        "status": "SUCCESS",
+                                        "bank_id": bank_id,
+                                        "pid": pid,
+                                        "round_number": round_number,
+                                        "attempt_id": attempt_id,
+                                        "weights": None,
+                                        "update_digest": "",
+                                        "sample_count": len(X_train),
+                                        "executed_epochs": 1,
+                                        "dp_provenance": {"status": "ALREADY_COMPLETED"},
+                                    }
+                                )
                                 continue
 
                         if admission.status != "ADMITTED":
                             err_msg = f"Attempt admission rejected ({admission.status}): {admission.reason}"
                             logger.error("Bank worker [%s] %s", bank_id, err_msg)
-                            outbox.put({
-                                "status": "ERROR",
-                                "bank_id": bank_id,
-                                "error": err_msg,
-                                "pid": pid,
-                            })
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": err_msg,
+                                    "pid": pid,
+                                }
+                            )
                             continue
 
                         # Execute Opacus DP-SGD
@@ -4484,6 +4544,7 @@ def run_bank_worker_node(
                     # In DP mode, un-noised training loss is restricted bank-internal data and omitted from release.
                     success_payload: dict[str, Any] = {
                         "status": "SUCCESS",
+                        "job_id": job_id,
                         "bank_id": bank_id,
                         "pid": pid,
                         "round_number": round_number,
@@ -4503,30 +4564,40 @@ def run_bank_worker_node(
 
                 if msg.get("command") == "SECAGG_SETUP":
                     job_id = str(msg["job_id"]).strip()
-                    consortium_id = str(msg.get("consortium_id") or "cfi-consortium").strip().lower()
+                    consortium_id = (
+                        str(msg.get("consortium_id") or "cfi-consortium").strip().lower()
+                    )
                     session_id = str(msg["session_id"]).strip()
                     round_number = int(msg["round_number"])
                     roster = [str(r).strip().upper() for r in msg.get("roster", []) if r]
-                    relayed_peer_identities = dict(msg.get("peer_identities") or msg.get("institutional_public_keys") or {})
+                    relayed_peer_identities = dict(
+                        msg.get("peer_identities") or msg.get("institutional_public_keys") or {}
+                    )
                     secagg_config = dict(msg.get("secagg_config") or {})
 
                     clean_bank = bank_id.strip().upper()
                     if session_id in secagg_worker_sessions:
                         err_msg = f"Bank worker [{bank_id}] rejected SecAgg setup: duplicate session_id '{session_id}'."
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     if clean_bank not in roster:
                         err_msg = f"Bank worker [{bank_id}] received SecAgg setup but is not in authorized roster: {roster}"
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     if len(roster) < 2:
                         err_msg = f"Bank worker [{bank_id}] rejected SecAgg setup: insufficient participants in roster ({len(roster)} < 2)."
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     # 1. Independently authenticate scheduled job, roster, and consortium against authoritative record
@@ -4534,7 +4605,9 @@ def run_bank_worker_node(
                     if sched is None:
                         err_msg = f"Bank worker [{bank_id}] rejected SecAgg setup: job [{job_id}] is not scheduled in authoritative record."
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     sched_workers = {w.strip().upper() for w in sched.permitted_workers}
@@ -4545,7 +4618,9 @@ def run_bank_worker_node(
                             f"does not match authoritative permitted workers {sorted(sched_workers)}."
                         )
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     if sched.consortium_id and sched.consortium_id.strip().lower() != consortium_id:
@@ -4554,27 +4629,39 @@ def run_bank_worker_node(
                             f"does not match authoritative job consortium [{sched.consortium_id}]."
                         )
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     # 2. Derive bank-owned institutional keypair
                     try:
-                        priv_hex, pub_hex = derive_institutional_identity_hex(clean_bank, worker_token)
+                        priv_hex, pub_hex = derive_institutional_identity_hex(
+                            clean_bank, worker_token
+                        )
                     except Exception as k_err:
-                        err_msg = f"Failed to derive institutional keypair for bank [{bank_id}]: {k_err}"
+                        err_msg = (
+                            f"Failed to derive institutional keypair for bank [{bank_id}]: {k_err}"
+                        )
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     # 3. Independently verify peer public keys against authoritative trust material outside coordinator control
                     authoritative_peer_keys = authority_source.get_institutional_identities(roster)
-                    missing_auth_keys = [r for r in roster if r not in authoritative_peer_keys or not authoritative_peer_keys[r]]
+                    missing_auth_keys = [
+                        r
+                        for r in roster
+                        if r not in authoritative_peer_keys or not authoritative_peer_keys[r]
+                    ]
                     if missing_auth_keys:
-                        err_msg = (
-                            f"Bank worker [{bank_id}] rejected SecAgg setup: missing authoritative institutional keys for {missing_auth_keys}."
-                        )
+                        err_msg = f"Bank worker [{bank_id}] rejected SecAgg setup: missing authoritative institutional keys for {missing_auth_keys}."
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     # Local bank's derived public key must match authoritative record
@@ -4585,7 +4672,9 @@ def run_bank_worker_node(
                             f"derived '{pub_hex}' != authoritative record '{local_auth_key}'."
                         )
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     # Treat coordinator-relayed public keys as untrusted transport data, never as a trust anchor!
@@ -4601,7 +4690,14 @@ def run_bank_worker_node(
                                     f"relayed '{r_key}' != authoritative '{expected_key}'. Rejecting setup."
                                 )
                                 logger.error(err_msg)
-                                outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                                outbox.put(
+                                    {
+                                        "status": "ERROR",
+                                        "bank_id": bank_id,
+                                        "error": err_msg,
+                                        "pid": pid,
+                                    }
+                                )
                                 substitution_detected = True
                                 break
                     if substitution_detected:
@@ -4628,7 +4724,9 @@ def run_bank_worker_node(
                     except Exception as init_err:
                         err_msg = f"Bank worker [{bank_id}] failed SecAgg driver initialization: {init_err}"
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     secagg_worker_sessions[session_id] = {
@@ -4645,31 +4743,40 @@ def run_bank_worker_node(
                     }
 
                     bundle_dict = bundle.to_dict()
-                    outbox.put({
-                        "status": "SUCCESS",
-                        "bank_id": bank_id,
-                        "pid": pid,
-                        "session_id": session_id,
-                        "bundle": bundle_dict,
-                        "public_bundle": bundle_dict,
-                    })
+                    outbox.put(
+                        {
+                            "status": "SUCCESS",
+                            "bank_id": bank_id,
+                            "pid": pid,
+                            "session_id": session_id,
+                            "bundle": bundle_dict,
+                            "public_bundle": bundle_dict,
+                        }
+                    )
                     continue
 
                 if msg.get("command") == "SECAGG_TRAIN_AND_MASK":
                     job_id = str(msg.get("job_id", "")).strip()
                     round_number = int(msg.get("round_number", 0))
                     session_id = str(msg.get("session_id", "")).strip()
-                    consortium_id = str(msg.get("consortium_id") or "cfi-consortium").strip().lower()
+                    consortium_id = (
+                        str(msg.get("consortium_id") or "cfi-consortium").strip().lower()
+                    )
                     peer_bundles_raw = dict(msg.get("peer_bundles") or {})
                     global_weights_obj = msg.get("global_weights")
-                    attempt_id = str(msg.get("attempt_id") or f"att_{job_id}_r{round_number}_{uuid.uuid4().hex[:8]}")
+                    attempt_id = str(
+                        msg.get("attempt_id")
+                        or f"att_{job_id}_r{round_number}_{uuid.uuid4().hex[:8]}"
+                    )
 
                     clean_bank = bank_id.strip().upper()
                     sess = secagg_worker_sessions.get(session_id)
                     if sess is None:
                         err_msg = f"Bank worker [{bank_id}] received SECAGG_TRAIN_AND_MASK for unknown session '{session_id}'"
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     # Single-use session state check: prevent replay of ephemeral key material
@@ -4679,7 +4786,9 @@ def run_bank_worker_node(
                             f"is in terminal state '{sess['state']}'. Single-use cryptographic session cannot be reused."
                         )
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     # Context binding check: bind to stored job_id, consortium_id, round_number, bank_id
@@ -4696,7 +4805,9 @@ def run_bank_worker_node(
                             f"got (job={job_id}, round={round_number}, consortium={consortium_id}, bank={clean_bank}). Session invalidated."
                         )
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     driver = sess["driver"]
@@ -4714,7 +4825,14 @@ def run_bank_worker_node(
                             sess["state"] = "ABORTED"
                             err_msg = f"Bank worker [{bank_id}] missing peer bundle for required participant [{clean_p}]."
                             logger.error(err_msg)
-                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": err_msg,
+                                    "pid": pid,
+                                }
+                            )
                             bundle_verification_failed = True
                             break
 
@@ -4723,13 +4841,24 @@ def run_bank_worker_node(
                             bundle_obj = ECDHPublicKeyBundle.from_dict(raw_bundle_dict)
                             peer_pub_hex = authoritative_peer_keys.get(clean_p)
                             if not peer_pub_hex:
-                                raise SecAggSecurityError(f"Missing authoritative institutional key for peer [{clean_p}].")
-                            driver.receive_peer_bundle(bundle_obj, peer_institutional_public_key=peer_pub_hex)
+                                raise SecAggSecurityError(
+                                    f"Missing authoritative institutional key for peer [{clean_p}]."
+                                )
+                            driver.receive_peer_bundle(
+                                bundle_obj, peer_institutional_public_key=peer_pub_hex
+                            )
                         except (SecAggSecurityError, Exception) as bv_err:
                             sess["state"] = "ABORTED"
                             err_msg = f"Bank worker [{bank_id}] rejected peer bundle from [{clean_p}]: {bv_err}"
                             logger.error(err_msg)
-                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": err_msg,
+                                    "pid": pid,
+                                }
+                            )
                             bundle_verification_failed = True
                             break
 
@@ -4746,15 +4875,29 @@ def run_bank_worker_node(
                             )
                         except Exception as start_err:
                             sess["state"] = "ABORTED"
-                            logger.error("Bank worker [%s] failed to start training job %s: %s", bank_id, job_id, start_err)
-                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": str(start_err), "pid": pid})
+                            logger.error(
+                                "Bank worker [%s] failed to start training job %s: %s",
+                                bank_id,
+                                job_id,
+                                start_err,
+                            )
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": str(start_err),
+                                    "pid": pid,
+                                }
+                            )
                             continue
 
                     sched = authority_source.get_scheduled_job(job_id)
                     dp_config = sched.dp_config if sched and sched.dp_config else None
                     is_dp_enabled = bool(dp_config and dp_config.get("dp_enabled", False))
 
-                    local_model = model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+                    local_model = model_service.create_model(
+                        input_dim=NUM_FEATURES, dp_compatible=True
+                    )
                     if global_weights_obj is not None:
                         model_service.set_parameters(local_model, global_weights_obj)
 
@@ -4766,30 +4909,42 @@ def run_bank_worker_node(
                         max_grad_norm = float(dp_config.get("max_grad_norm", 1.0))
                         noise_multiplier = (
                             float(dp_config["noise_multiplier"])
-                            if "noise_multiplier" in dp_config and dp_config["noise_multiplier"] is not None
+                            if "noise_multiplier" in dp_config
+                            and dp_config["noise_multiplier"] is not None
                             else None
                         )
                         raw_dataset_tag = str(dp_config.get("dataset_tag", "primary_vault")).strip()
                         is_prod = app_env.lower() == "production"
                         try:
-                            auth_dataset_tag = authority_source.resolve_authoritative_dataset_identity(
-                                bank_id=bank_id,
-                                dataset_tag=raw_dataset_tag,
-                                is_prod=is_prod,
+                            auth_dataset_tag = (
+                                authority_source.resolve_authoritative_dataset_identity(
+                                    bank_id=bank_id,
+                                    dataset_tag=raw_dataset_tag,
+                                    is_prod=is_prod,
+                                )
                             )
                         except Exception as tag_err:
                             sess["state"] = "ABORTED"
-                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": f"Unauthorized dataset: {tag_err}", "pid": pid})
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": f"Unauthorized dataset: {tag_err}",
+                                    "pid": pid,
+                                }
+                            )
                             continue
 
                         if vault_handle is not None:
                             vault_tag = vault_handle.get_authoritative_dataset_identity()
                             if is_prod and auth_dataset_tag != vault_tag:
                                 try:
-                                    resolved_vault = authority_source.resolve_authoritative_dataset_identity(
-                                        bank_id=bank_id,
-                                        dataset_tag=vault_tag,
-                                        is_prod=True,
+                                    resolved_vault = (
+                                        authority_source.resolve_authoritative_dataset_identity(
+                                            bank_id=bank_id,
+                                            dataset_tag=vault_tag,
+                                            is_prod=True,
+                                        )
                                     )
                                     if resolved_vault != auth_dataset_tag:
                                         raise TrainingProvenanceSecurityError(
@@ -4797,20 +4952,34 @@ def run_bank_worker_node(
                                         )
                                 except Exception as subst_err:
                                     sess["state"] = "ABORTED"
-                                    outbox.put({"status": "ERROR", "bank_id": bank_id, "error": str(subst_err), "pid": pid})
+                                    outbox.put(
+                                        {
+                                            "status": "ERROR",
+                                            "bank_id": bank_id,
+                                            "error": str(subst_err),
+                                            "pid": pid,
+                                        }
+                                    )
                                     continue
 
-                        accountant_type = str(
-                            dp_config.get("accountant_type")
-                            or dp_config.get("accountant")
-                            or "prv"
-                        ).strip().lower().replace("opacus_", "")
+                        accountant_type = (
+                            str(
+                                dp_config.get("accountant_type")
+                                or dp_config.get("accountant")
+                                or "prv"
+                            )
+                            .strip()
+                            .lower()
+                            .replace("opacus_", "")
+                        )
                         require_secure_rng = bool(dp_config.get("require_secure_rng", False))
                         batch_size = int(dp_config.get("batch_size", 32))
                         learning_rate = float(dp_config.get("learning_rate", 0.01))
                         expected_rounds = sched.expected_rounds if sched else 1
 
-                        session = dp_sessions.setdefault(job_id, {"privacy_engine": None, "steps_executed": 0})
+                        session = dp_sessions.setdefault(
+                            job_id, {"privacy_engine": None, "steps_executed": 0}
+                        )
                         existing_engine = session.get("privacy_engine")
 
                         budget_record = authority_source.get_institutional_privacy_budget(
@@ -4818,7 +4987,14 @@ def run_bank_worker_node(
                         )
                         if budget_record is None:
                             sess["state"] = "ABORTED"
-                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": "Privacy budget missing", "pid": pid})
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": "Privacy budget missing",
+                                    "pid": pid,
+                                }
+                            )
                             continue
 
                         history_job_eps = 0.0
@@ -4826,19 +5002,38 @@ def run_bank_worker_node(
                         prior_steps = 0
                         if budget_record.history:
                             for entry in budget_record.history:
-                                if isinstance(entry, dict) and entry.get("job_id") == job_id and entry.get("status") == "COMMITTED":
-                                    history_job_eps = max(history_job_eps, float(entry.get("spent_epsilon", 0.0)))
-                                    history_job_del = max(history_job_del, float(entry.get("spent_delta", 0.0)))
+                                if (
+                                    isinstance(entry, dict)
+                                    and entry.get("job_id") == job_id
+                                    and entry.get("status") == "COMMITTED"
+                                ):
+                                    history_job_eps = max(
+                                        history_job_eps, float(entry.get("spent_epsilon", 0.0))
+                                    )
+                                    history_job_del = max(
+                                        history_job_del, float(entry.get("spent_delta", 0.0))
+                                    )
                                     prior_steps += int(entry.get("steps_executed", 0))
 
-                        prior_job_spent_eps = max(history_job_eps, float(session.get("last_committed_eps", 0.0)))
-                        prior_job_spent_del = max(history_job_del, float(session.get("last_committed_del", 0.0)))
+                        prior_job_spent_eps = max(
+                            history_job_eps, float(session.get("last_committed_eps", 0.0))
+                        )
+                        prior_job_spent_del = max(
+                            history_job_del, float(session.get("last_committed_del", 0.0))
+                        )
                         needed_eps = max(0.001, target_epsilon - prior_job_spent_eps)
                         needed_del = max(0.0, target_delta - prior_job_spent_del)
 
                         if budget_record.remaining_epsilon < (needed_eps - 1e-9):
                             sess["state"] = "ABORTED"
-                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": "Privacy budget exhausted", "pid": pid})
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": "Privacy budget exhausted",
+                                    "pid": pid,
+                                }
+                            )
                             continue
 
                         params_digest_dict = {
@@ -4871,12 +5066,26 @@ def run_bank_worker_node(
                             )
                         except TrainingProvenanceSecurityError as pse:
                             sess["state"] = "ABORTED"
-                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": str(pse), "pid": pid})
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": str(pse),
+                                    "pid": pid,
+                                }
+                            )
                             continue
 
                         if admission.status != "ADMITTED":
                             sess["state"] = "ABORTED"
-                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": f"Attempt rejected: {admission.reason}", "pid": pid})
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": f"Attempt rejected: {admission.reason}",
+                                    "pid": pid,
+                                }
+                            )
                             continue
 
                         steps_per_epoch = math.ceil(len(X_train) / max(1, batch_size))
@@ -4902,17 +5111,32 @@ def run_bank_worker_node(
                                     prior_steps=prior_steps if existing_engine is None else 0,
                                 )
                             )
-                            session["privacy_engine"] = getattr(local_model, "_privacy_engine", None)
+                            session["privacy_engine"] = getattr(
+                                local_model, "_privacy_engine", None
+                            )
                             session["steps_executed"] += steps_per_epoch
                             dp_info = getattr(local_model, "dp_provenance", {})
                         except Exception as dp_err:
                             sess["state"] = "ABORTED"
-                            logger.error("Bank worker [%s] Opacus DP-SGD failed: %s", bank_id, dp_err)
-                            outbox.put({"status": "ERROR", "bank_id": bank_id, "error": f"Opacus DP-SGD failed: {dp_err}", "pid": pid})
+                            logger.error(
+                                "Bank worker [%s] Opacus DP-SGD failed: %s", bank_id, dp_err
+                            )
+                            outbox.put(
+                                {
+                                    "status": "ERROR",
+                                    "bank_id": bank_id,
+                                    "error": f"Opacus DP-SGD failed: {dp_err}",
+                                    "pid": pid,
+                                }
+                            )
                             continue
 
-                        spent_eps = float(dp_info.get("epsilon", needed_eps)) if dp_info else needed_eps
-                        spent_del = float(dp_info.get("delta", target_delta)) if dp_info else target_delta
+                        spent_eps = (
+                            float(dp_info.get("epsilon", needed_eps)) if dp_info else needed_eps
+                        )
+                        spent_del = (
+                            float(dp_info.get("delta", target_delta)) if dp_info else target_delta
+                        )
                         authority_source.commit_institutional_privacy_expenditure(
                             bank_id=bank_id,
                             dataset_tag=auth_dataset_tag,
@@ -4941,7 +5165,14 @@ def run_bank_worker_node(
 
                     if not loss_history:
                         sess["state"] = "ABORTED"
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": "No loss history produced", "pid": pid})
+                        outbox.put(
+                            {
+                                "status": "ERROR",
+                                "bank_id": bank_id,
+                                "error": "No loss history produced",
+                                "pid": pid,
+                            }
+                        )
                         continue
 
                     if is_dp_enabled:
@@ -4949,7 +5180,9 @@ def run_bank_worker_node(
                         obs_metrics = {
                             "dp_epsilon": float(dp_info.get("epsilon", 0.0)) if dp_info else 0.0,
                             "dp_delta": float(dp_info.get("delta", 0.0)) if dp_info else 0.0,
-                            "dp_noise_multiplier": float(dp_info.get("noise_multiplier", 0.0)) if dp_info else 0.0,
+                            "dp_noise_multiplier": float(dp_info.get("noise_multiplier", 0.0))
+                            if dp_info
+                            else 0.0,
                         }
                     else:
                         observed_loss = float(loss_history[-1])
@@ -4969,15 +5202,30 @@ def run_bank_worker_node(
                         masked_digest = hashlib.sha256(raw_bytes).hexdigest()
                     except Exception as mask_err:
                         sess["state"] = "ABORTED"
-                        err_msg = f"Bank worker [{bank_id}] failed to construct masked update: {mask_err}"
+                        err_msg = (
+                            f"Bank worker [{bank_id}] failed to construct masked update: {mask_err}"
+                        )
                         logger.error(err_msg)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid})
+                        outbox.put(
+                            {"status": "ERROR", "bank_id": bank_id, "error": err_msg, "pid": pid}
+                        )
                         continue
 
                     if fail_observation:
                         sess["state"] = "ABORTED"
-                        logger.warning("Bank worker [%s] simulated observation persistence failure for round %d", bank_id, round_number)
-                        outbox.put({"status": "OBSERVATION_FAILED", "bank_id": bank_id, "round_number": round_number, "pid": pid})
+                        logger.warning(
+                            "Bank worker [%s] simulated observation persistence failure for round %d",
+                            bank_id,
+                            round_number,
+                        )
+                        outbox.put(
+                            {
+                                "status": "OBSERVATION_FAILED",
+                                "bank_id": bank_id,
+                                "round_number": round_number,
+                                "pid": pid,
+                            }
+                        )
                         continue
 
                     # 4. Record round observation in PostgreSQL authority with masked digest
@@ -4994,11 +5242,27 @@ def run_bank_worker_node(
                             model_update_digest=masked_digest,
                             execution_status="COMPLETED",
                         )
-                        logger.info("Bank worker [%s] persisted SecAgg observation event %s for round %d", bank_id, obs.event_id, round_number)
+                        logger.info(
+                            "Bank worker [%s] persisted SecAgg observation event %s for round %d",
+                            bank_id,
+                            obs.event_id,
+                            round_number,
+                        )
                     except Exception as obs_err:
                         sess["state"] = "ABORTED"
-                        logger.error("Bank worker [%s] failed to record SecAgg observation: %s", bank_id, obs_err)
-                        outbox.put({"status": "ERROR", "bank_id": bank_id, "error": str(obs_err), "pid": pid})
+                        logger.error(
+                            "Bank worker [%s] failed to record SecAgg observation: %s",
+                            bank_id,
+                            obs_err,
+                        )
+                        outbox.put(
+                            {
+                                "status": "ERROR",
+                                "bank_id": bank_id,
+                                "error": str(obs_err),
+                                "pid": pid,
+                            }
+                        )
                         continue
 
                     # Mark session state as CONSUMED to strictly prevent reuse of ephemeral key material
@@ -5118,6 +5382,9 @@ class DistributedFederatedTrainingManager:
         dp_config: Mapping[str, Any] | None = None,
         secagg_enabled: bool = False,
         secagg_config: Mapping[str, Any] | None = None,
+        byzantine_defense: str = "none",
+        byzantine_f_max: int = 1,
+        trimmed_mean_trim_count: int | None = None,
     ) -> dict[str, Any]:
         """Execute complete distributed E2E federated training lifecycle across independent processes.
 
@@ -5178,6 +5445,82 @@ class DistributedFederatedTrainingManager:
         if not banks:
             raise ValueError("No participating banks provided.")
 
+        defense_norm = (byzantine_defense or "none").strip().lower()
+        if defense_norm in ("fed_avg", "fedavg", "fed_avg_weighted"):
+            defense_norm = "none"
+
+        supported_defenses = {
+            "none",
+            "coordinate_wise_median",
+            "trimmed_mean",
+            "krum",
+            "bulyan",
+        }
+        if defense_norm not in supported_defenses:
+            raise ValueError(
+                f"Unsupported Byzantine defense '{byzantine_defense}'. Supported: {sorted(supported_defenses)}"
+            )
+
+        # SecAgg incompatibility check
+        if secagg_enabled and defense_norm != "none":
+            raise ValueError(
+                f"SecAgg aggregate-only execution is mathematically incompatible with Byzantine defense '{byzantine_defense}'. "
+                "SecAgg masks individual client vectors, preventing non-linear coordinate or distance-based filtering."
+            )
+
+        # Precondition checks against consortium size
+        n_banks = len(banks)
+        f = byzantine_f_max
+        if defense_norm != "none" and f < 1:
+            raise ValueError(f"Byzantine fault tolerance f must be >= 1, got {f}")
+
+        if defense_norm == "krum":
+            if n_banks < 2 * f + 3:
+                raise ValueError(
+                    f"Krum theoretical precondition violated: requires n >= 2f + 3 participants. With f={f}, requires at least {2 * f + 3} banks, but got {n_banks}."
+                )
+        elif defense_norm == "bulyan":
+            if n_banks < 4 * f + 3:
+                raise ValueError(
+                    f"Bulyan theoretical precondition violated: requires n >= 4f + 3 participants. With f={f}, requires at least {4 * f + 3} banks, but got {n_banks}."
+                )
+        elif defense_norm == "coordinate_wise_median":
+            if f >= n_banks / 2.0:
+                raise ValueError(
+                    f"Coordinate-wise Median theoretical precondition violated: requires f < n/2. With n={n_banks}, maximum f is {int((n_banks - 1) / 2)}, but got f={f}."
+                )
+        elif defense_norm == "trimmed_mean":
+            trim_k_check = trimmed_mean_trim_count if trimmed_mean_trim_count is not None else f
+            if trim_k_check < 1:
+                raise ValueError(
+                    f"Trimmed Mean requires trim_count >= 1 to provide Byzantine defense, got {trim_k_check}."
+                )
+            if n_banks <= 2 * trim_k_check:
+                raise ValueError(
+                    f"Trimmed Mean theoretical precondition violated: requires n > 2k participants. With k={trim_k_check}, requires at least {2 * trim_k_check + 1} banks, but got {n_banks}."
+                )
+
+        trim_k: int | None = None
+        if secagg_enabled:
+            executed_algo_name = "secagg_fed_avg_weighted"
+            target_method = AggregationMethod.FED_AVG_WEIGHTED
+        elif defense_norm == "none":
+            executed_algo_name = "fed_avg_weighted"
+            target_method = AggregationMethod.FED_AVG_WEIGHTED
+        elif defense_norm == "coordinate_wise_median":
+            executed_algo_name = "coordinate_wise_median"
+            target_method = AggregationMethod.COORDINATE_WISE_MEDIAN
+        elif defense_norm == "trimmed_mean":
+            executed_algo_name = "trimmed_mean"
+            target_method = AggregationMethod.TRIMMED_MEAN
+            trim_k = trimmed_mean_trim_count if trimmed_mean_trim_count is not None else f
+        elif defense_norm == "krum":
+            executed_algo_name = "krum"
+            target_method = AggregationMethod.KRUM
+        elif defense_norm == "bulyan":
+            executed_algo_name = "bulyan"
+            target_method = AggregationMethod.BULYAN
+
         # Spawn workers if endpoints were not directly provided
         spawned_procs = worker_processes or {}
         endpoints = worker_endpoints or {}
@@ -5209,17 +5552,28 @@ class DistributedFederatedTrainingManager:
         )
 
         if dp_config and dp_config.get("dp_enabled") and not is_prod:
-            target_eps = float(dp_config.get("allocated_epsilon") or dp_config.get("target_epsilon", 10.0))
-            target_del = float(dp_config.get("allocated_delta") or dp_config.get("target_delta", 1e-5))
+            target_eps = float(
+                dp_config.get("allocated_epsilon") or dp_config.get("target_epsilon", 10.0)
+            )
+            target_del = float(
+                dp_config.get("allocated_delta") or dp_config.get("target_delta", 1e-5)
+            )
             raw_tag = str(dp_config.get("dataset_tag", "primary_vault")).strip()
             for b in banks:
-                if not self.authority_source.get_institutional_privacy_budget(b, raw_tag, token=self.coordinator_token):
+                if not self.authority_source.get_institutional_privacy_budget(
+                    b, raw_tag, token=self.coordinator_token
+                ):
                     self.authority_source.provision_institutional_privacy_budget(
                         bank_id=b,
                         dataset_tag=raw_tag,
                         allocated_epsilon=target_eps,
                         allocated_delta=target_del,
-                        aliases=[f"{b}_dataset", f"{b}_protected_dataset", "primary_vault", "default_vault"],
+                        aliases=[
+                            f"{b}_dataset",
+                            f"{b}_protected_dataset",
+                            "primary_vault",
+                            "default_vault",
+                        ],
                         authority_token=self.coordinator_token,
                     )
 
@@ -5260,9 +5614,7 @@ class DistributedFederatedTrainingManager:
                 if secagg_enabled:
                     # Secure Aggregation Multi-Phase Protocol
                     session_id = f"secagg_{job_id}_{round_num}_{uuid.uuid4().hex[:12]}"
-                    inst_keys = {
-                        b: endpoints[b].get("institutional_public_key", "") for b in banks
-                    }
+                    inst_keys = {b: endpoints[b].get("institutional_public_key", "") for b in banks}
 
                     # Phase A & B: Round initialization, roster agreement, ephemeral keypair generation
                     setup_payload = {
@@ -5420,7 +5772,9 @@ class DistributedFederatedTrainingManager:
 
                     if pause_aggregation_checkpoint_file:
                         try:
-                            with open(pause_aggregation_checkpoint_file, "w", encoding="utf-8") as _pf:
+                            with open(
+                                pause_aggregation_checkpoint_file, "w", encoding="utf-8"
+                            ) as _pf:
                                 _pf.write(
                                     f"AGGREGATION_EXECUTED_ROUND_{round_num}:{aggregated_model_digest}\n"
                                 )
@@ -5430,7 +5784,9 @@ class DistributedFederatedTrainingManager:
                             logger.warning("Failed writing aggregation checkpoint file: %s", _e)
                         _release_file = f"{pause_aggregation_checkpoint_file}.release"
                         _wait_start = time.time()
-                        while not os.path.exists(_release_file) and (time.time() - _wait_start < 30.0):
+                        while not os.path.exists(_release_file) and (
+                            time.time() - _wait_start < 30.0
+                        ):
                             time.sleep(0.05)
 
                     self.authority_source.record_global_aggregation(
@@ -5483,21 +5839,84 @@ class DistributedFederatedTrainingManager:
                         try:
                             res = out_q.get(timeout=60)
                         except Exception:
-                            logger.warning("Timeout waiting for response from Bank worker [%s]", b_id)
+                            logger.warning(
+                                "Timeout waiting for response from Bank worker [%s]", b_id
+                            )
                             continue
+
+                        if not isinstance(res, dict):
+                            raise TrainingProvenanceSecurityError(
+                                f"Worker response from {b_id} is malformed: expected dict, got {type(res).__name__}"
+                            )
 
                         if res.get("status") != "SUCCESS":
                             logger.warning("Worker [%s] failed round execution: %s", b_id, res)
                             continue
 
+                        # Section 4: Bind Operational Worker Updates to the Correct Round
+                        # Verify claimed worker identity against receiving worker endpoint
+                        res_bank = res.get("bank_id")
+                        if res_bank != b_id:
+                            raise TrainingProvenanceSecurityError(
+                                f"Worker response bank_id mismatch: receiving endpoint is '{b_id}', but response claims '{res_bank}'"
+                            )
+
+                        # Verify round number
+                        res_round = res.get("round_number")
+                        if res_round != round_num:
+                            raise TrainingProvenanceSecurityError(
+                                f"Stale or mismatched round response from {b_id}: expected round {round_num}, got round {res_round}"
+                            )
+
+                        # Verify job_id
+                        res_job = res.get("job_id")
+                        if res_job != job_id:
+                            raise TrainingProvenanceSecurityError(
+                                f"Cross-job response mismatch from {b_id}: expected job '{job_id}', got '{res_job}'"
+                            )
+
+                        # Reject duplicate responses in this round
+                        if b_id in accepted_participant_ids:
+                            raise TrainingProvenanceSecurityError(
+                                f"Duplicate response received from {b_id} in round {round_num}"
+                            )
+
                         worker_pids[b_id] = res["pid"]
-                        local_w = res["weights"]
-                        w_digest = res["update_digest"]
-                        s_count = res["sample_count"]
+                        local_w = res.get("weights")
+                        w_digest = res.get("update_digest")
+                        s_count = res.get("sample_count")
                         if "dp_provenance" in res:
                             latest_dp_provenance[b_id] = res["dp_provenance"]
 
-                        # Coordinator verifies update digest against received weight bytes
+                        # Verify sample counts
+                        if not isinstance(s_count, int) or s_count <= 0:
+                            raise TrainingProvenanceSecurityError(
+                                f"Worker [{b_id}] provided invalid sample count: {s_count}"
+                            )
+
+                        # Verify ModelWeights structure, shapes, lengths, and finite values
+                        if not isinstance(local_w, ModelWeights):
+                            raise TrainingProvenanceSecurityError(
+                                f"Worker [{b_id}] weights are not a ModelWeights instance: {type(local_w).__name__}"
+                            )
+
+                        if local_w.layer_shapes != global_weights.layer_shapes:
+                            raise TrainingProvenanceSecurityError(
+                                f"Worker [{b_id}] weights layer_shapes mismatch: expected {global_weights.layer_shapes}, got {local_w.layer_shapes}"
+                            )
+
+                        if len(local_w.flat_weights) != len(global_weights.flat_weights):
+                            raise TrainingProvenanceSecurityError(
+                                f"Worker [{b_id}] weights length mismatch: expected {len(global_weights.flat_weights)}, got {len(local_w.flat_weights)}"
+                            )
+
+                        arr_w = np.asarray(local_w.flat_weights, dtype=np.float32)
+                        if not np.all(np.isfinite(arr_w)):
+                            raise TrainingProvenanceSecurityError(
+                                f"Worker [{b_id}] weights contain non-finite values (NaN / Inf)"
+                            )
+
+                        # Coordinator verifies update digest against exact received weight bytes
                         calculated_digest = hashlib.sha256(
                             _serialize_weights_to_bytes(local_w)
                         ).hexdigest()
@@ -5521,12 +5940,15 @@ class DistributedFederatedTrainingManager:
                             f"Round {round_num} aborted: No valid worker contributions received."
                         )
 
-                    # Execute genuine FedAvg aggregation using production FederatedLearningEngine
+                    # Execute genuine robust or FedAvg aggregation using production FederatedLearningEngine
                     global_weights = self.fl_engine.aggregate_parameters(
                         client_weights=client_weights_list,
                         client_samples=client_samples_list,
-                        method=AggregationMethod.FED_AVG_WEIGHTED,
+                        method=target_method,
                         global_weights=global_weights,
+                        f_byzantine=f,
+                        trim_count=trim_k,
+                        strict_preconditions=True,
                     )
                     self.model_service.set_parameters(global_model, global_weights)
 
@@ -5536,7 +5958,9 @@ class DistributedFederatedTrainingManager:
 
                     if pause_aggregation_checkpoint_file:
                         try:
-                            with open(pause_aggregation_checkpoint_file, "w", encoding="utf-8") as _pf:
+                            with open(
+                                pause_aggregation_checkpoint_file, "w", encoding="utf-8"
+                            ) as _pf:
                                 _pf.write(
                                     f"AGGREGATION_EXECUTED_ROUND_{round_num}:{aggregated_model_digest}\n"
                                 )
@@ -5546,14 +5970,16 @@ class DistributedFederatedTrainingManager:
                             logger.warning("Failed writing aggregation checkpoint file: %s", _e)
                         _release_file = f"{pause_aggregation_checkpoint_file}.release"
                         _wait_start = time.time()
-                        while not os.path.exists(_release_file) and (time.time() - _wait_start < 30.0):
+                        while not os.path.exists(_release_file) and (
+                            time.time() - _wait_start < 30.0
+                        ):
                             time.sleep(0.05)
 
                     # Record global aggregation event in PostgreSQL authority
                     self.authority_source.record_global_aggregation(
                         job_id=job_id,
                         round_number=round_num,
-                        aggregation_algorithm="fed_avg_weighted",
+                        aggregation_algorithm=executed_algo_name,
                         accepted_participant_ids=accepted_participant_ids,
                         accepted_local_update_digests=accepted_local_update_digests,
                         aggregated_global_model_digest=aggregated_model_digest,
@@ -5809,6 +6235,10 @@ class DistributedFederatedTrainingManager:
                 "dp_provenance": latest_dp_provenance,
                 "secagg_enabled": secagg_enabled,
                 "secagg_provenance": secagg_session_provenance if secagg_enabled else None,
+                "requested_aggregation_method": byzantine_defense,
+                "executed_aggregation_method": executed_algo_name,
+                "byzantine_defense": byzantine_defense,
+                "byzantine_f_max": f,
             }
 
         finally:

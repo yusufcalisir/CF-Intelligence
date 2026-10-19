@@ -97,7 +97,9 @@ class TrustedWorkerEndpoint:
     registered_by: str = "provisioner"
 
 
-def resolve_authoritative_bank_tokens(settings: Any | None = None, app_env: str | None = None) -> dict[str, str]:
+def resolve_authoritative_bank_tokens(
+    settings: Any | None = None, app_env: str | None = None
+) -> dict[str, str]:
     """Resolve authoritative bank institutional tokens strictly from server configuration and environment."""
     if settings is None:
         settings = get_settings()
@@ -151,12 +153,16 @@ class WorkerEndpointRegistry:
     ) -> None:
         """Register a provisioned bank worker endpoint with capability, institutional credential, and liveness verification."""
         if not isinstance(bank_id, str) or not bank_id.strip():
-            raise TrainingProvenanceConfigurationError("Bank identifier must be a non-empty string.")
+            raise TrainingProvenanceConfigurationError(
+                "Bank identifier must be a non-empty string."
+            )
 
         clean_id = bank_id.strip().upper()
 
         if not isinstance(endpoint, dict):
-            raise TrainingProvenanceConfigurationError(f"Endpoint for bank [{clean_id}] must be a dictionary.")
+            raise TrainingProvenanceConfigurationError(
+                f"Endpoint for bank [{clean_id}] must be a dictionary."
+            )
 
         inbox = endpoint.get("inbox")
         outbox = endpoint.get("outbox")
@@ -200,8 +206,12 @@ class WorkerEndpointRegistry:
         elif registration_token is not None:
             # 1. Reject generic shared worker credentials for institution-scoped registration
             raw_worker_token = getattr(settings, "training_worker_token", None)
-            generic_worker_token = raw_worker_token.strip() if isinstance(raw_worker_token, str) else ""
-            if generic_worker_token and hmac.compare_digest(registration_token.strip(), generic_worker_token):
+            generic_worker_token = (
+                raw_worker_token.strip() if isinstance(raw_worker_token, str) else ""
+            )
+            if generic_worker_token and hmac.compare_digest(
+                registration_token.strip(), generic_worker_token
+            ):
                 raise TrainingProvenanceSecurityError(
                     f"Registration rejected for bank [{clean_id}]: generic shared worker credentials "
                     "are insufficient for institution-scoped registration."
@@ -221,7 +231,9 @@ class WorkerEndpointRegistry:
                     f"Registration rejected for bank [{clean_id}]: no authorized institutional credential configured for this bank."
                 )
 
-            if not isinstance(expected_token, str) or not hmac.compare_digest(registration_token.strip(), expected_token.strip()):
+            if not isinstance(expected_token, str) or not hmac.compare_digest(
+                registration_token.strip(), expected_token.strip()
+            ):
                 raise TrainingProvenanceSecurityError(
                     f"Registration authentication failed for bank [{clean_id}]: invalid institutional token."
                 )
@@ -258,7 +270,10 @@ class WorkerEndpointRegistry:
                             f"Existing worker PID {existing.pid} is still running. "
                             "Authorized replacement lifecycle transition required."
                         )
-                    if attestation_type == "development_direct" and existing.attestation_type != "development_direct":
+                    if (
+                        attestation_type == "development_direct"
+                        and existing.attestation_type != "development_direct"
+                    ):
                         raise TrainingProvenanceSecurityError(
                             f"Cannot overwrite active verified worker for bank [{clean_id}] with unauthenticated registration."
                         )
@@ -302,7 +317,11 @@ class WorkerEndpointRegistry:
         if is_prod:
             effective_tokens = resolve_authoritative_bank_tokens(settings, env)
         else:
-            effective_tokens = dict(bank_tokens) if bank_tokens is not None else resolve_authoritative_bank_tokens(settings, env)
+            effective_tokens = (
+                dict(bank_tokens)
+                if bank_tokens is not None
+                else resolve_authoritative_bank_tokens(settings, env)
+            )
 
         for b_id, ep in endpoints.items():
             clean_b = b_id.strip().upper()
@@ -337,7 +356,11 @@ class WorkerEndpointRegistry:
     ) -> None:
         """Enforce authentic institutional authorization for worker lifecycle mutations (revocation/unregistration)."""
         settings = get_settings()
-        env = "production" if is_prod else (getattr(settings, "app_env", "development")).strip().lower()
+        env = (
+            "production"
+            if is_prod
+            else (getattr(settings, "app_env", "development")).strip().lower()
+        )
         authoritative_bank_tokens = resolve_authoritative_bank_tokens(settings, env)
 
         if trusted_context is not None:
@@ -358,7 +381,9 @@ class WorkerEndpointRegistry:
 
         if token is not None:
             raw_worker_token = getattr(settings, "training_worker_token", None)
-            generic_worker_token = raw_worker_token.strip() if isinstance(raw_worker_token, str) else ""
+            generic_worker_token = (
+                raw_worker_token.strip() if isinstance(raw_worker_token, str) else ""
+            )
             if generic_worker_token and hmac.compare_digest(token.strip(), generic_worker_token):
                 raise TrainingProvenanceSecurityError(
                     f"Lifecycle action '{action_name}' rejected for bank [{clean_id}]: "
@@ -376,7 +401,9 @@ class WorkerEndpointRegistry:
                 raise TrainingProvenanceSecurityError(
                     f"Lifecycle action '{action_name}' rejected for bank [{clean_id}]: no authorized institutional token configured."
                 )
-            if not isinstance(expected_token, str) or not hmac.compare_digest(token.strip(), expected_token.strip()):
+            if not isinstance(expected_token, str) or not hmac.compare_digest(
+                token.strip(), expected_token.strip()
+            ):
                 raise TrainingProvenanceSecurityError(
                     f"Lifecycle action '{action_name}' authentication failed for bank [{clean_id}]: invalid institutional token."
                 )
@@ -406,7 +433,9 @@ class WorkerEndpointRegistry:
     ) -> None:
         """Explicitly revoke a registered bank worker endpoint upon security event or node withdrawal."""
         if not isinstance(bank_id, str) or not bank_id.strip():
-            raise TrainingProvenanceConfigurationError("Bank identifier must be a non-empty string.")
+            raise TrainingProvenanceConfigurationError(
+                "Bank identifier must be a non-empty string."
+            )
         clean_id = bank_id.strip().upper()
         settings = get_settings()
         env = (app_env or settings.app_env).strip().lower()
@@ -498,7 +527,12 @@ class WorkerEndpointRegistry:
             for b in bank_ids:
                 clean_id = b.strip().upper()
                 rec = cls._registry.get(clean_id)
-                if rec and rec.state == "ACTIVE" and rec.pid is not None and _is_process_alive(rec.pid):
+                if (
+                    rec
+                    and rec.state == "ACTIVE"
+                    and rec.pid is not None
+                    and _is_process_alive(rec.pid)
+                ):
                     res[clean_id] = rec.pid
             return res
 
@@ -526,7 +560,9 @@ class WorkerEndpointRegistry:
     ) -> None:
         """Remove a worker endpoint upon explicit shutdown or disconnection with authentication check."""
         if not isinstance(bank_id, str) or not bank_id.strip():
-            raise TrainingProvenanceConfigurationError("Bank identifier must be a non-empty string.")
+            raise TrainingProvenanceConfigurationError(
+                "Bank identifier must be a non-empty string."
+            )
         clean_id = bank_id.strip().upper()
         settings = get_settings()
         env = (app_env or settings.app_env).strip().lower()
@@ -613,10 +649,14 @@ class SingleHostBankWorkerProvisioner:
 
         clean_banks = [b.strip().upper() for b in participating_banks]
         if not clean_banks:
-            raise TrainingProvenanceConfigurationError("Cannot provision workers: participating_banks list is empty.")
+            raise TrainingProvenanceConfigurationError(
+                "Cannot provision workers: participating_banks list is empty."
+            )
 
         # Verify tokens exist for each requested bank
-        missing_tokens = [b for b in clean_banks if b not in self.bank_tokens or not self.bank_tokens[b]]
+        missing_tokens = [
+            b for b in clean_banks if b not in self.bank_tokens or not self.bank_tokens[b]
+        ]
         if missing_tokens:
             raise TrainingProvenanceSecurityError(
                 f"Cannot provision workers: missing dedicated credentials for banks {sorted(missing_tokens)}."
@@ -777,8 +817,14 @@ class OperationalFederationService:
         """Resolve pre-provisioned bank worker endpoints without exposing credentials to coordinator."""
         clean_banks = [b.strip().upper() for b in participating_banks]
         if self._worker_endpoints is not None:
-            endpoints = {b: self._worker_endpoints[b] for b in clean_banks if b in self._worker_endpoints}
-            pids = {b: self._worker_pids[b] for b in clean_banks if self._worker_pids and b in self._worker_pids}
+            endpoints = {
+                b: self._worker_endpoints[b] for b in clean_banks if b in self._worker_endpoints
+            }
+            pids = {
+                b: self._worker_pids[b]
+                for b in clean_banks
+                if self._worker_pids and b in self._worker_pids
+            }
         else:
             endpoints = WorkerEndpointRegistry.get_worker_endpoints(clean_banks)
             pids = WorkerEndpointRegistry.get_worker_pids(clean_banks)
@@ -906,22 +952,32 @@ class OperationalFederationService:
                         target_col = cand
                         break
                 if not target_col:
-                    raise TrainingProvenanceConfigurationError("Holdout dataset missing binary target column ('is_fraud').")
+                    raise TrainingProvenanceConfigurationError(
+                        "Holdout dataset missing binary target column ('is_fraud')."
+                    )
                 y = np.asarray(df[target_col].to_numpy(dtype=np.float32), dtype=np.float32)
                 has_raw_features = all(f in df.columns for f in FEATURE_NAMES)
                 if has_raw_features:
-                    X = np.asarray(DataGenerator.encode_features(df[list(FEATURE_NAMES)]), dtype=np.float32)
+                    X = np.asarray(
+                        DataGenerator.encode_features(df[list(FEATURE_NAMES)]), dtype=np.float32
+                    )
                 else:
                     feat_df = df.drop(columns=[target_col])
                     X = np.asarray(feat_df.to_numpy(dtype=np.float32), dtype=np.float32)
                 self._validate_holdout_arrays(X, y)
                 return X, y
             else:
-                raise TrainingProvenanceConfigurationError(f"Unsupported holdout data type: {type(data_source)}")
+                raise TrainingProvenanceConfigurationError(
+                    f"Unsupported holdout data type: {type(data_source)}"
+                )
 
         settings = get_settings()
-        manifest_path = os.environ.get("CFI_HOLDOUT_MANIFEST_PATH") or getattr(settings, "holdout_manifest_path", "")
-        holdout_path = os.environ.get("CFI_HOLDOUT_DATASET_PATH") or getattr(settings, "holdout_dataset_path", "")
+        manifest_path = os.environ.get("CFI_HOLDOUT_MANIFEST_PATH") or getattr(
+            settings, "holdout_manifest_path", ""
+        )
+        holdout_path = os.environ.get("CFI_HOLDOUT_DATASET_PATH") or getattr(
+            settings, "holdout_dataset_path", ""
+        )
 
         # 1. Manifest-backed resolution via HoldoutDatasetProvider
         if manifest_path and os.path.exists(manifest_path):
@@ -934,7 +990,9 @@ class OperationalFederationService:
                     self._validate_holdout_arrays(X, y)
                     return X, y
             except Exception as e:
-                raise TrainingProvenanceConfigurationError(f"Failed to load holdout from manifest '{manifest_path}': {e}") from e
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to load holdout from manifest '{manifest_path}': {e}"
+                ) from e
 
         # 2. Direct data file resolution
         if holdout_path and os.path.exists(holdout_path):
@@ -952,8 +1010,17 @@ class OperationalFederationService:
                     self._validate_holdout_arrays(X, y)
                     return X, y
 
-                if holdout_path.endswith(".parquet") or holdout_path.endswith(".pq") or holdout_path.endswith(".csv") or holdout_path.endswith(".txt"):
-                    df = pd.read_parquet(holdout_path) if (holdout_path.endswith(".parquet") or holdout_path.endswith(".pq")) else pd.read_csv(holdout_path)
+                if (
+                    holdout_path.endswith(".parquet")
+                    or holdout_path.endswith(".pq")
+                    or holdout_path.endswith(".csv")
+                    or holdout_path.endswith(".txt")
+                ):
+                    df = (
+                        pd.read_parquet(holdout_path)
+                        if (holdout_path.endswith(".parquet") or holdout_path.endswith(".pq"))
+                        else pd.read_csv(holdout_path)
+                    )
                     if df.empty:
                         raise TrainingProvenanceConfigurationError("Holdout dataset is empty.")
 
@@ -964,7 +1031,9 @@ class OperationalFederationService:
                             target_col = cand
                             break
                     if not target_col:
-                        raise TrainingProvenanceConfigurationError("Holdout dataset missing binary target column ('is_fraud').")
+                        raise TrainingProvenanceConfigurationError(
+                            "Holdout dataset missing binary target column ('is_fraud')."
+                        )
 
                     y = np.asarray(df[target_col].to_numpy(dtype=np.float32), dtype=np.float32)
 
@@ -972,7 +1041,9 @@ class OperationalFederationService:
                     has_raw_features = all(f in df.columns for f in FEATURE_NAMES)
                     if has_raw_features:
                         # Canonical preprocessing / encoding
-                        X = np.asarray(DataGenerator.encode_features(df[list(FEATURE_NAMES)]), dtype=np.float32)
+                        X = np.asarray(
+                            DataGenerator.encode_features(df[list(FEATURE_NAMES)]), dtype=np.float32
+                        )
                     else:
                         feat_df = df.drop(columns=[target_col])
                         try:
@@ -985,7 +1056,9 @@ class OperationalFederationService:
                     self._validate_holdout_arrays(X, y)
                     return X, y
             except Exception as e:
-                raise TrainingProvenanceConfigurationError(f"Failed to load holdout dataset from '{holdout_path}': {e}") from e
+                raise TrainingProvenanceConfigurationError(
+                    f"Failed to load holdout dataset from '{holdout_path}': {e}"
+                ) from e
 
         if is_prod:
             raise TrainingProvenanceConfigurationError(
@@ -1006,7 +1079,9 @@ class OperationalFederationService:
     def _validate_holdout_arrays(X: np.ndarray, y: np.ndarray) -> None:
         """Verify strict dimensional, finite, and binary label invariants on holdout arrays."""
         if not isinstance(X, np.ndarray) or not isinstance(y, np.ndarray):
-            raise TrainingProvenanceConfigurationError("Holdout features and labels must be numpy arrays.")
+            raise TrainingProvenanceConfigurationError(
+                "Holdout features and labels must be numpy arrays."
+            )
 
         if len(X) == 0 or len(y) == 0:
             raise TrainingProvenanceConfigurationError("Holdout evaluation dataset is empty.")
@@ -1023,10 +1098,14 @@ class OperationalFederationService:
             )
 
         if not np.all(np.isfinite(X)):
-            raise TrainingProvenanceConfigurationError("Holdout dataset contains non-finite feature values (NaN/Inf).")
+            raise TrainingProvenanceConfigurationError(
+                "Holdout dataset contains non-finite feature values (NaN/Inf)."
+            )
 
         if not np.all(np.isfinite(y)):
-            raise TrainingProvenanceConfigurationError("Holdout dataset contains non-finite target label values.")
+            raise TrainingProvenanceConfigurationError(
+                "Holdout dataset contains non-finite target label values."
+            )
 
         unique_labels = np.unique(y)
         if not set(unique_labels).issubset({0.0, 1.0}):
@@ -1050,6 +1129,9 @@ class OperationalFederationService:
         dp_config: Mapping[str, Any] | None = None,
         secagg_enabled: bool = False,
         secagg_config: Mapping[str, Any] | None = None,
+        byzantine_defense: str = "none",
+        byzantine_f_max: int = 1,
+        trimmed_mean_trim_count: int | None = None,
     ) -> dict[str, Any]:
         """Execute operational federated learning lifecycle with complete authority verification and lifecycle ownership."""
         settings = get_settings()
@@ -1057,10 +1139,64 @@ class OperationalFederationService:
         is_prod = active_env.lower() == "production"
 
         clean_consortium_id = (consortium_id or "cfi-consortium").strip().lower()
-        banks = [b.strip().upper() for b in participating_banks] if participating_banks else ["BANK_A", "BANK_B", "BANK_C"]
+        banks = (
+            [b.strip().upper() for b in participating_banks]
+            if participating_banks
+            else ["BANK_A", "BANK_B", "BANK_C"]
+        )
         clean_job_id = (job_id or f"job_fed_{uuid.uuid4().hex[:12]}").strip()
         clean_sim_id = (simulation_id or f"sim_{clean_job_id}").strip()
         training_run_id = f"run_{clean_job_id}"
+
+        defense_norm = (byzantine_defense or "none").strip().lower()
+        if defense_norm in ("fed_avg", "fedavg", "fed_avg_weighted"):
+            defense_norm = "none"
+
+        supported_defenses = {
+            "none",
+            "coordinate_wise_median",
+            "trimmed_mean",
+            "krum",
+            "bulyan",
+        }
+        if defense_norm not in supported_defenses:
+            raise ValueError(
+                f"Unsupported Byzantine defense '{byzantine_defense}'. Supported: {sorted(supported_defenses)}"
+            )
+
+        if secagg_enabled and defense_norm != "none":
+            raise ValueError(
+                f"Additive Secure Aggregation (SecAgg) is mathematically incompatible with non-linear Byzantine defense '{byzantine_defense}'. "
+                "SecAgg masks conceal individual updates, preventing coordinate sorting and distance computation."
+            )
+
+        n_banks = len(banks)
+        f = byzantine_f_max
+        if defense_norm != "none" and f < 1:
+            raise ValueError(f"Byzantine fault tolerance f must be >= 1, got {f}")
+
+        if defense_norm == "krum" and n_banks < 2 * f + 3:
+            raise ValueError(
+                f"Krum theoretical precondition violated: requires n >= 2f + 3 participants. With f={f}, requires at least {2 * f + 3} banks, but got {n_banks}."
+            )
+        elif defense_norm == "bulyan" and n_banks < 4 * f + 3:
+            raise ValueError(
+                f"Bulyan theoretical precondition violated: requires n >= 4f + 3 participants. With f={f}, requires at least {4 * f + 3} banks, but got {n_banks}."
+            )
+        elif defense_norm == "coordinate_wise_median" and f >= n_banks / 2.0:
+            raise ValueError(
+                f"Coordinate-wise Median theoretical precondition violated: requires f < n/2. With n={n_banks}, maximum f is {int((n_banks - 1) / 2)}, but got f={f}."
+            )
+        elif defense_norm == "trimmed_mean":
+            trim_k = trimmed_mean_trim_count if trimmed_mean_trim_count is not None else f
+            if trim_k < 1:
+                raise ValueError(
+                    f"Trimmed Mean requires trim count k >= 1 to provide Byzantine defense, got {trim_k}."
+                )
+            if n_banks <= 2 * trim_k:
+                raise ValueError(
+                    f"Trimmed Mean theoretical precondition violated: requires n > 2k participants. With k={trim_k}, requires at least {2 * trim_k + 1} banks, but got {n_banks}."
+                )
 
         signing_auth: Any | None = None
         spawned_signing: bool = False
@@ -1072,12 +1208,16 @@ class OperationalFederationService:
             coordinator_token = self.resolve_coordinator_token(is_prod)
             db_url = self.resolve_db_url(is_prod)
             worker_endpoints, worker_pids = self.resolve_worker_endpoints(banks, is_prod)
-            signing_auth, spawned_signing = self.resolve_signing_authority(coordinator_token, db_url, active_env, is_prod)
-            comp_auth, comp_endpoint, spawned_comp = self.resolve_completion_authority(coordinator_token, active_env, is_prod)
+            signing_auth, spawned_signing = self.resolve_signing_authority(
+                coordinator_token, db_url, active_env, is_prod
+            )
+            comp_auth, comp_endpoint, spawned_comp = self.resolve_completion_authority(
+                coordinator_token, active_env, is_prod
+            )
             holdout_data = self.resolve_holdout_data(is_prod)
 
             logger.info(
-                "Executing operational federation: job_id=%s, simulation_id=%s, consortium_id=%s, env=%s, banks=%s, rounds=%d, secagg=%s",
+                "Executing operational federation: job_id=%s, simulation_id=%s, consortium_id=%s, env=%s, banks=%s, rounds=%d, secagg=%s, defense=%s",
                 clean_job_id,
                 clean_sim_id,
                 clean_consortium_id,
@@ -1085,6 +1225,7 @@ class OperationalFederationService:
                 banks,
                 num_rounds,
                 secagg_enabled,
+                defense_norm,
             )
 
             # 2. Invoke canonical runner with explicit consortium_id
@@ -1113,6 +1254,9 @@ class OperationalFederationService:
                     dp_config=dp_config,
                     secagg_enabled=secagg_enabled,
                     secagg_config=secagg_config,
+                    byzantine_defense=byzantine_defense,
+                    byzantine_f_max=byzantine_f_max,
+                    trimmed_mean_trim_count=trimmed_mean_trim_count,
                 )
             else:
                 # Non-production path: direct execution through manager
@@ -1138,6 +1282,9 @@ class OperationalFederationService:
                     dp_config=dp_config,
                     secagg_enabled=secagg_enabled,
                     secagg_config=secagg_config,
+                    byzantine_defense=byzantine_defense,
+                    byzantine_f_max=byzantine_f_max,
+                    trimmed_mean_trim_count=trimmed_mean_trim_count,
                 )
 
             # 3. Truthful execution status and evidence validation
@@ -1170,7 +1317,9 @@ class OperationalFederationService:
                 "status": raw_status,
                 "is_verified": is_verified,
                 "metrics": result.get("metrics") or {},
-                "artifact_sha256": result.get("final_artifact_sha256") or result.get("artifact_sha256") or "",
+                "artifact_sha256": result.get("final_artifact_sha256")
+                or result.get("artifact_sha256")
+                or "",
                 "model_version": ver_number,
                 "is_promoted_champion": bool(result.get("is_promoted_champion", False)),
                 "coordinator_pid": result.get("coordinator_pid", 0),
@@ -1181,6 +1330,12 @@ class OperationalFederationService:
                 "dp_provenance": result.get("dp_provenance") or {},
                 "secagg_enabled": bool(result.get("secagg_enabled", False)),
                 "secagg_provenance": result.get("secagg_provenance"),
+                "requested_aggregation_method": result.get("requested_aggregation_method")
+                or byzantine_defense,
+                "executed_aggregation_method": result.get("executed_aggregation_method")
+                or ("secagg_fed_avg_weighted" if secagg_enabled else "fed_avg_weighted"),
+                "byzantine_defense": result.get("byzantine_defense") or byzantine_defense,
+                "byzantine_f_max": result.get("byzantine_f_max", byzantine_f_max),
             }
 
         finally:
