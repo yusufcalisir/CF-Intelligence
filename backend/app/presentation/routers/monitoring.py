@@ -258,15 +258,22 @@ async def get_fairness_metrics() -> FairnessMetricsResponse:
         }
         ModelGovernanceService.record_fairness_assessment(assessment)
 
+    dpr = assessment.get("demographic_parity_ratio")
+    dir_val = assessment.get("disparate_impact_ratio")
+    eod = assessment.get("equalized_odds_difference")
+    sffr = assessment.get("satisfies_four_fifths_rule")
+    eval_at = assessment.get("evaluated_at")
+    prot_attrs = assessment.get("protected_attributes")
+
     return FairnessMetricsResponse(
-        demographic_parity_ratio=float(assessment["demographic_parity_ratio"]),
-        disparate_impact_ratio=float(assessment["disparate_impact_ratio"]),
-        equalized_odds_difference=float(assessment["equalized_odds_difference"]),
-        satisfies_four_fifths_rule=bool(assessment["satisfies_four_fifths_rule"]),
-        evaluated_at=str(assessment["evaluated_at"]),
-        protected_attributes=list(
-            assessment.get("protected_attributes", ["consortium_bank_tier", "channel_type"])
-        ),
+        demographic_parity_ratio=float(dpr) if isinstance(dpr, (int, float, str)) else 0.0,
+        disparate_impact_ratio=float(dir_val) if isinstance(dir_val, (int, float, str)) else 0.0,
+        equalized_odds_difference=float(eod) if isinstance(eod, (int, float, str)) else 0.0,
+        satisfies_four_fifths_rule=bool(sffr),
+        evaluated_at=str(eval_at or ""),
+        protected_attributes=[str(attr) for attr in prot_attrs]
+        if isinstance(prot_attrs, (list, tuple))
+        else ["consortium_bank_tier", "channel_type"],
     )
 
 
