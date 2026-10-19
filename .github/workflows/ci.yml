@@ -279,9 +279,21 @@ jobs:
           uv pip install --system -r backend/requirements.txt pytest pytest-cov pytest-asyncio
           cd frontend && npm install
 
+      - name: Provision Ephemeral Redis 7 Integration Container
+        run: |
+          docker run -d --name cf-intelligence-redis-test -p 6379:6379 redis:7-alpine
+          for i in $(seq 1 15); do
+            if docker exec cf-intelligence-redis-test redis-cli ping | grep -q PONG; then
+              echo "Redis 7 container cf-intelligence-redis-test is live and healthy."
+              break
+            fi
+            sleep 1
+          done
+
       - name: Run Multi-Dimensional Coverage Audit
         env:
           PYTHONPATH: backend
+          REDIS_URL: redis://127.0.0.1:6379/0
         run: |
           python scripts/run_coverage_audit.py --fail-under=75
 

@@ -241,6 +241,7 @@ class TestRedisPredictionEvidenceAtomicity:
         # Simulate initially available Redis client
         mock_client = MagicMock()
         mock_client.ping.return_value = True
+        RedisStore._global_redis_unavailable = False
         engine._store._redis_client = mock_client
         engine._store._redis_failed = False
         engine._store._had_command_failure = False
