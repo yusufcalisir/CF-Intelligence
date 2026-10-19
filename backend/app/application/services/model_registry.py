@@ -2123,6 +2123,102 @@ class ModelRegistry:
                             os.remove(os.path.join(sim_dir, f_name))
 
             manifest = self._load_manifest(simulation_id)
+
+            # Idempotency Reconciler: Check if exact verified execution is already registered
+            incoming_receipt_id = (
+                receipt_dict.get("receipt_id")
+                if (receipt_dict and isinstance(receipt_dict, dict))
+                else None
+            )
+            incoming_job_id = (
+                receipt_dict.get("job_id")
+                if (receipt_dict and isinstance(receipt_dict, dict))
+                else None
+            )
+            incoming_run_id = (
+                training_run_id.strip()
+                if (training_run_id and training_run_id.strip() and training_run_id != "unspecified")
+                else None
+            )
+
+            # Determine candidate SHA-256 for identity and conflict checks
+            candidate_sha256: str | None = None
+            if source_bytes is not None:
+                candidate_sha256 = hashlib.sha256(source_bytes).hexdigest()
+            elif artifact_bytes is not None:
+                candidate_sha256 = hashlib.sha256(artifact_bytes).hexdigest()
+            elif receipt_dict and receipt_dict.get("artifact_sha256"):
+                candidate_sha256 = str(receipt_dict.get("artifact_sha256")).strip()
+            elif state_dict is not None:
+                buf = io.BytesIO()
+                torch.save(state_dict, buf)
+                source_bytes = buf.getvalue()
+                candidate_sha256 = hashlib.sha256(source_bytes).hexdigest()
+
+            if manifest and candidate_sha256:
+                for m_entry in manifest:
+                    entry_sha256 = m_entry.get("sha256")
+                    entry_receipt = m_entry.get("training_receipt") or {}
+                    entry_receipt_id = entry_receipt.get("receipt_id")
+                    entry_job_id = entry_receipt.get("job_id")
+                    entry_run_id = m_entry.get("training_run_id")
+
+                    # Check for conflicting registrations
+                    # 1. Receipt ID collision with conflicting digest
+                    if incoming_receipt_id and entry_receipt_id and incoming_receipt_id == entry_receipt_id:
+                        if entry_sha256 != candidate_sha256:
+                            raise ModelIntegrityError(
+                                f"Conflicting registration: receipt_id '{incoming_receipt_id}' was already registered with artifact digest {entry_sha256}, differing from incoming {candidate_sha256}."
+                            )
+                        if effective_consortium and m_entry.get("consortium_id") and m_entry.get("consortium_id") != effective_consortium:
+                            raise ModelIntegrityError(
+                                f"Conflicting consortium for receipt '{incoming_receipt_id}': registered={m_entry.get('consortium_id')}, incoming={effective_consortium}."
+                            )
+
+                    # 2. Training Run ID collision with conflicting digest
+                    if incoming_run_id and entry_run_id and incoming_run_id == entry_run_id:
+                        if entry_sha256 != candidate_sha256:
+                            raise ModelIntegrityError(
+                                f"Conflicting registration: training_run_id '{incoming_run_id}' was already registered with artifact digest {entry_sha256}, differing from incoming {candidate_sha256}."
+                            )
+                        if effective_consortium and m_entry.get("consortium_id") and m_entry.get("consortium_id") != effective_consortium:
+                            raise ModelIntegrityError(
+                                f"Conflicting consortium for training_run_id '{incoming_run_id}': registered={m_entry.get('consortium_id')}, incoming={effective_consortium}."
+                            )
+
+                    # 3. Exact match reconciliation:
+                    # Same SHA-256 AND matching receipt_id or matching run_id or matching job_id
+                    is_exact_match = False
+                    if entry_sha256 == candidate_sha256 and (
+                        (incoming_receipt_id and entry_receipt_id and incoming_receipt_id == entry_receipt_id)
+                        or (incoming_run_id and entry_run_id and incoming_run_id == entry_run_id)
+                        or (incoming_job_id and entry_job_id and incoming_job_id == entry_job_id)
+                    ):
+                        is_exact_match = True
+
+                    if is_exact_match:
+                        # Reconcile existing entry: verify physical artifact exists on disk with matching digest
+                        entry_filename = m_entry.get("filename")
+                        if not entry_filename:
+                            raise ModelIntegrityError(f"Corrupt manifest entry: missing filename for version {m_entry.get('version')}.")
+                        existing_pt_path = os.path.join(sim_dir, entry_filename)
+                        if not os.path.exists(existing_pt_path):
+                            raise ModelIntegrityError(
+                                f"Manifest records version {m_entry.get('version')} for simulation '{simulation_id}', but artifact file '{entry_filename}' is missing from disk."
+                            )
+                        if compute_file_sha256(existing_pt_path) != candidate_sha256:
+                            raise ModelIntegrityError(
+                                f"Disk artifact for version {m_entry.get('version')} does not match recorded digest {candidate_sha256}."
+                            )
+
+                        logger.info(
+                            "Idempotent registration retry reconciled existing candidate version %s for simulation '%s' (SHA-256: %s)",
+                            m_entry.get("version"),
+                            simulation_id,
+                            candidate_sha256,
+                        )
+                        return m_entry
+
             next_version = 1
             if manifest:
                 next_version = max(entry["version"] for entry in manifest) + 1

@@ -441,7 +441,13 @@ async def trigger_automated_retraining(
     request: RetrainTriggerRequest | None = None,
     reason: str | None = Query(default=None, description="Legacy reason query parameter"),
 ) -> RetrainTriggerResponse:
-    """Trigger an automated federated re-training round in response to concept drift."""
+    """Record drift alert and register automated retraining recommendation.
+
+    Truthfulness Guarantee:
+    Distinguishes alert recording from operational training dispatch. Operational
+    federated training requires operator RBAC, consortium authorization, and
+    authenticated runner execution via OperationalFederationService.
+    """
     effective_reason = (
         (request.reason if request and request.reason else None)
         or reason
@@ -461,7 +467,7 @@ async def trigger_automated_retraining(
     )
     now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%SZ")
     logger.info(
-        "Automated re-training round initiated: %s (Reason: %s, Features: %s)",
+        "Drift retraining recommendation recorded: %s (Reason: %s, Features: %s). Operational dispatch requires authorized execution.",
         job.job_id,
         effective_reason,
         features,
@@ -482,7 +488,7 @@ async def trigger_automated_retraining(
         drift_alert = ActiveAlertResponse(
             alert_name="ModelConceptDriftCritical",
             severity="critical",
-            summary=f"Automated federated re-training triggered for features [{feature_str}] (Peak PSI: {max_psi:.4f}). Job: {job.job_id}",
+            summary=f"Automated federated re-training recommended for features [{feature_str}] (Peak PSI: {max_psi:.4f}). Job: {job.job_id}",
             started_at=now_str,
             status="firing",
         )
@@ -491,6 +497,9 @@ async def trigger_automated_retraining(
 
     return RetrainTriggerResponse(
         triggered=True,
+        execution_status="ALERT_RECORDED_RETRAINING_RECOMMENDED",
+        operational_dispatch_confirmed=False,
+        dispatched_job_id=None,
         reason=effective_reason,
         new_simulation_id=job.job_id,
         triggered_at=now_str,
@@ -498,6 +507,11 @@ async def trigger_automated_retraining(
         alertmanager_alert_dispatched=alert_dispatched,
         prometheus_metric_emitted=True,
         drift_features_targeted=len(features),
+        recommendation_details={
+            "action": "RETRAINING_RECOMMENDED",
+            "required_authorization": "ConsortiumOperator clearance required to initiate OperationalFederationService",
+            "in_memory_job_id": job.job_id,
+        },
     )
 
 

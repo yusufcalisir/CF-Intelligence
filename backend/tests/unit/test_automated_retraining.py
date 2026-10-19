@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import pytest
+from unittest.mock import MagicMock
+
 from app.application.services.auto_rollback import AutoRollbackManager, RollbackCause
 from app.application.services.automated_retraining import (
     DriftTriggeredRetrainingService,
@@ -24,14 +27,37 @@ def test_drift_triggered_retraining_evaluation_and_execution() -> None:
     assert job.cause == RetrainingCause.PSI_DRIFT_EXCEEDED
     assert job.status == "TRIGGERED"
 
-    # 3. Execute retraining task
-    result = service.execute_retraining_pipeline(job.job_id)
-    assert result["status"] == "COMPLETED"
-    assert result["candidate_model_version"].startswith("model_candidate_")
+    # 3. Fail-closed: execution without authorized operational service raises RuntimeError and marks job FAILED
+    with pytest.raises(RuntimeError, match=r"(?i)no authorized OperationalFederationService provided"):
+        service.execute_retraining_pipeline(job.job_id)
 
     fetched = service.get_job(job.job_id)
     assert fetched is not None
-    assert fetched.status == "COMPLETED"
+    assert fetched.status == "FAILED"
+
+    # 4. Authorized operational service execution succeeds with genuine metrics and registered candidate
+    mock_op_service = MagicMock()
+    mock_op_service.execute_operational_federation.return_value = {
+        "status": "COMPLETED",
+        "candidate_model_version": "model_v1.0.1",
+        "evaluation_metrics": {"pr_auc": 0.892, "roc_auc": 0.915, "f1": 0.821},
+        "receipt_id": "receipt_autoret_123",
+    }
+    service_with_op = DriftTriggeredRetrainingService(
+        psi_threshold=0.20,
+        operational_service=mock_op_service,
+    )
+    job2 = service_with_op.evaluate_drift_and_trigger(psi_score=0.25)
+    assert job2 is not None
+    res2 = service_with_op.execute_retraining_pipeline(job2.job_id)
+    assert res2["status"] == "COMPLETED"
+    assert res2["candidate_model_version"] == "model_v1.0.1"
+    assert res2["evaluation_metrics"]["pr_auc"] == 0.892
+    assert res2["evaluation_metrics"]["roc_auc"] == 0.915
+    fetched2 = service_with_op.get_job(job2.job_id)
+    assert fetched2 is not None
+    assert fetched2.status == "COMPLETED"
+
 
 
 def test_auto_rollback_manager_health_evaluation() -> None:

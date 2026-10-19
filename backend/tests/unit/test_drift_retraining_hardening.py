@@ -225,13 +225,13 @@ def test_drift_triggered_retraining_service_concurrency_and_cancellation() -> No
     assert job_rec is not None
     assert job_rec.status == "CANCELLED"
 
-    # Execute second job
+    # Execute second job - fail-closed without operational service
     second_job_id = created_jobs[1]
-    result = service.execute_retraining_pipeline(second_job_id)
-    assert result["status"] == "COMPLETED"
-    assert service.get_job(second_job_id).status == "COMPLETED"
+    with pytest.raises(RuntimeError, match=r"(?i)no authorized OperationalFederationService provided"):
+        service.execute_retraining_pipeline(second_job_id)
+    assert service.get_job(second_job_id).status == "FAILED"
 
-    # Cancel already completed job fails gracefully
+    # Cancel already completed or failed job fails gracefully
     assert service.cancel_job(second_job_id) is False
 
 

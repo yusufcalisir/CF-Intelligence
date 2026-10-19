@@ -750,6 +750,7 @@ class OperationalFederationService:
         registry_storage_dir: str | None = None,
         model_registry: ModelRegistry | None = None,
         app_env: str | None = None,
+        bank_partitions: dict[str, tuple[np.ndarray, np.ndarray]] | None = None,
     ) -> None:
         self._coordinator_token = coordinator_token
         self._db_url = db_url
@@ -762,6 +763,7 @@ class OperationalFederationService:
         self._registry_storage_dir = registry_storage_dir
         self._model_registry = model_registry
         self._app_env = app_env
+        self._bank_partitions = bank_partitions
 
     def resolve_coordinator_token(self, is_prod: bool) -> str:
         """Resolve authoritative coordinator token server-side."""
@@ -924,6 +926,7 @@ class OperationalFederationService:
         self,
         is_prod: bool,
         holdout_data: Any = None,
+        training_partitions: dict[str, tuple[np.ndarray, np.ndarray]] | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Resolve authoritative holdout evaluation dataset server-side.
 
@@ -1066,12 +1069,29 @@ class OperationalFederationService:
                 "CFI_HOLDOUT_MANIFEST_PATH). Operational federation fails closed without synthetic fallback."
             )
 
-        # 3. Non-production synthetic holdout dataset (deterministic)
+        # 3. Non-production synthetic holdout dataset (demonstrably disjoint from training partitions)
+        logger.warning(
+            "Using non-production synthetic holdout dataset for evaluation. "
+            "Metrics derived from this dataset represent non-production development evidence only."
+        )
         gen = DataGenerator(seed=42)
-        datasets = gen.generate_bank_datasets(bank_a_size=500, bank_b_size=200, bank_c_size=200)
-        feats_df, labels = datasets["bank_a"]
-        X = np.asarray(DataGenerator.encode_features(feats_df), dtype=np.float32)
-        y = np.asarray(labels.to_numpy(dtype=np.float32), dtype=np.float32)
+        holdout_feats_df, holdout_labels = gen.generate_dedicated_holdout_dataset(size=500)
+        X = np.asarray(DataGenerator.encode_features(holdout_feats_df), dtype=np.float32)
+        y = np.asarray(holdout_labels.to_numpy(dtype=np.float32), dtype=np.float32)
+
+        # Enforce demonstrably disjoint validation data against any supplied training partitions
+        effective_partitions = training_partitions or self._bank_partitions
+        if effective_partitions:
+            holdout_rows = {tuple(np.round(row, 5)) for row in X}
+            for b_id, (train_x, _) in effective_partitions.items():
+                train_rows = {tuple(np.round(row, 5)) for row in train_x}
+                overlap = holdout_rows.intersection(train_rows)
+                if overlap:
+                    raise TrainingProvenanceConfigurationError(
+                        f"Non-production holdout validation dataset is not disjoint from training partition for {b_id}: "
+                        f"{len(overlap)} overlapping sample rows detected."
+                    )
+
         self._validate_holdout_arrays(X, y)
         return X, y
 
@@ -1214,7 +1234,9 @@ class OperationalFederationService:
             comp_auth, comp_endpoint, spawned_comp = self.resolve_completion_authority(
                 coordinator_token, active_env, is_prod
             )
-            holdout_data = self.resolve_holdout_data(is_prod)
+            holdout_data = self.resolve_holdout_data(
+                is_prod, training_partitions=self._bank_partitions
+            )
 
             logger.info(
                 "Executing operational federation: job_id=%s, simulation_id=%s, consortium_id=%s, env=%s, banks=%s, rounds=%d, secagg=%s, defense=%s",

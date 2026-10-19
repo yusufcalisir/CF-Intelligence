@@ -147,14 +147,36 @@ class TestDriftRetrainingPipelineIntegration:
         assert fetched_job is not None
         assert fetched_job.job_id == job.job_id
 
-        # Execute retraining pipeline
-        exec_res = service.execute_retraining_pipeline(job.job_id)
+        # Execute retraining pipeline without operational service fails closed
+        import pytest
+        from unittest.mock import MagicMock
+
+        with pytest.raises(RuntimeError, match=r"(?i)no authorized OperationalFederationService provided"):
+            service.execute_retraining_pipeline(job.job_id)
+        assert job.status == "FAILED"
+
+        # Supplying an authorized operational service allows genuine completion
+        mock_op = MagicMock()
+        mock_op.execute_operational_federation.return_value = {
+            "status": "COMPLETED",
+            "candidate_model_version": "model_v1.0.1",
+            "evaluation_metrics": {"pr_auc": 0.88, "precision": 0.84, "recall": 0.81},
+            "receipt_id": "rcpt_pipeline_test",
+        }
+        service_with_op = DriftTriggeredRetrainingService(operational_service=mock_op)
+        job2 = service_with_op.create_manual_job(
+            reason="Retest with operational service",
+            cause=RetrainingCause.PSI_DRIFT_EXCEEDED,
+            psi_score=0.285,
+        )
+        exec_res = service_with_op.execute_retraining_pipeline(job2.job_id)
         assert exec_res["status"] == "COMPLETED"
-        assert job.status == "COMPLETED"
+        assert job2.status == "COMPLETED"
+        assert exec_res["candidate_model_version"] == "model_v1.0.1"
 
         # List jobs
-        completed_jobs = service.list_jobs(status="COMPLETED")
-        assert any(j.job_id == job.job_id for j in completed_jobs)
+        completed_jobs = service_with_op.list_jobs(status="COMPLETED")
+        assert any(j.job_id == job2.job_id for j in completed_jobs)
 
     def test_decompressed_payload_integrity(self) -> None:
         """Verifies that the compressed model payload produced during retraining is well-formed."""

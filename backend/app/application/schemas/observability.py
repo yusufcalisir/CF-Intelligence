@@ -262,7 +262,19 @@ class RetrainTriggerRequest(BaseModel):
 
 
 class RetrainTriggerResponse(BaseModel):
-    triggered: bool
+    triggered: bool = Field(..., description="Whether drift trigger alert/request was successfully recorded")
+    execution_status: str = Field(
+        default="ALERT_RECORDED_RETRAINING_RECOMMENDED",
+        description="Explicit lifecycle status: ALERT_RECORDED_RETRAINING_RECOMMENDED, RETRAINING_REQUESTED, QUEUED, RUNNING, COMPLETED, or UNSUPPORTED",
+    )
+    operational_dispatch_confirmed: bool = Field(
+        default=False,
+        description="False when request is an observability alert/recommendation without authenticated federation executor dispatch",
+    )
+    dispatched_job_id: str | None = Field(
+        default=None,
+        description="Authoritative training job ID if dispatched to a real operational executor; None for un-dispatched monitoring alerts",
+    )
     reason: str
     new_simulation_id: str | None = None
     triggered_at: str
@@ -270,6 +282,10 @@ class RetrainTriggerResponse(BaseModel):
     alertmanager_alert_dispatched: bool = Field(default=False, description="Flag indicating Alertmanager alert was registered")
     prometheus_metric_emitted: bool = Field(default=True, description="Flag indicating Prometheus drift metrics were updated")
     drift_features_targeted: int = Field(default=0, description="Count of drifted features in retraining payload")
+    recommendation_details: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Details on required operator/consortium authorization before operational federation can be initiated",
+    )
 
 
 class SiemExportRequest(BaseModel):

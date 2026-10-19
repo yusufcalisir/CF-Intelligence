@@ -92,6 +92,19 @@ def _reconstruct_mappingproxy(d: dict[Any, Any]) -> types.MappingProxyType:
 copyreg.pickle(types.MappingProxyType, lambda mp: (_reconstruct_mappingproxy, (dict(mp),)))
 
 
+def _sync_dir(dir_path: str) -> None:
+    """Best-effort directory fsync for atomic on-disk operations."""
+    if os.name != "nt":
+        try:
+            fd = os.open(dir_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+        except OSError as exc:
+            logger.debug("Directory fsync skipped or unsupported for '%s': %s", dir_path, exc)
+
+
 def _generate_ed25519_keypair_hex() -> tuple[str, str]:
     private_key = ed25519.Ed25519PrivateKey.generate()
     private_raw = private_key.private_bytes(
@@ -5305,6 +5318,179 @@ def run_bank_worker_node(
 # ---------------------------------------------------------------------------
 
 
+class DurableArtifactStagingManager:
+    """Manages durable on-disk staging of aggregated model artifacts across post-completion crash windows.
+
+    Guarantees:
+    1. Durably preserves exact final aggregated model artifact bytes across the crash window
+       (after final round aggregation and completion recording, but before receipt issuance or ModelRegistry persistence).
+    2. Cryptographically binds staged artifact bytes to job_id, simulation_id, consortium_id, and SHA-256.
+    3. Uses atomic temp-write + fsync + replace semantics.
+    4. Enforces strict integrity verification on recovery: rejects missing, corrupted, tampered,
+       cross-job, or cross-consortium staged files.
+    5. Isolated from candidate/champion model serving paths: staged artifacts are located in a dedicated
+       staging directory and are never treated as candidates or active champions until formally committed
+       by ModelRegistry.
+    6. Privacy: Staged artifact contains only the aggregated global model parameters; coordinator never
+       stores individual bank plaintext updates or private keys.
+    """
+
+    def __init__(self, staging_dir: str | None = None) -> None:
+        if staging_dir:
+            self.staging_dir = os.path.abspath(staging_dir)
+        else:
+            settings = get_settings()
+            base_dir = getattr(settings, "model_storage_path", "./model_store") or "./model_store"
+            self.staging_dir = os.path.abspath(os.path.join(base_dir, ".recovery_staging"))
+        os.makedirs(self.staging_dir, exist_ok=True)
+
+    def stage_artifact(
+        self,
+        job_id: str,
+        simulation_id: str,
+        consortium_id: str | None,
+        artifact_bytes: bytes,
+    ) -> tuple[str, str]:
+        """Atomically stage aggregated artifact bytes with sidecar metadata bound to execution identity."""
+        if not artifact_bytes:
+            raise ValueError("Cannot stage empty artifact bytes.")
+
+        clean_job = job_id.strip()
+        clean_sim = simulation_id.strip()
+        clean_consortium = consortium_id.strip() if consortium_id else None
+        artifact_sha256 = hashlib.sha256(artifact_bytes).hexdigest()
+
+        final_art_path = os.path.join(self.staging_dir, f"{clean_job}.artifact.pt")
+        final_meta_path = os.path.join(self.staging_dir, f"{clean_job}.meta.json")
+
+        tmp_art = os.path.join(
+            self.staging_dir, f".tmp_art_{clean_job}_{os.getpid()}_{uuid.uuid4().hex}.pt"
+        )
+        tmp_meta = os.path.join(
+            self.staging_dir, f".tmp_meta_{clean_job}_{os.getpid()}_{uuid.uuid4().hex}.json"
+        )
+
+        # 1. Write artifact bytes atomically
+        with open(tmp_art, "wb") as f:
+            f.write(artifact_bytes)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_art, final_art_path)
+
+        # 2. Write sidecar metadata atomically
+        meta_payload = {
+            "job_id": clean_job,
+            "simulation_id": clean_sim,
+            "consortium_id": clean_consortium,
+            "artifact_sha256": artifact_sha256,
+            "byte_size": len(artifact_bytes),
+            "staged_at": datetime.now(UTC).isoformat(),
+        }
+        with open(tmp_meta, "w", encoding="utf-8") as f:
+            json.dump(meta_payload, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_meta, final_meta_path)
+
+        # 3. Directory sync if supported
+        _sync_dir(self.staging_dir)
+        logger.info(
+            "Durably staged aggregated artifact for job %s (SHA-256: %s, size: %d bytes)",
+            clean_job,
+            artifact_sha256,
+            len(artifact_bytes),
+        )
+        return final_art_path, final_meta_path
+
+    def has_staged_artifact(self, job_id: str) -> bool:
+        """Check if both artifact and sidecar metadata exist for job_id."""
+        clean_job = job_id.strip()
+        art_path = os.path.join(self.staging_dir, f"{clean_job}.artifact.pt")
+        meta_path = os.path.join(self.staging_dir, f"{clean_job}.meta.json")
+        return os.path.isfile(art_path) and os.path.isfile(meta_path)
+
+    def load_and_verify_staged_artifact(
+        self,
+        job_id: str,
+        simulation_id: str,
+        consortium_id: str | None,
+        expected_sha256: str,
+    ) -> bytes:
+        """Load and strictly verify staged recovery artifact bytes against expected execution identity."""
+        clean_job = job_id.strip()
+        clean_sim = simulation_id.strip()
+        clean_consortium = consortium_id.strip() if consortium_id else None
+        expected_digest = expected_sha256.strip().lower()
+
+        art_path = os.path.join(self.staging_dir, f"{clean_job}.artifact.pt")
+        meta_path = os.path.join(self.staging_dir, f"{clean_job}.meta.json")
+
+        if not os.path.isfile(art_path) or not os.path.isfile(meta_path):
+            raise TrainingProvenanceSecurityError(
+                f"Non-recoverable post-completion state: Staged artifact or metadata for job '{clean_job}' is missing on disk. "
+                "Operational federation fails closed."
+            )
+
+        try:
+            with open(meta_path, encoding="utf-8") as f:
+                meta = json.load(f)
+        except Exception as e:
+            raise TrainingProvenanceSecurityError(
+                f"Non-recoverable post-completion state: Failed reading staged metadata for job '{clean_job}': {e}"
+            ) from e
+
+        # Validate metadata bindings
+        if meta.get("job_id") != clean_job:
+            raise TrainingProvenanceSecurityError(
+                f"Staged recovery metadata job_id mismatch: {meta.get('job_id')} != {clean_job}"
+            )
+        if meta.get("simulation_id") != clean_sim:
+            raise TrainingProvenanceSecurityError(
+                f"Staged recovery metadata simulation_id mismatch: {meta.get('simulation_id')} != {clean_sim}"
+            )
+        if clean_consortium and meta.get("consortium_id") and meta.get("consortium_id") != clean_consortium:
+            raise TrainingProvenanceSecurityError(
+                f"Staged recovery metadata consortium_id mismatch: {meta.get('consortium_id')} != {clean_consortium}"
+            )
+        if meta.get("artifact_sha256", "").strip().lower() != expected_digest:
+            raise TrainingProvenanceSecurityError(
+                f"Staged recovery metadata artifact_sha256 mismatch: {meta.get('artifact_sha256')} != {expected_digest}"
+            )
+
+        # Read artifact bytes and verify physical digest
+        try:
+            with open(art_path, "rb") as f:
+                raw_bytes = f.read()
+        except Exception as e:
+            raise TrainingProvenanceSecurityError(
+                f"Non-recoverable post-completion state: Failed reading staged artifact for job '{clean_job}': {e}"
+            ) from e
+
+        actual_digest = hashlib.sha256(raw_bytes).hexdigest().lower()
+        if actual_digest != expected_digest:
+            raise TrainingProvenanceSecurityError(
+                f"Staged recovery artifact for job '{clean_job}' has corrupted or tampered SHA-256 digest: {actual_digest} != {expected_digest}"
+            )
+
+        logger.info(
+            "Successfully recovered and verified staged artifact for job %s (SHA-256: %s)",
+            clean_job,
+            actual_digest,
+        )
+        return raw_bytes
+
+    def cleanup_staged_artifact(self, job_id: str) -> None:
+        """Safely clean up staged artifact and metadata after authoritative candidate registration."""
+        clean_job = job_id.strip()
+        art_path = os.path.join(self.staging_dir, f"{clean_job}.artifact.pt")
+        meta_path = os.path.join(self.staging_dir, f"{clean_job}.meta.json")
+        for p in (art_path, meta_path):
+            with contextlib.suppress(OSError):
+                if os.path.exists(p):
+                    os.remove(p)
+        _sync_dir(self.staging_dir)
+
+
 class DistributedFederatedTrainingManager:
     """Orchestrates genuine distributed federated training across isolated bank worker processes.
 
@@ -5395,6 +5581,8 @@ class DistributedFederatedTrainingManager:
         byzantine_defense: str = "none",
         byzantine_f_max: int = 1,
         trimmed_mean_trim_count: int | None = None,
+        simulate_crash_after_completion: bool = False,
+        simulate_crash_after_receipt: bool = False,
     ) -> dict[str, Any]:
         """Execute complete distributed E2E federated training lifecycle across independent processes.
 
@@ -5408,6 +5596,10 @@ class DistributedFederatedTrainingManager:
             if pause_aggregation_checkpoint_file is not None:
                 raise TrainingProvenanceSecurityError(
                     "Production coordinator cannot accept test aggregation checkpoint hooks (ISO-07)."
+                )
+            if simulate_crash_after_completion or simulate_crash_after_receipt:
+                raise TrainingProvenanceSecurityError(
+                    "Production coordinator cannot accept simulated crash test hooks."
                 )
             if bank_partitions is not None:
                 raise TrainingProvenanceSecurityError(
@@ -5437,6 +5629,195 @@ class DistributedFederatedTrainingManager:
                     "Production coordinator cannot generate bank credentials or spawn workers with generated secrets (BI-04). "
                     "Pre-authenticated worker endpoints must be supplied."
                 )
+
+        staging_dir = (
+            os.path.join(registry_storage_dir, ".recovery_staging")
+            if registry_storage_dir
+            else None
+        )
+        staging_manager = DurableArtifactStagingManager(staging_dir=staging_dir)
+
+        # -------------------------------------------------------------------
+        # Post-Completion Crash Recovery Window
+        # Check if job was already finalized as COMPLETED in authority backend
+        # -------------------------------------------------------------------
+        pre_completed_rec = None
+        try:
+            pre_completed_rec = self.authority_source.get_completed_job_by_id(job_id)
+        except Exception as e:
+            logger.debug("No pre-existing completed authority record for job %s: %s", job_id, e)
+
+        if pre_completed_rec is not None and getattr(pre_completed_rec, "status", None) == "COMPLETED":
+            logger.info(
+                "Detected pre-existing COMPLETED authority record for job %s. Resuming post-completion recovery...",
+                job_id,
+            )
+            expected_digest = getattr(pre_completed_rec, "artifact_sha256", None)
+            if not expected_digest:
+                raise TrainingProvenanceSecurityError(
+                    f"Completed job record for '{job_id}' is missing required artifact_sha256. Cannot resume recovery."
+                )
+
+            # Load and verify staged recovery artifact bytes without re-executing private training or DP-SGD
+            final_model_bytes = staging_manager.load_and_verify_staged_artifact(
+                job_id=job_id,
+                simulation_id=simulation_id,
+                consortium_id=consortium_id,
+                expected_sha256=expected_digest,
+            )
+            final_artifact_sha256 = expected_digest
+            unique_samples = pre_completed_rec.sample_count
+            metrics_dict = dict(pre_completed_rec.observed_metrics)
+            completed_record = pre_completed_rec
+
+            loaded_state = torch.load(io.BytesIO(final_model_bytes), map_location="cpu")
+            try:
+                global_model = self.model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+                global_model.load_state_dict(loaded_state)
+            except Exception:
+                global_model = self.model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=False)
+                global_model.load_state_dict(loaded_state)
+
+            if simulate_crash_after_completion:
+                raise RuntimeError("Simulated coordinator process crash after completion before receipt issuance.")
+
+            # Issue or reconcile Ed25519 Receipt
+            if signing_authority is not None:
+                if hasattr(signing_authority, "sign_completed_job_receipt"):
+                    receipt = signing_authority.sign_completed_job_receipt(
+                        job_id=job_id,
+                        artifact_bytes=final_model_bytes,
+                        caller_identity="COORDINATOR",
+                        caller_token=self.coordinator_token,
+                    )
+                else:
+                    evidence = TrainingExecutionEvidence(
+                        training_run_id=training_run_id,
+                        job_id=job_id,
+                        simulation_id=simulation_id,
+                        completed_at=completed_record.completed_at,
+                        status="COMPLETED",
+                        executed_rounds=num_rounds,
+                        executed_epochs=num_rounds,
+                        sample_count=unique_samples,
+                        observed_metrics=dict(completed_record.observed_metrics),
+                        artifact_sha256=final_artifact_sha256,
+                        architecture="FraudDetectionNN",
+                        feature_schema_version="v1.0",
+                        feature_names=list(FEATURE_NAMES),
+                        producer_id="FEDERATED_COORDINATOR",
+                        consortium_id=consortium_id,
+                    )
+                    receipt = signing_authority.issue_receipt(
+                        evidence=evidence, model_bytes=final_model_bytes
+                    )
+            else:
+                active_issuer = receipt_issuer
+                if active_issuer is None:
+                    if signing_key_hex is not None:
+                        active_issuer = TrainingReceiptIssuer(
+                            signing_key_hex=signing_key_hex,
+                            key_id=DEFAULT_TRAINING_KEY_ID,
+                            job_record_source=self.authority_source,
+                            enforce_job_records=True,
+                        )
+                    else:
+                        active_issuer = get_default_training_issuer()
+
+                evidence = TrainingExecutionEvidence(
+                    training_run_id=training_run_id,
+                    job_id=job_id,
+                    simulation_id=simulation_id,
+                    completed_at=completed_record.completed_at,
+                    status="COMPLETED",
+                    executed_rounds=num_rounds,
+                    executed_epochs=num_rounds,
+                    sample_count=unique_samples,
+                    observed_metrics=dict(completed_record.observed_metrics),
+                    artifact_sha256=final_artifact_sha256,
+                    architecture="FraudDetectionNN",
+                    feature_schema_version="v1.0",
+                    feature_names=list(FEATURE_NAMES),
+                    producer_id="FEDERATED_COORDINATOR",
+                    consortium_id=consortium_id,
+                )
+                receipt = active_issuer.issue_receipt(
+                    evidence=evidence, model_bytes=final_model_bytes
+                )
+
+            if simulate_crash_after_receipt:
+                raise RuntimeError("Simulated coordinator process crash after receipt issuance before registry persistence.")
+
+            # Public-Key Verification
+            active_verifier = receipt_verifier or get_default_training_verifier()
+            is_valid, reason = active_verifier.verify_receipt(
+                receipt=receipt,
+                expected_simulation_id=simulation_id,
+                expected_architecture="FraudDetectionNN",
+                expected_feature_schema_version="v1.0",
+                expected_input_dim=NUM_FEATURES,
+                expected_feature_names=list(FEATURE_NAMES),
+                actual_artifact_bytes=final_model_bytes,
+            )
+            if not is_valid:
+                raise TrainingProvenanceSecurityError(
+                    f"Ed25519 receipt verification failed on recovery: {reason}"
+                )
+
+            # Idempotent candidate registration
+            active_registry = model_registry or ModelRegistry(
+                storage_dir=registry_storage_dir,
+                verifier=active_verifier,
+            )
+            saved_version = active_registry.save_version(
+                simulation_id=simulation_id,
+                state_dict=global_model.state_dict(),
+                metrics=metrics_dict,
+                is_promoted=False,
+                status="inactive",
+                provenance_type="TRAINING_RECORDED",
+                training_run_id=training_run_id,
+                training_receipt=receipt,
+                artifact_bytes=final_model_bytes,
+                expected_architecture="FraudDetectionNN",
+                expected_feature_schema_version="v1.0",
+                expected_input_dim=NUM_FEATURES,
+                expected_feature_names=list(FEATURE_NAMES),
+                consortium_id=consortium_id,
+            )
+
+            # Clean up staged artifact upon confirmed candidate registration
+            staging_manager.cleanup_staged_artifact(job_id)
+
+            active_champion = active_registry.get_active_champion_identity(
+                simulation_id=simulation_id
+            )
+            is_promoted_champion = (
+                active_champion is not None
+                and active_champion.get("sha256") == final_artifact_sha256
+            )
+
+            return {
+                "status": "COMPLETED",
+                "coordinator_pid": coordinator_pid,
+                "worker_pids": {},
+                "completed_record": completed_record,
+                "receipt": receipt,
+                "is_verified": is_valid,
+                "saved_version": saved_version,
+                "is_promoted_champion": is_promoted_champion,
+                "metrics": metrics_dict,
+                "final_artifact_sha256": final_artifact_sha256,
+                "consortium_id": consortium_id,
+                "dp_enabled": bool(dp_config.get("dp_enabled", False)) if dp_config else False,
+                "dp_provenance": {},
+                "secagg_enabled": secagg_enabled,
+                "secagg_provenance": None,
+                "requested_aggregation_method": byzantine_defense,
+                "executed_aggregation_method": "recovery_reconciled",
+                "byzantine_defense": byzantine_defense,
+                "recovered_from_staging": True,
+            }
 
         # Determine participating banks list
         banks = (
@@ -5608,7 +5989,7 @@ class DistributedFederatedTrainingManager:
         global_model = self.model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
         global_weights = self.model_service.get_parameters(global_model)
         aggregated_model_digest = ""
-        final_model_bytes: bytes = b""
+        final_model_bytes = b""
 
         secagg_session_provenance: dict[str, Any] = {"enabled": secagg_enabled, "rounds": {}}
 
@@ -6084,12 +6465,20 @@ class DistributedFederatedTrainingManager:
                 else None
             )
 
-            metrics_dict: dict[str, float] = {
+            metrics_dict = {
                 "auc_roc": float(val_auc),
                 "val_loss": float(val_loss),
             }
             if final_loss is not None:
                 metrics_dict["loss"] = float(final_loss)
+
+            # Durably stage final aggregated model artifact bytes across post-completion crash window
+            staging_manager.stage_artifact(
+                job_id=job_id,
+                simulation_id=simulation_id,
+                consortium_id=consortium_id,
+                artifact_bytes=final_model_bytes,
+            )
 
             # 6. Complete Job in PostgreSQL Authority via Independent Completion Authority
             if completion_authority is not None:
@@ -6122,6 +6511,9 @@ class DistributedFederatedTrainingManager:
                     consortium_id=consortium_id,
                     enforce_lifecycle=True,
                 )
+
+            if simulate_crash_after_completion:
+                raise RuntimeError("Simulated coordinator process crash after completion before receipt issuance.")
 
             # 7. Issue Ed25519 Receipt in RECEIPT ISSUER DOMAIN
             if signing_authority is not None:
@@ -6192,6 +6584,9 @@ class DistributedFederatedTrainingManager:
                     evidence=evidence, model_bytes=final_model_bytes
                 )
 
+            if simulate_crash_after_receipt:
+                raise RuntimeError("Simulated coordinator process crash after receipt issuance before registry persistence.")
+
             # 8. Public-Key-Only Verification in VERIFIER DOMAIN
             active_verifier = receipt_verifier or get_default_training_verifier()
             is_valid, reason = active_verifier.verify_receipt(
@@ -6229,6 +6624,9 @@ class DistributedFederatedTrainingManager:
                 expected_feature_names=list(FEATURE_NAMES),
                 consortium_id=consortium_id,
             )
+
+            # Clean up staged artifact upon confirmed candidate registration
+            staging_manager.cleanup_staged_artifact(job_id)
 
             # Confirm model is NOT champion
             active_champion = active_registry.get_active_champion_identity(

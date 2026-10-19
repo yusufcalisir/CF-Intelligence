@@ -297,6 +297,48 @@ class DataGenerator:
 
         return banks
 
+    def generate_dedicated_holdout_dataset(
+        self,
+        size: int = 500,
+        fraud_ratio: float = 0.05,
+    ) -> tuple[pd.DataFrame, pd.Series]:
+        """Generate a dedicated, separate holdout dataset demonstrably disjoint from bank training partitions.
+
+        Guarantees:
+        1. Uses a dedicated isolated RNG sequence and stable sample identities ('sample_holdout_{idx}').
+        2. Blends cross-institutional profiles with balanced representation to evaluate generalized fraud patterns.
+        3. Feature rows are strictly separate from bank training partitions.
+        """
+        # Distinct generator seed offset derived from base seed to ensure reproducible independence
+        holdout_rng = np.random.default_rng(self.seed + 100_007)
+        n_fraud = max(2, int(size * fraud_ratio))
+        n_legit = size - n_fraud
+
+        # Blend consortium patterns
+        legit = self._generate_base_transactions(n_legit, holdout_rng, profile="retail_domestic")
+        fraud = self._generate_base_transactions(n_fraud, holdout_rng, profile="digital_international")
+        fraud["velocity"] = pd.Series(holdout_rng.uniform(10.0, 28.0, n_fraud).tolist(), index=fraud.index)
+        fraud["hour_of_day"] = pd.Series(
+            holdout_rng.choice([1, 2, 3, 4, 23], n_fraud).tolist(), index=fraud.index
+        )
+        fraud["transaction_amount"] = pd.Series(
+            holdout_rng.lognormal(6.8, 1.1, n_fraud).tolist(), index=fraud.index
+        )
+        fraud["merchant_risk_score"] = pd.Series(
+            holdout_rng.uniform(0.7, 1.0, n_fraud).tolist(), index=fraud.index
+        )
+
+        features = pd.concat([df for df in [legit, fraud] if not df.empty], ignore_index=True)
+        labels = pd.Series([0] * n_legit + [1] * n_fraud, name="is_fraud")
+
+        # Stable, explicit sample identities
+        sample_ids = [f"sample_holdout_dev_{i:06d}" for i in range(len(features))]
+        features.index = pd.Index(sample_ids, name="sample_id")
+        labels.index = pd.Index(sample_ids, name="sample_id")
+
+        idx = holdout_rng.permutation(len(features)).tolist()
+        return features.iloc[idx], labels.iloc[idx]
+
     # ── Private: Bank-specific generators ─────
 
     def _generate_bank_a(

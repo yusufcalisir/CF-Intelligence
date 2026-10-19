@@ -54,9 +54,15 @@ class RetrainingJobRecord:
 class DriftTriggeredRetrainingService:
     """Monitors drift metrics and dispatches automated FL retraining pipelines."""
 
-    def __init__(self, psi_threshold: float = 0.20, min_auc_threshold: float = 0.70) -> None:
+    def __init__(
+        self,
+        psi_threshold: float = 0.20,
+        min_auc_threshold: float = 0.70,
+        operational_service: Any | None = None,
+    ) -> None:
         self.psi_threshold = psi_threshold
         self.min_auc_threshold = min_auc_threshold
+        self.operational_service = operational_service
         self._jobs: dict[str, RetrainingJobRecord] = {}
         self._lock = threading.RLock()
 
@@ -199,28 +205,113 @@ class DriftTriggeredRetrainingService:
         )
         return record
 
-    def execute_retraining_pipeline(self, job_id: str) -> dict[str, Any]:
-        """Executes automated FL retraining task producing a candidate model checkpoint."""
+    def execute_retraining_pipeline(
+        self,
+        job_id: str,
+        operational_service: Any | None = None,
+        participating_banks: list[str] | None = None,
+        consortium_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Executes genuine automated FL retraining task producing a candidate model checkpoint.
+
+        Truthfulness Guarantee:
+        Strictly prohibits fabricated completion, synthetic candidate IDs, or dummy ML metrics.
+        Requires an authorized OperationalFederationService to execute genuine distributed training,
+        evaluate holdout data, issue receipts, and register an inactive candidate.
+        If operational_service is not supplied, fails closed with an explicit RuntimeError.
+        """
+        effective_service = operational_service or self.operational_service
         with self._lock:
             if job_id not in self._jobs:
                 raise KeyError(f"Retraining job '{job_id}' does not exist.")
-
             record = self._jobs[job_id]
-            candidate_version = f"model_candidate_{uuid.uuid4().hex[:6]}"
-            record.status = "COMPLETED"
-            record.candidate_model_version = candidate_version
 
-        logger.info(
-            "Retraining job %s completed. Candidate model: %s",
-            job_id,
-            candidate_version,
-        )
-        return {
-            "job_id": job_id,
-            "status": "COMPLETED",
-            "candidate_model_version": candidate_version,
-            "metrics": {"auc": 0.88, "precision": 0.84, "recall": 0.81},
-        }
+            if effective_service is None:
+                record.status = "FAILED"
+                record.details["failure_reason"] = (
+                    "No authorized OperationalFederationService provided. Automated retraining "
+                    "cannot fabricate training completion or synthetic ML metrics (AGENTS.md)."
+                )
+                logger.error(
+                    "Retraining job %s failed closed: %s",
+                    job_id,
+                    record.details["failure_reason"],
+                )
+                raise RuntimeError(
+                    f"Retraining job '{job_id}' cannot execute: No authorized OperationalFederationService provided. "
+                    "Fabricated training completion and synthetic ML metrics are strictly prohibited (AGENTS.md)."
+                )
+
+            record.status = "RUNNING"
+
+        # Execute genuine operational federation outside the lock
+        try:
+            target_rounds = record.details.get("target_rounds", 3)
+            sim_id = f"sim_retrain_{job_id}"
+            fed_result = effective_service.execute_operational_federation(
+                simulation_id=sim_id,
+                num_rounds=target_rounds,
+                participating_banks=participating_banks or ["BANK_A", "BANK_B", "BANK_C"],
+                consortium_id=consortium_id,
+            )
+            if not isinstance(fed_result, dict) or fed_result.get("status") != "COMPLETED":
+                with self._lock:
+                    record.status = "FAILED"
+                    record.details["operational_result"] = fed_result
+                raise RuntimeError(
+                    f"Operational federation failed for retraining job '{job_id}': {fed_result}"
+                )
+
+            saved_version = fed_result.get("saved_version", {})
+            candidate_version_num = (
+                saved_version.get("version")
+                if isinstance(saved_version, dict)
+                else getattr(saved_version, "version", None)
+            )
+            candidate_version = (
+                f"v{candidate_version_num}"
+                if candidate_version_num is not None
+                else (
+                    fed_result.get("candidate_model_version")
+                    or f"model_v{candidate_version_num}"
+                )
+            )
+
+            completed_rec = fed_result.get("completed_record")
+            observed_metrics = (
+                getattr(completed_rec, "observed_metrics", None)
+                or fed_result.get("evaluation_metrics")
+                or fed_result.get("metrics")
+                or {}
+            )
+
+            with self._lock:
+                record.status = "COMPLETED"
+                record.candidate_model_version = str(candidate_version)
+                record.details["metrics"] = dict(observed_metrics)
+                record.details["saved_version"] = saved_version
+                record.details["is_promoted_champion"] = fed_result.get(
+                    "is_promoted_champion", False
+                )
+
+            logger.info(
+                "Retraining job %s completed via OperationalFederationService. Candidate model: %s",
+                job_id,
+                candidate_version,
+            )
+            return {
+                "job_id": job_id,
+                "status": "COMPLETED",
+                "candidate_model_version": str(candidate_version),
+                "metrics": dict(observed_metrics),
+                "evaluation_metrics": dict(observed_metrics),
+                "is_promoted_champion": fed_result.get("is_promoted_champion", False),
+            }
+        except Exception as exc:
+            with self._lock:
+                record.status = "FAILED"
+                record.details["failure_exception"] = str(exc)
+            raise
 
     def cancel_job(self, job_id: str, reason: str = "Cancelled by operator") -> bool:
         """Cancels a pending or triggered retraining job."""
