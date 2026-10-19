@@ -222,7 +222,11 @@ def reset_model_cache(simulation_id: str | None = None) -> None:
         if rc:
             if simulation_id:
                 rc.delete(f"cfi:champion_model:{simulation_id}", f"cfi:champion_model:{simulation_id}:auth")
-            rc.delete("cfi:champion_model", "cfi:champion_model:auth")
+                settings = get_settings()
+                if settings.default_simulation_id and simulation_id == settings.default_simulation_id:
+                    rc.delete("cfi:champion_model", "cfi:champion_model:auth")
+            else:
+                rc.delete("cfi:champion_model", "cfi:champion_model:auth")
 
 
 def _is_demo_mode_active() -> bool:
@@ -313,7 +317,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                 )
                                 with contextlib.suppress(Exception):
                                     redis_client.delete(scoped_model_key, scoped_auth_key)
-                                    if not sim_scope:
+                                    if not sim_scope or (settings.default_simulation_id and sim_scope == settings.default_simulation_id):
                                         redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                             else:
                                 # Normalize payload dictionary
@@ -354,7 +358,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                     logger.warning("Redis model cache failed HMAC authenticity verification. Evicting.")
                                     with contextlib.suppress(Exception):
                                         redis_client.delete(scoped_model_key, scoped_auth_key)
-                                        if scoped_model_key != "cfi:champion_model":
+                                        if not sim_scope or (settings.default_simulation_id and sim_scope == settings.default_simulation_id):
                                             redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                 else:
                                     # MANDATORY FIELD VALIDATION:
@@ -397,7 +401,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                     if not schema_valid:
                                         with contextlib.suppress(Exception):
                                             redis_client.delete(scoped_model_key, scoped_auth_key)
-                                            if scoped_model_key != "cfi:champion_model":
+                                            if not sim_scope or (settings.default_simulation_id and sim_scope == settings.default_simulation_id):
                                                 redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                     else:
                                         expected_model_sha = hashlib.sha256(cached_bytes).hexdigest()
@@ -407,7 +411,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                             logger.warning("Redis model cache SHA-256 digest mismatch. Evicting.")
                                             with contextlib.suppress(Exception):
                                                 redis_client.delete(scoped_model_key, scoped_auth_key)
-                                                if scoped_model_key != "cfi:champion_model":
+                                                if not sim_scope or (settings.default_simulation_id and sim_scope == settings.default_simulation_id):
                                                     redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                         elif (
                                             meta_for_schema.get("serialization_version") != 2
@@ -430,7 +434,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                             )
                                             with contextlib.suppress(Exception):
                                                 redis_client.delete(scoped_model_key, scoped_auth_key)
-                                                if scoped_model_key != "cfi:champion_model":
+                                                if not sim_scope or (settings.default_simulation_id and sim_scope == settings.default_simulation_id):
                                                     redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                         else:
                                             # Authenticated, complete schema, and strictly matches current active champion!
@@ -567,11 +571,15 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
 
                     if hasattr(redis_client, "pipeline"):
                         try:
+                            is_default_or_unscoped = not sim_scope or (
+                                bool(settings.default_simulation_id) and sim_scope == settings.default_simulation_id
+                            )
                             pipe = redis_client.pipeline(transaction=True)
                             pipe.set(scoped_model_key, model_bytes, ex=3600)
                             pipe.set(scoped_auth_key, auth_envelope_str, ex=3600)
-                            pipe.set("cfi:champion_model", model_bytes, ex=3600)
-                            pipe.set("cfi:champion_model:auth", auth_envelope_str, ex=3600)
+                            if is_default_or_unscoped:
+                                pipe.set("cfi:champion_model", model_bytes, ex=3600)
+                                pipe.set("cfi:champion_model:auth", auth_envelope_str, ex=3600)
                             pipe.execute()
                             logger.info(
                                 "Cached champion v%d gen %d in Redis atomically with version-bound HMAC envelope.",

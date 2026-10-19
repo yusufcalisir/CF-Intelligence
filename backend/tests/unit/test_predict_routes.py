@@ -286,9 +286,11 @@ def test_feature_store_offload_thread_execution_and_exception_resilience(
     executed_threads: list[int] = []
     orig_get_online_features = predict_module._feature_store.get_online_features
 
-    def tracking_get_online_features(entity_rows: list[dict[str, Any]], features: list[str]) -> list[dict[str, Any]]:
+    def tracking_get_online_features(
+        entity_rows: list[dict[str, Any]], features: list[str], *args: Any, **kwargs: Any
+    ) -> list[dict[str, Any]]:
         executed_threads.append(threading.get_ident())
-        return orig_get_online_features(entity_rows, features)
+        return orig_get_online_features(entity_rows, features, *args, **kwargs)
 
     monkeypatch.setattr(predict_module._settings, "feature_store_enabled", True)
     monkeypatch.setattr(predict_module._feature_store, "get_online_features", tracking_get_online_features)
@@ -310,7 +312,9 @@ def test_feature_store_offload_thread_execution_and_exception_resilience(
     assert "risk_score" in res.json()
 
     # 2. Exception resilience: verify that if FeatureStore raises, score_transaction falls back gracefully
-    def failing_get_online_features(entity_rows: list[dict[str, Any]], features: list[str]) -> list[dict[str, Any]]:
+    def failing_get_online_features(
+        entity_rows: list[dict[str, Any]], features: list[str], *args: Any, **kwargs: Any
+    ) -> list[dict[str, Any]]:
         raise RuntimeError("Simulated Redis/Feast timeout")
 
     monkeypatch.setattr(predict_module._feature_store, "get_online_features", failing_get_online_features)

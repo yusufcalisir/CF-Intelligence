@@ -46,27 +46,27 @@ class TransactionPredictRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     transaction_amount: float = Field(..., ge=0.0, description="Amount of the transaction")
-    merchant_category: str = Field(
-        "grocery",
+    merchant_category: str | None = Field(
+        default=None,
         max_length=256,
         description="Merchant category name (e.g. crypto, grocery, travel)",
     )
-    country_code: str = Field(
-        "US", max_length=256, description="Originating ISO country code (e.g. US, NG, TR)"
+    country_code: str | None = Field(
+        default=None, max_length=256, description="Originating ISO country code (e.g. US, NG, TR)"
     )
-    device_type: str = Field(
-        "web_browser", max_length=256, description="Type of device (e.g. web_browser, mobile_app)"
+    device_type: str | None = Field(
+        default=None, max_length=256, description="Type of device (e.g. web_browser, mobile_app)"
     )
     velocity: float | None = Field(default=None, ge=0.0, description="Transaction velocity (txns/hr)")
-    hour_of_day: int = Field(12, ge=0, le=23, description="Hour of the transaction")
-    merchant_risk_score: float = Field(
-        0.05, ge=0.0, le=1.0, description="Historical fraud rate of the merchant"
+    hour_of_day: int | None = Field(default=None, ge=0, le=23, description="Hour of the transaction")
+    merchant_risk_score: float | None = Field(
+        default=None, ge=0.0, le=1.0, description="Historical fraud rate of the merchant"
     )
-    customer_history_score: float = Field(
-        0.95, ge=0.0, le=1.0, description="Trustworthiness score of the customer"
+    customer_history_score: float | None = Field(
+        default=None, ge=0.0, le=1.0, description="Trustworthiness score of the customer"
     )
-    chargeback_count: int = Field(0, ge=0, description="Customer chargeback count")
-    account_age_days: int = Field(365, ge=0, description="Age of the customer account in days")
+    chargeback_count: int | None = Field(default=None, ge=0, description="Customer chargeback count")
+    account_age_days: int | None = Field(default=None, ge=0, description="Age of the customer account in days")
     bank_id: str | None = Field(
         None, max_length=256, description="Optional bank identifier. Defaults to gateway ID."
     )
@@ -86,7 +86,16 @@ class TransactionPredictRequest(BaseModel):
         "EUR", max_length=3, description="ISO 4217 transaction currency"
     )
 
-    @field_validator("transaction_amount", "velocity", "merchant_risk_score", "customer_history_score", mode="before")
+    @field_validator(
+        "transaction_amount",
+        "velocity",
+        "merchant_risk_score",
+        "customer_history_score",
+        "hour_of_day",
+        "chargeback_count",
+        "account_age_days",
+        mode="before",
+    )
     @classmethod
     def _validate_finite_float(cls, v: Any) -> Any:
         if isinstance(v, bool):
@@ -98,7 +107,7 @@ class TransactionPredictRequest(BaseModel):
                 raise ValueError(f"Numeric fields must be valid numbers: {v}") from err
             if not math.isfinite(val):
                 raise ValueError("Numeric fields must be finite numbers (NaN, +Inf, -Inf rejected)")
-            return val
+            return val if not isinstance(v, int) else int(val)
         return v
 
 
@@ -241,6 +250,54 @@ class ScoreTransactionRequest(BaseModel):
     merchant_id: str = Field(..., max_length=256, description="Target merchant identifier")
     country: str = Field("EE", max_length=16, description="ISO 3166-1 alpha-2 origin country code")
     device_id: str = Field(..., max_length=256, description="Device fingerprint identifier")
+    merchant_category: str | None = Field(
+        None, max_length=256, description="Explicit merchant category (e.g. grocery, crypto, dining)"
+    )
+    device_type: str | None = Field(
+        None, max_length=256, description="Observed device category (e.g. web_browser, mobile_app)"
+    )
+    velocity: float | None = Field(
+        None, ge=0.0, description="Observed transaction velocity (txns/hr)"
+    )
+    customer_history_score: float | None = Field(
+        None, ge=0.0, le=1.0, description="Observed customer trustworthiness score"
+    )
+    chargeback_count: int | None = Field(
+        None, ge=0, description="Customer chargeback count"
+    )
+    account_age_days: int | None = Field(
+        None, ge=0, description="Age of customer account in days"
+    )
+    merchant_risk_score: float | None = Field(
+        None, ge=0.0, le=1.0, description="Historical fraud rate of merchant"
+    )
+    hour_of_day: int | None = Field(
+        None, ge=0, le=23, description="Hour of the transaction [0, 23]"
+    )
+    simulation_id: str | None = Field(
+        None, max_length=256, description="Optional simulation ID to resolve champion model"
+    )
+
+    @field_validator(
+        "amount",
+        "velocity",
+        "customer_history_score",
+        "merchant_risk_score",
+        mode="before",
+    )
+    @classmethod
+    def _validate_finite_float(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("Boolean values are not valid numeric values")
+        if v is not None:
+            try:
+                val = float(v)
+            except (ValueError, TypeError) as err:
+                raise ValueError(f"Numeric fields must be valid numbers: {v}") from err
+            if not math.isfinite(val):
+                raise ValueError("Numeric fields must be finite numbers (NaN, +Inf, -Inf rejected)")
+            return val
+        return v
 
 
 class FeatureContributionItem(BaseModel):
@@ -269,7 +326,9 @@ class ScoreTransactionResponse(BaseModel):
     risk_score: int = Field(..., ge=0, le=1000, description="Normalized risk score [0, 1000]")
     risk_level: str = Field(..., description="LOW, MEDIUM, or HIGH risk classification")
     decision: str = Field(..., description="Automated decision: ALLOW, REVIEW, or BLOCK")
-    model_version: str = Field("v2.4.1", description="Active global model version")
+    model_version: str = Field(..., description="Active global model version")
+    artifact_sha256: str | None = Field(None, description="SHA-256 fingerprint of active champion model artifact")
+    simulation_id: str | None = Field(None, description="Simulation scope of active champion model")
     explanations: list[FeatureContributionItem] = Field(default_factory=list)
     related_entities: list[RelatedEntityItem] = Field(default_factory=list)
     latency_ms: float = Field(..., description="Response latency in milliseconds")

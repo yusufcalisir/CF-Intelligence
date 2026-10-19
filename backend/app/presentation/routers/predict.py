@@ -10,7 +10,6 @@ import asyncio
 import io
 import logging
 import math
-import random
 import threading
 import time
 import uuid
@@ -69,6 +68,7 @@ from app.dependencies import (
 from app.domain.model_serving_errors import (
     ModelAuthorizationError,
     ModelCompatibilityError,
+    ModelExecutionError,
     ModelIntegrityError,
     ModelNotAvailableError,
 )
@@ -84,29 +84,87 @@ router = APIRouter(prefix="/api/v1", tags=["prediction"])
 # Singleton instances (matching backend router architectures)
 _settings = get_settings()
 
+DEV_DEFAULTS: dict[str, Any] = {
+    "merchant_category": "grocery",
+    "country_code": "US",
+    "device_type": "web_browser",
+    "velocity": 1.0,
+    "hour_of_day": 12,
+    "merchant_risk_score": 0.05,
+    "customer_history_score": 0.95,
+    "chargeback_count": 0,
+    "account_age_days": 365,
+}
+
+REQUIRED_ML_FEATURES: list[str] = [
+    "transaction_amount",
+    "merchant_category",
+    "country_code",
+    "device_type",
+    "velocity",
+    "hour_of_day",
+    "merchant_risk_score",
+    "customer_history_score",
+    "chargeback_count",
+    "account_age_days",
+]
+
 
 def _eval_model(model: torch.nn.Module, input_tensor: torch.Tensor) -> float:
-    """Evaluate PyTorch model forward pass synchronously (offloaded to threadpool)."""
+    """Evaluate PyTorch model forward pass synchronously with strict output validation."""
+    if not isinstance(input_tensor, torch.Tensor):
+        raise ModelExecutionError(f"Model input must be a torch.Tensor, got {type(input_tensor).__name__}")
+    if input_tensor.dim() != 2 or input_tensor.shape[0] != 1:
+        raise ModelExecutionError(f"Model input must have shape (1, features), got {tuple(input_tensor.shape)}")
+
     with torch.no_grad():
-        out = float(model(input_tensor).item())
-        if not math.isfinite(out):
-            raise ValueError(f"Model inference produced non-finite output: {out}")
-        return out
+        out = model(input_tensor)
+        if not isinstance(out, torch.Tensor):
+            raise ModelExecutionError(f"Model forward pass must return a torch.Tensor, got {type(out).__name__}")
+        if out.numel() != 1:
+            raise ModelExecutionError(f"Model forward pass produced unexpected output shape: {tuple(out.shape)} (expected 1 scalar output)")
+        val = float(out.item())
+        if not math.isfinite(val):
+            raise ModelExecutionError(f"Model inference produced non-finite output: {val}")
+        if not (0.0 <= val <= 1.0):
+            raise ModelExecutionError(f"Model inference produced out-of-bounds probability: {val} (expected range [0.0, 1.0])")
+        return val
 
 
 def _eval_model_batch(model: torch.nn.Module, input_tensors: torch.Tensor) -> list[float]:
-    """Evaluate PyTorch model forward pass synchronously for a batch of input tensors."""
+    """Evaluate PyTorch model forward pass synchronously for a batch of input tensors with strict validation."""
+    if not isinstance(input_tensors, torch.Tensor):
+        raise ModelExecutionError(f"Model batch input must be a torch.Tensor, got {type(input_tensors).__name__}")
+    if input_tensors.dim() != 2:
+        raise ModelExecutionError(f"Model batch input must have shape (batch_size, features), got {tuple(input_tensors.shape)}")
+
+    batch_size = input_tensors.shape[0]
     with torch.no_grad():
         outputs = model(input_tensors)
-        if outputs.dim() == 0:
+        if not isinstance(outputs, torch.Tensor):
+            raise ModelExecutionError(f"Model batch forward pass must return a torch.Tensor, got {type(outputs).__name__}")
+
+        if outputs.dim() == 0 and batch_size == 1:
             res = [float(outputs.item())]
         elif outputs.dim() == 1:
+            if outputs.shape[0] != batch_size:
+                raise ModelExecutionError(f"Model batch output count mismatch: expected {batch_size}, got {outputs.shape[0]}")
             res = [float(v) for v in outputs.tolist()]
+        elif outputs.dim() == 2:
+            if outputs.shape[0] != batch_size or outputs.shape[1] != 1:
+                raise ModelExecutionError(f"Model batch output shape mismatch: expected ({batch_size}, 1), got {tuple(outputs.shape)}")
+            res = [float(v[0]) for v in outputs.tolist()]
         else:
-            res = [float(v[0]) if len(v) > 0 else 0.0 for v in outputs.tolist()]
-        for v in res:
+            raise ModelExecutionError(f"Model batch output unexpected shape: {tuple(outputs.shape)} for batch size {batch_size}")
+
+        if len(res) != batch_size:
+            raise ModelExecutionError(f"Model batch result count mismatch: expected {batch_size}, got {len(res)}")
+
+        for i, v in enumerate(res):
             if not math.isfinite(v):
-                raise ValueError(f"Model batch inference produced non-finite output: {v}")
+                raise ModelExecutionError(f"Model batch inference item {i} produced non-finite output: {v}")
+            if not (0.0 <= v <= 1.0):
+                raise ModelExecutionError(f"Model batch inference item {i} produced out-of-bounds probability: {v} (expected range [0.0, 1.0])")
         return res
 
 
@@ -233,8 +291,10 @@ def clear_all_serving_caches() -> None:
     _clear_challenger_model_cache()
 
 
-def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Module:
-    """Resolve, verify, and cache active serving neural network model in memory.
+def _get_cached_serving_model_with_ident(
+    simulation_id: str | None = None,
+) -> tuple[torch.nn.Module, dict[str, Any]]:
+    """Resolve, verify, and cache active serving neural network model in memory with identity snapshot.
 
     Enforces:
     - Authoritative loading through ModelService.get_champion(simulation_id).
@@ -336,7 +396,7 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
                             detail="Serving model rejected: model authority or signing key has been revoked.",
                         )
                 _cached_serving_model_version = cached_ident.get("version")
-                return cached_model
+                return cached_model, cached_ident
 
     # 3. Load genuine champion model via authoritative ModelService
     try:
@@ -403,11 +463,18 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
 
     with _serving_cache_lock:
         _serving_model_cache[simulation_id] = (model, active_ident)
-        _cached_serving_model = model
-        _cached_serving_model_mtime = time.time()
-        _cached_serving_model_kid = active_ident.get("issuer_key_id")
-        _cached_serving_model_version = active_ident.get("version")
+        if simulation_id is None or simulation_id == get_settings().default_simulation_id:
+            _cached_serving_model = model
+            _cached_serving_model_mtime = time.time()
+            _cached_serving_model_kid = active_ident.get("issuer_key_id")
+            _cached_serving_model_version = active_ident.get("version")
 
+    return model, active_ident
+
+
+def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Module:
+    """Resolve, verify, and cache active serving neural network model in memory."""
+    model, _ = _get_cached_serving_model_with_ident(simulation_id)
     return model
 
 
@@ -433,28 +500,21 @@ async def predict_transaction(
     if caller_tenant and payload.bank_id:
         enforce_tenant_isolation(caller_tenant, payload.bank_id)
 
-    # 1. Resolve cached active model instance
-    try:
-        model = _get_cached_serving_model(payload.simulation_id)
-        bank_id = payload.bank_id or "serving_client"
-        txn_id = payload.transaction_id or str(uuid.uuid4())
-        # Resolve entity hash from customer_id, account_id, or default entity
-        customer_ref = payload.customer_id or payload.account_id or "customer_1"
-        entity_hash = f"serving:{bank_id}:{customer_ref}"
+    bank_id = payload.bank_id or "serving_client"
+    txn_id = payload.transaction_id or str(uuid.uuid4())
+    customer_ref = payload.customer_id or payload.account_id or "customer_1"
+    entity_hash = f"serving:{bank_id}:{customer_ref}"
 
-        txn_dict = payload.model_dump()
+    txn_dict = payload.model_dump()
+    settings = get_settings()
+    is_production = settings.app_env.lower() in ("production", "prod")
 
-        # Online Feature Store: schedule ingest as background task (fire-and-forget).
-        # This follows real production feature store semantics:
-        #   - Scoring reads the last committed feature snapshot (get_online_features).
-        #   - The current transaction's features are written asynchronously after scoring.
-        #   - The next request will observe the updated snapshot.
-        # This eliminates the rolling_velocity_1h accumulation side-effect identified
-        # in the scientific audit (Section 6 — Prediction Idempotency).
-        if _settings.feature_store_enabled:
-            merch_id = f"merch_{payload.merchant_category}"
+    # Online Feature Store: query real customer and merchant historical features if enabled
+    if settings.feature_store_enabled:
+        merch_id = f"merch_{payload.merchant_category}" if payload.merchant_category else None
+        try:
             online_feats = _feature_store.get_online_features(
-                [{"customer_id": entity_hash, "merchant_id": merch_id}],
+                [{"customer_id": entity_hash, **({"merchant_id": merch_id} if merch_id else {})}],
                 [
                     "rolling_velocity_1h",
                     "avg_amount_24h",
@@ -468,54 +528,79 @@ async def predict_transaction(
             )
             if online_feats:
                 feats = online_feats[0]
-                if feats.get("rolling_velocity_1h") is not None:
+                if txn_dict.get("velocity") is None and feats.get("rolling_velocity_1h") is not None:
                     txn_dict["velocity"] = feats["rolling_velocity_1h"]
-                if feats.get("customer_history_score") is not None:
+                if txn_dict.get("customer_history_score") is None and feats.get("customer_history_score") is not None:
                     txn_dict["customer_history_score"] = feats["customer_history_score"]
-                if feats.get("account_age_days") is not None:
+                if txn_dict.get("account_age_days") is None and feats.get("account_age_days") is not None:
                     txn_dict["account_age_days"] = feats["account_age_days"]
-                if feats.get("chargeback_count") is not None:
+                if txn_dict.get("chargeback_count") is None and feats.get("chargeback_count") is not None:
                     txn_dict["chargeback_count"] = feats["chargeback_count"]
-                if feats.get("merchant_risk_score") is not None:
+                if txn_dict.get("merchant_risk_score") is None and feats.get("merchant_risk_score") is not None:
                     txn_dict["merchant_risk_score"] = feats["merchant_risk_score"]
-                if feats.get("merchant_category") is not None:
+                if txn_dict.get("merchant_category") is None and feats.get("merchant_category") is not None:
                     txn_dict["merchant_category"] = feats["merchant_category"]
-            # Schedule asynchronous feature ingestion — runs after response is sent
-            background_tasks.add_task(
-                _feature_store.ingest_transaction,
-                customer_id=entity_hash,
-                amount=payload.transaction_amount,
-                merchant_id=merch_id,
-                merchant_category=payload.merchant_category,
-                merchant_risk_score=payload.merchant_risk_score,
-                customer_history_score=payload.customer_history_score,
-                chargeback_count=payload.chargeback_count,
-                account_age_days=payload.account_age_days,
-                transaction_id=txn_id,
-                tenant_id=bank_id,
-            )
+        except Exception as exc:
+            logger.debug("Feature Store online query failed in predict_transaction: %s", exc)
 
+        # Schedule asynchronous feature ingestion — runs after response is sent
+        background_tasks.add_task(
+            _feature_store.ingest_transaction,
+            customer_id=entity_hash,
+            amount=payload.transaction_amount,
+            merchant_id=merch_id or f"merch_{txn_dict.get('merchant_category', 'general')}",
+            merchant_category=txn_dict.get("merchant_category") or "grocery",
+            merchant_risk_score=txn_dict.get("merchant_risk_score") if txn_dict.get("merchant_risk_score") is not None else 0.05,
+            customer_history_score=txn_dict.get("customer_history_score") if txn_dict.get("customer_history_score") is not None else 0.95,
+            chargeback_count=txn_dict.get("chargeback_count") if txn_dict.get("chargeback_count") is not None else 0,
+            account_age_days=txn_dict.get("account_age_days") if txn_dict.get("account_age_days") is not None else 365,
+            transaction_id=txn_id,
+            tenant_id=bank_id,
+        )
+
+    # Enforce strict production feature contract vs dev defaults
+    if is_production:
+        missing_feats = [f for f in REQUIRED_ML_FEATURES if txn_dict.get(f) is None]
+        if missing_feats:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Production feature contract violation: Missing required features: {missing_feats}. "
+                    f"Features must be explicitly supplied or observed in online feature store."
+                ),
+            )
+        try:
+            preprocess_transaction(txn_dict, strict_categorical=True)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Production categorical validation failed: {exc}",
+            )
+    else:
+        for f, default_val in DEV_DEFAULTS.items():
+            if txn_dict.get(f) is None:
+                txn_dict[f] = default_val
+
+    # 1. Resolve cached active model instance and identity snapshot
+    try:
+        model, active_ident = _get_cached_serving_model_with_ident(payload.simulation_id)
         network = getattr(model, "network", None)
         first_layer = None
         if isinstance(network, (torch.nn.Sequential, torch.nn.ModuleList, list)) and len(network) > 0:
             first_layer = network[0]
         input_dim = int(getattr(first_layer, "in_features", NUM_FEATURES))
-        input_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
-        if input_tensor.shape[1] < input_dim:
-            logger.warning("Padding input tensor from %d to %d", input_tensor.shape[1], input_dim)
-            input_tensor = torch.nn.functional.pad(
-                input_tensor, (0, input_dim - input_tensor.shape[1]), value=0.0
+        input_tensor = preprocess_transaction(txn_dict, strict_categorical=is_production).to(_model_service.device)
+        if input_tensor.shape[1] != input_dim:
+            raise ModelCompatibilityError(
+                f"Feature tensor dimension mismatch: input has {input_tensor.shape[1]} features, but model expects {input_dim}."
             )
-        elif input_tensor.shape[1] > input_dim:
-            logger.warning("Truncating input tensor from %d to %d", input_tensor.shape[1], input_dim)
-            input_tensor = input_tensor[:, :input_dim]
 
         # Measure Champion Latency
         champ_start = time.perf_counter()
         champ_prob = _eval_model(model, input_tensor)
         champ_latency = (time.perf_counter() - champ_start) * 1000
 
-        # Measure Challenger Latency (Shadow Deployment)
+        # Measure Challenger Latency (Shadow Deployment ONLY)
         chall_prob = None
         chall_latency = None
         challenger_ver = None
@@ -527,13 +612,9 @@ async def predict_transaction(
             if challenger_entry:
                 challenger_ver = challenger_entry["version"]
                 try:
-                    from app.config import get_settings
-
-                    _st = get_settings()
-                    if _st.app_env.lower() == "production":
+                    if is_production:
                         validate_production_admission(challenger_entry, context="predict_challenger_serving")
 
-                    # Use LRU-cached loader — avoids per-request disk I/O
                     chall_model = _load_challenger_model(
                         payload.simulation_id, challenger_ver, dp_compatible=True
                     )
@@ -545,17 +626,17 @@ async def predict_transaction(
                     )
                     chall_input_dim = int(getattr(chall_first, "in_features", NUM_FEATURES))
 
-                    chall_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
-                    if chall_tensor.shape[1] < chall_input_dim:
-                        chall_tensor = torch.nn.functional.pad(
-                            chall_tensor, (0, chall_input_dim - chall_tensor.shape[1]), value=0.0
+                    chall_tensor = preprocess_transaction(txn_dict, strict_categorical=is_production).to(_model_service.device)
+                    if chall_tensor.shape[1] != chall_input_dim:
+                        logger.warning(
+                            "Challenger tensor dimension %d mismatches model expected dimension %d; skipping shadow evaluation.",
+                            chall_tensor.shape[1],
+                            chall_input_dim,
                         )
-                    elif chall_tensor.shape[1] > chall_input_dim:
-                        chall_tensor = chall_tensor[:, :chall_input_dim]
-
-                    chall_start = time.perf_counter()
-                    chall_prob = _eval_model(chall_model, chall_tensor)
-                    chall_latency = (time.perf_counter() - chall_start) * 1000
+                    else:
+                        chall_start = time.perf_counter()
+                        chall_prob = _eval_model(chall_model, chall_tensor)
+                        chall_latency = (time.perf_counter() - chall_start) * 1000
                 except Exception as exc:
                     logger.warning(
                         "Failed to run challenger model version %d: %s",
@@ -565,32 +646,39 @@ async def predict_transaction(
                     chall_prob = None
                     challenger_ver = None
 
-
-        # Traffic Routing: Route a portion of the traffic to the Challenger
-        routed_to = "champion"
+        # Authoritative production prediction must ALWAYS use currently authorized champion.
+        # Shadow predictions must NEVER replace champion probabilities in actual production risk scores,
+        # decisions, alerts, policy enforcement, or customer responses.
         fraud_prob = champ_prob
-        if payload.simulation_id and challenger_ver and chall_prob is not None:
-            traffic_share = _eval_engine.get_traffic_share(payload.simulation_id)
-            if random.random() < traffic_share:
-                fraud_prob = chall_prob
-                routed_to = "challenger"
 
-        # Log prediction for evaluation and rollback engine
+        # Log prediction for shadow evaluation and rollback engine
         sim_id_eval = payload.simulation_id or "live_prod_v2"
         _eval_engine.log_prediction(
             simulation_id=sim_id_eval,
             transaction_id=txn_id,
-            champion_version=active_entry["version"] if active_entry else 1,
+            champion_version=active_entry["version"] if active_entry else (active_ident.get("version") if active_ident else 1),
             champion_prob=champ_prob,
             champion_latency_ms=champ_latency,
-                challenger_version=challenger_ver,
-                challenger_prob=chall_prob,
-                challenger_latency_ms=chall_latency,
-                routed_to=routed_to,
-            )
+            challenger_version=challenger_ver,
+            challenger_prob=chall_prob,
+            challenger_latency_ms=chall_latency,
+            routed_to="champion",
+        )
 
     except HTTPException:
         raise
+    except ModelCompatibilityError as exc:
+        logger.error("Model compatibility error during prediction: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Serving model unavailable: model architecture or dimension is incompatible: {exc}",
+        ) from exc
+    except ModelExecutionError as exc:
+        logger.error("Model execution error during prediction: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Serving model execution error: {exc}",
+        ) from exc
     except ValueError as e:
         logger.error("Inference validation failed: %s", e)
         raise HTTPException(
@@ -606,9 +694,10 @@ async def predict_transaction(
 
     # 4. Compute composite risk score
     # Register historical signals context dynamically for the entity hash
-    if payload.chargeback_count > 0:
-        _risk_engine.register_chargeback(entity_hash, min(1.0, payload.chargeback_count / 10.0))
-        for _ in range(min(5, payload.chargeback_count)):
+    cb_count = txn_dict.get("chargeback_count") or 0
+    if cb_count > 0:
+        _risk_engine.register_chargeback(entity_hash, min(1.0, cb_count / 10.0))
+        for _ in range(min(5, cb_count)):
             _risk_engine.register_alert(entity_hash)
     _risk_engine.register_baseline(entity_hash, {"mean_amount": 100.0, "std_amount": 50.0})
 
@@ -640,14 +729,14 @@ async def predict_transaction(
             features_dict = {
                 "transaction_id": txn_id,
                 "customer_id": payload.customer_id or payload.account_id or customer_ref,
-                "merchant_category": payload.merchant_category,
-                "country_code": payload.country_code,
-                "device_type": payload.device_type,
+                "merchant_category": txn_dict.get("merchant_category"),
+                "country_code": txn_dict.get("country_code"),
+                "device_type": txn_dict.get("device_type"),
                 "transaction_amount": payload.transaction_amount,
-                "merchant_risk_score": payload.merchant_risk_score,
-                "customer_history_score": payload.customer_history_score,
-                "chargeback_count": payload.chargeback_count,
-                "account_age_days": payload.account_age_days,
+                "merchant_risk_score": txn_dict.get("merchant_risk_score"),
+                "customer_history_score": txn_dict.get("customer_history_score"),
+                "chargeback_count": cb_count,
+                "account_age_days": txn_dict.get("account_age_days"),
             }
 
             # Generate and persist the alert in Redis
@@ -685,14 +774,14 @@ async def predict_transaction(
             features_dict = {
                 "transaction_id": txn_id,
                 "customer_id": payload.customer_id or payload.account_id or customer_ref,
-                "merchant_category": payload.merchant_category,
-                "country_code": payload.country_code,
-                "device_type": payload.device_type,
+                "merchant_category": txn_dict.get("merchant_category"),
+                "country_code": txn_dict.get("country_code"),
+                "device_type": txn_dict.get("device_type"),
                 "transaction_amount": payload.transaction_amount,
-                "merchant_risk_score": payload.merchant_risk_score,
-                "customer_history_score": payload.customer_history_score,
-                "chargeback_count": payload.chargeback_count,
-                "account_age_days": payload.account_age_days,
+                "merchant_risk_score": txn_dict.get("merchant_risk_score"),
+                "customer_history_score": txn_dict.get("customer_history_score"),
+                "chargeback_count": cb_count,
+                "account_age_days": txn_dict.get("account_age_days"),
             }
             unassessed_alert = _alert_service.generate_unassessed_hold_alert(
                 bank_id=bank_id,
@@ -796,26 +885,19 @@ async def predict_batch(
         )
 
     start_batch = time.perf_counter()
-    try:
-        model = _get_cached_serving_model(payload.simulation_id)
-        network = getattr(model, "network", None)
-        first_layer = (
-            network[0]
-            if isinstance(network, (torch.nn.Sequential, torch.nn.ModuleList, list))
-            and len(network) > 0
-            else None
-        )
-        input_dim = int(getattr(first_layer, "in_features", NUM_FEATURES))
+    settings = get_settings()
+    is_production = settings.app_env.lower() in ("production", "prod")
 
-        txn_dicts = [t.model_dump() for t in payload.transactions]
-        if _settings.feature_store_enabled:
-            entity_rows = [
-                {
-                    "customer_id": f"serving:{target_tenant}:customer_1",
-                    "merchant_id": f"merch_{t.merchant_category}",
-                }
-                for t in payload.transactions
-            ]
+    txn_dicts = [t.model_dump() for t in payload.transactions]
+    if settings.feature_store_enabled:
+        entity_rows = [
+            {
+                "customer_id": f"serving:{target_tenant}:{t.customer_id or t.account_id or f'customer_{idx+1}'}",
+                "merchant_id": f"merch_{t.merchant_category}" if t.merchant_category else None,
+            }
+            for idx, t in enumerate(payload.transactions)
+        ]
+        try:
             online_feats = _feature_store.get_online_features(
                 entity_rows,
                 [
@@ -827,39 +909,92 @@ async def predict_batch(
                     "merchant_risk_score",
                     "merchant_category",
                 ],
+                tenant_id=target_tenant,
             )
             for idx, feats in enumerate(online_feats):
                 td = txn_dicts[idx]
-                if feats.get("rolling_velocity_1h") is not None:
+                if td.get("velocity") is None and feats.get("rolling_velocity_1h") is not None:
                     td["velocity"] = feats["rolling_velocity_1h"]
-                if feats.get("customer_history_score") is not None:
+                if td.get("customer_history_score") is None and feats.get("customer_history_score") is not None:
                     td["customer_history_score"] = feats["customer_history_score"]
-                if feats.get("account_age_days") is not None:
+                if td.get("account_age_days") is None and feats.get("account_age_days") is not None:
                     td["account_age_days"] = feats["account_age_days"]
-                if feats.get("chargeback_count") is not None:
+                if td.get("chargeback_count") is None and feats.get("chargeback_count") is not None:
                     td["chargeback_count"] = feats["chargeback_count"]
-                if feats.get("merchant_risk_score") is not None:
+                if td.get("merchant_risk_score") is None and feats.get("merchant_risk_score") is not None:
                     td["merchant_risk_score"] = feats["merchant_risk_score"]
-                if feats.get("merchant_category") is not None:
+                if td.get("merchant_category") is None and feats.get("merchant_category") is not None:
                     td["merchant_category"] = feats["merchant_category"]
+        except Exception as exc:
+            logger.debug("Feature Store online query failed in predict_batch: %s", exc)
+
+    if is_production:
+        for idx, td in enumerate(txn_dicts):
+            missing_feats = [f for f in REQUIRED_ML_FEATURES if td.get(f) is None]
+            if missing_feats:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Production feature contract violation in batch item {idx}: Missing required features: "
+                        f"{missing_feats}. Features must be explicitly supplied or observed in online feature store."
+                    ),
+                )
+            try:
+                preprocess_transaction(td, strict_categorical=True)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Production categorical validation failed in batch item {idx}: {exc}",
+                )
+    else:
+        for td in txn_dicts:
+            for f, default_val in DEV_DEFAULTS.items():
+                if td.get(f) is None:
+                    td[f] = default_val
+
+    try:
+        model, active_ident = _get_cached_serving_model_with_ident(payload.simulation_id)
+        network = getattr(model, "network", None)
+        first_layer = (
+            network[0]
+            if isinstance(network, (torch.nn.Sequential, torch.nn.ModuleList, list))
+            and len(network) > 0
+            else None
+        )
+        input_dim = int(getattr(first_layer, "in_features", NUM_FEATURES))
 
         tensors = []
-        for td in txn_dicts:
-            t_tensor = preprocess_transaction(td)
-            if t_tensor.shape[1] < input_dim:
-                logger.warning("Padding input tensor from %d to %d", t_tensor.shape[1], input_dim)
-                t_tensor = torch.nn.functional.pad(
-                    t_tensor, (0, input_dim - t_tensor.shape[1]), value=0.0
+        for idx, td in enumerate(txn_dicts):
+
+            t_tensor = preprocess_transaction(td, strict_categorical=is_production)
+            if t_tensor.shape[1] != input_dim:
+                raise ModelCompatibilityError(
+                    f"Feature tensor dimension mismatch in batch item {idx}: input has {t_tensor.shape[1]} features, but model expects {input_dim}."
                 )
-            elif t_tensor.shape[1] > input_dim:
-                logger.warning("Truncating input tensor from %d to %d", t_tensor.shape[1], input_dim)
-                t_tensor = t_tensor[:, :input_dim]
             tensors.append(t_tensor)
 
         batch_tensor = torch.cat(tensors, dim=0).to(_model_service.device)
         probs = await asyncio.to_thread(_eval_model_batch, model, batch_tensor)
     except HTTPException:
         raise
+    except ModelCompatibilityError as exc:
+        logger.error("Model compatibility error during batch inference: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Serving model unavailable: model architecture or dimension is incompatible: {exc}",
+        ) from exc
+    except ModelExecutionError as exc:
+        logger.error("Model execution error during batch inference: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Serving model execution error: {exc}",
+        ) from exc
+    except ValueError as exc:
+        logger.error("Batch feature validation error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Batch feature validation error: {exc}",
+        ) from exc
     except Exception as exc:
         logger.error("Batch inference execution failed: %s", exc, exc_info=True)
         raise HTTPException(
@@ -878,9 +1013,10 @@ async def predict_batch(
         txn_id = t_req.transaction_id or f"batch_tx_{uuid.uuid4().hex[:8]}"
         e_hash = f"batch:{target_tenant}:{txn_id}"
 
-        if t_req.chargeback_count > 0:
-            _risk_engine.register_chargeback(e_hash, min(1.0, t_req.chargeback_count / 10.0))
-            for _ in range(min(5, t_req.chargeback_count)):
+        cb_cnt = t_dict.get("chargeback_count") or 0
+        if cb_cnt > 0:
+            _risk_engine.register_chargeback(e_hash, min(1.0, cb_cnt / 10.0))
+            for _ in range(min(5, cb_cnt)):
                 _risk_engine.register_alert(e_hash)
         _risk_engine.register_baseline(e_hash, {"mean_amount": 100.0, "std_amount": 50.0})
 
@@ -948,6 +1084,67 @@ async def explain_transaction(
     start_time = time.perf_counter()
     txn_dict = payload.transaction.model_dump()
     txn_id = payload.transaction_id or payload.transaction.transaction_id or f"tx_{uuid.uuid4().hex[:8]}"
+
+    is_production = _settings.app_env.lower() in ("production", "prod")
+
+    # Online Feature Store: query real customer and merchant historical features if enabled
+    if _settings.feature_store_enabled:
+        bank_id = payload.transaction.bank_id or "serving_client"
+        customer_ref = payload.transaction.customer_id or payload.transaction.account_id or "customer_1"
+        entity_hash = f"serving:{bank_id}:{customer_ref}"
+        merch_id = f"merch_{payload.transaction.merchant_category}" if payload.transaction.merchant_category else None
+        try:
+            online_feats = _feature_store.get_online_features(
+                [{"customer_id": entity_hash, **({"merchant_id": merch_id} if merch_id else {})}],
+                [
+                    "rolling_velocity_1h",
+                    "avg_amount_24h",
+                    "customer_history_score",
+                    "account_age_days",
+                    "chargeback_count",
+                    "merchant_risk_score",
+                    "merchant_category",
+                ],
+                tenant_id=bank_id,
+            )
+            if online_feats:
+                feats = online_feats[0]
+                if txn_dict.get("velocity") is None and feats.get("rolling_velocity_1h") is not None:
+                    txn_dict["velocity"] = feats["rolling_velocity_1h"]
+                if txn_dict.get("customer_history_score") is None and feats.get("customer_history_score") is not None:
+                    txn_dict["customer_history_score"] = feats["customer_history_score"]
+                if txn_dict.get("account_age_days") is None and feats.get("account_age_days") is not None:
+                    txn_dict["account_age_days"] = feats["account_age_days"]
+                if txn_dict.get("chargeback_count") is None and feats.get("chargeback_count") is not None:
+                    txn_dict["chargeback_count"] = feats["chargeback_count"]
+                if txn_dict.get("merchant_risk_score") is None and feats.get("merchant_risk_score") is not None:
+                    txn_dict["merchant_risk_score"] = feats["merchant_risk_score"]
+                if txn_dict.get("merchant_category") is None and feats.get("merchant_category") is not None:
+                    txn_dict["merchant_category"] = feats["merchant_category"]
+        except Exception as exc:
+            logger.debug("Feature Store query in explain_transaction failed: %s", exc)
+
+    if is_production:
+        missing_feats = [f for f in REQUIRED_ML_FEATURES if txn_dict.get(f) is None]
+        if missing_feats:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Production feature contract violation: Missing required features: {missing_feats}. "
+                    f"Features must be explicitly supplied or observed in online feature store."
+                ),
+            )
+        try:
+            preprocess_transaction(txn_dict, strict_categorical=True)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Production categorical validation failed: {exc}",
+            )
+    else:
+        for f, default_val in DEV_DEFAULTS.items():
+            if txn_dict.get(f) is None:
+                txn_dict[f] = default_val
 
     try:
         # Resolve active serving model bound to the simulation/tenant
@@ -1100,38 +1297,132 @@ async def score_transaction(
     if caller_tenant and x_bank_id:
         enforce_tenant_isolation(caller_tenant, x_bank_id)
 
-    # Derive canonical merchant category from merchant_id for risk engine lookup
-    _merchant_id_lower = payload.merchant_id.lower()
-    if (
-        "crypto" in _merchant_id_lower
-        or "bitcoin" in _merchant_id_lower
-        or "exchange" in _merchant_id_lower
-    ):
-        merchant_category = "crypto"
-        merchant_risk = 0.85
-    elif (
-        "gambling" in _merchant_id_lower
-        or "casino" in _merchant_id_lower
-        or "bet" in _merchant_id_lower
-    ):
-        merchant_category = "gambling"
-        merchant_risk = 0.90
-    elif "wire" in _merchant_id_lower or "transfer" in _merchant_id_lower:
-        merchant_category = "wire_transfer"
-        merchant_risk = 0.75
-    elif "jewelry" in _merchant_id_lower or "jewel" in _merchant_id_lower:
-        merchant_category = "jewelry"
-        merchant_risk = 0.60
-    elif (
-        "grocery" in _merchant_id_lower
-        or "supermarket" in _merchant_id_lower
-        or "rewe" in _merchant_id_lower
-    ):
-        merchant_category = "grocery"
-        merchant_risk = 0.03
+    tenant_scope = x_bank_id or (caller_tenant if isinstance(caller_tenant, str) else getattr(caller_tenant, "tenant_id", None)) or "global"
+    settings = get_settings()
+    is_production = settings.app_env.lower() in ("production", "prod")
+
+    # Initial explicit feature values
+    merchant_category = payload.merchant_category
+    device_type = payload.device_type
+    velocity = payload.velocity
+    customer_history_score = payload.customer_history_score
+    chargeback_count = payload.chargeback_count
+    account_age_days = payload.account_age_days
+    merchant_risk_score = payload.merchant_risk_score
+    hour_of_day = payload.hour_of_day
+
+    # Online Feature Store: query real customer and merchant historical features if enabled
+    fs_enabled = getattr(_settings, "feature_store_enabled", False) or settings.feature_store_enabled
+    if fs_enabled:
+        try:
+            entity_rows = [
+                {
+                    "customer_id": f"serving:{tenant_scope}:{payload.account_id}",
+                    "merchant_id": payload.merchant_id,
+                }
+            ]
+            online_feats = await asyncio.to_thread(
+                _feature_store.get_online_features,
+                entity_rows,
+                [
+                    "customer_history_score",
+                    "account_age_days",
+                    "chargeback_count",
+                    "rolling_velocity_1h",
+                    "merchant_risk_score",
+                    "merchant_category",
+                    "device_type",
+                ],
+                tenant_id=tenant_scope,
+            )
+            if online_feats:
+                feats = online_feats[0]
+                if customer_history_score is None and feats.get("customer_history_score") is not None:
+                    customer_history_score = feats["customer_history_score"]
+                if chargeback_count is None and feats.get("chargeback_count") is not None:
+                    chargeback_count = feats["chargeback_count"]
+                if account_age_days is None and feats.get("account_age_days") is not None:
+                    account_age_days = feats["account_age_days"]
+                if velocity is None and feats.get("rolling_velocity_1h") is not None:
+                    velocity = float(feats["rolling_velocity_1h"])
+                if merchant_risk_score is None and feats.get("merchant_risk_score") is not None:
+                    merchant_risk_score = float(feats["merchant_risk_score"])
+                if merchant_category is None and feats.get("merchant_category") is not None:
+                    merchant_category = feats["merchant_category"]
+                if device_type is None and feats.get("device_type") is not None:
+                    device_type = feats["device_type"]
+        except Exception as exc:
+            logger.debug("Feature Store online query failed in score_transaction: %s", exc)
+
+    if is_production:
+        # Strict Production Feature Contract: do not fabricate or guess features in production
+        missing = []
+        if merchant_category is None:
+            missing.append("merchant_category")
+        if device_type is None:
+            missing.append("device_type")
+        if velocity is None:
+            missing.append("velocity")
+        if customer_history_score is None:
+            missing.append("customer_history_score")
+        if chargeback_count is None:
+            missing.append("chargeback_count")
+        if account_age_days is None:
+            missing.append("account_age_days")
+        if merchant_risk_score is None:
+            missing.append("merchant_risk_score")
+        if hour_of_day is None:
+            missing.append("hour_of_day")
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Production scoring rejected: missing required model features: {missing}. "
+                    f"Features must be explicitly supplied or observed in online feature store."
+                ),
+            )
     else:
-        merchant_category = "online_marketplace"
-        merchant_risk = 0.45
+        # Non-production demo/development fallback logic
+        if merchant_category is None:
+            _merchant_id_lower = payload.merchant_id.lower()
+            if "crypto" in _merchant_id_lower or "bitcoin" in _merchant_id_lower or "exchange" in _merchant_id_lower:
+                merchant_category = "crypto"
+            elif "gambling" in _merchant_id_lower or "casino" in _merchant_id_lower or "bet" in _merchant_id_lower:
+                merchant_category = "gambling"
+            elif "wire" in _merchant_id_lower or "transfer" in _merchant_id_lower:
+                merchant_category = "wire_transfer"
+            elif "jewelry" in _merchant_id_lower or "jewel" in _merchant_id_lower:
+                merchant_category = "jewelry"
+            elif "grocery" in _merchant_id_lower or "supermarket" in _merchant_id_lower or "rewe" in _merchant_id_lower:
+                merchant_category = "grocery"
+            else:
+                merchant_category = "online_marketplace"
+
+        if merchant_risk_score is None:
+            cat_risk_map = {
+                "crypto": 0.85,
+                "gambling": 0.90,
+                "wire_transfer": 0.75,
+                "jewelry": 0.60,
+                "grocery": 0.03,
+                "online_marketplace": 0.45,
+            }
+            merchant_risk_score = cat_risk_map.get(merchant_category, 0.45)
+
+        if device_type is None:
+            device_type = "web_browser"
+
+        if velocity is None:
+            velocity = 7.5 if merchant_category in ("crypto", "gambling", "wire_transfer") else 2.0
+
+        if customer_history_score is None:
+            customer_history_score = 0.90
+        if chargeback_count is None:
+            chargeback_count = 0
+        if account_age_days is None:
+            account_age_days = 365
+        if hour_of_day is None:
+            hour_of_day = time.gmtime().tm_hour
 
     # FATF high-risk jurisdiction supplement: countries not in engine's lookup table
     _HIGH_RISK_COUNTRIES = {"KP", "IR", "MM", "SY", "YE", "LY", "SS", "SO", "CF", "ER"}
@@ -1145,51 +1436,14 @@ async def score_transaction(
         else None
     )
 
-    # Derive velocity: elevated for high-risk merchant categories (crypto, gambling, wire_transfer)
-    velocity = 7.5 if merchant_category in ("crypto", "gambling", "wire_transfer") else 2.0
-
-    # Online Feature Store: query real customer and merchant historical features if enabled
-    customer_history_score = 0.90
-    chargeback_count = 0
-    account_age_days = 365
-    if _settings.feature_store_enabled:
-        try:
-            entity_rows = [
-                {
-                    "customer_id": f"serving:{payload.account_id}",
-                    "merchant_id": payload.merchant_id,
-                }
-            ]
-            online_feats = _feature_store.get_online_features(
-                entity_rows,
-                [
-                    "customer_history_score",
-                    "account_age_days",
-                    "chargeback_count",
-                    "rolling_velocity_1h",
-                ],
-            )
-            if online_feats:
-                feats = online_feats[0]
-                if feats.get("customer_history_score") is not None:
-                    customer_history_score = feats["customer_history_score"]
-                if feats.get("chargeback_count") is not None:
-                    chargeback_count = feats["chargeback_count"]
-                if feats.get("account_age_days") is not None:
-                    account_age_days = feats["account_age_days"]
-                if feats.get("rolling_velocity_1h") is not None:
-                    velocity = max(velocity, float(feats["rolling_velocity_1h"]))
-        except Exception as exc:
-            logger.debug("Feature Store online query failed in score_transaction: %s", exc)
-
     txn_dict = {
         "transaction_amount": payload.amount,
         "merchant_category": merchant_category,
         "country_code": payload.country,
-        "device_type": payload.device_id,
+        "device_type": device_type,
         "velocity": velocity,
-        "hour_of_day": time.gmtime().tm_hour,
-        "merchant_risk_score": merchant_risk,
+        "hour_of_day": hour_of_day,
+        "merchant_risk_score": merchant_risk_score,
         "customer_history_score": customer_history_score,
         "chargeback_count": chargeback_count,
         "account_age_days": account_age_days,
@@ -1198,8 +1452,8 @@ async def score_transaction(
 
     # 1. Real ML model inference via cached serving neural network
     try:
-        serving_model = _get_cached_serving_model()
-        input_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
+        serving_model, model_ident = _get_cached_serving_model_with_ident(payload.simulation_id)
+        input_tensor = preprocess_transaction(txn_dict, strict_categorical=is_production).to(_model_service.device)
         network = getattr(serving_model, "network", None)
         first_layer = (
             network[0]
@@ -1207,13 +1461,34 @@ async def score_transaction(
             else None
         )
         input_dim = int(getattr(first_layer, "in_features", NUM_FEATURES))
-        if input_tensor.shape[1] < input_dim:
-            input_tensor = torch.nn.functional.pad(
-                input_tensor, (0, input_dim - input_tensor.shape[1]), value=0.0
+        if input_tensor.shape[1] != input_dim:
+            raise ModelCompatibilityError(
+                f"Feature tensor dimension mismatch: input has {input_tensor.shape[1]} features, but model expects {input_dim}."
             )
-        elif input_tensor.shape[1] > input_dim:
-            input_tensor = input_tensor[:, :input_dim]
         ml_prediction = _eval_model(serving_model, input_tensor)
+    except ModelCompatibilityError as exc:
+        logger.error("Serving model compatibility error in score_transaction: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Serving model incompatible: {exc}",
+        )
+    except (ModelAuthorizationError, ModelNotAvailableError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Serving model unavailable: {exc}",
+        )
+    except ModelExecutionError as exc:
+        logger.error("Serving model execution error in score_transaction: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Model inference execution failure: {exc}",
+        )
+    except ValueError as exc:
+        # Categorical parsing/validation error from preprocess_transaction
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Production categorical validation failed: {exc}",
+        )
     except HTTPException:
         raise
     except Exception as exc:
@@ -1224,7 +1499,7 @@ async def score_transaction(
         )
 
     # Run composite risk scoring engine with genuine ML confidence
-    entity_hash = f"scoring:{x_bank_id or 'global'}:{payload.account_id}"
+    entity_hash = f"scoring:{tenant_scope}:{payload.account_id}"
     risk_score_obj = _risk_engine.score_transaction(txn_dict, ml_prediction, entity_hash)
     raw_score = risk_score_obj.score
 
@@ -1239,7 +1514,7 @@ async def score_transaction(
     elif is_fatf_greylist:
         risk_score = max(risk_score, 350)
     # 3. High-value transactions on high-risk merchants -> REVIEW
-    if payload.amount >= 10000.0 and merchant_risk >= 0.35:
+    if payload.amount >= 10000.0 and (merchant_risk_score or 0.0) >= 0.35:
         risk_score = max(risk_score, 350)
     # 4. Very large amounts -> always at least REVIEW
     if payload.amount >= 50000.0:
@@ -1261,20 +1536,9 @@ async def score_transaction(
     else:
         decision = "ALLOW"
 
-    # Model version tag — resolve from cached serving model if available, fallback to v2.4.1
-    if _cached_serving_model_version is not None:
-        model_ver = f"v{_cached_serving_model_version}.0.0"
-    else:
-        model_ver = "v2.4.1"
-        try:
-            active_sim_id = _model_service.get_active_simulation_id()
-            if active_sim_id:
-                versions = _registry.list_versions(active_sim_id)
-                champion = next((v for v in reversed(versions) if v.get("status") == "champion"), None)
-                if champion:
-                    model_ver = f"v{champion['version']}.0.0"
-        except Exception:
-            pass
+    # Model version tag — resolve truth from active_ident snapshot bound to the execution
+    ident_ver = model_ident.get("version")
+    model_ver = f"v{ident_ver}.0.0" if ident_ver is not None else "unknown"
 
     # Map internal risk scoring signal names to canonical API / SHAP feature names
     SIGNAL_FEATURE_MAP = {
@@ -1320,6 +1584,8 @@ async def score_transaction(
         risk_level=risk_level,
         decision=decision,
         model_version=model_ver,
+        artifact_sha256=model_ident.get("sha256"),
+        simulation_id=model_ident.get("simulation_id") or payload.simulation_id,
         explanations=explanations,
         related_entities=related_entities,
         latency_ms=latency_ms,
