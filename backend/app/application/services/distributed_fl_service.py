@@ -4078,6 +4078,7 @@ def run_bank_worker_node(
                         model_service.set_parameters(local_model, global_weights_obj)
 
                     dp_info: dict[str, Any] | None = None
+                    session: dict[str, Any] | None = None
                     if is_dp_enabled:
                         assert dp_config is not None
                         target_epsilon = float(dp_config["target_epsilon"])
@@ -4481,7 +4482,7 @@ def run_bank_worker_node(
                         success_payload["loss"] = observed_loss
                     if dp_info is not None:
                         success_payload["dp_provenance"] = dp_info
-                    if is_dp_enabled:
+                    if is_dp_enabled and session is not None:
                         session[f"attempt_{attempt_id}"] = success_payload
                     outbox.put(success_payload)
                     continue
@@ -4578,7 +4579,6 @@ def run_bank_worker_node(
                         "bundle": bundle_dict,
                         "public_bundle": bundle_dict,
                     })
-                    continue
                     continue
 
                 if msg.get("command") == "SECAGG_TRAIN_AND_MASK":
