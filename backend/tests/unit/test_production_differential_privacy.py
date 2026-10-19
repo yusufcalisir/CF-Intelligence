@@ -79,6 +79,12 @@ class TestProductionDifferentialPrivacy:
         job_id = f"job_{uuid.uuid4().hex[:8]}"
 
         authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        authority.provision_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag="credit_partition",
+            allocated_epsilon=10.0,
+            allocated_delta=1e-5,
+        )
         authority.schedule_training_job(
             job_id=job_id,
             training_run_id=f"run_{job_id}",
@@ -227,6 +233,12 @@ class TestProductionDifferentialPrivacy:
         job_id = f"job_multiround_{uuid.uuid4().hex[:8]}"
 
         authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        authority.provision_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag="cum_ds",
+            allocated_epsilon=10.0,
+            allocated_delta=1e-5,
+        )
         authority.schedule_training_job(
             job_id=job_id,
             training_run_id=f"run_{job_id}",
@@ -494,6 +506,12 @@ class TestProductionDifferentialPrivacy:
         job_id = f"job_fail_{uuid.uuid4().hex[:8]}"
 
         authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        authority.provision_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag="fail_test",
+            allocated_epsilon=10.0,
+            allocated_delta=1e-5,
+        )
         authority.schedule_training_job(
             job_id=job_id,
             training_run_id=f"run_{job_id}",
@@ -769,7 +787,7 @@ class TestProductionDifferentialPrivacy:
         authority.get_or_create_institutional_privacy_budget(
             bank_id=bank_id, dataset_tag=dataset_tag, allocated_epsilon=25.0, allocated_delta=1e-4
         )
-        authority.reserve_institutional_privacy_budget(bank_id, dataset_tag, job_id, 2.0, round_number=1)
+        authority.reserve_institutional_privacy_budget(bank_id, dataset_tag, job_id, 2.0, round_number=1, attempt_id="att_1")
         authority.commit_institutional_privacy_expenditure(
             bank_id, dataset_tag, job_id, spent_epsilon=1.5, steps_executed=10, round_number=1, attempt_id="att_1"
         )
@@ -793,7 +811,7 @@ class TestProductionDifferentialPrivacy:
         )
         # Cumulative epsilon is strictly positive and training adds to accounting
         assert eps_r2 > 0.0
-        authority.reserve_institutional_privacy_budget(bank_id, dataset_tag, job_id, eps_r2, round_number=2)
+        authority.reserve_institutional_privacy_budget(bank_id, dataset_tag, job_id, eps_r2, round_number=2, attempt_id="att_2")
         authority.commit_institutional_privacy_expenditure(
             bank_id, dataset_tag, job_id, spent_epsilon=eps_r2, steps_executed=10, round_number=2, attempt_id="att_2"
         )
@@ -810,9 +828,11 @@ class TestProductionDifferentialPrivacy:
         dataset_tag = "replay_ds"
         job_id = "job_replay"
         authority.get_or_create_institutional_privacy_budget(
-            bank_id=bank_id, dataset_tag=dataset_tag, allocated_epsilon=10.0
+            bank_id=bank_id, dataset_tag=dataset_tag, allocated_epsilon=10.0, allocated_delta=1e-3
         )
-        authority.reserve_institutional_privacy_budget(bank_id, dataset_tag, job_id, 2.0, round_number=1)
+        authority.reserve_institutional_privacy_budget(
+            bank_id, dataset_tag, job_id, 2.0, round_number=1, attempt_id="attempt_alpha"
+        )
 
         # Initial commit of attempt_alpha
         b1 = authority.commit_institutional_privacy_expenditure(
@@ -827,6 +847,9 @@ class TestProductionDifferentialPrivacy:
         assert b2.spent_epsilon == pytest.approx(1.8, abs=1e-5)
 
         # Re-execution with new attempt consumes additional budget
+        authority.reserve_institutional_privacy_budget(
+            bank_id, dataset_tag, job_id, 2.0, round_number=1, attempt_id="attempt_beta"
+        )
         b3 = authority.commit_institutional_privacy_expenditure(
             bank_id, dataset_tag, job_id, spent_epsilon=1.8, steps_executed=10, round_number=1, attempt_id="attempt_beta"
         )
@@ -958,3 +981,511 @@ class TestProductionDifferentialPrivacy:
         assert prov["accountant"] == "opacus_prv"
         assert prov["secure_rng"] is False
         assert prov["sampling"] == "poisson"
+
+    # Negative Test A: Two unrelated labels for the same authoritative bank dataset cannot create independent budgets.
+    def test_negative_a_unrelated_labels_same_dataset_cannot_create_independent_budgets(
+        self, temp_db_url: str
+    ) -> None:
+        authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        bank_id = "BANK_A"
+        auth_tag = "fraud_vault_v1"
+        authority.provision_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=auth_tag,
+            allocated_epsilon=6.0,
+            allocated_delta=1e-3,
+        )
+        # Register two unrelated aliases pointing to the same authoritative dataset
+        authority.register_institutional_dataset_alias(bank_id, "transactions_q1", auth_tag)
+        authority.register_institutional_dataset_alias(bank_id, "transactions_q2", auth_tag)
+
+        assert authority.resolve_authoritative_dataset_identity(bank_id, "transactions_q1") == auth_tag
+        assert authority.resolve_authoritative_dataset_identity(bank_id, "transactions_q2") == auth_tag
+
+        # Spend 4.0 via transactions_q1
+        authority.reserve_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag="transactions_q1",
+            job_id="job_q1",
+            round_number=1,
+            requested_epsilon=4.0,
+            requested_delta=1e-4,
+            attempt_id="att_q1",
+        )
+        authority.commit_institutional_privacy_expenditure(
+            bank_id=bank_id,
+            dataset_tag="transactions_q1",
+            job_id="job_q1",
+            round_number=1,
+            spent_epsilon=4.0,
+            spent_delta=1e-4,
+            steps_executed=10,
+            attempt_id="att_q1",
+        )
+
+        # Observed budget via transactions_q2 MUST reflect the 4.0 spent
+        b2 = authority.get_institutional_privacy_budget(bank_id, "transactions_q2")
+        assert b2 is not None
+        assert b2.spent_epsilon == pytest.approx(4.0, abs=1e-5)
+        assert b2.remaining_epsilon == pytest.approx(2.0, abs=1e-5)
+
+        # Attempting to reserve 3.0 via transactions_q2 must fail closed (4.0 + 3.0 = 7.0 > 6.0)
+        with pytest.raises(TrainingProvenanceSecurityError, match="Privacy budget exceeded"):
+            authority.reserve_institutional_privacy_budget(
+                bank_id=bank_id,
+                dataset_tag="transactions_q2",
+                job_id="job_q2",
+                round_number=1,
+                requested_epsilon=3.0,
+                requested_delta=1e-4,
+                attempt_id="att_q2",
+            )
+
+    # Negative Test B: Consortium or job change cannot reset cumulative expenditure.
+    def test_negative_b_consortium_or_job_change_cannot_reset_cumulative_expenditure(
+        self, temp_db_url: str
+    ) -> None:
+        source = TrustedTrainingJobRecordSource(
+            coordinator_token="coord_alpha", db_url=temp_db_url, app_env="development"
+        )
+        bank_id = "BANK_A"
+        dataset_tag = "core_transactions"
+        source.provision_institutional_privacy_budget(
+            bank_id=bank_id, dataset_tag=dataset_tag, allocated_epsilon=5.0, allocated_delta=1e-3
+        )
+
+        # Job 1 under Consortium Alpha spends 3.5 epsilon
+        source.schedule_training_job(
+            job_id="job_alpha",
+            training_run_id="run_alpha",
+            simulation_id="sim_alpha",
+            coordinator_token="coord_alpha",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            permitted_workers=[bank_id],
+            consortium_id="consortium-alpha",
+            dp_config={"dp_enabled": True, "target_epsilon": 3.5, "dataset_tag": dataset_tag},
+        )
+        source.reserve_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            job_id="job_alpha",
+            requested_epsilon=3.5,
+            attempt_id="att_alpha",
+        )
+        source.commit_institutional_privacy_expenditure(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            job_id="job_alpha",
+            spent_epsilon=3.5,
+            attempt_id="att_alpha",
+        )
+
+        # Switch to Consortium Beta with different coordinator token
+        source_beta = TrustedTrainingJobRecordSource(
+            coordinator_token="coord_beta", db_url=temp_db_url, app_env="development"
+        )
+        source_beta.schedule_training_job(
+            job_id="job_beta",
+            training_run_id="run_beta",
+            simulation_id="sim_beta",
+            coordinator_token="coord_beta",
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            permitted_workers=[bank_id],
+            consortium_id="consortium-beta",
+            dp_config={"dp_enabled": True, "target_epsilon": 2.0, "dataset_tag": dataset_tag},
+        )
+
+        # Reserving 2.0 must fail closed because cumulative expenditure (3.5 + 2.0 = 5.5) exceeds 5.0
+        with pytest.raises(TrainingProvenanceSecurityError, match="Privacy budget exceeded"):
+            source_beta.reserve_institutional_privacy_budget(
+                bank_id=bank_id,
+                dataset_tag=dataset_tag,
+                job_id="job_beta",
+                requested_epsilon=2.0,
+                attempt_id="att_beta",
+            )
+
+    # Negative Test C: Missing trusted dataset identity fails closed in production.
+    def test_negative_c_missing_trusted_dataset_identity_fails_closed_in_production(
+        self, temp_db_url: str
+    ) -> None:
+        authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        # 1. Unknown or unregistered dataset tag fails closed in production
+        with pytest.raises(TrainingProvenanceSecurityError, match="Unauthorized dataset identity"):
+            authority.resolve_authoritative_dataset_identity(
+                bank_id="BANK_A", dataset_tag="unknown_external_alias", is_prod=True
+            )
+
+        # 2. Empty dataset_tag fails closed in production
+        with pytest.raises(TrainingProvenanceSecurityError, match="Empty dataset_tag rejected"):
+            authority.resolve_authoritative_dataset_identity(
+                bank_id="BANK_A", dataset_tag="", is_prod=True
+            )
+
+    # Negative Test D: Training request with large target epsilon cannot create or enlarge allocation.
+    def test_negative_d_training_request_with_large_epsilon_cannot_create_or_enlarge_allocation(
+        self, temp_db_url: str
+    ) -> None:
+        source = TrustedTrainingJobRecordSource(
+            coordinator_token="coord_tok", db_url=temp_db_url, app_env="development"
+        )
+        bank_id = "BANK_A"
+        dataset_tag = "fixed_cap_ds"
+
+        # Explicit provisioning by allocation authority sets budget to 3.0
+        source.provision_institutional_privacy_budget(
+            bank_id=bank_id, dataset_tag=dataset_tag, allocated_epsilon=3.0, allocated_delta=1e-3
+        )
+
+        # Training request / get_or_create attempting to allocate 100.0 epsilon does NOT enlarge the budget
+        b = source.get_or_create_institutional_privacy_budget(
+            bank_id=bank_id, dataset_tag=dataset_tag, allocated_epsilon=100.0
+        )
+        assert b.allocated_epsilon == 3.0
+
+        # Requesting 4.0 epsilon fails closed against the 3.0 cap
+        with pytest.raises(TrainingProvenanceSecurityError, match="Privacy budget exceeded"):
+            source.reserve_institutional_privacy_budget(
+                bank_id=bank_id,
+                dataset_tag=dataset_tag,
+                job_id="job_oversize",
+                requested_epsilon=4.0,
+            )
+
+    # Negative Test E: Only authorized allocation authority can provision new dataset budget.
+    def test_negative_e_only_authorized_allocation_authority_can_provision_new_budget(
+        self, temp_db_url: str
+    ) -> None:
+        source = TrustedTrainingJobRecordSource(
+            coordinator_token="valid_coord_token",
+            db_url=temp_db_url,
+            app_env="development",
+            bank_tokens={"BANK_A": "bank_worker_token_a"},
+        )
+        # Attempting to provision using worker credential instead of coordinator credential fails closed
+        with pytest.raises(TrainingProvenanceSecurityError, match="Bank worker credential cannot authorize coordinator actions"):
+            source.provision_institutional_privacy_budget(
+                bank_id="BANK_A",
+                dataset_tag="unauth_ds",
+                allocated_epsilon=10.0,
+                authority_token="bank_worker_token_a",
+            )
+
+        # Attempting to provision using invalid coordinator token fails closed
+        with pytest.raises(TrainingProvenanceSecurityError, match="invalid coordinator token"):
+            source.provision_institutional_privacy_budget(
+                bank_id="BANK_A",
+                dataset_tag="unauth_ds",
+                allocated_epsilon=10.0,
+                authority_token="invalid_coord_token",
+            )
+
+        # With valid coordinator token, provisioning succeeds
+        b = source.provision_institutional_privacy_budget(
+            bank_id="BANK_A",
+            dataset_tag="auth_ds",
+            allocated_epsilon=10.0,
+            authority_token="valid_coord_token",
+        )
+        assert b.allocated_epsilon == 10.0
+
+    # Negative Test F: Replayed TRAIN_ROUND and attempt ID cannot execute second training.
+    def test_negative_f_replayed_train_round_and_attempt_id_cannot_execute_second_training(
+        self, temp_db_url: str, synthetic_bank_data: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        X, y = synthetic_bank_data
+        coord_token = f"coord_{uuid.uuid4().hex}"
+        bank_id = "BANK_A"
+        worker_token = f"tok_{uuid.uuid4().hex}"
+        job_id = f"job_replay_{uuid.uuid4().hex[:8]}"
+        attempt_id = f"attempt_dedup_{uuid.uuid4().hex[:6]}"
+
+        authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        authority.provision_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag="replay_train_ds",
+            allocated_epsilon=10.0,
+            allocated_delta=1e-3,
+        )
+        authority.schedule_training_job(
+            job_id=job_id,
+            training_run_id=f"run_{job_id}",
+            simulation_id=f"sim_{job_id}",
+            coordinator_token=coord_token,
+            expected_rounds=1,
+            expected_epochs=1,
+            input_dim=NUM_FEATURES,
+            feature_names=list(FEATURE_NAMES),
+            permitted_workers=[bank_id],
+            dp_config={
+                "dp_enabled": True,
+                "target_epsilon": 2.0,
+                "target_delta": 1e-5,
+                "dataset_tag": "replay_train_ds",
+            },
+        )
+
+        import multiprocessing as mp
+
+        inbox: mp.Queue = mp.Queue()
+        outbox: mp.Queue = mp.Queue()
+
+        model_svc = ModelService(get_settings())
+        base_model = model_svc.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+        init_weights = model_svc.get_parameters(base_model)
+
+        # First TRAIN_ROUND execution
+        inbox.put({
+            "command": "TRAIN_ROUND",
+            "job_id": job_id,
+            "round_number": 1,
+            "attempt_id": attempt_id,
+            "global_weights": init_weights,
+        })
+        # Replay the EXACT SAME TRAIN_ROUND and attempt_id
+        inbox.put({
+            "command": "TRAIN_ROUND",
+            "job_id": job_id,
+            "round_number": 1,
+            "attempt_id": attempt_id,
+            "global_weights": init_weights,
+        })
+        inbox.put({"command": "STOP"})
+
+        run_bank_worker_node(
+            bank_id=bank_id,
+            worker_token=worker_token,
+            inbox=inbox,
+            outbox=outbox,
+            db_url=temp_db_url,
+            local_partition=(X, y),
+            app_env="development",
+        )
+
+        res_1 = outbox.get(timeout=10)
+        assert res_1["status"] == "SUCCESS"
+        assert "dp_provenance" in res_1
+        eps_1 = res_1["dp_provenance"]["actual_epsilon"]
+
+        res_2 = outbox.get(timeout=10)
+        assert res_2["status"] == "SUCCESS"
+        # Second execution was detected as ALREADY_COMPLETED and returned cached result
+        assert res_2.get("replayed") is True or res_2.get("dp_provenance") is not None
+
+        # Check durable budget in DB: spent_epsilon must NOT have doubled!
+        b = authority.get_institutional_privacy_budget(bank_id, "replay_train_ds")
+        assert b is not None
+        assert b.spent_epsilon == pytest.approx(eps_1, abs=1e-5)
+
+    # Negative Test G: Distinct valid attempts consume privacy budget independently.
+    def test_negative_g_distinct_valid_attempts_consume_budget_independently(
+        self, temp_db_url: str
+    ) -> None:
+        authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        bank_id = "BANK_A"
+        dataset_tag = "multi_attempt_ds"
+        job_id = "job_multi_att"
+
+        authority.provision_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            allocated_epsilon=10.0,
+            allocated_delta=1e-3,
+        )
+
+        # Attempt 1
+        authority.reserve_institutional_privacy_budget(
+            bank_id, dataset_tag, job_id, 2.0, round_number=1, attempt_id="att_valid_1"
+        )
+        b1 = authority.commit_institutional_privacy_expenditure(
+            bank_id, dataset_tag, job_id, spent_epsilon=1.5, round_number=1, attempt_id="att_valid_1"
+        )
+        assert b1.spent_epsilon == pytest.approx(1.5, abs=1e-5)
+
+        # Attempt 2 (Round 2 cumulative Opacus expenditure)
+        authority.reserve_institutional_privacy_budget(
+            bank_id, dataset_tag, job_id, 2.0, round_number=2, attempt_id="att_valid_2"
+        )
+        b2 = authority.commit_institutional_privacy_expenditure(
+            bank_id, dataset_tag, job_id, spent_epsilon=3.0, round_number=2, attempt_id="att_valid_2"
+        )
+        assert b2.spent_epsilon == pytest.approx(3.0, abs=1e-5)
+
+    # Negative Test H: Concurrent or restarted workers cannot reuse one attempt authorization.
+    def test_negative_h_concurrent_or_restarted_workers_cannot_reuse_attempt_authorization(
+        self, temp_db_url: str
+    ) -> None:
+        authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        bank_id = "BANK_A"
+        dataset_tag = "concurrent_ds"
+        job_id = "job_conc"
+        attempt_id = "att_locked_123"
+
+        authority.provision_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            allocated_epsilon=10.0,
+            allocated_delta=1e-3,
+        )
+
+        # Worker 1 admits attempt_locked_123 (now in active_reservations as RESERVED)
+        res1 = authority.admit_training_attempt(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            job_id=job_id,
+            round_number=1,
+            attempt_id=attempt_id,
+            parameters_digest="params_digest_conc_1",
+            requested_epsilon=2.0,
+            requested_delta=1e-5,
+        )
+        assert res1.status == "ADMITTED"
+
+        # Worker 2 attempts to admit the same attempt_id while still active
+        res2 = authority.admit_training_attempt(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            job_id=job_id,
+            round_number=1,
+            attempt_id=attempt_id,
+            parameters_digest="params_digest_conc_1",
+            requested_epsilon=2.0,
+            requested_delta=1e-5,
+        )
+        assert res2.status == "CONCURRENT_EXECUTION_BLOCKED"
+        assert "currently executing in another active worker" in res2.reason
+
+        # reserve_institutional_privacy_budget raises TrainingProvenanceSecurityError
+        with pytest.raises(TrainingProvenanceSecurityError, match="currently executing in another active worker"):
+            authority.reserve_institutional_privacy_budget(
+                bank_id=bank_id,
+                dataset_tag=dataset_tag,
+                job_id=job_id,
+                round_number=1,
+                requested_epsilon=2.0,
+                attempt_id=attempt_id,
+            )
+
+    # Negative Test I: Commit for absent or mismatched reservation is rejected safely.
+    def test_negative_i_commit_for_absent_or_mismatched_reservation_is_rejected_safely(
+        self, temp_db_url: str
+    ) -> None:
+        authority = TrainingJobAuthorityDatabase(db_url=temp_db_url, is_prod=False)
+        bank_id = "BANK_A"
+        dataset_tag = "mismatch_ds"
+        job_id = "job_mismatch"
+
+        authority.provision_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            allocated_epsilon=10.0,
+            allocated_delta=1e-3,
+        )
+
+        # Case 1: Commit for unreserved attempt is rejected safely
+        with pytest.raises(TrainingProvenanceSecurityError, match="no active matching reservation"):
+            authority.commit_institutional_privacy_expenditure(
+                bank_id=bank_id,
+                dataset_tag=dataset_tag,
+                job_id=job_id,
+                round_number=1,
+                spent_epsilon=1.0,
+                attempt_id="att_never_reserved",
+            )
+
+        # Case 2: Reservation made for att_alpha, commit attempted for att_beta is rejected safely
+        authority.reserve_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            job_id=job_id,
+            round_number=1,
+            requested_epsilon=2.0,
+            attempt_id="att_alpha",
+        )
+        with pytest.raises(TrainingProvenanceSecurityError, match="attempt mismatch"):
+            authority.commit_institutional_privacy_expenditure(
+                bank_id=bank_id,
+                dataset_tag=dataset_tag,
+                job_id=job_id,
+                round_number=1,
+                spent_epsilon=1.0,
+                attempt_id="att_beta",
+            )
+
+    # Negative Test J: Multi-process Opacus training and inactive candidate registration.
+    def test_negative_j_multi_process_opacus_training_and_inactive_candidate_registration(
+        self, temp_db_url: str, synthetic_bank_data: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        X, y = synthetic_bank_data
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_neg_j",
+            db_url=temp_db_url,
+            app_env="development",
+        )
+        job_id = f"job_j_{uuid.uuid4().hex[:8]}"
+
+        result = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=f"run_{job_id}",
+            simulation_id=f"sim_{job_id}",
+            holdout_val_data=(X[:50], y[:50]),
+            bank_partitions={
+                "BANK_A": (X[:100], y[:100]),
+                "BANK_B": (X[100:200], y[100:200]),
+            },
+            num_rounds=1,
+            dp_config={
+                "dp_enabled": True,
+                "target_epsilon": 8.0,
+                "target_delta": 1e-5,
+                "max_grad_norm": 1.0,
+                "dataset_tag": "partition_ds",
+            },
+        )
+
+        assert result["status"] == "COMPLETED"
+        assert result["is_verified"] is True
+        assert result["is_promoted_champion"] is False
+        assert result["saved_version"]["status"] == "inactive"
+        assert result["dp_enabled"] is True
+        assert "BANK_A" in result["dp_provenance"]
+        assert "BANK_B" in result["dp_provenance"]
+        assert result["dp_provenance"]["BANK_A"]["mechanism"] == "SubsampledGaussianDP"
+
+    # Negative Test K: Existing non-DP training remains unaffected.
+    def test_negative_k_existing_non_dp_training_remains_unaffected(
+        self, temp_db_url: str, synthetic_bank_data: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        X, y = synthetic_bank_data
+        manager = DistributedFederatedTrainingManager(
+            coordinator_token="coord_neg_k",
+            db_url=temp_db_url,
+            app_env="development",
+        )
+        job_id = f"job_k_{uuid.uuid4().hex[:8]}"
+
+        result = manager.execute_distributed_federation(
+            job_id=job_id,
+            training_run_id=f"run_{job_id}",
+            simulation_id=f"sim_{job_id}",
+            holdout_val_data=(X[:50], y[:50]),
+            bank_partitions={
+                "BANK_A": (X[:100], y[:100]),
+                "BANK_B": (X[100:200], y[100:200]),
+            },
+            num_rounds=1,
+            dp_config=None,
+        )
+
+        assert result["status"] == "COMPLETED"
+        assert result["is_verified"] is True
+        assert result["dp_enabled"] is False
+        assert result["dp_provenance"] == {}
+        assert result["saved_version"]["status"] == "inactive"
+

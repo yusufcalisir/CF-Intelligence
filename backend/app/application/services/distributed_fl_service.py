@@ -20,6 +20,7 @@ import copyreg
 import hashlib
 import hmac
 import io
+import json
 import logging
 import math
 import multiprocessing as mp
@@ -368,6 +369,23 @@ class BankPrivateStorageVault:
             self.vault_dir, f"Bank private vault directory for '{self.bank_id}'"
         )
         configure_bank_vault_os_permissions(self.vault_dir, self.bank_id)
+
+    @property
+    def authoritative_dataset_identity(self) -> str:
+        """Return the authoritative bank-local dataset identity for this private vault."""
+        manifest_path = os.path.join(self.vault_dir, "dataset_manifest.json")
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict) and data.get("authoritative_dataset_tag"):
+                        return str(data["authoritative_dataset_tag"]).strip()
+            except Exception:
+                pass
+        return f"{self.bank_id}_protected_dataset"
+
+    def get_authoritative_dataset_identity(self) -> str:
+        return self.authoritative_dataset_identity
 
     def _get_encryption_cipher(self) -> Fernet | None:
         if self.bank_encryption_key is not None:
@@ -4045,7 +4063,47 @@ def run_bank_worker_node(
                             and dp_config["noise_multiplier"] is not None
                             else None
                         )
-                        dataset_tag = str(dp_config.get("dataset_tag", "primary_vault")).strip()
+                        raw_dataset_tag = str(dp_config.get("dataset_tag", "primary_vault")).strip()
+                        is_prod = app_env.lower() == "production"
+                        try:
+                            auth_dataset_tag = authority_source.resolve_authoritative_dataset_identity(
+                                bank_id=bank_id,
+                                dataset_tag=raw_dataset_tag,
+                                is_prod=is_prod,
+                            )
+                        except Exception as tag_err:
+                            logger.error("Bank worker [%s] dataset identity resolution failed: %s", bank_id, tag_err)
+                            outbox.put({
+                                "status": "ERROR",
+                                "bank_id": bank_id,
+                                "error": f"Unauthorized dataset identity: {tag_err}",
+                                "pid": pid,
+                            })
+                            continue
+
+                        if vault_handle is not None:
+                            vault_tag = vault_handle.get_authoritative_dataset_identity()
+                            if is_prod and auth_dataset_tag != vault_tag:
+                                try:
+                                    resolved_vault = authority_source.resolve_authoritative_dataset_identity(
+                                        bank_id=bank_id,
+                                        dataset_tag=vault_tag,
+                                        is_prod=True,
+                                    )
+                                    if resolved_vault != auth_dataset_tag:
+                                        raise TrainingProvenanceSecurityError(
+                                            f"Unauthorized dataset substitution: requested dataset resolves to '{auth_dataset_tag}', "
+                                            f"but local bank storage vault is bound to '{resolved_vault}'."
+                                        )
+                                except Exception as subst_err:
+                                    outbox.put({
+                                        "status": "ERROR",
+                                        "bank_id": bank_id,
+                                        "error": str(subst_err),
+                                        "pid": pid,
+                                    })
+                                    continue
+
                         accountant_type = str(
                             dp_config.get("accountant_type")
                             or dp_config.get("accountant")
@@ -4062,40 +4120,33 @@ def run_bank_worker_node(
                         )
                         existing_engine = session.get("privacy_engine")
 
-                        # Authoritative Institutional Budget Check & Reservation
-                        alloc_eps_raw = dp_config.get("allocated_epsilon")
-                        alloc_eps = (
-                            float(alloc_eps_raw)
-                            if alloc_eps_raw is not None
-                            else float(target_epsilon)
-                        )
-                        alloc_del_raw = dp_config.get("allocated_delta")
-                        alloc_del = (
-                            float(alloc_del_raw)
-                            if alloc_del_raw is not None
-                            else float(target_delta)
-                        )
-                        authority_source.get_or_create_institutional_privacy_budget(
-                            bank_id=bank_id,
-                            dataset_tag=dataset_tag,
-                            allocated_epsilon=alloc_eps,
-                            allocated_delta=alloc_del,
-                            token=worker_token,
-                        )
-
-                        # Prior expenditure by this specific job on this dataset
+                        # Authoritative Institutional Budget Check (Fail closed if missing - do NOT auto-allocate!)
                         budget_record = authority_source.get_institutional_privacy_budget(
-                            bank_id, dataset_tag, token=worker_token
+                            bank_id, auth_dataset_tag, token=worker_token
                         )
+                        if budget_record is None:
+                            err_msg = (
+                                f"No institutional privacy budget provisioned for bank '{bank_id}', dataset '{auth_dataset_tag}'. "
+                                f"Workers cannot allocate new budgets. Allocation must be explicitly provisioned by trusted authority."
+                            )
+                            logger.error("Bank worker [%s] %s", bank_id, err_msg)
+                            outbox.put({
+                                "status": "ERROR",
+                                "bank_id": bank_id,
+                                "error": f"Privacy budget missing: {err_msg}",
+                                "pid": pid,
+                            })
+                            continue
+
                         history_job_eps = 0.0
                         history_job_del = 0.0
                         prior_steps = 0
-                        if budget_record and budget_record.history:
+                        if budget_record.history:
                             for entry in budget_record.history:
                                 if (
                                     isinstance(entry, dict)
                                     and entry.get("job_id") == job_id
-                                    and entry.get("status") != "REJECTED_OVERSPEND_EXHAUSTED"
+                                    and entry.get("status") == "COMMITTED"
                                 ):
                                     history_job_eps = max(
                                         history_job_eps, float(entry.get("spent_epsilon", 0.0))
@@ -4116,49 +4167,115 @@ def run_bank_worker_node(
                         needed_del = max(0.0, target_delta - prior_job_spent_del)
 
                         # Strict budget admission: Never reduce reservation without recalibration
-                        if budget_record is not None and budget_record.remaining_epsilon < (needed_eps - 1e-9):
+                        if budget_record.remaining_epsilon < (needed_eps - 1e-9):
                             err_msg = (
                                 f"Privacy budget exceeded: job planned expenditure ({needed_eps:.4f}) "
                                 f"exceeds remaining available budget ({budget_record.remaining_epsilon:.4f})."
                             )
                             logger.error("Bank worker [%s] %s", bank_id, err_msg)
-                            outbox.put(
-                                {
-                                    "status": "ERROR",
-                                    "bank_id": bank_id,
-                                    "error": f"Privacy budget exhausted: {err_msg}",
-                                    "pid": pid,
-                                }
-                            )
+                            outbox.put({
+                                "status": "ERROR",
+                                "bank_id": bank_id,
+                                "error": f"Privacy budget exhausted: {err_msg}",
+                                "pid": pid,
+                            })
                             continue
 
+                        # Compute immutable parameter digest for attempt binding
+                        params_digest_dict = {
+                            "bank_id": bank_id,
+                            "dataset_tag": auth_dataset_tag,
+                            "job_id": job_id,
+                            "round_number": round_number,
+                            "target_epsilon": target_epsilon,
+                            "target_delta": target_delta,
+                            "max_grad_norm": max_grad_norm,
+                            "batch_size": batch_size,
+                            "learning_rate": learning_rate,
+                            "accountant_type": accountant_type,
+                        }
+                        params_digest = hashlib.sha256(
+                            json.dumps(params_digest_dict, sort_keys=True).encode("utf-8")
+                        ).hexdigest()
+
+                        # 3. Durable attempt admission BEFORE private computation
                         try:
-                            authority_source.reserve_institutional_privacy_budget(
+                            admission = authority_source.admit_training_attempt(
                                 bank_id=bank_id,
-                                dataset_tag=dataset_tag,
+                                dataset_tag=auth_dataset_tag,
                                 job_id=job_id,
                                 round_number=round_number,
+                                attempt_id=attempt_id,
+                                parameters_digest=params_digest,
                                 requested_epsilon=needed_eps,
                                 requested_delta=needed_del,
                                 worker_token=worker_token,
-                                attempt_id=attempt_id,
                             )
                         except TrainingProvenanceSecurityError as pse:
                             logger.error(
-                                "Bank worker [%s] privacy budget reservation rejected for job %s round %d: %s",
-                                bank_id,
-                                job_id,
-                                round_number,
-                                pse,
+                                "Bank worker [%s] attempt admission security error for job %s round %d: %s",
+                                bank_id, job_id, round_number, pse,
                             )
-                            outbox.put(
-                                {
-                                    "status": "ERROR",
+                            outbox.put({
+                                "status": "ERROR",
+                                "bank_id": bank_id,
+                                "error": f"Attempt admission security error: {pse}",
+                                "pid": pid,
+                            })
+                            continue
+
+                        if admission.status == "ALREADY_COMPLETED":
+                            logger.info(
+                                "Bank worker [%s] attempt %s for job %s round %d already completed. Replaying cached output without re-training.",
+                                bank_id, attempt_id, job_id, round_number,
+                            )
+                            cached_res = session.get(f"attempt_{attempt_id}")
+                            if cached_res is not None:
+                                outbox.put(cached_res)
+                                continue
+                            existing_obs = authority_source.get_round_observations(job_id)
+                            cached_obs = [
+                                o for o in existing_obs
+                                if o.bank_id == bank_id and o.round_number == round_number
+                            ]
+                            if cached_obs and cached_obs[0].model_update_digest:
+                                outbox.put({
+                                    "status": "SUCCESS",
                                     "bank_id": bank_id,
-                                    "error": f"Privacy budget exhausted: {pse}",
                                     "pid": pid,
-                                }
-                            )
+                                    "round_number": round_number,
+                                    "attempt_id": attempt_id,
+                                    "weights": None,
+                                    "update_digest": cached_obs[0].model_update_digest,
+                                    "sample_count": cached_obs[0].actual_sample_count,
+                                    "executed_epochs": cached_obs[0].actual_executed_epochs,
+                                    "dp_provenance": {"status": "ALREADY_COMPLETED"},
+                                })
+                                continue
+                            else:
+                                outbox.put({
+                                    "status": "SUCCESS",
+                                    "bank_id": bank_id,
+                                    "pid": pid,
+                                    "round_number": round_number,
+                                    "attempt_id": attempt_id,
+                                    "weights": None,
+                                    "update_digest": "",
+                                    "sample_count": len(X_train),
+                                    "executed_epochs": 1,
+                                    "dp_provenance": {"status": "ALREADY_COMPLETED"},
+                                })
+                                continue
+
+                        if admission.status != "ADMITTED":
+                            err_msg = f"Attempt admission rejected ({admission.status}): {admission.reason}"
+                            logger.error("Bank worker [%s] %s", bank_id, err_msg)
+                            outbox.put({
+                                "status": "ERROR",
+                                "bank_id": bank_id,
+                                "error": err_msg,
+                                "pid": pid,
+                            })
                             continue
 
                         # Execute Opacus DP-SGD
@@ -4218,7 +4335,7 @@ def run_bank_worker_node(
                         )
                         authority_source.commit_institutional_privacy_expenditure(
                             bank_id=bank_id,
-                            dataset_tag=dataset_tag,
+                            dataset_tag=auth_dataset_tag,
                             job_id=job_id,
                             round_number=round_number,
                             spent_epsilon=spent_eps,
@@ -4338,6 +4455,8 @@ def run_bank_worker_node(
                         success_payload["loss"] = observed_loss
                     if dp_info is not None:
                         success_payload["dp_provenance"] = dp_info
+                    if is_dp_enabled:
+                        session[f"attempt_{attempt_id}"] = success_payload
                     outbox.put(success_payload)
         finally:
             if vault_handle is not None:
@@ -4523,6 +4642,21 @@ class DistributedFederatedTrainingManager:
             consortium_id=consortium_id,
             dp_config=dp_config,
         )
+
+        if dp_config and dp_config.get("dp_enabled") and not is_prod:
+            target_eps = float(dp_config.get("allocated_epsilon") or dp_config.get("target_epsilon", 10.0))
+            target_del = float(dp_config.get("allocated_delta") or dp_config.get("target_delta", 1e-5))
+            raw_tag = str(dp_config.get("dataset_tag", "primary_vault")).strip()
+            for b in banks:
+                if not self.authority_source.get_institutional_privacy_budget(b, raw_tag, token=self.coordinator_token):
+                    self.authority_source.provision_institutional_privacy_budget(
+                        bank_id=b,
+                        dataset_tag=raw_tag,
+                        allocated_epsilon=target_eps,
+                        allocated_delta=target_del,
+                        aliases=[f"{b}_dataset", f"{b}_protected_dataset", "primary_vault", "default_vault"],
+                        authority_token=self.coordinator_token,
+                    )
 
         inboxes = {b: endpoints[b]["inbox"] for b in banks}
         outboxes = {b: endpoints[b]["outbox"] for b in banks}

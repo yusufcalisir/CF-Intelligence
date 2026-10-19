@@ -43,6 +43,7 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from app.application.services.data_generator import FEATURE_NAMES as CANONICAL_FEATURE_NAMES
 from app.config import get_settings
 from app.infrastructure.database.training_authority_backends import (
+    AttemptAdmissionResult,
     CompletedJobExecutionRecord,
     GlobalAggregationEvent,
     InstitutionalPrivacyBudget,
@@ -380,6 +381,68 @@ class TrainingJobAuthorityDatabase:
 
     def get_started_job(self, job_id: str) -> StartedTrainingJob | None:
         return self._backend.get_started_job(job_id)
+
+    def register_institutional_dataset_alias(
+        self,
+        bank_id: str,
+        alias_tag: str,
+        authoritative_dataset_tag: str,
+    ) -> None:
+        self._backend.register_institutional_dataset_alias(
+            bank_id=bank_id,
+            alias_tag=alias_tag,
+            authoritative_dataset_tag=authoritative_dataset_tag,
+        )
+
+    def resolve_authoritative_dataset_identity(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        is_prod: bool = False,
+    ) -> str:
+        return self._backend.resolve_authoritative_dataset_identity(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            is_prod=is_prod,
+        )
+
+    def provision_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        allocated_epsilon: float,
+        allocated_delta: float = 1e-5,
+        aliases: Sequence[str] | None = None,
+    ) -> InstitutionalPrivacyBudget:
+        return self._backend.provision_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            allocated_epsilon=allocated_epsilon,
+            allocated_delta=allocated_delta,
+            aliases=aliases,
+        )
+
+    def admit_training_attempt(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        job_id: str,
+        round_number: int,
+        attempt_id: str,
+        parameters_digest: str,
+        requested_epsilon: float,
+        requested_delta: float = 1e-5,
+    ) -> AttemptAdmissionResult:
+        return self._backend.admit_training_attempt(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            job_id=job_id,
+            round_number=round_number,
+            attempt_id=attempt_id,
+            parameters_digest=parameters_digest,
+            requested_epsilon=requested_epsilon,
+            requested_delta=requested_delta,
+        )
 
     def get_or_create_institutional_privacy_budget(
         self,
@@ -1383,6 +1446,67 @@ class TrustedTrainingJobRecordSource:
             return started
         return self._db.get_scheduled_job(job_id)
 
+    def register_institutional_dataset_alias(
+        self,
+        bank_id: str,
+        alias_tag: str,
+        authoritative_dataset_tag: str,
+        authority_token: str | None = None,
+    ) -> None:
+        active_env = self._app_env or get_settings().app_env
+        is_prod = active_env.lower() == "production"
+        if is_prod and not authority_token:
+            raise TrainingProvenanceSecurityError(
+                "Unauthenticated dataset alias registration rejected in production."
+            )
+        if authority_token is not None:
+            self._validate_coordinator_token(authority_token)
+
+        self._db.register_institutional_dataset_alias(
+            bank_id=bank_id,
+            alias_tag=alias_tag,
+            authoritative_dataset_tag=authoritative_dataset_tag,
+        )
+
+    def resolve_authoritative_dataset_identity(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        is_prod: bool = False,
+    ) -> str:
+        return self._db.resolve_authoritative_dataset_identity(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            is_prod=is_prod,
+        )
+
+    def provision_institutional_privacy_budget(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        allocated_epsilon: float,
+        allocated_delta: float = 1e-5,
+        aliases: Sequence[str] | None = None,
+        authority_token: str | None = None,
+    ) -> InstitutionalPrivacyBudget:
+        active_env = self._app_env or get_settings().app_env
+        is_prod = active_env.lower() == "production"
+        token_to_check = authority_token if authority_token is not None else self._coordinator_token
+        if is_prod and not token_to_check:
+            raise TrainingProvenanceSecurityError(
+                "Unauthenticated budget provisioning rejected in production."
+            )
+        if token_to_check is not None:
+            self._validate_coordinator_token(token_to_check)
+
+        return self._db.provision_institutional_privacy_budget(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            allocated_epsilon=allocated_epsilon,
+            allocated_delta=allocated_delta,
+            aliases=aliases,
+        )
+
     def get_or_create_institutional_privacy_budget(
         self,
         bank_id: str,
@@ -1393,11 +1517,13 @@ class TrustedTrainingJobRecordSource:
     ) -> InstitutionalPrivacyBudget:
         active_env = self._app_env or get_settings().app_env
         is_prod = active_env.lower() == "production"
-        if is_prod and not token:
-            raise TrainingProvenanceSecurityError(
-                "Unauthenticated budget creation/mutation rejected in production."
-            )
-        if token is not None:
+        if is_prod:
+            if not token:
+                raise TrainingProvenanceSecurityError(
+                    "Unauthenticated budget creation/mutation rejected in production."
+                )
+            self._validate_coordinator_token(token)
+        elif token is not None:
             try:
                 self._validate_coordinator_token(token)
             except Exception:
@@ -1435,6 +1561,40 @@ class TrustedTrainingJobRecordSource:
         return self._db.get_institutional_privacy_budget(
             bank_id=bank_id,
             dataset_tag=dataset_tag,
+        )
+
+    def admit_training_attempt(
+        self,
+        bank_id: str,
+        dataset_tag: str,
+        job_id: str,
+        round_number: int,
+        attempt_id: str,
+        parameters_digest: str,
+        requested_epsilon: float,
+        requested_delta: float = 1e-5,
+        worker_token: str | None = None,
+    ) -> AttemptAdmissionResult:
+        active_env = self._app_env or get_settings().app_env
+        is_prod = active_env.lower() == "production"
+        if is_prod and not worker_token:
+            raise TrainingProvenanceSecurityError(
+                "Unauthenticated attempt admission rejected in production."
+            )
+        if worker_token is not None:
+            self._validate_worker_token(worker_token, claimed_bank_id=bank_id.strip())
+        elif self._bank_tokens:
+            self._validate_worker_token(None, claimed_bank_id=bank_id.strip())
+
+        return self._db.admit_training_attempt(
+            bank_id=bank_id,
+            dataset_tag=dataset_tag,
+            job_id=job_id,
+            round_number=round_number,
+            attempt_id=attempt_id,
+            parameters_digest=parameters_digest,
+            requested_epsilon=requested_epsilon,
+            requested_delta=requested_delta,
         )
 
     def reserve_institutional_privacy_budget(
