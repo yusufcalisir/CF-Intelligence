@@ -278,7 +278,10 @@ def test_feature_store_tenant_isolation(monkeypatch: pytest.MonkeyPatch) -> None
         lambda sim_id: (MockModel(), {"version": 1, "sha256": "sha_v1"}),
     )
 
-    # Call score-transaction under bank_alpha header
+    from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
+
+    token = OIDCAuthenticator().create_mock_token(username="user_alpha", bank_id="bank_alpha", roles=["analyst"])
+    # Call score-transaction under authenticated bank_alpha token
     res = client.post(
         "/api/v1/score-transaction",
         json={
@@ -290,7 +293,7 @@ def test_feature_store_tenant_isolation(monkeypatch: pytest.MonkeyPatch) -> None
             "device_id": "dev_01",
             "hour_of_day": 12,
         },
-        headers={"X-Bank-ID": "bank_alpha"},
+        headers={"Authorization": f"Bearer {token}", "X-Bank-ID": "bank_alpha"},
     )
     assert res.status_code == 200, res.text
     assert "bank_alpha" in queried_tenants

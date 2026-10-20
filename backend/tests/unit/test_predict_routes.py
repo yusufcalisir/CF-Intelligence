@@ -218,9 +218,18 @@ def test_realtime_inference_dual_prefix_routing() -> None:
 
 
 def test_inference_quota_telemetry_endpoint() -> None:
-    """Verify /api/v1/inference/quota returns configured tenant limits, usage, and reset date."""
+    """Verify /api/v1/inference/quota returns configured tenant limits, usage, and reset date for authenticated tenants."""
+    from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
+
+    oidc = OIDCAuthenticator()
+    token_alpha = oidc.create_mock_token(username="user_alpha", bank_id="bank_alpha", roles=["analyst"])
+    token_beta = oidc.create_mock_token(username="user_beta", bank_id="bank_beta", roles=["analyst"])
+
     # Test on /api/v1/inference/quota
-    res_api = client.get("/api/v1/inference/quota", headers={"X-Tenant-ID": "bank_alpha"})
+    res_api = client.get(
+        "/api/v1/inference/quota",
+        headers={"Authorization": f"Bearer {token_alpha}", "X-Tenant-ID": "bank_alpha"},
+    )
     assert res_api.status_code == 200, res_api.text
 
     data = res_api.json()
@@ -231,24 +240,32 @@ def test_inference_quota_telemetry_endpoint() -> None:
     assert "reset_date" in data
 
     # Test on legacy /v1/inference/quota
-    res_v1 = client.get("/v1/inference/quota", headers={"X-Tenant-ID": "bank_beta"})
+    res_v1 = client.get(
+        "/v1/inference/quota",
+        headers={"Authorization": f"Bearer {token_beta}", "X-Tenant-ID": "bank_beta"},
+    )
     assert res_v1.status_code == 200, res_v1.text
     assert res_v1.json()["tenant_id"] == "bank_beta"
 
 
 def test_cross_tenant_isolation_enforcement() -> None:
     """Verify cross-tenant BOLA tampering on predict endpoint is strictly blocked with HTTP 403."""
+    from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
+
+    token_attacker = OIDCAuthenticator().create_mock_token(
+        username="attacker", bank_id="bank_attacker", roles=["analyst"]
+    )
     payload = {
         "transaction_amount": 500.0,
         "merchant_category": "grocery",
         "bank_id": "bank_victim",
     }
 
-    # Caller identified as bank_attacker attempting to score as bank_victim
+    # Caller authenticated as bank_attacker attempting to score as bank_victim
     response = client.post(
         "/api/v1/predict",
         json=payload,
-        headers={"X-Tenant-ID": "bank_attacker"},
+        headers={"Authorization": f"Bearer {token_attacker}"},
     )
     assert response.status_code == 403
     assert (

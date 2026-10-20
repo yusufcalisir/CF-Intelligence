@@ -125,7 +125,7 @@ class OIDCAuthenticator:
             user_claims = UserClaims(
                 sub=claims_dict.get("sub", "anonymous"),
                 username=claims_dict.get("preferred_username", claims_dict.get("username", "user")),
-                bank_id=claims_dict.get("bank_id", "bank_a"),
+                bank_id=claims_dict.get("bank_id") or "",
                 roles=list(claims_dict.get("roles") or []),
                 clearance_level=int(claims_dict.get("clearance_level", 0)),
                 shift_hours=str(claims_dict.get("shift_hours", "00:00-24:00")),

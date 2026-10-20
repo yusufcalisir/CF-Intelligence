@@ -873,16 +873,18 @@ async def predict_batch(
     from app.application.services.tenant_metering import get_tenant_metering_service
 
     metering = get_tenant_metering_service()
-    target_tenant = payload.bank_id or caller_tenant or metered_tenant or "bank_alpha"
-    allowed, reason = metering.acquire_quota(
-        target_tenant, "INFERENCE", count=len(payload.transactions)
-    )
-    if not allowed:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Batch inference quota exceeded: {reason}",
-            headers={"Retry-After": "3600", "X-Quota-Exceeded": "true"},
+    target_tenant = metered_tenant
+    additional_count = max(0, len(payload.transactions) - 1)
+    if additional_count > 0:
+        allowed, reason = metering.acquire_quota(
+            target_tenant, "INFERENCE", count=additional_count
         )
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Batch inference quota exceeded: {reason}",
+                headers={"Retry-After": "3600", "X-Quota-Exceeded": "true"},
+            )
 
     start_batch = time.perf_counter()
     settings = get_settings()

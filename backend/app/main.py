@@ -1117,10 +1117,48 @@ class TenantAccessControlMiddleware:
         "/metrics",
         "/ws/",
         "/api/v1/onboarding",
+        "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+        "/api/v1/auth/lockout-status",
+    )
+
+    _PROTECTED_PREFIXES = (
+        "/api/v1/alerts",
+        "/alerts",
+        "/api/v1/cases",
+        "/cases",
+        "/api/v1/scenarios",
+        "/api/v1/dashboard",
+        "/api/v1/banks",
+        "/banks",
+        "/api/v1/training",
+        "/training",
+        "/api/v1/model-registry",
+        "/model-registry",
+        "/api/v1/models",
+        "/models",
+        "/api/v1/entities",
+        "/entities",
+        "/api/v1/graph",
+        "/graph",
+        "/api/v1/admin",
+        "/admin",
+        "/api/v1/settlement",
+        "/settlement",
+        "/api/v1/privacy-defense",
+        "/api/v1/optimization",
+        "/optimization",
+        "/api/v1/psd2",
+        "/api/v1/auth/me",
+        "/api/v1/auth/verify",
+        "/api/v1/auth/logout",
     )
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
+
+    def _is_protected_path(self, path: str) -> bool:
+        return any(path.startswith(p) for p in self._PROTECTED_PREFIXES)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -1133,74 +1171,97 @@ class TenantAccessControlMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # 1. Extract caller tenant identity and roles from OIDC JWT, X-Tenant-ID, X-Bank-ID, or X-API-Key
-        caller_tenant: str | None = None
-        caller_roles: list[str] = []
+        from app.infrastructure.database import active_tenant
+        from app.infrastructure.security.principal_auth import (
+            resolve_authenticated_principal,
+            resolve_authorized_tenant,
+        )
 
-        auth = request.headers.get("authorization") or request.headers.get("Authorization") or ""
-        if auth.startswith("Bearer "):
-            token = auth[7:].strip()
-            try:
-                from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
-
-                auth_helper = OIDCAuthenticator()
-                valid, claims, _ = auth_helper.decode_and_validate_token(token)
-                if valid and claims:
-                    caller_tenant = claims.bank_id
-                    caller_roles = claims.roles
-            except Exception:
-                pass
-
-        if not caller_tenant:
-            caller_tenant = (
-                request.headers.get("X-Tenant-ID")
-                or request.headers.get("x-tenant-id")
-                or request.headers.get("X-Bank-ID")
-                or request.headers.get("x-bank-id")
+        # 1. Authoritative request principal resolution
+        principal, auth_err, auth_status = resolve_authenticated_principal(request)
+        if auth_err:
+            title = "Conflicting Request Headers" if auth_status == 400 else "Authentication Failed"
+            err_type = (
+                "https://cfi-platform.org/errors/InvalidHeaderConfiguration"
+                if auth_status == 400
+                else "https://cfi-platform.org/errors/AuthenticationRequired"
             )
+            headers = {"WWW-Authenticate": "Bearer"} if auth_status == 401 else {}
+            response = JSONResponse(
+                status_code=auth_status,
+                content={
+                    "type": err_type,
+                    "title": title,
+                    "status": auth_status,
+                    "detail": auth_err,
+                    "instance": request.url.path,
+                },
+                media_type="application/problem+json",
+                headers=headers,
+            )
+            await response(scope, receive, send)
+            return
 
-        if not caller_tenant:
-            api_key = request.headers.get("X-API-Key") or request.headers.get("x-api-key") or ""
-            if api_key and ":" in api_key:
-                parts = api_key.split(":")
-                if len(parts) >= 2:
-                    caller_tenant = parts[1]
+        # 2. Authoritative tenant identity and resource selector validation
+        target_tenant, target_err, target_status = resolve_authorized_tenant(principal, request)
+        if target_err:
+            title = (
+                "Cross-Tenant Broken Access Control Forbidden"
+                if target_status == 403
+                else ("Authentication Required" if target_status == 401 else "Invalid Tenant Selector")
+            )
+            err_type = (
+                "https://cfi-platform.org/errors/TenantAccessDenied"
+                if target_status == 403
+                else (
+                    "https://cfi-platform.org/errors/AuthenticationRequired"
+                    if target_status == 401
+                    else "https://cfi-platform.org/errors/InvalidTenantSelector"
+                )
+            )
+            headers = {"WWW-Authenticate": "Bearer"} if target_status == 401 else {}
+            response = JSONResponse(
+                status_code=target_status,
+                content={
+                    "type": err_type,
+                    "title": title,
+                    "status": target_status,
+                    "detail": target_err,
+                    "instance": request.url.path,
+                },
+                media_type="application/problem+json",
+                headers=headers,
+            )
+            await response(scope, receive, send)
+            return
 
-        # 2. If caller tenant is bound, verify against target bank_id query param
-        if caller_tenant and not any(
-            r in caller_roles
-            for r in ("super_admin", "cross_bank_investigator", "compliance_auditor")
-        ):
-            norm_caller = caller_tenant.lower().replace("-", "_").strip()
+        # 3. Enforce authentication on protected endpoints
+        if not principal.is_authenticated and self._is_protected_path(request.url.path):
+            response = JSONResponse(
+                status_code=401,
+                content={
+                    "type": "https://cfi-platform.org/errors/AuthenticationRequired",
+                    "title": "Authentication Required",
+                    "status": 401,
+                    "detail": "Authentication credentials are required to access this protected resource.",
+                    "instance": request.url.path,
+                },
+                media_type="application/problem+json",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            await response(scope, receive, send)
+            return
 
-            target_bank = request.query_params.get("bank_id")
-            if target_bank:
-                norm_target = target_bank.lower().replace("-", "_").strip()
-                if (
-                    norm_target not in ("global", "all", "system", "coordinator")
-                    and norm_target != norm_caller
-                ):
-                    logger.warning(
-                        "BOLA Access Denied: Tenant '%s' attempted cross-tenant access to bank '%s' on %s",
-                        caller_tenant,
-                        target_bank,
-                        request.url.path,
-                    )
-                    response = JSONResponse(
-                        status_code=403,
-                        content={
-                            "type": "https://cfi-platform.org/errors/TenantAccessDenied",
-                            "title": "Cross-Tenant Broken Access Control Forbidden",
-                            "status": 403,
-                            "detail": f"Tenant '{caller_tenant}' is not authorized to access resources belonging to bank '{target_bank}'.",
-                            "instance": request.url.path,
-                        },
-                        media_type="application/problem+json",
-                    )
-                    await response(scope, receive, send)
-                    return
+        # 4. Attach resolved state to request for downstream handlers & dependencies
+        request.state.principal = principal
+        request.state.tenant_id = target_tenant
 
-        await self.app(scope, receive, send)
+        # 5. Bind ContextVar active_tenant with guaranteed cleanup
+        token = active_tenant.set(target_tenant)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            active_tenant.reset(token)
 
 
 app.add_middleware(TenantAccessControlMiddleware)

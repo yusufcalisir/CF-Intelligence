@@ -1,15 +1,15 @@
 """Comprehensive Golden Semantic Test Suite for TenantAccessControlMiddleware.
 
-Tests PRE and POST behavior for:
+Tests PRE and POST behavior under the Hardened Identity & Quota Authority Contract:
 - Exempt prefixes, near-prefixes, and case sensitivity
 - Authorization header extraction and scheme matching
-- Identity resolution precedence (JWT > X-Tenant-ID > X-Bank-ID > X-API-Key)
-- OIDC exception and invalid token fallback
-- Raw duplicate ASGI header semantics (FIRST value wins in Starlette)
-- Duplicate query parameter semantics (LAST value wins in Starlette)
-- X-API-Key parsing
-- Tenant normalization and special bypass targets
-- Privileged role evaluation and malformed roles handling
+- Authoritative principal resolution (JWT / verified API Key > resource selectors)
+- Fail-closed on invalid/expired/revoked JWT (no header fallback)
+- Conflicting tenant selector headers (X-Tenant-ID vs X-Bank-ID fail with 400)
+- Unverified X-API-Key text grants no authority (fails with 401)
+- Verified API key binding to authorized institution
+- Query parameter semantics and tenant normalization
+- Privileged role evaluation and cross-bank authorization
 - Cross-tenant 403 RFC 7807 problem details
 - Outermost short-circuit behavior
 - Pass-through response transparency and streaming
@@ -85,11 +85,12 @@ def oidc() -> OIDCAuthenticator:
         ("/api/v1/cases", False),
     ],
 )
-def test_exempt_prefix_matrix(client: TestClient, path: str, expected_exempt: bool):
-    # Cross-tenant query targeting bank_b while caller is bank_a
+def test_exempt_prefix_matrix(client: TestClient, oidc: OIDCAuthenticator, path: str, expected_exempt: bool):
+    # Verified Bank A principal targeting bank_b via query param
     # If exempt: passes through TenantAccess without 403 (will 200 or 404 depending on route)
     # If not exempt: TenantAccess immediately intercepts and returns 403
-    resp = client.get(f"{path}?bank_id=bank_b", headers={"X-Tenant-ID": "bank_a"})
+    token = oidc.create_mock_token(username="user1", bank_id="bank_a", roles=["analyst"])
+    resp = client.get(f"{path}?bank_id=bank_b", headers={"Authorization": f"Bearer {token}"})
     if expected_exempt:
         assert resp.status_code != 403 or "TenantAccessDenied" not in resp.text
     else:
@@ -97,22 +98,23 @@ def test_exempt_prefix_matrix(client: TestClient, path: str, expected_exempt: bo
         assert resp.json()["type"] == "https://cfi-platform.org/errors/TenantAccessDenied"
 
 
-# ── 2. Authorization Header & OIDC Timing ───────────────────────────────────
+# ── 2. Authorization Header & Authentication Enforcement ────────────────────
 
 def test_auth_header_absent(client: TestClient):
     resp = client.get("/api/v1/alerts?bank_id=bank_a")
-    # Unauthenticated / no caller tenant bound -> passes TenantAccess middleware
-    assert resp.status_code == 200
+    # Protected endpoint requires authentication -> 401
+    assert resp.status_code == 401
+    assert resp.json()["type"] == "https://cfi-platform.org/errors/AuthenticationRequired"
 
 
 def test_auth_header_empty(client: TestClient):
     resp = client.get("/api/v1/alerts?bank_id=bank_a", headers={"Authorization": ""})
-    assert resp.status_code == 200
+    assert resp.status_code == 401
 
 
 def test_auth_header_whitespace(client: TestClient):
     resp = client.get("/api/v1/alerts?bank_id=bank_a", headers={"Authorization": "   "})
-    assert resp.status_code == 200
+    assert resp.status_code == 401
 
 
 def test_auth_header_bearer_valid(client: TestClient, oidc: OIDCAuthenticator):
@@ -127,92 +129,91 @@ def test_auth_header_bearer_valid(client: TestClient, oidc: OIDCAuthenticator):
 
 def test_auth_header_bearer_case_sensitivity(client: TestClient, oidc: OIDCAuthenticator):
     token = oidc.create_mock_token(username="user1", bank_id="bank_a", roles=["analyst"])
-    # "bearer " (lowercase) does NOT match auth.startswith("Bearer ")
-    # Therefore caller_tenant is not resolved from JWT, falls through!
-    resp = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": f"bearer {token}"})
-    # Falls through because lowercase "bearer " is not parsed by TenantAccess (existing quirk)
-    assert resp.status_code != 403 or "TenantAccessDenied" not in resp.text
+    resp = client.get("/api/v1/alerts?bank_id=bank_a", headers={"Authorization": f"bearer {token}"})
+    assert resp.status_code == 200
+
+    resp_denied = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": f"bearer {token}"})
+    assert resp_denied.status_code == 403
 
 
 def test_auth_header_bearer_empty_token(client: TestClient):
     resp = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": "Bearer "})
-    assert resp.status_code != 403 or "TenantAccessDenied" not in resp.text
+    assert resp.status_code == 401
 
 
 def test_auth_header_basic(client: TestClient):
     resp = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": "Basic dXNlcjpwYXNz"})
-    assert resp.status_code != 403 or "TenantAccessDenied" not in resp.text
+    assert resp.status_code == 401
 
 
-# ── 3. Identity Precedence & Fallback ────────────────────────────────────────
+# ── 3. Identity Authority & Fail-Closed Fallback Prevention ──────────────────
 
-def test_jwt_wins_over_headers(client: TestClient, oidc: OIDCAuthenticator):
+def test_jwt_authority_rejects_unauthorized_header_override(client: TestClient, oidc: OIDCAuthenticator):
     token = oidc.create_mock_token(username="u1", bank_id="bank_a", roles=["analyst"])
-    # JWT is bank_a, X-Tenant-ID is bank_b. Target is bank_a.
-    # JWT wins -> target bank_a matches caller bank_a -> 200 OK.
+    # JWT is bank_a. Caller supplies X-Bank-ID: bank_b.
+    # An ordinary Bank A caller cannot impersonate Bank B merely by supplying X-Bank-ID: bank_b!
     resp = client.get(
-        "/api/v1/alerts?bank_id=bank_a",
+        "/api/v1/alerts?bank_id=bank_b",
         headers={
             "Authorization": f"Bearer {token}",
             "X-Tenant-ID": "bank_b",
             "X-Bank-ID": "bank_b",
-            "X-API-Key": "key:bank_b",
-        },
-    )
-    assert resp.status_code == 200
-
-
-def test_invalid_jwt_permits_fallback_to_tenant_header(client: TestClient):
-    # Invalid JWT + X-Tenant-ID bank_a -> fallback occurs to bank_a.
-    # Target bank_b -> 403 Forbidden!
-    resp = client.get(
-        "/api/v1/alerts?bank_id=bank_b",
-        headers={
-            "Authorization": "Bearer invalid.jwt.token",
-            "X-Tenant-ID": "bank_a",
         },
     )
     assert resp.status_code == 403
     assert resp.json()["type"] == "https://cfi-platform.org/errors/TenantAccessDenied"
 
 
-def test_jwt_exception_permits_fallback(client: TestClient):
+def test_invalid_jwt_fails_closed_no_header_fallback(client: TestClient):
+    # Invalid JWT + X-Tenant-ID bank_a -> must fail closed with 401, NO fallback to headers!
+    resp = client.get(
+        "/api/v1/alerts?bank_id=bank_a",
+        headers={
+            "Authorization": "Bearer invalid.jwt.token",
+            "X-Tenant-ID": "bank_a",
+        },
+    )
+    assert resp.status_code == 401
+    assert resp.json()["type"] == "https://cfi-platform.org/errors/AuthenticationRequired"
+
+
+def test_jwt_exception_fails_closed_no_fallback(client: TestClient):
     with patch("app.infrastructure.security.oidc_authenticator.OIDCAuthenticator.decode_and_validate_token") as mock_dec:
         mock_dec.side_effect = RuntimeError("Crypto signature failure")
         resp = client.get(
-            "/api/v1/alerts?bank_id=bank_b",
+            "/api/v1/alerts?bank_id=bank_a",
             headers={
                 "Authorization": "Bearer some_token",
                 "X-Tenant-ID": "bank_a",
             },
         )
-        assert resp.status_code == 403
-        assert resp.json()["type"] == "https://cfi-platform.org/errors/TenantAccessDenied"
+        assert resp.status_code == 401
 
 
-def test_tenant_header_wins_over_bank_header(client: TestClient):
-    # X-Tenant-ID is bank_a, X-Bank-ID is bank_b.
-    # Caller becomes bank_a. Target bank_b -> 403!
+def test_conflicting_tenant_selector_headers_fail_safely(client: TestClient, oidc: OIDCAuthenticator):
+    token = oidc.create_mock_token(username="u1", bank_id="bank_a", roles=["analyst"])
+    # X-Tenant-ID is bank_a, X-Bank-ID is bank_b -> Conflicting selector headers fail safely with 400!
     resp = client.get(
-        "/api/v1/alerts?bank_id=bank_b",
+        "/api/v1/alerts",
         headers={
+            "Authorization": f"Bearer {token}",
             "X-Tenant-ID": "bank_a",
             "X-Bank-ID": "bank_b",
         },
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 400
 
 
-def test_bank_header_wins_over_api_key(client: TestClient):
-    # X-Bank-ID is bank_a, X-API-Key is key:bank_b. Target bank_b -> 403!
+def test_unverified_api_key_fails_closed(client: TestClient):
+    # Unverified API key string grants NO authority -> 401
     resp = client.get(
         "/api/v1/alerts?bank_id=bank_b",
         headers={
             "X-Bank-ID": "bank_a",
-            "X-API-Key": "key:bank_b",
+            "X-API-Key": "unverified_key:bank_b:bank",
         },
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 401
 
 
 # ── 4. Raw Duplicate Headers (ASGI Level) ────────────────────────────────────
@@ -220,7 +221,6 @@ def test_bank_header_wins_over_api_key(client: TestClient):
 @pytest.mark.asyncio
 async def test_raw_duplicate_headers_first_wins():
     """Verify raw ASGI duplicate headers behavior (Starlette Headers.get returns FIRST)."""
-    # 1. Duplicate X-Tenant-ID: bank_a then bank_b
     scope = {
         "type": "http",
         "method": "GET",
@@ -232,11 +232,8 @@ async def test_raw_duplicate_headers_first_wins():
         ],
     }
     req = Request(scope)
-    # Caller tenant derived from first header: "bank_a"
-    # Target bank is "bank_b" -> should deny!
     assert req.headers.get("x-tenant-id") == "bank_a"
 
-    # 2. Duplicate X-Tenant-ID: bank_b then bank_a
     scope2 = {
         "type": "http",
         "method": "GET",
@@ -250,7 +247,6 @@ async def test_raw_duplicate_headers_first_wins():
     req2 = Request(scope2)
     assert req2.headers.get("x-tenant-id") == "bank_b"
 
-    # 3. Duplicate X-API-Key
     scope3 = {
         "type": "http",
         "method": "GET",
@@ -265,63 +261,51 @@ async def test_raw_duplicate_headers_first_wins():
     assert req3.headers.get("x-api-key") == "prefix:bank_first"
 
 
-# ── 5. X-API-Key Parsing Matrix ──────────────────────────────────────────────
+# ── 5. Gateway API Key Authority Verification ────────────────────────────────
 
-@pytest.mark.parametrize(
-    "api_key_header,expected_tenant",
-    [
-        ("", None),
-        (":", ""),
-        ("a:", ""),
-        (":bank_a", "bank_a"),
-        ("key:bank_a", "bank_a"),
-        ("key:bank_a:extra", "bank_a"),
-        ("key::extra", ""),
-        ("key: bank_a ", " bank_a "),  # Raw split preserves whitespace before normalization
-        (" key:bank_a", "bank_a"),
-        ("key-bank_a", None),  # No colon -> None
-        (":::", ""),
-    ],
-)
-def test_api_key_parsing(client: TestClient, api_key_header: str, expected_tenant: str | None):
-    # Target is bank_a
-    resp = client.get("/api/v1/alerts?bank_id=bank_a", headers={"X-API-Key": api_key_header})
-    if expected_tenant == "bank_a" or expected_tenant == " bank_a ":
-        # Matches bank_a after normalization -> 200
-        assert resp.status_code == 200
-    elif expected_tenant is None or expected_tenant == "":
-        # No caller tenant bound -> passes TenantAccess without 403
-        assert resp.status_code == 200
-    else:
-        # Cross tenant -> 403
-        assert resp.status_code == 403
+def test_api_key_authority_verification(client: TestClient):
+    # Configured key_bank_a binds authoritatively to bank_a
+    resp_ok = client.get("/api/v1/alerts?bank_id=bank_a", headers={"X-API-Key": "key_bank_a"})
+    assert resp_ok.status_code == 200
+
+    # Cross-tenant query targeting bank_b with key_bank_a -> 403 Forbidden
+    resp_cross = client.get("/api/v1/alerts?bank_id=bank_b", headers={"X-API-Key": "key_bank_a"})
+    assert resp_cross.status_code == 403
+
+    # Unverified API key -> 401 Unauthorized
+    resp_unverified = client.get("/api/v1/alerts", headers={"X-API-Key": "unverified_random_key"})
+    assert resp_unverified.status_code == 401
 
 
 # ── 6. Query Parameter Semantics (Duplicate bank_id: LAST wins) ──────────────
 
-def test_duplicate_query_params_last_wins(client: TestClient):
-    # Caller is bank_a
+def test_duplicate_query_params_last_wins(client: TestClient, oidc: OIDCAuthenticator):
+    token = oidc.create_mock_token(username="user1", bank_id="bank_a", roles=["analyst"])
+    headers = {"Authorization": f"Bearer {token}"}
+
     # ?bank_id=bank_a&bank_id=bank_b -> target becomes bank_b (LAST value) -> 403!
-    r1 = client.get("/api/v1/alerts?bank_id=bank_a&bank_id=bank_b", headers={"X-Tenant-ID": "bank_a"})
+    r1 = client.get("/api/v1/alerts?bank_id=bank_a&bank_id=bank_b", headers=headers)
     assert r1.status_code == 403
 
     # ?bank_id=bank_b&bank_id=bank_a -> target becomes bank_a (LAST value) -> 200!
-    r2 = client.get("/api/v1/alerts?bank_id=bank_b&bank_id=bank_a", headers={"X-Tenant-ID": "bank_a"})
+    r2 = client.get("/api/v1/alerts?bank_id=bank_b&bank_id=bank_a", headers=headers)
     assert r2.status_code == 200
 
 
-def test_query_param_case_sensitive(client: TestClient):
-    # Starlette query_params.get("bank_id") is case-sensitive
-    # ?BANK_ID=bank_b does NOT match .get("bank_id") -> None -> passes without 403!
-    resp = client.get("/api/v1/alerts?BANK_ID=bank_b", headers={"X-Tenant-ID": "bank_a"})
+def test_query_param_case_sensitive(client: TestClient, oidc: OIDCAuthenticator):
+    token = oidc.create_mock_token(username="user1", bank_id="bank_a", roles=["analyst"])
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = client.get("/api/v1/alerts?BANK_ID=bank_b", headers=headers)
     assert resp.status_code != 403 or "TenantAccessDenied" not in resp.text
 
 
-def test_query_param_empty_or_missing(client: TestClient):
-    r1 = client.get("/api/v1/alerts?bank_id=", headers={"X-Tenant-ID": "bank_a"})
+def test_query_param_empty_or_missing(client: TestClient, oidc: OIDCAuthenticator):
+    token = oidc.create_mock_token(username="user1", bank_id="bank_a", roles=["analyst"])
+    headers = {"Authorization": f"Bearer {token}"}
+    r1 = client.get("/api/v1/alerts?bank_id=", headers=headers)
     assert r1.status_code == 200
 
-    r2 = client.get("/api/v1/alerts", headers={"X-Tenant-ID": "bank_a"})
+    r2 = client.get("/api/v1/alerts", headers=headers)
     assert r2.status_code == 200
 
 
@@ -340,8 +324,9 @@ def test_query_param_empty_or_missing(client: TestClient):
         ("bank_a", "bank-b", False),
     ],
 )
-def test_tenant_normalization(client: TestClient, caller: str, target: str, should_allow: bool):
-    resp = client.get(f"/api/v1/alerts?bank_id={target}", headers={"X-Tenant-ID": caller})
+def test_tenant_normalization(client: TestClient, oidc: OIDCAuthenticator, caller: str, target: str, should_allow: bool):
+    token = oidc.create_mock_token(username="user1", bank_id=caller, roles=["analyst"])
+    resp = client.get(f"/api/v1/alerts?bank_id={target}", headers={"Authorization": f"Bearer {token}"})
     if should_allow:
         assert resp.status_code == 200
     else:
@@ -364,9 +349,9 @@ def test_tenant_normalization(client: TestClient, caller: str, target: str, shou
         "COORDINATOR",
     ],
 )
-def test_special_target_values_bypass(client: TestClient, special_target: str):
-    # Any caller is allowed to query global/all/system/coordinator
-    resp = client.get(f"/api/v1/alerts?bank_id={special_target}", headers={"X-Tenant-ID": "bank_a"})
+def test_special_target_values_bypass(client: TestClient, oidc: OIDCAuthenticator, special_target: str):
+    token = oidc.create_mock_token(username="user1", bank_id="bank_a", roles=["analyst"])
+    resp = client.get(f"/api/v1/alerts?bank_id={special_target}", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
 
 
@@ -381,35 +366,18 @@ def test_special_target_values_bypass(client: TestClient, special_target: str):
     ],
 )
 def test_privileged_roles_bypass(client: TestClient, oidc: OIDCAuthenticator, role: str):
-    # Privileged caller bank_a targeting bank_b -> allowed!
     token = oidc.create_mock_token(username="admin", bank_id="bank_a", roles=[role])
     resp = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
 
 
 def test_privileged_roles_case_sensitive(client: TestClient, oidc: OIDCAuthenticator):
-    # "Super_Admin" (mixed case) is NOT in ("super_admin", ...)
     token = oidc.create_mock_token(username="admin", bank_id="bank_a", roles=["Super_Admin"])
     resp = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 403
 
 
-def test_malformed_roles_none_raises_typeerror():
-    """When claims.roles is None, 'r in caller_roles' raises TypeError, propagating to 500."""
-    with patch("app.infrastructure.security.oidc_authenticator.OIDCAuthenticator.decode_and_validate_token") as mock_dec:
-        mock_claims = MagicMock()
-        mock_claims.bank_id = "bank_a"
-        mock_claims.roles = None  # Non-iterable!
-        mock_dec.return_value = (True, mock_claims, None)
-
-        local_client = TestClient(app, raise_server_exceptions=False)
-        resp = local_client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": "Bearer some_token"})
-        # TypeError propagates -> 500 Internal Server Error
-        assert resp.status_code == 500
-
-
 def test_malformed_roles_int_raises_typeerror():
-    """When claims.roles is an int, 'r in caller_roles' raises TypeError, propagating to 500."""
     with patch("app.infrastructure.security.oidc_authenticator.OIDCAuthenticator.decode_and_validate_token") as mock_dec:
         mock_claims = MagicMock()
         mock_claims.bank_id = "bank_a"
@@ -422,11 +390,10 @@ def test_malformed_roles_int_raises_typeerror():
 
 
 def test_roles_string_evaluated_by_substring(client: TestClient):
-    """When claims.roles is a string 'super_admin', 'super_admin' in 'super_admin' evaluates True."""
     with patch("app.infrastructure.security.oidc_authenticator.OIDCAuthenticator.decode_and_validate_token") as mock_dec:
         mock_claims = MagicMock()
         mock_claims.bank_id = "bank_a"
-        mock_claims.roles = "super_admin"  # String!
+        mock_claims.roles = "super_admin"
         mock_dec.return_value = (True, mock_claims, None)
 
         resp = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": "Bearer some_token"})
@@ -435,8 +402,9 @@ def test_roles_string_evaluated_by_substring(client: TestClient):
 
 # ── 9. Cross-Tenant 403 Golden Response Format ───────────────────────────────
 
-def test_403_rfc7807_golden_response(client: TestClient):
-    resp = client.get("/api/v1/alerts?bank_id=bank_b", headers={"X-Tenant-ID": "bank_a"})
+def test_403_rfc7807_golden_response(client: TestClient, oidc: OIDCAuthenticator):
+    token = oidc.create_mock_token(username="u1", bank_id="bank_a", roles=["analyst"])
+    resp = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 403
     assert resp.headers["content-type"] == "application/problem+json"
 
@@ -450,18 +418,16 @@ def test_403_rfc7807_golden_response(client: TestClient):
 
 # ── 10. Outermost Short-Circuit Verification ─────────────────────────────────
 
-def test_403_short_circuits_inner_middleware(client: TestClient):
-    # Cross-tenant request denied by TenantAccess
-    # DDoS, MTLS, W3C should be completely bypassed
+def test_403_short_circuits_inner_middleware(client: TestClient, oidc: OIDCAuthenticator):
+    token = oidc.create_mock_token(username="u1", bank_id="bank_a", roles=["analyst"])
     resp = client.get(
         "/api/v1/alerts?bank_id=bank_b",
         headers={
-            "X-Tenant-ID": "bank_a",
+            "Authorization": f"Bearer {token}",
             "X-Forwarded-For": "198.51.100.99",
         },
     )
     assert resp.status_code == 403
-    # Inner DDoS headers should NOT be present on TenantAccess early 403
     assert "X-RateLimit-Limit" not in resp.headers
     assert "X-RateLimit-Remaining" not in resp.headers
     assert "X-DDoS-Throttled" not in resp.headers
@@ -470,7 +436,6 @@ def test_403_short_circuits_inner_middleware(client: TestClient):
 # ── 11. Pass-Through Response Transparency & Streaming ───────────────────────
 
 def test_pass_through_streaming_response():
-    """Verify streaming response passes through unmodified."""
     local_app = FastAPI()
 
     from app.main import TenantAccessControlMiddleware
@@ -484,13 +449,12 @@ def test_pass_through_streaming_response():
         return StreamingResponse(generator(), media_type="text/plain")
 
     local_client = TestClient(local_app)
-    resp = local_client.get("/stream?bank_id=bank_a", headers={"X-Tenant-ID": "bank_a"})
+    resp = local_client.get("/stream")
     assert resp.status_code == 200
     assert resp.content == b"chunk1chunk2"
 
 
 def test_pass_through_status_codes():
-    """Verify 204, 404, 500 pass through unmodified."""
     local_app = FastAPI()
 
     from app.main import TenantAccessControlMiddleware
@@ -503,9 +467,9 @@ def test_pass_through_status_codes():
         return JSONResponse(status_code=code, content={"code": code})
 
     local_client = TestClient(local_app)
-    assert local_client.get("/status/204?bank_id=bank_a", headers={"X-Tenant-ID": "bank_a"}).status_code == 204
-    assert local_client.get("/status/404?bank_id=bank_a", headers={"X-Tenant-ID": "bank_a"}).status_code == 404
-    assert local_client.get("/status/500?bank_id=bank_a", headers={"X-Tenant-ID": "bank_a"}).status_code == 500
+    assert local_client.get("/status/204").status_code == 204
+    assert local_client.get("/status/404").status_code == 404
+    assert local_client.get("/status/500").status_code == 500
 
 
 # ── 12. Downstream Exception Propagation ─────────────────────────────────────
@@ -521,7 +485,7 @@ def test_downstream_exception_propagates():
         raise ValueError("Downstream unhandled failure")
 
     local_client = TestClient(local_app, raise_server_exceptions=False)
-    resp = local_client.get("/error?bank_id=bank_a", headers={"X-Tenant-ID": "bank_a"})
+    resp = local_client.get("/error")
     assert resp.status_code == 500
 
 
@@ -529,7 +493,6 @@ def test_downstream_exception_propagates():
 
 @pytest.mark.asyncio
 async def test_non_http_scope_handling():
-    """Verify websocket or lifespan scopes are not blocked and pass through directly."""
     from app.main import TenantAccessControlMiddleware
 
     called = False
@@ -551,6 +514,5 @@ async def test_non_http_scope_handling():
 
 @pytest.mark.asyncio
 async def test_contextvar_propagation():
-    """Diagnostic test for ContextVar visibility across middleware boundaries."""
     test_cvar.set("upstream_value")
     assert test_cvar.get() == "upstream_value"

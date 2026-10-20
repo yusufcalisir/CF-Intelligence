@@ -610,8 +610,54 @@ def get_inference_quota(
 ) -> InferenceQuotaResponse:
     """Returns real-time tenant inference quotas, limits, and consumption."""
     from app.application.services.tenant_metering import get_tenant_metering_service
+    from app.infrastructure.security.principal_auth import resolve_authenticated_principal
 
-    tenant = x_tenant_id or x_bank_id or caller_tenant or "bank_alpha"
+    principal = getattr(request.state, "principal", None)
+    if principal is None:
+        principal, auth_err, auth_status = resolve_authenticated_principal(request)
+        if auth_err:
+            raise HTTPException(
+                status_code=auth_status,
+                detail=auth_err,
+                headers={"WWW-Authenticate": "Bearer"} if auth_status == 401 else None,
+            )
+        request.state.principal = principal
+
+    if not principal.is_authenticated:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required to inspect tenant quota.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if x_tenant_id and x_bank_id and (
+        x_tenant_id.strip().lower().replace("-", "_") != x_bank_id.strip().lower().replace("-", "_")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Conflicting tenant selector headers (X-Tenant-ID vs X-Bank-ID).",
+        )
+
+    target_selector = (x_tenant_id or x_bank_id or request.query_params.get("bank_id") or "").strip()
+
+    if principal.is_privileged:
+        tenant = target_selector or principal.tenant_id or "system"
+    else:
+        if not principal.tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Principal is not bound to an authorized tenant institution.",
+            )
+        if target_selector:
+            norm_target = target_selector.lower().replace("-", "_")
+            norm_caller = principal.tenant_id.lower().replace("-", "_")
+            if norm_target != norm_caller:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Caller is not authorized to inspect quota for tenant '{target_selector}'.",
+                )
+        tenant = principal.tenant_id
+
     metering = get_tenant_metering_service()
     limits = metering.get_quota_limits(tenant)
     usage = metering.get_usage(tenant)

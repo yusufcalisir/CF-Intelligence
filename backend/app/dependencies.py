@@ -33,74 +33,53 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 # ── Tenant Resolution & BOLA / ABAC Access Control ───
 async def resolve_tenant(request: Request) -> str | None:
-    """Extract the bank tenant from the request and bind it to the active context.
+    """Extract and authoritatively bind the tenant identity for the active context.
 
-    Resolution order:
-        1. ``Authorization`` Bearer JWT Token (OIDC claims)
-        2. ``X-Tenant-ID`` or ``X-Bank-ID`` headers (explicit identity)
-        3. API key metadata embedded in the ``X-API-Key`` header
-           (format: ``key_bank_a:bank_a:bank`` → tenant = ``bank_a``)
-        4. ``bank_id`` query parameter
-
-    Returns the resolved tenant identifier or None for system-level access.
+    Enforces runtime truth:
+    - Never infers tenant identity from unauthenticated headers or query params.
+    - Fails closed on invalid/expired/revoked credentials (HTTP 401).
+    - Fails closed on conflicting headers (HTTP 400).
+    - Rejects unauthorized cross-tenant requests (HTTP 403).
+    - Binds verified tenant to active_tenant ContextVar.
     """
-    tenant: str | None = None
-    is_privileged = False
+    from app.infrastructure.security.principal_auth import (
+        resolve_authenticated_principal,
+        resolve_authorized_tenant,
+    )
 
-    # 1. Bearer JWT Token (OIDC)
-    auth = request.headers.get("Authorization") or request.headers.get("authorization") or ""
-    if auth.startswith("Bearer "):
-        token = auth[7:].strip()
-        try:
-            from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
+    principal = getattr(request.state, "principal", None)
+    if principal is None:
+        principal, auth_err, auth_status = resolve_authenticated_principal(request)
+        if auth_err:
+            raise HTTPException(
+                status_code=auth_status,
+                detail=auth_err,
+                headers={"WWW-Authenticate": "Bearer"} if auth_status == 401 else None,
+            )
+        request.state.principal = principal
 
-            auth_helper = OIDCAuthenticator()
-            valid, claims, _ = auth_helper.decode_and_validate_token(token)
-            if valid and claims:
-                if any(
-                    r in claims.roles
-                    for r in ("super_admin", "cross_bank_investigator", "compliance_auditor")
-                ):
-                    is_privileged = True
-                else:
-                    tenant = claims.bank_id
-        except Exception:
-            pass
+    target_tenant, target_err, target_status = resolve_authorized_tenant(principal, request)
+    if target_err:
+        raise HTTPException(status_code=target_status, detail=target_err)
 
-    # If privileged, caller has cross-institution authority (unrestricted)
-    if is_privileged:
-        req_bank = request.query_params.get("bank_id")
-        active_tenant.set(req_bank.strip() if req_bank else None)
-        return None
+    if principal.is_privileged:
+        active_tenant.set(target_tenant)
+        return target_tenant
 
-    # 2. Explicit headers
-    if not tenant:
-        tenant = (
-            request.headers.get("X-Tenant-ID")
-            or request.headers.get("x-tenant-id")
-            or request.headers.get("X-Bank-ID")
-            or request.headers.get("x-bank-id")
+    if principal.is_authenticated:
+        active_tenant.set(target_tenant)
+        return target_tenant
+
+    # Unauthenticated caller
+    if request.headers.get("X-Tenant-ID") or request.headers.get("X-Bank-ID") or request.headers.get("X-API-Key"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Unauthenticated headers cannot confer tenant authority.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 3. API key metadata
-    if not tenant:
-        api_key = request.headers.get("X-API-Key", "")
-        if api_key:
-            parts = api_key.split(":")
-            if len(parts) >= 2:
-                tenant = parts[1]
-
-    # 4. Query parameter fallback
-    if not tenant:
-        tenant = request.query_params.get("bank_id")
-
-    # Set the context variable for downstream database routing
-    if tenant:
-        active_tenant.set(tenant.strip())
-    else:
-        active_tenant.set(None)
-
-    return tenant.strip() if tenant else None
+    active_tenant.set(None)
+    return None
 
 
 
@@ -262,19 +241,70 @@ async def enforce_tenant_quota(
 ) -> str:
     """FastAPI dependency enforcing tenant resource quotas before request execution.
 
-    Extracts tenant identity and evaluates usage limits.
+    Charges inference usage strictly to the authenticated, authorized tenant.
+    Prevents double metering across nested dependencies or batch handlers.
     Raises HTTP 429 Too Many Requests if quota is exceeded.
     """
+    if getattr(request.state, "quota_metered", False):
+        return str(getattr(request.state, "metered_tenant", ""))
+
     if metering is None:
         metering = get_tenant_metering_service()
 
-    target_tenant = (
-        tenant_id
-        or request.headers.get("X-Tenant-ID")
-        or request.headers.get("X-Bank-ID")
-        or getattr(request.state, "tenant_id", None)
-        or "bank_alpha"
-    )
+    from app.infrastructure.security.principal_auth import resolve_authenticated_principal
+
+    principal = getattr(request.state, "principal", None)
+    if principal is None:
+        principal, auth_err, auth_status = resolve_authenticated_principal(request)
+        if auth_err:
+            raise HTTPException(
+                status_code=auth_status,
+                detail=auth_err,
+                headers={"WWW-Authenticate": "Bearer"} if auth_status == 401 else None,
+            )
+        request.state.principal = principal
+
+    if principal.is_authenticated:
+        if principal.is_privileged:
+            target_tenant = (
+                tenant_id
+                or request.headers.get("X-Tenant-ID")
+                or request.headers.get("X-Bank-ID")
+                or getattr(request.state, "tenant_id", None)
+                or "system"
+            )
+        else:
+            if not principal.tenant_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Principal is not bound to an authorized tenant institution.",
+                )
+
+            selector = (request.headers.get("X-Tenant-ID") or request.headers.get("X-Bank-ID") or "").strip()
+            if selector:
+                norm_sel = selector.lower().replace("-", "_")
+                norm_ten = principal.tenant_id.lower().replace("-", "_")
+                if norm_sel != norm_ten:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Tenant '{principal.tenant_id}' cannot execute inference or consume quota on behalf of bank '{selector}'.",
+                    )
+            target_tenant = principal.tenant_id
+    else:
+        # Unauthenticated principal
+        selector = (
+            tenant_id
+            or request.headers.get("X-Tenant-ID")
+            or request.headers.get("X-Bank-ID")
+            or ""
+        ).strip()
+        if selector:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Authentication required. Unauthenticated caller cannot consume quota for tenant '{selector}'.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        target_tenant = "synthetic_dev_quota"
 
     allowed, reason = metering.acquire_quota(target_tenant, "INFERENCE", count=1)
     if not allowed:
@@ -283,5 +313,8 @@ async def enforce_tenant_quota(
             detail=reason,
             headers={"Retry-After": "3600", "X-Quota-Exceeded": "true"},
         )
+
+    request.state.quota_metered = True
+    request.state.metered_tenant = target_tenant
     return target_tenant
 
