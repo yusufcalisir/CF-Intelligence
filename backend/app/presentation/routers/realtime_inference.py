@@ -317,7 +317,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                 )
                                 with contextlib.suppress(Exception):
                                     redis_client.delete(scoped_model_key, scoped_auth_key)
-                                    if not sim_scope or (settings.default_simulation_id and sim_scope == settings.default_simulation_id):
+                                    if scoped_model_key != "cfi:champion_model":
                                         redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                             else:
                                 # Normalize payload dictionary
@@ -358,7 +358,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                     logger.warning("Redis model cache failed HMAC authenticity verification. Evicting.")
                                     with contextlib.suppress(Exception):
                                         redis_client.delete(scoped_model_key, scoped_auth_key)
-                                        if not sim_scope or (settings.default_simulation_id and sim_scope == settings.default_simulation_id):
+                                        if scoped_model_key != "cfi:champion_model":
                                             redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                 else:
                                     # MANDATORY FIELD VALIDATION:
@@ -401,7 +401,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                     if not schema_valid:
                                         with contextlib.suppress(Exception):
                                             redis_client.delete(scoped_model_key, scoped_auth_key)
-                                            if not sim_scope or (settings.default_simulation_id and sim_scope == settings.default_simulation_id):
+                                            if scoped_model_key != "cfi:champion_model":
                                                 redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                     else:
                                         expected_model_sha = hashlib.sha256(cached_bytes).hexdigest()
@@ -411,7 +411,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                             logger.warning("Redis model cache SHA-256 digest mismatch. Evicting.")
                                             with contextlib.suppress(Exception):
                                                 redis_client.delete(scoped_model_key, scoped_auth_key)
-                                                if not sim_scope or (settings.default_simulation_id and sim_scope == settings.default_simulation_id):
+                                                if scoped_model_key != "cfi:champion_model":
                                                     redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                         elif (
                                             meta_for_schema.get("serialization_version") != 2
@@ -434,7 +434,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
                                             )
                                             with contextlib.suppress(Exception):
                                                 redis_client.delete(scoped_model_key, scoped_auth_key)
-                                                if not sim_scope or (settings.default_simulation_id and sim_scope == settings.default_simulation_id):
+                                                if scoped_model_key != "cfi:champion_model":
                                                     redis_client.delete("cfi:champion_model", "cfi:champion_model:auth")
                                         else:
                                             # Authenticated, complete schema, and strictly matches current active champion!
