@@ -224,20 +224,16 @@ def authorize_model_serving(
         owning_bank = ownership.get("owning_bank_id")
         consortium_id = ownership.get("consortium_id")
 
-        # Exclusive bank ownership
-        if owning_bank:
-            norm_owner = owning_bank.lower().strip()
-            if not is_privileged and norm_owner != norm_tenant:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=(
-                        f"Broken Access Control: Tenant '{norm_tenant}' is not authorized to execute private "
-                        f"champion model owned by bank '{owning_bank}'."
-                    ),
-                )
+        if is_privileged:
             return clean_sim_id, ownership
 
-        # Consortium ownership
+        norm_owner = owning_bank.lower().strip() if owning_bank else None
+
+        # Exclusive institution ownership remains exclusive when caller is owner
+        if norm_owner and norm_owner == norm_tenant:
+            return clean_sim_id, ownership
+
+        # If ownership binds a consortium, evaluate active authorized membership
         if consortium_id:
             c = DurableConsortiumStore.get_instance().get_consortium(consortium_id)
             if c is None or c.status != ConsortiumStatus.ACTIVE:
@@ -246,26 +242,35 @@ def authorize_model_serving(
                     detail=f"Broken Access Control: Consortium '{consortium_id}' is not active or not found.",
                 )
 
-            if not is_privileged:
-                if norm_tenant in c.removed_members:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail=(
-                            f"Broken Access Control: Institutional membership for tenant '{norm_tenant}' in "
-                            f"consortium '{consortium_id}' has been revoked; new inference requests are rejected."
-                        ),
-                    )
+            if norm_tenant in c.removed_members:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"Broken Access Control: Institutional membership for tenant '{norm_tenant}' in "
+                        f"consortium '{consortium_id}' has been revoked; new inference requests are rejected."
+                    ),
+                )
 
-                if norm_tenant not in c.members:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail=(
-                            f"Broken Access Control: Tenant '{norm_tenant}' is not an active member of "
-                            f"consortium '{consortium_id}'."
-                        ),
-                    )
+            if norm_tenant not in c.members:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"Broken Access Control: Tenant '{norm_tenant}' is not an active member of "
+                        f"consortium '{consortium_id}'."
+                    ),
+                )
 
             return clean_sim_id, ownership
+
+        # If model has an owning bank and no consortium sharing authorization exists
+        if norm_owner and norm_owner != norm_tenant:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Broken Access Control: Tenant '{norm_tenant}' is not authorized to execute private "
+                    f"champion model owned by bank '{owning_bank}'."
+                ),
+            )
 
         # Missing authoritative ownership
         raise HTTPException(

@@ -40,7 +40,52 @@ api_router = APIRouter(prefix="/v1/feedback", tags=["feedback"])
 
 _pipeline = LocalLabelFeedbackPipeline()
 
-FEEDBACK_OPERATOR_ROLES: frozenset[str] = frozenset({
+FEEDBACK_INGEST_ROLES: frozenset[str] = frozenset({
+    "analyst",
+    "senior_analyst",
+    "lead_analyst",
+    "investigator",
+    "bank_admin",
+    "admin",
+    "operator",
+    "super_admin",
+})
+
+FEEDBACK_READ_ROLES: frozenset[str] = frozenset({
+    "analyst",
+    "senior_analyst",
+    "lead_analyst",
+    "investigator",
+    "bank_admin",
+    "admin",
+    "operator",
+    "compliance_auditor",
+    "cross_bank_investigator",
+    "auditor",
+    "super_admin",
+})
+
+FEEDBACK_SAMPLE_ROLES: frozenset[str] = frozenset({
+    "analyst",
+    "senior_analyst",
+    "lead_analyst",
+    "ml_lead",
+    "ml_engineer",
+    "bank_admin",
+    "admin",
+    "operator",
+    "super_admin",
+})
+
+FEEDBACK_CONSUME_ROLES: frozenset[str] = frozenset({
+    "admin",
+    "bank_admin",
+    "operator",
+    "lead_analyst",
+    "super_admin",
+})
+
+FEEDBACK_GRADIENT_ROLES: frozenset[str] = frozenset({
     "admin",
     "bank_admin",
     "operator",
@@ -50,13 +95,17 @@ FEEDBACK_OPERATOR_ROLES: frozenset[str] = frozenset({
     "super_admin",
 })
 
-FEEDBACK_DESTRUCTIVE_ROLES: frozenset[str] = frozenset({
+FEEDBACK_CLEAR_ROLES: frozenset[str] = frozenset({
     "admin",
     "bank_admin",
     "operator",
     "lead_analyst",
     "super_admin",
 })
+
+# Backward-compatibility aliases
+FEEDBACK_OPERATOR_ROLES: frozenset[str] = FEEDBACK_GRADIENT_ROLES
+FEEDBACK_DESTRUCTIVE_ROLES: frozenset[str] = FEEDBACK_CLEAR_ROLES
 
 
 def _authorize_feedback_request(
@@ -68,7 +117,7 @@ def _authorize_feedback_request(
 ) -> tuple[AuthenticatedPrincipal, str]:
     """Verify authentication, institutional tenant binding, and role permissions for feedback APIs."""
     settings = get_settings()
-    is_prod = str(getattr(settings, "environment", "")).lower() in ("production", "prod", "staging")
+    is_prod = str(getattr(settings, "app_env", "")).lower() in ("production", "prod", "staging")
 
     principal, auth_err, auth_status = resolve_authenticated_principal(request)
     if auth_err:
@@ -120,8 +169,10 @@ def _authorize_feedback_request(
                 detail=f"Principal '{principal.principal_id}' has no institutional tenant binding.",
             )
 
-    # Role-based action check
-    if required_roles and principal.is_authenticated and not principal.is_privileged:
+    # Role-based action check:
+    # Cross-bank resource access (is_privileged) and action permission (required_roles) are separate decisions.
+    # Privileged principal (e.g. read-only compliance_auditor) must NOT bypass required action roles.
+    if required_roles and principal.is_authenticated:
         principal_roles = set(principal.roles or [])
         if not principal_roles.intersection(required_roles):
             raise HTTPException(
@@ -148,6 +199,7 @@ async def _ingest_handler(
         request=request,
         target_tenant_id=payload.tenant_id,
         caller_tenant=caller_tenant,
+        required_roles=FEEDBACK_INGEST_ROLES,
         action_name="ingest_feedback",
     )
     try:
@@ -227,6 +279,7 @@ def _get_stats_handler(
         request=request,
         target_tenant_id=tenant_id,
         caller_tenant=caller_tenant,
+        required_roles=FEEDBACK_READ_ROLES,
         action_name="get_feedback_stats",
     )
     stats = _pipeline.get_buffer_stats(tenant_id=authorized_tenant)
@@ -289,13 +342,13 @@ async def sample_retraining_batch(
     caller_tenant: TenantDep = None,
 ) -> RetrainingBatchResponse:
     """Sample a prioritized, stratified batch of human-verified feedback items for local model retraining."""
-    required_roles = FEEDBACK_DESTRUCTIVE_ROLES if payload.mark_consumed else None
+    required_roles = FEEDBACK_CONSUME_ROLES if payload.mark_consumed else FEEDBACK_SAMPLE_ROLES
     _, authorized_tenant = _authorize_feedback_request(
         request=request,
         target_tenant_id=payload.tenant_id,
         caller_tenant=caller_tenant,
         required_roles=required_roles,
-        action_name="sample_retraining_batch_destructive" if payload.mark_consumed else "sample_retraining_batch",
+        action_name="consume_retraining_batch" if payload.mark_consumed else "sample_retraining_batch",
     )
     batch_data = _pipeline.get_priority_retraining_batch(
         tenant_id=authorized_tenant,
@@ -329,7 +382,7 @@ async def compute_dp_gradient(
         request=request,
         target_tenant_id=payload.tenant_id,
         caller_tenant=caller_tenant,
-        required_roles=FEEDBACK_OPERATOR_ROLES,
+        required_roles=FEEDBACK_GRADIENT_ROLES,
         action_name="compute_dp_gradient",
     )
     try:
@@ -372,7 +425,7 @@ async def clear_feedback_buffer(
         request=request,
         target_tenant_id=tenant_id,
         caller_tenant=caller_tenant,
-        required_roles=FEEDBACK_DESTRUCTIVE_ROLES,
+        required_roles=FEEDBACK_CLEAR_ROLES,
         action_name="clear_feedback_buffer",
     )
     cleared = _pipeline.clear_buffer(tenant_id=authorized_tenant)

@@ -251,6 +251,7 @@ class RedisStore:
         simulation_id: str,
         transaction_id: str,
         payload: dict[str, Any],
+        bank_id: str | None = None,
         max_window_size: int = 1000,
     ) -> dict[str, Any]:
         """Atomically record prediction evidence and maintain bounded prediction index.
@@ -260,9 +261,21 @@ class RedisStore:
         - Preserves existing sequence, timestamp, and feedback on duplicate/retry.
         - Atomically inserts key into prediction_keys list and evicts oldest items if exceeding max_window_size.
         - Deletes evicted prediction records from Redis.
+        - Scopes evidence identity to authoritative (simulation_id, bank_id, transaction_id).
         - In production with strict_production, fails closed (raises RuntimeError) if Redis write fails.
         """
-        rel_key = f"{simulation_id}:prediction:{transaction_id}"
+        clean_bank = (
+            str(bank_id or payload.get("bank_id") or "").lower().replace("-", "_").strip()
+            if (bank_id or payload.get("bank_id"))
+            else None
+        )
+        if clean_bank:
+            rel_key = f"{simulation_id}:prediction:{clean_bank}:{transaction_id}"
+            payload["bank_id"] = clean_bank
+        else:
+            rel_key = f"{simulation_id}:prediction:{transaction_id}"
+            payload["bank_id"] = None
+
         pred_key = self._make_key(rel_key)
         seq_key = self._make_key(f"{simulation_id}:prediction_seq")
         list_key = self._make_key(f"{simulation_id}:prediction_keys")
@@ -404,38 +417,149 @@ class RedisStore:
                 "retained_count": len(keys),
             }
 
+    def get_prediction_evidence(
+        self,
+        simulation_id: str,
+        transaction_id: str,
+        bank_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Retrieve stored prediction evidence for a transaction with institutional scoping."""
+        clean_bank = str(bank_id).lower().replace("-", "_").strip() if bank_id else None
+        if clean_bank:
+            scoped_key = f"{simulation_id}:prediction:{clean_bank}:{transaction_id}"
+            rec = self.get(scoped_key)
+            if rec is not None:
+                return rec
+
+        # Check legacy unscoped key
+        legacy_key = f"{simulation_id}:prediction:{transaction_id}"
+        rec = self.get(legacy_key)
+        if rec is not None:
+            rec_bank = rec.get("bank_id")
+            if clean_bank and rec_bank:
+                norm_rec_bank = str(rec_bank).lower().replace("-", "_").strip()
+                if norm_rec_bank != clean_bank:
+                    return rec
+            return rec
+
+        # Check if another bank owns this transaction_id in the simulation
+        # (Allows upstream authorization gates to inspect institutional ownership and fail closed with 403)
+        c = self.client
+        if c:
+            try:
+                pattern = self._make_key(f"{simulation_id}:prediction:*:{transaction_id}")
+                matched_keys = c.keys(pattern)
+                prefix_len = len(self.prefix) + 1
+                for k in matched_keys:
+                    rel_k = k[prefix_len:]
+                    other_rec = self.get(rel_k)
+                    if other_rec is not None:
+                        return other_rec
+            except Exception as e:
+                logger.error("Redis get_prediction_evidence pattern scan failed: %s", e)
+        else:
+            with RedisStore._lock:
+                prefix_tag = f"{simulation_id}:prediction:"
+                suffix_tag = f":{transaction_id}"
+                for k, v in self._fallback_store.items():
+                    if k.startswith(prefix_tag) and k.endswith(suffix_tag) and isinstance(v, dict):
+                        return v
+
+        return None
+
     def record_feedback(
         self,
         simulation_id: str,
         transaction_id: str,
         actual_label: int,
+        bank_id: str | None = None,
     ) -> dict[str, Any]:
         """Atomically record ground truth label for an existing prediction record."""
-        rel_key = f"{simulation_id}:prediction:{transaction_id}"
-        pred_key = self._make_key(rel_key)
+        clean_bank = str(bank_id).lower().replace("-", "_").strip() if bank_id else ""
+        scoped_rel_key = f"{simulation_id}:prediction:{clean_bank}:{transaction_id}" if clean_bank else ""
+        legacy_rel_key = f"{simulation_id}:prediction:{transaction_id}"
 
         c = self.client
         if c:
             try:
                 lua_script = """
-                local pred_key = KEYS[1]
-                local label = tonumber(ARGV[1])
+                local scoped_key = KEYS[1]
+                local legacy_key = KEYS[2]
 
-                local raw = redis.call('GET', pred_key)
+                local label = tonumber(ARGV[1])
+                local exp_bank = ARGV[2]
+                local is_prod = tonumber(ARGV[3])
+                local sim_id = ARGV[4]
+                local tx_id = ARGV[5]
+                local pfx = ARGV[6]
+
+                local target_key = nil
+                local raw = nil
+
+                if scoped_key ~= "" then
+                    raw = redis.call('GET', scoped_key)
+                    if raw then
+                        target_key = scoped_key
+                    end
+                end
+
+                if not raw and legacy_key ~= "" then
+                    raw = redis.call('GET', legacy_key)
+                    if raw then
+                        target_key = legacy_key
+                    end
+                end
+
+                if not raw and exp_bank ~= "" and sim_id ~= "" and tx_id ~= "" then
+                    local pat = pfx .. ":" .. sim_id .. ":prediction:*:" .. tx_id
+                    local matched = redis.call('KEYS', pat)
+                    if matched and #matched > 0 then
+                        raw = redis.call('GET', matched[1])
+                        target_key = matched[1]
+                    end
+                end
+
                 if not raw then
                     return cjson.encode({found = false})
                 end
 
                 local rec = cjson.decode(raw)
+                local rec_bank = string.lower(tostring(rec["bank_id"] or ""))
+
+                if exp_bank ~= "" then
+                    if rec_bank == "" then
+                        if is_prod == 1 then
+                            return cjson.encode({found = true, mismatch = true, error = "missing_owner"})
+                        end
+                    elseif rec_bank ~= exp_bank then
+                        return cjson.encode({found = true, mismatch = true, error = "bank_mismatch"})
+                    end
+                end
+
                 rec["actual_label"] = label
-                redis.call('SET', pred_key, cjson.encode(rec))
+                redis.call('SET', target_key, cjson.encode(rec))
                 return cjson.encode({found = true, record = rec})
                 """
-                res_raw = c.eval(lua_script, 1, pred_key, str(actual_label))
+                scoped_full = self._make_key(scoped_rel_key) if scoped_rel_key else ""
+                legacy_full = self._make_key(legacy_rel_key)
+                is_prod_val = 1 if self.is_production else 0
+
+                res_raw = c.eval(
+                    lua_script,
+                    2,
+                    scoped_full,
+                    legacy_full,
+                    str(actual_label),
+                    clean_bank,
+                    str(is_prod_val),
+                    simulation_id,
+                    transaction_id,
+                    self.prefix,
+                )
                 if res_raw:
                     return json.loads(res_raw)
             except Exception as e:
-                logger.error("Redis record_feedback failed for %s: %s", rel_key, e)
+                logger.error("Redis record_feedback failed for %s (%s): %s", scoped_rel_key or legacy_rel_key, clean_bank, e)
                 self._had_command_failure = True
                 self._redis_failed = True
                 if self.is_production:
@@ -451,11 +575,36 @@ class RedisStore:
             )
 
         with RedisStore._lock:
-            rec = self._fallback_store.get(rel_key)
+            rec = None
+            target_key = None
+            if scoped_rel_key and scoped_rel_key in self._fallback_store:
+                target_key = scoped_rel_key
+                rec = self._fallback_store.get(scoped_rel_key)
+            elif legacy_rel_key in self._fallback_store:
+                target_key = legacy_rel_key
+                rec = self._fallback_store.get(legacy_rel_key)
+            elif clean_bank:
+                prefix_tag = f"{simulation_id}:prediction:"
+                suffix_tag = f":{transaction_id}"
+                for k, v in self._fallback_store.items():
+                    if k.startswith(prefix_tag) and k.endswith(suffix_tag) and isinstance(v, dict):
+                        target_key = k
+                        rec = v
+                        break
+
             if not rec or not isinstance(rec, dict):
                 return {"found": False}
+
+            rec_bank = str(rec.get("bank_id") or "").lower().replace("-", "_").strip()
+            if clean_bank:
+                if not rec_bank:
+                    if self.is_production:
+                        return {"found": True, "mismatch": True, "error": "missing_owner"}
+                elif rec_bank != clean_bank:
+                    return {"found": True, "mismatch": True, "error": "bank_mismatch"}
+
             rec["actual_label"] = actual_label
-            self._fallback_store[rel_key] = rec
+            self._fallback_store[target_key] = rec
             return {"found": True, "record": rec}
 
     def update_conditional(

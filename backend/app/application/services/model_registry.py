@@ -6071,6 +6071,7 @@ class ModelEvaluationEngine:
         and thread-safe in-memory store in local development mode.
         Fails closed in production if shared Redis publication fails.
         """
+        norm_bank = str(bank_id).lower().replace("-", "_").strip() if bank_id else None
         payload = {
             "champion_version": champion_version,
             "champion_prob": champion_prob,
@@ -6080,7 +6081,7 @@ class ModelEvaluationEngine:
             "challenger_latency_ms": challenger_latency_ms,
             "actual_label": None,
             "routed_to": routed_to,
-            "bank_id": bank_id,
+            "bank_id": norm_bank,
             "timestamp": datetime.now(UTC).isoformat(),
         }
         with self._lock:
@@ -6088,6 +6089,7 @@ class ModelEvaluationEngine:
                 simulation_id=simulation_id,
                 transaction_id=transaction_id,
                 payload=payload,
+                bank_id=norm_bank,
                 max_window_size=1000,
             )
 
@@ -6095,12 +6097,15 @@ class ModelEvaluationEngine:
         self,
         simulation_id: str,
         transaction_id: str,
+        bank_id: str | None = None,
     ) -> dict[str, Any] | None:
-        """Retrieve stored prediction evidence for a transaction."""
+        """Retrieve stored prediction evidence for a transaction with institutional scoping."""
         with self._lock:
-            key = f"{simulation_id}:prediction:{transaction_id}"
-            return self._store.get(key)
-
+            return self._store.get_prediction_evidence(
+                simulation_id=simulation_id,
+                transaction_id=transaction_id,
+                bank_id=bank_id,
+            )
 
     def log_feedback(
         self,
@@ -6108,22 +6113,34 @@ class ModelEvaluationEngine:
         transaction_id: str,
         actual_label: int,
         target_challenger_version: int | None = None,
+        bank_id: str | None = None,
     ) -> dict[str, Any]:
         """Record the ground truth label for a transaction and evaluate performance.
 
         Raises:
             KeyError: If transaction prediction was not previously logged (Zero-Mock Invariant).
+            PermissionError: If record's institutional ownership mismatches caller or lacks binding in production.
         """
         with self._lock:
             res = self._store.record_feedback(
                 simulation_id=simulation_id,
                 transaction_id=transaction_id,
                 actual_label=actual_label,
+                bank_id=bank_id,
             )
             if not res.get("found"):
                 raise KeyError(
                     f"Prediction for transaction '{transaction_id}' not found in evaluation store. "
                     "Cannot log feedback for unscored transactions (Zero-Mock Invariant)."
+                )
+            if res.get("mismatch"):
+                err_type = res.get("error")
+                if err_type == "missing_owner":
+                    raise PermissionError(
+                        f"Prediction for transaction '{transaction_id}' lacks authoritative institutional tenant binding."
+                    )
+                raise PermissionError(
+                    f"Cross-tenant feedback rejected: institutional owner mismatch for transaction '{transaction_id}'."
                 )
 
             return self.evaluate_performance(

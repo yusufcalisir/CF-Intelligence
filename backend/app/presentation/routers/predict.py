@@ -1365,7 +1365,11 @@ async def submit_transaction_feedback(
     )
 
     # Validate prediction record evidence in evaluation store
-    record = _eval_engine.get_prediction_record(auth_sim_id, payload.transaction_id)
+    record = _eval_engine.get_prediction_record(
+        simulation_id=auth_sim_id,
+        transaction_id=payload.transaction_id,
+        bank_id=effective_tenant,
+    )
     if not record:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1397,6 +1401,7 @@ async def submit_transaction_feedback(
             simulation_id=auth_sim_id,
             transaction_id=payload.transaction_id,
             actual_label=payload.actual_label,
+            bank_id=effective_tenant,
         )
         return {"status": "success", "metrics": metrics}
     except KeyError as e:
@@ -1404,6 +1409,12 @@ async def submit_transaction_feedback(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Transaction not found.",
+        )
+    except PermissionError as e:
+        logger.warning("Feedback authorization mismatch: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
         )
     except HTTPException:
         raise

@@ -716,3 +716,413 @@ def test_t_legitimate_workflows_continue_to_function(client: TestClient, oidc: O
     headers_super = {"Authorization": f"Bearer {token_super}"}
     resp_b = client.get("/api/v1/models/sim_bank_b/shadow/metrics", headers=headers_super)
     assert resp_b.status_code == 200
+
+
+# ── Residual Authorization & Evidence Scoping Hardening (Scenarios A through K) ──
+
+def test_final_a_b_evidence_collision_prevention_same_tx_different_banks(client: TestClient, oidc: OIDCAuthenticator):
+    """Scenario A & B: Bank A and Bank B use same consortium model and identical transaction_id
+
+    without overwriting each other's evidence, and both submit valid feedback separately.
+    """
+    token_a = oidc.create_mock_token(username="analyst_a", bank_id="bank_a", roles=["analyst"])
+    token_b = oidc.create_mock_token(username="analyst_b", bank_id="bank_b", roles=["analyst"])
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    tx_id = "tx_consortium_collision_001"
+    engine = ModelEvaluationEngine(ModelRegistry())
+
+    # Bank A scores transaction tx_id on consortium model
+    engine.log_prediction(
+        simulation_id="sim_consortium",
+        transaction_id=tx_id,
+        champion_prob=0.85,
+        bank_id="bank_a",
+    )
+
+    # Bank B scores identical transaction tx_id on same consortium model
+    engine.log_prediction(
+        simulation_id="sim_consortium",
+        transaction_id=tx_id,
+        champion_prob=0.15,
+        bank_id="bank_b",
+    )
+
+    # Verify both records exist with distinct institutional ownership
+    rec_a = engine.get_prediction_record("sim_consortium", tx_id, bank_id="bank_a")
+    rec_b = engine.get_prediction_record("sim_consortium", tx_id, bank_id="bank_b")
+    assert rec_a is not None
+    assert rec_b is not None
+    assert rec_a["bank_id"] == "bank_a"
+    assert rec_b["bank_id"] == "bank_b"
+    assert rec_a["champion_prob"] == 0.85
+    assert rec_b["champion_prob"] == 0.15
+    assert rec_a["actual_label"] is None
+    assert rec_b["actual_label"] is None
+
+    # Scenario B: Both banks submit valid feedback against their own separately recorded transactions
+    fb_a = client.post(
+        "/api/v1/predict/feedback",
+        json={
+            "transaction_id": tx_id,
+            "actual_label": 1,
+            "simulation_id": "sim_consortium",
+        },
+        headers=headers_a,
+    )
+    assert fb_a.status_code == 200
+
+    fb_b = client.post(
+        "/api/v1/predict/feedback",
+        json={
+            "transaction_id": tx_id,
+            "actual_label": 0,
+            "simulation_id": "sim_consortium",
+        },
+        headers=headers_b,
+    )
+    assert fb_b.status_code == 200
+
+    # Verify feedback was applied to each institution's evidence independently
+    rec_a_after = engine.get_prediction_record("sim_consortium", tx_id, bank_id="bank_a")
+    rec_b_after = engine.get_prediction_record("sim_consortium", tx_id, bank_id="bank_b")
+    assert rec_a_after is not None and rec_a_after["actual_label"] == 1
+    assert rec_b_after is not None and rec_b_after["actual_label"] == 0
+
+
+def test_final_c_cross_bank_evidence_retrieval_and_labeling_blocked(client: TestClient, oidc: OIDCAuthenticator):
+    """Scenario C: Bank A cannot retrieve, overwrite, or label Bank B evidence by choosing identical transaction_id."""
+    token_a = oidc.create_mock_token(username="analyst_a", bank_id="bank_a", roles=["analyst"])
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+
+    tx_id = "tx_bank_b_exclusive_002"
+    engine = ModelEvaluationEngine(ModelRegistry())
+
+    # Only Bank B scores this transaction
+    engine.log_prediction(
+        simulation_id="sim_consortium",
+        transaction_id=tx_id,
+        champion_prob=0.35,
+        bank_id="bank_b",
+    )
+
+    # Bank A attempts to submit feedback for Bank B's transaction
+    resp_a_fb = client.post(
+        "/api/v1/predict/feedback",
+        json={
+            "transaction_id": tx_id,
+            "actual_label": 1,
+            "simulation_id": "sim_consortium",
+        },
+        headers=headers_a,
+    )
+    # Fails closed (403 cross-tenant feedback rejection)
+    assert resp_a_fb.status_code == 403
+    assert "belongs to bank 'bank_b'" in resp_a_fb.text
+
+    # Bank B's record remains unlabeled
+    rec_b = engine.get_prediction_record("sim_consortium", tx_id, bank_id="bank_b")
+    assert rec_b is not None
+    assert rec_b["actual_label"] is None
+
+
+def test_final_d_prediction_does_not_inherit_other_bank_actual_label(client: TestClient, oidc: OIDCAuthenticator):
+    """Scenario D: A second prediction from a different bank cannot inherit another institution's actual_label,
+
+    while repeated predictions from the same bank preserve idempotency.
+    """
+    token_a = oidc.create_mock_token(username="analyst_a", bank_id="bank_a", roles=["analyst"])
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+
+    tx_id = "tx_label_inherit_003"
+    engine = ModelEvaluationEngine(ModelRegistry())
+
+    # 1. Bank A scores and labels transaction as fraud (1)
+    engine.log_prediction(
+        simulation_id="sim_consortium",
+        transaction_id=tx_id,
+        champion_prob=0.92,
+        bank_id="bank_a",
+    )
+    client.post(
+        "/api/v1/predict/feedback",
+        json={
+            "transaction_id": tx_id,
+            "actual_label": 1,
+            "simulation_id": "sim_consortium",
+        },
+        headers=headers_a,
+    )
+
+    # 2. Bank B scores the same transaction ID
+    engine.log_prediction(
+        simulation_id="sim_consortium",
+        transaction_id=tx_id,
+        champion_prob=0.08,
+        bank_id="bank_b",
+    )
+
+    # Bank B's record MUST NOT inherit Bank A's actual_label
+    rec_b = engine.get_prediction_record("sim_consortium", tx_id, bank_id="bank_b")
+    assert rec_b is not None
+    assert rec_b["actual_label"] is None
+
+    # 3. Repeated prediction from SAME bank (Bank A) preserves idempotency and existing label
+    engine.log_prediction(
+        simulation_id="sim_consortium",
+        transaction_id=tx_id,
+        champion_prob=0.95,
+        bank_id="bank_a",
+    )
+    rec_a = engine.get_prediction_record("sim_consortium", tx_id, bank_id="bank_a")
+    assert rec_a is not None
+    assert rec_a["actual_label"] == 1
+
+
+def test_final_e_f_atomic_mutation_and_fallback_reject_owner_mismatch():
+    """Scenario E & F: Atomic mutation and local fallback reject cross-bank ownership mismatch."""
+    from app.infrastructure.redis_store import RedisStore
+
+    store = RedisStore("test_atomic_ownership")
+
+    sim_id = "sim_test_atomic"
+    tx_id = "tx_atomic_mismatch_004"
+
+    # Record evidence for Bank A
+    store.record_prediction_evidence(
+        simulation_id=sim_id,
+        transaction_id=tx_id,
+        payload={"champion_prob": 0.75, "timestamp": "2026-01-01T00:00:00Z"},
+        bank_id="bank_a",
+    )
+
+    # Bank B tries to mutate Bank A's record via record_feedback
+    res_mismatch = store.record_feedback(
+        simulation_id=sim_id,
+        transaction_id=tx_id,
+        actual_label=1,
+        bank_id="bank_b",
+    )
+    # Either not found under bank_b or reports mismatch
+    if res_mismatch.get("found"):
+        assert res_mismatch.get("mismatch") is True
+        assert res_mismatch.get("error") == "bank_mismatch"
+
+    # Verify Bank A's evidence is unmodified
+    rec_a = store.get_prediction_evidence(sim_id, tx_id, bank_id="bank_a")
+    assert rec_a is not None
+    assert rec_a.get("actual_label") is None
+
+    # Legitimate Bank A update succeeds
+    res_success = store.record_feedback(
+        simulation_id=sim_id,
+        transaction_id=tx_id,
+        actual_label=1,
+        bank_id="bank_a",
+    )
+    assert res_success["found"] is True
+    assert res_success.get("mismatch") is not True
+    assert res_success["record"]["actual_label"] == 1
+
+
+def test_final_g_legacy_records_missing_bank_ownership_cannot_authorize_prod(client: TestClient, oidc: OIDCAuthenticator, monkeypatch: pytest.MonkeyPatch):
+    """Scenario G: Records with missing legacy bank ownership cannot authorize production feedback."""
+    token_a = oidc.create_mock_token(username="analyst_a", bank_id="bank_a", roles=["analyst"])
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+
+    # Seed legacy record with NO bank_id directly into fallback store before switching to production
+    engine = ModelEvaluationEngine(ModelRegistry())
+    legacy_tx = "tx_legacy_unbound_005"
+    engine._store._fallback_store[f"sim_consortium:prediction:{legacy_tx}"] = {
+        "champion_prob": 0.5,
+        "bank_id": None,
+        "timestamp": "2026-01-01T00:00:00Z",
+    }
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "app_env", "production")
+
+    # Attempt to submit feedback in production
+    resp = client.post(
+        "/api/v1/predict/feedback",
+        json={
+            "transaction_id": legacy_tx,
+            "actual_label": 1,
+            "simulation_id": "sim_consortium",
+        },
+        headers=headers_a,
+    )
+    assert resp.status_code == 403
+    assert "lacks authoritative institutional tenant binding" in resp.json()["detail"]
+
+
+def test_final_h_compliance_auditor_lacks_destructive_privileges(client: TestClient, oidc: OIDCAuthenticator):
+    """Scenario H: compliance_auditor cannot delete buffer, consume batches, or compute gradients solely through read privilege."""
+    token_auditor = oidc.create_mock_token(
+        username="auditor",
+        bank_id="",
+        roles=["compliance_auditor"],
+    )
+    headers = {"Authorization": f"Bearer {token_auditor}"}
+
+    # 1. Clear buffer rejected
+    resp_clear = client.delete("/api/v1/feedback/buffer/bank_a", headers=headers)
+    assert resp_clear.status_code == 403
+    assert "clear_feedback_buffer" in resp_clear.json()["detail"]
+
+    # 2. Batch consumption rejected
+    resp_consume = client.post(
+        "/api/v1/feedback/retraining-batch",
+        json={"tenant_id": "bank_a", "batch_size": 10, "mark_consumed": True},
+        headers=headers,
+    )
+    assert resp_consume.status_code == 403
+    assert "consume_retraining_batch" in resp_consume.json()["detail"]
+
+    # 3. DP gradient computation rejected
+    resp_grad = client.post(
+        "/api/v1/feedback/dp-gradient",
+        json={"tenant_id": "bank_a", "epsilon": 1.0, "delta": 1e-5, "clip_norm": 1.0},
+        headers=headers,
+    )
+    assert resp_grad.status_code == 403
+    assert "compute_dp_gradient" in resp_grad.json()["detail"]
+
+    # 4. Ingest feedback rejected
+    resp_ingest = client.post(
+        "/api/v1/feedback/ingest",
+        json={"tenant_id": "bank_a", "alert_id": "alt_001", "determination": "CONFIRMED_FRAUD"},
+        headers=headers,
+    )
+    assert resp_ingest.status_code == 403
+    assert "ingest_feedback" in resp_ingest.json()["detail"]
+
+    # 5. Read-only audit stats allowed
+    resp_stats = client.get("/api/v1/feedback/stats/bank_a", headers=headers)
+    assert resp_stats.status_code == 200
+
+
+def test_final_i_authorized_operator_and_super_admin_flows_work(client: TestClient, oidc: OIDCAuthenticator):
+    """Scenario I: Authorized bank-local operator and super_admin flows remain functional."""
+    token_op = oidc.create_mock_token(username="op_a", bank_id="bank_a", roles=["operator", "admin"])
+    headers_op = {"Authorization": f"Bearer {token_op}"}
+
+    token_super = oidc.create_mock_token(username="super_user", bank_id="", roles=["super_admin"])
+    headers_super = {"Authorization": f"Bearer {token_super}"}
+
+    # Operator for Bank A can ingest into Bank A buffer
+    ingest_resp = client.post(
+        "/api/v1/feedback/ingest",
+        json={"tenant_id": "bank_a", "alert_id": "alt_op_01", "determination": "CONFIRMED_FRAUD"},
+        headers=headers_op,
+    )
+    assert ingest_resp.status_code == 201
+
+    # Operator for Bank A can clear Bank A buffer
+    clear_resp = client.delete("/api/v1/feedback/buffer/bank_a", headers=headers_op)
+    assert clear_resp.status_code == 200
+
+    # Operator for Bank A CANNOT clear Bank B buffer
+    clear_b_resp = client.delete("/api/v1/feedback/buffer/bank_b", headers=headers_op)
+    assert clear_b_resp.status_code == 403
+
+    # Super admin CAN clear Bank B buffer
+    super_clear = client.delete("/api/v1/feedback/buffer/bank_b", headers=headers_super)
+    assert super_clear.status_code == 200
+
+
+def test_final_j_production_feedback_rejects_anonymous_requests(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    """Scenario J: Production feedback handlers reject anonymous requests independently of middleware."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "app_env", "production")
+
+    endpoints = [
+        ("POST", "/api/v1/feedback/ingest", {"tenant_id": "bank_a", "alert_id": "alt_anon", "determination": "CONFIRMED_FRAUD"}),
+        ("GET", "/api/v1/feedback/stats/bank_a", None),
+        ("POST", "/api/v1/feedback/retraining-batch", {"tenant_id": "bank_a", "batch_size": 5, "mark_consumed": False}),
+        ("POST", "/api/v1/feedback/dp-gradient", {"tenant_id": "bank_a", "epsilon": 1.0, "delta": 1e-5, "clip_norm": 1.0}),
+        ("DELETE", "/api/v1/feedback/buffer/bank_a", None),
+    ]
+
+    for method, path, payload in endpoints:
+        if method == "POST":
+            resp = client.post(path, json=payload)
+        elif method == "GET":
+            resp = client.get(path)
+        elif method == "DELETE":
+            resp = client.delete(path)
+        assert resp.status_code == 401, f"Expected 401 for anonymous {method} {path}, got {resp.status_code}"
+
+
+def test_final_k_bank_owned_consortium_model_shared_serving(client: TestClient, oidc: OIDCAuthenticator):
+    """Scenario K: Bank-owned, consortium-authorized shared model remains accessible to eligible members and inaccessible to revoked/unrelated members."""
+    registry = ModelRegistry()
+    c_store = DurableConsortiumStore.get_instance()
+
+    # Create a consortium where bank_a and bank_b are members, and bank_c is removed
+    c_hybrid = Consortium(
+        consortium_id="c_hybrid_test",
+        name="Hybrid Consortium",
+        status=ConsortiumStatus.ACTIVE,
+        members={
+            "bank_a": ConsortiumMember(bank_id="bank_a", role=MemberRole.FOUNDER),
+            "bank_b": ConsortiumMember(bank_id="bank_b", role=MemberRole.FULL_MEMBER),
+        },
+        removed_members={
+            "bank_c": "Voluntary departure or sanction",
+        },
+    )
+    def _add_hybrid(consortia, proposals):
+        consortia["c_hybrid_test"] = c_hybrid
+    c_store.atomic_mutate(_add_hybrid)
+
+    # Register model owned by Bank A but authorized for c_hybrid_test
+    registry._save_ownership(
+        "sim_bank_owned_consortium",
+        {
+            "simulation_id": "sim_bank_owned_consortium",
+            "owning_bank_id": "bank_a",
+            "consortium_id": "c_hybrid_test",
+            "bound_at": "2026-01-01T00:00:00Z",
+            "bound_by": "consortium_champion_vote",
+            "is_unbound": False,
+        },
+    )
+
+    base_payload = {
+        "transaction_amount": 100.0,
+        "merchant_category": "grocery",
+        "country_code": "US",
+        "device_type": "mobile_app",
+        "velocity": 1.0,
+        "hour_of_day": 12,
+        "merchant_risk_score": 0.05,
+        "customer_history_score": 0.95,
+        "chargeback_count": 0,
+        "account_age_days": 365,
+        "simulation_id": "sim_bank_owned_consortium",
+    }
+
+    # 1. Bank A (owner) -> Authorized (passes authorization without 403)
+    token_a = oidc.create_mock_token(username="user_a", bank_id="bank_a", roles=["analyst"])
+    resp_a = client.post("/api/v1/predict", json=base_payload, headers={"Authorization": f"Bearer {token_a}"})
+    assert resp_a.status_code != 403
+
+    # 2. Bank B (active consortium member) -> Authorized (passes authorization without 403)
+    token_b = oidc.create_mock_token(username="user_b", bank_id="bank_b", roles=["analyst"])
+    resp_b = client.post("/api/v1/predict", json=base_payload, headers={"Authorization": f"Bearer {token_b}"})
+    assert resp_b.status_code != 403
+
+    # 3. Bank C (revoked member) -> Forbidden (403)
+    token_c = oidc.create_mock_token(username="user_c", bank_id="bank_c", roles=["analyst"])
+    resp_c = client.post("/api/v1/predict", json=base_payload, headers={"Authorization": f"Bearer {token_c}"})
+    assert resp_c.status_code == 403
+    assert "revoked" in resp_c.json()["detail"].lower()
+
+    # 4. Bank D (unrelated non-member) -> Forbidden (403)
+    token_d = oidc.create_mock_token(username="user_d", bank_id="bank_d", roles=["analyst"])
+    resp_d = client.post("/api/v1/predict", json=base_payload, headers={"Authorization": f"Bearer {token_d}"})
+    assert resp_d.status_code == 403
+    assert "not an active member" in resp_d.json()["detail"].lower()
+
