@@ -27,6 +27,7 @@ from app.application.services.data_generator import (
 )
 from app.application.services.model_service import ModelService
 from app.config import get_settings
+from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
 from app.main import app
 
 EXPECTED_CANONICAL_FEATURES = [
@@ -123,8 +124,12 @@ class TestRealtimeInferenceEndpointFeatureGuards:
             "hour_of_day": 15.0,
         }
 
+        oidc = OIDCAuthenticator()
+        token = oidc.create_mock_token("analyst_a", "bank_a", ["analyst"])
+        headers = {"Authorization": f"Bearer {token}"}
+
         with patch.object(get_settings(), "app_env", "production"):
-            resp = client.post("/v1/inference/score", json=incomplete_payload)
+            resp = client.post("/v1/inference/score", json=incomplete_payload, headers=headers)
             assert resp.status_code == 422
             detail = resp.json()["detail"]
             assert detail["code"] == "MISSING_REQUIRED_FEATURES"
@@ -150,8 +155,12 @@ class TestRealtimeInferenceEndpointFeatureGuards:
             "hour_of_day": 10.0,
         }
 
+        oidc = OIDCAuthenticator()
+        token = oidc.create_mock_token("analyst_a", "bank_a", ["analyst"])
+        headers = {"Authorization": f"Bearer {token}"}
+
         with patch.object(get_settings(), "app_env", "production"):
-            resp = client.post("/v1/inference/score", json=invalid_cat_payload)
+            resp = client.post("/v1/inference/score", json=invalid_cat_payload, headers=headers)
             assert resp.status_code == 422
             detail = resp.json()["detail"]
             assert detail["code"] == "INVALID_FEATURE_INPUT"
@@ -173,11 +182,15 @@ class TestRealtimeInferenceEndpointFeatureGuards:
             "hour_of_day": 9.0,
         }
 
+        oidc = OIDCAuthenticator()
+        token = oidc.create_mock_token("analyst_a", "bank_a", ["analyst"])
+        headers = {"Authorization": f"Bearer {token}"}
+
         svc = ModelService(get_settings())
         m = svc.create_model(dp_compatible=True)
         with patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(m, False)), \
              patch.object(get_settings(), "app_env", "production"):
-            resp = client.post("/v1/inference/score", json=valid_payload)
+            resp = client.post("/v1/inference/score", json=valid_payload, headers=headers)
             assert resp.status_code == 200
             data = resp.json()
             assert data["evaluated_by"] == "ML_MODEL"

@@ -42,6 +42,14 @@ def setup_seed():
     seed_mock_data()
 
 
+@pytest.fixture(autouse=True)
+def enforce_production_env(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+
+
 @pytest.fixture
 def auth_service() -> AuthenticationService:
     return AuthenticationService.get_instance()

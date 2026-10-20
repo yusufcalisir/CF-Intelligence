@@ -189,8 +189,9 @@ PATH_ROUTING = {
 
 def get_api_keys() -> dict[str, tuple[str, str, int]]:
     """Parse configured gateway API keys into map of key -> (identity, role, clearance_level)."""
+    curr_settings = get_settings()
     keys_map = {}
-    for item in settings.gateway_api_keys.split(","):
+    for item in curr_settings.gateway_api_keys.split(","):
         if not item:
             continue
         parts = item.split(":")
@@ -217,10 +218,11 @@ def check_rate_limit(client_id: str) -> tuple[bool, int, int, int]:
     Returns:
         tuple: (allowed: bool, limit: int, remaining: int, reset_seconds: int)
     """
+    curr_settings = get_settings()
     now = time.time()
     minute_bucket = int(now / 60)
     key = f"rl:{client_id}:{minute_bucket}"
-    limit = settings.gateway_rate_limit
+    limit = curr_settings.gateway_rate_limit
     reset = (minute_bucket + 1) * 60 - int(now)
 
     with _rate_limiter_lock:
@@ -295,13 +297,14 @@ def authenticate_request(
             return identity, role, api_key, claims
 
     # Production and staging environments must strictly enforce authentication regardless of overrides
-    if settings.gateway_require_auth or settings.app_env.lower() not in ("development", "test"):
+    curr_settings = get_settings()
+    if curr_settings.gateway_require_auth or curr_settings.app_env.lower() not in ("development", "test"):
         return "", "", api_key or bearer_token, None
 
     # Development-only unauthenticated fallback when gateway_require_auth is explicitly configured False
     logger.warning(
         "Gateway authentication disabled via explicit configuration in %s environment. Falling back to dev identity.",
-        settings.app_env,
+        curr_settings.app_env,
     )
     dev_claims = UserClaims(
         sub="usr_analyst_default",

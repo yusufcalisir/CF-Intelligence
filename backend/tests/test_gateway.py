@@ -27,6 +27,7 @@ def test_gateway_versioning():
 
 def test_gateway_authentication():
     # Enable auth requirement for this test
+    settings = get_settings()
     original_require_auth = settings.gateway_require_auth
     settings.gateway_require_auth = True
     try:
@@ -69,6 +70,7 @@ def test_gateway_rate_limiting():
     RedisStore._global_redis_unavailable = True
     _rate_limiter.clear()
 
+    settings = get_settings()
     original_rate_limit = settings.gateway_rate_limit
     original_require_auth = settings.gateway_require_auth
     settings.gateway_rate_limit = 2
@@ -95,6 +97,7 @@ def test_gateway_rate_limiting():
 
 def test_gateway_abac_clearance_regression():
     """Positive and negative regression tests for ABAC clearance and fail-closed authorization."""
+    settings = get_settings()
     original_keys = settings.gateway_api_keys
     original_require_auth = settings.gateway_require_auth
     settings.gateway_require_auth = True

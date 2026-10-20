@@ -312,6 +312,11 @@ def resolve_authenticated_principal(
             )
             return principal, None, 200
         else:
+            from app.config import get_settings
+
+            settings = get_settings()
+            if not getattr(settings, "gateway_require_auth", True):
+                return ANONYMOUS_PRINCIPAL, None, 200
             return ANONYMOUS_PRINCIPAL, "Invalid or unverified API key.", 401
 
     # 4. No credentials provided
@@ -361,7 +366,7 @@ def resolve_authorized_tenant(
             # Caller attempted cross-tenant access without privilege!
             return (
                 None,
-                f"Broken Access Control: Tenant '{caller_tenant}' is not authorized to access resources belonging to bank '{target_selector}'.",
+                f"Broken Access Control: Cross-tenant access forbidden. Tenant '{caller_tenant}' is not authorized to access resources belonging to bank '{target_selector}'.",
                 403,
             )
 

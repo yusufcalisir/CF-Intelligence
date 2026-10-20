@@ -1120,6 +1120,9 @@ class TenantAccessControlMiddleware:
         "/api/v1/auth/login",
         "/api/v1/auth/refresh",
         "/api/v1/auth/lockout-status",
+        "/v1/cron",
+        "/cron",
+        "/api/v1/cron",
     )
 
     _PROTECTED_PREFIXES = (
@@ -1179,9 +1182,6 @@ class TenantAccessControlMiddleware:
         clean_path = path.rstrip("/") or "/"
         # Private quota inspection always requires authentication
         if clean_path in self._PRIVATE_QUOTA_PATHS:
-            return True
-        # Alerts endpoints always require authentication
-        if any(clean_path == p or clean_path.startswith(p + "/") for p in ("/api/v1/alerts", "/alerts")):
             return True
         # In production, all inference, scoring, and institutional endpoints require authentication
         if is_prod:
