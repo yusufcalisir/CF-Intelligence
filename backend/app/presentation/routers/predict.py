@@ -1364,7 +1364,7 @@ async def score_transaction(
     if is_production:
         # Strict Production Feature Contract: do not fabricate or guess features in production
         missing = []
-        if country is None or not str(country).strip():
+        if country is None or not country.strip():
             missing.append("country")
         if merchant_category is None:
             missing.append("merchant_category")
@@ -1393,7 +1393,7 @@ async def score_transaction(
 
         # Validate country code format if provided
         if country is not None:
-            c_str = str(country).strip().upper()
+            c_str = country.strip().upper()
             if len(c_str) != 2 or not c_str.isalpha():
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -1401,7 +1401,7 @@ async def score_transaction(
                 )
     else:
         # Non-production demo/development fallback logic: preserve EE backward compatibility default only outside production
-        if country is None or not str(country).strip():
+        if country is None or not country.strip():
             country = "EE"
 
         if merchant_category is None:
@@ -1448,7 +1448,7 @@ async def score_transaction(
     # FATF high-risk jurisdiction supplement: countries not in engine's lookup table
     _HIGH_RISK_COUNTRIES = {"KP", "IR", "MM", "SY", "YE", "LY", "SS", "SO", "CF", "ER"}
     _ELEVATED_RISK_COUNTRIES = {"PK", "TZ", "VU", "NG", "HT", "PH", "AO", "RU", "BY"}
-    country_upper = str(country).strip().upper() if country else ""
+    country_upper = country.strip().upper() if country else ""
     is_fatf_blacklist = country_upper in _HIGH_RISK_COUNTRIES
     is_fatf_greylist = country_upper in _ELEVATED_RISK_COUNTRIES
     country_risk_override = (
