@@ -569,16 +569,25 @@ async def predict_transaction(
             logger.debug("Feature Store online query failed in predict_transaction: %s", exc)
 
         # Schedule asynchronous feature ingestion — runs after response is sent
+        raw_m_risk = txn_dict.get("merchant_risk_score")
+        m_risk_val: float = float(raw_m_risk) if raw_m_risk is not None else 0.05
+        raw_c_hist = txn_dict.get("customer_history_score")
+        c_hist_val: float = float(raw_c_hist) if raw_c_hist is not None else 0.95
+        raw_cb = txn_dict.get("chargeback_count")
+        cb_val: int = int(raw_cb) if raw_cb is not None else 0
+        raw_age = txn_dict.get("account_age_days")
+        age_val: int = int(raw_age) if raw_age is not None else 365
+
         background_tasks.add_task(
             _feature_store.ingest_transaction,
             customer_id=entity_hash,
             amount=payload.transaction_amount,
             merchant_id=merch_id or f"merch_{txn_dict.get('merchant_category', 'general')}",
-            merchant_category=txn_dict.get("merchant_category") or "grocery",
-            merchant_risk_score=txn_dict.get("merchant_risk_score") if txn_dict.get("merchant_risk_score") is not None else 0.05,
-            customer_history_score=txn_dict.get("customer_history_score") if txn_dict.get("customer_history_score") is not None else 0.95,
-            chargeback_count=txn_dict.get("chargeback_count") if txn_dict.get("chargeback_count") is not None else 0,
-            account_age_days=txn_dict.get("account_age_days") if txn_dict.get("account_age_days") is not None else 365,
+            merchant_category=str(txn_dict.get("merchant_category") or "grocery"),
+            merchant_risk_score=m_risk_val,
+            customer_history_score=c_hist_val,
+            chargeback_count=cb_val,
+            account_age_days=age_val,
             transaction_id=txn_id,
             tenant_id=bank_id,
         )
@@ -1364,7 +1373,8 @@ async def submit_transaction_feedback(
         )
 
     # Verify institutional tenant match against evidence
-    if not principal.is_privileged and effective_tenant:
+    is_privileged = bool(principal and principal.is_privileged)
+    if not is_privileged and effective_tenant:
         record_bank = record.get("bank_id")
         if record_bank:
             norm_rec = str(record_bank).lower().replace("-", "_")

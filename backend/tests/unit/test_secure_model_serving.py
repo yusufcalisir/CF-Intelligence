@@ -1820,11 +1820,16 @@ def test_p05_operational_serving_bypass_returns_503(temp_registry_dir: str) -> N
         "hour_of_day": 12,
     }
 
+    from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
+
+    token = OIDCAuthenticator().create_mock_token(username="analyst_a", bank_id="bank_a", roles=["analyst"])
+    headers = {"Authorization": f"Bearer {token}"}
+
     with (
         patch.object(settings, "app_env", "production"),
         patch("app.infrastructure.cache.get_redis_client", return_value=None),
     ):
-        resp = client.post("/v1/inference/score", json=payload)
+        resp = client.post("/v1/inference/score", json=payload, headers=headers)
         assert resp.status_code == 503, f"Expected HTTP 503, got {resp.status_code}: {resp.text}"
         data = resp.json()
         assert data["detail"]["code"] == "MODEL_NOT_READY"

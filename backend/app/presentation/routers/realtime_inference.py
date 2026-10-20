@@ -709,13 +709,16 @@ def score_transaction_realtime(
         requested_bank_id=payload.bank_id,
         action_name="score_transaction_realtime",
     )
-    auth_sim_id, ownership = authorize_model_serving(
-        principal=principal,
-        caller_tenant=effective_tenant,
-        simulation_id=payload.simulation_id,
-        registry=ModelRegistry(),
-        action_name="score_transaction_realtime",
-    )
+    auth_sim_id: str | None = None
+    ownership: dict[str, Any] | None = None
+    if payload.simulation_id:
+        auth_sim_id, ownership = authorize_model_serving(
+            principal=principal,
+            caller_tenant=effective_tenant,
+            simulation_id=payload.simulation_id,
+            registry=ModelRegistry(),
+            action_name="score_transaction_realtime",
+        )
 
     # 1. Check Circuit Breaker State (60s cooldown) under thread lock
     with _cb_lock:
@@ -874,8 +877,26 @@ def score_transaction_realtime(
         ) from err
 
     # 4. Retrieve verified champion model (fail-closed if unavailable or corrupt)
+    target_sim_id = auth_sim_id
     try:
-        scripted_model, from_redis = get_scripted_model(simulation_id=auth_sim_id)
+        if target_sim_id is None:
+            try:
+                target_sim_id, ownership = authorize_model_serving(
+                    principal=principal,
+                    caller_tenant=effective_tenant,
+                    simulation_id=None,
+                    registry=ModelRegistry(),
+                    action_name="score_transaction_realtime",
+                )
+            except HTTPException as auth_http_exc:
+                if auth_http_exc.status_code == status.HTTP_404_NOT_FOUND:
+                    target_sim_id = None
+                else:
+                    raise
+            except Exception:
+                target_sim_id = None
+
+        scripted_model, from_redis = get_scripted_model(simulation_id=target_sim_id)
     except ModelNotAvailableError as exc:
         logger.warning("Champion model unavailable for transaction %s: %s", payload.transaction_id, exc)
         if demo_active:

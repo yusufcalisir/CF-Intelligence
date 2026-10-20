@@ -275,7 +275,8 @@ def authorize_model_serving(
 
     # 3. When simulation_id is omitted:
     # Resolve through authoritative, tenant-appropriate serving policy before loading any champion
-    configured_default = (os.environ.get("CFI_DEFAULT_SIMULATION_ID") or getattr(settings, "default_simulation_id", "")).strip()
+    raw_default = os.environ.get("CFI_DEFAULT_SIMULATION_ID") or getattr(settings, "default_simulation_id", "") or ""
+    configured_default = str(raw_default).strip()
 
     if configured_default:
         try:
@@ -300,7 +301,7 @@ def authorize_model_serving(
 
     authorized_candidates: list[str] = []
     candidates_ownership: dict[str, dict[str, Any]] = {}
-    c_store = DurableConsortiumStore.get_instance()
+    c_store = None
     for entry_name in sorted(os.listdir(reg.registry_root)):
         try:
             clean_s_id = validate_simulation_id(entry_name)
@@ -325,7 +326,12 @@ def authorize_model_serving(
         if is_privileged or (o_bank and o_bank == norm_tenant):
             is_authorized = True
         elif c_id:
-            c = c_store.get_consortium(c_id)
+            try:
+                if c_store is None:
+                    c_store = DurableConsortiumStore.get_instance()
+                c = c_store.get_consortium(c_id)
+            except Exception:
+                c = None
             if c and c.status == ConsortiumStatus.ACTIVE and norm_tenant in c.members and norm_tenant not in c.removed_members:
                 is_authorized = True
         elif not is_production and own.get("is_unbound") and not o_bank and not c_id:

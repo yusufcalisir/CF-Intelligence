@@ -44,12 +44,18 @@ from app.domain.model_serving_errors import (
     ModelNotAvailableError,
 )
 from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
 from app.main import app
 from app.presentation.routers.realtime_inference import (
     LocalModelCache,
     reset_circuit_breaker,
     reset_model_cache,
 )
+
+
+def _auth_headers() -> dict[str, str]:
+    token = OIDCAuthenticator().create_mock_token(username="analyst_a", bank_id="bank_a", roles=["analyst"])
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
@@ -914,7 +920,7 @@ def test_production_request_missing_customer_history_returns_422():
         "hour_of_day": 12.0,
     }
     with patch.object(get_settings(), "app_env", "production"):
-        resp = client.post("/v1/inference/score", json=req)
+        resp = client.post("/v1/inference/score", json=req, headers=_auth_headers())
         assert resp.status_code == 422
         assert resp.json()["detail"]["code"] == "MISSING_REQUIRED_FEATURES"
         assert "customer_history_score" in resp.json()["detail"]["message"]
@@ -936,7 +942,7 @@ def test_production_request_missing_chargeback_count_returns_422():
         "hour_of_day": 12.0,
     }
     with patch.object(get_settings(), "app_env", "production"):
-        resp = client.post("/v1/inference/score", json=req)
+        resp = client.post("/v1/inference/score", json=req, headers=_auth_headers())
         assert resp.status_code == 422
         assert "chargeback_count" in resp.json()["detail"]["message"]
 
@@ -957,7 +963,7 @@ def test_production_request_missing_account_age_returns_422():
         "hour_of_day": 12.0,
     }
     with patch.object(get_settings(), "app_env", "production"):
-        resp = client.post("/v1/inference/score", json=req)
+        resp = client.post("/v1/inference/score", json=req, headers=_auth_headers())
         assert resp.status_code == 422
         assert "account_age_days" in resp.json()["detail"]["message"]
 
@@ -1048,7 +1054,7 @@ def test_complete_production_features_scored_as_authoritative_ml_model(temp_reg_
     }
     with patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(m, False)), \
          patch.object(get_settings(), "app_env", "production"):
-        resp = client.post("/v1/inference/score", json=req)
+        resp = client.post("/v1/inference/score", json=req, headers=_auth_headers())
         assert resp.status_code == 200
         data = resp.json()
         assert data["evaluated_by"] == "ML_MODEL"
@@ -1204,7 +1210,7 @@ def test_production_feature_validation_and_scoring_contract():
         "velocity_1h": 1,
     }
     with patch.object(get_settings(), "app_env", "production"):
-        resp = client.post("/v1/inference/score", json=incomplete_req)
+        resp = client.post("/v1/inference/score", json=incomplete_req, headers=_auth_headers())
         assert resp.status_code == 422
         assert resp.json()["detail"]["code"] == "MISSING_REQUIRED_FEATURES"
 
@@ -1225,6 +1231,6 @@ def test_production_feature_validation_and_scoring_contract():
     m = svc.create_model(dp_compatible=True)
     with patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(m, False)), \
          patch.object(get_settings(), "app_env", "production"):
-        resp2 = client.post("/v1/inference/score", json=complete_req)
+        resp2 = client.post("/v1/inference/score", json=complete_req, headers=_auth_headers())
         assert resp2.status_code == 200
         assert resp2.json()["evaluated_by"] == "ML_MODEL"

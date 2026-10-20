@@ -592,7 +592,7 @@ def test_o_transaction_cannot_cross_tenant_boundaries_in_consortium(client: Test
 
 def test_p_model_shadow_metrics_authorized_scope(client: TestClient, oidc: OIDCAuthenticator):
     token_a = oidc.create_mock_token(username="analyst_a", bank_id="bank_a", roles=["analyst"])
-    token_privileged = oidc.create_mock_token(username="auditor", bank_id=None, roles=["compliance_auditor"])
+    token_privileged = oidc.create_mock_token(username="auditor", bank_id="", roles=["compliance_auditor"])
 
     # Bank A reads Bank A metrics -> 200
     resp_own = client.get("/api/v1/models/sim_bank_a/shadow/metrics", headers={"Authorization": f"Bearer {token_a}"})
@@ -712,7 +712,7 @@ def test_t_legitimate_workflows_continue_to_function(client: TestClient, oidc: O
     assert resp_consortium.status_code == 200
 
     # 3. Privileged investigator accesses cross-bank metrics
-    token_super = oidc.create_mock_token(username="investigator", bank_id=None, roles=["cross_bank_investigator"])
+    token_super = oidc.create_mock_token(username="investigator", bank_id="", roles=["cross_bank_investigator"])
     headers_super = {"Authorization": f"Bearer {token_super}"}
     resp_b = client.get("/api/v1/models/sim_bank_b/shadow/metrics", headers=headers_super)
     assert resp_b.status_code == 200
