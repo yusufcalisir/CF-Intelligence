@@ -390,3 +390,197 @@ def test_req_p_public_health_and_onboarding_remain_functional():
     resp_onboarding = client.get("/api/v1/onboarding/ca-bundle")
     assert resp_onboarding.status_code != 401
     assert resp_onboarding.status_code != 403
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Focused Final Regression Tests (Requirements A through O)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_final_req_a_bank_admin_remains_bank_scoped(oidc: OIDCAuthenticator):
+    """A signed Bank A token with role 'bank_admin' remains Bank A-scoped and cannot access Bank B."""
+    token = oidc.create_mock_token(username="admin_a", bank_id="bank_a", roles=["bank_admin"])
+    # 1. Accessing Bank A succeeds
+    resp_a = client.get("/api/v1/alerts?bank_id=bank_a", headers={"Authorization": f"Bearer {token}"})
+    assert resp_a.status_code == 200
+
+    # 2. Accessing Bank B fails with 403
+    resp_b = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": f"Bearer {token}"})
+    assert resp_b.status_code == 403
+    assert "TenantAccessDenied" in resp_b.json()["type"]
+
+    # 3. Quota inspection for Bank B fails with 403
+    resp_quota = client.get("/v1/inference/quota?bank_id=bank_b", headers={"Authorization": f"Bearer {token}"})
+    assert resp_quota.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "deceptive_role",
+    ["assistant_admin", "not_super_admin", "super_admin_disabled", "admin"],
+)
+def test_final_req_b_deceptive_roles_cannot_gain_privileged_access(oidc: OIDCAuthenticator, deceptive_role: str):
+    """Signed tokens with 'assistant_admin', 'not_super_admin', 'super_admin_disabled', or 'admin' do not gain privileged access."""
+    token = oidc.create_mock_token(username="sneaky_user", bank_id="bank_a", roles=[deceptive_role])
+    resp = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 403
+    assert resp.json()["type"] == "https://cfi-platform.org/errors/TenantAccessDenied"
+
+
+@pytest.mark.parametrize(
+    "priv_role",
+    ["super_admin", "cross_bank_investigator", "compliance_auditor"],
+)
+def test_final_req_c_exact_authorized_privileged_roles_retain_cross_bank_access(oidc: OIDCAuthenticator, priv_role: str):
+    """Exact authorized privileged roles retain their intended cross-bank permissions."""
+    token = oidc.create_mock_token(username="root_sec", bank_id="bank_a", roles=[priv_role])
+    resp = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+
+
+def test_final_req_d_signed_oidc_token_with_wrong_issuer_rejected(oidc: OIDCAuthenticator):
+    """Signed OIDC token with wrong issuer claim is rejected with HTTP 401."""
+    wrong_issuer_token = oidc.create_token(
+        username="analyst_a1",
+        bank_id="bank_a",
+        issuer="https://untrusted-idp.attacker.internal/realms/evil",
+    )
+    resp = client.get(
+        "/api/v1/alerts",
+        headers={"Authorization": f"Bearer {wrong_issuer_token}"},
+    )
+    assert resp.status_code == 401
+    assert "issuer" in resp.json()["detail"].lower()
+
+
+def test_final_req_e_signed_oidc_token_with_wrong_audience_rejected(oidc: OIDCAuthenticator):
+    """Signed OIDC token with wrong audience claim is rejected with HTTP 401."""
+    wrong_aud_token = oidc.create_token(
+        username="analyst_a1",
+        bank_id="bank_a",
+        audience="different-app-client-id",
+    )
+    resp = client.get(
+        "/api/v1/alerts",
+        headers={"Authorization": f"Bearer {wrong_aud_token}"},
+    )
+    assert resp.status_code == 401
+    assert "audience" in resp.json()["detail"].lower()
+
+
+@pytest.mark.parametrize(
+    "method,path,payload",
+    [
+        ("POST", "/api/v1/predict", {"transaction_amount": 100.0, "merchant_category": "grocery", "country_code": "US", "device_type": "web_browser"}),
+        ("POST", "/api/v1/predict/batch", {"transactions": []}),
+        ("POST", "/api/v1/score-transaction", {"transaction_id": "tx_h1", "amount": 100.0, "merchant_id": "m1", "device_id": "d1"}),
+        ("POST", "/api/v1/transactions/score", {"transaction_id": "tx_h2", "amount": 100.0, "merchant_id": "m1", "device_id": "d1"}),
+        ("POST", "/api/v1/predict/score", {"transaction_id": "tx_h3", "amount": 100.0, "merchant_id": "m1", "device_id": "d1"}),
+        ("POST", "/api/v1/inference/score", {"transaction_id": "tx_h4", "amount": 100.0, "merchant_category": "grocery"}),
+        ("POST", "/v1/inference/score", {"transaction_id": "tx_h5", "amount": 100.0, "merchant_category": "grocery"}),
+        ("GET", "/api/v1/inference/quota", None),
+        ("GET", "/v1/inference/quota", None),
+    ],
+)
+def test_final_req_h_anonymous_production_requests_denied_across_all_inference_routes(
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
+    path: str,
+    payload: dict | None,
+):
+    """Anonymous production requests to every inference and private quota endpoint are denied (HTTP 401)."""
+    from app.config import get_settings
+    settings = get_settings()
+    monkeypatch.setattr(settings, "app_env", "production")
+
+    resp = client.post(path, json=payload or {}) if method == "POST" else client.get(path)
+
+    assert resp.status_code == 401
+    assert "AuthenticationRequired" in resp.text or "Authentication required" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_final_req_i_anonymous_calls_cannot_use_synthetic_dev_quota_in_production(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Anonymous calls without tenant headers cannot use synthetic_dev_quota in production."""
+    from app.config import get_settings
+    settings = get_settings()
+    monkeypatch.setattr(settings, "app_env", "production")
+
+    req = Request({
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/predict",
+        "headers": [],
+    })
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as exc_info:
+        await enforce_tenant_quota(req)
+    assert exc_info.value.status_code == 401
+    assert "Production inference and quota access require an authenticated principal" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_final_req_j_authenticated_batch_request_without_double_metering(
+    oidc: OIDCAuthenticator,
+):
+    """Authenticated Bank A batch requests are charged to Bank A without double metering."""
+    token = oidc.create_mock_token(username="analyst_a", bank_id="bank_a", roles=["analyst"])
+
+    req = Request({
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/predict/batch",
+        "headers": [(b"authorization", f"Bearer {token}".encode("latin1"))],
+    })
+    charged_1 = await enforce_tenant_quota(req)
+    assert charged_1 == "bank_a"
+    assert req.state.quota_metered is True
+
+    # Second invocation on the same request object short-circuits without re-metering
+    charged_2 = await enforce_tenant_quota(req)
+    assert charged_2 == "bank_a"
+
+
+def test_final_req_k_bank_a_cannot_charge_or_inspect_bank_b_quota(oidc: OIDCAuthenticator):
+    """Bank A cannot inspect or charge Bank B quotas using forged headers or query parameters."""
+    token = oidc.create_mock_token(username="analyst_a", bank_id="bank_a", roles=["analyst"])
+
+    # Forged header to private quota endpoint
+    resp_header = client.get("/v1/inference/quota", headers={"Authorization": f"Bearer {token}", "X-Bank-ID": "bank_b"})
+    assert resp_header.status_code == 403
+
+    # Forged query parameter to private quota endpoint
+    resp_query = client.get("/v1/inference/quota?bank_id=bank_b", headers={"Authorization": f"Bearer {token}"})
+    assert resp_query.status_code == 403
+
+
+@pytest.mark.parametrize("target_sys", ["global", "system", "all", "coordinator"])
+def test_final_req_l_ordinary_bank_a_cannot_promote_to_system_namespace(
+    oidc: OIDCAuthenticator,
+    target_sys: str,
+):
+    """Ordinary Bank A principal cannot promote its active tenant context to global/system/coordinator."""
+    token = oidc.create_mock_token(username="analyst_a", bank_id="bank_a", roles=["analyst"])
+
+    # Header attempt
+    resp_hdr = client.get("/api/v1/alerts", headers={"Authorization": f"Bearer {token}", "X-Tenant-ID": target_sys})
+    assert resp_hdr.status_code == 403
+    assert "not authorized to assume privileged system namespace" in resp_hdr.json()["detail"]
+
+    # Query param attempt
+    resp_qry = client.get(f"/api/v1/alerts?bank_id={target_sys}", headers={"Authorization": f"Bearer {token}"})
+    assert resp_qry.status_code == 403
+    assert "not authorized to assume privileged system namespace" in resp_qry.json()["detail"]
+
+
+def test_final_req_m_authenticated_shared_resource_access_without_tenant_impersonation(
+    oidc: OIDCAuthenticator,
+):
+    """Authenticated bank users can query shared health and documentation without tenant impersonation."""
+    token = oidc.create_mock_token(username="analyst_a", bank_id="bank_a", roles=["analyst"])
+
+    resp_health = client.get("/api/v1/health", headers={"Authorization": f"Bearer {token}"})
+    assert resp_health.status_code == 200
+
+    resp_docs = client.get("/docs", headers={"Authorization": f"Bearer {token}"})
+    assert resp_docs.status_code == 200

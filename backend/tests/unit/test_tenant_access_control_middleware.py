@@ -349,8 +349,25 @@ def test_tenant_normalization(client: TestClient, oidc: OIDCAuthenticator, calle
         "COORDINATOR",
     ],
 )
-def test_special_target_values_bypass(client: TestClient, oidc: OIDCAuthenticator, special_target: str):
+def test_ordinary_caller_cannot_assume_special_target_values(client: TestClient, oidc: OIDCAuthenticator, special_target: str):
+    """Ordinary bank user cannot assume privileged system or cross-bank namespaces."""
     token = oidc.create_mock_token(username="user1", bank_id="bank_a", roles=["analyst"])
+    resp = client.get(f"/api/v1/alerts?bank_id={special_target}", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 403
+    assert "not authorized to assume privileged system namespace" in resp.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    "special_target",
+    [
+        "global",
+        "system",
+        "coordinator",
+    ],
+)
+def test_privileged_roles_can_select_system_target_values(client: TestClient, oidc: OIDCAuthenticator, special_target: str):
+    """Privileged super_admin can operationalize system/global tenant switching."""
+    token = oidc.create_mock_token(username="admin", bank_id="bank_a", roles=["super_admin"])
     resp = client.get(f"/api/v1/alerts?bank_id={special_target}", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
 
@@ -377,27 +394,37 @@ def test_privileged_roles_case_sensitive(client: TestClient, oidc: OIDCAuthentic
     assert resp.status_code == 403
 
 
-def test_malformed_roles_int_raises_typeerror():
+def test_malformed_roles_int_fails_closed():
     with patch("app.infrastructure.security.oidc_authenticator.OIDCAuthenticator.decode_and_validate_token") as mock_dec:
         mock_claims = MagicMock()
         mock_claims.bank_id = "bank_a"
+        mock_claims.username = "user1"
+        mock_claims.sub = "user1"
+        mock_claims.clearance_level = 1
+        mock_claims.exp = 9999999999.0
         mock_claims.roles = 123  # Non-iterable!
         mock_dec.return_value = (True, mock_claims, None)
 
         local_client = TestClient(app, raise_server_exceptions=False)
         resp = local_client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": "Bearer some_token"})
-        assert resp.status_code == 500
+        assert resp.status_code == 403
 
 
-def test_roles_string_evaluated_by_substring(client: TestClient):
-    with patch("app.infrastructure.security.oidc_authenticator.OIDCAuthenticator.decode_and_validate_token") as mock_dec:
-        mock_claims = MagicMock()
-        mock_claims.bank_id = "bank_a"
-        mock_claims.roles = "super_admin"
-        mock_dec.return_value = (True, mock_claims, None)
-
-        resp = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": "Bearer some_token"})
-        assert resp.status_code == 200
+@pytest.mark.parametrize(
+    "deceptive_role",
+    [
+        "bank_admin",
+        "assistant_admin",
+        "not_super_admin",
+        "super_admin_disabled",
+        "admin",
+    ],
+)
+def test_deceptive_roles_cannot_escalate_cross_bank_privilege(client: TestClient, oidc: OIDCAuthenticator, deceptive_role: str):
+    token = oidc.create_mock_token(username="admin", bank_id="bank_a", roles=[deceptive_role])
+    resp = client.get("/api/v1/alerts?bank_id=bank_b", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 403
+    assert resp.json()["type"] == "https://cfi-platform.org/errors/TenantAccessDenied"
 
 
 # ── 9. Cross-Tenant 403 Golden Response Format ───────────────────────────────

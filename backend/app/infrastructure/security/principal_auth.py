@@ -21,16 +21,18 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+import jwt
 from fastapi import Request
 
 logger = logging.getLogger(__name__)
 
-PRIVILEGED_ROLES = frozenset({
+PRIVILEGED_CROSS_BANK_ROLES = frozenset({
     "super_admin",
     "cross_bank_investigator",
     "compliance_auditor",
-    "admin",
 })
+
+PRIVILEGED_ROLES = PRIVILEGED_CROSS_BANK_ROLES
 
 
 @dataclass(frozen=True)
@@ -47,15 +49,17 @@ class AuthenticatedPrincipal:
 
     @property
     def is_privileged(self) -> bool:
-        """Indicates whether this principal possesses verified cross-bank administrative authority."""
-        if isinstance(self.roles, str):
-            return any(role in self.roles for role in PRIVILEGED_ROLES)
-        for r in self.roles:
-            if r in PRIVILEGED_ROLES:
-                return True
-            if isinstance(r, str) and any(role in r for role in PRIVILEGED_ROLES):
-                return True
-        return False
+        """Indicates whether this principal possesses verified cross-bank administrative authority.
+
+        Enforces exact canonical role matching:
+        - Exact matching against PRIVILEGED_CROSS_BANK_ROLES only.
+        - No substring, prefix, or suffix matching.
+        - Malformed or non-string role types are rejected and cannot escalate privilege.
+        - Generic "admin" or "bank_admin" roles are institution-scoped, NOT cross-bank privileged.
+        """
+        if not isinstance(self.roles, (list, tuple, set, frozenset)):
+            return False
+        return any(isinstance(r, str) and r in PRIVILEGED_CROSS_BANK_ROLES for r in self.roles)
 
 
 ANONYMOUS_PRINCIPAL = AuthenticatedPrincipal(
@@ -165,8 +169,8 @@ def resolve_authenticated_principal(
             raw_plat_roles = plat_claims.get("roles")
             if isinstance(raw_plat_roles, str):
                 roles = [raw_plat_roles]
-            elif raw_plat_roles is not None:
-                roles = list(raw_plat_roles)
+            elif isinstance(raw_plat_roles, (list, tuple, set, frozenset)):
+                roles = [str(r) for r in raw_plat_roles if isinstance(r, str)]
             else:
                 roles = []
             clearance = int(plat_claims.get("clearance_level", 1))
@@ -180,6 +184,19 @@ def resolve_authenticated_principal(
                 token_claims=plat_claims,
             )
             return principal, None, 200
+
+        # Fail closed immediately if token was identified as a platform-issued token
+        try:
+            unverified_claims = jwt.decode(token, options={"verify_signature": False})
+            is_platform_token = (
+                unverified_claims.get("token_type") == "access"
+                or ("jti" in unverified_claims and "bank_id" in unverified_claims)
+            )
+        except Exception:
+            is_platform_token = False
+
+        if is_platform_token and not is_valid_plat:
+            return ANONYMOUS_PRINCIPAL, plat_msg or "Platform access token verification failed.", 401
 
         # If platform identified token was revoked or associated user suspended, fail closed immediately
         if any(term in (plat_msg or "").lower() for term in ("revoked", "suspended", "deactivated", "disabled")):
@@ -200,8 +217,8 @@ def resolve_authenticated_principal(
             raw_oidc_roles = getattr(oidc_claims, "roles", None)
             if isinstance(raw_oidc_roles, str):
                 roles = [raw_oidc_roles]
-            elif raw_oidc_roles is not None:
-                roles = list(raw_oidc_roles)
+            elif isinstance(raw_oidc_roles, (list, tuple, set, frozenset)):
+                roles = [str(r) for r in raw_oidc_roles if isinstance(r, str)]
             else:
                 roles = []
             principal = AuthenticatedPrincipal(
@@ -298,9 +315,13 @@ def resolve_authorized_tenant(
         norm_target = target_selector.lower().replace("-", "_").strip()
         norm_caller = (caller_tenant or "").lower().replace("-", "_").strip()
 
-        # Bypasses for global/all/system/coordinator endpoints
+        # Reject ordinary callers attempting to assume privileged system or cross-bank namespaces
         if norm_target in ("global", "all", "system", "coordinator"):
-            return norm_target, None, 200
+            return (
+                None,
+                f"Tenant '{caller_tenant}' is not authorized to assume privileged system namespace '{target_selector}'.",
+                403,
+            )
 
         if norm_caller and norm_target != norm_caller:
             # Caller attempted cross-tenant access without privilege!

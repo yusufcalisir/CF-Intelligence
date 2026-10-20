@@ -1154,11 +1154,42 @@ class TenantAccessControlMiddleware:
         "/api/v1/auth/logout",
     )
 
+    _INFERENCE_EXACT_PATHS = frozenset({
+        "/api/v1/predict",
+        "/api/v1/predict/batch",
+        "/api/v1/predict/score",
+        "/api/v1/predict/explain",
+        "/api/v1/score-transaction",
+        "/api/v1/transactions/score",
+        "/api/v1/inference/score",
+        "/v1/inference/score",
+        "/api/v1/inference/quota",
+        "/v1/inference/quota",
+    })
+
+    _PRIVATE_QUOTA_PATHS = frozenset({
+        "/api/v1/inference/quota",
+        "/v1/inference/quota",
+    })
+
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
-    def _is_protected_path(self, path: str) -> bool:
-        return any(path.startswith(p) for p in self._PROTECTED_PREFIXES)
+    def _is_protected_path(self, path: str, is_prod: bool = False) -> bool:
+        clean_path = path.rstrip("/") or "/"
+        # Private quota inspection always requires authentication
+        if clean_path in self._PRIVATE_QUOTA_PATHS:
+            return True
+        # Core institutional endpoints always require authentication
+        if any(clean_path == p or clean_path.startswith(p + "/") for p in self._PROTECTED_PREFIXES):
+            return True
+        # In production, all inference and scoring endpoints require authentication
+        if is_prod:
+            if clean_path in self._INFERENCE_EXACT_PATHS:
+                return True
+            if any(clean_path.startswith(p) for p in ("/api/v1/predict", "/api/v1/inference", "/v1/inference")):
+                return True
+        return False
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -1171,11 +1202,15 @@ class TenantAccessControlMiddleware:
             await self.app(scope, receive, send)
             return
 
+        from app.config import get_settings
         from app.infrastructure.database import active_tenant
         from app.infrastructure.security.principal_auth import (
             resolve_authenticated_principal,
             resolve_authorized_tenant,
         )
+
+        settings = get_settings()
+        is_prod = getattr(settings, "app_env", "development").lower() in ("production", "prod")
 
         # 1. Authoritative request principal resolution
         principal, auth_err, auth_status = resolve_authenticated_principal(request)
@@ -1236,7 +1271,7 @@ class TenantAccessControlMiddleware:
             return
 
         # 3. Enforce authentication on protected endpoints
-        if not principal.is_authenticated and self._is_protected_path(request.url.path):
+        if not principal.is_authenticated and self._is_protected_path(request.url.path, is_prod=is_prod):
             response = JSONResponse(
                 status_code=401,
                 content={

@@ -292,6 +292,17 @@ async def enforce_tenant_quota(
             target_tenant = principal.tenant_id
     else:
         # Unauthenticated principal
+        from app.config import get_settings
+
+        settings = get_settings()
+        is_production = getattr(settings, "app_env", "development").lower() in ("production", "prod")
+        if is_production:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required. Production inference and quota access require an authenticated principal.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
         selector = (
             tenant_id
             or request.headers.get("X-Tenant-ID")

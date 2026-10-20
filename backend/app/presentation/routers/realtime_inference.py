@@ -13,7 +13,7 @@ import time
 from typing import Any
 
 import torch
-from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
 from app.application.schemas.transaction import (
     InferenceQuotaResponse,
@@ -25,7 +25,7 @@ from app.application.services.training_provenance_service import (
     derive_domain_key,
 )
 from app.config import get_settings
-from app.dependencies import TenantDep
+from app.dependencies import TenantDep, enforce_tenant_quota
 from app.domain.inference_fallback import (
     InferenceDecision,
     InferenceFallbackEngine,
@@ -684,6 +684,7 @@ def get_inference_quota(
 @api_router.post("/score", response_model=RealtimeInferenceResponse)
 def score_transaction_realtime(
     payload: RealtimeInferenceRequest,
+    metered_tenant: str = Depends(enforce_tenant_quota),
 ) -> RealtimeInferenceResponse:
     """Scores an incoming transaction in real time with verified champion model, Redis caching, and circuit breaker."""
     global _consecutive_failures, _circuit_open, _circuit_opened_at

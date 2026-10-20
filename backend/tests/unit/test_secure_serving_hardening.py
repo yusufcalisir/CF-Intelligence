@@ -38,6 +38,13 @@ from app.main import app
 client = TestClient(app)
 
 
+def _get_auth_headers() -> dict[str, str]:
+    from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
+
+    token = OIDCAuthenticator().create_mock_token(username="analyst_1", bank_id="bank_1", roles=["analyst"])
+    return {"Authorization": f"Bearer {token}", "X-Bank-ID": "bank_1"}
+
+
 @pytest.fixture(autouse=True)
 def override_db(monkeypatch: pytest.MonkeyPatch):
     mock_session = MagicMock()
@@ -162,7 +169,7 @@ def test_production_predict_missing_features_rejected(monkeypatch: pytest.Monkey
         # velocity, customer_history_score, chargeback_count, account_age_days, merchant_risk_score are MISSING
     }
 
-    res = client.post("/api/v1/predict", json=payload)
+    res = client.post("/api/v1/predict", json=payload, headers=_get_auth_headers())
     assert res.status_code == 422
     assert "Production feature contract violation: Missing required features" in res.text
 
@@ -186,7 +193,7 @@ def test_production_score_transaction_missing_features_rejected(monkeypatch: pyt
         "device_id": "fp_device_abc",
     }
 
-    res = client.post("/api/v1/score-transaction", json=payload)
+    res = client.post("/api/v1/score-transaction", json=payload, headers=_get_auth_headers())
     assert res.status_code == 422
     assert "Production scoring rejected: missing required model features" in res.text
 
@@ -228,7 +235,7 @@ def test_production_score_transaction_succeeds_with_explicit_features(monkeypatc
         "hour_of_day": 14,
     }
 
-    res = client.post("/api/v1/score-transaction", json=payload)
+    res = client.post("/api/v1/score-transaction", json=payload, headers=_get_auth_headers())
     assert res.status_code == 200, res.text
     data = res.json()
     assert data["decision"] in ("ALLOW", "REVIEW", "BLOCK")
@@ -411,7 +418,7 @@ def test_dimension_mismatch_never_padded_or_truncated(monkeypatch: pytest.Monkey
         "account_age_days": 365,
     }
 
-    res = client.post("/api/v1/predict", json=payload)
+    res = client.post("/api/v1/predict", json=payload, headers=_get_auth_headers())
     assert res.status_code == 503
     assert "Feature tensor dimension mismatch" in res.text
 
@@ -597,7 +604,7 @@ def test_production_score_transaction_without_country_fails_422(monkeypatch: pyt
         # 'country' and 'country_code' omitted!
     }
 
-    res = client.post("/api/v1/score-transaction", json=payload)
+    res = client.post("/api/v1/score-transaction", json=payload, headers=_get_auth_headers())
     assert res.status_code == 422, res.text
     assert "missing required model features" in res.text
     assert "country" in res.text
@@ -630,7 +637,7 @@ def test_production_score_transaction_aliases_behave_identically_on_missing_coun
     }
 
     for path in ("/api/v1/score-transaction", "/api/v1/transactions/score", "/api/v1/predict/score"):
-        res = client.post(path, json=payload)
+        res = client.post(path, json=payload, headers=_get_auth_headers())
         assert res.status_code == 422, f"Failed on {path}: {res.text}"
         data = res.json()
         assert "missing required model features" in data["detail"]
@@ -682,7 +689,7 @@ def test_production_score_transaction_explicit_valid_country_produces_canonical_
         "hour_of_day": 12,
     }
 
-    res = client.post("/api/v1/score-transaction", json=payload_de)
+    res = client.post("/api/v1/score-transaction", json=payload_de, headers=_get_auth_headers())
     assert res.status_code == 200, res.text
     assert len(captured_tensors) == 1
 
@@ -700,7 +707,7 @@ def test_production_score_transaction_explicit_valid_country_produces_canonical_
     payload_alias = dict(payload_de)
     del payload_alias["country"]
     payload_alias["country_code"] = "DE"
-    res_alias = client.post("/api/v1/score-transaction", json=payload_alias)
+    res_alias = client.post("/api/v1/score-transaction", json=payload_alias, headers=_get_auth_headers())
     assert res_alias.status_code == 200, res_alias.text
     assert len(captured_tensors) == 1
     assert abs(captured_tensors[0][0, 2].item() - expected_de_scaled) < 1e-5
@@ -736,7 +743,7 @@ def test_omitted_country_never_fabricates_ee_in_production_but_preserves_demo_fa
         "hour_of_day": 10,
     }
 
-    res_prod = client.post("/api/v1/score-transaction", json=payload)
+    res_prod = client.post("/api/v1/score-transaction", json=payload, headers=_get_auth_headers())
     assert res_prod.status_code == 422
     assert "country" in res_prod.json()["detail"]
 
