@@ -20,6 +20,11 @@ from app.application.schemas.transaction import (
     RealtimeInferenceRequest,
     RealtimeInferenceResponse,
 )
+from app.application.services.model_registry import ModelRegistry
+from app.application.services.model_serving_authorization import (
+    authorize_model_serving,
+    resolve_effective_caller_tenant,
+)
 from app.application.services.training_provenance_service import (
     DOMAIN_MODEL_CACHE,
     derive_domain_key,
@@ -684,6 +689,8 @@ def get_inference_quota(
 @api_router.post("/score", response_model=RealtimeInferenceResponse)
 def score_transaction_realtime(
     payload: RealtimeInferenceRequest,
+    request: Request,
+    caller_tenant: TenantDep = None,
     metered_tenant: str = Depends(enforce_tenant_quota),
 ) -> RealtimeInferenceResponse:
     """Scores an incoming transaction in real time with verified champion model, Redis caching, and circuit breaker."""
@@ -694,6 +701,21 @@ def score_transaction_realtime(
     settings = get_settings()
     is_production = settings.app_env.lower() == "production"
     demo_active = _is_demo_mode_active()
+
+    # Authorize caller tenant and model serving BEFORE risk state, caching, or inference
+    principal, effective_tenant = resolve_effective_caller_tenant(
+        request=request,
+        caller_tenant=caller_tenant,
+        requested_bank_id=payload.bank_id,
+        action_name="score_transaction_realtime",
+    )
+    auth_sim_id, ownership = authorize_model_serving(
+        principal=principal,
+        caller_tenant=effective_tenant,
+        simulation_id=payload.simulation_id,
+        registry=ModelRegistry(),
+        action_name="score_transaction_realtime",
+    )
 
     # 1. Check Circuit Breaker State (60s cooldown) under thread lock
     with _cb_lock:
@@ -853,7 +875,7 @@ def score_transaction_realtime(
 
     # 4. Retrieve verified champion model (fail-closed if unavailable or corrupt)
     try:
-        scripted_model, from_redis = get_scripted_model(simulation_id=payload.simulation_id)
+        scripted_model, from_redis = get_scripted_model(simulation_id=auth_sim_id)
     except ModelNotAvailableError as exc:
         logger.warning("Champion model unavailable for transaction %s: %s", payload.transaction_id, exc)
         if demo_active:

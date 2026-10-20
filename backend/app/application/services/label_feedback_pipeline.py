@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import random
+import re
 import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -95,11 +96,38 @@ class LabelFeedbackItem:
         )
 
 
+
+TENANT_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-]+$")
+
+
+def validate_tenant_id(tenant_id: str) -> str:
+    """Validate and sanitize a tenant identifier at the service boundary.
+
+    Enforces:
+    - Non-empty string, length 1-128 characters.
+    - Strictly alphanumeric characters, hyphens, and underscores.
+    - Explicit rejection of traversal segments (..), path separators (/ and \\),
+      null bytes, whitespace, and reserved filenames.
+    """
+    if not isinstance(tenant_id, str):
+        raise ValueError("Tenant identifier must be a string.")
+    clean = tenant_id.strip()
+    if not clean or len(clean) > 128 or not TENANT_ID_PATTERN.match(clean):
+        raise ValueError(
+            f"Invalid tenant identifier: '{tenant_id}'. Must be 1-128 characters matching [a-zA-Z0-9_\\-]."
+        )
+    if clean in (".", "..") or "/" in clean or "\\" in clean:
+        raise ValueError(f"Unsafe tenant identifier: '{tenant_id}'.")
+    return clean
+
+
 class LocalLabelFeedbackPipeline:
     """Ingests analyst ground-truth determinations, maintains isolated tenant retraining buffers,
 
     and computes DP-noise-protected gradient updates for continuous federated model fine-tuning.
     """
+
+    validate_tenant_id = staticmethod(validate_tenant_id)
 
     def __init__(self, storage_dir: str | None = None, seed: int | None = None) -> None:
         self.privacy_guard = LabelPrivacyGuard()
@@ -109,22 +137,28 @@ class LocalLabelFeedbackPipeline:
         self._rng = random.Random(seed) if seed is not None else random.Random()
 
     def _get_tenant_file(self, tenant_id: str) -> Path:
-        """Returns the file path for tenant buffer persistence."""
-        return self._storage_dir / tenant_id / "label_buffer.json"
+        """Returns the file path for tenant buffer persistence with strict path traversal prevention."""
+        clean_tenant = validate_tenant_id(tenant_id)
+        base = self._storage_dir.resolve()
+        target = (base / clean_tenant / "label_buffer.json").resolve()
+        if not target.is_relative_to(base):
+            raise ValueError(f"Path traversal detected in tenant identifier: '{tenant_id}'")
+        return target
 
     def _save_tenant_buffer_unlocked(self, tenant_id: str) -> None:
         """Persists in-memory tenant buffer to local disk atomically (must hold self._lock)."""
+        clean_tenant = validate_tenant_id(tenant_id)
         try:
-            target_path = self._get_tenant_file(tenant_id)
+            target_path = self._get_tenant_file(clean_tenant)
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            items = self._buffers.get(tenant_id, [])
+            items = self._buffers.get(clean_tenant, [])
             serialized = [item.to_dict() for item in items]
             temp_path = target_path.with_suffix(".tmp")
             with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(serialized, f, indent=2)
             temp_path.replace(target_path)
         except Exception as exc:
-            logger.warning("Failed to persist feedback buffer for tenant '%s': %s", tenant_id, exc)
+            logger.warning("Failed to persist feedback buffer for tenant '%s': %s", clean_tenant, exc)
 
     def ingest_analyst_determination(
         self,
@@ -336,8 +370,9 @@ class LocalLabelFeedbackPipeline:
 
     def get_buffer_stats(self, tenant_id: str) -> dict[str, Any]:
         """Retrieves summary metrics for tenant's feedback store."""
+        clean_tenant = validate_tenant_id(tenant_id)
         with self._lock:
-            buffer = self._buffers.get(tenant_id, [])
+            buffer = self._buffers.get(clean_tenant, [])
             total = len(buffer)
             fraud = sum(1 for i in buffer if i.label == FeedbackLabel.CONFIRMED_FRAUD)
             fp = sum(1 for i in buffer if i.label == FeedbackLabel.FALSE_POSITIVE)
@@ -349,7 +384,7 @@ class LocalLabelFeedbackPipeline:
                 p_dist[i.priority] = p_dist.get(i.priority, 0) + 1
 
             return {
-                "tenant_id": tenant_id,
+                "tenant_id": clean_tenant,
                 "total_count": total,
                 "fraud_count": fraud,
                 "false_positive_count": fp,
@@ -360,31 +395,35 @@ class LocalLabelFeedbackPipeline:
 
     def get_buffer_size(self, tenant_id: str) -> int:
         """Retrieves tenant feedback buffer size."""
+        clean_tenant = validate_tenant_id(tenant_id)
         with self._lock:
-            return len(self._buffers.get(tenant_id, []))
+            return len(self._buffers.get(clean_tenant, []))
 
     def clear_buffer(self, tenant_id: str) -> int:
         """Clears in-memory and disk buffer for the specified tenant."""
+        clean_tenant = validate_tenant_id(tenant_id)
         with self._lock:
-            existing = len(self._buffers.get(tenant_id, []))
-            self._buffers[tenant_id] = []
-            target_path = self._get_tenant_file(tenant_id)
+            existing = len(self._buffers.get(clean_tenant, []))
+            self._buffers[clean_tenant] = []
+            target_path = self._get_tenant_file(clean_tenant)
             if target_path.exists():
                 try:
                     target_path.unlink()
                 except Exception as exc:
-                    logger.warning("Could not delete persisted buffer file for '%s': %s", tenant_id, exc)
+                    logger.warning("Could not delete persisted buffer file for '%s': %s", clean_tenant, exc)
             return existing
 
     def save_to_disk(self, tenant_id: str) -> str:
         """Explicitly saves tenant buffer to disk and returns the file path."""
+        clean_tenant = validate_tenant_id(tenant_id)
         with self._lock:
-            self._save_tenant_buffer_unlocked(tenant_id)
-            return str(self._get_tenant_file(tenant_id))
+            self._save_tenant_buffer_unlocked(clean_tenant)
+            return str(self._get_tenant_file(clean_tenant))
 
     def load_from_disk(self, tenant_id: str) -> int:
         """Loads persisted feedback items from disk into memory buffer."""
-        target_path = self._get_tenant_file(tenant_id)
+        clean_tenant = validate_tenant_id(tenant_id)
+        target_path = self._get_tenant_file(clean_tenant)
         if not target_path.exists():
             return 0
 
@@ -393,9 +432,9 @@ class LocalLabelFeedbackPipeline:
                 with open(target_path, encoding="utf-8") as f:
                     data = json.load(f)
                 loaded_items = [LabelFeedbackItem.from_dict(item) for item in data]
-                self._buffers[tenant_id] = loaded_items
-                logger.info("Loaded %d feedback items from disk for tenant '%s'", len(loaded_items), tenant_id)
+                self._buffers[clean_tenant] = loaded_items
+                logger.info("Loaded %d feedback items from disk for tenant '%s'", len(loaded_items), clean_tenant)
                 return len(loaded_items)
             except Exception as exc:
-                logger.error("Failed to load feedback buffer for tenant '%s': %s", tenant_id, exc)
+                logger.error("Failed to load feedback buffer for tenant '%s': %s", clean_tenant, exc)
                 return 0

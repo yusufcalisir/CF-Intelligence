@@ -6063,6 +6063,7 @@ class ModelEvaluationEngine:
         challenger_prob: float | None = None,
         challenger_latency_ms: float | None = None,
         routed_to: str = "champion",
+        bank_id: str | None = None,
     ) -> None:
         """Log scoring details for a transaction.
 
@@ -6079,6 +6080,7 @@ class ModelEvaluationEngine:
             "challenger_latency_ms": challenger_latency_ms,
             "actual_label": None,
             "routed_to": routed_to,
+            "bank_id": bank_id,
             "timestamp": datetime.now(UTC).isoformat(),
         }
         with self._lock:
@@ -6088,6 +6090,17 @@ class ModelEvaluationEngine:
                 payload=payload,
                 max_window_size=1000,
             )
+
+    def get_prediction_record(
+        self,
+        simulation_id: str,
+        transaction_id: str,
+    ) -> dict[str, Any] | None:
+        """Retrieve stored prediction evidence for a transaction."""
+        with self._lock:
+            key = f"{simulation_id}:prediction:{transaction_id}"
+            return self._store.get(key)
+
 
     def log_feedback(
         self,

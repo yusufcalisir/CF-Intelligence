@@ -25,8 +25,8 @@ class AnalystFeedbackIngestRequest(BaseModel):
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    tenant_id: str = Field(
-        default="bank_alpha",
+    tenant_id: str | None = Field(
+        default=None,
         min_length=1,
         max_length=64,
         pattern=r"^[a-zA-Z0-9_\-]+$",
@@ -77,6 +77,13 @@ class AnalystFeedbackIngestRequest(BaseModel):
         description="Additional operational metadata",
     )
 
+    @field_validator("determination", mode="before")
+    @classmethod
+    def normalize_determination(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.strip().upper()
+        return v
+
     @field_validator("notes")
     @classmethod
     def sanitize_notes(cls, v: str | None) -> str | None:
@@ -113,8 +120,8 @@ class RetrainingBatchRequest(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    tenant_id: str = Field(
-        default="bank_alpha",
+    tenant_id: str | None = Field(
+        default=None,
         min_length=1,
         max_length=64,
         pattern=r"^[a-zA-Z0-9_\-]+$",
@@ -160,8 +167,8 @@ class DPGradientRequest(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    tenant_id: str = Field(
-        default="bank_alpha",
+    tenant_id: str | None = Field(
+        default=None,
         min_length=1,
         max_length=64,
         pattern=r"^[a-zA-Z0-9_\-]+$",

@@ -57,12 +57,15 @@ from app.application.services.model_registry import (
     validate_production_admission,
 )
 from app.application.services.model_service import NUM_FEATURES, ModelService
+from app.application.services.model_serving_authorization import (
+    authorize_model_serving,
+    resolve_effective_caller_tenant,
+)
 from app.application.services.risk_engine import RiskScoringEngine
 from app.config import get_settings
 from app.dependencies import (
     SessionDep,
     TenantDep,
-    enforce_tenant_isolation,
     enforce_tenant_quota,
 )
 from app.domain.model_serving_errors import (
@@ -80,6 +83,7 @@ from app.infrastructure.security.rate_limiter import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["prediction"])
+api_router = APIRouter(prefix="/v1", tags=["prediction"])
 
 # Singleton instances (matching backend router architectures)
 _settings = get_settings()
@@ -480,6 +484,7 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
 
 
 @router.post("/predict", response_model=TransactionPredictResponse)
+@api_router.post("/predict", response_model=TransactionPredictResponse)
 @limiter.limit("60/minute")
 async def predict_transaction(
     request: Request,
@@ -497,17 +502,37 @@ async def predict_transaction(
     evaluates fraud probability, computes composite risk score, and
     generates alerts if fraud is suspected.
     """
-    if caller_tenant and payload.bank_id:
-        enforce_tenant_isolation(caller_tenant, payload.bank_id)
+    principal, effective_tenant = resolve_effective_caller_tenant(
+        request=request,
+        caller_tenant=caller_tenant,
+        requested_bank_id=payload.bank_id,
+        action_name="predict_transaction",
+    )
+    auth_sim_id, ownership = authorize_model_serving(
+        principal=principal,
+        caller_tenant=effective_tenant,
+        simulation_id=payload.simulation_id,
+        registry=_registry,
+        action_name="predict_transaction",
+    )
 
-    bank_id = payload.bank_id or "serving_client"
+    settings = get_settings()
+    is_production = settings.app_env.lower() in ("production", "prod")
+
+    bank_id = effective_tenant or payload.bank_id
+    if not bank_id:
+        if is_production:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Institutional tenant identity is required for production prediction.",
+            )
+        bank_id = "serving_client"
+
     txn_id = payload.transaction_id or str(uuid.uuid4())
     customer_ref = payload.customer_id or payload.account_id or "customer_1"
     entity_hash = f"serving:{bank_id}:{customer_ref}"
 
     txn_dict = payload.model_dump()
-    settings = get_settings()
-    is_production = settings.app_env.lower() in ("production", "prod")
 
     # Online Feature Store: query real customer and merchant historical features if enabled
     if settings.feature_store_enabled:
@@ -583,7 +608,7 @@ async def predict_transaction(
 
     # 1. Resolve cached active model instance and identity snapshot
     try:
-        model, active_ident = _get_cached_serving_model_with_ident(payload.simulation_id)
+        model, active_ident = _get_cached_serving_model_with_ident(auth_sim_id)
         network = getattr(model, "network", None)
         first_layer = None
         if isinstance(network, (torch.nn.Sequential, torch.nn.ModuleList, list)) and len(network) > 0:
@@ -605,8 +630,8 @@ async def predict_transaction(
         chall_latency = None
         challenger_ver = None
         active_entry = None
-        if payload.simulation_id:
-            manifest = _registry._load_manifest(payload.simulation_id)
+        if auth_sim_id:
+            manifest = _registry._load_manifest(auth_sim_id)
             active_entry = next((e for e in manifest if (e.get("status") in ("champion", "active") and e.get("is_active")) or e.get("status") == "active"), None)
             challenger_entry = next((e for e in manifest if e.get("status") == "challenger"), None)
             if challenger_entry:
@@ -616,7 +641,7 @@ async def predict_transaction(
                         validate_production_admission(challenger_entry, context="predict_challenger_serving")
 
                     chall_model = _load_challenger_model(
-                        payload.simulation_id, challenger_ver, dp_compatible=True
+                        auth_sim_id, challenger_ver, dp_compatible=True
                     )
                     chall_net = getattr(chall_model, "network", None)
                     chall_first = (
@@ -652,7 +677,7 @@ async def predict_transaction(
         fraud_prob = champ_prob
 
         # Log prediction for shadow evaluation and rollback engine
-        sim_id_eval = payload.simulation_id or "live_prod_v2"
+        sim_id_eval = auth_sim_id or "live_prod_v2"
         _eval_engine.log_prediction(
             simulation_id=sim_id_eval,
             transaction_id=txn_id,
@@ -663,7 +688,9 @@ async def predict_transaction(
             challenger_prob=chall_prob,
             challenger_latency_ms=chall_latency,
             routed_to="champion",
+            bank_id=bank_id,
         )
+
 
     except HTTPException:
         raise
@@ -696,15 +723,16 @@ async def predict_transaction(
     # Register historical signals context dynamically for the entity hash
     cb_count = txn_dict.get("chargeback_count") or 0
     if cb_count > 0:
-        _risk_engine.register_chargeback(entity_hash, min(1.0, cb_count / 10.0))
+        _risk_engine.register_chargeback(entity_hash, min(1.0, cb_count / 10.0), tenant_id=bank_id)
         for _ in range(min(5, cb_count)):
-            _risk_engine.register_alert(entity_hash)
-    _risk_engine.register_baseline(entity_hash, {"mean_amount": 100.0, "std_amount": 50.0})
+            _risk_engine.register_alert(entity_hash, tenant_id=bank_id)
+    _risk_engine.register_baseline(entity_hash, {"mean_amount": 100.0, "std_amount": 50.0}, tenant_id=bank_id)
 
     risk_score_obj = _risk_engine.score_transaction(
         transaction=txn_dict,
         ml_prediction=fraud_prob,
         entity_hash=entity_hash,
+        tenant_id=bank_id,
     )
 
     score = risk_score_obj.score
@@ -854,6 +882,7 @@ async def predict_transaction(
 
 
 @router.post("/predict/batch", response_model=BatchPredictionResponse)
+@api_router.post("/predict/batch", response_model=BatchPredictionResponse)
 @limiter.limit("30/minute")
 async def predict_batch(
     request: Request,
@@ -867,13 +896,50 @@ async def predict_batch(
     Batch processes up to 1,000 transaction payloads in a single forward pass,
     evaluates risk scores, and returns itemized decisions with batch latency metrics.
     """
-    if caller_tenant and payload.bank_id:
-        enforce_tenant_isolation(caller_tenant, payload.bank_id)
+    principal, effective_tenant = resolve_effective_caller_tenant(
+        request=request,
+        caller_tenant=caller_tenant,
+        requested_bank_id=payload.bank_id,
+        action_name="predict_batch",
+    )
+    auth_sim_id, ownership = authorize_model_serving(
+        principal=principal,
+        caller_tenant=effective_tenant,
+        simulation_id=payload.simulation_id,
+        registry=_registry,
+        action_name="predict_batch",
+    )
+
+    settings = get_settings()
+    is_production = settings.app_env.lower() in ("production", "prod")
+
+    target_tenant = effective_tenant or payload.bank_id
+    if not target_tenant:
+        if is_production:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Institutional tenant identity is required for production batch prediction.",
+            )
+        target_tenant = metered_tenant or "serving_client"
+
+    # Enforce item-level bank_id agreement with authorized scope
+    for idx, txn_item in enumerate(payload.transactions):
+        item_bank = getattr(txn_item, "bank_id", None)
+        if item_bank:
+            norm_item = item_bank.lower().replace("-", "_")
+            norm_target = target_tenant.lower().replace("-", "_")
+            if norm_item != norm_target:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"Batch item {idx} bank_id '{item_bank}' does not match "
+                        f"authorized batch tenant '{target_tenant}'."
+                    ),
+                )
 
     from app.application.services.tenant_metering import get_tenant_metering_service
 
     metering = get_tenant_metering_service()
-    target_tenant = metered_tenant
     additional_count = max(0, len(payload.transactions) - 1)
     if additional_count > 0:
         allowed, reason = metering.acquire_quota(
@@ -885,6 +951,7 @@ async def predict_batch(
                 detail=f"Batch inference quota exceeded: {reason}",
                 headers={"Retry-After": "3600", "X-Quota-Exceeded": "true"},
             )
+
 
     start_batch = time.perf_counter()
     settings = get_settings()
@@ -955,7 +1022,7 @@ async def predict_batch(
                     td[f] = default_val
 
     try:
-        model, active_ident = _get_cached_serving_model_with_ident(payload.simulation_id)
+        model, active_ident = _get_cached_serving_model_with_ident(auth_sim_id)
         network = getattr(model, "network", None)
         first_layer = (
             network[0]
@@ -1017,17 +1084,19 @@ async def predict_batch(
 
         cb_cnt = t_dict.get("chargeback_count") or 0
         if cb_cnt > 0:
-            _risk_engine.register_chargeback(e_hash, min(1.0, cb_cnt / 10.0))
+            _risk_engine.register_chargeback(e_hash, min(1.0, cb_cnt / 10.0), tenant_id=target_tenant)
             for _ in range(min(5, cb_cnt)):
-                _risk_engine.register_alert(e_hash)
-        _risk_engine.register_baseline(e_hash, {"mean_amount": 100.0, "std_amount": 50.0})
+                _risk_engine.register_alert(e_hash, tenant_id=target_tenant)
+        _risk_engine.register_baseline(e_hash, {"mean_amount": 100.0, "std_amount": 50.0}, tenant_id=target_tenant)
 
         risk_obj = _risk_engine.score_transaction(
             transaction=t_dict,
             ml_prediction=prob,
             entity_hash=e_hash,
+            tenant_id=target_tenant,
         )
         score = risk_obj.score
+
         is_fraud = score >= 600.0
         if is_fraud:
             fraud_count += 1
@@ -1072,6 +1141,7 @@ async def predict_batch(
 
 
 @router.post("/predict/explain", response_model=ExplainTransactionResponse)
+@api_router.post("/predict/explain", response_model=ExplainTransactionResponse)
 @limiter.limit("60/minute")
 async def explain_transaction(
     request: Request,
@@ -1080,8 +1150,20 @@ async def explain_transaction(
     metered_tenant: str = Depends(enforce_tenant_quota),
 ) -> ExplainTransactionResponse:
     """Generate SHAP feature attributions and counterfactual remediation paths for a transaction."""
-    if caller_tenant and payload.transaction.bank_id:
-        enforce_tenant_isolation(caller_tenant, payload.transaction.bank_id)
+    principal, effective_tenant = resolve_effective_caller_tenant(
+        request=request,
+        caller_tenant=caller_tenant,
+        requested_bank_id=payload.transaction.bank_id,
+        action_name="explain_transaction",
+    )
+    sim_id_req = getattr(payload, "simulation_id", None) or getattr(payload.transaction, "simulation_id", None)
+    auth_sim_id, ownership = authorize_model_serving(
+        principal=principal,
+        caller_tenant=effective_tenant,
+        simulation_id=sim_id_req,
+        registry=_registry,
+        action_name="explain_transaction",
+    )
 
     start_time = time.perf_counter()
     txn_dict = payload.transaction.model_dump()
@@ -1089,11 +1171,20 @@ async def explain_transaction(
 
     is_production = _settings.app_env.lower() in ("production", "prod")
 
+    bank_id = effective_tenant or payload.transaction.bank_id
+    if not bank_id:
+        if is_production:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Institutional tenant identity is required for production explanation.",
+            )
+        bank_id = "serving_client"
+
     # Online Feature Store: query real customer and merchant historical features if enabled
     if _settings.feature_store_enabled:
-        bank_id = payload.transaction.bank_id or "serving_client"
         customer_ref = payload.transaction.customer_id or payload.transaction.account_id or "customer_1"
         entity_hash = f"serving:{bank_id}:{customer_ref}"
+
         merch_id = f"merch_{payload.transaction.merchant_category}" if payload.transaction.merchant_category else None
         try:
             online_feats = _feature_store.get_online_features(
@@ -1150,8 +1241,7 @@ async def explain_transaction(
 
     try:
         # Resolve active serving model bound to the simulation/tenant
-        sim_id = getattr(payload.transaction, "simulation_id", None)
-        serving_model = _get_cached_serving_model(sim_id)
+        serving_model = _get_cached_serving_model(auth_sim_id)
 
         # Offload CPU-heavy SHAP kernel explanation to threadpool to preserve event loop health
         shap_features = await asyncio.to_thread(_explainability_service.compute_shap_values, txn_dict, model=serving_model)
@@ -1244,11 +1334,57 @@ async def explain_transaction(
 
 
 @router.post("/predict/feedback")
-async def submit_transaction_feedback(payload: TransactionFeedbackRequest) -> dict[str, Any]:
+@api_router.post("/predict/feedback")
+async def submit_transaction_feedback(
+    payload: TransactionFeedbackRequest,
+    request: Request,
+    caller_tenant: TenantDep = None,
+) -> dict[str, Any]:
     """Ingest ground truth label feedback for evaluation of Champion/Challenger models."""
+    principal, effective_tenant = resolve_effective_caller_tenant(
+        request=request,
+        caller_tenant=caller_tenant,
+        requested_bank_id=None,
+        action_name="submit_transaction_feedback",
+    )
+    auth_sim_id, ownership = authorize_model_serving(
+        principal=principal,
+        caller_tenant=effective_tenant,
+        simulation_id=payload.effective_simulation_id,
+        registry=_registry,
+        action_name="submit_transaction_feedback",
+    )
+
+    # Validate prediction record evidence in evaluation store
+    record = _eval_engine.get_prediction_record(auth_sim_id, payload.transaction_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Prediction for transaction '{payload.transaction_id}' not found in evaluation store.",
+        )
+
+    # Verify institutional tenant match against evidence
+    if not principal.is_privileged and effective_tenant:
+        record_bank = record.get("bank_id")
+        if record_bank:
+            norm_rec = str(record_bank).lower().replace("-", "_")
+            norm_eff = str(effective_tenant).lower().replace("-", "_")
+            if norm_rec != norm_eff:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Cross-tenant feedback rejected. Prediction '{payload.transaction_id}' belongs to bank '{record_bank}'.",
+                )
+        else:
+            settings = get_settings()
+            if settings.app_env.lower() in ("production", "prod"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Prediction evidence lacks authoritative institutional tenant binding.",
+                )
+
     try:
         metrics = _eval_engine.log_feedback(
-            simulation_id=payload.effective_simulation_id,
+            simulation_id=auth_sim_id,
             transaction_id=payload.transaction_id,
             actual_label=payload.actual_label,
         )
@@ -1259,6 +1395,8 @@ async def submit_transaction_feedback(payload: TransactionFeedbackRequest) -> di
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Transaction not found.",
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Failed to process transaction feedback: %s", e, exc_info=True)
         raise HTTPException(
@@ -1267,8 +1405,12 @@ async def submit_transaction_feedback(payload: TransactionFeedbackRequest) -> di
         )
 
 
-
 @router.post(
+    "/score-transaction",
+    response_model=ScoreTransactionResponse,
+    status_code=status.HTTP_200_OK,
+)
+@api_router.post(
     "/score-transaction",
     response_model=ScoreTransactionResponse,
     status_code=status.HTTP_200_OK,
@@ -1278,12 +1420,21 @@ async def submit_transaction_feedback(payload: TransactionFeedbackRequest) -> di
     response_model=ScoreTransactionResponse,
     status_code=status.HTTP_200_OK,
 )
+@api_router.post(
+    "/transactions/score",
+    response_model=ScoreTransactionResponse,
+    status_code=status.HTTP_200_OK,
+)
 @router.post(
     "/predict/score",
     response_model=ScoreTransactionResponse,
     status_code=status.HTTP_200_OK,
 )
-
+@api_router.post(
+    "/predict/score",
+    response_model=ScoreTransactionResponse,
+    status_code=status.HTTP_200_OK,
+)
 @limiter.limit("60/minute")
 async def score_transaction(
     request: Request,
@@ -1295,13 +1446,32 @@ async def score_transaction(
     """Low-Latency Real-Time Risk Decision API providing sub-10ms risk evaluation against the globally trained model."""
     start_time = time.perf_counter()
 
-    # Enforce multi-tenant isolation if tenant header is provided
-    if caller_tenant and x_bank_id:
-        enforce_tenant_isolation(caller_tenant, x_bank_id)
+    principal, effective_tenant = resolve_effective_caller_tenant(
+        request=request,
+        caller_tenant=caller_tenant,
+        requested_bank_id=x_bank_id,
+        action_name="score_transaction",
+    )
+    auth_sim_id, ownership = authorize_model_serving(
+        principal=principal,
+        caller_tenant=effective_tenant,
+        simulation_id=payload.simulation_id,
+        registry=_registry,
+        action_name="score_transaction",
+    )
 
-    tenant_scope = x_bank_id or (caller_tenant if isinstance(caller_tenant, str) else getattr(caller_tenant, "tenant_id", None)) or "global"
     settings = get_settings()
     is_production = settings.app_env.lower() in ("production", "prod")
+
+    tenant_scope = effective_tenant or x_bank_id
+    if not tenant_scope:
+        if is_production:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Institutional tenant identity is required for production transaction scoring.",
+            )
+        tenant_scope = "serving_client"
+
 
     # Initial explicit feature values
     merchant_category = payload.merchant_category
@@ -1475,7 +1645,7 @@ async def score_transaction(
 
     # 1. Real ML model inference via cached serving neural network
     try:
-        serving_model, model_ident = _get_cached_serving_model_with_ident(payload.simulation_id)
+        serving_model, model_ident = _get_cached_serving_model_with_ident(auth_sim_id)
         input_tensor = preprocess_transaction(txn_dict, strict_categorical=is_production).to(_model_service.device)
         network = getattr(serving_model, "network", None)
         first_layer = (
@@ -1523,7 +1693,7 @@ async def score_transaction(
 
     # Run composite risk scoring engine with genuine ML confidence
     entity_hash = f"scoring:{tenant_scope}:{payload.account_id}"
-    risk_score_obj = _risk_engine.score_transaction(txn_dict, ml_prediction, entity_hash)
+    risk_score_obj = _risk_engine.score_transaction(txn_dict, ml_prediction, entity_hash, tenant_id=tenant_scope)
     raw_score = risk_score_obj.score
 
     # Normalize integer risk score [0, 1000]

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from app.application.schemas.feedback import (
     AnalystFeedbackIngestRequest,
@@ -25,7 +25,13 @@ from app.application.schemas.feedback import (
 from app.application.services.label_feedback_pipeline import (
     LocalLabelFeedbackPipeline,
 )
+from app.config import get_settings
+from app.dependencies import TenantDep
 from app.domain.label_privacy_guard import LabelPrivacyViolationError
+from app.infrastructure.security.principal_auth import (
+    AuthenticatedPrincipal,
+    resolve_authenticated_principal,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +40,119 @@ api_router = APIRouter(prefix="/v1/feedback", tags=["feedback"])
 
 _pipeline = LocalLabelFeedbackPipeline()
 
+FEEDBACK_OPERATOR_ROLES: frozenset[str] = frozenset({
+    "admin",
+    "bank_admin",
+    "operator",
+    "lead_analyst",
+    "ml_lead",
+    "ml_engineer",
+    "super_admin",
+})
+
+FEEDBACK_DESTRUCTIVE_ROLES: frozenset[str] = frozenset({
+    "admin",
+    "bank_admin",
+    "operator",
+    "lead_analyst",
+    "super_admin",
+})
+
+
+def _authorize_feedback_request(
+    request: Request,
+    target_tenant_id: str | None,
+    caller_tenant: str | None = None,
+    required_roles: frozenset[str] | None = None,
+    action_name: str = "feedback",
+) -> tuple[AuthenticatedPrincipal, str]:
+    """Verify authentication, institutional tenant binding, and role permissions for feedback APIs."""
+    settings = get_settings()
+    is_prod = str(getattr(settings, "environment", "")).lower() in ("production", "prod", "staging")
+
+    principal, auth_err, auth_status = resolve_authenticated_principal(request)
+    if auth_err:
+        raise HTTPException(status_code=auth_status, detail=auth_err)
+
+    if is_prod and not principal.is_authenticated:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required for production feedback endpoints.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Resolve effective caller tenant
+    effective_caller = caller_tenant or principal.tenant_id
+    if not effective_caller and principal.is_authenticated and not principal.is_privileged:
+        # Verified principal with no tenant bound
+        pass
+
+    target_clean = (target_tenant_id or "").strip()
+    if not target_clean:
+        if effective_caller:
+            target_clean = effective_caller
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tenant identifier is required for feedback operations.",
+            )
+
+    try:
+        validated_tenant = LocalLabelFeedbackPipeline.validate_tenant_id(target_clean)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    # Cross-tenant authorization check
+    if principal.is_authenticated and not principal.is_privileged:
+        if principal.tenant_id:
+            norm_principal_tenant = principal.tenant_id.lower().replace("-", "_")
+            if norm_principal_tenant != validated_tenant:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"Cross-tenant access forbidden. Principal '{principal.principal_id}' of "
+                        f"tenant '{principal.tenant_id}' cannot access feedback for tenant '{validated_tenant}'."
+                    ),
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Principal '{principal.principal_id}' has no institutional tenant binding.",
+            )
+
+    # Role-based action check
+    if required_roles and principal.is_authenticated and not principal.is_privileged:
+        principal_roles = set(principal.roles or [])
+        if not principal_roles.intersection(required_roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Forbidden: Action '{action_name}' requires one of "
+                    f"{sorted(list(required_roles))}, but principal '{principal.principal_id}' "
+                    f"has roles {sorted(list(principal_roles))}."
+                ),
+            )
+
+    return principal, validated_tenant
+
 
 # ── Ingestion & Submission ──────────────────────────────────────────────────
 
-async def _ingest_handler(payload: AnalystFeedbackIngestRequest) -> AnalystFeedbackIngestResponse:
+async def _ingest_handler(
+    payload: AnalystFeedbackIngestRequest,
+    request: Request,
+    caller_tenant: str | None = None,
+) -> AnalystFeedbackIngestResponse:
     """Core handler ingesting an analyst determination into local tenant feedback buffer."""
+    _, authorized_tenant = _authorize_feedback_request(
+        request=request,
+        target_tenant_id=payload.tenant_id,
+        caller_tenant=caller_tenant,
+        action_name="ingest_feedback",
+    )
     try:
         item = _pipeline.ingest_analyst_determination(
-            tenant_id=payload.tenant_id,
+            tenant_id=authorized_tenant,
             transaction_id_hash=payload.transaction_id_hash,
             determination=payload.determination,
             alert_id=payload.alert_id,
@@ -76,9 +187,13 @@ async def _ingest_handler(payload: AnalystFeedbackIngestRequest) -> AnalystFeedb
     response_model=AnalystFeedbackIngestResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def ingest_feedback(payload: AnalystFeedbackIngestRequest) -> AnalystFeedbackIngestResponse:
+async def ingest_feedback(
+    payload: AnalystFeedbackIngestRequest,
+    request: Request,
+    caller_tenant: TenantDep = None,
+) -> AnalystFeedbackIngestResponse:
     """Ingest an analyst determination into the tenant's local label feedback buffer."""
-    return await _ingest_handler(payload)
+    return await _ingest_handler(payload, request, caller_tenant)
 
 
 @router.post(
@@ -91,17 +206,30 @@ async def ingest_feedback(payload: AnalystFeedbackIngestRequest) -> AnalystFeedb
     response_model=AnalystFeedbackIngestResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def submit_feedback(payload: AnalystFeedbackIngestRequest) -> AnalystFeedbackIngestResponse:
+async def submit_feedback(
+    payload: AnalystFeedbackIngestRequest,
+    request: Request,
+    caller_tenant: TenantDep = None,
+) -> AnalystFeedbackIngestResponse:
     """Confirm ground truth fraud/clean labels and push to retraining priority queue (API_REGISTRY.md alias)."""
-    return await _ingest_handler(payload)
+    return await _ingest_handler(payload, request, caller_tenant)
 
 
 # ── Statistics & Monitoring ─────────────────────────────────────────────────
 
-def _get_stats_handler(tenant_id: str) -> FeedbackStatsResponse:
+def _get_stats_handler(
+    request: Request,
+    tenant_id: str | None,
+    caller_tenant: str | None = None,
+) -> FeedbackStatsResponse:
     """Core handler retrieving summary metrics for a tenant's feedback store."""
-    clean_tenant = tenant_id.strip() or "bank_alpha"
-    stats = _pipeline.get_buffer_stats(tenant_id=clean_tenant)
+    _, authorized_tenant = _authorize_feedback_request(
+        request=request,
+        target_tenant_id=tenant_id,
+        caller_tenant=caller_tenant,
+        action_name="get_feedback_stats",
+    )
+    stats = _pipeline.get_buffer_stats(tenant_id=authorized_tenant)
     return FeedbackStatsResponse(**stats)
 
 
@@ -116,10 +244,12 @@ def _get_stats_handler(tenant_id: str) -> FeedbackStatsResponse:
     status_code=status.HTTP_200_OK,
 )
 async def get_feedback_stats_query(
-    tenant_id: str = Query(default="bank_alpha", description="Target bank tenant ID"),
+    request: Request,
+    tenant_id: str | None = Query(default=None, description="Target bank tenant ID"),
+    caller_tenant: TenantDep = None,
 ) -> FeedbackStatsResponse:
     """Return label distribution and ground truth buffer occupancy (API_REGISTRY.md endpoint)."""
-    return _get_stats_handler(tenant_id)
+    return _get_stats_handler(request, tenant_id, caller_tenant)
 
 
 @router.get(
@@ -132,9 +262,13 @@ async def get_feedback_stats_query(
     response_model=FeedbackStatsResponse,
     status_code=status.HTTP_200_OK,
 )
-async def get_feedback_stats(tenant_id: str) -> FeedbackStatsResponse:
+async def get_feedback_stats(
+    tenant_id: str,
+    request: Request,
+    caller_tenant: TenantDep = None,
+) -> FeedbackStatsResponse:
     """Retrieve summary metrics and class balance for a tenant's feedback store by path."""
-    return _get_stats_handler(tenant_id)
+    return _get_stats_handler(request, tenant_id, caller_tenant)
 
 
 # ── Retraining Batch Sampling ───────────────────────────────────────────────
@@ -149,10 +283,22 @@ async def get_feedback_stats(tenant_id: str) -> FeedbackStatsResponse:
     response_model=RetrainingBatchResponse,
     status_code=status.HTTP_200_OK,
 )
-async def sample_retraining_batch(payload: RetrainingBatchRequest) -> RetrainingBatchResponse:
+async def sample_retraining_batch(
+    payload: RetrainingBatchRequest,
+    request: Request,
+    caller_tenant: TenantDep = None,
+) -> RetrainingBatchResponse:
     """Sample a prioritized, stratified batch of human-verified feedback items for local model retraining."""
+    required_roles = FEEDBACK_DESTRUCTIVE_ROLES if payload.mark_consumed else None
+    _, authorized_tenant = _authorize_feedback_request(
+        request=request,
+        target_tenant_id=payload.tenant_id,
+        caller_tenant=caller_tenant,
+        required_roles=required_roles,
+        action_name="sample_retraining_batch_destructive" if payload.mark_consumed else "sample_retraining_batch",
+    )
     batch_data = _pipeline.get_priority_retraining_batch(
-        tenant_id=payload.tenant_id,
+        tenant_id=authorized_tenant,
         batch_size=payload.batch_size,
         mark_consumed=payload.mark_consumed,
         min_priority=payload.min_priority,
@@ -173,11 +319,22 @@ async def sample_retraining_batch(payload: RetrainingBatchRequest) -> Retraining
     response_model=DPGradientResponse,
     status_code=status.HTTP_200_OK,
 )
-async def compute_dp_gradient(payload: DPGradientRequest) -> DPGradientResponse:
+async def compute_dp_gradient(
+    payload: DPGradientRequest,
+    request: Request,
+    caller_tenant: TenantDep = None,
+) -> DPGradientResponse:
     """Compute Differential-Privacy-protected gradient update for tenant's local model."""
+    _, authorized_tenant = _authorize_feedback_request(
+        request=request,
+        target_tenant_id=payload.tenant_id,
+        caller_tenant=caller_tenant,
+        required_roles=FEEDBACK_OPERATOR_ROLES,
+        action_name="compute_dp_gradient",
+    )
     try:
         grad_data = _pipeline.compute_dp_gradient_update(
-            tenant_id=payload.tenant_id,
+            tenant_id=authorized_tenant,
             epsilon=payload.epsilon,
             delta=payload.delta,
             clip_norm=payload.clip_norm,
@@ -205,7 +362,19 @@ async def compute_dp_gradient(payload: DPGradientRequest) -> DPGradientResponse:
     response_model=ClearFeedbackBufferResponse,
     status_code=status.HTTP_200_OK,
 )
-async def clear_feedback_buffer(tenant_id: str) -> ClearFeedbackBufferResponse:
+async def clear_feedback_buffer(
+    tenant_id: str,
+    request: Request,
+    caller_tenant: TenantDep = None,
+) -> ClearFeedbackBufferResponse:
     """Clear all feedback items from the tenant's buffer."""
-    cleared = _pipeline.clear_buffer(tenant_id=tenant_id)
-    return ClearFeedbackBufferResponse(status="success", tenant_id=tenant_id, cleared_count=cleared)
+    _, authorized_tenant = _authorize_feedback_request(
+        request=request,
+        target_tenant_id=tenant_id,
+        caller_tenant=caller_tenant,
+        required_roles=FEEDBACK_DESTRUCTIVE_ROLES,
+        action_name="clear_feedback_buffer",
+    )
+    cleared = _pipeline.clear_buffer(tenant_id=authorized_tenant)
+    return ClearFeedbackBufferResponse(status="success", tenant_id=authorized_tenant, cleared_count=cleared)
+

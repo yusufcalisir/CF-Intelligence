@@ -1155,6 +1155,9 @@ class TenantAccessControlMiddleware:
         "/api/v1/auth/me",
         "/api/v1/auth/verify",
         "/api/v1/auth/logout",
+        "/api/v1/feedback",
+        "/v1/feedback",
+        "/feedback",
     )
 
     _INFERENCE_EXACT_PATHS = frozenset({
@@ -1421,6 +1424,7 @@ elif service_name == "fraud-alert":
     app.include_router(cases.router)
     app.include_router(cases.api_router)
     app.include_router(predict.router)
+    app.include_router(predict.api_router)
     app.include_router(rules.router)
     app.include_router(rules.api_router)
     app.include_router(
@@ -1471,6 +1475,7 @@ else:
     app.include_router(cases.router)
     app.include_router(cases.api_router)
     app.include_router(predict.router)
+    app.include_router(predict.api_router)
     app.include_router(rules.router)
     app.include_router(rules.api_router)
     app.include_router(bank_client.router)

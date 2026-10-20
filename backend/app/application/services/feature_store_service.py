@@ -44,6 +44,27 @@ class FeatureStoreService:
         self.online_stats.clear()
         self.tx_history.clear()
 
+    @staticmethod
+    def _scope_id(raw_id: str | None, tenant_id: str | None) -> str | None:
+        """Strictly binds an entity identifier to an authoritative tenant scope.
+
+        Ensures:
+        - If tenant_id is provided, the key is always prefixed with the normalized tenant.
+        - Foreign-prefixed keys (e.g. 'bank_b:cust') passed under bank_a cannot escape or
+          pollute Bank B's namespace; they become 'bank_a:bank_b:cust'.
+        """
+        if raw_id is None:
+            return None
+        raw_str = str(raw_id).strip()
+        if not raw_str:
+            return raw_str
+        if tenant_id and str(tenant_id).strip():
+            norm_tenant = str(tenant_id).lower().strip()
+            if raw_str.startswith(f"{norm_tenant}:"):
+                return raw_str
+            return f"{norm_tenant}:{raw_str}"
+        return raw_str
+
     def ingest_transaction(
         self,
         customer_id: str,
@@ -85,21 +106,9 @@ class FeatureStoreService:
             return
 
         # Multi-tenant isolation: namespace customer, merchant, and transaction IDs by tenant
-        scoped_customer_id = (
-            f"{tenant_id}:{customer_id}"
-            if tenant_id and not customer_id.startswith(f"{tenant_id}:")
-            else customer_id
-        )
-        scoped_merchant_id = (
-            f"{tenant_id}:{merchant_id}"
-            if tenant_id and not merchant_id.startswith(f"{tenant_id}:")
-            else merchant_id
-        )
-        scoped_tx_id = (
-            f"{tenant_id}:{transaction_id}"
-            if tenant_id and transaction_id and not transaction_id.startswith(f"{tenant_id}:")
-            else transaction_id
-        )
+        scoped_customer_id = self._scope_id(customer_id, tenant_id) or customer_id
+        scoped_merchant_id = self._scope_id(merchant_id, tenant_id) or merchant_id
+        scoped_tx_id = self._scope_id(transaction_id, tenant_id)
 
         # 1. Update static/profile features in the Online Store
         self.online_customer.set(
@@ -197,23 +206,13 @@ class FeatureStoreService:
             cust_profile: dict[str, float | int] = {}
             stats_profile: dict[str, float] = {}
             if raw_cust:
-                raw_cust_str = str(raw_cust)
-                cust_id = (
-                    f"{row_tenant}:{raw_cust_str}"
-                    if row_tenant and not raw_cust_str.startswith(f"{row_tenant}:")
-                    else raw_cust_str
-                )
+                cust_id = self._scope_id(raw_cust, row_tenant) or str(raw_cust)
                 cust_profile = self.online_customer.get(cust_id) or {}
                 stats_profile = self.online_stats.get(cust_id) or {}
 
             merch_profile: dict[str, str | float] = {}
             if raw_merch:
-                raw_merch_str = str(raw_merch)
-                merch_id = (
-                    f"{row_tenant}:{raw_merch_str}"
-                    if row_tenant and not raw_merch_str.startswith(f"{row_tenant}:")
-                    else raw_merch_str
-                )
+                merch_id = self._scope_id(raw_merch, row_tenant) or str(raw_merch)
                 merch_profile = self.online_merchant.get(merch_id) or {}
 
             # Blend views into single record

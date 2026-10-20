@@ -7,7 +7,7 @@ import math
 import os
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Query, status
+from fastapi import APIRouter, Header, HTTPException, Query, Request, status
 
 from app.application.schemas.model_registry import (
     CanaryDecisionItem,
@@ -29,6 +29,10 @@ from app.application.schemas.model_registry import (
     UpgradeWindowInfo,
 )
 from app.application.services.model_registry import ModelEvaluationEngine, ModelRegistry
+from app.application.services.model_serving_authorization import (
+    authorize_model_serving,
+    resolve_effective_caller_tenant,
+)
 from app.application.services.zero_downtime_deployer import ZeroDowntimeDeploymentManager
 from app.domain.model_serving_errors import (
     ModelAuthorizationError,
@@ -928,16 +932,35 @@ async def sign_off_model(
 @api_router.get("/{simulation_id}/shadow/metrics", response_model=ShadowMetricsResponse, status_code=status.HTTP_200_OK)
 @models_router.get("/{simulation_id}/shadow/metrics", response_model=ShadowMetricsResponse, status_code=status.HTTP_200_OK)
 @models_api_router.get("/{simulation_id}/shadow/metrics", response_model=ShadowMetricsResponse, status_code=status.HTTP_200_OK)
-async def get_shadow_metrics(simulation_id: str) -> ShadowMetricsResponse:
-    """Get real-time shadowing deployment and evaluation metrics."""
+async def get_shadow_metrics(
+    simulation_id: str,
+    request: Request,
+) -> ShadowMetricsResponse:
+    """Get real-time shadowing deployment and evaluation metrics with institutional authorization."""
+    principal, effective_tenant = resolve_effective_caller_tenant(
+        request=request,
+        caller_tenant=None,
+        requested_bank_id=None,
+        action_name="get_shadow_metrics",
+    )
+    auth_sim_id, _ = authorize_model_serving(
+        principal=principal,
+        caller_tenant=effective_tenant,
+        simulation_id=simulation_id,
+        registry=registry,
+        action_name="get_shadow_metrics",
+    )
     try:
-        metrics = _eval_engine.get_shadow_metrics(simulation_id)
+        metrics = _eval_engine.get_shadow_metrics(auth_sim_id)
         if not metrics:
             return ShadowMetricsResponse(sample_count=0)
         return ShadowMetricsResponse(**metrics)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Failed to retrieve shadow metrics: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to load shadow metrics: {e}",
         ) from e
+

@@ -100,11 +100,31 @@ class RiskScoringEngine:
 
         self.feature_store = FeatureStoreService()
 
+    @staticmethod
+    def _scope_entity(entity_hash: str, tenant_id: str | None = None) -> str:
+        """Binds an entity hash to an authoritative institutional tenant namespace.
+
+        Prevents cross-bank collision or state leakage across unisolated entity strings.
+        """
+        if not entity_hash:
+            return ""
+        if tenant_id and str(tenant_id).strip():
+            norm_tenant = str(tenant_id).lower().strip()
+            if entity_hash.startswith(f"serving:{norm_tenant}:"):
+                return entity_hash
+            if entity_hash.startswith(f"{norm_tenant}:"):
+                return f"serving:{entity_hash}"
+            # Clean any foreign prefix attempting namespace injection
+            clean = entity_hash.split(":")[-1]
+            return f"serving:{norm_tenant}:{clean}"
+        return entity_hash
+
     def score_transaction(
         self,
         transaction: dict,
         ml_prediction: float = 0.0,
         entity_hash: str = "",
+        tenant_id: str | None = None,
     ) -> RiskScore:
         """Score a single transaction by evaluating all risk signals.
 
@@ -112,6 +132,7 @@ class RiskScoringEngine:
             transaction: Dict of transaction features.
             ml_prediction: ML model output (0-1).
             entity_hash: Privacy-preserving hash of the transacting entity.
+            tenant_id: Authoritative institution tenant identifier for multi-tenant isolation.
 
         Returns:
             Composite RiskScore with breakdown.
@@ -120,11 +141,13 @@ class RiskScoringEngine:
 
         settings = get_settings()
 
+        scoped_entity = self._scope_entity(entity_hash, tenant_id)
+
         txn_eval = transaction.copy()
-        if settings.feature_store_enabled and entity_hash:
+        if settings.feature_store_enabled and scoped_entity:
             entity_rows = [
                 {
-                    "customer_id": entity_hash,
+                    "customer_id": scoped_entity,
                     "merchant_id": transaction.get(
                         "merchant_id", f"merch_{transaction.get('merchant_category', 'grocery')}"
                     ),
@@ -141,7 +164,7 @@ class RiskScoringEngine:
             ]
             try:
                 online_feats = self.feature_store.get_online_features(
-                    entity_rows, features_to_fetch
+                    entity_rows, features_to_fetch, tenant_id=tenant_id
                 )
                 if online_feats:
                     feats = online_feats[0]
@@ -160,7 +183,7 @@ class RiskScoringEngine:
                     if feats.get("merchant_category") is not None:
                         txn_eval["merchant_category"] = feats["merchant_category"]
                     logger.info(
-                        "Online Feature Store retrieved successfully for entity %s", entity_hash
+                        "Online Feature Store retrieved successfully for entity %s", scoped_entity
                     )
             except Exception as e:
                 logger.warning("Feature Store online lookup failed: %s", e)
@@ -172,9 +195,9 @@ class RiskScoringEngine:
             self._eval_country_risk(txn_eval),
             self._eval_device_anomaly(txn_eval),
             self._eval_customer_history(txn_eval),
-            self._eval_previous_alerts(entity_hash),
-            self._eval_chargeback_history(entity_hash),
-            self._eval_behavior_anomaly(txn_eval, entity_hash),
+            self._eval_previous_alerts(scoped_entity),
+            self._eval_chargeback_history(scoped_entity),
+            self._eval_behavior_anomaly(txn_eval, scoped_entity),
         ]
 
         # Evaluate GNN topological risk if configured or supplied in transaction
@@ -197,18 +220,21 @@ class RiskScoringEngine:
         with self._lock:
             self.weights = weights
 
-    def register_alert(self, entity_hash: str) -> None:
-        """Record an alert for historical signal tracking."""
+    def register_alert(self, entity_hash: str, tenant_id: str | None = None) -> None:
+        """Record an alert for historical signal tracking scoped by tenant."""
+        scoped = self._scope_entity(entity_hash, tenant_id)
         with self._lock:
-            self._alert_history[entity_hash] = self._alert_history.get(entity_hash, 0) + 1
+            self._alert_history[scoped] = self._alert_history.get(scoped, 0) + 1
 
-    def register_chargeback(self, entity_hash: str, rate: float) -> None:
+    def register_chargeback(self, entity_hash: str, rate: float, tenant_id: str | None = None) -> None:
+        scoped = self._scope_entity(entity_hash, tenant_id)
         with self._lock:
-            self._chargeback_history[entity_hash] = rate
+            self._chargeback_history[scoped] = rate
 
-    def register_baseline(self, entity_hash: str, baseline: dict) -> None:
+    def register_baseline(self, entity_hash: str, baseline: dict, tenant_id: str | None = None) -> None:
+        scoped = self._scope_entity(entity_hash, tenant_id)
         with self._lock:
-            self._behavior_baselines[entity_hash] = baseline
+            self._behavior_baselines[scoped] = baseline
 
     # ── Signal evaluators ─────────────────────
 
