@@ -41,7 +41,7 @@
     "recharts": "^3.10.1",
     "three": "^0.185.1",
     "vitest": "^5.0.0",
-    "zustand": "^5.0.0"
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
