@@ -317,6 +317,8 @@ jobs:
 
       - name: Install Dependencies & Playwright Browsers
         run: |
+          sudo rm -f /etc/apt/sources.list.d/*microsoft*.list /etc/apt/sources.list.d/*azure*.list 2>/dev/null || true
+          if [ -d /etc/apt/sources.list.d ]; then sudo grep -l "packages.microsoft.com" /etc/apt/sources.list.d/* 2>/dev/null | xargs -r sudo rm -f || true; fi
           cd frontend
           npm install
           npx playwright install --with-deps chromium
@@ -346,6 +348,8 @@ jobs:
 
       - name: Install Dependencies & Playwright Browsers
         run: |
+          sudo rm -f /etc/apt/sources.list.d/*microsoft*.list /etc/apt/sources.list.d/*azure*.list 2>/dev/null || true
+          if [ -d /etc/apt/sources.list.d ]; then sudo grep -l "packages.microsoft.com" /etc/apt/sources.list.d/* 2>/dev/null | xargs -r sudo rm -f || true; fi
           cd frontend
           npm install
           npx playwright install --with-deps chromium webkit firefox
@@ -377,6 +381,8 @@ jobs:
 
       - name: Install Dependencies & Playwright Browsers
         run: |
+          sudo rm -f /etc/apt/sources.list.d/*microsoft*.list /etc/apt/sources.list.d/*azure*.list 2>/dev/null || true
+          if [ -d /etc/apt/sources.list.d ]; then sudo grep -l "packages.microsoft.com" /etc/apt/sources.list.d/* 2>/dev/null | xargs -r sudo rm -f || true; fi
           cd frontend
           npm install
           npx playwright install --with-deps chromium
