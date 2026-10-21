@@ -55,11 +55,11 @@ class FeatureStoreService:
         """
         if raw_id is None:
             return None
-        raw_str = str(raw_id).strip()
+        raw_str = raw_id.strip()
         if not raw_str:
             return raw_str
-        if tenant_id and str(tenant_id).strip():
-            norm_tenant = str(tenant_id).lower().strip()
+        if tenant_id and tenant_id.strip():
+            norm_tenant = tenant_id.lower().strip()
             if raw_str.startswith(f"{norm_tenant}:"):
                 return raw_str
             return f"{norm_tenant}:{raw_str}"

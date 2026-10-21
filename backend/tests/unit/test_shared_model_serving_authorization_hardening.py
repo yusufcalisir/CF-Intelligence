@@ -466,7 +466,7 @@ def test_d_authorization_helper_never_probes_serving_model_loader(
 
     with patch.object(get_settings(), "app_env", "production"):
         with patch("app.presentation.routers.predict._get_cached_serving_model_with_ident") as mock_loader:
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 authorize_model_serving(
                     principal=principal_a,
                     caller_tenant="bank_a",
@@ -714,7 +714,7 @@ def test_k_unauthenticated_production_call_cannot_obtain_model_authority(
 
     with patch.object(get_settings(), "app_env", "production"):
         # 1. Direct helper call with principal=None in production raises HTTP 401
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(HTTPException) as exc_info:
             authorize_model_serving(
                 principal=None,
                 caller_tenant="bank_a",
@@ -724,7 +724,7 @@ def test_k_unauthenticated_production_call_cannot_obtain_model_authority(
         assert exc_info.value.status_code == 401
 
         # 2. Direct resolve_effective_caller_tenant with principal=None in production raises HTTP 401
-        with pytest.raises(Exception) as exc_info2:
+        with pytest.raises(HTTPException) as exc_info2:
             resolve_effective_caller_tenant(
                 principal=None,
                 caller_tenant="bank_a",

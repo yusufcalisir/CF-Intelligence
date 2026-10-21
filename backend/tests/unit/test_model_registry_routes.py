@@ -21,6 +21,8 @@ def _admin_headers() -> dict[str, str]:
 
     auth_svc = AuthenticationService.get_instance()
     admin_user = auth_svc.get_user("admin")
+    if admin_user is None:
+        raise RuntimeError("Authoritative admin user record not found in authentication service")
     token = auth_svc.create_token_bundle(admin_user).access_token
     return {"Authorization": f"Bearer {token}"}
 

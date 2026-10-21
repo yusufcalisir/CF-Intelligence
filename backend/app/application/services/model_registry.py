@@ -6071,7 +6071,7 @@ class ModelEvaluationEngine:
         and thread-safe in-memory store in local development mode.
         Fails closed in production if shared Redis publication fails.
         """
-        norm_bank = str(bank_id).lower().replace("-", "_").strip() if bank_id else None
+        norm_bank = bank_id.lower().replace("-", "_").strip() if bank_id else None
         payload = {
             "champion_version": champion_version,
             "champion_prob": champion_prob,

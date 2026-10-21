@@ -256,7 +256,7 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
     """
     settings = get_settings()
     is_production = settings.app_env.lower() == "production"
-    if is_production and (simulation_id is None or not str(simulation_id).strip()):
+    if is_production and (simulation_id is None or not simulation_id.strip()):
         raise ModelNotAvailableError(
             "Concrete authorized simulation_id is required for champion model loading in production."
         )
@@ -883,7 +883,7 @@ def score_transaction_realtime(
         registry=ModelRegistry(),
         action_name="score_transaction_realtime",
     )
-    if is_production and (not auth_sim_id or not str(auth_sim_id).strip()):
+    if is_production and (not auth_sim_id or not auth_sim_id.strip()):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
@@ -894,7 +894,7 @@ def score_transaction_realtime(
 
     # 5. Retrieve verified champion model (fail-closed in production if unavailable or corrupt)
     target_sim_id = auth_sim_id
-    if is_production and (not target_sim_id or not str(target_sim_id).strip()):
+    if is_production and (not target_sim_id or not target_sim_id.strip()):
         if demo_active:
             decision, risk_score, explanation = fallback_engine.evaluate_heuristic_fallback(
                 amount=payload.amount,

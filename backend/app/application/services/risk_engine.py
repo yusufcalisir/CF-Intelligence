@@ -108,8 +108,8 @@ class RiskScoringEngine:
         """
         if not entity_hash:
             return ""
-        if tenant_id and str(tenant_id).strip():
-            norm_tenant = str(tenant_id).lower().strip()
+        if tenant_id and tenant_id.strip():
+            norm_tenant = tenant_id.lower().strip()
             if entity_hash.startswith(f"serving:{norm_tenant}:"):
                 return entity_hash
             if entity_hash.startswith(f"{norm_tenant}:"):
