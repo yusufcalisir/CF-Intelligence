@@ -255,6 +255,11 @@ def get_scripted_model(simulation_id: str | None = None) -> tuple[Any, bool]:
     Never falls back to unsafe deserialization (pickle) or random weights.
     """
     settings = get_settings()
+    is_production = settings.app_env.lower() == "production"
+    if is_production and (simulation_id is None or not str(simulation_id).strip()):
+        raise ModelNotAvailableError(
+            "Concrete authorized simulation_id is required for champion model loading in production."
+        )
     from app.application.services.model_registry import ModelRegistry
     from app.application.services.model_service import NUM_FEATURES, ModelService
 
@@ -706,23 +711,13 @@ def score_transaction_realtime(
     is_production = settings.app_env.lower() == "production"
     demo_active = _is_demo_mode_active()
 
-    # Authorize caller tenant and model serving BEFORE risk state, caching, or inference
+    # Authorize caller tenant identity
     principal, effective_tenant = resolve_effective_caller_tenant(
         request=request,
         caller_tenant=caller_tenant,
         requested_bank_id=payload.bank_id,
         action_name="score_transaction_realtime",
     )
-    auth_sim_id: str | None = None
-    ownership: dict[str, Any] | None = None
-    if payload.simulation_id:
-        auth_sim_id, ownership = authorize_model_serving(
-            principal=principal,
-            caller_tenant=effective_tenant,
-            simulation_id=payload.simulation_id,
-            registry=ModelRegistry(),
-            action_name="score_transaction_realtime",
-        )
 
     # 1. Check Circuit Breaker State (60s cooldown) under thread lock
     with _cb_lock:
@@ -880,26 +875,50 @@ def score_transaction_realtime(
             },
         ) from err
 
-    # 4. Retrieve verified champion model (fail-closed if unavailable or corrupt)
-    target_sim_id = auth_sim_id
-    try:
-        if target_sim_id is None:
-            try:
-                target_sim_id, ownership = authorize_model_serving(
-                    principal=principal,
-                    caller_tenant=effective_tenant,
-                    simulation_id=None,
-                    registry=ModelRegistry(),
-                    action_name="score_transaction_realtime",
-                )
-            except HTTPException as auth_http_exc:
-                if auth_http_exc.status_code == status.HTTP_404_NOT_FOUND:
-                    target_sim_id = None
-                else:
-                    raise
-            except Exception:
-                target_sim_id = None
+    # 4. Authorize model serving for caller tenant
+    auth_sim_id, ownership = authorize_model_serving(
+        principal=principal,
+        caller_tenant=effective_tenant,
+        simulation_id=payload.simulation_id,
+        registry=ModelRegistry(),
+        action_name="score_transaction_realtime",
+    )
+    if is_production and (not auth_sim_id or not str(auth_sim_id).strip()):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "MODEL_NOT_FOUND",
+                "message": f"No authorized active champion model found for institution '{effective_tenant}'.",
+            },
+        )
 
+    # 5. Retrieve verified champion model (fail-closed in production if unavailable or corrupt)
+    target_sim_id = auth_sim_id
+    if is_production and (not target_sim_id or not str(target_sim_id).strip()):
+        if demo_active:
+            decision, risk_score, explanation = fallback_engine.evaluate_heuristic_fallback(
+                amount=payload.amount,
+                velocity_1h=payload.velocity_1h,
+                merchant_category=payload.merchant_category,
+            )
+            latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            return RealtimeInferenceResponse(
+                transaction_id=payload.transaction_id,
+                risk_score=risk_score,
+                decision=decision,
+                latency_ms=latency_ms,
+                evaluated_by="HEURISTIC_FALLBACK",
+                explanation=f"[Model Not Found - Demo Fallback] {explanation}",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "MODEL_NOT_FOUND",
+                "message": f"No authorized active champion model found for institution '{effective_tenant}'.",
+            },
+        )
+
+    try:
         scripted_model, from_redis = get_scripted_model(simulation_id=target_sim_id)
     except ModelNotAvailableError as exc:
         logger.warning("Champion model unavailable for transaction %s: %s", payload.transaction_id, exc)

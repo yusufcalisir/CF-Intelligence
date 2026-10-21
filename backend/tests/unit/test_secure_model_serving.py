@@ -1801,10 +1801,22 @@ def test_p05_operational_serving_bypass_returns_503(temp_registry_dir: str) -> N
         "created_at": "2026-10-10T00:00:00Z",
     }
     reg._save_manifest("sim_p05", [manifest_entry])
+    reg._save_ownership(
+        "sim_p05",
+        {
+            "simulation_id": "sim_p05",
+            "owning_bank_id": "bank_a",
+            "consortium_id": None,
+            "bound_at": "2026-01-01T00:00:00Z",
+            "bound_by": "test",
+            "is_unbound": False,
+        },
+    )
 
     reset_model_cache()
     payload = {
         "transaction_id": "tx_p05_bypass",
+        "simulation_id": "sim_p05",
         "amount": 100.0,
         "currency": "USD",
         "source_account": "acc_1",

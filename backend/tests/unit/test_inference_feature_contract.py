@@ -188,8 +188,11 @@ class TestRealtimeInferenceEndpointFeatureGuards:
 
         svc = ModelService(get_settings())
         m = svc.create_model(dp_compatible=True)
-        with patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(m, False)), \
-             patch.object(get_settings(), "app_env", "production"):
+        with (
+            patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(m, False)),
+            patch("app.presentation.routers.realtime_inference.authorize_model_serving", return_value=("sim_valid", {"simulation_id": "sim_valid", "bank_id": "bank_a"})),
+            patch.object(get_settings(), "app_env", "production"),
+        ):
             resp = client.post("/v1/inference/score", json=valid_payload, headers=headers)
             assert resp.status_code == 200
             data = resp.json()
