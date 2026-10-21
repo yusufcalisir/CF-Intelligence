@@ -34,8 +34,8 @@ from app.infrastructure.storage.durable_consortium_store import DurableConsortiu
 logger = logging.getLogger(__name__)
 
 _OMITTED_SERVING_CACHE: dict[
-    tuple[str, str | None, bool, bool],
-    tuple[int, float, str | None, dict[str, Any]],
+    tuple[str, str, bool, bool],
+    tuple[int, float, str, dict[str, Any], float | None, float | None],
 ] = {}
 _OMITTED_SERVING_CACHE_GUARD = threading.Lock()
 
@@ -444,19 +444,69 @@ def authorize_model_serving(
         cached = _OMITTED_SERVING_CACHE.get(cache_key)
 
     if cached is not None:
-        cached_gen, cached_mtime, cached_chosen, cached_own = cached
+        (
+            cached_gen,
+            cached_mtime,
+            candidate_sim,
+            cached_own,
+            cached_own_mtime,
+            cached_manifest_mtime,
+        ) = cached
+        # Invalidate if registry generation or directory mtime changed
         if cached_gen == cur_gen and cached_mtime == cur_mtime:
-            if cached_chosen is None:
-                if not is_production:
-                    return None, cached_own
-                # In production with 0 candidates, fall through to raise 404
-            else:
-                try:
-                    ident = reg.get_active_champion_identity(simulation_id=cached_chosen)
-                    if ident is not None:
-                        return cached_chosen, cached_own
-                except Exception:
-                    pass
+            # Revalidate authoritative current champion identity, ownership, and consortium membership on EVERY cache hit
+            reval_passed = False
+            cur_own: dict[str, Any] | None = cached_own
+            try:
+                sim_dir = reg._get_sim_dir(candidate_sim, create=False)
+                manifest_path = os.path.join(sim_dir, "registry.json")
+                own_path = reg._get_ownership_path(candidate_sim, create=False)
+
+                cur_manifest_mtime = (
+                    os.path.getmtime(manifest_path) if os.path.exists(manifest_path) else None
+                )
+                cur_own_mtime = (
+                    os.path.getmtime(own_path) if os.path.exists(own_path) else None
+                )
+
+                # If ownership file modified on disk, reload authoritative ownership
+                if cur_own_mtime != cached_own_mtime:
+                    cur_own = reg.get_simulation_ownership(candidate_sim)
+
+                # If manifest modified on disk, verify active champion identity
+                if cur_manifest_mtime != cached_manifest_mtime:
+                    ident = reg.get_active_champion_identity(simulation_id=candidate_sim)
+                    if ident is None:
+                        cur_own = None
+
+                if cur_own and not (cur_own.get("is_unbound") and is_production):
+                    o_bank = (cur_own.get("owning_bank_id") or "").lower().strip()
+                    c_id = cur_own.get("consortium_id")
+                    if is_privileged or (o_bank and o_bank == norm_tenant):
+                        reval_passed = True
+                    elif c_id:
+                        c = DurableConsortiumStore.get_instance().get_consortium(c_id)
+                        if (
+                            c is not None
+                            and c.status == ConsortiumStatus.ACTIVE
+                            and norm_tenant in c.members
+                            and norm_tenant not in c.removed_members
+                        ):
+                            reval_passed = True
+                    elif not is_production and cur_own.get("is_unbound") and not o_bank and not c_id:
+                        reval_passed = True
+            except Exception as exc:
+                logger.debug(
+                    "Omitted serving revalidation error for candidate %s: %s", candidate_sim, exc
+                )
+                reval_passed = False
+
+            if reval_passed and cur_own is not None:
+                return candidate_sim, cur_own
+
+        # Stale, mutated ownership, revoked consortium member, or unseated champion: evict
+        with _OMITTED_SERVING_CACHE_GUARD:
+            _OMITTED_SERVING_CACHE.pop(cache_key, None)
 
     authorized_candidates: list[str] = []
     candidates_ownership: dict[str, dict[str, Any]] = {}
@@ -505,16 +555,34 @@ def authorize_model_serving(
     if len(authorized_candidates) == 1:
         chosen = authorized_candidates[0]
         chosen_ownership = candidates_ownership[chosen]
+        sim_dir = reg._get_sim_dir(chosen, create=False)
+        manifest_path = os.path.join(sim_dir, "registry.json")
+        own_path = reg._get_ownership_path(chosen, create=False)
+        try:
+            m_mtime = os.path.getmtime(manifest_path) if os.path.exists(manifest_path) else None
+        except OSError:
+            m_mtime = None
+        try:
+            o_mtime = os.path.getmtime(own_path) if os.path.exists(own_path) else None
+        except OSError:
+            o_mtime = None
+
         with _OMITTED_SERVING_CACHE_GUARD:
-            _OMITTED_SERVING_CACHE[cache_key] = (cur_gen, cur_mtime, chosen, chosen_ownership)
+            _OMITTED_SERVING_CACHE[cache_key] = (
+                cur_gen,
+                cur_mtime,
+                chosen,
+                chosen_ownership,
+                o_mtime,
+                m_mtime,
+            )
         return chosen, chosen_ownership
 
     if len(authorized_candidates) == 0:
-        fallback_own = {"simulation_id": None, "is_unbound": True}
         with _OMITTED_SERVING_CACHE_GUARD:
-            _OMITTED_SERVING_CACHE[cache_key] = (cur_gen, cur_mtime, None, fallback_own)
+            _OMITTED_SERVING_CACHE.pop(cache_key, None)
         if not is_production:
-            return None, fallback_own
+            return None, {"simulation_id": None, "is_unbound": True}
 
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
