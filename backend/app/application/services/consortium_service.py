@@ -843,8 +843,7 @@ class ConsortiumGovernanceService:
         if res is None and consortium_id == "cfi-consortium":
             is_prod = getattr(self._store, "_is_prod", False)
             if not is_prod:
-                init_default_consortium(self)
-                return self._store.get_consortium(consortium_id)
+                return init_default_consortium(self)
         return res
 
     def get_proposal(self, proposal_id: str) -> MembershipProposal | None:
@@ -967,7 +966,9 @@ class ConsortiumGovernanceService:
         """Resets service state for clean test isolation."""
         with self._lock:
             self._store.clear()
-            init_default_consortium(self)
+            is_prod = getattr(self._store, "_is_prod", False)
+            if not is_prod:
+                init_default_consortium(self)
 
 
 def init_default_consortium(
@@ -985,7 +986,7 @@ def init_default_consortium(
     svc = service or consortium_governance_service
     is_prod = getattr(svc._store, "_is_prod", False)
 
-    existing = svc.get_consortium("cfi-consortium")
+    existing = svc._store.get_consortium("cfi-consortium")
     if existing is not None:
         return existing
 
