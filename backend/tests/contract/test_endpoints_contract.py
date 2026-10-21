@@ -11,13 +11,19 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
+from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
 from app.main import app
 
 
 @pytest.fixture(scope="module")
 def client() -> TestClient:
-    """FastAPI TestClient fixture."""
-    return TestClient(app)
+    """FastAPI TestClient fixture with administrative clearance."""
+    token = OIDCAuthenticator().create_mock_token(
+        username="contract_test_admin",
+        bank_id="bank_a",
+        roles=["super_admin", "compliance_auditor", "cross_bank_investigator"],
+    )
+    return TestClient(app, headers={"Authorization": f"Bearer {token}"})
 
 
 # ── 1. System Health & Root Contract ──────────────────────────────────────────

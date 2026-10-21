@@ -68,6 +68,17 @@ def clean_redis_stores(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "feature_store_enabled", False)
 
 
+def _make_auth_headers(bank_id: str = "bank_alpha") -> dict[str, str]:
+    from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
+
+    token = OIDCAuthenticator().create_mock_token(
+        username="test_investigator",
+        bank_id=bank_id,
+        roles=["super_admin", "compliance_auditor", "cross_bank_investigator", "analyst"],
+    )
+    return {"Authorization": f"Bearer {token}", "X-Tenant-ID": bank_id}
+
+
 class TestTransactionLifecycleAndSystemInvariants:
     """Scenarios 5, 6, 7, 8, 9, 10: Cross-domain verification of whole-system invariants."""
 
@@ -82,7 +93,7 @@ class TestTransactionLifecycleAndSystemInvariants:
             - Actor B cannot silently overwrite A.
             - Timeline hash remains valid.
         """
-        client = TestClient(app)
+        client = TestClient(app, headers=_make_auth_headers("bank_alpha"))
         case_svc = CaseManagementService()
         case = case_svc.create_case(
             title="Concurrent Investigation Dossier",
@@ -111,7 +122,7 @@ class TestTransactionLifecycleAndSystemInvariants:
                 "expected_version": v1_num,
                 "expected_timeline_hash": v1_hash,
             },
-            headers={"X-Tenant-ID": "bank_alpha"},
+            headers=_make_auth_headers("bank_alpha"),
         )
         assert res_a.status_code == 200, f"Actor A resolution failed: {res_a.text}"
         case_after_a = res_a.json()
@@ -130,13 +141,13 @@ class TestTransactionLifecycleAndSystemInvariants:
                 "expected_version": v1_num,
                 "expected_timeline_hash": v1_hash,
             },
-            headers={"X-Tenant-ID": "bank_alpha"},
+            headers=_make_auth_headers("bank_alpha"),
         )
         assert res_b.status_code == 409, f"Expected 409 Precondition Failed for stale decision, got {res_b.status_code}"
         assert "precondition failed" in res_b.json()["detail"].lower()
 
         # Verify timeline integrity hash remains valid
-        verify_res = client.get(f"/api/v1/cases/{case.id}/timeline/verify")
+        verify_res = client.get(f"/api/v1/cases/{case.id}/timeline/verify", headers=_make_auth_headers("bank_alpha"))
         assert verify_res.status_code == 200
         assert verify_res.json()["is_valid"] is True
 
@@ -152,6 +163,7 @@ class TestTransactionLifecycleAndSystemInvariants:
         """
         payload_t = {
             "transaction_id": "tx_provenance_high_risk",
+            "customer_id": "cust_provenance_high_risk",
             "transaction_amount": 15000.0,
             "merchant_category": "crypto",
             "country_code": "NG",
@@ -166,6 +178,7 @@ class TestTransactionLifecycleAndSystemInvariants:
         }
         payload_u = {
             "transaction_id": "tx_provenance_low_risk",
+            "customer_id": "cust_provenance_low_risk",
             "transaction_amount": 15.0,
             "merchant_category": "grocery",
             "country_code": "DE",  # Germany
@@ -288,7 +301,7 @@ class TestTransactionLifecycleAndSystemInvariants:
             - Stale case version returns HTTP 409 (not silent success).
             - Webhook failure returns False (not marked delivered).
         """
-        client = TestClient(app)
+        client = TestClient(app, headers=_make_auth_headers("bank_alpha"))
 
         # 1. Model forward pass failure in /predict/score
         with patch("app.presentation.routers.predict._eval_model", side_effect=RuntimeError("PyTorch forward pass CUDA OOM")):
@@ -317,7 +330,7 @@ class TestTransactionLifecycleAndSystemInvariants:
         res_stale = client.patch(
             f"/api/v1/cases/{case.id}",
             json={"status": "investigating", "expected_version": 999},  # Stale version
-            headers={"X-Tenant-ID": "bank_alpha"},
+            headers=_make_auth_headers("bank_alpha"),
         )
         assert res_stale.status_code == 409, f"Expected 409 Conflict, got {res_stale.status_code}"
 
@@ -396,7 +409,7 @@ class TestTransactionLifecycleAndSystemInvariants:
             - Human disposition recorded separately in case.status.
             - SAR filing action becomes strictly ineligible (HTTP 400).
         """
-        client = TestClient(app)
+        client = TestClient(app, headers=_make_auth_headers("bank_alpha"))
 
         # 1. Trigger high-risk prediction
         pred_res = client.post(
@@ -436,7 +449,7 @@ class TestTransactionLifecycleAndSystemInvariants:
                 "assigned_to": "lead_investigator_bob",
                 "bank_id": "bank_alpha",
             },
-            headers={"X-Tenant-ID": "bank_alpha"},
+            headers=_make_auth_headers("bank_alpha"),
         )
         assert case_res.status_code == 200
         case_id = case_res.json()["id"]
@@ -445,7 +458,7 @@ class TestTransactionLifecycleAndSystemInvariants:
         client.patch(
             f"/api/v1/cases/{case_id}",
             json={"status": "investigating"},
-            headers={"X-Tenant-ID": "bank_alpha"},
+            headers=_make_auth_headers("bank_alpha"),
         )
 
         # 3. Compliance team resolves case as FALSE_POSITIVE under Four-Eyes control
@@ -457,14 +470,14 @@ class TestTransactionLifecycleAndSystemInvariants:
                 "primary_supervisor": "supervisor_alice",
                 "secondary_supervisor": "supervisor_charlie",
             },
-            headers={"X-Tenant-ID": "bank_alpha"},
+            headers=_make_auth_headers("bank_alpha"),
         )
         assert resolve_res.status_code == 200
         resolved_case = resolve_res.json()
         assert resolved_case["status"] == "closed_false_positive"
 
         # 4. Verify historical machine prediction remains completely unchanged
-        alert_res = client.get(f"/api/v1/alerts/{alert_id}", headers={"X-Tenant-ID": "bank_alpha"})
+        alert_res = client.get(f"/api/v1/alerts/{alert_id}", headers=_make_auth_headers("bank_alpha"))
         assert alert_res.status_code == 200
         alert_obj = alert_res.json()
         assert alert_obj["risk_score"] == pytest.approx(orig_score, rel=1e-3), (
@@ -475,7 +488,7 @@ class TestTransactionLifecycleAndSystemInvariants:
         # 5. Verify FinCEN SAR filing is rejected for false positive
         sar_res = client.post(
             f"/api/v1/cases/{case_id}/file-sar",
-            headers={"X-Tenant-ID": "bank_alpha"},
+            headers=_make_auth_headers("bank_alpha"),
         )
         assert sar_res.status_code == 400
         assert "false_positive" in sar_res.json()["detail"].lower(), (
