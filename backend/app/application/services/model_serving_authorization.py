@@ -15,7 +15,6 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
-import threading
 from typing import Any
 
 from fastapi import HTTPException, Request, status
@@ -32,14 +31,9 @@ from app.infrastructure.storage.durable_consortium_store import DurableConsortiu
 
 logger = logging.getLogger(__name__)
 
-_unscoped_auth_lock = threading.RLock()
-_unscoped_auth_cache: dict[tuple[str, bool, bool], tuple[float, str, dict[str, Any]]] = {}
-
-
 def clear_serving_auth_cache() -> None:
-    """Clear cached unscoped model serving authorization resolutions."""
-    with _unscoped_auth_lock:
-        _unscoped_auth_cache.clear()
+    """Clear cached unscoped model serving authorization resolutions (no-op)."""
+    pass
 
 
 def resolve_effective_caller_tenant(
@@ -71,17 +65,16 @@ def resolve_effective_caller_tenant(
 
     # If principal is absent or unauthenticated
     if principal is None or not principal.is_authenticated:
-        # If institutional tenant is explicitly requested in direct call or payload
-        if req_bank and req_bank.strip():
-            return principal, req_bank.strip().lower()
-        if caller_tenant and caller_tenant.strip():
-            return principal, caller_tenant.strip().lower()
         if is_production:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication required for production inference scoring.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        if req_bank and req_bank.strip():
+            return principal, req_bank.strip().lower()
+        if caller_tenant and caller_tenant.strip():
+            return principal, caller_tenant.strip().lower()
         return principal, "bank_a"
 
     # Privileged cross-bank authority
@@ -173,27 +166,34 @@ def authorize_model_serving(
     reg = registry or ModelRegistry()
 
     # 1. Validate Authentication & Institutional Identity
-    if principal is None or not principal.is_authenticated:
-        if eff_tenant and eff_tenant.strip():
-            norm_tenant = eff_tenant.strip().lower()
-        elif is_production:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required for production model serving.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        else:
-            norm_tenant = "bank_a"
-    else:
+    if is_production and (principal is None or not principal.is_authenticated):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required for production model serving.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if principal and principal.is_authenticated:
         if principal.is_privileged:
             norm_tenant = (eff_tenant or principal.tenant_id or "global").lower().strip()
         else:
-            if not eff_tenant:
+            auth_tenant = (principal.tenant_id or "").strip().lower()
+            if not auth_tenant:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Model serving authorization requires an authenticated institutional tenant.",
                 )
-            norm_tenant = eff_tenant.lower().strip()
+            norm_tenant = auth_tenant
+            if eff_tenant and eff_tenant.strip().lower() != auth_tenant:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"Broken Access Control: Tenant '{eff_tenant.strip().lower()}' does not match "
+                        f"authenticated principal tenant '{auth_tenant}'."
+                    ),
+                )
+    else:
+        norm_tenant = eff_tenant.strip().lower() if eff_tenant and eff_tenant.strip() else "bank_a"
 
     is_privileged = bool(principal and principal.is_privileged)
 
@@ -326,23 +326,6 @@ def authorize_model_serving(
             detail="Model registry directory not found.",
         )
 
-    cache_key = (norm_tenant, is_privileged, is_production)
-    try:
-        current_root_mtime = os.path.getmtime(reg.registry_root)
-    except OSError:
-        current_root_mtime = 0.0
-
-    with _unscoped_auth_lock:
-        cached = _unscoped_auth_cache.get(cache_key)
-        if cached is not None:
-            cached_mtime, cached_sim_id, cached_ownership = cached
-            if cached_mtime == current_root_mtime:
-                ident = reg.get_active_champion_identity(simulation_id=cached_sim_id)
-                if ident:
-                    return cached_sim_id, dict(cached_ownership)
-                else:
-                    _unscoped_auth_cache.pop(cache_key, None)
-
     authorized_candidates: list[str] = []
     candidates_ownership: dict[str, dict[str, Any]] = {}
     c_store = None
@@ -390,39 +373,9 @@ def authorize_model_serving(
     if len(authorized_candidates) == 1:
         chosen = authorized_candidates[0]
         chosen_ownership = candidates_ownership[chosen]
-        with _unscoped_auth_lock:
-            _unscoped_auth_cache[cache_key] = (current_root_mtime, chosen, chosen_ownership)
         return chosen, chosen_ownership
 
     if len(authorized_candidates) == 0:
-        # Check if serving model is mocked or resolvable in cached serving loader
-        try:
-            import app.presentation.routers.predict as pred_mod
-
-            loader = getattr(pred_mod, "_get_cached_serving_model_with_ident", None)
-            if loader is not None:
-                m_obj, m_id = loader(None)
-                if m_obj is not None:
-                    return None, {"simulation_id": None, "is_unbound": True}
-        except Exception:
-            pass
-
-        # Check if active champion identity resolves unambiguously
-        try:
-            active_ident = reg.get_active_champion_identity(simulation_id=None)
-            if active_ident and active_ident.get("simulation_id"):
-                cand_sim = str(active_ident["simulation_id"]).strip()
-                return authorize_model_serving(
-                    principal=principal,
-                    effective_tenant=norm_tenant,
-                    requested_simulation_id=cand_sim,
-                    registry=reg,
-                    consortium_service=consortium_service,
-                    action_name=action_name,
-                )
-        except Exception:
-            pass
-
         if not is_production:
             return None, {"simulation_id": None, "is_unbound": True}
 
