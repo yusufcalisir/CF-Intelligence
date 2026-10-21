@@ -1414,7 +1414,7 @@ async def submit_transaction_feedback(
         record_bank = record.get("bank_id")
         if record_bank:
             norm_rec = str(record_bank).lower().replace("-", "_")
-            norm_eff = str(effective_tenant).lower().replace("-", "_")
+            norm_eff = effective_tenant.lower().replace("-", "_")
             if norm_rec != norm_eff:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -1505,7 +1505,7 @@ async def score_transaction(
 
     country = payload.country or payload.country_code
     if is_production:
-        if country is None or not str(country).strip():
+        if country is None or not country.strip():
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Production scoring rejected: missing required model features: ['country']. Features must be explicitly supplied or observed in online feature store.",
