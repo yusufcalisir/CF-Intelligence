@@ -487,7 +487,14 @@ def test_registry_and_inference_contract(client: TestClient):
     from app.config import get_settings
 
     reg = ModelRegistry()
-    if reg.get_champion_metadata(simulation_id="live_prod_v2") is None:
+    champ = reg.get_champion_metadata(simulation_id="live_prod_v2")
+    if champ is None or not champ.get("owning_bank_id"):
+        from app.infrastructure.security.auth_service import AuthenticationService
+
+        auth_svc = AuthenticationService.get_instance()
+        admin_user = auth_svc.get_user("admin")
+        admin_tok = auth_svc.create_token_bundle(admin_user).access_token if admin_user else None
+
         svc = ModelService(get_settings())
         model = svc.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
         X = np.random.RandomState(42).randn(64, NUM_FEATURES).astype(np.float32)
@@ -501,6 +508,8 @@ def test_registry_and_inference_contract(client: TestClient):
             is_promoted=True,
             status="champion",
             provenance_type="TRAINING_RECORDED",
+            owning_bank_id="bank_a",
+            auth_token=admin_tok,
         )
 
     # List model versions for mock simulation

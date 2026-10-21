@@ -217,6 +217,11 @@ def test_production_score_transaction_succeeds_with_explicit_features(monkeypatc
         "_get_cached_serving_model_with_ident",
         lambda sim_id: (MockModel(), {"version": 3, "sha256": "sha_v3", "simulation_id": "sim_prod"}),
     )
+    monkeypatch.setattr(
+        predict_module,
+        "authorize_model_serving",
+        lambda **kwargs: ("sim_prod", {"simulation_id": "sim_prod", "owning_bank_id": kwargs.get("caller_tenant", "bank_1")}),
+    )
 
     payload = {
         "transaction_id": "tx_score_002",
@@ -283,6 +288,11 @@ def test_feature_store_tenant_isolation(monkeypatch: pytest.MonkeyPatch) -> None
         predict_module,
         "_get_cached_serving_model_with_ident",
         lambda sim_id: (MockModel(), {"version": 1, "sha256": "sha_v1"}),
+    )
+    monkeypatch.setattr(
+        predict_module,
+        "authorize_model_serving",
+        lambda **kwargs: ("sim_alpha", {"simulation_id": "sim_alpha", "owning_bank_id": kwargs.get("caller_tenant", "bank_alpha")}),
     )
 
     from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
@@ -403,6 +413,11 @@ def test_dimension_mismatch_never_padded_or_truncated(monkeypatch: pytest.Monkey
         predict_module,
         "_get_cached_serving_model_with_ident",
         lambda sim_id: (IncompatibleModel(), {"version": 1, "sha256": "sha_incomp"}),
+    )
+    monkeypatch.setattr(
+        predict_module,
+        "authorize_model_serving",
+        lambda **kwargs: ("sim_prod", {"simulation_id": "sim_prod", "owning_bank_id": kwargs.get("caller_tenant", "bank_1")}),
     )
 
     payload = {
@@ -669,6 +684,11 @@ def test_production_score_transaction_explicit_valid_country_produces_canonical_
         predict_module,
         "_get_cached_serving_model_with_ident",
         lambda sim_id: (MockModel(), {"version": 1, "sha256": "sha_v1", "simulation_id": "sim_valid"}),
+    )
+    monkeypatch.setattr(
+        predict_module,
+        "authorize_model_serving",
+        lambda **kwargs: ("sim_valid", {"simulation_id": "sim_valid", "owning_bank_id": kwargs.get("caller_tenant", "bank_1")}),
     )
 
     # 1. Supply explicit country="DE"

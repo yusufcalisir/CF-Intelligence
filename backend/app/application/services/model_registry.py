@@ -838,6 +838,12 @@ class ModelRegistry:
     _manifest_cache_guard: threading.Lock = threading.Lock()
     _shared_champion_sim_hint: str | None = None
     _shared_registry_root_mtime: float = 0.0
+    _registry_generation: int = 0
+
+    @classmethod
+    def get_registry_generation(cls) -> int:
+        with cls._manifest_cache_guard:
+            return cls._registry_generation
 
     def __init__(
         self,
@@ -1702,6 +1708,7 @@ class ModelRegistry:
                 with ModelRegistry._manifest_cache_guard:
                     ModelRegistry._shared_manifest_cache.pop(clean_sim_id, None)
                     ModelRegistry._shared_champion_sim_hint = None
+                    ModelRegistry._registry_generation += 1
             except Exception as e:
                 logger.error(
                     "Authoritative ownership persistence failed for %s: %s", clean_sim_id, e
@@ -1733,6 +1740,7 @@ class ModelRegistry:
                 with ModelRegistry._manifest_cache_guard:
                     ModelRegistry._shared_manifest_cache.pop(clean_sim_id, None)
                     ModelRegistry._shared_champion_sim_hint = None
+                    ModelRegistry._registry_generation += 1
             except Exception as e:
                 logger.error(
                     "Authoritative manifest persistence failed for %s: %s", simulation_id, e

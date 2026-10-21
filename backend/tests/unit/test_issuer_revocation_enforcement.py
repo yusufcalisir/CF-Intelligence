@@ -34,6 +34,7 @@ from starlette.responses import Response
 import app.application.services.training_provenance_service as prov_service
 import app.presentation.routers.predict as predict_module
 from app.application.schemas.transaction import TransactionPredictRequest
+from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.model_registry import (
     ModelEvaluationEngine,
@@ -404,6 +405,14 @@ def test_rev06_challenger_cached_before_revocation_cannot_be_served():
                     "client": ("127.0.0.1", 12345),
                     "server": ("127.0.0.1", 8000),
                 }
+            )
+            req.state.principal = AuthenticatedPrincipal(
+                principal_id="eng_ml",
+                tenant_id="bank_a",
+                roles=["ml_engineer"],
+                auth_method="bearer",
+                is_authenticated=True,
+                clearance_level=2,
             )
             resp = Response()
             mock_session = MagicMock()

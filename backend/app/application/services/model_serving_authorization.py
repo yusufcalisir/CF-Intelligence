@@ -16,6 +16,7 @@ import contextlib
 import json
 import logging
 import os
+import threading
 from typing import Any
 
 from fastapi import HTTPException, Request, status
@@ -32,9 +33,18 @@ from app.infrastructure.storage.durable_consortium_store import DurableConsortiu
 
 logger = logging.getLogger(__name__)
 
+_OMITTED_SERVING_CACHE: dict[
+    tuple[str, str | None, bool, bool],
+    tuple[int, float, str | None, dict[str, Any]],
+] = {}
+_OMITTED_SERVING_CACHE_GUARD = threading.Lock()
+
+
 def clear_serving_auth_cache() -> None:
-    """Clear cached unscoped model serving authorization resolutions (no-op)."""
-    pass
+    """Clear cached unscoped model serving authorization resolutions."""
+    with _OMITTED_SERVING_CACHE_GUARD:
+        _OMITTED_SERVING_CACHE.clear()
+
 
 
 def _resolve_historical_simulation_ownership(
@@ -423,6 +433,31 @@ def authorize_model_serving(
             detail="Model registry directory not found.",
         )
 
+    cache_key = (reg.registry_root, norm_tenant, is_privileged, is_production)
+    cur_gen = getattr(reg, "get_registry_generation", lambda: 0)()
+    try:
+        cur_mtime = os.path.getmtime(reg.registry_root)
+    except OSError:
+        cur_mtime = 0.0
+
+    with _OMITTED_SERVING_CACHE_GUARD:
+        cached = _OMITTED_SERVING_CACHE.get(cache_key)
+
+    if cached is not None:
+        cached_gen, cached_mtime, cached_chosen, cached_own = cached
+        if cached_gen == cur_gen and cached_mtime == cur_mtime:
+            if cached_chosen is None:
+                if not is_production:
+                    return None, cached_own
+                # In production with 0 candidates, fall through to raise 404
+            else:
+                try:
+                    ident = reg.get_active_champion_identity(simulation_id=cached_chosen)
+                    if ident is not None:
+                        return cached_chosen, cached_own
+                except Exception:
+                    pass
+
     authorized_candidates: list[str] = []
     candidates_ownership: dict[str, dict[str, Any]] = {}
     c_store = None
@@ -470,16 +505,24 @@ def authorize_model_serving(
     if len(authorized_candidates) == 1:
         chosen = authorized_candidates[0]
         chosen_ownership = candidates_ownership[chosen]
+        with _OMITTED_SERVING_CACHE_GUARD:
+            _OMITTED_SERVING_CACHE[cache_key] = (cur_gen, cur_mtime, chosen, chosen_ownership)
         return chosen, chosen_ownership
 
     if len(authorized_candidates) == 0:
+        fallback_own = {"simulation_id": None, "is_unbound": True}
+        with _OMITTED_SERVING_CACHE_GUARD:
+            _OMITTED_SERVING_CACHE[cache_key] = (cur_gen, cur_mtime, None, fallback_own)
         if not is_production:
-            return None, {"simulation_id": None, "is_unbound": True}
+            return None, fallback_own
 
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No authorized active champion model found for institution '{norm_tenant}'.",
         )
+
+    with _OMITTED_SERVING_CACHE_GUARD:
+        _OMITTED_SERVING_CACHE.pop(cache_key, None)
 
     # Multiple candidates exist and none unambiguously selected
     raise HTTPException(
