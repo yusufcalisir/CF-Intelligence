@@ -1052,6 +1052,8 @@ def test_final_j_production_feedback_rejects_anonymous_requests(client: TestClie
             resp = client.get(path)
         elif method == "DELETE":
             resp = client.delete(path)
+        else:
+            raise ValueError(f"Unsupported test method: {method}")
         assert resp.status_code == 401, f"Expected 401 for anonymous {method} {path}, got {resp.status_code}"
 
 
@@ -1070,7 +1072,7 @@ def test_final_k_bank_owned_consortium_model_shared_serving(client: TestClient, 
             "bank_b": ConsortiumMember(bank_id="bank_b", role=MemberRole.FULL_MEMBER),
         },
         removed_members={
-            "bank_c": "Voluntary departure or sanction",
+            "bank_c": {"reason": "Voluntary departure or sanction"},
         },
     )
     def _add_hybrid(consortia, proposals):

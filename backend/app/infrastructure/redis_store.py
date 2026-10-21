@@ -424,7 +424,7 @@ class RedisStore:
         bank_id: str | None = None,
     ) -> dict[str, Any] | None:
         """Retrieve stored prediction evidence for a transaction with institutional scoping."""
-        clean_bank = str(bank_id).lower().replace("-", "_").strip() if bank_id else None
+        clean_bank = bank_id.lower().replace("-", "_").strip() if bank_id else None
         if clean_bank:
             scoped_key = f"{simulation_id}:prediction:{clean_bank}:{transaction_id}"
             rec = self.get(scoped_key)
@@ -475,7 +475,7 @@ class RedisStore:
         bank_id: str | None = None,
     ) -> dict[str, Any]:
         """Atomically record ground truth label for an existing prediction record."""
-        clean_bank = str(bank_id).lower().replace("-", "_").strip() if bank_id else ""
+        clean_bank = bank_id.lower().replace("-", "_").strip() if bank_id else ""
         scoped_rel_key = f"{simulation_id}:prediction:{clean_bank}:{transaction_id}" if clean_bank else ""
         legacy_rel_key = f"{simulation_id}:prediction:{transaction_id}"
 
@@ -647,9 +647,9 @@ class RedisStore:
                 end
                 return 1
                 """
-                exp_st = str(expected_status).lower() if expected_status is not None else ""
+                exp_st = expected_status.lower() if expected_status is not None else ""
                 exp_ver = str(expected_version) if expected_version is not None else ""
-                exp_hash = str(expected_timeline_hash) if expected_timeline_hash is not None else ""
+                exp_hash = expected_timeline_hash if expected_timeline_hash is not None else ""
                 ttl_str = str(ex) if ex else "0"
                 res = c.eval(
                     lua_script,
@@ -682,7 +682,7 @@ class RedisStore:
                 return False
             if expected_status is not None:
                 cur_status = str(cur.get("status", "")).lower()
-                if cur_status != str(expected_status).lower():
+                if cur_status != expected_status.lower():
                     return False
             if expected_version is not None:
                 cur_ver = cur.get("version")

@@ -502,6 +502,28 @@ async def predict_transaction(
     evaluates fraud probability, computes composite risk score, and
     generates alerts if fraud is suspected.
     """
+    settings = get_settings()
+    is_production = settings.app_env.lower() in ("production", "prod")
+
+    txn_dict = payload.model_dump()
+    if is_production and not settings.feature_store_enabled:
+        missing_feats = [f for f in REQUIRED_ML_FEATURES if txn_dict.get(f) is None]
+        if missing_feats:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Production feature contract violation: Missing required features: {missing_feats}. "
+                    f"Features must be explicitly supplied or observed in online feature store."
+                ),
+            )
+        try:
+            preprocess_transaction(txn_dict, strict_categorical=True)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Production categorical validation failed: {exc}",
+            )
+
     principal, effective_tenant = resolve_effective_caller_tenant(
         request=request,
         caller_tenant=caller_tenant,
@@ -515,9 +537,6 @@ async def predict_transaction(
         registry=_registry,
         action_name="predict_transaction",
     )
-
-    settings = get_settings()
-    is_production = settings.app_env.lower() in ("production", "prod")
 
     bank_id = effective_tenant or payload.bank_id
     if not bank_id:
@@ -905,10 +924,21 @@ async def predict_batch(
     Batch processes up to 1,000 transaction payloads in a single forward pass,
     evaluates risk scores, and returns itemized decisions with batch latency metrics.
     """
+    req_bank_id = payload.bank_id
+    if not req_bank_id and payload.transactions:
+        item_banks = {getattr(t, "bank_id", None) for t in payload.transactions if getattr(t, "bank_id", None)}
+        if len(item_banks) == 1:
+            req_bank_id = next(iter(item_banks))
+        elif len(item_banks) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Batch contains mixed bank_ids across transactions; all items in a batch must belong to the same institution.",
+            )
+
     principal, effective_tenant = resolve_effective_caller_tenant(
         request=request,
         caller_tenant=caller_tenant,
-        requested_bank_id=payload.bank_id,
+        requested_bank_id=req_bank_id,
         action_name="predict_batch",
     )
     auth_sim_id, ownership = authorize_model_serving(
@@ -922,7 +952,7 @@ async def predict_batch(
     settings = get_settings()
     is_production = settings.app_env.lower() in ("production", "prod")
 
-    target_tenant = effective_tenant or payload.bank_id
+    target_tenant = effective_tenant or req_bank_id
     if not target_tenant:
         if is_production:
             raise HTTPException(
@@ -1467,6 +1497,44 @@ async def score_transaction(
     """Low-Latency Real-Time Risk Decision API providing sub-10ms risk evaluation against the globally trained model."""
     start_time = time.perf_counter()
 
+    settings = get_settings()
+    is_production = settings.app_env.lower() in ("production", "prod")
+    fs_enabled = getattr(_settings, "feature_store_enabled", False) or settings.feature_store_enabled
+
+    country = payload.country or payload.country_code
+    if is_production:
+        if country is None or not str(country).strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Production scoring rejected: missing required model features: ['country']. Features must be explicitly supplied or observed in online feature store.",
+            )
+        if not fs_enabled:
+            missing = []
+            if payload.merchant_category is None:
+                missing.append("merchant_category")
+            if payload.device_type is None:
+                missing.append("device_type")
+            if payload.velocity is None:
+                missing.append("velocity")
+            if payload.customer_history_score is None:
+                missing.append("customer_history_score")
+            if payload.chargeback_count is None:
+                missing.append("chargeback_count")
+            if payload.account_age_days is None:
+                missing.append("account_age_days")
+            if payload.merchant_risk_score is None:
+                missing.append("merchant_risk_score")
+            if payload.hour_of_day is None:
+                missing.append("hour_of_day")
+            if missing:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Production scoring rejected: missing required model features: {missing}. "
+                        f"Features must be explicitly supplied or observed in online feature store."
+                    ),
+                )
+
     principal, effective_tenant = resolve_effective_caller_tenant(
         request=request,
         caller_tenant=caller_tenant,
@@ -1480,9 +1548,6 @@ async def score_transaction(
         registry=_registry,
         action_name="score_transaction",
     )
-
-    settings = get_settings()
-    is_production = settings.app_env.lower() in ("production", "prod")
 
     tenant_scope = effective_tenant or x_bank_id
     if not tenant_scope:

@@ -839,7 +839,13 @@ class ConsortiumGovernanceService:
 
     def get_consortium(self, consortium_id: str) -> Consortium | None:
         """Retrieves consortium by ID after validating disk freshness."""
-        return self._store.get_consortium(consortium_id)
+        res = self._store.get_consortium(consortium_id)
+        if res is None and consortium_id == "cfi-consortium":
+            is_prod = getattr(self._store, "_is_prod", False)
+            if not is_prod:
+                init_default_consortium(self)
+                return self._store.get_consortium(consortium_id)
+        return res
 
     def get_proposal(self, proposal_id: str) -> MembershipProposal | None:
         """Retrieves a proposal by ID and updates expiration if elapsed."""

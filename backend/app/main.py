@@ -1186,9 +1186,6 @@ class TenantAccessControlMiddleware:
         # Private quota inspection always requires authentication
         if clean_path in self._PRIVATE_QUOTA_PATHS:
             return True
-        # Alerts endpoints always require authentication
-        if any(clean_path == p or clean_path.startswith(p + "/") for p in ("/api/v1/alerts", "/alerts")):
-            return True
         # In production, all inference, scoring, and institutional endpoints require authentication
         if is_prod:
             if clean_path in self._INFERENCE_EXACT_PATHS:

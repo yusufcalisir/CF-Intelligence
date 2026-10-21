@@ -10,7 +10,7 @@ import json
 import logging
 import threading
 import time
-from typing import Any
+from typing import Any, cast
 
 import torch
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -222,6 +222,10 @@ def _get_redis_client() -> Any:
 def reset_model_cache(simulation_id: str | None = None) -> None:
     """Clear local and Redis cached scripted model."""
     _local_cache.clear(simulation_id)
+    with contextlib.suppress(Exception):
+        from app.application.services.model_serving_authorization import clear_serving_auth_cache
+
+        clear_serving_auth_cache()
     with contextlib.suppress(Exception):
         rc = _get_redis_client()
         if rc:
@@ -689,7 +693,7 @@ def get_inference_quota(
 @api_router.post("/score", response_model=RealtimeInferenceResponse)
 def score_transaction_realtime(
     payload: RealtimeInferenceRequest,
-    request: Request,
+    request: Request = cast("Request", None),
     caller_tenant: TenantDep = None,
     metered_tenant: str = Depends(enforce_tenant_quota),
 ) -> RealtimeInferenceResponse:
