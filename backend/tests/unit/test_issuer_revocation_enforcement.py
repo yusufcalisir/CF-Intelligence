@@ -34,7 +34,6 @@ from starlette.responses import Response
 import app.application.services.training_provenance_service as prov_service
 import app.presentation.routers.predict as predict_module
 from app.application.schemas.transaction import TransactionPredictRequest
-from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.model_registry import (
     ModelEvaluationEngine,
@@ -51,6 +50,7 @@ from app.application.services.training_provenance_service import (
 from app.config import get_settings
 from app.domain.model_serving_errors import ModelIntegrityError, ModelNotAvailableError
 from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 from app.presentation.routers.realtime_inference import (
     get_scripted_model,
     reset_model_cache,

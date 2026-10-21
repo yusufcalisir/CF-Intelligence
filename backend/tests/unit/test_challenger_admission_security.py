@@ -32,7 +32,6 @@ from starlette.responses import Response
 import app.application.services.training_provenance_service as prov_service
 import app.presentation.routers.predict as predict_module
 from app.application.schemas.transaction import TransactionPredictRequest
-from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 from app.application.services.data_generator import FEATURE_NAMES
 from app.application.services.model_registry import (
     ModelEvaluationEngine,
@@ -51,6 +50,7 @@ from app.config import get_settings
 from app.domain.model_serving_errors import (
     ModelIntegrityError,
 )
+from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 
 
 def _create_mock_checkpoint(input_dim: int = NUM_FEATURES) -> tuple[dict[str, torch.Tensor], bytes, str]:
