@@ -26,6 +26,7 @@ T. Legitimate authorized bank-specific, consortium, and internal service workflo
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -48,6 +49,7 @@ from app.domain.consortium_governance import (
 from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 from app.main import app, seed_mock_data
+from app.presentation.routers.predict import _eval_engine
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -931,14 +933,15 @@ def test_final_g_legacy_records_missing_bank_ownership_cannot_authorize_prod(cli
     token_a = oidc.create_mock_token(username="analyst_a", bank_id="bank_a", roles=["analyst"])
     headers_a = {"Authorization": f"Bearer {token_a}"}
 
-    # Seed legacy record with NO bank_id directly into fallback store before switching to production
-    engine = ModelEvaluationEngine(ModelRegistry())
     legacy_tx = "tx_legacy_unbound_005"
-    engine._store._fallback_store[f"sim_consortium:prediction:{legacy_tx}"] = {
+    legacy_record = {
         "champion_prob": 0.5,
         "bank_id": None,
         "timestamp": "2026-01-01T00:00:00Z",
     }
+    _eval_engine._store._fallback_store[f"sim_consortium:prediction:{legacy_tx}"] = legacy_record
+    with contextlib.suppress(Exception):
+        _eval_engine._store.set(f"sim_consortium:prediction:{legacy_tx}", legacy_record)
 
     settings = get_settings()
     monkeypatch.setattr(settings, "app_env", "production")

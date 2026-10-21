@@ -1052,8 +1052,11 @@ def test_complete_production_features_scored_as_authoritative_ml_model(temp_reg_
         "merchant_risk_score": 0.10,
         "hour_of_day": 19.0,
     }
-    with patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(m, False)), \
-         patch.object(get_settings(), "app_env", "production"):
+    with (
+        patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(m, False)),
+        patch("app.presentation.routers.realtime_inference.authorize_model_serving", return_value=("sim_valid", {"simulation_id": "sim_valid", "bank_id": "bank_a"})),
+        patch.object(get_settings(), "app_env", "production"),
+    ):
         resp = client.post("/v1/inference/score", json=req, headers=_auth_headers())
         assert resp.status_code == 200
         data = resp.json()
@@ -1229,8 +1232,11 @@ def test_production_feature_validation_and_scoring_contract():
     }
     svc = ModelService(get_settings())
     m = svc.create_model(dp_compatible=True)
-    with patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(m, False)), \
-         patch.object(get_settings(), "app_env", "production"):
+    with (
+        patch("app.presentation.routers.realtime_inference.get_scripted_model", return_value=(m, False)),
+        patch("app.presentation.routers.realtime_inference.authorize_model_serving", return_value=("sim_valid", {"simulation_id": "sim_valid", "bank_id": "bank_a"})),
+        patch.object(get_settings(), "app_env", "production"),
+    ):
         resp2 = client.post("/v1/inference/score", json=complete_req, headers=_auth_headers())
         assert resp2.status_code == 200
         assert resp2.json()["evaluated_by"] == "ML_MODEL"
