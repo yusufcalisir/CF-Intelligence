@@ -13,6 +13,7 @@ AFTER authentication, ensuring:
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import os
 from typing import Any
@@ -34,6 +35,65 @@ logger = logging.getLogger(__name__)
 def clear_serving_auth_cache() -> None:
     """Clear cached unscoped model serving authorization resolutions (no-op)."""
     pass
+
+
+def _resolve_historical_simulation_ownership(
+    registry: ModelRegistry, simulation_id: str
+) -> dict[str, Any] | None:
+    """Resolves authoritative ownership for historical simulations whose model directory was deleted."""
+    if hasattr(registry, "get_historical_ownership"):
+        record = registry.get_historical_ownership(simulation_id)
+        if isinstance(record, dict) and (record.get("owning_bank_id") or record.get("consortium_id")):
+            return record
+
+    reg_root = getattr(registry, "registry_root", None)
+    storage_dir = getattr(registry, "storage_dir", None)
+
+    candidate_files: list[str] = []
+    if reg_root:
+        candidate_files.extend([
+            os.path.join(reg_root, "historical_ownership", f"{simulation_id}.json"),
+            os.path.join(reg_root, f"{simulation_id}.ownership.json"),
+            os.path.join(reg_root, "historical_ownership.json"),
+        ])
+    if storage_dir:
+        candidate_files.extend([
+            os.path.join(storage_dir, "historical_ownership", f"{simulation_id}.json"),
+            os.path.join(storage_dir, f"{simulation_id}.ownership.json"),
+            os.path.join(storage_dir, "historical_ownership.json"),
+        ])
+
+    for fpath in candidate_files:
+        if not os.path.isfile(fpath):
+            continue
+        try:
+            with open(fpath, encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                continue
+            if simulation_id in data and isinstance(data[simulation_id], dict):
+                rec = data[simulation_id]
+            else:
+                rec = data
+
+            owning_bank = rec.get("owning_bank_id")
+            consortium_id = rec.get("consortium_id")
+            is_unbound = not owning_bank and not consortium_id
+
+            if not is_unbound:
+                return {
+                    "simulation_id": simulation_id,
+                    "owning_bank_id": owning_bank,
+                    "consortium_id": consortium_id,
+                    "bound_at": rec.get("bound_at"),
+                    "bound_by": rec.get("bound_by"),
+                    "is_unbound": False,
+                }
+        except Exception as exc:
+            logger.warning("Failed to load historical ownership record from %s: %s", fpath, exc)
+            continue
+
+    return None
 
 
 def resolve_effective_caller_tenant(
@@ -208,9 +268,27 @@ def authorize_model_serving(
             ) from err
 
         sim_dir = reg._get_sim_dir(clean_sim_id, create=False)
-        if not os.path.isdir(sim_dir):
-            if action_name == "get_shadow_metrics":
-                return clean_sim_id, {"simulation_id": clean_sim_id, "is_unbound": True}
+        sim_dir_exists = os.path.isdir(sim_dir)
+
+        # Retrieve authoritative ownership
+        ownership: dict[str, Any] | None = None
+        try:
+            ownership = reg.get_simulation_ownership(clean_sim_id)
+        except ModelIntegrityError as exc:
+            logger.error("Simulation ownership verification failed for %s: %s", clean_sim_id, exc)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Serving model rejected: ownership verification failed for simulation '{clean_sim_id}': {exc}",
+            ) from exc
+
+        # If simulation directory does not exist, check separate authoritative historical ownership record
+        if not sim_dir_exists and (not ownership or ownership.get("is_unbound")):
+            hist_record = _resolve_historical_simulation_ownership(reg, clean_sim_id)
+            if hist_record:
+                ownership = hist_record
+
+        # If simulation directory does not exist and no authoritative ownership record exists
+        if not sim_dir_exists and (not ownership or ownership.get("is_unbound")):
             ident = None
             with contextlib.suppress(Exception):
                 ident = reg.get_active_champion_identity(clean_sim_id)
@@ -220,14 +298,28 @@ def authorize_model_serving(
                     detail=f"Simulation '{clean_sim_id}' not found.",
                 )
 
-        try:
-            ownership = reg.get_simulation_ownership(clean_sim_id)
-        except ModelIntegrityError as exc:
-            logger.error("Simulation ownership verification failed for %s: %s", clean_sim_id, exc)
+        if not ownership:
+            ownership = {
+                "simulation_id": clean_sim_id,
+                "owning_bank_id": None,
+                "consortium_id": None,
+                "is_unbound": True,
+            }
+
+        # For get_shadow_metrics, unbound or missing ownership fails closed across all environments
+        if action_name == "get_shadow_metrics" and ownership.get("is_unbound"):
+            if not sim_dir_exists:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Simulation '{clean_sim_id}' not found.",
+                )
             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Serving model rejected: ownership verification failed for simulation '{clean_sim_id}': {exc}",
-            ) from exc
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Broken Access Control: Shadow metrics access rejected because simulation '{clean_sim_id}' "
+                    f"has unbound or ambiguous institutional ownership."
+                ),
+            )
 
         # Unbound ownership fails closed in production
         if ownership.get("is_unbound"):
@@ -284,11 +376,16 @@ def authorize_model_serving(
 
         # If model has an owning bank and no consortium sharing authorization exists
         if norm_owner and norm_owner != norm_tenant:
+            action_desc = (
+                "access shadow metrics for model"
+                if action_name == "get_shadow_metrics"
+                else "execute private champion model"
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
-                    f"Broken Access Control: Tenant '{norm_tenant}' is not authorized to execute private "
-                    f"champion model owned by bank '{owning_bank}'."
+                    f"Broken Access Control: Tenant '{norm_tenant}' is not authorized to {action_desc} "
+                    f"owned by bank '{owning_bank}'."
                 ),
             )
 

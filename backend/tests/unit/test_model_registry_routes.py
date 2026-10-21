@@ -419,6 +419,7 @@ class TestRollbackCanaryAndShadowMetrics:
         assert canary_data[0]["is_promoted"] is True
 
     def test_shadow_metrics_empty_returns_clean_schema(self):
+        _seed_sample_model("sim_unscored_new")
         resp = client.get("/api/v1/registry/sim_unscored_new/shadow/metrics")
         assert resp.status_code == 200
         data = resp.json()
