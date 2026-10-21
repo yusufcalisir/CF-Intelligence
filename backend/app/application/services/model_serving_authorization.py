@@ -150,11 +150,11 @@ def authorize_model_serving(
     registry: ModelRegistry | None = None,
     consortium_service: Any | None = None,
     action_name: str = "inference",
-) -> tuple[str, dict[str, Any]]:
+) -> tuple[str | None, dict[str, Any]]:
     """Verifies that the caller possesses authoritative permission to serve/execute the target model.
 
     Returns:
-        tuple[str, dict[str, Any]]: (Authorized simulation ID, simulation ownership record).
+        tuple[str | None, dict[str, Any]]: (Authorized simulation ID, simulation ownership record).
 
     Raises:
         HTTPException:

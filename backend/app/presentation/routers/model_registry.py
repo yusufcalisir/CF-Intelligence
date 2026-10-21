@@ -951,7 +951,7 @@ async def get_shadow_metrics(
         action_name="get_shadow_metrics",
     )
     try:
-        metrics = _eval_engine.get_shadow_metrics(auth_sim_id)
+        metrics = _eval_engine.get_shadow_metrics(auth_sim_id or simulation_id or "default")
         if not metrics:
             return ShadowMetricsResponse(sample_count=0)
         return ShadowMetricsResponse(**metrics)

@@ -1394,9 +1394,11 @@ async def submit_transaction_feedback(
         action_name="submit_transaction_feedback",
     )
 
+    target_sim = auth_sim_id or payload.effective_simulation_id or "default"
+
     # Validate prediction record evidence in evaluation store
     record = _eval_engine.get_prediction_record(
-        simulation_id=auth_sim_id,
+        simulation_id=target_sim,
         transaction_id=payload.transaction_id,
         bank_id=effective_tenant,
     )
@@ -1428,7 +1430,7 @@ async def submit_transaction_feedback(
 
     try:
         metrics = _eval_engine.log_feedback(
-            simulation_id=auth_sim_id,
+            simulation_id=target_sim,
             transaction_id=payload.transaction_id,
             actual_label=payload.actual_label,
             bank_id=effective_tenant,
