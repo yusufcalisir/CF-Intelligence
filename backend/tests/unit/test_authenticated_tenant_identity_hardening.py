@@ -40,6 +40,19 @@ client = TestClient(app)
 @pytest.fixture(scope="module", autouse=True)
 def setup_seed():
     seed_mock_data()
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    AuthenticationService.get_instance()
+
+
+@pytest.fixture(autouse=True)
+def enforce_production_env(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("APP_ENV", "development")
+    from app.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "app_env", "production")
+    yield
 
 
 @pytest.fixture
