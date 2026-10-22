@@ -25,7 +25,7 @@ All CF-Intelligence API endpoints follow strict Clean Architecture, OpenAPI 3.1.
 
 ---
 
-## 📑 API Endpoint Directory (24 Endpoints)
+## 📑 API Endpoint Directory (26 Endpoints)
 
 | # | Endpoint | Method | Category | Description |
 | :--- | :--- | :---: | :--- | :--- |
@@ -53,6 +53,8 @@ All CF-Intelligence API endpoints follow strict Clean Architecture, OpenAPI 3.1.
 | **18.22** | /api/v1/models/{simulation_id}/active | GET | Model Registry | Active champion model metadata, version hash, and serving status |
 | **18.23** | /api/v1/models/{simulation_id}/versions/{version}/signoff | POST | Model Governance | SR 11-7 Four-Eyes dual control supervisor cryptographic sign-off |
 | **18.24** | /v1/inference/score | POST | Real-Time Inference | High-throughput low-latency inference endpoint (fails closed HTTP 503 if unverified) |
+| **18.25** | /api/v1/training/federation/jobs | POST | Operational Federation | Launch production federated learning across isolated bank workers |
+| **18.26** | /api/v1/compliance/dossier/generate | POST | Regulatory Dossier | Compile EU AI Act Articles 9–15 and SR 11-7 compliance verification dossier |
 
 ---
 
@@ -1341,5 +1343,64 @@ High-throughput, real-time transaction scoring route (aliased at `POST /api/v1/i
 }
 ```
 
+---
+
+### 18.25 Operational Federation Job Launch
+
+**Operational Training Request (`POST /api/v1/training/federation/jobs`):**
+```json
+{
+  "consortium_id": "consortium_eu_nordic",
+  "participating_banks": ["bank_a", "bank_b", "bank_c"],
+  "num_rounds": 5,
+  "dp_enabled": true,
+  "byzantine_defense": "trimmed_mean"
+}
+```
+
+**Operational Training Response (HTTP 200 OK):**
+```json
+{
+  "job_id": "fed_job_2026_99482",
+  "consortium_id": "consortium_eu_nordic",
+  "status": "STARTED",
+  "participating_banks": ["bank_a", "bank_b", "bank_c"],
+  "worker_isolation": "PROCESS_RESTRICTED_TOKEN",
+  "receipts": [
+    {
+      "bank_id": "bank_a",
+      "status": "ATTESTED",
+      "ed25519_signature": "e5c2b9a7...148f",
+      "domain_token": "CFI-FED-RECEIPT-v1"
+    }
+  ],
+  "admission_state": "TRAINING_RECORDED_INACTIVE"
+}
+```
+
+---
+
+### 18.26 Regulatory Dossier Generation
+
+**Dossier Generation Request (`POST /api/v1/compliance/dossier/generate`):**
+```json
+{
+  "consortium_id": "consortium_eu_nordic",
+  "model_version": "v2.4.1",
+  "jurisdiction": "EU"
+}
+```
+
+**Dossier Generation Response (HTTP 200 OK):**
+```json
+{
+  "dossier_id": "dossier_eu_2026_00491",
+  "status": "GENERATED",
+  "compliance_score": 0.985,
+  "standards_validated": ["EU_AI_ACT_ART_9_15", "SR_11_7_ANNEX_IV"],
+  "audit_sha256": "4b92d6e8f499b109e29a39f1c64e58a75e2b02444634f19b1836e5a409f982a1",
+  "pdf_url": "/api/v1/compliance/dossier/dossier_eu_2026_00491/download"
+}
+```
 
 ---

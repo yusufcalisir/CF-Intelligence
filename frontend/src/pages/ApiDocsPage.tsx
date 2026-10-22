@@ -302,6 +302,71 @@ const API_ENDPOINTS: ApiEndpointSpec[] = [
       message: 'Dataset enrolled successfully for federated training round.',
     },
   },
+  {
+    id: 'operational-federation-jobs',
+    category: 'Operational Federation',
+    method: 'POST',
+    path: '/api/v1/training/federation/jobs',
+    title: 'Launch Operational Federated Learning across Isolated Bank Workers',
+    description:
+      'Spawns and orchestrates process-isolated bank worker nodes (Windows Restricted Tokens / POSIX fork) with server-side authority resolution, transactional row locks, and Ed25519 asymmetric receipt verification.',
+    authRequired: true,
+    rateLimit: '30 req/min',
+    headers: {
+      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+      'Content-Type': 'application/json',
+    },
+    requestBodySample: {
+      consortium_id: 'consortium_eu_nordic',
+      participating_banks: ['bank_a', 'bank_b', 'bank_c'],
+      num_rounds: 5,
+      dp_enabled: true,
+      byzantine_defense: 'trimmed_mean',
+    },
+    responseBodySample: {
+      job_id: 'fed_job_2026_99482',
+      consortium_id: 'consortium_eu_nordic',
+      status: 'STARTED',
+      worker_isolation: 'PROCESS_RESTRICTED_TOKEN',
+      receipts: [
+        {
+          bank_id: 'bank_a',
+          status: 'ATTESTED',
+          ed25519_signature: 'e5c2b9a7...148f',
+          domain_token: 'CFI-FED-RECEIPT-v1',
+        },
+      ],
+      admission_state: 'TRAINING_RECORDED_INACTIVE',
+    },
+  },
+  {
+    id: 'compliance-dossier-generate',
+    category: 'Regulatory & Compliance',
+    method: 'POST',
+    path: '/api/v1/compliance/dossier/generate',
+    title: 'Compile EU AI Act & SR 11-7 Regulatory Compliance Dossier',
+    description:
+      'Compiles EU Artificial Intelligence Act Articles 9–15 and Federal Reserve SR 11-7 model risk management verification package with immutable SHA-256 audit digest.',
+    authRequired: true,
+    rateLimit: '60 req/min',
+    headers: {
+      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+      'Content-Type': 'application/json',
+    },
+    requestBodySample: {
+      consortium_id: 'consortium_eu_nordic',
+      model_version: 'v2.4.1',
+      jurisdiction: 'EU',
+    },
+    responseBodySample: {
+      dossier_id: 'dossier_eu_2026_00491',
+      status: 'GENERATED',
+      compliance_score: 0.985,
+      standards_validated: ['EU_AI_ACT_ART_9_15', 'SR_11_7_ANNEX_IV'],
+      audit_sha256: '4b92d6e8f499b109e29a39f1c64e58a75e2b02444634f19b1836e5a409f982a1',
+      pdf_url: '/api/v1/compliance/dossier/dossier_eu_2026_00491/download',
+    },
+  },
 ];
 
 type SupportedLanguage = 'curl' | 'python' | 'node' | 'java' | 'go';

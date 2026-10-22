@@ -262,7 +262,7 @@ In strict adherence to the `AGENTS.md` runtime truth invariant, `_verify_service
 
 ## 🧪 6. Automated Unit Test Suite Parity
 
-The consortium governance and policy enforcement modules are verified across **34 automated unit tests**:
+The consortium governance and policy enforcement modules are verified across **41 automated unit tests**:
 
 ```bash
 python -m pytest \
@@ -270,7 +270,7 @@ python -m pytest \
   backend/tests/unit/test_consortium_governance_hardening.py \
   backend/tests/unit/test_consortium_policy.py \
   backend/tests/unit/test_consortium_policy_hardening.py -v
-# 34 passed in 2.25s (100% Pass)
+# 41 passed (100% Pass)
 ```
 
 | Test File | Test Function | Verification Scope |

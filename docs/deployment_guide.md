@@ -34,7 +34,13 @@ This comprehensive guide details the production deployment models for the **Coll
   │    • Multi-stage Alpine   │     │    • Python 3.12, Uvicorn │
   │    • HTML5 pushstate SPA  │     │    • Non-root user (1000) │
   └───────────────────────────┘     └─────────────┬─────────────┘
-                                                  │
+                                                  │ (Gated on migrations success)
+                                    ┌─────────────┴─────────────┐
+                                    │ One-Shot Alembic Container│
+                                    │ (`cfi-migrations`)        │
+                                    │ • alembic upgrade head    │
+                                    │ • Dual schema revisions   │
+                                    └─────────────┬─────────────┘
                          ┌────────────────────────┴────────────────────────┐
                          ▼ (State / Relational)                            ▼ (Cache / Events)
   ┌───────────────────────────────────────────────┐ ┌───────────────────────────────────────────────┐
@@ -277,12 +283,12 @@ The deployment configurations and infrastructure manifests are backed by automat
 python -m pytest \
   backend/tests/unit/test_docker_manifests.py \
   backend/tests/integration/test_multinode_fl_round.py -v
-# 6 passed in 0.94s (100% Pass)
+# 11 passed (100% Pass)
 ```
 
 | Test Suite | Test Count | Scope |
 | :--- | :---: | :--- |
-| `test_docker_manifests.py` | 3 | Secrets generator entropy, 5 core services Compose structure, Nginx WebSocket & security headers |
+| `test_docker_manifests.py` | 8 | Secrets generator entropy, Compose services structure (including one-shot `migrations`), production fail-closed security invariants, Helm storage guardrails, and Nginx WebSocket & security headers |
 | `test_multinode_fl_round.py` | 3 | Multi-node network isolation boundary, per-node mTLS PKI cert generation, daemon config |
 | `verify_docker_deployment.py` | CLI | 100% audit pass across Dockerfiles, Compose manifests, env floor, and Nginx reverse proxy |
 | `validate_k8s_manifests.py` | CLI | Dry-run schema validation of all 16 Kubernetes Helm resources |

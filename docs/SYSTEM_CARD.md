@@ -195,10 +195,11 @@ Evaluated on standard host hardware distinguishing in-process compute microbench
 
 ## 8. Verification & Continuous Validation
 
-The system test infrastructure comprises **6,187 total automated tests collected across test suites**:
-- **Backend Pytest Suite**: **5,371 automated tests collected** (unit, integration, chaos, property-based, and security invariants; 5,001 verified passing in standard integration gate).
-- **Scientific Verification Suite**: **410 verification tests collected** across 21 modules (409 verified passing, 1 skipped; differential privacy moments accounting, membership inference attack resistance, DLG gradient inversion resilience, test set isolation).
+The system test infrastructure comprises **6,444 total automated tests collected across test suites**:
+- **Backend Pytest Suite**: **5,617 automated tests collected** (unit, integration, chaos, property-based, and security invariants).
+- **Scientific Verification Suite**: **410 verification tests collected** across 22 modules (409 verified passing, 1 skipped; differential privacy moments accounting, membership inference attack resistance, DLG gradient inversion resilience, test set isolation).
+- **Python SDK Test Suite**: **11 automated tests collected** (`sdk/python/tests/`).
 - **Frontend Vitest Suite**: **375 component and integration tests collected** (87 test suites, 100% passing).
 - **Smart Contracts Suite**: **31 Hardhat tests collected** for consortium Shapley value settlement (100% passing).
 
-*(Note: 5,371 Backend + 410 Scientific + 375 Frontend + 31 Contracts = 6,187 automated tests collected across suites; 5,781 Python core tests. Additional optional E2E/Playwright tests run in separate browser workflows).*
+*(Note: 5,617 Backend + 410 Scientific + 11 SDK + 375 Frontend + 31 Contracts = 6,444 automated tests collected across suites; 6,038 Python core tests. Additional optional E2E/Playwright tests run in separate browser workflows).*

@@ -33,12 +33,14 @@ This matrix maps platform privacy, authentication, zero-trust cryptographic prot
 | **`ACID-CONCURRENCY`**| SOC 2 / PCI-DSS | Zero-drift Alembic schema parity, SQLSTATE Class 40 transaction retries & Redis distributed token locking | `run_cockroach_transaction`, `CacheService.distributed_lock`, `AlertModel` | `test_alembic_migrations.py`, `test_database_persistence_hardening.py`, `test_concurrency_safety.py` | `PASS` |
 | **`HSM-PKCS11-VAULT`** | FIPS 140-2 Level 3 / eIDAS | Hardware-anchored Zero-Disk key management, Curve25519 ECDH in enclave, automated mTLS 1.3 cert rotation | `HSMKeyService`, `VaultHSMPKIBinder` | `test_hsm_key_service.py`, `test_vault_hsm_pki_binder.py`, `test_hsm_signer.py` | `PASS` |
 | **`EU-AI-ACT-DOSSIER`** | EU AI Act / SR 11-7 | High-Risk AI Articles 9–15 compliance matrix, FedGNN proofs, dual-control cryptographic sign-offs | `RegulatoryDossierGenerator`, `regulatory_dossier.py` | `test_regulatory_dossier_generator.py` | `PASS` |
+| **`OP-FED-ISOLATION`**  | SOC 2 / ISO 27001 | Subprocess-isolated bank worker nodes (Windows Restricted Token / POSIX fork) with Ed25519 receipts | `OperationalFederationService`, `run_worker_node.py` | `test_operational_federation_integration.py` | `PASS` |
+| **`PROD-INVARIANTS-SEC`** | SOC 2 / CIS Benchmark | Fail-closed credential validation in production/staging and demo mock data generation block | `Settings.validate_production_invariants()`, `main.py` | `test_runtime_adversarial_verification.py`, `test_docker_manifests.py` | `PASS` |
 
 ---
 
 ## 🔒 Verification References
 
-All controls listed above are automatically verified by the continuous testing pipeline across **5,777 automated tests** (5,371 Backend Pytest + 375 Frontend Vitest + 31 Smart Contracts) and 21 scientific verification audit modules (410 verification tests; 6,187 total collected tests).
+All controls listed above are automatically verified by the continuous testing pipeline across **6,444 automated tests collected repository-wide** (5,617 Backend Pytest + 410 Scientific Verification across 22 modules + 11 Python SDK + 375 Frontend Vitest + 31 Smart Contracts).
 
 
 

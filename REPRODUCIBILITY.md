@@ -13,7 +13,7 @@ This document provides the authoritative, publication-grade, step-by-step reprod
 
 The platform guarantees three levels of reproducibility:
 1. **Bitwise Exact Software Determinism**: All non-convex stochastic optimizers (FedAvg, FedProx, DP-SGD), graph neighborhood samplers, and synthetic transaction generators utilize cryptographically initialized pseudo-random seeds ($S \in \{42, 123, 456, 789, 101112\}$) and PyTorch deterministic algorithms (`torch.use_deterministic_algorithms(True)`).
-2. **Empirical Metric Parity**: All reported evaluation metrics ($\text{PR-AUC}$, $\text{ROC-AUC}$, $\text{Recall @ 0.01% FPR}$, $\text{Recall @ 0.1% FPR}$, $\text{ECE}$, $\text{Brier Score}$) reconcile within documented floating-point confidence intervals ($95\%\text{ CI}$) across distinct CPU/GPU architectures.
+2. **Empirical Metric Parity**: All reported evaluation metrics ($\mathrm{PR\text{-}AUC}$, $\mathrm{ROC\text{-}AUC}$, $\text{Recall @ 0.01% FPR}$, $\text{Recall @ 0.1% FPR}$, $\mathrm{ECE}$, $\text{Brier Score}$) reconcile within documented floating-point confidence intervals ($95\%\text{ CI}$) across distinct CPU/GPU architectures.
 3. **Immutable 5-Artifact Hierarchy**: Every executed experiment writes an identical, auditable artifact bundle (`config.json`, `results.json`, `metrics.csv`, `report.md`, `plots/*.png`), ensuring external MLflow, Weights & Biases, or regulatory audit ingestion without proprietary tool lock-in.
 
 ---
@@ -95,7 +95,7 @@ The repository includes a comprehensive `Makefile` automating end-to-end executi
 # 1. Complete Environment Verification & Smoke Test
 make test
 
-# 2. Master One-Line Verification of All Automated Test Suites (5,371 Pytest + 375 Vitest + 31 Hardhat)
+# 2. Master One-Line Verification of All Automated Test Suites (5,617 Pytest + 410 Verification + 11 SDK + 375 Vitest + 31 Hardhat = 6,444 Total)
 make test-all
 
 # 3. Run All Empirical Benchmark Runners & Compile Master Matrix
@@ -318,4 +318,4 @@ The reproducibility pipeline is continuously verified by targeted unit and integ
 | **Experiment Artifact Standard** | [`backend/tests/unit/test_experiment_artifact_hierarchy.py`](backend/tests/unit/test_experiment_artifact_hierarchy.py) | Verifies 5-artifact hierarchy (`config.json`, `results.json`, `metrics.csv`, `report.md`, `plots/`) across all 8 datasets |
 | **Authoritative Dataset Cards** | [`backend/tests/unit/test_dataset_cards.py`](backend/tests/unit/test_dataset_cards.py) | Verifies `DATASETS.md` provenance, licensing, and 0/10 protected demographic PII scan |
 | **Model & System Cards** | [`backend/tests/unit/test_system_and_model_cards.py`](backend/tests/unit/test_system_and_model_cards.py) | Verifies `MODEL_CARD.md` and `SYSTEM_CARD.md` regulatory conformity |
-| **Master Test Runner** | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | Orchestrates all backend (5,371), frontend (375), verification (410), and contracts (31) tests |
+| **Master Test Runner** | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | Orchestrates all backend (5,617), verification (410), SDK (11), frontend (375), and contracts (31) tests = 6,444 total |

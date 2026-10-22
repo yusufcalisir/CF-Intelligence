@@ -2,7 +2,7 @@
 
 > **CF-Intelligence Technical Audit Report**  
 > **Repository:** [`https://github.com/yusufcalisir/CF-Intelligence`](https://github.com/yusufcalisir/CF-Intelligence)  
-> **Audited Baseline:** 6,187 Collected Tests across Backend (5,371 Pytest), Scientific Verification (410 Tests / 21 Modules), Frontend (375 Vitest), and Smart Contracts (31 Hardhat).
+> **Audited Baseline:** 6,444 Collected Tests across Backend (5,617 Pytest), Scientific Verification (410 Tests / 22 Modules), Python SDK (11 Tests), Frontend (375 Vitest), and Smart Contracts (31 Hardhat).
 
 ---
 
@@ -25,7 +25,7 @@ The audit inspected all components across the full repository footprint:
 3. **API Presentation Layer** (`backend/app/presentation/routers/`): 35 FastAPI routers exposing 160+ endpoints, WebSocket handlers, and ABAC dependency injectors.
 4. **Machine Learning & Privacy** (`fl_engine.py`, `graph_embedding_model.py`, `privacy_service.py`): FedAvg, FedProx, SCAFFOLD implementations, PyTorch GraphSAGE mean aggregators, and Opacus Differential Privacy accounting.
 5. **Research Prototypes**: TenSEAL CKKS FHE driver, Groth16 zk-SNARK attestation verifier, software-emulated TEE driver, CRYSTALS-Kyber-768 PQC driver, and Solidity smart contracts (`contracts/`).
-6. **Test Suites** (`backend/tests/`, `verification/`, `frontend/tests/`, `contracts/`): 237+ backend test modules (5,371 Pytest tests), 21 self-contained scientific verification suites (410 tests), 87 frontend Vitest test files (375 tests), and 31 Hardhat smart contract tests.
+6. **Test Suites** (`backend/tests/`, `verification/`, `sdk/`, `frontend/tests/`, `contracts/`): 245+ backend test modules (5,617 Pytest tests), 22 self-contained scientific verification suites (410 tests), Python SDK test suite (11 tests), 87 frontend Vitest test files (375 tests), and 31 Hardhat smart contract tests.
 
 ---
 
@@ -89,9 +89,9 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 │ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
 │ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ Validated by 5,371 Pytest tests,     │ Evaluated across 8 canonical datasets│
+│ Validated by 5,617 Pytest tests,     │ Evaluated across 8 canonical datasets│
 │ (+ 410 verification modules/tests),  │ via benchmarks/runners/ & harness.   │
-│ 375 Vitest components, 31 Hardhat.   │ (Zero mock data or synthetic clamps) │
+│ 11 SDK, 375 Vitest, 31 Hardhat.      │ (Zero mock data or synthetic clamps) │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
 │ NOT prove fraud detection capability.│ if the gateway crashes or leaks PII. │
@@ -226,10 +226,10 @@ Every dataset in `experiments/<dataset>/` strictly adheres to the canonical 5-ar
 
 #### Category 6: Code Quality, CI/CD & Automated Test Suites (Items 34–38)
 - **ITEM-34**: Deterministic CI Smoke Gates ($< 20\text{s}$ fast-fail dataloader, model serialization, schema validation) — *VERIFIED [PASS]*
-- **ITEM-35**: Backend Pytest Suite (5,371 automated tests collected, 5,001 passing in standard suite) — *VERIFIED [PASS]*
+- **ITEM-35**: Backend Pytest Suite (5,617 automated tests collected across 245+ test modules) — *VERIFIED [PASS]*
 - **ITEM-36**: Frontend Vitest Suite (87 test files, 375 tests, 100% passing) — *VERIFIED [PASS]*
-- **ITEM-37**: Scientific Invariant Verification Suite (21 modules, 410 tests, 409 passing, 1 skipped) — *VERIFIED [PASS]*
-- **ITEM-38**: Smart Contracts (31 tests, Hardhat) & Clean Static Analysis (0 Ruff errors) — *VERIFIED [PASS]*
+- **ITEM-37**: Scientific Invariant Verification Suite (22 modules, 410 tests, 409 passing, 1 skipped) — *VERIFIED [PASS]*
+- **ITEM-38**: Python SDK (11 tests) & Smart Contracts (31 tests, Hardhat) & Clean Static Analysis (0 Ruff errors) — *VERIFIED [PASS]*
 
 ### 8.3 Formal Attestation Sign-Off Statement
 > **PLATFORM REPRODUCIBILITY & INTEGRITY CERTIFICATION:**  
