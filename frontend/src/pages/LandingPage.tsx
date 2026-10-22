@@ -37,6 +37,8 @@ const PLATFORM_MODULES: Module[] = [
   { id: 'docker-stack', name: 'One-Click Enterprise Deployment Stack', category: 'Core Production Engine', purpose: 'Full multi-container orchestration package deploying Nginx Gateway, React 19 SPA, FastAPI, PostgreSQL 16, and Redis 7.2 in under 30s with Same-Origin routing and 86400s WebSocket keepalive.', algorithm: 'Same-Origin Reverse Proxy, Zero-Trust Health Probing', inputs: 'docker compose up -d, .env credentials', outputs: 'Healthy production mesh, unified same-origin portal', tech: 'Docker Compose v2, Nginx, PostgreSQL 16, Redis 7.2' },
   { id: 'db-migrations', name: 'Multi-Tenant Database & Alembic Engine', category: 'Core Production Engine', purpose: 'Executes linear dual-revision migrations (001 -> 002) with dynamic tenant discovery from tenant_configs across PostgreSQL schemas and isolated SQLite databases.', algorithm: 'Alembic Linear Revision, Dynamic Discovery, Auto-Stamping', inputs: 'SQLAlchemy AsyncEngine, active_tenant context', outputs: 'Zero-drift isolated schemas, batch SQLite migration', tech: 'Alembic, SQLAlchemy 2.0 Async, PostgreSQL 16, SQLite' },
   { id: 'tenant-kms', name: 'Multi-Tenant KMS & Key Lifecycle Engine', category: 'Core Production Engine', purpose: 'Enforces versioned envelope encryption (v1/v2) with AES-256-GCM, automated re-encryption, fail-closed revocation, and scheduled rotation cron triggers.', algorithm: 'Envelope AES-256-GCM, Key Rotation Pipeline, HashiCorp Vault', inputs: 'Tenant secret keys, master Vault secret', outputs: 'Versioned ciphertext envelopes, re-encrypted payloads', tech: 'Cryptography (AES-GCM), HashiCorp Vault, Python 3.12' },
+  { id: 'operational-federation', name: 'Operational Federation & Bank Worker Mesh', category: 'Core Production Engine', purpose: 'Coordinates production federated learning across isolated bank worker processes (Windows Restricted Token / POSIX fork) with Ed25519 worker receipts and inactive candidate model registration.', algorithm: 'Process-Isolated Attestation + Ed25519 Receipts + Provenance Chaining', inputs: 'Pre-provisioned bank endpoints, server-side authority context, mTLS certs', outputs: 'Signed bank worker receipts, verified aggregated candidate model, TRAINING_RECORDED provenance', tech: 'OperationalFederationService, Windows Restricted Tokens, Ed25519, ModelRegistry' },
+  { id: 'dataset-ingestor', name: 'Client-Side Dataset Ingestion Studio', category: 'Core Production Engine', purpose: 'Sanitizes incoming customer PANs via Luhn algorithm, applies type-salted HMAC-SHA256 pseudonymization, and enforces Great Expectations 1.x data contract suites before local training.', algorithm: 'Luhn Algorithm + Type-Salted HMAC-SHA256 + Great Expectations 1.x Schema Gates', inputs: 'Raw CSV / Parquet bank transaction records', outputs: 'Zero-Raw-PII normalized tensors + cryptographic verification receipts', tech: 'Great Expectations 1.x, Pandas, HMAC-SHA256, Python 3.12' },
 
   // ── FRONTIER LAB (ADVANCED R&D TRACK) ─────────────────────────────────────
   { id: 'pqc-secagg', name: 'Post-Quantum Cryptography PQC', category: 'Frontier R&D Lab', purpose: 'Researches lattice-based key exchanges for inter-bank P2P SecAgg against future quantum decryption threats (NIST FIPS 203/204).', algorithm: 'CRYSTALS-Kyber-768 KEM + Dilithium-3 Signatures', inputs: 'Lattice public key vectors & encrypted pairwise shares', outputs: 'Quantum-safe decrypted global model gradient', tech: 'NIST FIPS 203/204, liboqs, HKDF-SHA256' },
@@ -161,6 +163,15 @@ const MODULE_SPECS_EXTRA: Record<string, {
     actionRoute: '/operations?openIngest=true',
     actionLabel: 'Open Ingestion Studio',
     tensorSample: 'Zero-PII Receipt: {luhn: PASSED, iban_hash: 0x8a92...bc, dirichlet_alpha: 0.524}',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'operational-federation': {
+    sla: 'Sub-50ms worker dispatch & attestation',
+    security: 'Process-isolated token, Ed25519 domain-separated signatures, zero client credentials',
+    compliance: 'SR 11-7 MRM Model Provenance, SOC 2 Type II Process Isolation',
+    actionRoute: '/operations',
+    actionLabel: 'Open Operational Federation',
+    tensorSample: 'Receipt: {bank: "BANK_A", round: 1, ed25519_sig: "0x...", pid: 8893, status: "READY"} → CandidateModel(status=INACTIVE)',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'docker-stack': {
@@ -304,13 +315,15 @@ const MODULE_SPECS_EXTRA: Record<string, {
 
 const ARCH_NODES: ArchNode[] = [
   { id: 'frontend', label: 'React Dashboard', description: 'Real-time monitoring dashboard and fraud investigation interface.', tech: ['React 19', 'Vite', 'Framer Motion', 'Recharts'], responsibilities: ['FL round monitoring', 'Graph visualisation', 'Risk investigation', 'Node inspection'], protocols: ['WebSocket', 'REST'] },
-  { id: 'api-gw', label: 'API Gateway', description: 'Authenticated entrypoint for all dashboard, bank connector, and external tool traffic.', tech: ['FastAPI', 'JWT', 'TLS 1.3'], responsibilities: ['Auth enforcement', 'Rate limiting', 'Routing', 'Request logging'], protocols: ['HTTPS', 'WebSocket'] },
-  { id: 'coordinator', label: 'FL Coordinator', description: 'Central orchestrator managing training rounds, node selection, and aggregation scheduling.', tech: ['Python 3.12', 'gRPC', 'Celery', 'Redis'], responsibilities: ['Round scheduling', 'Node selection', 'Timeout handling', 'Model versioning'], protocols: ['gRPC', 'Protocol Buffers'] },
+  { id: 'api-gw', label: 'API Gateway', description: 'Authenticated entrypoint for all dashboard, bank connector, and external tool traffic with strict production invariant enforcement.', tech: ['FastAPI', 'JWT', 'TLS 1.3'], responsibilities: ['Auth enforcement', 'Rate limiting', 'Routing', 'Request logging'], protocols: ['HTTPS', 'WebSocket'] },
+  { id: 'coordinator', label: 'FL Coordinator', description: 'Central orchestrator managing training rounds, node selection, and aggregation scheduling.', tech: ['Python 3.12', 'gRPC', 'Celery', 'Redis 7.2'], responsibilities: ['Round scheduling', 'Node selection', 'Timeout handling', 'Model versioning'], protocols: ['gRPC', 'Protocol Buffers'] },
+  { id: 'operational-fed', label: 'Operational Worker Mesh', description: 'Coordinates process-isolated bank worker processes under Windows Restricted Tokens / POSIX fork with Ed25519 receipts.', tech: ['OperationalFederationService', 'Restricted Token', 'Ed25519', 'Alembic 1.13'], responsibilities: ['Worker process isolation', 'Authority resolution', 'Receipt signing', 'Candidate registration'], protocols: ['Internal IPC', 'Process Isolation', 'mTLS'] },
   { id: 'fl-engine', label: 'FL Engine', description: 'Implements federated optimisation algorithms (FedAvg, FedProx) and gradient aggregation.', tech: ['PyTorch 2.4', 'NumPy', 'SciPy'], responsibilities: ['FedAvg', 'FedProx', 'Straggler tolerance', 'Model validation'], protocols: ['Shared Memory', 'gRPC'] },
   { id: 'privacy-engine', label: 'Privacy Engine', description: 'Applies calibrated Gaussian noise and manages cumulative (ε, δ) privacy budget via RDP accountant.', tech: ['Opacus 1.4', 'python-phe', 'RDP'], responsibilities: ['Gradient clipping', 'Noise injection', 'Budget tracking', 'ε audit'], protocols: ['Internal API'] },
   { id: 'sgx-enclave', label: 'SGX Enclave', description: 'Hardware-isolated trusted execution environment for homomorphic aggregation of encrypted gradients.', tech: ['Intel SGX SDK', 'LibTorch (C++)', 'OpenEnclave'], responsibilities: ['HE aggregation', 'Remote attestation', 'Enclave verification', 'Key management'], protocols: ['Enclave-to-Enclave', 'ECALL/OCALL'] },
   { id: 'graph-engine', label: 'Graph Engine', description: 'PyTorch Geometric runtime for transaction graph construction and GNN inference from ISO 20022 feeds.', tech: ['PyTorch Geometric 2.6', 'DGL', 'NetworkX'], responsibilities: ['Graph construction', 'GATConv inference', 'Subgraph sampling', 'Embedding store'], protocols: ['Internal gRPC'] },
   { id: 'bank-nodes', label: 'Bank Node Agents', description: 'Lightweight Python agents deployed at each bank performing local training on private ledger data.', tech: ['PyTorch', 'gRPC client', 'HSM SDK'], responsibilities: ['Local training', 'DP noise injection', 'Gradient encryption', 'Heartbeat'], protocols: ['gRPC (mTLS)', 'ISO 20022 XML'] },
+  { id: 'db-migrations', label: 'Database & Migrations', description: 'Dedicated one-shot migrations container executing Alembic upgrade head before startup; asyncpg for serving, psycopg_pool for ACID transactions.', tech: ['PostgreSQL 16', 'Alembic 1.13', 'asyncpg', 'psycopg_pool'], responsibilities: ['Linear migrations', 'Multi-tenant schemas', 'ACID transactions', 'Zero-drift state'], protocols: ['PostgreSQL Wire Protocol', 'TCP :5432'] },
 ];
 
 const PRESENTATION_WORKFLOW = [
@@ -435,7 +448,7 @@ export interface BenchmarkDatasetInfo {
   routeDataset: 'paysim' | 'ieee_cis' | 'elliptic' | 'creditcard';
 }
 
-export type BenchmarkDatasetKey = 'master' | 'creditcard' | 'paysim' | 'ieee_cis' | 'elliptic';
+export type BenchmarkDatasetKey = 'master' | 'creditcard' | 'paysim' | 'ieee_cis' | 'elliptic' | 'amlsim' | 'synthaml' | 'amlnet';
 
 export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDatasetInfo> = {
   master: {
@@ -537,6 +550,62 @@ export const BENCHMARK_DATASETS_DETAIL: Record<BenchmarkDatasetKey, BenchmarkDat
       { paradigm: 'Tabular MLP Baseline (Node Features Only)', badge: 'Tabular Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.5778', rocauc: '0.7840', recall01: '32.10%', brier: '0.0240', latency: '0.045 ms', compliance: 'Tabular Outperforms GraphSAGE', compliant: false },
       { paradigm: 'Federated Graph Partition (Consortium)', badge: 'Not Evaluated', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '— (NOT_EVALUATED)', rocauc: '—', recall01: '—', brier: '—', latency: '—', compliance: 'Transparent Disclosure (SR 11-7)', compliant: false },
       { paradigm: 'Archived Synthetic Prototype (Quarantined)', badge: 'Historical Proxy', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: 'Archived (0.9001)', rocauc: 'Archived (0.9420)', recall01: 'Archived (80.60%)', brier: '0.0180', latency: '0.340 ms', compliance: '1,500-Node Prototype (Quarantined)', compliant: false },
+    ],
+  },
+  amlsim: {
+    id: 'amlsim',
+    name: 'IBM AMLSim Multi-Hop GraphSAGE',
+    datasetTag: 'Multi-Hop Graph Simulation',
+    scope: '1.32M Transactions · 10k Accounts (Agent Simulation)',
+    prevalence: '0.11% Multi-Hop SAR Patterns',
+    uplift: '+0.0434 PR-AUC vs Tabular (0.6527 vs 0.6093)',
+    fpReduction: '70.50% Fan-In Recall',
+    latency: '13.36 ms / 1k txns',
+    roi: '67.36% Cycle Laundering Interdiction',
+    description: 'Canonical 1.32M transaction agent-based graph benchmark on IBM AMLSim topology (70% train / 30% test). Inductive GraphSAGE 2-layer achieves 0.6527 PR-AUC on multi-hop cycles and fan-in structures, outperforming Tabular MLP baseline (0.6093).',
+    cm: { tp: 742, fp: 189, fn: 312, tn: 394757, precision: '79.7%', recall: '70.4%', f1: '74.8%', specificity: '99.95%' },
+    routeDataset: 'paysim',
+    rows: [
+      { paradigm: 'Inductive GraphSAGE 2-Layer (Graph)', badge: 'Graph Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.6527', rocauc: '0.8940', recall01: '70.50%', brier: '0.0084', latency: '13.36 ms / 1k', compliance: 'Graph Topology Inductive', compliant: true },
+      { paradigm: 'Tabular MLP Baseline (Flat Features)', badge: 'Tabular Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.6093', rocauc: '0.8520', recall01: '52.10%', brier: '0.0125', latency: '0.045 ms', compliance: 'Blind to Dynamic Graph Cycles', compliant: false },
+      { paradigm: 'Centralized Oracle Bound', badge: 'Upper Bound', badgeColor: 'text-slate-400 bg-slate-500/10 border-slate-500/20', prauc: '0.6650', rocauc: '0.9020', recall01: '72.30%', brier: '0.0078', latency: '12.80 ms / 1k', compliance: 'Centralized Graph Pool', compliant: false },
+    ],
+  },
+  synthaml: {
+    id: 'synthaml',
+    name: 'Spar Nord Bank SynthAML AlertMLP',
+    datasetTag: 'Extreme Silo Starvation',
+    scope: '5,000 Multi-Bank Alerts (Synthetic Copula)',
+    prevalence: 'Bank Beta: 0.2214 Silo Collapse',
+    uplift: '+0.7710 PR-AUC (Bank Beta Rescue: 0.9924 vs 0.2214)',
+    fpReduction: '99.2% Precision @ High Precision',
+    latency: '0.042 ms',
+    roi: 'Collaborative Federation Rescue',
+    description: 'Project-generated synthetic benchmark modeled on Danish Spar Nord Bank SAR profiles across 3 banks under extreme partition imbalance. Bank Beta silo collapses to 0.2214 PR-AUC due to sparse local fraud; FedAvg achieves 0.9924 collaborative rescue (Centralized baseline: 0.9341).',
+    cm: { tp: 248, fp: 2, fn: 2, tn: 4748, precision: '99.2%', recall: '99.2%', f1: '99.2%', specificity: '99.96%' },
+    routeDataset: 'creditcard',
+    rows: [
+      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Consortium Champion', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '0.9924', rocauc: '0.9980', recall01: '99.20%', brier: '0.0004', latency: '0.042 ms', compliance: 'Zero Raw PII (Rescues Bank Beta)', compliant: true },
+      { paradigm: 'Centralized Pooled Baseline', badge: 'Pooled Baseline', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', prauc: '0.9341', rocauc: '0.9890', recall01: '94.50%', brier: '0.0012', latency: '0.040 ms', compliance: 'Illegal Data Pooling', compliant: false },
+      { paradigm: 'Bank Beta Silo (Starved Small Bank)', badge: 'Collapsed Silo', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: '0.2214', rocauc: '0.7420', recall01: '18.40%', brier: '0.0450', latency: '0.038 ms', compliance: 'Severe Sample Starvation', compliant: false },
+    ],
+  },
+  amlnet: {
+    id: 'amlnet',
+    name: 'AUSTRAC AMLNet Structuring Detection',
+    datasetTag: 'Cash Structuring Detection',
+    scope: '25,000 Transactions (AUSTRAC Wire Profiles)',
+    prevalence: 'Synthetic Threshold Structuring',
+    uplift: '1.0000 PR-AUC (Rule Separability)',
+    fpReduction: '100% Specificity @ 10k Threshold',
+    latency: '0.038 ms',
+    roi: 'Instant Structuring Pattern Isolation',
+    description: 'AUSTRAC wire structuring benchmark across 3 banks evaluating near-threshold transactions ($8,500-$9,950 AUD). 1.0000 PR-AUC reflects synthetic structuring rule separability where near_thresh feature trivially isolates laundering transactions across institutions.',
+    cm: { tp: 500, fp: 0, fn: 0, tn: 24500, precision: '100.0%', recall: '100.0%', f1: '100.0%', specificity: '100.0%' },
+    routeDataset: 'paysim',
+    rows: [
+      { paradigm: 'Federated FedAvg (Collaborative)', badge: 'Federated Structuring', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', prauc: '1.0000', rocauc: '1.0000', recall01: '100.0%', brier: '0.0001', latency: '0.038 ms', compliance: 'Zero Raw PII (Smurfing Defense)', compliant: true },
+      { paradigm: 'Isolated Bank Silo (Single Institution)', badge: 'Silo Baseline', badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20', prauc: '0.7840', rocauc: '0.8920', recall01: '64.20%', brier: '0.0120', latency: '0.035 ms', compliance: 'Blind to Multi-Bank Smurfing', compliant: false },
     ],
   },
 };
@@ -1275,7 +1344,7 @@ export default function LandingPage() {
   const [selectedBenchmarkTab, setSelectedBenchmarkTab] = useState<BenchmarkDatasetKey>('master');
   const [activeBankDrawer, setActiveBankDrawer] = useState<BankInfoDetail | null>(null);
   const [activeModule, setActiveModule] = useState<Module | null>(PLATFORM_MODULES[0] ?? null);
-  const [moduleFilter, setModuleFilter] = useState<'ALL' | 'CORE' | 'FRONTIER'>('ALL');
+  const [moduleFilter, setModuleFilter] = useState<'ALL' | 'CORE' | 'REGTECH' | 'FRONTIER'>('ALL');
   const [activeArchNode, setActiveArchNode] = useState<ArchNode | null>(ARCH_NODES[0] ?? null);
 
   const [activeWorkflowStep, setActiveWorkflowStep] = useState<number>(1);
@@ -1883,10 +1952,11 @@ export default function LandingPage() {
               </div>
 
               {/* Category Filter Pills */}
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/4 border border-white/8 shrink-0 self-start md:self-end">
+              <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-white/4 border border-white/8 shrink-0 self-start md:self-end">
                 {[
                   { id: 'ALL', label: `All (${PLATFORM_MODULES.length})` },
                   { id: 'CORE', label: `Core Engine (${PLATFORM_MODULES.filter(m => m.category.includes('Core')).length})` },
+                  { id: 'REGTECH', label: `European RegTech (${PLATFORM_MODULES.filter(m => m.category.includes('European') || m.category.includes('RegTech')).length})` },
                   { id: 'FRONTIER', label: `Frontier Lab (${PLATFORM_MODULES.filter(m => m.category.includes('Frontier')).length})` },
                 ].map(tab => (
                   <button
@@ -1894,7 +1964,13 @@ export default function LandingPage() {
                     onClick={() => {
                       setModuleFilter(tab.id as any);
                       const filtered = PLATFORM_MODULES.filter(m => 
-                        tab.id === 'ALL' ? true : tab.id === 'CORE' ? m.category.includes('Core') : m.category.includes('Frontier')
+                        tab.id === 'ALL'
+                          ? true
+                          : tab.id === 'CORE'
+                          ? m.category.includes('Core')
+                          : tab.id === 'REGTECH'
+                          ? m.category.includes('European') || m.category.includes('RegTech')
+                          : m.category.includes('Frontier')
                       );
                       const first = filtered[0];
                       if (first && (!activeModule || !filtered.some(m => m.id === activeModule.id))) {
@@ -1917,7 +1993,13 @@ export default function LandingPage() {
               {/* Left Column: Filtered List with Clean Scrollbar & Mobile Accordion */}
               <div className="lg:col-span-4 space-y-2.5 w-full min-w-0 max-h-none lg:max-h-[640px] lg:overflow-y-auto pr-0 lg:pr-1">
                 {PLATFORM_MODULES.filter(m =>
-                  moduleFilter === 'ALL' ? true : moduleFilter === 'CORE' ? m.category.includes('Core') : m.category.includes('Frontier')
+                  moduleFilter === 'ALL'
+                    ? true
+                    : moduleFilter === 'CORE'
+                    ? m.category.includes('Core')
+                    : moduleFilter === 'REGTECH'
+                    ? m.category.includes('European') || m.category.includes('RegTech')
+                    : m.category.includes('Frontier')
                 ).map(mod => {
                   const isSelected = activeModule?.id === mod.id;
                   const isCore = mod.category.includes('Core');
@@ -2244,9 +2326,9 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* 5 Dataset Interactive Pill Selectors */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-6">
-              {(['master', 'creditcard', 'paysim', 'ieee_cis', 'elliptic'] as const).map(tabKey => {
+            {/* 8 Dataset Interactive Pill Selectors */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-6">
+              {(['master', 'creditcard', 'paysim', 'ieee_cis', 'elliptic', 'amlsim', 'synthaml', 'amlnet'] as const).map(tabKey => {
                 const ds = BENCHMARK_DATASETS_DETAIL[tabKey];
                 if (!ds) return null;
                 const isActive = selectedBenchmarkTab === tabKey;
@@ -2255,24 +2337,24 @@ export default function LandingPage() {
                     key={tabKey}
                     type="button"
                     onClick={() => setSelectedBenchmarkTab(tabKey)}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
+                    className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
                       isActive
                         ? 'bg-gradient-to-b from-[#131338] to-[#0a0a24] border-indigo-500/60 shadow-[0_0_20px_rgba(99,102,241,0.25)]'
                         : 'bg-[#060614]/80 border-white/8 hover:border-white/20 hover:bg-[#0c0c28]/60 text-slate-400'
                     }`}
                   >
-                    <div className="flex items-center justify-between text-[9px] font-mono mb-1">
+                    <div className="flex items-center justify-between text-[8.5px] font-mono mb-1">
                       <span className={isActive ? 'text-indigo-400 font-bold' : 'text-slate-400'}>
-                        {ds.datasetTag}
+                        {ds.datasetTag.split(' ')[0]}
                       </span>
                       {isActive && (
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
                       )}
                     </div>
-                    <div className={`text-xs font-bold truncate ${isActive ? 'text-white' : 'text-slate-200'}`}>
+                    <div className={`text-[11px] font-bold truncate ${isActive ? 'text-white' : 'text-slate-200'}`}>
                       {ds.name.split('(')[0]?.trim()}
                     </div>
-                    <div className="text-[10px] font-mono text-slate-400 mt-1 truncate">
+                    <div className="text-[9.5px] font-mono text-slate-400 mt-0.5 truncate">
                       {ds.scope.split('·')[0]?.trim()}
                     </div>
                   </button>
@@ -2827,10 +2909,15 @@ telemetry.on('round.stage', (evt) => {
                   {[
                     { method: 'POST', path: '/api/v1/score-transaction', desc: 'Real-Time Fraud Gateway: score transaction with entity resolution & SHAP breakdown', req: 'transaction_id, amount, merchant_id, currency', res: 'risk_score, risk_level, decision, latency_ms' },
                     { method: 'POST', path: '/api/v1/predict',           desc: 'Full-Feature Composite Inference: multi-signal fraud prediction & rule triggers', req: 'transaction_amount, velocity, merchant_risk_score', res: 'fraud_probability, risk_score, policy_action' },
+                    { method: 'POST', path: '/api/v1/training/federation/jobs', desc: 'Operational Federation: Launch production federated learning across isolated bank workers with server-side authority resolution & Ed25519 receipts', req: 'consortium_id, participating_banks, num_rounds, dp_enabled, byzantine_defense', res: 'job_id, status: STARTED, receipts array, model_id' },
                     { method: 'POST', path: '/api/v1/simulations',       desc: 'Trigger a new federated training round across authenticated bank nodes', req: 'consortium_id, node_ids, privacy_config', res: 'simulation_id, status: STARTED' },
                     { method: 'POST', path: '/api/v1/copilot/generate-sar', desc: 'Autonomous Agentic AML Copilot: synthesize 5-paragraph FinCEN SAR narratives & 4-Eyes briefings', req: 'case_id, shap_attributions, graph_nodes', res: 'sar_narrative, supervisor_briefing' },
                     { method: 'POST', path: '/api/v1/onboarding/register', desc: 'Issue bank node onboarding and certificate provisioning request', req: 'bank_id, legal_name, jurisdiction, contact_email', res: 'bank_id, cert_fingerprint, mtls_cert_pem' },
                     { method: 'GET',  path: '/api/v1/onboarding/bundle/{bank_id}', desc: 'Download mTLS X.509 client certificate and pre-rendered daemon config', req: 'bank_id (path parameter)', res: 'cert_fingerprint, config_yaml' },
+                    { method: 'POST', path: '/api/v1/compliance/dossier/generate', desc: 'Regulatory Dossier Generator: Compile EU AI Act Articles 9–15 and SR 11-7 model risk management verification package', req: 'consortium_id, model_version, jurisdiction', res: 'dossier_id, compliance_score, audit_sha256, pdf_url' },
+                    { method: 'POST', path: '/api/v1/bridge/messages',    desc: 'Inter-Bank FININT Messaging: Exchange encrypted collaborative case intelligence tickets (Curve25519 ECDH + AES-256-GCM)', req: 'recipient_bic, encrypted_payload, evidence_hash, sla_hours', res: 'ticket_id, delivery_status: ENCRYPTED, timestamp' },
+                    { method: 'POST', path: '/api/v1/recall/payment',     desc: 'SEPA Instant Recall Automation: Dispatch ISO 20022 camt.056 cancellation & trigger sub-second provisional hold webhooks', req: 'msg_id, original_uetr, recall_reason: FRAD/TECH, return_amount', res: 'recall_id, xml_camt056, provisional_hold_status' },
+                    { method: 'POST', path: '/api/v1/screening/screen',   desc: 'Sanctions & PEP Screening: Match entity against 5 multi-jurisdiction watchlists (EU/UN/OFAC/HMT/PEP) across 5 phonetic/fuzzy algorithms', req: 'entity_name, entity_type, nationalities, dob', res: 'risk_score, match_status, matched_sources, audit_id' },
                     { method: 'POST', path: '/api/v1/security/bridge/disburse', desc: 'Cross-Chain Settlement: disburse Leave-One-Out Shapley incentive payouts via Chainlink CCIP', req: 'epoch_id, pool_amount, currency', res: 'routes, gas_fees_usd, audit_hash' },
                     { method: 'POST', path: '/api/v1/security/rdp/calibrate', desc: 'Adaptive DP Auto-Scaler: dynamically calibrate per-round noise multiplier σ_t via Rényi DP', req: 'round_id, current_loss, batch_size', res: 'calibrated_sigma, optimal_alpha' },
                     { method: 'GET',  path: '/api/v1/audit/records',     desc: 'Query immutable SHA-256 cryptographic audit chain records', req: 'tenant_id (optional), limit', res: 'array of AuditRecord objects + block_hash' },
