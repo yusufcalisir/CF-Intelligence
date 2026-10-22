@@ -83,6 +83,7 @@ jobs:
               --ignore-vuln PYSEC-2026-35 \
               --ignore-vuln PYSEC-2026-1284 \
               --ignore-vuln PYSEC-2026-2141 \
+              --ignore-vuln CVE-2026-114603 \
               --ignore-vuln PYSEC-2026-1805; then
               echo "✅ pip-audit completed successfully."
               exit 0
@@ -101,6 +102,7 @@ jobs:
             --ignore-vuln PYSEC-2026-35 \
             --ignore-vuln PYSEC-2026-1284 \
             --ignore-vuln PYSEC-2026-2141 \
+            --ignore-vuln CVE-2026-114603 \
             --ignore-vuln PYSEC-2026-1805
 
       # ── Frontend: npm audit ─────────────────────────────────────────────

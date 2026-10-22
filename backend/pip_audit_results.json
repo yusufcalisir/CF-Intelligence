@@ -597,42 +597,42 @@
     },
     {
       "name": "opentelemetry-api",
-      "version": "1.44.0",
+      "version": "1.45.1",
       "vulns": []
     },
     {
       "name": "opentelemetry-sdk",
-      "version": "1.44.0",
+      "version": "1.45.1",
       "vulns": []
     },
     {
       "name": "opentelemetry-semantic-conventions",
-      "version": "0.65b0",
+      "version": "0.66b1",
       "vulns": []
     },
     {
       "name": "opentelemetry-exporter-otlp",
-      "version": "1.44.0",
+      "version": "1.45.1",
       "vulns": []
     },
     {
       "name": "opentelemetry-exporter-otlp-proto-grpc",
-      "version": "1.44.0",
+      "version": "1.45.1",
       "vulns": []
     },
     {
       "name": "opentelemetry-exporter-otlp-proto-common",
-      "version": "1.44.0",
+      "version": "1.45.1",
       "vulns": []
     },
     {
       "name": "opentelemetry-exporter-otlp-proto-http",
-      "version": "1.44.0",
+      "version": "1.45.1",
       "vulns": []
     },
     {
       "name": "opentelemetry-proto",
-      "version": "1.44.0",
+      "version": "1.45.1",
       "vulns": []
     },
     {
@@ -1046,22 +1046,22 @@
     },
     {
       "name": "opentelemetry-instrumentation-fastapi",
-      "version": "0.65b0",
+      "version": "0.66b1",
       "vulns": []
     },
     {
       "name": "opentelemetry-instrumentation",
-      "version": "0.65b0",
+      "version": "0.66b1",
       "vulns": []
     },
     {
       "name": "opentelemetry-instrumentation-asgi",
-      "version": "0.65b0",
+      "version": "0.66b1",
       "vulns": []
     },
     {
       "name": "opentelemetry-util-http",
-      "version": "0.65b0",
+      "version": "0.66b1",
       "vulns": []
     },
     {
