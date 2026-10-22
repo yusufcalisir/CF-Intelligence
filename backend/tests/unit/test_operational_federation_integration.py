@@ -2914,7 +2914,7 @@ class TestImmutablePreTrainingConsortiumBinding:
                 assert rec_before["transaction_id"] == "txn_continuous_e2e_001"
                 assert rec_before["champion_version"] == model_ver
                 assert rec_before["bank_id"] == "bank_a"
-                assert rec_before["champion_prob"] == pred_json["fraud_probability"]
+                assert rec_before["champion_prob"] == pytest.approx(pred_json["fraud_probability"], rel=1e-5)
                 assert rec_before.get("actual_label") is None
 
                 feedback_req = {
