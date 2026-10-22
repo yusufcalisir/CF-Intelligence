@@ -26,19 +26,43 @@ def test_generate_secrets_creates_valid_env(tmp_path: Path) -> None:
     assert "cfi_secure_pass_2026_change_in_production" not in content
     assert "cfi_redis_secure_pass_2026_change_in_production" not in content
     assert "admin_change_in_production" not in content
+    assert "cfi_local_secret_key_2026_change_me_in_production" not in content
+    assert "cfi_payload_signing_secret_2026_change_in_production" not in content
+    assert "cfi_training_coordinator_token_2026_change_in_production" not in content
+    assert "cfi_training_worker_token_2026_change_in_production" not in content
+    assert "cfi_oidc_jwt_secret_key_2026_enterprise_change_in_production" not in content
+    assert "cfi_identity_store_secret_2026_change_in_production" not in content
+
     assert "POSTGRES_PASSWORD=" in content
     assert "SECRET_KEY=" in content
     assert "REDIS_PASSWORD=" in content
+    assert "TRAINING_JOB_DB_URL=" in content
+    assert "OIDC_JWT_SIGNING_SECRET=" in content
+    assert "PAYLOAD_SIGNING_SECRET=" in content
+    assert "TRAINING_COORDINATOR_TOKEN=" in content
+    assert "TRAINING_WORKER_TOKEN=" in content
+    assert "IDENTITY_STORE_SECRET=" in content
+
+    # Invariant: Freshly generated .env must pass production invariant validation
+    from app.config import Settings
+
+    settings = Settings(_env_file=dst_env, app_env="production")
+    # Must not raise ValueError
+    settings.validate_production_invariants()
 
 
 def test_docker_compose_manifest_structure() -> None:
-    """Verify master docker-compose.yml contains all 5 core production services."""
+    """Verify master docker-compose.yml contains all core production services and one-shot migration service."""
     compose_path = root_dir / "docker-compose.yml"
     assert compose_path.exists()
 
     content = compose_path.read_text(encoding="utf-8")
-    for svc in ["gateway:", "frontend:", "backend:", "postgres:", "redis:"]:
+    for svc in ["gateway:", "frontend:", "backend:", "postgres:", "redis:", "migrations:"]:
         assert svc in content, f"Service {svc} missing from docker-compose.yml"
+
+    # Backend must wait for migration completion before serving traffic
+    assert "migrations:" in content
+    assert "condition: service_completed_successfully" in content
 
 
 def test_nginx_gateway_websocket_and_security_headers() -> None:
@@ -100,4 +124,107 @@ def test_dev_compose_parity() -> None:
     assert "DATABASE_TYPE=postgres" in content
     assert "POSTGRES_HOST=postgres" in content
     assert "REDIS_HOST=redis" in content
+
+
+def test_missing_secrets_fail_closed_in_production() -> None:
+    """Verify that empty, placeholder, or insecure secrets strictly fail production invariants."""
+    import pytest
+
+    from app.config import Settings
+
+    # Case 1: Insecure postgres password containing change_me
+    bad_settings = Settings(
+        app_env="production",
+        app_debug=False,
+        database_type="postgres",
+        postgres_password="change_me_in_production",
+        payload_signing_secret="valid_payload_signing_secret_64_chars_high_entropy_token_2026_ok",
+        training_coordinator_token="valid_coord_token_64_chars_high_entropy_token_2026_ok",
+        training_worker_token="valid_worker_token_64_chars_high_entropy_token_2026_ok",
+        training_job_db_url="postgresql://user:pass@host:5432/db",
+        oidc_jwt_signing_secret="valid_oidc_jwt_signing_secret_64_chars_high_entropy_2026_ok",
+        identity_store_secret="valid_identity_store_secret_64_chars_high_entropy_2026_ok",
+    )
+    with pytest.raises(ValueError, match="postgres_password must be customized in production"):
+        bad_settings.validate_production_invariants()
+
+    # Case 2: Identical worker and coordinator tokens (privilege separation)
+    bad_priv = Settings(
+        app_env="production",
+        app_debug=False,
+        database_type="postgres",
+        postgres_password="secure_pg_pass_2026_production_ok",
+        payload_signing_secret="valid_payload_signing_secret_64_chars_high_entropy_token_2026_ok",
+        training_coordinator_token="shared_identical_token_between_worker_and_coordinator",
+        training_worker_token="shared_identical_token_between_worker_and_coordinator",
+        training_job_db_url="postgresql://user:pass@host:5432/db",
+        oidc_jwt_signing_secret="valid_oidc_jwt_signing_secret_64_chars_high_entropy_2026_ok",
+        identity_store_secret="valid_identity_store_secret_64_chars_high_entropy_2026_ok",
+    )
+    with pytest.raises(ValueError, match="training_worker_token and training_coordinator_token must be distinct"):
+        bad_priv.validate_production_invariants()
+
+    # Case 3: Incompatible SQLite training authority URL in production
+    bad_db = Settings(
+        app_env="production",
+        app_debug=False,
+        database_type="postgres",
+        postgres_password="secure_pg_pass_2026_production_ok",
+        payload_signing_secret="valid_payload_signing_secret_64_chars_high_entropy_token_2026_ok",
+        training_coordinator_token="valid_coord_token_64_chars_high_entropy_token_2026_ok",
+        training_worker_token="valid_worker_token_64_chars_high_entropy_token_2026_ok",
+        training_job_db_url="sqlite:///tmp/test.db",
+        oidc_jwt_signing_secret="valid_oidc_jwt_signing_secret_64_chars_high_entropy_2026_ok",
+        identity_store_secret="valid_identity_store_secret_64_chars_high_entropy_2026_ok",
+    )
+    with pytest.raises(ValueError, match="training_job_db_url in production must be a PostgreSQL connection URL"):
+        bad_db.validate_production_invariants()
+
+
+def test_standalone_helm_chart_security_and_storage_guardrails() -> None:
+    """Verify helm/cfi-platform defines UID 1000, persistent storage, and single-replica staging defaults."""
+    import shutil
+    import subprocess
+
+    import yaml
+
+    helm_dir = root_dir / "helm" / "cfi-platform"
+    assert (helm_dir / "Chart.yaml").exists()
+    assert (helm_dir / "values.yaml").exists()
+    assert (helm_dir / "templates" / "pvc.yaml").exists()
+
+    values = yaml.safe_load((helm_dir / "values.yaml").read_text(encoding="utf-8"))
+    assert values["replicaCount"] == 1
+    assert values["podSecurityContext"]["runAsUser"] == 1000
+    assert values["podSecurityContext"]["fsGroup"] == 1000
+    assert values["persistence"]["enabled"] is True
+    assert values["persistence"]["mountPath"] == "/app/storage"
+    assert values["existingSecret"] == "cfi-platform-secrets"
+    assert values["autoscaling"]["enabled"] is False
+
+    # If helm CLI is present, execute real lint and template verification
+    helm_bin = shutil.which("helm")
+    if helm_bin:
+        # Test 1: helm lint must succeed
+        res_lint = subprocess.run([helm_bin, "lint", str(helm_dir)], capture_output=True, text=True, check=False)
+        assert res_lint.returncode == 0, f"helm lint failed: {res_lint.stderr}"
+
+        # Test 2: helm template staging render must succeed
+        res_tmpl = subprocess.run([helm_bin, "template", "cfi-staging", str(helm_dir)], capture_output=True, text=True, check=False)
+        assert res_tmpl.returncode == 0, f"helm template failed: {res_tmpl.stderr}"
+        output = res_tmpl.stdout
+        assert "PersistentVolumeClaim" in output
+        assert "cfi-platform-storage-pvc" in output
+        assert "runAsUser: 1000" in output
+        assert "cfi-platform-secrets" in output
+
+        # Test 3: Unsafe multi-replica guardrail with ReadWriteOnce must fail fast
+        res_bad = subprocess.run(
+            [helm_bin, "template", "cfi-bad", str(helm_dir), "--set", "replicaCount=2"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert res_bad.returncode != 0
+        assert "Unsafe multi-replica deployment: ReadWriteOnce persistence cannot be mounted" in res_bad.stderr
 

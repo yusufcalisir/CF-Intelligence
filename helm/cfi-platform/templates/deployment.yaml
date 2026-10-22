@@ -1,3 +1,9 @@
+{{- if and (gt (int .Values.replicaCount) 1) (and .Values.persistence.enabled (eq .Values.persistence.accessMode "ReadWriteOnce")) }}
+{{- fail "Unsafe multi-replica deployment: ReadWriteOnce persistence cannot be mounted across multiple replicas without shared storage (ReadWriteMany). Set replicaCount=1 or use a shared storage class with ReadWriteMany." }}
+{{- end }}
+{{- if and (gt (int .Values.replicaCount) 1) (not .Values.persistence.enabled) }}
+{{- fail "Unsafe multi-replica deployment: Authoritative model registry and governance state requires persistent storage. Running multiple replicas on ephemeral storage will cause state divergence." }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -59,9 +65,25 @@ spec:
             requests:
               cpu: {{ .Values.resources.requests.cpu | quote }}
               memory: {{ .Values.resources.requests.memory | quote }}
+          {{- if .Values.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.existingSecret | quote }}
+          {{- end }}
           env:
             {{- range $key, $val := .Values.env }}
             - name: {{ $key }}
               value: {{ $val | quote }}
             {{- end }}
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: storage-data
+              mountPath: {{ .Values.persistence.mountPath | default "/app/storage" }}
+          {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+        - name: storage-data
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default "cfi-platform-storage-pvc" }}
+      {{- end }}
 

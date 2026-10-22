@@ -219,7 +219,14 @@ class Settings(BaseSettings):
     oidc_enabled: bool = True
     oidc_issuer_url: str = "https://auth.cfi-platform.internal/realms/cfi"
     oidc_client_id: str = "cfi-api"
-    oidc_jwt_signing_secret: str = "cfi_oidc_jwt_secret_key_2026_enterprise_hs256"
+    oidc_jwt_signing_secret: str = Field(
+        default="cfi_oidc_jwt_secret_key_2026_enterprise_hs256",
+        validation_alias=AliasChoices(
+            "oidc_jwt_signing_secret",
+            "cfi_oidc_jwt_signing_secret",
+        ),
+        description="High-entropy JWT signing secret for enterprise OIDC authentication.",
+    )
     identity_store_path: str = Field(
         default="",
         validation_alias=AliasChoices(
@@ -374,11 +381,11 @@ class Settings(BaseSettings):
         }
 
     def validate_production_invariants(self) -> None:
-        """Enforces security-by-default and fail-closed validation when operating in production mode.
+        """Enforces security-by-default and fail-closed validation when operating in production or staging mode.
 
         Fails fast if insecure development defaults, fallback secrets, or open debug flags are retained.
         """
-        if self.app_env.lower() != "production":
+        if self.app_env.lower() not in ("production", "staging"):
             return
 
         violations: list[str] = []

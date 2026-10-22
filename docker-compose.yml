@@ -46,7 +46,33 @@ services:
       timeout: 3s
       retries: 3
 
-  # ── 3. Backend API & Federated ML Engine ────────────────────────────────────
+  # ── 3. Database Migration Service (One-Shot Schema Preparation) ───────────────
+  migrations:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    image: cfi-intelligence/backend:latest
+    container_name: cfi-migrations
+    restart: "no"
+    working_dir: /app/backend
+    environment:
+      - APP_ENV=${APP_ENV:-staging}
+      - DATABASE_TYPE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cfi-network
+
+  # ── 4. Backend API & Federated ML Engine ────────────────────────────────────
   backend:
     build:
       context: .
@@ -54,25 +80,35 @@ services:
     image: cfi-intelligence/backend:latest
     container_name: cfi-api-server
     restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
     ports:
       - "${CFI_PORT_GRPC:-50051}:50051"
     environment:
-      - APP_ENV=production
+      - APP_ENV=${APP_ENV:-staging}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DATABASE_TYPE=postgres
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=${POSTGRES_USER:-cfi_admin}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-cfi_secure_pass_2026_change_in_production}
-      - POSTGRES_DB=${POSTGRES_DB:-cfi_fraud_db}
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cfi_admin}:${POSTGRES_PASSWORD:-cfi_secure_pass_2026_change_in_production}@postgres:5432/${POSTGRES_DB:-cfi_fraud_db}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - TRAINING_JOB_DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-cfi_redis_secure_pass_2026_change_in_production}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-cfi_redis_secure_pass_2026_change_in_production}@redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-cfi_super_secret_jwt_key_2026_enterprise_floor}
-      - CONSORTIUM_HMAC_SALT=${CONSORTIUM_HMAC_SALT:-cfi_salt_consortium_hmac_sha256_floor_token_2026}
-      - CFI_REGULATORY_ENVELOPE_SECRET=${CFI_REGULATORY_ENVELOPE_SECRET:-cfi_regulatory_envelope_hmac_secret_2026_enterprise}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - OIDC_JWT_SIGNING_SECRET=${OIDC_JWT_SIGNING_SECRET}
+      - PAYLOAD_SIGNING_SECRET=${PAYLOAD_SIGNING_SECRET}
+      - TRAINING_COORDINATOR_TOKEN=${TRAINING_COORDINATOR_TOKEN}
+      - TRAINING_WORKER_TOKEN=${TRAINING_WORKER_TOKEN}
+      - IDENTITY_STORE_SECRET=${IDENTITY_STORE_SECRET}
+      - CFI_IDENTITY_STORE_SECRET=${IDENTITY_STORE_SECRET}
+      - CFI_CONSORTIUM_STORE_SECRET=${CFI_CONSORTIUM_STORE_SECRET}
+      - CONSORTIUM_HMAC_SALT=${CONSORTIUM_HMAC_SALT}
+      - CFI_REGULATORY_ENVELOPE_SECRET=${CFI_REGULATORY_ENVELOPE_SECRET}
+      - CFI_CRON_SECRET=${CFI_CRON_SECRET}
       - CFI_STORAGE_DIR=/app/storage
       - TELEMETRY_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
@@ -81,18 +117,19 @@ services:
       - KAFKA_TRANSACTION_TOPIC=${KAFKA_TRANSACTION_TOPIC:-org.cfi.finint.transactions.v1}
       - KAFKA_ALERT_TOPIC=${KAFKA_ALERT_TOPIC:-org.cfi.finint.alerts.v1}
       - KAFKA_DLQ_TOPIC=${KAFKA_DLQ_TOPIC:-org.cfi.finint.dlq.v1}
-      - KAFKA_ENABLED=${KAFKA_ENABLED:-true}
+      - KAFKA_ENABLED=${KAFKA_ENABLED:-false}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
     volumes:
       - storage-data:/app/storage
       - ./backend/storage/datasets:/app/storage/datasets:ro
       - ./backend/storage/datasets:/app/backend/storage/datasets:ro
       - logs-data:/app/logs
-
     networks:
       - cfi-network
     healthcheck:
@@ -102,15 +139,15 @@ services:
       start_period: 20s
       retries: 3
 
-  # ── 4. PostgreSQL 16 Enterprise Database ────────────────────────────────────
+  # ── 5. PostgreSQL 16 Enterprise Database ────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: cfi-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-cfi_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cfi_secure_pass_2026_change_in_production}
-      POSTGRES_DB: ${POSTGRES_DB:-cfi_fraud_db}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "${CFI_PORT_PG:-5432}:5432"
     volumes:
@@ -124,14 +161,14 @@ services:
       timeout: 3s
       retries: 5
 
-  # ── 5. Redis 7.2 Cache & Message Broker ─────────────────────────────────────
+  # ── 6. Redis 7.2 Cache & Message Broker ─────────────────────────────────────
   redis:
     image: redis:7.2-alpine
     container_name: cfi-redis
     restart: unless-stopped
     command: >
       redis-server
-      --requirepass ${REDIS_PASSWORD:-cfi_redis_secure_pass_2026_change_in_production}
+      --requirepass ${REDIS_PASSWORD}
       --appendonly yes
       --maxmemory 512mb
       --maxmemory-policy volatile-lru
@@ -142,7 +179,7 @@ services:
     networks:
       - cfi-network
     healthcheck:
-      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-cfi_redis_secure_pass_2026_change_in_production}", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 3

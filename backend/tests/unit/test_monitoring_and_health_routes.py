@@ -81,6 +81,33 @@ class TestHealthAndReadinessProbes:
             assert data["status"] == "degraded"
             assert data["checks"]["database"] is False
 
+    def test_readiness_probe_redis_degraded_and_recovery(self):
+        """Verify readiness probe returns 503 when Redis is unavailable/degraded and recovers to 200 when healthy."""
+        degraded_redis = DependencyHealthStatus(
+            status="DEGRADED",
+            latency_ms=10.0,
+            message="Redis ping failed or connection timed out",
+        )
+        healthy_redis = DependencyHealthStatus(status="HEALTHY", latency_ms=1.1)
+
+        # 1. Degraded Redis -> 503
+        with patch("app.presentation.routers.health.check_redis_component_health", new_callable=AsyncMock) as mock_redis:
+            mock_redis.return_value = degraded_redis
+            resp = client.get("/health/ready")
+            assert resp.status_code == 503
+            data = resp.json()
+            assert data["status"] == "degraded"
+            assert data["checks"]["redis"] is False
+
+        # 2. Redis recovered -> 200
+        with patch("app.presentation.routers.health.check_redis_component_health", new_callable=AsyncMock) as mock_redis:
+            mock_redis.return_value = healthy_redis
+            resp = client.get("/health/ready")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["status"] == "ready"
+            assert data["checks"]["redis"] is True
+
     @pytest.mark.parametrize("prefix", ["/health/dependencies", "/api/v1/health/dependencies", "/v1/health/dependencies"])
     def test_dependencies_detailed_latencies(self, prefix: str):
         """Verify dependency breakdown provides individual latencies and component statuses."""

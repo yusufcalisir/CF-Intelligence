@@ -97,6 +97,10 @@ async def run_migrations_online() -> None:
     db_url = _resolve_target_database_url()
     if db_url.startswith("sqlite:///") and "+aiosqlite" not in db_url:
         db_url = db_url.replace("sqlite:///", "sqlite+aiosqlite:///")
+    if db_url.startswith("postgresql://") and "+asyncpg" not in db_url:
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://")
+    elif db_url.startswith("postgres://") and "+asyncpg" not in db_url:
+        db_url = db_url.replace("postgres://", "postgresql+asyncpg://")
 
     is_sqlite = db_url.startswith("sqlite")
     connectable = create_async_engine(db_url, **_make_async_engine_kwargs(db_url))
@@ -168,6 +172,10 @@ async def run_migrations_for_all_tenants() -> None:
     central_url = _resolve_target_database_url()
     if central_url.startswith("sqlite:///") and "+aiosqlite" not in central_url:
         central_url = central_url.replace("sqlite:///", "sqlite+aiosqlite:///")
+    if central_url.startswith("postgresql://") and "+asyncpg" not in central_url:
+        central_url = central_url.replace("postgresql://", "postgresql+asyncpg://")
+    elif central_url.startswith("postgres://") and "+asyncpg" not in central_url:
+        central_url = central_url.replace("postgres://", "postgresql+asyncpg://")
 
     tenants = await _get_active_tenants(central_url)
 

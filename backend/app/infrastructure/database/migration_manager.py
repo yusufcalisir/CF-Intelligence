@@ -134,3 +134,11 @@ def get_current_head_revision(db_url: str | None = None) -> list[str]:
 
     script = ScriptDirectory.from_config(alembic_cfg)
     return list(script.get_heads())
+
+
+if __name__ == "__main__":
+    import sys
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    target_url = sys.argv[1] if len(sys.argv) > 1 else None
+    upgrade_head(target_url)

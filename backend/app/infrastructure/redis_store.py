@@ -25,6 +25,11 @@ class RedisStore:
         RedisStore is retained only for simulation progress tracking in
         ``simulation_tasks.py`` and rate-limiting in ``gateway.py`` until
         those are migrated.  All other uses should be removed.
+
+        Deployment Topology Limitation:
+        The canonical deployment uses standalone Redis with password authentication.
+        Sharded Redis Cluster topology is UNSUPPORTED / NOT VERIFIED. Multi-key
+        operations and atomic transactions assume single-node keyspaces.
     """
 
     # Class-level flag: once Redis is confirmed unreachable, skip for all instances

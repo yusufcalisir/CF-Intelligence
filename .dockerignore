@@ -4,6 +4,11 @@
 .venv
 venv
 env
+backend/.venv
+backend/venv
+**/.venv
+**/venv
+**/env
 __pycache__
 *.pyc
 *.pyo
@@ -54,6 +59,10 @@ frontend/dist
 .cursor/
 contracts/
 helm/
+deployments/
+scratch/
+.codeql-local/
+.local_runtime_truth_guard/
 
 # Logs & Temporary Files
 *.log

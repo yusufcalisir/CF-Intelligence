@@ -1,4 +1,4 @@
-replicaCount: 2
+replicaCount: 1
 
 image:
   repository: cfi-intelligence/backend
@@ -11,14 +11,24 @@ serviceAccount:
 
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 10001
-  fsGroup: 10001
+  runAsUser: 1000
+  fsGroup: 1000
 
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
       - ALL
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  mountPath: /app/storage
+  existingClaim: ""
+
+existingSecret: "cfi-platform-secrets"
 
 service:
   type: ClusterIP
@@ -51,9 +61,9 @@ resources:
     memory: 1Gi
 
 autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 20
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
   targetCPUUtilizationPercentage: 70
 
 probes:
