@@ -15,21 +15,23 @@ helm/
     └── templates/
         ├── deployment.yaml            # Backend API & FL engine deployment (ports 8000, 50051)
         ├── service.yaml               # ClusterIP service routing HTTP & gRPC traffic
-        ├── hpa.yaml                   # HorizontalPodAutoscaler (2-20 replicas @ 70% CPU)
-        └── ingress.yaml               # Ingress resource with TLS termination & rate limiting
+        ├── hpa.yaml                   # HorizontalPodAutoscaler (1-5 replicas @ 70% CPU)
+        ├── ingress.yaml               # Ingress resource with TLS termination & rate limiting
+        └── pvc.yaml                   # PersistentVolumeClaim for /app/storage (ReadWriteOnce)
 ```
 
 ---
 
 ## 2. Resource Specifications
 
-The chart renders and deploys **4 validated Kubernetes resources**:
+The chart renders and deploys **5 validated Kubernetes resources**:
 
 | Resource | Kind | Name | Port / Config |
 |:---|:---|:---|:---|
-| **Deployment** | `apps/v1` | `cfi-platform-deployment` | Ports `8000` (HTTP), `50051` (gRPC), non-root UID `10001`, `/health` liveness & `/ready` readiness probes |
+| **Deployment** | `apps/v1` | `cfi-platform-deployment` | Ports `8000` (HTTP), `50051` (gRPC), non-root UID `1000`, `/health` liveness & `/ready` readiness probes |
 | **Service** | `v1` | `cfi-platform-service` | `ClusterIP` exposing `8000` (HTTP) and `50051` (gRPC) |
-| **HPA** | `autoscaling/v2` | `cfi-platform-hpa` | Min `2`, Max `20`, Target CPU utilization `70%` |
+| **PVC** | `v1` | `cfi-platform-storage-pvc` | Persistent volume claim for `/app/storage` (10Gi, `ReadWriteOnce`) |
+| **HPA** | `autoscaling/v2` | `cfi-platform-hpa` | Min `1`, Max `5`, Target CPU utilization `70%` (optional/disabled by default) |
 | **Ingress** | `networking.k8s.io/v1` | `cfi-platform-ingress` | Nginx Ingress with cert-manager Let's Encrypt TLS |
 
 ---
@@ -38,13 +40,19 @@ The chart renders and deploys **4 validated Kubernetes resources**:
 
 | Parameter | Type | Default | Description |
 |:---|:---|:---|:---|
-| `replicaCount` | `int` | `2` | Initial replica count |
+| `replicaCount` | `int` | `1` | Initial replica count (guardrail enforced for ReadWriteOnce storage) |
 | `image.repository` | `string` | `cfi-intelligence/backend` | Container image repository |
 | `image.tag` | `string` | `latest` | Container image tag |
 | `image.pullPolicy` | `string` | `IfNotPresent` | Image pull policy |
 | `serviceAccount.create` | `bool` | `true` | Create dedicated Kubernetes ServiceAccount |
 | `podSecurityContext.runAsNonRoot` | `bool` | `true` | Enforce non-root execution |
-| `podSecurityContext.runAsUser` | `int` | `10001` | Non-root runtime user UID |
+| `podSecurityContext.runAsUser` | `int` | `1000` | Non-root runtime user UID |
+| `podSecurityContext.fsGroup` | `int` | `1000` | Non-root runtime filesystem group GID |
+| `securityContext.allowPrivilegeEscalation` | `bool` | `false` | Prevent container privilege escalation |
+| `persistence.enabled` | `bool` | `true` | Enable persistent storage for registry & ledgers |
+| `persistence.size` | `string` | `10Gi` | Persistent storage allocation |
+| `persistence.mountPath` | `string` | `/app/storage` | Container storage mount target |
+| `existingSecret` | `string` | `cfi-platform-secrets` | Pre-existing Kubernetes Secret name |
 | `service.type` | `string` | `ClusterIP` | Kubernetes Service type |
 | `service.port` | `int` | `8000` | HTTP API port |
 | `service.grpcPort` | `int` | `50051` | gRPC Mutual TLS port |
@@ -52,9 +60,9 @@ The chart renders and deploys **4 validated Kubernetes resources**:
 | `ingress.className` | `string` | `nginx` | Ingress controller class |
 | `resources.limits.cpu` | `string` | `2000m` | CPU limit |
 | `resources.limits.memory` | `string` | `4Gi` | Memory limit |
-| `autoscaling.enabled` | `bool` | `true` | Enable HorizontalPodAutoscaler |
-| `autoscaling.minReplicas` | `int` | `2` | Minimum autoscaling replicas |
-| `autoscaling.maxReplicas` | `int` | `20` | Maximum autoscaling replicas |
+| `autoscaling.enabled` | `bool` | `false` | Enable HorizontalPodAutoscaler |
+| `autoscaling.minReplicas` | `int` | `1` | Minimum autoscaling replicas |
+| `autoscaling.maxReplicas` | `int` | `5` | Maximum autoscaling replicas |
 | `autoscaling.targetCPUUtilizationPercentage` | `int` | `70` | Target CPU utilization percentage for autoscaling |
 | `probes.liveness.path` | `string` | `/health` | Kubernetes container liveness probe endpoint path |
 | `probes.liveness.initialDelaySeconds` | `int` | `15` | Liveness probe initial delay in seconds |
