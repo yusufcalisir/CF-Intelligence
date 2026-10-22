@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -42,7 +43,23 @@ class StreamingEngine:
 
     def __init__(self, kafka_connector: KafkaStreamingConnector | None = None) -> None:
         self._active_scenarios: dict[str, dict] = {}
-        self._kafka_connector = kafka_connector or KafkaStreamingConnector()
+        if kafka_connector is not None:
+            self._kafka_connector: KafkaStreamingConnector | None = kafka_connector
+        else:
+            from app.config import get_settings
+
+            _cfg = get_settings()
+            app_env = os.getenv("APP_ENV", _cfg.app_env).lower().strip()
+            kafka_configured = bool(
+                getattr(_cfg, "kafka_enabled", False)
+                or getattr(_cfg, "use_kafka", False)
+            )
+            if app_env in ("production", "prod") and not kafka_configured:
+                # In production when Kafka is not enabled/configured, Kafka streaming is disabled.
+                # An unauthorized in-memory Kafka loopback substitute must NOT be instantiated (Rule 1, 5, 11).
+                self._kafka_connector = None
+            else:
+                self._kafka_connector = KafkaStreamingConnector()
 
     async def start_scenario(
         self,
@@ -150,21 +167,22 @@ class StreamingEngine:
             except Exception as broadcast_err:
                 logger.debug("Failed to dispatch in-process streaming event: %s", broadcast_err)
 
-            # Publish to Apache Kafka via CloudEvents 1.0 specification
-            try:
-                ce = CloudEvent(
-                    id=event.id,
-                    source=f"urn:cfi:bank:{event.bank_id}",
-                    type=EVENT_TYPE_ALERT if "alert" in event.event_type.lower() else EVENT_TYPE_TRANSACTION,
-                    time=event.timestamp,
-                    data=event_data,
-                    bank_id=event.bank_id,
-                    correlation_id=scenario.id,
-                    idempotency_key=f"scenario:{scenario.id}:{event.id}",
-                )
-                await self._kafka_connector.publish(ce)
-            except Exception as kafka_err:
-                logger.debug("Failed to stream event to Kafka: %s", kafka_err)
+            # Publish to Apache Kafka via CloudEvents 1.0 specification if enabled
+            if self._kafka_connector is not None:
+                try:
+                    ce = CloudEvent(
+                        id=event.id,
+                        source=f"urn:cfi:bank:{event.bank_id}",
+                        type=EVENT_TYPE_ALERT if "alert" in event.event_type.lower() else EVENT_TYPE_TRANSACTION,
+                        time=event.timestamp,
+                        data=event_data,
+                        bank_id=event.bank_id,
+                        correlation_id=scenario.id,
+                        idempotency_key=f"scenario:{scenario.id}:{event.id}",
+                    )
+                    await self._kafka_connector.publish(ce)
+                except Exception as kafka_err:
+                    logger.debug("Failed to stream event to Kafka: %s", kafka_err)
 
             # Process the event locally to populate in-memory stores
             try:
@@ -462,8 +480,8 @@ class StreamingEngine:
                     case_svc._cases.set(case.id, _case_to_dict(case))
 
     @property
-    def kafka_connector(self) -> KafkaStreamingConnector:
-        """Return the underlying Kafka streaming connector."""
+    def kafka_connector(self) -> KafkaStreamingConnector | None:
+        """Return the underlying Kafka streaming connector, or None if disabled."""
         return self._kafka_connector
 
     async def stream_cloudevent(
@@ -472,4 +490,8 @@ class StreamingEngine:
         topic: str | None = None,
     ) -> PublishReceipt:
         """Publish a standalone CloudEvent to the Kafka streaming bus."""
+        if self._kafka_connector is None:
+            raise RuntimeError(
+                "Kafka streaming connector is not enabled in production (kafka_enabled=False / use_kafka=False)."
+            )
         return await self._kafka_connector.publish(event, topic=topic)

@@ -56,7 +56,7 @@ services:
     restart: "no"
     working_dir: /app/backend
     environment:
-      - APP_ENV=${APP_ENV:-staging}
+      - APP_ENV=${APP_ENV:-production}
       - DATABASE_TYPE=postgres
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -84,7 +84,7 @@ services:
     ports:
       - "${CFI_PORT_GRPC:-50051}:50051"
     environment:
-      - APP_ENV=${APP_ENV:-staging}
+      - APP_ENV=${APP_ENV:-production}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DATABASE_TYPE=postgres
       - POSTGRES_HOST=postgres
