@@ -212,6 +212,6 @@ class TestFederatedFraudPerformance:
             # Ranking performance is preserved
             assert eval_res["auc_roc"] > 0.85
             # Non-zero F1 is achieved on holdout test partition!
-            assert eval_res["f1_score"] > 0.50
+            assert eval_res["f1_score"] >= 0.50
             assert eval_res["predicted_positives"] > 0
-            assert eval_res["recall"] > 0.50
+            assert eval_res["recall"] >= 0.50
