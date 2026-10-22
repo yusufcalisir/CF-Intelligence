@@ -2604,6 +2604,8 @@ class TestImmutablePreTrainingConsortiumBinding:
         self, clean_test_environment: str, tmp_path: Any
     ) -> None:
         """Section 01-I Final Integration: Continuous E2E execution from genuine operational federation to serving and feedback."""
+        import app.presentation.routers.predict as predict_router
+        import app.presentation.routers.realtime_inference as realtime_router
         from app.application.services.model_registry import (
             ModelEvaluationEngine,
             generate_signoff_signature,
@@ -2616,8 +2618,6 @@ class TestImmutablePreTrainingConsortiumBinding:
             MemberRole,
         )
         from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
-        import app.presentation.routers.predict as predict_router
-        import app.presentation.routers.realtime_inference as realtime_router
 
         registry_dir = str(tmp_path / "model_registry")
         db_file = str(tmp_path / "authority.db")
@@ -2826,6 +2826,7 @@ class TestImmutablePreTrainingConsortiumBinding:
                 )
 
                 entry_approved = reg.get_version_metadata(target_sim_id, model_ver)
+                assert entry_approved is not None
                 assert entry_approved["status"] == "approved"
                 assert entry_approved["is_production_eligible"] is True
 
@@ -2932,6 +2933,7 @@ class TestImmutablePreTrainingConsortiumBinding:
                     transaction_id="txn_continuous_e2e_001",
                     bank_id="bank_a",
                 )
+                assert rec_after is not None
                 assert rec_after["actual_label"] == 1
 
                 # Essential Negative Assertion 1: UNVERIFIED simulation artifacts cannot be promoted through production gate
@@ -2982,6 +2984,7 @@ class TestImmutablePreTrainingConsortiumBinding:
                     transaction_id="txn_continuous_e2e_001",
                     bank_id="bank_a",
                 )
+                assert rec_final is not None
                 assert rec_final["actual_label"] == 1.0
 
             finally:
