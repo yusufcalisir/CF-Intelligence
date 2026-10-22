@@ -633,7 +633,6 @@ class FlowerFLEngine:
                         "RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO": "0",
                         "KMP_DUPLICATE_LIB_OK": "TRUE",
                     },
-                    "worker_process_setup_hook": _ray_worker_process_setup_hook,
                 },
             )
 

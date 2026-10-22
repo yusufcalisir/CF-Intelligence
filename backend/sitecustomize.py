@@ -9,6 +9,10 @@ import sys
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 os.environ.setdefault("RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO", "0")
 
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+if _backend_dir not in sys.path:
+    sys.path.insert(0, _backend_dir)
+
 if sys.platform == "win32":
     # On Windows, Raylet's process termination signals (TerminateProcess / pipe close)
     # cause Python's faulthandler in exiting workers to dump benign disconnection tracebacks.

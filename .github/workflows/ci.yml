@@ -128,14 +128,14 @@ jobs:
 
       - name: Run Deterministic ML & Pipeline Smoke Gates (Dataloaders, Serialization, Schemas)
         env:
-          PYTHONPATH: backend
+          PYTHONPATH: ${{ github.workspace }}/backend:backend
           REDIS_URL: redis://127.0.0.1:6379/0
         run: |
           pytest backend/tests/unit/test_ci_smoke_gates.py -v
 
       - name: Run Backend Pytest Suite
         env:
-          PYTHONPATH: backend
+          PYTHONPATH: ${{ github.workspace }}/backend:backend
           REDIS_URL: redis://127.0.0.1:6379/0
         run: |
           pytest backend/tests/ -v
@@ -203,7 +203,7 @@ jobs:
 
       - name: Run API Contract Tests
         env:
-          PYTHONPATH: backend
+          PYTHONPATH: ${{ github.workspace }}/backend:backend
         run: |
           python scripts/run_all_tests.py --api-contract
 
@@ -243,7 +243,7 @@ jobs:
 
       - name: Run Mutation Testing Suite
         env:
-          PYTHONPATH: backend
+          PYTHONPATH: ${{ github.workspace }}/backend:backend
         run: |
           python scripts/run_mutation_tests.py
 
@@ -294,7 +294,7 @@ jobs:
 
       - name: Run Multi-Dimensional Coverage Audit
         env:
-          PYTHONPATH: backend
+          PYTHONPATH: ${{ github.workspace }}/backend:backend
           REDIS_URL: redis://127.0.0.1:6379/0
         run: |
           python scripts/run_coverage_audit.py --fail-under=75
@@ -424,13 +424,13 @@ jobs:
 
       - name: Run Subsystem Scientific Verification Audits
         env:
-          PYTHONPATH: backend
+          PYTHONPATH: ${{ github.workspace }}/backend:backend
         run: |
           pytest verification/ -v
 
       - name: Run FL Reference Verification Benchmarks
         env:
-          PYTHONPATH: backend
+          PYTHONPATH: ${{ github.workspace }}/backend:backend
         run: |
           python verification/federated_learning/tests/fl_reference_verification.py
 
