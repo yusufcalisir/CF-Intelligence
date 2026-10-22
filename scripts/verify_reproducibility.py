@@ -487,14 +487,14 @@ class ReproducibilityVerifier:
         b_ok = b_test_file.exists()
         self._record(
             "ITEM-35",
-            "Backend Pytest Suite (4,370 Automated Tests)",
+            "Backend Pytest Suite (5,617 Automated Tests)",
             cat,
             b_ok,
             "Exhaustive test suite covering domain logic, application orchestration, and security drivers",
             "backend/tests/",
         )
 
-        # ITEM-36: Frontend Vitest Suite (87 Files, 373 Tests)
+        # ITEM-36: Frontend Vitest Suite (87 Files, 375 Tests)
         fe_pkg = self.root / "frontend" / "package.json"
         fe_ok = fe_pkg.exists()
         if fe_ok:
@@ -502,7 +502,7 @@ class ReproducibilityVerifier:
             fe_ok = "vitest" in fe_text
         self._record(
             "ITEM-36",
-            "Frontend Vitest Suite (87 Files, 373 Tests)",
+            "Frontend Vitest Suite (87 Files, 375 Tests)",
             cat,
             fe_ok,
             "Component, view, navigation, and integration test coverage across all investigation portals",
