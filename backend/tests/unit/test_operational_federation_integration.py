@@ -2600,6 +2600,407 @@ class TestImmutablePreTrainingConsortiumBinding:
         assert reg.resolve_and_verify_champion("sim_case_g") is None
         assert reg._load_manifest("sim_case_g") == []
 
+    def test_continuous_operational_federation_to_champion_serving_pipeline(
+        self, clean_test_environment: str, tmp_path: Any
+    ) -> None:
+        """Section 01-I Final Integration: Continuous E2E execution from genuine operational federation to serving and feedback."""
+        from app.application.services.model_registry import (
+            ModelEvaluationEngine,
+            generate_signoff_signature,
+            validate_production_admission,
+        )
+        from app.domain.consortium_governance import (
+            Consortium,
+            ConsortiumMember,
+            ConsortiumStatus,
+            MemberRole,
+        )
+        from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
+        import app.presentation.routers.predict as predict_router
+        import app.presentation.routers.realtime_inference as realtime_router
+
+        registry_dir = str(tmp_path / "model_registry")
+        db_file = str(tmp_path / "authority.db")
+        vault_root = str(tmp_path / "bank_vaults")
+
+        # Configure environment so registry points to isolated test storage
+        old_storage = os.environ.get("CFI_STORAGE_DIR")
+        os.environ["CFI_STORAGE_DIR"] = registry_dir
+
+        try:
+            # 1. Prepare private bank partitions and spawn real worker subprocesses
+            val_X = np.random.randn(20, NUM_FEATURES).astype(np.float32)
+            val_y = np.random.randint(0, 2, size=20).astype(np.float32)
+
+            bank_data_paths = {}
+            bank_enc_keys = {b: Fernet.generate_key() for b in ("BANK_A", "BANK_B")}
+            bank_tokens = {b: f"test_worker_token_{b}" for b in ("BANK_A", "BANK_B")}
+
+            np.random.seed(42)
+            for b_id, n_samples in (("BANK_A", 40), ("BANK_B", 40)):
+                X_part = np.random.randn(n_samples, NUM_FEATURES).astype(np.float32)
+                y_part = np.random.randint(0, 2, size=n_samples).astype(np.float32)
+                p = setup_bank_private_storage(
+                    bank_storage_dir=vault_root,
+                    bank_id=b_id,
+                    X_partition=X_part,
+                    y_partition=y_part,
+                    bank_token=bank_tokens[b_id],
+                    bank_encryption_key=bank_enc_keys[b_id],
+                )
+                bank_data_paths[b_id] = p
+
+            procs, endpoints = spawn_bank_workers(
+                participating_banks=["BANK_A", "BANK_B"],
+                bank_tokens=bank_tokens,
+                db_url=db_file,
+                bank_data_paths=bank_data_paths,
+                bank_encryption_keys=bank_enc_keys,
+                app_env="development",
+            )
+
+            try:
+                pids = {b: proc.pid or 0 for b, proc in procs.items()}
+                WorkerEndpointRegistry.register_provisioned_workers(
+                    endpoints=endpoints,
+                    pids=pids,
+                    app_env="development",
+                )
+
+                # Initialize active consortium in DurableConsortiumStore for institutional authorization
+                consortium_store = DurableConsortiumStore.get_instance()
+                old_consortium = consortium_store.get_consortium("cfi-consortium")
+                def _init_consortium(consortia: dict[str, Any], proposals: dict[str, Any]) -> None:
+                    consortia["cfi-consortium"] = Consortium(
+                        consortium_id="cfi-consortium",
+                        name="CFI Operational Consortium",
+                        quorum_ratio=0.5,
+                        min_members_n=2,
+                        max_epsilon=5.0,
+                        status=ConsortiumStatus.ACTIVE,
+                        members={
+                            "bank_a": ConsortiumMember(bank_id="bank_a", role=MemberRole.FOUNDER, voting_power=1.0),
+                            "bank_b": ConsortiumMember(bank_id="bank_b", role=MemberRole.FULL_MEMBER, voting_power=1.0),
+                            "bank_c": ConsortiumMember(bank_id="bank_c", role=MemberRole.FULL_MEMBER, voting_power=1.0),
+                        },
+                    )
+                consortium_store.atomic_mutate(_init_consortium)
+
+                svc = OperationalFederationService(
+                    db_url=db_file,
+                    holdout_val_data=(val_X, val_y),
+                    registry_storage_dir=registry_dir,
+                    app_env="development",
+                )
+
+                # 2. Execute operational federation via canonical service adapter
+                target_job_id = "job_continuous_e2e_01"
+                target_sim_id = "sim_continuous_e2e_01"
+                exec_result = svc.execute_operational_federation(
+                    job_id=target_job_id,
+                    simulation_id=target_sim_id,
+                    participating_banks=["BANK_A", "BANK_B"],
+                    num_rounds=1,
+                    consortium_id="cfi-consortium",
+                )
+
+                # 3. Verify persisted completed-job evidence in authority DB and signed receipt
+                assert exec_result["status"] == "COMPLETED"
+                assert exec_result["is_verified"] is True
+                assert exec_result["consortium_id"] == "cfi-consortium"
+                artifact_sha = exec_result["artifact_sha256"]
+                assert len(artifact_sha) == 64
+                model_ver = exec_result["model_version"]
+                assert model_ver is not None
+
+                job_authority = SQLiteTrainingJobAuthority(db_file)
+                completed_rec = job_authority.get_completed_job_by_id(target_job_id)
+                assert completed_rec is not None
+                assert completed_rec.status == "COMPLETED"
+                assert completed_rec.simulation_id == target_sim_id
+                assert completed_rec.artifact_sha256 == artifact_sha
+                assert completed_rec.executed_rounds >= 1
+
+                receipt = exec_result.get("receipt")
+                assert receipt is not None
+                receipt_dict = receipt.to_dict() if hasattr(receipt, "to_dict") else receipt
+                assert receipt_dict.get("job_id") == target_job_id
+                assert receipt_dict.get("simulation_id") == target_sim_id
+                assert receipt_dict.get("model_artifact_sha256") == artifact_sha
+
+                # 4 & 5. Verify exact artifact SHA-256 continuity and inactive status before approval
+                reg = ModelRegistry(storage_dir=registry_dir)
+                candidate_entry = reg.get_version_metadata(target_sim_id, model_ver)
+                assert candidate_entry is not None
+                assert candidate_entry["status"] == "inactive"
+                assert candidate_entry["provenance_type"] == "TRAINING_RECORDED"
+                assert candidate_entry["consortium_id"] == "cfi-consortium"
+                assert candidate_entry["sha256"] == artifact_sha
+                assert candidate_entry["is_active"] is False
+                assert exec_result["is_promoted_champion"] is False
+
+                # 6. Create two distinct institutional approver identities using AuthenticationService
+                auth_svc = AuthenticationService.get_instance()
+
+                # ML Engineer approver
+                ml_user = auth_svc.get_user("ml_engineer_signoff")
+                if not ml_user:
+                    ml_user = auth_svc.register_user(
+                        username="ml_engineer_signoff",
+                        plain_password="SafePassword123!",
+                        bank_id="bank_a",
+                        roles=["ml_engineer"],
+                        clearance_level=2,
+                    )
+                ml_user.roles = ["ml_engineer"]
+                ml_user.bank_id = "bank_a"
+                ml_user.clearance_level = 2
+                ml_user.is_active = True
+                ml_user.status = "active"
+                auth_svc.identity_store.save_user(ml_user)
+
+                # Compliance approver
+                comp_user = auth_svc.get_user("compliance_signoff")
+                if not comp_user:
+                    comp_user = auth_svc.register_user(
+                        username="compliance_signoff",
+                        plain_password="SafePassword123!",
+                        bank_id="bank_b",
+                        roles=["compliance"],
+                        clearance_level=2,
+                    )
+                comp_user.roles = ["compliance"]
+                comp_user.bank_id = "bank_b"
+                comp_user.clearance_level = 2
+                comp_user.is_active = True
+                comp_user.status = "active"
+                auth_svc.identity_store.save_user(comp_user)
+
+                # Lead operator for promotion
+                lead_user = auth_svc.get_user("lead_operator")
+                if not lead_user:
+                    lead_user = auth_svc.register_user(
+                        username="lead_operator",
+                        plain_password="SafePassword123!",
+                        bank_id="bank_a",
+                        roles=["ml_lead", "admin"],
+                        clearance_level=3,
+                    )
+                lead_user.roles = ["ml_lead", "admin"]
+                lead_user.bank_id = "bank_a"
+                lead_user.clearance_level = 3
+                lead_user.is_active = True
+                lead_user.status = "active"
+                auth_svc.identity_store.save_user(lead_user)
+                lead_token = auth_svc.create_token_bundle(lead_user).access_token
+
+                # 7. Perform genuine Four-Eyes sign-offs through production implementation
+                sig_ml = generate_signoff_signature(
+                    simulation_id=target_sim_id,
+                    version=model_ver,
+                    artifact_sha256=artifact_sha,
+                    role="ml_engineer",
+                    user=ml_user.username,
+                )
+                reg.sign_off(
+                    simulation_id=target_sim_id,
+                    version=model_ver,
+                    role="ml_engineer",
+                    user=ml_user.username,
+                    signature=sig_ml,
+                )
+
+                sig_comp = generate_signoff_signature(
+                    simulation_id=target_sim_id,
+                    version=model_ver,
+                    artifact_sha256=artifact_sha,
+                    role="compliance",
+                    user=comp_user.username,
+                )
+                reg.sign_off(
+                    simulation_id=target_sim_id,
+                    version=model_ver,
+                    role="compliance",
+                    user=comp_user.username,
+                    signature=sig_comp,
+                )
+
+                entry_approved = reg.get_version_metadata(target_sim_id, model_ver)
+                assert entry_approved["status"] == "approved"
+                assert entry_approved["is_production_eligible"] is True
+
+                # 8. Promote candidate to champion via governance contract
+                promoted = reg.promote_version(
+                    simulation_id=target_sim_id,
+                    version=model_ver,
+                    target_status="champion",
+                    auth_token=lead_token,
+                    actor=lead_user.username,
+                )
+                assert promoted["status"] == "champion"
+                assert promoted["is_active"] is True
+                assert promoted["sha256"] == artifact_sha
+
+                # 9. Retrieve promoted artifact through secure champion resolution
+                champion_resolved = reg.resolve_and_verify_champion(simulation_id=target_sim_id)
+                assert champion_resolved is not None
+                champ_path, champ_bytes, champ_meta = champion_resolved
+                assert champ_meta["version"] == model_ver
+                assert champ_meta["sha256"] == artifact_sha
+                assert hashlib.sha256(champ_bytes).hexdigest() == artifact_sha
+
+                # Synchronize serving singletons to isolated test registry
+                predict_router._registry = reg
+                predict_router._eval_engine = ModelEvaluationEngine(reg)
+                predict_router.clear_all_serving_caches()
+                realtime_router.reset_model_cache()
+
+                # 10 & 11. Execute authenticated HTTP inference using the actual promoted model
+                bank_a_headers = _get_operator_auth_headers(
+                    username="bank_a_operator",
+                    bank_id="bank_a",
+                    roles=["analyst"],
+                    clearance_level=2,
+                )
+
+                predict_req = {
+                    "transaction_id": "txn_continuous_e2e_001",
+                    "simulation_id": target_sim_id,
+                    "bank_id": "bank_a",
+                    "transaction_amount": 150.0,
+                    "merchant_category": "electronics",
+                    "country_code": "US",
+                    "device_type": "mobile_app",
+                    "velocity": 2.5,
+                    "hour_of_day": 14,
+                    "merchant_risk_score": 0.15,
+                    "customer_history_score": 0.88,
+                    "chargeback_count": 0,
+                    "account_age_days": 420,
+                }
+                resp_predict = client.post("/api/v1/predict", json=predict_req, headers=bank_a_headers)
+                assert resp_predict.status_code == 200, resp_predict.text
+                pred_json = resp_predict.json()
+                assert pred_json["transaction_id"] == "txn_continuous_e2e_001"
+                assert 0.0 <= pred_json["fraud_probability"] <= 1.0
+                assert 0.0 <= pred_json["risk_score"] <= 1000.0
+                assert pred_json["policy_action"] in ("ALLOW", "FLAG", "BLOCK", "REVIEW")
+
+                # Test /api/v1/inference/score endpoint against exact champion
+                score_req = {
+                    "transaction_id": "txn_realtime_score_002",
+                    "simulation_id": target_sim_id,
+                    "bank_id": "bank_a",
+                    "amount": 250.0,
+                    "merchant_category": "grocery",
+                    "velocity_1h": 2,
+                }
+                resp_score = client.post("/api/v1/inference/score", json=score_req, headers=bank_a_headers)
+                assert resp_score.status_code == 200, resp_score.text
+                score_json = resp_score.json()
+                assert score_json["transaction_id"] == "txn_realtime_score_002"
+                assert score_json["evaluated_by"] == "ML_MODEL"
+                assert 0.0 <= score_json["risk_score"] <= 1.0
+                assert "ML Model" in score_json["explanation"]
+
+                # 12 & 13. Prediction evidence contract & authorized ground-truth feedback
+                rec_before = predict_router._eval_engine.get_prediction_record(
+                    simulation_id=target_sim_id,
+                    transaction_id="txn_continuous_e2e_001",
+                    bank_id="bank_a",
+                )
+                assert rec_before is not None
+                assert rec_before["transaction_id"] == "txn_continuous_e2e_001"
+                assert rec_before["champion_version"] == model_ver
+                assert rec_before["bank_id"] == "bank_a"
+                assert rec_before["champion_prob"] == pred_json["fraud_probability"]
+                assert rec_before.get("actual_label") is None
+
+                feedback_req = {
+                    "transaction_id": "txn_continuous_e2e_001",
+                    "actual_label": 1,
+                    "simulation_id": target_sim_id,
+                }
+                resp_fb = client.post("/api/v1/predict/feedback", json=feedback_req, headers=bank_a_headers)
+                assert resp_fb.status_code == 200, resp_fb.text
+                fb_json = resp_fb.json()
+                assert fb_json["status"] == "success"
+                assert "metrics" in fb_json
+
+                rec_after = predict_router._eval_engine.get_prediction_record(
+                    simulation_id=target_sim_id,
+                    transaction_id="txn_continuous_e2e_001",
+                    bank_id="bank_a",
+                )
+                assert rec_after["actual_label"] == 1
+
+                # Essential Negative Assertion 1: UNVERIFIED simulation artifacts cannot be promoted through production gate
+                unverified_candidate = {
+                    "version": 99,
+                    "status": "inactive",
+                    "provenance_type": "UNVERIFIED",
+                    "is_production_eligible": False,
+                    "sha256": "c" * 64,
+                }
+                with mock.patch("app.config.get_settings") as mock_set:
+                    mock_set.return_value = mock.MagicMock(app_env="production")
+                    with pytest.raises(ModelIntegrityError) as exc_unverified:
+                        validate_production_admission(unverified_candidate, context="promote_version")
+                    assert "ineligible" in str(exc_unverified.value).lower() or "unverified" in str(exc_unverified.value).lower()
+
+                # Essential Negative Assertion 2: Foreign bank cannot execute the private champion unless explicitly authorized
+                foreign_headers = _get_operator_auth_headers(
+                    username="foreign_bank_analyst",
+                    bank_id="bank_foreign_unauthorized",
+                    roles=["analyst"],
+                    clearance_level=2,
+                )
+                predict_req_foreign = {**predict_req, "bank_id": "bank_foreign_unauthorized"}
+                resp_foreign = client.post("/api/v1/predict", json=predict_req_foreign, headers=foreign_headers)
+                assert resp_foreign.status_code == 403
+                assert "not an active member" in resp_foreign.json()["detail"].lower()
+
+                # Essential Negative Assertion 3: Unauthorized feedback cannot modify recorded transaction label
+                bank_b_headers = _get_operator_auth_headers(
+                    username="bank_b_analyst",
+                    bank_id="bank_b",
+                    roles=["analyst"],
+                    clearance_level=2,
+                )
+                tamper_fb_req = {
+                    "transaction_id": "txn_continuous_e2e_001",
+                    "actual_label": 0,
+                    "simulation_id": target_sim_id,
+                }
+                resp_tamper = client.post("/api/v1/predict/feedback", json=tamper_fb_req, headers=bank_b_headers)
+                assert resp_tamper.status_code == 403
+                assert "cross-tenant feedback rejected" in resp_tamper.json()["detail"].lower()
+
+                # Verify label remained 1.0
+                rec_final = predict_router._eval_engine.get_prediction_record(
+                    simulation_id=target_sim_id,
+                    transaction_id="txn_continuous_e2e_001",
+                    bank_id="bank_a",
+                )
+                assert rec_final["actual_label"] == 1.0
+
+            finally:
+                if old_consortium is not None:
+                    def _restore_consortium(consortia: dict[str, Any], proposals: dict[str, Any]) -> None:
+                        consortia["cfi-consortium"] = old_consortium
+                    consortium_store.atomic_mutate(_restore_consortium)
+                for proc in procs.values():
+                    try:
+                        proc.terminate()
+                        proc.join(timeout=2.0)
+                    except Exception:
+                        pass
+        finally:
+            if old_storage is not None:
+                os.environ["CFI_STORAGE_DIR"] = old_storage
+            else:
+                os.environ.pop("CFI_STORAGE_DIR", None)
+
 
 
 
