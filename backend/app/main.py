@@ -230,11 +230,15 @@ def _acquire_seed_right() -> bool:
 
 def seed_mock_data() -> None:
     """Seed initial demonstration data for AML financial crime intelligence platform."""
-    settings = get_settings()
-    if getattr(settings, "app_env", "development").lower() in ("production", "staging"):
-        logging.getLogger(__name__).warning("seed_mock_data invoked in production or staging mode; aborting demo data generation.")
+    current_settings = get_settings()
+    env = getattr(current_settings, "app_env", "development").lower().strip()
+    if env in ("production", "prod"):
+        logging.getLogger(__name__).warning("seed_mock_data invoked in production mode; aborting demo data generation.")
         return
-    if not getattr(settings, "enable_demo_data_seeding", False):
+    if env == "staging":
+        logging.getLogger(__name__).warning("seed_mock_data invoked in staging mode; aborting demo data generation.")
+        return
+    if not getattr(current_settings, "enable_demo_data_seeding", False):
         logging.getLogger(__name__).warning(
             "seed_mock_data invoked without explicit opt-in (enable_demo_data_seeding=False); aborting demo data generation."
         )
