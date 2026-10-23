@@ -5,9 +5,10 @@ Replaces in-memory dict storage. PostgreSQL is the single source of truth.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select, update
@@ -94,63 +95,125 @@ class CaseRepository:
     async def link_alert(
         self, case_id: str, alert_id: str, bank_id: str | None = None
     ) -> CaseModel | None:
-        """Link an alert ID to the case.
+        """Link an alert ID to the case with database-level concurrency safety.
 
         Preconditions:
             - bank_id, if provided, must represent the verified institutional owner of the alert,
               authorized by an upstream service/API boundary.
 
-        Semantics:
+        Semantics & Concurrency Guarantees:
+            - Uses pessimistic row locking (SELECT ... FOR UPDATE) on dialects that support it (PostgreSQL)
+              to serialize concurrent alert link operations on the same case.
+            - Uses optimistic row versioning via atomic conditional WHERE clauses on the UPDATE statement
+              (matching current bank_id and updated_at) to serialize concurrent operations and prevent lost
+              updates on dialects without row locking (SQLite).
             - If case does not exist: returns None.
-            - If case.bank_id is already set and bank_id is provided:
-                - If case.bank_id != bank_id: raises ValueError for cross-tenant conflict.
-            - If case.bank_id is unset/None and bank_id is provided:
-                - Binds case.bank_id = bank_id.
-            - If alert_id is not already in case.alert_ids:
-                - Appends alert_id (no duplicates).
-            - Idempotent: repeated links with same alert and compatible bank_id do not duplicate
-              alert_ids or corrupt state.
+            - If case.bank_id is bound and bank_id is provided with a conflicting institution:
+                raises ValueError and commits zero changes.
+            - If case is unbound and bank_id is provided: durably binds case.bank_id = bank_id.
+            - If concurrent conflicting sessions attempt to bind an unbound case, exactly one succeeds
+              and the conflicting session is rejected with ValueError without overwriting state.
+            - Idempotent: repeated links with the same alert do not produce duplicate alert IDs.
+            - Concurrent legitimate links from the same institution do not lose previously committed alerts.
         """
-        case = await self.get_by_id(case_id)
-        if case is None:
-            return None
+        max_attempts = 5
+        for attempt in range(max_attempts):
+            # 1. Fetch case with row-level lock on supporting dialects (PostgreSQL FOR UPDATE)
+            stmt = select(CaseModel).where(CaseModel.id == case_id).with_for_update()
+            result = await self.session.execute(stmt)
+            case = result.scalar_one_or_none()
+            if case is None:
+                return None
 
-        # Cross-tenant check: if case already bound to a different institution
-        if case.bank_id is not None and bank_id is not None and case.bank_id != bank_id:
-            logger.warning(
-                "Cross-tenant alert link rejected: case_id=%s owned by %s, alert %s bank is %s",
-                case_id,
-                case.bank_id,
-                alert_id,
-                bank_id,
-            )
-            raise ValueError(
-                f"Cross-tenant alert linking rejected: case '{case_id}' belongs to bank '{case.bank_id}', "
-                f"cannot link alert '{alert_id}' from bank '{bank_id}'."
-            )
+            # 2. Cross-tenant check
+            if case.bank_id is not None and bank_id is not None and case.bank_id != bank_id:
+                logger.warning(
+                    "Cross-tenant alert link rejected: case_id=%s owned by %s, alert %s bank is %s",
+                    case_id,
+                    case.bank_id,
+                    alert_id,
+                    bank_id,
+                )
+                raise ValueError(
+                    f"Cross-tenant alert linking rejected: case '{case_id}' belongs to bank '{case.bank_id}', "
+                    f"cannot link alert '{alert_id}' from bank '{bank_id}'."
+                )
 
-        alert_ids = list(case.alert_ids or [])
-        values_to_update: dict[str, Any] = {"updated_at": datetime.now(UTC)}
-        needs_update = False
+            current_bank_id = case.bank_id
+            current_updated_at = case.updated_at
+            alert_ids = list(case.alert_ids or [])
+            values_to_update: dict[str, Any] = {}
+            needs_update = False
 
-        if alert_id not in alert_ids:
-            alert_ids.append(alert_id)
-            case.alert_ids = alert_ids
-            values_to_update["alert_ids"] = alert_ids
-            needs_update = True
+            if alert_id not in alert_ids:
+                values_to_update["alert_ids"] = [*alert_ids, alert_id]
+                needs_update = True
 
-        if bank_id is not None and case.bank_id is None:
-            case.bank_id = bank_id
-            values_to_update["bank_id"] = bank_id
-            needs_update = True
+            if bank_id is not None and current_bank_id is None:
+                values_to_update["bank_id"] = bank_id
+                needs_update = True
 
-        if needs_update:
-            await self.session.execute(
-                update(CaseModel)
-                .where(CaseModel.id == case_id)
-                .values(**values_to_update)
-            )
+            if not needs_update:
+                return case
+
+            # Monotonically advance updated_at for optimistic concurrency control
+            norm_updated_at = current_updated_at
+            if norm_updated_at is not None and norm_updated_at.tzinfo is None:
+                norm_updated_at = norm_updated_at.replace(tzinfo=UTC)
+
+            new_updated_at = datetime.now(UTC)
+            if norm_updated_at is not None and new_updated_at <= norm_updated_at:
+                new_updated_at = norm_updated_at + timedelta(microseconds=1)
+            values_to_update["updated_at"] = new_updated_at
+
+            # 3. Build atomic conditional UPDATE statement
+            update_stmt = update(CaseModel).where(CaseModel.id == case_id)
+            if current_bank_id is None:
+                # Unbound case: ensure it was not concurrently bound to another bank
+                update_stmt = update_stmt.where(CaseModel.bank_id.is_(None))
+            else:
+                # Bound case: ensure bank_id was not modified
+                update_stmt = update_stmt.where(CaseModel.bank_id == current_bank_id)
+
+            if current_updated_at is None:
+                update_stmt = update_stmt.where(CaseModel.updated_at.is_(None))
+            else:
+                update_stmt = update_stmt.where(CaseModel.updated_at == current_updated_at)
+
+            update_stmt = update_stmt.values(**values_to_update)
+            update_res = await self.session.execute(update_stmt)
+
+            rowcount = getattr(update_res, "rowcount", None)
+            if rowcount == 0:
+                # Concurrent mutation detected. Rollback session state and evaluate conflict
+                await self.session.rollback()
+                fresh_case = await self.get_by_id(case_id)
+                if (
+                    fresh_case is not None
+                    and fresh_case.bank_id is not None
+                    and bank_id is not None
+                    and fresh_case.bank_id != bank_id
+                ):
+                    logger.warning(
+                        "Cross-tenant alert link race detected: case_id=%s bound to %s concurrently, alert %s bank is %s",
+                        case_id,
+                        fresh_case.bank_id,
+                        alert_id,
+                        bank_id,
+                    )
+                    raise ValueError(
+                        f"Cross-tenant alert linking rejected: case '{case_id}' belongs to bank '{fresh_case.bank_id}', "
+                        f"cannot link alert '{alert_id}' from bank '{bank_id}'."
+                    )
+                if attempt == max_attempts - 1:
+                    raise RuntimeError(
+                        f"Concurrent update conflict on case '{case_id}' exceeded max attempts."
+                    )
+                await asyncio.sleep(0.01 * (attempt + 1))
+                continue
+
             await self.session.commit()
+            return await self.get_by_id(case_id)
 
         return await self.get_by_id(case_id)
 

@@ -9,6 +9,9 @@ Run with:
 
 from __future__ import annotations
 
+import asyncio
+from typing import Any
+
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -265,6 +268,94 @@ async def test_case_list_by_bank(db_session: AsyncSession) -> None:
     beta_cases = await repo.list_by_bank("bank_beta")
     assert len(beta_cases) == 1
     assert beta_cases[0].title == "Beta 1"
+
+
+@pytest.mark.asyncio
+async def test_case_link_alert_concurrency_conflicting_institutions(
+    db_session: AsyncSession,
+) -> None:
+    """Verify that concurrent conflicting alert links on an unbound case are safely handled:
+    exactly one institution binds the case, and the conflicting session is rejected with ValueError.
+    """
+    repo = CaseRepository(db_session)
+    case = await repo.create(title="Concurrent Unbound SQLite Case", bank_id=None)
+    case_id = case.id
+
+    assert db_session.bind is not None
+    factory = async_sessionmaker(db_session.bind, class_=AsyncSession, expire_on_commit=False)
+
+    async def worker(bank: str, alert: str) -> Any:
+        async with factory() as session:
+            r = CaseRepository(session)
+            return await r.link_alert(case_id, alert, bank_id=bank)
+
+    results = await asyncio.gather(
+        worker("bank_alpha", "alert-alpha-race"),
+        worker("bank_beta", "alert-beta-race"),
+        return_exceptions=True,
+    )
+
+    successes = [r for r in results if not isinstance(r, Exception)]
+    failures = [r for r in results if isinstance(r, Exception)]
+
+    assert len(successes) == 1, f"Expected 1 success, got {len(successes)}: {results}"
+    assert len(failures) == 1, f"Expected 1 failure, got {len(failures)}: {results}"
+    assert isinstance(failures[0], ValueError)
+    assert "Cross-tenant alert linking rejected" in str(failures[0])
+
+    winning_bank = successes[0].bank_id
+    assert winning_bank in ("bank_alpha", "bank_beta")
+    losing_alert = "alert-beta-race" if winning_bank == "bank_alpha" else "alert-alpha-race"
+    winning_alert = "alert-alpha-race" if winning_bank == "bank_alpha" else "alert-beta-race"
+
+    async with factory() as fresh_session:
+        fresh_repo = CaseRepository(fresh_session)
+        final_case = await fresh_repo.get_by_id(case_id)
+        assert final_case is not None
+        assert final_case.bank_id == winning_bank
+        assert final_case.alert_ids == [winning_alert]
+        assert losing_alert not in final_case.alert_ids
+
+
+@pytest.mark.asyncio
+async def test_case_link_alert_concurrency_same_institution(
+    db_session: AsyncSession,
+) -> None:
+    """Verify that concurrent alert links from the same institution do not lose alert IDs."""
+    repo = CaseRepository(db_session)
+    case = await repo.create(
+        title="Concurrent Shared SQLite Case",
+        bank_id="bank_alpha",
+        alert_ids=["alert-000"],
+    )
+    case_id = case.id
+
+    assert db_session.bind is not None
+    factory = async_sessionmaker(db_session.bind, class_=AsyncSession, expire_on_commit=False)
+
+    async def worker(alert: str) -> Any:
+        async with factory() as session:
+            r = CaseRepository(session)
+            return await r.link_alert(case_id, alert, bank_id="bank_alpha")
+
+    results = await asyncio.gather(
+        worker("alert-001"),
+        worker("alert-002"),
+        return_exceptions=True,
+    )
+
+    failures = [r for r in results if isinstance(r, Exception)]
+    assert len(failures) == 0, f"Unexpected failures in concurrent same-tenant linking: {failures}"
+
+    async with factory() as fresh_session:
+        fresh_repo = CaseRepository(fresh_session)
+        final_case = await fresh_repo.get_by_id(case_id)
+        assert final_case is not None
+        assert final_case.bank_id == "bank_alpha"
+        assert "alert-000" in final_case.alert_ids
+        assert "alert-001" in final_case.alert_ids
+        assert "alert-002" in final_case.alert_ids
+        assert len(final_case.alert_ids) == 3
 
 
 # ── EntityRepository Tests ─────────────────────────────────────────────────────
