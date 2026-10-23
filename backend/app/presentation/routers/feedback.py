@@ -251,11 +251,7 @@ async def _ingest_handler(
                 )
 
                 eval_engine = ModelEvaluationEngine(ModelRegistry())
-                raw_det = (
-                    payload.determination.value
-                    if hasattr(payload.determination, "value")
-                    else str(payload.determination)
-                )
+                raw_det = str(getattr(payload.determination, "value", payload.determination))
                 actual_label = 1 if raw_det == "CONFIRMED_FRAUD" else 0
                 for sim in ("default_sim", "sim_retrain_default"):
                     try:
