@@ -219,7 +219,7 @@ class MambuConnector(BaseBankConnector):
         claimed_bank = payload.get("bankId") or payload.get("tenantId")
         if claimed_bank:
             norm_claimed = str(claimed_bank).strip().lower().replace("-", "_")
-            norm_bound = str(self.tenant_id).strip().lower().replace("-", "_")
+            norm_bound = self.tenant_id.strip().lower().replace("-", "_")
             if norm_claimed != norm_bound:
                 raise MambuTenantMismatchError(
                     f"Mambu webhook payload tenant claim '{claimed_bank}' does not match connector institutional tenant '{self.tenant_id}'."

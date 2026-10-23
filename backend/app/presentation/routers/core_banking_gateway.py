@@ -205,9 +205,9 @@ async def _handle_mambu_webhook(
         ) from val_err
 
     if isinstance(result, NormalizedTransaction):
-        mcc_raw = str(result.merchant_category_code or "5411")
+        mcc_raw = result.merchant_category_code or "5411"
         mapped_category = MCC_TO_MERCHANT_CATEGORY.get(mcc_raw, "grocery")
-        mapped_channel = CHANNEL_TO_DEVICE_TYPE.get(str(result.channel_type).upper(), "web_browser")
+        mapped_channel = CHANNEL_TO_DEVICE_TYPE.get(result.channel_type.upper(), "web_browser")
         effective_bank = result.bank_id or connector.tenant_id
         hour_val = result.timestamp.hour if result.timestamp else 12
 
