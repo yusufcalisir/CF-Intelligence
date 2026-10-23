@@ -994,10 +994,12 @@ The platform connects raw core-banking transaction ingress to investigator triag
 ```
 
 ### Key Behavioral Guarantees
-1. **Institutional Tenancy:** Webhook signatures and incoming transaction tenants bind directly to verified bank partitions (`X-Bank-ID`, `bankId`), preventing cross-tenant leakage.
-2. **Model Integrity:** Inferences execute strictly through authorized champion models validated by Four-Eyes signoff (`validate_production_admission`); unverified or missing artifacts fail closed with HTTP 503.
-3. **Continuous Audit Trail:** Prediction evidence, generated alerts, investigation cases, and supervisor signoffs share deterministic correlation identifiers (`transaction_id`, `alert_id`, `case_id`).
-4. **Differential-Privacy Retraining:** Human-verified ground-truth labels (`CONFIRMED_FRAUD` / `FALSE_POSITIVE`) ingest into isolated per-tenant buffers with priority sampling and DP Gaussian noise injection ($\epsilon \le 1.0, \delta = 10^{-5}$).
+1. **Institutional Tenancy & Machine Authorization:** Webhook signatures authenticate via high-entropy HMAC-SHA256 secrets (default secrets rejected in production). Payload tenant claims (`bankId`, `tenantId`) are strictly validated against authoritative connector identity (HTTP 403 on mismatch), and active consortium serving rights are checked before inference.
+2. **Runtime Truth in Feature Ingress:** Model inference features reflect observed transaction payloads; no velocity, customer profile, or jurisdiction defaults are fabricated. Missing required inputs fail closed with HTTP 422 under server-side production validation policy.
+3. **Model Integrity & Serving Failure Closed:** Inferences execute strictly through authorized champion models validated by Four-Eyes signoff (`validate_production_admission`); unverified or missing artifacts fail closed with HTTP 503.
+4. **Truthful Alert Persistence:** Transactions requiring investigator intervention must durably persist in the alert intelligence service; persistence failures return a retryable HTTP 503 rather than claiming investigation success.
+5. **Continuous Audit Trail & Genuine Feedback Correlation:** Prediction evidence, generated alerts, investigation cases, and supervisor signoffs share deterministic correlation identifiers (`transaction_id`, `alert_id`, `case_id`). Case closure feedback verifies institutional ownership, rejects cross-tenant alerts, and distinguishes local feedback buffer ingestion from prediction-evidence correlation.
+6. **Differential-Privacy Retraining:** Human-verified ground-truth labels (`CONFIRMED_FRAUD` / `FALSE_POSITIVE`) ingest into isolated per-tenant buffers with priority sampling and DP Gaussian noise injection ($\epsilon \le 1.0, \delta = 10^{-5}$).
 
 
 

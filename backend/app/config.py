@@ -380,6 +380,11 @@ class Settings(BaseSettings):
             "bank_c": "http://localhost:8013",
         }
 
+    @property
+    def is_production(self) -> bool:
+        """Return True if running in production mode."""
+        return self.app_env.lower() in ("production", "prod")
+
     def validate_production_invariants(self) -> None:
         """Enforces security-by-default and fail-closed validation when operating in production or staging mode.
 

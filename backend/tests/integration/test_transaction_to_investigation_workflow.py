@@ -27,7 +27,7 @@ from fastapi.testclient import TestClient
 from app.application.services.alert_service import AlertIntelligenceService
 from app.application.services.label_feedback_pipeline import LocalLabelFeedbackPipeline
 from app.application.services.model_registry import ModelEvaluationEngine, ModelRegistry
-from app.domain.enums import CasePriority
+from app.domain.enums import CasePriority, CaseStatus
 from app.main import app
 from app.presentation.routers.cases import get_case_service
 from app.presentation.routers.core_banking_gateway import get_mambu_connector
@@ -325,3 +325,287 @@ class TestTransactionToInvestigationWorkflow:
         assert resp2.status_code == 200
         assert resp2.headers.get("idempotency-replayed") == "true"
         assert resp2.json()["id"] == case1_id
+
+    def test_signed_webhook_mismatching_tenant_claim_rejection(self, clean_stores) -> None:
+        """Verify that a validly signed webhook with mismatching bankId payload claim is rejected (HTTP 403)."""
+        connector = get_mambu_connector()
+        payload = {
+            "type": "deposit-transaction.created",
+            "transactionId": f"TX_MISMATCH_{uuid.uuid4().hex[:8]}",
+            "accountId": "ACC_ALPHA_01",
+            "amount": 500.0,
+            "currencyCode": "EUR",
+            "bankId": "bank_beta",  # Mismatching tenant claim
+        }
+        raw_body = json.dumps(payload).encode("utf-8")
+        sig_header = _compute_mambu_hmac(connector.webhook_secret, raw_body)
+
+        resp = client.post(
+            "/connectors/core-banking/mambu/webhook",
+            content=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Mambu-Signature": sig_header,
+            },
+        )
+        assert resp.status_code == 403
+        assert "does not match connector institutional tenant" in resp.json()["detail"]
+
+    def test_missing_or_default_production_webhook_secret_fails_closed(self, clean_stores) -> None:
+        """Verify that repository default signing secrets in production mode fail closed with HTTP 401."""
+        connector = get_mambu_connector()
+        payload = {
+            "type": "deposit-transaction.created",
+            "transactionId": f"TX_PROD_SEC_{uuid.uuid4().hex[:8]}",
+            "accountId": "ACC_ALPHA_01",
+            "amount": 250.0,
+            "currencyCode": "EUR",
+            "bankId": "bank_alpha",
+        }
+        raw_body = json.dumps(payload).encode("utf-8")
+        sig_header = _compute_mambu_hmac(connector.webhook_secret, raw_body)
+
+        from app.config import get_settings
+
+        settings = get_settings()
+        orig_env = settings.app_env
+        try:
+            settings.app_env = "production"
+            resp = client.post(
+                "/connectors/core-banking/mambu/webhook",
+                content=raw_body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Mambu-Signature": sig_header,
+                },
+            )
+            assert resp.status_code == 401
+            assert "repository-default" in resp.json()["detail"].lower()
+        finally:
+            settings.app_env = orig_env
+
+    def test_revoked_consortium_institutional_serving_rejection(self, clean_stores) -> None:
+        """Verify that institutional tenant revoked from an active consortium is rejected (HTTP 403)."""
+        connector = get_mambu_connector()
+        payload = {
+            "type": "deposit-transaction.created",
+            "transactionId": f"TX_REVOKED_{uuid.uuid4().hex[:8]}",
+            "accountId": "ACC_ALPHA_REVOKED",
+            "amount": 3000.0,
+            "currencyCode": "EUR",
+            "bankId": "bank_alpha",
+        }
+        raw_body = json.dumps(payload).encode("utf-8")
+        sig_header = _compute_mambu_hmac(connector.webhook_secret, raw_body)
+
+        from app.domain.consortium_governance import (
+            Consortium,
+            ConsortiumMember,
+            ConsortiumStatus,
+            MemberRole,
+        )
+        from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
+
+        store = DurableConsortiumStore.get_instance()
+        test_c_id = f"consortium_revoked_test_{uuid.uuid4().hex[:6]}"
+        revoked_consortium = Consortium(
+            consortium_id=test_c_id,
+            name="Revocation Test Alliance",
+            status=ConsortiumStatus.ACTIVE,
+            members={
+                "bank_beta": ConsortiumMember(bank_id="bank_beta", role=MemberRole.FOUNDER, voting_power=1.0),
+            },
+            removed_members={"bank_alpha": {"reason": "Revoked for regulatory breach"}},
+        )
+        with store._lock:
+            store._consortia[test_c_id] = revoked_consortium
+
+        try:
+            resp = client.post(
+                "/connectors/core-banking/mambu/webhook",
+                content=raw_body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Mambu-Signature": sig_header,
+                },
+            )
+            assert resp.status_code == 403
+            assert "has been revoked" in resp.json()["detail"]
+        finally:
+            with store._lock:
+                store._consortia.pop(test_c_id, None)
+
+    def test_production_feature_validation_without_store_fails_closed(self, clean_stores) -> None:
+        """Verify that in production mode, webhooks missing mandatory ML features cannot bypass validation (HTTP 422)."""
+        connector = get_mambu_connector()
+        orig_tenant = connector.tenant_id
+        orig_secret = connector.webhook_secret
+        connector_secret = "mambu_secure_production_secret_key_2026_xyz"
+        connector.tenant_id = "bank_a"
+        connector.webhook_secret = connector_secret
+        payload = {
+            "type": "deposit-transaction.created",
+            "transactionId": f"TX_PROD_MISSING_{uuid.uuid4().hex[:8]}",
+            "accountId": "ACC_PROD_01",
+            "amount": 1000.0,
+            "currencyCode": "EUR",
+            "bankId": "bank_a",
+            "mcc": "5411",
+        }
+        raw_body = json.dumps(payload).encode("utf-8")
+        sig_header = _compute_mambu_hmac(connector_secret, raw_body)
+
+        from app.config import get_settings
+
+        settings = get_settings()
+        orig_env = settings.app_env
+        orig_fs = settings.feature_store_enabled
+        def mock_champ(simulation_id=None):
+            if simulation_id == "live_prod_v2":
+                return {"version": 1, "generation": 1, "simulation_id": "live_prod_v2"}
+            return None
+
+        try:
+            settings.app_env = "production"
+            settings.feature_store_enabled = False
+            with patch(
+                "app.application.services.model_registry.ModelRegistry.get_active_champion_identity",
+                side_effect=mock_champ,
+            ):
+                resp = client.post(
+                    "/connectors/core-banking/mambu/webhook",
+                    content=raw_body,
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Mambu-Signature": sig_header,
+                    },
+                )
+            assert resp.status_code == 422
+            detail = resp.json()["detail"]
+            assert "Production feature contract violation" in detail
+            assert "Missing required features" in detail
+        finally:
+            settings.app_env = orig_env
+            settings.feature_store_enabled = orig_fs
+            connector.webhook_secret = orig_secret
+            connector.tenant_id = orig_tenant
+
+    def test_alert_persistence_failure_returns_retryable_error(self, clean_stores) -> None:
+        """Verify that when alert persistence fails on a high-risk transaction, gateway returns HTTP 503 instead of 200."""
+        connector = get_mambu_connector()
+        tx_id = f"TX_ALERT_FAIL_{uuid.uuid4().hex[:8]}"
+        payload = {
+            "type": "deposit-transaction.created",
+            "transactionId": tx_id,
+            "accountId": "ACC_HIGH_RISK_01",
+            "amount": 18000.0,
+            "currencyCode": "EUR",
+            "channel": "ONLINE",
+            "mcc": "6051",
+            "bankId": "bank_alpha",
+            "originCountry": "NG",
+            "velocity": 35.0,
+            "customer_history_score": 0.05,
+            "chargeback_count": 5,
+            "account_age_days": 5,
+        }
+        raw_body = json.dumps(payload).encode("utf-8")
+        sig_header = _compute_mambu_hmac(connector.webhook_secret, raw_body)
+
+        with patch.object(AlertIntelligenceService, "generate_alerts", return_value=[]):
+            resp = client.post(
+                "/connectors/core-banking/mambu/webhook",
+                content=raw_body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Mambu-Signature": sig_header,
+                },
+            )
+            assert resp.status_code == 503
+            assert "Alert persistence failed" in resp.json()["detail"]
+
+    def test_case_feedback_genuine_correlation_and_cross_tenant_rejection(self, clean_stores) -> None:
+        """Verify that case feedback uses genuine alert evidence and rejects cross-tenant alert correlation."""
+        alert_svc = AlertIntelligenceService()
+        case_svc = get_case_service()
+        eval_engine = ModelEvaluationEngine(ModelRegistry())
+
+        # 1. Genuine Alert Creation for bank_alpha
+        tx_alpha = f"TX_GENUINE_{uuid.uuid4().hex[:8]}"
+        alerts_a = alert_svc.generate_alerts(
+            bank_id="bank_alpha",
+            transactions=[{"transaction_id": tx_alpha, "customer_id": "CUST_GENUINE_01", "amount": 5000.0}],
+            predictions=[0.85],
+        )
+        alert_alpha = alerts_a[0]
+
+        eval_engine.log_prediction(
+            simulation_id="live_prod_v2",
+            transaction_id=tx_alpha,
+            champion_version=1,
+            champion_prob=0.85,
+            routed_to="champion",
+            bank_id="bank_alpha",
+        )
+
+        # 2. Case for bank_alpha with genuine alert
+        case_alpha = case_svc.create_case(
+            title="Genuine Alpha Case",
+            priority=CasePriority.P1_CRITICAL,
+            alert_ids=[alert_alpha.id],
+            bank_id="bank_alpha",
+            assigned_to="alice",
+        )
+        case_svc.change_status(case_alpha.id, CaseStatus.INVESTIGATING, actor="alice")
+        closed_alpha = case_svc.change_status(
+            case_alpha.id,
+            CaseStatus.CLOSED_CONFIRMED,
+            actor="alice",
+            supervisor_signature="supervisor_bob",
+        )
+        last_event = closed_alpha.timeline[-1]
+        assert last_event.metadata.get("prediction_evidence_recorded") is True
+        pred_rec = eval_engine.get_prediction_record("live_prod_v2", tx_alpha, bank_id="bank_alpha")
+        assert pred_rec is not None
+        assert pred_rec["actual_label"] == 1
+
+        # 3. Missing alert: Cannot correlate ground-truth prediction evidence
+        case_missing = case_svc.create_case(
+            title="Missing Alert Case",
+            priority=CasePriority.P2_HIGH,
+            alert_ids=["non_existent_alert_12345"],
+            bank_id="bank_alpha",
+            assigned_to="alice",
+        )
+        case_svc.change_status(case_missing.id, CaseStatus.INVESTIGATING, actor="alice")
+        closed_missing = case_svc.change_status(
+            case_missing.id,
+            CaseStatus.CLOSED_FALSE_POSITIVE,
+            actor="alice",
+            supervisor_signature="supervisor_bob",
+        )
+        assert closed_missing.timeline[-1].metadata.get("prediction_evidence_recorded") is False
+
+        # 4. Cross-tenant alert: Case bank_alpha linking bank_beta alert raises PermissionError
+        alerts_b = alert_svc.generate_alerts(
+            bank_id="bank_beta",
+            transactions=[{"transaction_id": f"TX_BETA_{uuid.uuid4().hex[:8]}", "customer_id": "CUST_BETA_01", "amount": 9000.0}],
+            predictions=[0.90],
+        )
+        alert_beta = alerts_b[0]
+        case_cross = case_svc.create_case(
+            title="Cross-Tenant Case",
+            priority=CasePriority.P1_CRITICAL,
+            alert_ids=[alert_beta.id],
+            bank_id="bank_alpha",  # Bank mismatch!
+            assigned_to="alice",
+        )
+        case_svc.change_status(case_cross.id, CaseStatus.INVESTIGATING, actor="alice")
+        with pytest.raises(PermissionError) as exc_info:
+            case_svc.change_status(
+                case_cross.id,
+                CaseStatus.CLOSED_CONFIRMED,
+                actor="alice",
+                supervisor_signature="supervisor_bob",
+            )
+        assert "Cross-tenant alert feedback rejected" in str(exc_info.value)

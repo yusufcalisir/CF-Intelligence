@@ -35,6 +35,22 @@ class MambuWebhookSignatureError(ValueError):
     pass
 
 
+class MambuTenantMismatchError(PermissionError):
+    """Raised when Mambu webhook payload tenant claim mismatches connector institutional tenant."""
+
+    pass
+
+
+REPOSITORY_DEFAULT_MAMBU_SECRETS: frozenset[str] = frozenset({
+    "mambu_consortium_secret_key_2026",
+    "secret",
+    "default",
+    "changeme",
+    "test",
+    "",
+})
+
+
 class MambuConnector(BaseBankConnector):
     """Enterprise Cloud Banking Connector for Mambu v2 REST/Webhook Services.
 
@@ -51,7 +67,7 @@ class MambuConnector(BaseBankConnector):
         base_url: str | None = None,
         api_key: str | None = None,
         webhook_secret: str | None = None,
-        tenant_id: str = "mambu_default_tenant",
+        tenant_id: str | None = None,
         max_buffer_size: int = 1000,
     ) -> None:
         super().__init__()
@@ -59,7 +75,7 @@ class MambuConnector(BaseBankConnector):
         self.base_url = resolved_url.rstrip("/")
         self.api_key = api_key or os.getenv("MAMBU_API_KEY", "")
         self.webhook_secret = webhook_secret or os.getenv("MAMBU_WEBHOOK_SECRET", "mambu_consortium_secret_key_2026")
-        self.tenant_id = tenant_id
+        self.tenant_id = (tenant_id or os.getenv("MAMBU_TENANT_ID") or "bank_alpha").strip().lower().replace("-", "_")
         self._buffer: deque[NormalizedTransaction] = deque(maxlen=max_buffer_size)
         self._audit_holds: list[dict[str, Any]] = []
         self._events_ingested: int = 0
@@ -69,6 +85,14 @@ class MambuConnector(BaseBankConnector):
     def _verify_signature(self, raw_payload: bytes | str, signature_header: str | None) -> bool:
         """Verifies HMAC-SHA256 signature of Mambu webhook payload."""
         if not signature_header or not self.webhook_secret:
+            return False
+
+        from app.config import get_settings
+
+        settings = get_settings()
+        is_prod = getattr(settings, "is_production", False) or settings.app_env.lower() in ("production", "prod")
+        if is_prod and self.webhook_secret.strip() in REPOSITORY_DEFAULT_MAMBU_SECRETS:
+            logger.error("Rejecting Mambu webhook signature in production: default secret is prohibited.")
             return False
 
         payload_bytes = raw_payload.encode() if isinstance(raw_payload, str) else raw_payload
@@ -94,6 +118,15 @@ class MambuConnector(BaseBankConnector):
         require_signature: bool = False,
     ) -> NormalizedTransaction | dict[str, Any]:
         """Parses and normalizes Mambu webhook events into internal entities."""
+        from app.config import get_settings
+
+        settings = get_settings()
+        is_prod = getattr(settings, "is_production", False) or settings.app_env.lower() in ("production", "prod")
+        if is_prod and (not self.webhook_secret or self.webhook_secret.strip() in REPOSITORY_DEFAULT_MAMBU_SECRETS):
+            raise MambuWebhookSignatureError(
+                "Production webhook signature verification rejected: missing or repository-default signing secret."
+            )
+
         # When raw body is provided (HTTP ingress) or require_signature is True, signature is mandatory
         if raw_body is not None or require_signature:
             if not signature_header:
@@ -183,6 +216,18 @@ class MambuConnector(BaseBankConnector):
         else:
             event_time = event_time.astimezone(UTC)
 
+        claimed_bank = payload.get("bankId") or payload.get("tenantId")
+        if claimed_bank:
+            norm_claimed = str(claimed_bank).strip().lower().replace("-", "_")
+            norm_bound = str(self.tenant_id).strip().lower().replace("-", "_")
+            if norm_claimed != norm_bound:
+                raise MambuTenantMismatchError(
+                    f"Mambu webhook payload tenant claim '{claimed_bank}' does not match connector institutional tenant '{self.tenant_id}'."
+                )
+
+        origin_country = str(payload["originCountry"]) if payload.get("originCountry") is not None else None
+        destination_country = str(payload["destinationCountry"]) if payload.get("destinationCountry") is not None else None
+
         normalized = NormalizedTransaction(
             transaction_id=str(tx_id),
             account_id=str(account_id),
@@ -191,12 +236,12 @@ class MambuConnector(BaseBankConnector):
             currency=currency,
             timestamp=event_time,
             merchant_category_code=str(payload.get("mcc") or "6011"),
-            origin_country=str(payload.get("originCountry") or "DE"),
-            destination_country=str(payload.get("destinationCountry") or "DE"),
+            origin_country=origin_country,
+            destination_country=destination_country,
             device_fingerprint=str(payload.get("deviceFingerprint") or ""),
             ip_subnet=str(payload.get("ipSubnet") or "10.0.0.0/24"),
             channel_type=channel if channel in ("ONLINE", "MOBILE", "ATM", "POS", "SWIFT") else "ONLINE",
-            bank_id=str(payload.get("bankId") or payload.get("tenantId") or self.tenant_id),
+            bank_id=self.tenant_id,
         )
         self._buffer.append(normalized)
         return normalized

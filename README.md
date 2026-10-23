@@ -610,10 +610,11 @@ Alerts scoring above the threshold trigger investigation workflows through a 6-s
 - Processes automated `pacs.004` Payment Return responses to reconcile frozen funds.
 
 ### 11.4 Continuous Transaction-to-Investigation Workflow (`core_banking_gateway.py`, `predict.py`, `cases.py`)
-- **Ingress & Normalization:** Authenticates external core-banking webhooks (e.g. Mambu HMAC-SHA256) and normalizes ISO MCCs, channels, and jurisdiction corridors into canonical transaction records while stripping cleartext PII.
-- **Champion Serving & Prediction Evidence:** Dispatches normalized transactions to the authorized champion model with fail-closed HTTP 503 protection, recording prediction confidence, model version, and inference latency in `ModelEvaluationEngine`.
-- **Triage & Case Creation:** Evaluates composite risk across 9 signals via `RiskScoringEngine`, triggering automatic alerts (`HOLD` / `FLAG` decisions) in `AlertIntelligenceService`. Investigators escalate alerts into multi-tenant cases via `/api/v1/cases`.
-- **Four-Eyes Governance & Feedback Loop:** Terminal case resolutions (`CONFIRMED_FRAUD` / `FALSE_POSITIVE`) require dual-supervisor authorization and feed ground-truth labels back into `LocalLabelFeedbackPipeline` with differential privacy protections for local fine-tuning.
+- **Ingress & Authoritative Identity:** Authenticates external core-banking webhooks (e.g. Mambu HMAC-SHA256) using machine credentials, rejects repository-default credentials in production, and strictly binds tenant claims against connector configurations to reject payload spoofing (HTTP 403).
+- **Environment Feature Validation & Serving Authorization:** Normalizes ISO MCCs, channels, and jurisdiction corridors into canonical transaction records without fabricating unobserved velocity or profile statistics. Missing mandatory inputs fail closed (HTTP 422), and active consortium / model serving authorizations are enforced prior to inference.
+- **Champion Serving & Prediction Evidence:** Dispatches valid transactions to the authorized champion model with fail-closed HTTP 503 protection, recording prediction confidence, model version, and inference latency in `ModelEvaluationEngine`.
+- **Triage & Truthful Alert Persistence:** Evaluates composite risk across 9 signals via `RiskScoringEngine`, triggering automated alerts (`HOLD` / `FLAG` decisions) in `AlertIntelligenceService`. If high-risk alert persistence fails, the gateway returns a retryable HTTP 503 error rather than claiming successful investigation dispatch.
+- **Four-Eyes Governance & Ground-Truth Feedback Loop:** Terminal case resolutions (`CONFIRMED_FRAUD` / `FALSE_POSITIVE`) require dual-supervisor authorization. Feedback correlates against genuine alert and transaction evidence while enforcing bank ownership, feeding verified labels back into `LocalLabelFeedbackPipeline` with differential privacy protections for local fine-tuning.
 
 ---
 

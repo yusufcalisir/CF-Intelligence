@@ -518,7 +518,7 @@ def evaluate_transaction_risk_and_alerts(
         missing_feats = [f for f in REQUIRED_ML_FEATURES if txn_dict.get(f) is None]
         if missing_feats:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=(
                     f"Production feature contract violation: Missing required features: {missing_feats}. "
                     f"Features must be explicitly supplied or observed in online feature store."
@@ -528,7 +528,7 @@ def evaluate_transaction_risk_and_alerts(
             preprocess_transaction(txn_dict, strict_categorical=True)
         except ValueError as exc:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"Production categorical validation failed: {exc}",
             )
 

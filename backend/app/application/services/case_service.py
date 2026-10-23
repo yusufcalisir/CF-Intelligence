@@ -474,7 +474,8 @@ class CaseManagementService:
                 actual_label = 1 if new_status == CaseStatus.CLOSED_CONFIRMED else 0
                 metadata["retraining_feedback_label"] = actual_label
 
-                feedback_recorded = False
+                feedback_buffer_recorded = False
+                prediction_evidence_recorded = False
                 try:
                     from app.application.services.alert_service import AlertIntelligenceService
                     from app.application.services.label_feedback_pipeline import (
@@ -494,14 +495,44 @@ class CaseManagementService:
                     if not sim_id:
                         sim_id = "live_prod_v2"
 
+                    case_bank = getattr(case, "bank_id", None)
+
                     for alert_id in case.alert_ids:
                         alert = alert_svc.get_alert(alert_id)
-                        actual_tx_id = alert.transaction_id if alert and alert.transaction_id else alert_id
-                        effective_bank = (
-                            getattr(case, "bank_id", None)
-                            or (alert.bank_id if alert else None)
-                            or "bank_alpha"
-                        )
+                        if alert is not None:
+                            alert_bank = alert.bank_id
+                            if case_bank and alert_bank:
+                                norm_case_bank = case_bank.lower().replace("-", "_").strip()
+                                norm_alert_bank = alert_bank.lower().replace("-", "_").strip()
+                                if norm_case_bank != norm_alert_bank:
+                                    logger.error(
+                                        "Cross-tenant alert feedback rejected: alert '%s' bank '%s' mismatches case bank '%s'",
+                                        alert_id,
+                                        alert_bank,
+                                        case_bank,
+                                    )
+                                    raise PermissionError(
+                                        f"Cross-tenant alert feedback rejected: alert '{alert_id}' belongs to bank '{alert_bank}', "
+                                        f"but case '{case_id}' belongs to bank '{case_bank}'."
+                                    )
+                            effective_bank = case_bank or alert_bank
+                        else:
+                            effective_bank = case_bank
+
+                        if not effective_bank:
+                            from app.config import get_settings
+
+                            _cfg = get_settings()
+                            _is_prod = getattr(_cfg, "is_production", False) or getattr(_cfg, "app_env", "development").lower() in ("production", "prod")
+                            if not _is_prod:
+                                effective_bank = "bank_alpha"
+                            else:
+                                logger.warning(
+                                    "Case '%s' (alert %s) lacks authoritative bank identity; skipping feedback.",
+                                    case_id[:8],
+                                    alert_id,
+                                )
+                                continue
 
                         try:
                             feedback_pipeline.ingest_analyst_determination(
@@ -511,11 +542,20 @@ class CaseManagementService:
                                 notes=f"Closed by {actor} with supervisor signoff {collected_signatures}",
                                 metadata={"alert_id": alert_id, "case_id": case.id},
                             )
-                            feedback_recorded = True
+                            feedback_buffer_recorded = True
                         except Exception as pipe_exc:
                             logger.warning("Feedback pipeline ingestion notice for alert %s: %s", alert_id, pipe_exc)
 
-                        # Record ground truth label for genuine transaction evidence in evaluation engine
+                        # Genuine transaction evidence ground-truth correlation:
+                        # Only correlate if genuine alert and actual_tx_id exist. Never fabricate tx_id!
+                        if alert is None or not alert.transaction_id:
+                            logger.debug(
+                                "Cannot correlate ground-truth prediction evidence: Alert '%s' not found or lacks genuine transaction ID.",
+                                alert_id,
+                            )
+                            continue
+
+                        actual_tx_id = alert.transaction_id
                         logged = False
                         target_sims = (sim_id, "default_sim") if sim_id != "default_sim" else (sim_id,)
                         for target_sim in target_sims:
@@ -527,7 +567,7 @@ class CaseManagementService:
                                     bank_id=effective_bank,
                                 )
                                 logged = True
-                                feedback_recorded = True
+                                prediction_evidence_recorded = True
                                 break
                             except KeyError:
                                 continue
@@ -552,7 +592,9 @@ class CaseManagementService:
                     logger.warning(
                         "Failed to record retraining label feedback for case %s: %s", case_id[:8], exc
                     )
-                metadata["retraining_feedback_recorded"] = feedback_recorded
+                metadata["retraining_feedback_recorded"] = feedback_buffer_recorded
+                metadata["feedback_buffer_recorded"] = feedback_buffer_recorded
+                metadata["prediction_evidence_recorded"] = prediction_evidence_recorded
             elif collected_signatures:
                 case.supervisor_signatures = collected_signatures
 

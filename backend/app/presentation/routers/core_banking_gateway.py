@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 from app.infrastructure.connectors.base_connector import NormalizedTransaction
 from app.infrastructure.connectors.mambu_connector import (
     MambuConnector,
+    MambuTenantMismatchError,
     MambuWebhookSignatureError,
 )
 from app.infrastructure.connectors.thought_machine_connector import (
@@ -192,9 +193,14 @@ async def _handle_mambu_webhook(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(sig_err),
         ) from sig_err
+    except MambuTenantMismatchError as mismatch_err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(mismatch_err),
+        ) from mismatch_err
     except ValueError as val_err:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(val_err),
         ) from val_err
 
@@ -202,42 +208,72 @@ async def _handle_mambu_webhook(
         mcc_raw = str(result.merchant_category_code or "5411")
         mapped_category = MCC_TO_MERCHANT_CATEGORY.get(mcc_raw, "grocery")
         mapped_channel = CHANNEL_TO_DEVICE_TYPE.get(str(result.channel_type).upper(), "web_browser")
-        effective_bank = result.bank_id or "bank_alpha"
+        effective_bank = result.bank_id or connector.tenant_id
         hour_val = result.timestamp.hour if result.timestamp else 12
 
-        raw_cb = payload.get("chargeback_count")
-        cb_val = int(raw_cb) if raw_cb is not None else 0
+        # 1. Authoritative Institutional & Consortium Serving Authorization
+        from app.application.services.model_serving_authorization import authorize_model_serving
+        from app.domain.consortium_governance import ConsortiumStatus
+        from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
+        from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 
-        raw_vel = payload.get("velocity")
-        vel_val = float(raw_vel) if raw_vel is not None else 1.0
+        machine_principal = AuthenticatedPrincipal(
+            principal_id=f"connector:mambu:{effective_bank}",
+            tenant_id=effective_bank,
+            roles=["core_banking_connector", "machine_client"],
+            auth_method="mambu_hmac_sha256",
+            is_authenticated=True,
+        )
 
-        raw_c_hist = payload.get("customer_history_score")
-        c_hist_val = float(raw_c_hist) if raw_c_hist is not None else 0.95
+        try:
+            c_store = DurableConsortiumStore.get_instance()
+            for c in c_store.list_consortia():
+                if c.status == ConsortiumStatus.ACTIVE and effective_bank in c.removed_members:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=(
+                            f"Broken Access Control: Institutional membership for tenant '{effective_bank}' in "
+                            f"consortium '{c.consortium_id}' has been revoked; serving access is rejected."
+                        ),
+                    )
+        except HTTPException:
+            raise
+        except Exception as c_err:
+            logger.debug("Active consortium store verification bypassed or unconfigured: %s", c_err)
 
-        raw_age = payload.get("account_age_days")
-        age_val = int(raw_age) if raw_age is not None else 365
+        auth_sim_id, ownership = authorize_model_serving(
+            principal=machine_principal,
+            caller_tenant=effective_bank,
+            simulation_id=None,
+            action_name="core_banking_webhook",
+        )
 
-        raw_m_risk = payload.get("merchant_risk_score")
-        if raw_m_risk is not None:
-            m_risk_val = float(raw_m_risk)
-        elif mapped_category in ("crypto", "gambling", "wire_transfer", "jewelry"):
-            m_risk_val = 0.85
-        else:
-            m_risk_val = 0.15
-
+        # 2. Extract genuine transaction features without fabrication
         txn_features: dict[str, Any] = {
             "transaction_id": result.transaction_id,
             "customer_id": result.account_id,
             "transaction_amount": float(result.amount),
             "merchant_category": mapped_category,
-            "country_code": result.origin_country or "US",
+            "country_code": result.origin_country,
             "device_type": mapped_channel,
-            "velocity": vel_val,
             "hour_of_day": hour_val,
-            "merchant_risk_score": m_risk_val,
-            "customer_history_score": c_hist_val,
-            "chargeback_count": cb_val,
-            "account_age_days": age_val,
+            "velocity": float(payload["velocity"]) if payload.get("velocity") is not None else None,
+            "customer_history_score": (
+                float(payload["customer_history_score"])
+                if payload.get("customer_history_score") is not None
+                else None
+            ),
+            "chargeback_count": (
+                int(payload["chargeback_count"]) if payload.get("chargeback_count") is not None else None
+            ),
+            "account_age_days": (
+                int(payload["account_age_days"]) if payload.get("account_age_days") is not None else None
+            ),
+            "merchant_risk_score": (
+                float(payload["merchant_risk_score"])
+                if payload.get("merchant_risk_score") is not None
+                else None
+            ),
         }
 
         from app.presentation.routers.predict import evaluate_transaction_risk_and_alerts
@@ -246,11 +282,24 @@ async def _handle_mambu_webhook(
             evaluate_transaction_risk_and_alerts(
                 txn_dict=txn_features,
                 bank_id=effective_bank,
+                simulation_id=auth_sim_id,
                 customer_ref=result.account_id,
                 background_tasks=background_tasks,
-                strict_production=False,
             )
         )
+
+        # 3. Handle alert persistence failure truthfully: never claim completed investigation on failure
+        is_high_risk = score >= 600.0 or risk_level in ("CRITICAL", "HIGH")
+        if is_high_risk and active_alert is None:
+            logger.error(
+                "Alert persistence failure: High-risk transaction %s (score=%.2f) could not be persisted for investigation.",
+                result.transaction_id,
+                score,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Alert persistence failed: high-risk transaction could not be persisted for investigation. Gateway delivery must be retried.",
+            )
 
         if score >= 700.0 or risk_level in ("CRITICAL", "HIGH"):
             decision = "HOLD"
@@ -319,7 +368,7 @@ async def _handle_thought_machine_webhook(
         ) from sig_err
     except ValueError as val_err:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(val_err),
         ) from val_err
 
