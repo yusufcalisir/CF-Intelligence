@@ -627,7 +627,7 @@ export function useIntelligenceStats() {
 
 // ── Phase 2: Cases ─────────────────────────
 
-export function useCases(filters?: { status?: string; priority?: string }) {
+export function useCases(filters?: { status?: string; priority?: string; alert_id?: string }) {
   return useQuery<CaseSummary[]>({
     queryKey: ['cases', filters],
     queryFn: async () => {
@@ -652,8 +652,12 @@ export function useCase(id: string | undefined) {
 export function useCreateCase() {
   const queryClient = useQueryClient();
   return useMutation<Case, Error, CaseCreatePayload>({
-    mutationFn: async (payload) => {
-      const { data } = await apiClient.post('/api/v1/cases', payload);
+    mutationFn: async ({ idempotencyKey, ...payload }) => {
+      const headers: Record<string, string> = {};
+      if (idempotencyKey) {
+        headers['Idempotency-Key'] = idempotencyKey;
+      }
+      const { data } = await apiClient.post('/api/v1/cases', payload, { headers });
       return data;
     },
     onSuccess: () => {

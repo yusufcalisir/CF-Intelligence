@@ -5,6 +5,7 @@ import {
   useCase,
   useAddCaseNote,
   useUpdateCaseStatus,
+  useResolveCase,
   useCaseEvidence,
   useAddEvidence,
   useGenerateCopilotNarrative,
@@ -86,6 +87,7 @@ export default function CaseDetailPage() {
   const { data: caseData, isLoading } = useCase(caseId);
   const addNote = useAddCaseNote();
   const updateStatus = useUpdateCaseStatus();
+  const resolveCase = useResolveCase();
   const queryClient = useQueryClient();
   const [noteContent, setNoteContent] = useState('');
   const [supervisorSig, setSupervisorSig] = useState('');
@@ -216,29 +218,18 @@ export default function CaseDetailPage() {
   }) => {
     if (!caseId) return;
     setStatusError(null);
-    const targetStatus = payload.resolution === 'CONFIRMED_FRAUD' ? 'closed_confirmed' : 'closed_false_positive';
     try {
-      await updateStatus.mutateAsync({
+      await resolveCase.mutateAsync({
         caseId,
-        status: targetStatus,
+        resolution: payload.resolution,
+        primary_supervisor: payload.primarySupervisor,
+        secondary_supervisor: payload.secondarySupervisor,
         actor: 'analyst',
-        supervisor_signature: `supervisor:${payload.primarySupervisor}`,
-        second_supervisor_signature: `supervisor:${payload.secondarySupervisor}`,
-        supervisor_signatures: [
-          `supervisor:${payload.primarySupervisor}`,
-          `supervisor:${payload.secondarySupervisor}`,
-        ],
+        notes: payload.notes || undefined,
         expected_status: caseData?.status,
         expected_version: caseData?.version,
         expected_timeline_hash: caseData?.timeline_hash,
       });
-      if (payload.notes) {
-        await addNote.mutateAsync({
-          caseId,
-          author: `supervisor:${payload.primarySupervisor}`,
-          content: `Four-Eyes Signoff Consensus Rationale: ${payload.notes}`,
-        });
-      }
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
     } catch (err: unknown) {
@@ -877,27 +868,15 @@ export default function CaseDetailPage() {
                     <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mr-2" />
                     Loading alert explainability and graph topology...
                   </div>
-                ) : (
+                ) : realSelectedAlert ? (
                   <ExplainabilityPanel
-                    alert={
-                      realSelectedAlert || {
-                        id: selectedAlertId,
-                        bank_id: (caseData as any).bank_id || 'bank_a',
-                        transaction_id: `tx_${selectedAlertId.slice(0, 8)}`,
-                        risk_score: 720.0,
-                        severity: 'high' as any,
-                        status: 'new' as any,
-                        reason_codes: ['HIGH-AMT', 'GEO-RISK', 'VEL-001'],
-                        confidence: 0.92,
-                        involved_entity_ids: [`ent_acc_${selectedAlertId.slice(0, 8)}`],
-                        created_at: caseData.created_at,
-                        top_features: [{ feature: 'transaction_amount', contribution: 0.45 }],
-                        risk_factors: ['High risk score across multiple signals'],
-                        model_confidence: 0.92,
-                      }
-                    }
+                    alert={realSelectedAlert}
                     hideEscalateButton={true}
                   />
+                ) : (
+                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 font-mono flex items-center justify-between">
+                    <span>⚠️ Alert evidence unavailable: Alert {selectedAlertId} was not found in intelligence service.</span>
+                  </div>
                 )}
               </div>
             )}
@@ -1104,7 +1083,7 @@ export default function CaseDetailPage() {
           assignedInvestigator={caseData.assigned_to}
           currentActor="analyst"
           onConfirm={handleFourEyesConfirm}
-          isSubmitting={updateStatus.isPending}
+          isSubmitting={resolveCase.isPending}
         />
       )}
     </div>

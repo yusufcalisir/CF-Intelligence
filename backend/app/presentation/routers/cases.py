@@ -96,6 +96,7 @@ def _enforce_case_tenant(case: Any, caller_tenant: str | None) -> None:
 async def list_cases(
     status: str | None = Query(None),
     priority: str | None = Query(None),
+    alert_id: str | None = Query(None, description="Filter cases linking a specific alert"),
     limit: int = Query(50, ge=1, le=200),
     caller_tenant: TenantDep = None,
 ) -> list[CaseSummaryResponse]:
@@ -117,7 +118,7 @@ async def list_cases(
             f"Valid values: {[e.value for e in CasePriority]}",
         )
 
-    cases = _case_service.get_cases(status=stat, priority=pri, limit=limit)
+    cases = _case_service.get_cases(status=stat, priority=pri, alert_id=alert_id, limit=limit)
     if caller_tenant:
         cases = [
             c
@@ -178,7 +179,26 @@ async def create_case(
     If a request with the same key was successfully processed within 24 hours,
     the original response is returned without creating a duplicate case.
     """
+    if caller_tenant and req.bank_id:
+        enforce_tenant_isolation(caller_tenant, req.bank_id)
     tenant_id = caller_tenant or getattr(req, "bank_id", None)
+
+    if req.alert_ids:
+        from app.presentation.routers.alerts import get_alert_service
+
+        alert_svc = get_alert_service()
+        for a_id in req.alert_ids:
+            a = alert_svc.get_alert(a_id)
+            if a:
+                a_bank = getattr(a, "bank_id", None)
+                if a_bank:
+                    if caller_tenant:
+                        enforce_tenant_isolation(caller_tenant, a_bank)
+                    if tenant_id:
+                        enforce_tenant_isolation(tenant_id, a_bank)
+                    else:
+                        tenant_id = a_bank
+
     payload_hash = IdempotencyService.canonical_payload_hash(req)
     idem = IdempotencyService.get()
     status_or_hit, cached = idem.acquire(
@@ -521,6 +541,13 @@ async def resolve_case(
             expected_version=req.expected_version,
             expected_timeline_hash=req.expected_timeline_hash,
         )
+        if getattr(req, "notes", None):
+            _case_service.add_note(
+                case_id,
+                author=f"supervisor:{req.primary_supervisor}",
+                content=f"Four-Eyes Signoff Consensus Rationale: {req.notes}",
+            )
+            case = _case_service.get_case(case_id) or case
         return _serialize_case(case)
     except CaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -647,12 +674,19 @@ async def link_alert(
         raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
     _enforce_case_tenant(case, caller_tenant)
 
-    if caller_tenant:
-        from app.presentation.routers.alerts import get_alert_service
+    from app.presentation.routers.alerts import get_alert_service
 
-        alert = get_alert_service().get_alert(req.alert_id)
-        if alert and getattr(alert, "bank_id", None):
-            enforce_tenant_isolation(caller_tenant, alert.bank_id)
+    alert_svc = get_alert_service()
+    alert = alert_svc.get_alert(req.alert_id)
+    if alert:
+        alert_bank = getattr(alert, "bank_id", None)
+        if alert_bank:
+            if caller_tenant:
+                enforce_tenant_isolation(caller_tenant, alert_bank)
+            if getattr(case, "bank_id", None):
+                enforce_tenant_isolation(case.bank_id, alert_bank)
+            else:
+                case.bank_id = alert_bank
 
     try:
         case = _case_service.link_alert(case_id, req.alert_id)

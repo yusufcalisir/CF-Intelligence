@@ -633,6 +633,7 @@ export interface CaseCreatePayload {
   total_risk_score?: number;
   assigned_to?: string;
   bank_id?: string;
+  idempotencyKey?: string;
 }
 
 export interface CaseStatusUpdatePayload {
@@ -669,6 +670,7 @@ export interface CaseResolvePayload {
   primary_supervisor: string;
   secondary_supervisor: string;
   actor?: string;
+  notes?: string;
   expected_status?: string;
   expected_version?: number;
   expected_timeline_hash?: string | null;

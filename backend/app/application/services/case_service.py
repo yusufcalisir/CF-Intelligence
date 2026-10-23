@@ -955,6 +955,7 @@ class CaseManagementService:
         self,
         status: CaseStatus | None = None,
         priority: CasePriority | None = None,
+        alert_id: str | None = None,
         limit: int = 50,
     ) -> list[Case]:
         """Retrieve cases with optional filters."""
@@ -965,6 +966,8 @@ class CaseManagementService:
                 cases = [c for c in cases if c.status == status]
             if priority:
                 cases = [c for c in cases if c.priority == priority]
+            if alert_id:
+                cases = [c for c in cases if alert_id in getattr(c, "alert_ids", [])]
             return sorted(cases, key=lambda c: c.created_at, reverse=True)[:limit]
 
     # ── Private helpers ────────────────────────

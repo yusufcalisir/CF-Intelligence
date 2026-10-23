@@ -348,3 +348,147 @@ class TestCasesRoutes:
         assert resp_logs.status_code == 200
         logs = resp_logs.json()
         assert len(logs) >= 1
+
+    def test_list_cases_filter_by_alert_id(self, client: TestClient, clean_case_service):
+        c1 = clean_case_service.create_case(
+            title="Case for Alert 100",
+            alert_ids=["ALT-100", "ALT-COMMON"],
+        )
+        c2 = clean_case_service.create_case(
+            title="Case for Alert 200",
+            alert_ids=["ALT-200", "ALT-COMMON"],
+        )
+
+        resp100 = client.get("/api/v1/cases", params={"alert_id": "ALT-100"})
+        assert resp100.status_code == 200
+        data100 = resp100.json()
+        assert len(data100) == 1
+        assert data100[0]["id"] == c1.id
+
+        resp_common = client.get("/api/v1/cases", params={"alert_id": "ALT-COMMON"})
+        assert resp_common.status_code == 200
+        data_common = resp_common.json()
+        assert len(data_common) == 2
+        assert any(item["id"] == c2.id for item in data_common)
+
+        resp_none = client.get("/api/v1/cases", params={"alert_id": "ALT-NONEXISTENT"})
+        assert resp_none.status_code == 200
+        assert len(resp_none.json()) == 0
+
+    def test_alert_associated_case_tenant_inheritance_and_isolation(self, client: TestClient, clean_case_service):
+        from app.application.services.alert_service import _alert_to_dict
+        alert_svc = get_alert_service()
+
+        alert_alpha = Alert(
+            id="ALT-TENANT-ALPHA-01",
+            bank_id="bank_alpha",
+            severity=AlertSeverity.HIGH,
+            status=AlertStatus.NEW,
+        )
+        alert_svc._alert_store.set(alert_alpha.id, _alert_to_dict(alert_alpha))
+
+        # 1. Successful case creation inheriting tenant from alert when no bank_id provided
+        resp_create = client.post(
+            "/api/v1/cases",
+            json={
+                "title": "Alpha Escalation Case",
+                "priority": "p2_high",
+                "alert_ids": [alert_alpha.id],
+            },
+        )
+        assert resp_create.status_code == 200
+        case_data = resp_create.json()
+        assert case_data["bank_id"] == "bank_alpha"
+
+        # 2. Reject case creation if caller tenant differs from alert bank_id
+        resp_caller_mismatch = client.post(
+            "/api/v1/cases",
+            json={
+                "title": "Cross-tenant escalation attempt",
+                "priority": "p2_high",
+                "alert_ids": [alert_alpha.id],
+            },
+            headers={"X-Tenant-ID": "bank_beta"},
+        )
+        assert resp_caller_mismatch.status_code == 403
+        assert "Broken Access Control Prevention" in resp_caller_mismatch.json()["detail"]
+
+        # 3. Reject case creation if explicit bank_id in body conflicts with alert bank_id
+        resp_body_mismatch = client.post(
+            "/api/v1/cases",
+            json={
+                "title": "Conflicting body bank_id",
+                "priority": "p2_high",
+                "bank_id": "bank_gamma",
+                "alert_ids": [alert_alpha.id],
+            },
+        )
+        assert resp_body_mismatch.status_code == 403
+        assert "Broken Access Control Prevention" in resp_body_mismatch.json()["detail"]
+
+    def test_link_alert_cross_tenant_rejection(self, client: TestClient, clean_case_service):
+        from app.application.services.alert_service import _alert_to_dict
+        alert_svc = get_alert_service()
+
+        alert_alpha = Alert(
+            id="ALT-TENANT-ALPHA-02",
+            bank_id="bank_alpha",
+            severity=AlertSeverity.HIGH,
+            status=AlertStatus.NEW,
+        )
+        alert_svc._alert_store.set(alert_alpha.id, _alert_to_dict(alert_alpha))
+
+        # Create case for bank_beta
+        case_beta = clean_case_service.create_case(
+            title="Beta Case",
+            bank_id="bank_beta",
+        )
+
+        # Attempt to link bank_alpha alert to bank_beta case -> 403
+        resp_link_conflict = client.post(
+            f"/api/v1/cases/{case_beta.id}/alerts",
+            json={"alert_id": alert_alpha.id},
+        )
+        assert resp_link_conflict.status_code == 403
+        assert "Broken Access Control Prevention" in resp_link_conflict.json()["detail"]
+
+        # Attempt to link with mismatched caller header -> 403
+        case_alpha = clean_case_service.create_case(
+            title="Alpha Case",
+            bank_id="bank_alpha",
+        )
+        resp_caller_conflict = client.post(
+            f"/api/v1/cases/{case_alpha.id}/alerts",
+            json={"alert_id": alert_alpha.id},
+            headers={"X-Tenant-ID": "bank_beta"},
+        )
+        assert resp_caller_conflict.status_code == 403
+        assert "Broken Access Control Prevention" in resp_caller_conflict.json()["detail"]
+
+    def test_four_eyes_resolution_with_consensus_notes(self, client: TestClient, clean_case_service):
+        case = clean_case_service.create_case(title="Four-Eyes Consensus Note Case")
+        clean_case_service.change_status(case.id, CaseStatus.INVESTIGATING)
+        clean_case_service.change_status(case.id, CaseStatus.PENDING_REVIEW)
+
+        consensus_text = "Consortium agreed on high probability mule layering network."
+        resp_resolve = client.post(
+            f"/api/v1/cases/{case.id}/resolve",
+            json={
+                "resolution": "CONFIRMED_FRAUD",
+                "primary_supervisor": "supervisor_1",
+                "secondary_supervisor": "supervisor_2",
+                "actor": "analyst_99",
+                "notes": consensus_text,
+            },
+        )
+        assert resp_resolve.status_code == 200
+        case_data = resp_resolve.json()
+        assert case_data["status"] == "closed_confirmed"
+        assert case_data["is_open"] is False
+
+        # Verify consensus note is recorded on case notes
+        notes = case_data.get("notes", [])
+        assert any(consensus_text in n.get("content", "") for n in notes)
+        matching_notes = [n for n in notes if consensus_text in n.get("content", "")]
+        assert "supervisor:supervisor_1" in matching_notes[0]["author"]
+

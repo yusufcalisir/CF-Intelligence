@@ -183,6 +183,11 @@ class CaseResolveRequest(BaseModel):
         max_length=128,
         pattern=r"^[a-zA-Z0-9_\-\.@:]+$",
     )
+    notes: str | None = Field(
+        None,
+        max_length=1024,
+        description="Optional consensus rationale recorded with Four-Eyes resolution",
+    )
     expected_status: str | None = Field(
         None,
         description="Optional precondition: expected case status",

@@ -194,37 +194,53 @@ export default function AlertsPage() {
       const txRef = alertToEscalate.transaction_id || alertToEscalate.id.slice(0, 8);
       const caseTitle = `[${bankLabel.toUpperCase()}] AML Case: ${primaryReason} - Tx ${txRef}`;
 
-      // 3. Create Case via TanStack Query mutation
-      const newCase = await createCase.mutateAsync({
-        title: caseTitle,
-        priority,
-        alert_ids: [alertToEscalate.id],
-        total_risk_score: alertToEscalate.risk_score,
-        bank_id: alertToEscalate.bank_id,
-      });
+      // 3. Create Case via TanStack Query mutation with deterministic idempotency key
+      const idempotencyKey = `escalate_alert_${alertToEscalate.id}`;
+      let newCase: any;
+      try {
+        newCase = await createCase.mutateAsync({
+          title: caseTitle,
+          priority,
+          alert_ids: [alertToEscalate.id],
+          total_risk_score: alertToEscalate.risk_score,
+          bank_id: alertToEscalate.bank_id,
+          idempotencyKey,
+        });
+      } catch (createErr: unknown) {
+        console.error('Failed to create investigation case:', createErr);
+        const detail = formatApiError(createErr, 'Failed to escalate alert to investigation case. Please try again.');
+        setEscalationError(detail);
+        setEscalatingAlertId(null);
+        return;
+      }
 
-      // 4. Update Alert status to 'escalated'
-      await updateAlertStatus.mutateAsync({
-        alertId: alertToEscalate.id,
-        payload: {
-          status: 'escalated',
-          resolution_notes: `Escalated directly to AML Investigation Case #${newCase.id.slice(0, 8)} (${newCase.title})`,
-        },
-      });
+      // Case creation succeeded and is persisted in genuine backend state.
+      // Execute follow-up operations (alert status update, initial forensic note, telemetry evidence) safely:
+      try {
+        await updateAlertStatus.mutateAsync({
+          alertId: alertToEscalate.id,
+          payload: {
+            status: 'escalated',
+            resolution_notes: `Escalated directly to AML Investigation Case #${newCase.id.slice(0, 8)} (${newCase.title})`,
+          },
+        });
+      } catch (statusErr: unknown) {
+        console.warn('Alert status update failed after case creation:', statusErr);
+      }
 
-      // 5. Append initial forensic SHAP attribution and triage note
-      const shapDrivers = (alertToEscalate.top_features || [])
-        .slice(0, 5)
-        .map((f: any) => {
-          const val = f.contribution ?? f.value ?? 0;
-          const sign = val >= 0 ? '+' : '';
-          return `${f.feature || f.name}: ${sign}${Math.round(val * 100)}%`;
-        })
-        .join(', ');
-      const entityList = (alertToEscalate.involved_entity_ids || []).join(', ');
-      const reasonList = (alertToEscalate.reason_codes || []).join(', ');
+      try {
+        const shapDrivers = (alertToEscalate.top_features || [])
+          .slice(0, 5)
+          .map((f: any) => {
+            const val = f.contribution ?? f.value ?? 0;
+            const sign = val >= 0 ? '+' : '';
+            return `${f.feature || f.name}: ${sign}${Math.round(val * 100)}%`;
+          })
+          .join(', ');
+        const entityList = (alertToEscalate.involved_entity_ids || []).join(', ');
+        const reasonList = (alertToEscalate.reason_codes || []).join(', ');
 
-      const forensicContent = `⚡ Automated AML Triage Escalation from Alerts Workbench
+        const forensicContent = `⚡ Automated AML Triage Escalation from Alerts Workbench
 - Origin Alert ID: ${alertToEscalate.id}
 - Reporting Institution: ${bankLabel}
 - Associated Transaction: ${alertToEscalate.transaction_id || 'N/A'}
@@ -234,40 +250,46 @@ export default function AlertsPage() {
 - Suspect Entity Identifiers: ${entityList || 'None mapped'}
 - Primary SHAP Attribution Drivers: ${shapDrivers || 'Baseline feature distribution'}`;
 
-      await addCaseNote.mutateAsync({
-        caseId: newCase.id,
-        author: 'ai_triage_engine',
-        content: forensicContent,
-      });
+        await addCaseNote.mutateAsync({
+          caseId: newCase.id,
+          author: 'ai_triage_engine',
+          content: forensicContent,
+        });
+      } catch (noteErr: unknown) {
+        console.warn('Initial case note creation failed:', noteErr);
+      }
 
-      // 6. Register Alert Telemetry Evidence in Case Evidence Registry (Chain of Custody)
-      const evidencePayload = JSON.stringify({
-        alert_id: alertToEscalate.id,
-        bank_id: alertToEscalate.bank_id,
-        transaction_id: alertToEscalate.transaction_id,
-        risk_score: alertToEscalate.risk_score,
-        severity: alertToEscalate.severity,
-        reason_codes: alertToEscalate.reason_codes,
-        involved_entity_ids: alertToEscalate.involved_entity_ids,
-        top_features: alertToEscalate.top_features,
-        risk_factors: alertToEscalate.risk_factors,
-        escalated_at: new Date().toISOString(),
-      }, null, 2);
+      try {
+        const evidencePayload = JSON.stringify({
+          alert_id: alertToEscalate.id,
+          bank_id: alertToEscalate.bank_id,
+          transaction_id: alertToEscalate.transaction_id,
+          risk_score: alertToEscalate.risk_score,
+          severity: alertToEscalate.severity,
+          reason_codes: alertToEscalate.reason_codes,
+          involved_entity_ids: alertToEscalate.involved_entity_ids,
+          top_features: alertToEscalate.top_features,
+          risk_factors: alertToEscalate.risk_factors,
+          escalated_at: new Date().toISOString(),
+        }, null, 2);
 
-      await addEvidence.mutateAsync({
-        caseId: newCase.id,
-        evidence_type: 'document',
-        title: `Alert Telemetry & SHAP Dossier (${alertToEscalate.id.slice(0, 8)})`,
-        file_path: `evidence/alerts/alert_${alertToEscalate.id.slice(0, 8)}_dossier.json`,
-        content: evidencePayload,
-        uploaded_by: 'ai_triage_engine',
-      });
+        await addEvidence.mutateAsync({
+          caseId: newCase.id,
+          evidence_type: 'document',
+          title: `Alert Telemetry & SHAP Dossier (${alertToEscalate.id.slice(0, 8)})`,
+          file_path: `evidence/alerts/alert_${alertToEscalate.id.slice(0, 8)}_dossier.json`,
+          content: evidencePayload,
+          uploaded_by: 'ai_triage_engine',
+        });
+      } catch (evErr: unknown) {
+        console.warn('Telemetry evidence registration failed:', evErr);
+      }
 
-      // 7. Route directly to /cases/:newCaseId
+      // Always navigate to the created case
       navigate(`/cases/${newCase.id}`);
     } catch (err: unknown) {
-      console.error('Failed to escalate alert to case:', err);
-      const detail = formatApiError(err, 'Failed to escalate alert to investigation case. Please try again.');
+      console.error('Unexpected error during escalation workflow:', err);
+      const detail = formatApiError(err, 'Failed to complete escalation workflow.');
       setEscalationError(detail);
       setEscalatingAlertId(null);
     }
@@ -558,29 +580,41 @@ function AlertCard({
             <span className="text-[9px]">➔</span>
           </Link>
         </div>
-        {onEscalate && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEscalate(alert);
-            }}
-            disabled={isEscalating}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-            title="Escalate alert into an official AML Investigation Case"
+        {alert.status === 'escalated' ? (
+          <Link
+            to={`/cases?alert_id=${encodeURIComponent(alert.id)}`}
+            onClick={(e) => e.stopPropagation()}
+            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-500/30 transition-all flex items-center gap-1.5 shadow-sm"
+            title="View investigation case for this alert"
           >
-            {isEscalating ? (
-              <>
-                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Escalating...</span>
-              </>
-            ) : (
-              <>
-                <span>⚡</span>
-                <span>Escalate to Case</span>
-              </>
-            )}
-          </button>
+            <span>📁 View Case</span>
+            <span className="text-[10px]">➔</span>
+          </Link>
+        ) : (
+          onEscalate && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEscalate(alert);
+              }}
+              disabled={isEscalating}
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              title="Escalate alert into an official AML Investigation Case"
+            >
+              {isEscalating ? (
+                <>
+                  <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Escalating...</span>
+                </>
+              ) : (
+                <>
+                  <span>⚡</span>
+                  <span>Escalate to Case</span>
+                </>
+              )}
+            </button>
+          )
         )}
       </div>
     </motion.div>

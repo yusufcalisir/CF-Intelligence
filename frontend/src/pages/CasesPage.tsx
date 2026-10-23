@@ -59,19 +59,20 @@ export default function CasesPage() {
   });
 
   // Check for incoming alert escalation parameters (?from_alert=... / ?alert_id=... / ?create=true)
-  const fromAlertId = searchParams.get('from_alert') || searchParams.get('alert_id') || undefined;
+  const fromAlertId = searchParams.get('from_alert') || undefined;
+  const alertIdParam = searchParams.get('alert_id') || undefined;
   const initialTitleParam = searchParams.get('title') || '';
   const initialPriorityParam = searchParams.get('priority') || '';
   const initialRiskScoreParam = searchParams.get('risk_score');
   const initialRiskScore = initialRiskScoreParam ? parseFloat(initialRiskScoreParam) : undefined;
 
   const [showCreateModal, setShowCreateModal] = useState<boolean>(() => {
-    return Boolean(searchParams.get('create') === 'true' || searchParams.get('from_alert') || searchParams.get('alert_id'));
+    return Boolean(searchParams.get('create') === 'true' || searchParams.get('from_alert'));
   });
 
   // Auto-open modal if escalation query params change
   useEffect(() => {
-    if (searchParams.get('create') === 'true' || searchParams.get('from_alert') || searchParams.get('alert_id')) {
+    if (searchParams.get('create') === 'true' || searchParams.get('from_alert')) {
       setShowCreateModal(true);
     }
   }, [searchParams]);
@@ -161,6 +162,7 @@ export default function CasesPage() {
   const { data: cases, isLoading, refetch } = useCases({
     status: statusFilter || undefined,
     priority: priorityFilter || undefined,
+    alert_id: alertIdParam,
   });
 
   const createCase = useCreateCase();
@@ -196,11 +198,13 @@ export default function CasesPage() {
     alertIds?: string[],
     totalRiskScore?: number
   ) => {
+    const idempotencyKey = alertIds && alertIds.length === 1 ? `escalate_alert_${alertIds[0]}` : undefined;
     const result = await createCase.mutateAsync({
       title,
       priority,
       alert_ids: alertIds,
       total_risk_score: totalRiskScore,
+      idempotencyKey,
     });
 
     if (alertIds && alertIds.length > 0) {
