@@ -270,7 +270,7 @@ class TestCasesRoutes:
         alert_svc = get_alert_service()
         seeded_alert = Alert(
             id="ALT-HASH-CHAIN-101",
-            bank_id=None,
+            bank_id="",
             severity=AlertSeverity.MEDIUM,
             status=AlertStatus.NEW,
         )
@@ -586,7 +586,7 @@ class TestCasesRoutes:
 
         alert_standalone = Alert(
             id="ALT-STANDALONE-001",
-            bank_id=None,
+            bank_id="",
             severity=AlertSeverity.LOW,
             status=AlertStatus.NEW,
         )
