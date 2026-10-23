@@ -220,11 +220,28 @@ def test_dp_gradient_analytical_sigma_and_gaussian_noise(temp_storage_dir: str) 
 
 def test_end_to_end_case_service_real_feedback_ingestion() -> None:
     """Verifies that CaseManagementService terminal transitions record feedback into pipeline without error."""
+    from app.application.services.alert_service import AlertIntelligenceService
+    from app.domain.investigation_entities import Alert, AlertSeverity, AlertStatus
+
+    alert_svc = AlertIntelligenceService()
+    alert_svc.create_alert(
+        Alert(
+            id="alt_integration_777",
+            bank_id="bank_alpha",
+            transaction_id="tx_integration_777",
+            risk_score=850.0,
+            severity=AlertSeverity.HIGH,
+            status=AlertStatus.NEW,
+            reason_codes=["VELOCITY_HIGH"],
+        )
+    )
+
     case_service = CaseManagementService()
     case = case_service.create_case(
         title="Automated Retraining Integration Test",
         priority=CasePriority.P1_CRITICAL,
         alert_ids=["alt_integration_777"],
+        bank_id="bank_alpha",
     )
     case_service.assign_case(case.id, investigator="investigator_john")
     case_service.change_status(case.id, CaseStatus.INVESTIGATING, actor="investigator_john")

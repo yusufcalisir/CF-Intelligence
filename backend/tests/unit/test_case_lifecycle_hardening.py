@@ -81,11 +81,28 @@ def test_four_eyes_rejection_of_duplicate_supervisors() -> None:
 
 def test_four_eyes_distinct_supervisors_success_and_retraining_label() -> None:
     """Distinct supervisor signoff closes the case, sets closed_at, and records retraining feedback."""
+    from app.application.services.alert_service import AlertIntelligenceService
+    from app.domain.investigation_entities import Alert, AlertSeverity, AlertStatus
+
+    alert_svc = AlertIntelligenceService()
+    alert_svc.create_alert(
+        Alert(
+            id="alt_hardening_01",
+            bank_id="bank_alpha",
+            transaction_id="tx_hardening_01",
+            risk_score=850.0,
+            severity=AlertSeverity.HIGH,
+            status=AlertStatus.NEW,
+            reason_codes=["VELOCITY_HIGH"],
+        )
+    )
+
     service = CaseManagementService()
     case = service.create_case(
         title="Account Takeover via Multi-Bank Device",
         priority=CasePriority.P1_CRITICAL,
         alert_ids=["alt_hardening_01"],
+        bank_id="bank_alpha",
     )
     service.change_status(case.id, CaseStatus.INVESTIGATING, actor="analyst_dave")
 

@@ -213,9 +213,12 @@ async def _handle_mambu_webhook(
 
         # 1. Authoritative Institutional & Consortium Serving Authorization
         from app.application.services.model_serving_authorization import authorize_model_serving
+        from app.config import get_settings
         from app.domain.consortium_governance import ConsortiumStatus
         from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
         from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
+
+        settings = get_settings()
 
         machine_principal = AuthenticatedPrincipal(
             principal_id=f"connector:mambu:{effective_bank}",
@@ -225,6 +228,7 @@ async def _handle_mambu_webhook(
             is_authenticated=True,
         )
 
+        c_store: DurableConsortiumStore | None = None
         try:
             c_store = DurableConsortiumStore.get_instance()
             for c in c_store.list_consortia():
@@ -239,6 +243,12 @@ async def _handle_mambu_webhook(
         except HTTPException:
             raise
         except Exception as c_err:
+            if settings.is_production or (c_store is not None and getattr(c_store, "is_established", False)):
+                logger.error("Authoritative consortium governance verification failed: %s", c_err)
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"Authoritative consortium governance verification failed: {c_err}",
+                ) from c_err
             logger.debug("Active consortium store verification bypassed or unconfigured: %s", c_err)
 
         auth_sim_id, ownership = authorize_model_serving(

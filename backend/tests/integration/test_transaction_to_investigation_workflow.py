@@ -18,8 +18,9 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 import uuid
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -27,7 +28,9 @@ from fastapi.testclient import TestClient
 from app.application.services.alert_service import AlertIntelligenceService
 from app.application.services.label_feedback_pipeline import LocalLabelFeedbackPipeline
 from app.application.services.model_registry import ModelEvaluationEngine, ModelRegistry
+from app.config import get_settings
 from app.domain.enums import CasePriority, CaseStatus
+from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 from app.main import app
 from app.presentation.routers.cases import get_case_service
 from app.presentation.routers.core_banking_gateway import get_mambu_connector
@@ -455,11 +458,10 @@ class TestTransactionToInvestigationWorkflow:
         raw_body = json.dumps(payload).encode("utf-8")
         sig_header = _compute_mambu_hmac(connector_secret, raw_body)
 
-        from app.config import get_settings
-
         settings = get_settings()
         orig_env = settings.app_env
         orig_fs = settings.feature_store_enabled
+        orig_c_sec = os.environ.get("CFI_CONSORTIUM_STORE_SECRET")
         def mock_champ(simulation_id=None):
             if simulation_id == "live_prod_v2":
                 return {"version": 1, "generation": 1, "simulation_id": "live_prod_v2"}
@@ -468,10 +470,13 @@ class TestTransactionToInvestigationWorkflow:
         try:
             settings.app_env = "production"
             settings.feature_store_enabled = False
+            mock_c_store = MagicMock()
+            mock_c_store.list_consortia.return_value = []
+            mock_c_store.is_established = True
             with patch(
                 "app.application.services.model_registry.ModelRegistry.get_active_champion_identity",
                 side_effect=mock_champ,
-            ):
+            ), patch.object(DurableConsortiumStore, "get_instance", return_value=mock_c_store):
                 resp = client.post(
                     "/connectors/core-banking/mambu/webhook",
                     content=raw_body,
@@ -487,6 +492,11 @@ class TestTransactionToInvestigationWorkflow:
         finally:
             settings.app_env = orig_env
             settings.feature_store_enabled = orig_fs
+            if orig_c_sec is not None:
+                os.environ["CFI_CONSORTIUM_STORE_SECRET"] = orig_c_sec
+            else:
+                os.environ.pop("CFI_CONSORTIUM_STORE_SECRET", None)
+            DurableConsortiumStore._instance = None
             connector.webhook_secret = orig_secret
             connector.tenant_id = orig_tenant
 
@@ -524,11 +534,65 @@ class TestTransactionToInvestigationWorkflow:
             assert resp.status_code == 503
             assert "Alert persistence failed" in resp.json()["detail"]
 
+    def test_consortium_store_failure_fails_closed(self, clean_stores) -> None:
+        """Verify that authoritative consortium-store failure fails closed with HTTP 503 instead of authorizing serving."""
+        connector = get_mambu_connector()
+        orig_tenant = connector.tenant_id
+        orig_secret = connector.webhook_secret
+        connector_secret = "mambu_secure_production_secret_key_2026_xyz"
+        connector.tenant_id = "bank_a"
+        connector.webhook_secret = connector_secret
+        payload = {
+            "type": "deposit-transaction.created",
+            "transactionId": f"TX_CONSORTIUM_FAIL_{uuid.uuid4().hex[:8]}",
+            "accountId": "ACC_ALPHA_01",
+            "amount": 2500.0,
+            "currencyCode": "EUR",
+            "bankId": "bank_a",
+            "mcc": "6011",
+            "channel": "ONLINE",
+            "velocity": 1.0,
+            "customer_history_score": 0.8,
+            "chargeback_count": 0,
+            "account_age_days": 180,
+        }
+        raw_body = json.dumps(payload).encode("utf-8")
+        sig_header = _compute_mambu_hmac(connector_secret, raw_body)
+
+        settings = get_settings()
+        orig_env = settings.app_env
+        orig_c_sec = os.environ.get("CFI_CONSORTIUM_STORE_SECRET")
+        try:
+            settings.app_env = "production"
+            os.environ["CFI_CONSORTIUM_STORE_SECRET"] = "test_prod_consortium_authority_secret_64bytes!"
+            DurableConsortiumStore._instance = None
+            with patch.object(DurableConsortiumStore, "list_consortia", side_effect=RuntimeError("Consortium storage unavailable")):
+                resp = client.post(
+                    "/connectors/core-banking/mambu/webhook",
+                    content=raw_body,
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Mambu-Signature": sig_header,
+                    },
+                )
+                assert resp.status_code == 503
+                assert "Authoritative consortium governance verification failed" in resp.json()["detail"]
+        finally:
+            settings.app_env = orig_env
+            if orig_c_sec is not None:
+                os.environ["CFI_CONSORTIUM_STORE_SECRET"] = orig_c_sec
+            else:
+                os.environ.pop("CFI_CONSORTIUM_STORE_SECRET", None)
+            DurableConsortiumStore._instance = None
+            connector.tenant_id = orig_tenant
+            connector.webhook_secret = orig_secret
+
     def test_case_feedback_genuine_correlation_and_cross_tenant_rejection(self, clean_stores) -> None:
         """Verify that case feedback uses genuine alert evidence and rejects cross-tenant alert correlation."""
         alert_svc = AlertIntelligenceService()
         case_svc = get_case_service()
         eval_engine = ModelEvaluationEngine(ModelRegistry())
+        feedback_pipeline = LocalLabelFeedbackPipeline()
 
         # 1. Genuine Alert Creation for bank_alpha
         tx_alpha = f"TX_GENUINE_{uuid.uuid4().hex[:8]}"
@@ -565,11 +629,15 @@ class TestTransactionToInvestigationWorkflow:
         )
         last_event = closed_alpha.timeline[-1]
         assert last_event.metadata.get("prediction_evidence_recorded") is True
+        assert last_event.metadata.get("feedback_buffer_recorded") is True
         pred_rec = eval_engine.get_prediction_record("live_prod_v2", tx_alpha, bank_id="bank_alpha")
         assert pred_rec is not None
         assert pred_rec["actual_label"] == 1
+        alpha_buffer = feedback_pipeline.get_feedback_buffer("bank_alpha")
+        assert any(item["alert_id"] == alert_alpha.id for item in alpha_buffer)
 
-        # 3. Missing alert: Cannot correlate ground-truth prediction evidence
+        # 3. Missing alert: Cannot correlate ground-truth prediction evidence or ingest into feedback buffer
+        feedback_pipeline.clear_buffer("bank_alpha")
         case_missing = case_svc.create_case(
             title="Missing Alert Case",
             priority=CasePriority.P2_HIGH,
@@ -585,6 +653,8 @@ class TestTransactionToInvestigationWorkflow:
             supervisor_signature="supervisor_bob",
         )
         assert closed_missing.timeline[-1].metadata.get("prediction_evidence_recorded") is False
+        assert closed_missing.timeline[-1].metadata.get("feedback_buffer_recorded") is False
+        assert len(feedback_pipeline.get_feedback_buffer("bank_alpha")) == 0
 
         # 4. Cross-tenant alert: Case bank_alpha linking bank_beta alert raises PermissionError
         alerts_b = alert_svc.generate_alerts(
@@ -609,3 +679,92 @@ class TestTransactionToInvestigationWorkflow:
                 supervisor_signature="supervisor_bob",
             )
         assert "Cross-tenant alert feedback rejected" in str(exc_info.value)
+        assert len(feedback_pipeline.get_feedback_buffer("bank_alpha")) == 0
+        assert len(feedback_pipeline.get_feedback_buffer("bank_beta")) == 0
+
+    def test_case_feedback_mixed_valid_and_missing_alerts_prevents_partial_writes(self, clean_stores) -> None:
+        """Verify that a mixed list of valid and missing alerts prevents partial feedback writes."""
+        alert_svc = AlertIntelligenceService()
+        case_svc = get_case_service()
+        feedback_pipeline = LocalLabelFeedbackPipeline()
+
+        tx_valid = f"TX_VALID_{uuid.uuid4().hex[:8]}"
+        alerts_valid = alert_svc.generate_alerts(
+            bank_id="bank_alpha",
+            transactions=[{"transaction_id": tx_valid, "customer_id": "CUST_MIXED_01", "amount": 4000.0}],
+            predictions=[0.80],
+        )
+        valid_alert = alerts_valid[0]
+
+        # Case contains valid alert followed by non-existent alert
+        case_mixed = case_svc.create_case(
+            title="Mixed Valid and Missing Case",
+            priority=CasePriority.P2_HIGH,
+            alert_ids=[valid_alert.id, "unresolvable_alert_9999"],
+            bank_id="bank_alpha",
+            assigned_to="alice",
+        )
+        case_svc.change_status(case_mixed.id, CaseStatus.INVESTIGATING, actor="alice")
+        closed_mixed = case_svc.change_status(
+            case_mixed.id,
+            CaseStatus.CLOSED_CONFIRMED,
+            actor="alice",
+            supervisor_signature="supervisor_bob",
+        )
+        # Case resolution succeeds, but feedback ingestion is rejected entirely due to unverified alert
+        assert closed_mixed.timeline[-1].metadata.get("feedback_buffer_recorded") is False
+        assert closed_mixed.timeline[-1].metadata.get("prediction_evidence_recorded") is False
+
+        # Crucial check: valid alert must NOT have been written to the buffer
+        buffer_items = feedback_pipeline.get_feedback_buffer("bank_alpha")
+        assert not any(item["alert_id"] == valid_alert.id for item in buffer_items)
+        assert len(buffer_items) == 0
+
+    def test_case_feedback_mixed_valid_and_cross_tenant_alerts_prevents_partial_writes(self, clean_stores) -> None:
+        """Verify that a mixed list of valid and cross-tenant alerts raises PermissionError and prevents partial writes."""
+        alert_svc = AlertIntelligenceService()
+        case_svc = get_case_service()
+        feedback_pipeline = LocalLabelFeedbackPipeline()
+
+        # Valid alert for bank_alpha
+        tx_valid = f"TX_VALID_CT_{uuid.uuid4().hex[:8]}"
+        alerts_alpha = alert_svc.generate_alerts(
+            bank_id="bank_alpha",
+            transactions=[{"transaction_id": tx_valid, "customer_id": "CUST_MIXED_02", "amount": 7500.0}],
+            predictions=[0.88],
+        )
+        valid_alert_alpha = alerts_alpha[0]
+
+        # Cross-tenant alert for bank_beta
+        tx_beta = f"TX_BETA_CT_{uuid.uuid4().hex[:8]}"
+        alerts_beta = alert_svc.generate_alerts(
+            bank_id="bank_beta",
+            transactions=[{"transaction_id": tx_beta, "customer_id": "CUST_MIXED_03", "amount": 9500.0}],
+            predictions=[0.92],
+        )
+        cross_alert_beta = alerts_beta[0]
+
+        # Case contains valid alert followed by cross-tenant alert
+        case_mixed = case_svc.create_case(
+            title="Mixed Valid and Cross-Tenant Case",
+            priority=CasePriority.P1_CRITICAL,
+            alert_ids=[valid_alert_alpha.id, cross_alert_beta.id],
+            bank_id="bank_alpha",
+            assigned_to="alice",
+        )
+        case_svc.change_status(case_mixed.id, CaseStatus.INVESTIGATING, actor="alice")
+
+        with pytest.raises(PermissionError) as exc_info:
+            case_svc.change_status(
+                case_mixed.id,
+                CaseStatus.CLOSED_CONFIRMED,
+                actor="alice",
+                supervisor_signature="supervisor_bob",
+            )
+        assert "Cross-tenant alert feedback rejected" in str(exc_info.value)
+
+        # Crucial check: valid alert must NOT have been written to bank_alpha buffer before failure
+        buffer_alpha = feedback_pipeline.get_feedback_buffer("bank_alpha")
+        assert not any(item["alert_id"] == valid_alert_alpha.id for item in buffer_alpha)
+        assert len(buffer_alpha) == 0
+        assert len(feedback_pipeline.get_feedback_buffer("bank_beta")) == 0

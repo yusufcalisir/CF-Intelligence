@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.domain.enums import CasePriority, CaseStatus
-from app.domain.investigation_entities import Case, CaseEvent, CaseNote
+from app.domain.investigation_entities import Alert, Case, CaseEvent, CaseNote
 from app.domain.models.case import (
     DuplicateSupervisorSignatureError,
     FourEyesVerificationError,
@@ -497,95 +497,110 @@ class CaseManagementService:
 
                     case_bank = getattr(case, "bank_id", None)
 
-                    for alert_id in case.alert_ids:
-                        alert = alert_svc.get_alert(alert_id)
-                        if alert is not None:
+                    # Phase 1: Pre-validate ALL linked alerts before ingesting ANY feedback
+                    # Prevents partial unauthorized writes on mixed valid/invalid alert lists.
+                    # Never produce a training label from an unresolved, missing, or cross-tenant alert.
+                    resolved_alerts: list[Alert] = []
+                    validation_passed = True
+                    current_bank = case_bank
+
+                    if not case.alert_ids:
+                        validation_passed = False
+                    else:
+                        for alert_id in case.alert_ids:
+                            alert = alert_svc.get_alert(alert_id)
+                            if alert is None:
+                                logger.warning(
+                                    "Case '%s' contains unresolved or missing alert '%s'; skipping retraining feedback.",
+                                    case_id[:8],
+                                    alert_id,
+                                )
+                                validation_passed = False
+                                break
+
                             alert_bank = alert.bank_id
-                            if case_bank and alert_bank:
-                                norm_case_bank = case_bank.lower().replace("-", "_").strip()
+                            if not current_bank and alert_bank:
+                                current_bank = alert_bank
+
+                            if current_bank and alert_bank:
+                                norm_current_bank = current_bank.lower().replace("-", "_").strip()
                                 norm_alert_bank = alert_bank.lower().replace("-", "_").strip()
-                                if norm_case_bank != norm_alert_bank:
+                                if norm_current_bank != norm_alert_bank:
                                     logger.error(
                                         "Cross-tenant alert feedback rejected: alert '%s' bank '%s' mismatches case bank '%s'",
                                         alert_id,
                                         alert_bank,
-                                        case_bank,
+                                        current_bank,
                                     )
                                     raise PermissionError(
                                         f"Cross-tenant alert feedback rejected: alert '{alert_id}' belongs to bank '{alert_bank}', "
-                                        f"but case '{case_id}' belongs to bank '{case_bank}'."
+                                        f"but case '{case_id}' belongs to bank '{current_bank}'."
                                     )
-                            effective_bank = case_bank or alert_bank
-                        else:
-                            effective_bank = case_bank
-
-                        if not effective_bank:
-                            from app.config import get_settings
-
-                            _cfg = get_settings()
-                            _is_prod = getattr(_cfg, "is_production", False) or getattr(_cfg, "app_env", "development").lower() in ("production", "prod")
-                            if not _is_prod:
-                                effective_bank = "bank_alpha"
-                            else:
+                            elif not current_bank and not alert_bank:
                                 logger.warning(
-                                    "Case '%s' (alert %s) lacks authoritative bank identity; skipping feedback.",
+                                    "Case '%s' and alert '%s' lack authoritative bank identity; skipping retraining feedback.",
                                     case_id[:8],
                                     alert_id,
                                 )
-                                continue
-
-                        try:
-                            feedback_pipeline.ingest_analyst_determination(
-                                tenant_id=effective_bank,
-                                alert_id=alert_id,
-                                determination="CONFIRMED_FRAUD" if actual_label == 1 else "FALSE_POSITIVE",
-                                notes=f"Closed by {actor} with supervisor signoff {collected_signatures}",
-                                metadata={"alert_id": alert_id, "case_id": case.id},
-                            )
-                            feedback_buffer_recorded = True
-                        except Exception as pipe_exc:
-                            logger.warning("Feedback pipeline ingestion notice for alert %s: %s", alert_id, pipe_exc)
-
-                        # Genuine transaction evidence ground-truth correlation:
-                        # Only correlate if genuine alert and actual_tx_id exist. Never fabricate tx_id!
-                        if alert is None or not alert.transaction_id:
-                            logger.debug(
-                                "Cannot correlate ground-truth prediction evidence: Alert '%s' not found or lacks genuine transaction ID.",
-                                alert_id,
-                            )
-                            continue
-
-                        actual_tx_id = alert.transaction_id
-                        logged = False
-                        target_sims = (sim_id, "default_sim") if sim_id != "default_sim" else (sim_id,)
-                        for target_sim in target_sims:
-                            try:
-                                eval_engine.log_feedback(
-                                    simulation_id=target_sim,
-                                    transaction_id=actual_tx_id,
-                                    actual_label=actual_label,
-                                    bank_id=effective_bank,
-                                )
-                                logged = True
-                                prediction_evidence_recorded = True
+                                validation_passed = False
                                 break
-                            except KeyError:
-                                continue
-                            except PermissionError:
-                                logger.error(
-                                    "Cross-tenant feedback authorization failed: transaction %s bank %s mismatches caller",
-                                    actual_tx_id,
-                                    effective_bank,
-                                )
-                                raise
 
-                        if not logged:
-                            logger.debug(
-                                "Transaction '%s' (alert %s) not present in evaluation store for simulation '%s'.",
-                                actual_tx_id,
-                                alert_id,
-                                sim_id,
-                            )
+                            resolved_alerts.append(alert)
+
+                    # Phase 2: Ingest and correlate feedback ONLY if all alerts were verified
+                    if validation_passed and resolved_alerts and current_bank:
+                        for alert in resolved_alerts:
+                            try:
+                                feedback_pipeline.ingest_analyst_determination(
+                                    tenant_id=current_bank,
+                                    alert_id=alert.id,
+                                    determination="CONFIRMED_FRAUD" if actual_label == 1 else "FALSE_POSITIVE",
+                                    notes=f"Closed by {actor} with supervisor signoff {collected_signatures}",
+                                    metadata={"alert_id": alert.id, "case_id": case.id},
+                                )
+                                feedback_buffer_recorded = True
+                            except Exception as pipe_exc:
+                                logger.warning("Feedback pipeline ingestion notice for alert %s: %s", alert.id, pipe_exc)
+
+                            # Genuine transaction evidence ground-truth correlation:
+                            if not alert.transaction_id:
+                                logger.debug(
+                                    "Cannot correlate ground-truth prediction evidence: Alert '%s' lacks genuine transaction ID.",
+                                    alert.id,
+                                )
+                                continue
+
+                            actual_tx_id = alert.transaction_id
+                            logged = False
+                            target_sims = (sim_id, "default_sim") if sim_id != "default_sim" else (sim_id,)
+                            for target_sim in target_sims:
+                                try:
+                                    eval_engine.log_feedback(
+                                        simulation_id=target_sim,
+                                        transaction_id=actual_tx_id,
+                                        actual_label=actual_label,
+                                        bank_id=current_bank,
+                                    )
+                                    logged = True
+                                    prediction_evidence_recorded = True
+                                    break
+                                except KeyError:
+                                    continue
+                                except PermissionError:
+                                    logger.error(
+                                        "Cross-tenant feedback authorization failed: transaction %s bank %s mismatches caller",
+                                        actual_tx_id,
+                                        current_bank,
+                                    )
+                                    raise
+
+                            if not logged:
+                                logger.debug(
+                                    "Transaction '%s' (alert %s) not present in evaluation store for simulation '%s'.",
+                                    actual_tx_id,
+                                    alert.id,
+                                    sim_id,
+                                )
                 except PermissionError:
                     raise
                 except Exception as exc:

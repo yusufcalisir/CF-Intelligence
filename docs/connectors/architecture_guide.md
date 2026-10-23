@@ -64,6 +64,12 @@ $$\mathrm{Sig}_{\mathrm{expected}} = \mathrm{HMAC}_{\mathrm{SHA256}}(\mathrm{Sec
 
 Replay attacks and tampered payloads are rejected with HTTP 401 Unauthorized before parsing.
 
+In production mode, institutional identity and consortium governance verification fail closed:
+- Webhooks using repository-default or placeholder secrets fail closed with HTTP 401.
+- Mismatching institutional payload claims (`bankId`) fail with HTTP 403.
+- Authoritative consortium store failures fail closed with HTTP 503 instead of silently granting webhook serving access.
+- Institutional tenants revoked from active consortia are rejected with HTTP 403.
+
 ### 2.3 Outbound Provisional Holds
 When a fraud alert triggers automated containment, `MambuConnector.apply_provisional_hold()` executes:
 - Dispatches `POST /api/deposits/{accountId}/blocks` with an idempotency token.

@@ -30,10 +30,27 @@ def test_case_escalation_and_assignment() -> None:
 
 def test_analyst_determination_closed_confirmed_feedback_loop() -> None:
     """Verifies closed_confirmed verdict records label 1 retraining feedback and generates SAR XML."""
+    from app.application.services.alert_service import AlertIntelligenceService
+    from app.domain.investigation_entities import Alert, AlertSeverity, AlertStatus
+
+    alert_svc = AlertIntelligenceService()
+    alert_svc.create_alert(
+        Alert(
+            id="alt_2001",
+            bank_id="bank_alpha",
+            transaction_id="tx_2001",
+            risk_score=850.0,
+            severity=AlertSeverity.HIGH,
+            status=AlertStatus.NEW,
+            reason_codes=["VELOCITY_HIGH"],
+        )
+    )
+
     case = case_service.create_case(
         title="Confirmed Cross-Bank Fraud Ring",
         priority=CasePriority.P1_CRITICAL,
         alert_ids=["alt_2001"],
+        bank_id="bank_alpha",
     )
     case_service.assign_case(case.id, investigator="analyst_alice")
     case_service.change_status(case.id, new_status=CaseStatus.INVESTIGATING, actor="analyst_alice")
@@ -58,10 +75,27 @@ def test_analyst_determination_closed_confirmed_feedback_loop() -> None:
 
 def test_analyst_determination_closed_false_positive_feedback_loop() -> None:
     """Verifies closed_false_positive verdict records label 0 retraining feedback."""
+    from app.application.services.alert_service import AlertIntelligenceService
+    from app.domain.investigation_entities import Alert, AlertSeverity, AlertStatus
+
+    alert_svc = AlertIntelligenceService()
+    alert_svc.create_alert(
+        Alert(
+            id="alt_3001",
+            bank_id="bank_alpha",
+            transaction_id="tx_3001",
+            risk_score=450.0,
+            severity=AlertSeverity.LOW,
+            status=AlertStatus.NEW,
+            reason_codes=["LOW_RISK"],
+        )
+    )
+
     case = case_service.create_case(
         title="Legitimate High-Volume Holiday Purchase",
         priority=CasePriority.P3_MEDIUM,
         alert_ids=["alt_3001"],
+        bank_id="bank_alpha",
     )
     case_service.assign_case(case.id, investigator="analyst_alice")
     case_service.change_status(case.id, new_status=CaseStatus.INVESTIGATING, actor="analyst_alice")
