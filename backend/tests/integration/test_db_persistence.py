@@ -146,6 +146,127 @@ async def test_case_assign_and_note(db_session: AsyncSession) -> None:
     assert "timestamp" in noted.notes[0]
 
 
+@pytest.mark.asyncio
+async def test_case_institutional_ownership_create_and_reload(db_session: AsyncSession) -> None:
+    """Case creation with institutional owner persists bank_id across fresh session reload.
+    Standalone case without bank_id remains unbound (None).
+    """
+    repo = CaseRepository(db_session)
+
+    # 1. Standalone unbound case
+    unbound_case = await repo.create(title="Unbound investigation")
+    assert unbound_case.bank_id is None
+
+    # 2. Institution-owned case
+    owned_case = await repo.create(
+        title="Institution-specific investigation",
+        bank_id="bank_alpha",
+        priority="p1_critical",
+    )
+    assert owned_case.bank_id == "bank_alpha"
+
+    # 3. Fresh session reload on the same engine
+    assert db_session.bind is not None
+    factory = async_sessionmaker(db_session.bind, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as fresh_session:
+        fresh_repo = CaseRepository(fresh_session)
+        reloaded_unbound = await fresh_repo.get_by_id(unbound_case.id)
+        assert reloaded_unbound is not None
+        assert reloaded_unbound.bank_id is None
+
+        reloaded_owned = await fresh_repo.get_by_id(owned_case.id)
+        assert reloaded_owned is not None
+        assert reloaded_owned.bank_id == "bank_alpha"
+
+
+@pytest.mark.asyncio
+async def test_case_link_alert_binds_unbound_ownership(db_session: AsyncSession) -> None:
+    """Linking an institutional alert to an initially unbound case durably binds bank_id."""
+    repo = CaseRepository(db_session)
+    case = await repo.create(title="Pending triage case")
+    assert case.bank_id is None
+    assert case.alert_ids == []
+
+    # Link alert with verified bank_id
+    linked = await repo.link_alert(case.id, "alert-alpha-001", bank_id="bank_alpha")
+    assert linked is not None
+    assert linked.bank_id == "bank_alpha"
+    assert "alert-alpha-001" in linked.alert_ids
+
+    # Verify durability across fresh session
+    assert db_session.bind is not None
+    factory = async_sessionmaker(db_session.bind, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as fresh_session:
+        fresh_repo = CaseRepository(fresh_session)
+        reloaded = await fresh_repo.get_by_id(case.id)
+        assert reloaded is not None
+        assert reloaded.bank_id == "bank_alpha"
+        assert reloaded.alert_ids == ["alert-alpha-001"]
+
+
+@pytest.mark.asyncio
+async def test_case_link_alert_idempotent(db_session: AsyncSession) -> None:
+    """Repeatedly linking the same alert with compatible bank_id is idempotent."""
+    repo = CaseRepository(db_session)
+    case = await repo.create(title="Idempotency test case", bank_id="bank_alpha")
+
+    # Link alert once
+    linked1 = await repo.link_alert(case.id, "alert-alpha-001", bank_id="bank_alpha")
+    assert linked1 is not None
+    assert linked1.alert_ids == ["alert-alpha-001"]
+
+    # Link same alert again with same bank_id
+    linked2 = await repo.link_alert(case.id, "alert-alpha-001", bank_id="bank_alpha")
+    assert linked2 is not None
+    assert linked2.alert_ids == ["alert-alpha-001"]
+    assert linked2.bank_id == "bank_alpha"
+
+
+@pytest.mark.asyncio
+async def test_case_link_alert_cross_tenant_rejection(db_session: AsyncSession) -> None:
+    """Linking an alert from a different institution to an already bound case must fail
+    with ValueError and leave existing case associations unchanged."""
+    repo = CaseRepository(db_session)
+    case = await repo.create(
+        title="Alpha-owned Case",
+        bank_id="bank_alpha",
+        alert_ids=["alert-alpha-001"],
+    )
+
+    # Attempt cross-tenant link from bank_beta
+    with pytest.raises(ValueError, match="Cross-tenant alert linking rejected"):
+        await repo.link_alert(case.id, "alert-beta-999", bank_id="bank_beta")
+
+    # Verify in fresh session that bank_id and alert_ids were NOT modified
+    assert db_session.bind is not None
+    factory = async_sessionmaker(db_session.bind, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as fresh_session:
+        fresh_repo = CaseRepository(fresh_session)
+        reloaded = await fresh_repo.get_by_id(case.id)
+        assert reloaded is not None
+        assert reloaded.bank_id == "bank_alpha"
+        assert reloaded.alert_ids == ["alert-alpha-001"]
+        assert "alert-beta-999" not in reloaded.alert_ids
+
+
+@pytest.mark.asyncio
+async def test_case_list_by_bank(db_session: AsyncSession) -> None:
+    """list_by_bank returns only cases belonging to the specified institution."""
+    repo = CaseRepository(db_session)
+    await repo.create(title="Alpha 1", bank_id="bank_alpha", priority="p1_critical")
+    await repo.create(title="Alpha 2", bank_id="bank_alpha", priority="p2_high")
+    await repo.create(title="Beta 1", bank_id="bank_beta", priority="p3_medium")
+    await repo.create(title="Unbound", bank_id=None, priority="p3_medium")
+
+    alpha_cases = await repo.list_by_bank("bank_alpha")
+    assert len(alpha_cases) == 2
+    assert all(c.bank_id == "bank_alpha" for c in alpha_cases)
+
+    beta_cases = await repo.list_by_bank("bank_beta")
+    assert len(beta_cases) == 1
+    assert beta_cases[0].title == "Beta 1"
+
+
 # ── EntityRepository Tests ─────────────────────────────────────────────────────
 
 

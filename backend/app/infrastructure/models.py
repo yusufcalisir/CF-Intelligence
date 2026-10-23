@@ -122,6 +122,7 @@ class CaseModel(Base):
     __tablename__ = "cases"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    bank_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
     priority: Mapped[str] = mapped_column(String(20), nullable=False, default="p3_medium")

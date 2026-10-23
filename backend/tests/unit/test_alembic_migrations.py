@@ -60,7 +60,7 @@ def test_alembic_heads_is_single_linear_branch() -> None:
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
     assert len(heads) == 1, f"Expected exactly 1 migration head, found {len(heads)}: {heads}"
-    assert heads[0] == "004_training_authority_tables"
+    assert heads[0] == "005_case_institutional_ownership"
 
 
 def test_alembic_migrations_upgrade_head_and_downgrade_base_cleanly(temp_alembic_db: str) -> None:
@@ -523,4 +523,136 @@ def test_alembic_upgrade_from_pre_repair_002_revision(temp_alembic_db: str) -> N
     assert cur.fetchone()[0] == 3
 
     conn.close()
+
+
+def test_alembic_upgrade_from_004_to_005_case_institutional_ownership(temp_alembic_db: str) -> None:
+    """Verify that an existing database at revision 004 upgrades cleanly to 005:
+    1. Upgrade to 004_training_authority_tables.
+    2. Insert a legacy case without bank_id (since cases has no bank_id at 004).
+    3. Upgrade to 005_case_institutional_ownership (head).
+    4. Verify cases table has column 'bank_id' and index 'ix_cases_bank_id'.
+    5. Verify existing legacy case survived with bank_id IS NULL.
+    6. Verify inserting a new case with bank_id succeeds.
+    7. Downgrade to 004_training_authority_tables: verify bank_id column is dropped cleanly and existing case survives.
+    8. Re-upgrade to head: verify bank_id column is re-added cleanly.
+    """
+    cfg = _get_alembic_config(f"sqlite+aiosqlite:///{temp_alembic_db}")
+
+    # 1. Upgrade to 004_training_authority_tables
+    command.upgrade(cfg, "004_training_authority_tables")
+
+    conn = sqlite3.connect(temp_alembic_db)
+    cur = conn.cursor()
+
+    # Verify cases column list at 004 does NOT have bank_id
+    cur.execute("PRAGMA table_info(cases);")
+    cols_004 = {row[1] for row in cur.fetchall()}
+    assert "bank_id" not in cols_004
+    assert "title" in cols_004
+
+    # 2. Insert a case into cases at 004
+    cur.execute(
+        "INSERT INTO cases (id, title, status, priority, alert_ids, evidence_ids, notes, timeline, total_risk_score) "
+        "VALUES ('case_legacy_01', 'Legacy Case 01', 'open', 'p3_medium', '[]', '[]', '[]', '[]', 0.5);"
+    )
+    conn.commit()
+    conn.close()
+
+    # 3. Upgrade to head (005_case_institutional_ownership)
+    command.upgrade(cfg, "head")
+
+    conn = sqlite3.connect(temp_alembic_db)
+    cur = conn.cursor()
+
+    # 4. Verify cases column list at 005 has bank_id
+    cur.execute("PRAGMA table_info(cases);")
+    cols_005 = {row[1] for row in cur.fetchall()}
+    assert "bank_id" in cols_005
+
+    # Verify index ix_cases_bank_id exists
+    cur.execute("PRAGMA index_list(cases);")
+    indexes_005 = {row[1] for row in cur.fetchall()}
+    assert "ix_cases_bank_id" in indexes_005
+
+    # 5. Verify existing case survived and bank_id is NULL
+    cur.execute("SELECT id, title, bank_id FROM cases WHERE id = 'case_legacy_01';")
+    row = cur.fetchone()
+    assert row is not None
+    assert row[0] == "case_legacy_01"
+    assert row[1] == "Legacy Case 01"
+    assert row[2] is None
+
+    # 6. Verify inserting a new case with bank_id succeeds
+    cur.execute(
+        "INSERT INTO cases (id, bank_id, title, status, priority, alert_ids, evidence_ids, notes, timeline, total_risk_score) "
+        "VALUES ('case_new_02', 'bank_alpha', 'Institutional Case', 'open', 'p2_high', '[]', '[]', '[]', '[]', 0.8);"
+    )
+    conn.commit()
+    cur.execute("SELECT id, bank_id FROM cases WHERE id = 'case_new_02';")
+    assert cur.fetchone() == ("case_new_02", "bank_alpha")
+    conn.close()
+
+    # 7. Downgrade to 004_training_authority_tables
+    command.downgrade(cfg, "004_training_authority_tables")
+
+    conn = sqlite3.connect(temp_alembic_db)
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(cases);")
+    cols_downgrade = {row[1] for row in cur.fetchall()}
+    assert "bank_id" not in cols_downgrade
+    cur.execute("PRAGMA index_list(cases);")
+    indexes_downgrade = {row[1] for row in cur.fetchall()}
+    assert "ix_cases_bank_id" not in indexes_downgrade
+
+    # Legacy record still intact
+    cur.execute("SELECT id, title FROM cases WHERE id = 'case_legacy_01';")
+    assert cur.fetchone() == ("case_legacy_01", "Legacy Case 01")
+    conn.close()
+
+    # 8. Re-upgrade to head
+    command.upgrade(cfg, "head")
+    conn = sqlite3.connect(temp_alembic_db)
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(cases);")
+    cols_reupgrade = {row[1] for row in cur.fetchall()}
+    assert "bank_id" in cols_reupgrade
+    conn.close()
+
+
+def test_migration_manager_handles_legacy_unversioned_db_missing_bank_id(temp_alembic_db: str) -> None:
+    """Verify that migration_manager._ensure_migrated_or_stamped detects an unversioned database
+    lacking cases.bank_id, stamps 004_training_authority_tables, and upgrades to 005_case_institutional_ownership."""
+    from app.infrastructure.database.migration_manager import upgrade_head
+
+    # 1. Build database up to 004 using alembic, then DROP alembic_version to simulate an unversioned legacy database
+    cfg = _get_alembic_config(f"sqlite+aiosqlite:///{temp_alembic_db}")
+    command.upgrade(cfg, "004_training_authority_tables")
+
+    conn = sqlite3.connect(temp_alembic_db)
+    cur = conn.cursor()
+    cur.execute("DROP TABLE alembic_version;")
+    conn.commit()
+
+    # Confirm it has cases without bank_id and has cfi_scheduled_jobs
+    cur.execute("PRAGMA table_info(cases);")
+    assert "bank_id" not in {row[1] for row in cur.fetchall()}
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cfi_scheduled_jobs';")
+    assert cur.fetchone() is not None
+    conn.close()
+
+    # 2. Invoke upgrade_head via migration manager
+    upgrade_head(f"sqlite+aiosqlite:///{temp_alembic_db}")
+
+    # 3. Verify alembic_version is at head (005_case_institutional_ownership) and cases has bank_id
+    conn = sqlite3.connect(temp_alembic_db)
+    cur = conn.cursor()
+    cur.execute("SELECT version_num FROM alembic_version;")
+    version_row = cur.fetchone()
+    assert version_row is not None
+    assert version_row[0] == "005_case_institutional_ownership"
+
+    cur.execute("PRAGMA table_info(cases);")
+    assert "bank_id" in {row[1] for row in cur.fetchall()}
+    conn.close()
+
 

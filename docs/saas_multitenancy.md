@@ -55,9 +55,12 @@ Data isolation is enforced at the database engine level to comply with SOC 2 Typ
 
 Database migrations are managed programmatically via Alembic (`alembic.ini` and `backend/app/infrastructure/database/migrations/env.py`):
 
-- **Linear Dual-Revision Lifecycle:**
+- **Linear Migration Lifecycle:**
   - `001_production_domain_tables`: Generates foundational multi-tenant domain tables (`banks`, `alerts`, `cases`, `models`, `audit_logs`).
   - `002_core_and_aml_tables`: Generates advanced AML, graph relationship, simulation, and evidence tables.
+  - `003_alerts_unique_constraint`: Composite tenant-transaction uniqueness constraint on alerts.
+  - `004_training_authority_tables`: ACID training execution and provenance authority tables (`cfi_*`).
+  - `005_case_institutional_ownership`: Additive nullable `cases.bank_id` with `ix_cases_bank_id` index.
 - **Dynamic Active Tenant Discovery (`_get_active_tenants`):**
   Instead of relying on a static hardcoded bank list, the migration runner dynamically queries registered institutions from the `tenant_configs` relational table, ensuring newly onboarded banks are migrated automatically:
   ```python
@@ -173,7 +176,7 @@ All SaaS multi-tenancy capabilities are verified by continuous automated test su
 | **KMS & DB Isolation** | `backend/tests/unit/test_multi_tenancy.py` | Engine isolation, KMS key persistence, model vault directories, log filtering | `18/18 PASSED` |
 | **BOLA / IDOR Security** | `backend/tests/unit/test_multi_tenant_security_audit.py` | Cross-tenant 403 isolation, ContextVar leakage prevention, Redis key prefixing | `4/4 PASSED` |
 | **Tenant KMS & Metering** | `backend/tests/unit/test_tenant_kms_metering.py` | Quota boundary enforcement, 429 rate limits, per-tenant envelope encryption | `4/4 PASSED` |
-| **Alembic Migrations** | `backend/tests/integration/test_alembic_migrations.py` | Dual revision linear head (`002_core_and_aml_tables`), offline SQL, dynamic discovery | `4/4 PASSED` |
+| **Alembic Migrations** | `backend/tests/integration/test_alembic_migrations.py` | Linear migration head (`005_case_institutional_ownership`), offline SQL, dynamic discovery | `4/4 PASSED` |
 | **KMS Key Lifecycle** | `backend/tests/unit/test_key_lifecycle_vault.py` | Versioned envelope encryption, re-encryption, invalidation, rotation cron | `5/5 PASSED` |
 | **Vault Transit Realism** | `backend/tests/unit/test_vault_aesgcm_transit_realism.py` | Genuine AES-256-GCM encryption, tamper rejection, tenant AAD isolation | `5/5 PASSED` |
 | **Concurrency Safety** | `backend/tests/unit/test_concurrency_safety.py` | Atomic quota acquire under 50 threads, single champion promotion, idempotency locks | `5/5 PASSED` |

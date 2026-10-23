@@ -71,7 +71,12 @@ def _ensure_migrated_or_stamped(alembic_cfg: Config, db_url: str | None) -> None
     if "+aiosqlite" in sync_url:
         sync_url = sync_url.replace("+aiosqlite", "")
     elif "+asyncpg" in sync_url:
-        sync_url = sync_url.replace("+asyncpg", "")
+        try:
+            import psycopg  # noqa: F401
+
+            sync_url = sync_url.replace("+asyncpg", "+psycopg")
+        except ImportError:
+            sync_url = sync_url.replace("+asyncpg", "")
 
     engine = None
     try:
@@ -99,9 +104,34 @@ def _ensure_migrated_or_stamped(alembic_cfg: Config, db_url: str | None) -> None
         if not has_version and any(
             t in table_names for t in ("federated_rounds", "consortium_members", "simulation_runs")
         ):
-            logger.info("Adopting existing database schema by stamping Alembic head...")
-            command.stamp(alembic_cfg, "head")
-            return
+            # Verify actual column and table presence to prevent false adoption of newer revisions
+            has_case_bank_id = False
+            if "cases" in table_names:
+                case_cols = {c["name"] for c in insp.get_columns("cases")}
+                has_case_bank_id = "bank_id" in case_cols
+
+            has_training_authority = "cfi_scheduled_jobs" in table_names
+
+            if not has_training_authority:
+                stamp_rev = (
+                    "003_alerts_unique_constraint"
+                    if "alerts" in table_names
+                    else "001_production_domain_tables"
+                )
+                logger.info(
+                    "Adopting legacy database schema by stamping %s then upgrading to head...",
+                    stamp_rev,
+                )
+                command.stamp(alembic_cfg, stamp_rev)
+            elif not has_case_bank_id:
+                logger.info(
+                    "Adopting database schema at 004_training_authority_tables (missing cases.bank_id)..."
+                )
+                command.stamp(alembic_cfg, "004_training_authority_tables")
+            else:
+                logger.info("Adopting fully migrated database schema by stamping Alembic head...")
+                command.stamp(alembic_cfg, "head")
+                return
     except Exception as exc:
         logger.debug("Could not inspect database tables for auto-stamp check: %s", exc)
     finally:

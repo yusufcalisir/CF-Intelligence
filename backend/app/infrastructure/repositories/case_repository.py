@@ -36,10 +36,16 @@ class CaseRepository:
         alert_ids: list[str] | None = None,
         assigned_to: str | None = None,
         total_risk_score: float = 0.0,
+        bank_id: str | None = None,
     ) -> CaseModel:
-        """Persist a new investigation case."""
+        """Persist a new investigation case.
+
+        Institutional ownership (bank_id) is optional for standalone unbound cases.
+        When provided, it must be validated upstream by the authoritative service layer.
+        """
         model = CaseModel(
             id=str(uuid.uuid4()),
+            bank_id=bank_id,
             title=title,
             status="open",
             priority=priority,
@@ -53,7 +59,13 @@ class CaseRepository:
         self.session.add(model)
         await self.session.commit()
         await self.session.refresh(model)
-        logger.info("Case created id=%s title=%r priority=%s", model.id, title, priority)
+        logger.info(
+            "Case created id=%s title=%r priority=%s bank_id=%s",
+            model.id,
+            title,
+            priority,
+            bank_id,
+        )
         return model
 
     async def update_status(self, case_id: str, status: str) -> CaseModel | None:
@@ -79,24 +91,59 @@ class CaseRepository:
         await self.session.commit()
         return await self.get_by_id(case_id)
 
-    async def link_alert(self, case_id: str, alert_id: str, bank_id: str | None = None) -> CaseModel | None:
-        """Link an alert ID to the case."""
+    async def link_alert(
+        self, case_id: str, alert_id: str, bank_id: str | None = None
+    ) -> CaseModel | None:
+        """Link an alert ID to the case.
+
+        Preconditions:
+            - bank_id, if provided, must represent the verified institutional owner of the alert,
+              authorized by an upstream service/API boundary.
+
+        Semantics:
+            - If case does not exist: returns None.
+            - If case.bank_id is already set and bank_id is provided:
+                - If case.bank_id != bank_id: raises ValueError for cross-tenant conflict.
+            - If case.bank_id is unset/None and bank_id is provided:
+                - Binds case.bank_id = bank_id.
+            - If alert_id is not already in case.alert_ids:
+                - Appends alert_id (no duplicates).
+            - Idempotent: repeated links with same alert and compatible bank_id do not duplicate
+              alert_ids or corrupt state.
+        """
         case = await self.get_by_id(case_id)
         if case is None:
             return None
+
+        # Cross-tenant check: if case already bound to a different institution
+        if case.bank_id is not None and bank_id is not None and case.bank_id != bank_id:
+            logger.warning(
+                "Cross-tenant alert link rejected: case_id=%s owned by %s, alert %s bank is %s",
+                case_id,
+                case.bank_id,
+                alert_id,
+                bank_id,
+            )
+            raise ValueError(
+                f"Cross-tenant alert linking rejected: case '{case_id}' belongs to bank '{case.bank_id}', "
+                f"cannot link alert '{alert_id}' from bank '{bank_id}'."
+            )
+
         alert_ids = list(case.alert_ids or [])
         values_to_update: dict[str, Any] = {"updated_at": datetime.now(UTC)}
         needs_update = False
+
         if alert_id not in alert_ids:
             alert_ids.append(alert_id)
             case.alert_ids = alert_ids
             values_to_update["alert_ids"] = alert_ids
             needs_update = True
-        if bank_id and not getattr(case, "bank_id", None):
-            case.bank_id = bank_id  # type: ignore[attr-defined]
-            if hasattr(CaseModel, "bank_id"):
-                values_to_update["bank_id"] = bank_id
+
+        if bank_id is not None and case.bank_id is None:
+            case.bank_id = bank_id
+            values_to_update["bank_id"] = bank_id
             needs_update = True
+
         if needs_update:
             await self.session.execute(
                 update(CaseModel)
@@ -104,6 +151,7 @@ class CaseRepository:
                 .values(**values_to_update)
             )
             await self.session.commit()
+
         return await self.get_by_id(case_id)
 
     async def assign_to(self, case_id: str, investigator: str) -> CaseModel | None:
@@ -143,6 +191,17 @@ class CaseRepository:
     ) -> list[CaseModel]:
         """List cases assigned to an investigator, optionally filtered by status."""
         stmt = select(CaseModel).where(CaseModel.assigned_to == investigator)
+        if status:
+            stmt = stmt.where(CaseModel.status == status)
+        stmt = stmt.order_by(CaseModel.created_at.desc()).limit(limit)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def list_by_bank(
+        self, bank_id: str, *, status: str | None = None, limit: int = 50
+    ) -> list[CaseModel]:
+        """List cases belonging to a specific institution (bank_id), optionally filtered by status."""
+        stmt = select(CaseModel).where(CaseModel.bank_id == bank_id)
         if status:
             stmt = stmt.where(CaseModel.status == status)
         stmt = stmt.order_by(CaseModel.created_at.desc()).limit(limit)

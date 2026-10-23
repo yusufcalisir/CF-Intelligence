@@ -68,6 +68,23 @@ graph TD
 - **Agentic AML Copilot**: [`backend/app/application/services/aml_agentic_copilot.py`](../backend/app/application/services/aml_agentic_copilot.py)
 - **Regulatory Reporting & XSD Engine**: [`backend/app/application/services/regulatory_reporter.py`](../backend/app/application/services/regulatory_reporter.py)
 - **REST Presentation Router**: [`backend/app/presentation/routers/cases.py`](../backend/app/presentation/routers/cases.py)
+- **Relational SQL Repository & ORM**: [`backend/app/infrastructure/repositories/case_repository.py`](../backend/app/infrastructure/repositories/case_repository.py), [`backend/app/infrastructure/models.py`](../backend/app/infrastructure/models.py) (`CaseModel`, `cases` table)
+
+### Storage Boundaries: Redis CAS Hash-Chaining vs. Relational SQL Persistence
+
+The Case Management subsystem maintains distinct, purpose-specific storage layers:
+1. **API / Workbench Service Layer ([`CaseManagementService`](../backend/app/application/services/case_service.py)):**
+   Backed by `RedisStore("case")` / `MemoryStore`. Provides microsecond-latency state transitions, cryptographic SHA-256 parent hash verification on case timelines, CAS optimistic locking (`expected_status`), and FinCEN SAR narrative synthesis.
+2. **Relational Database Repository ([`CaseRepository`](../backend/app/infrastructure/repositories/case_repository.py)):**
+   Backed by PostgreSQL (production) or SQLite (testing) via SQLAlchemy 2.0 `CaseModel`. Provides indexed SQL persistence and queryability (`list_by_bank`, `list_by_assignee`, `list_open`).
+   - **Institutional Ownership Parity (`cases.bank_id`):** Added in forward-only Alembic revision `005_case_institutional_ownership.py` as a nullable `VARCHAR(36)` column with index `ix_cases_bank_id`.
+   - **Ownership Lifecycle Semantics:**
+     - Standalone cases may remain institutionally unbound (`bank_id = None`) when initially filed.
+     - Authorized cases created with an institutional owner persist that owner durably.
+     - Linking a verified institutional alert to an unbound case durably binds `case.bank_id`.
+     - Cross-tenant alert linking on a bound case is rejected (`ValueError`) leaving stored state and associations immutable.
+     - Repeated alert linking is idempotent.
+     - `migration_manager._ensure_migrated_or_stamped` prevents false schema adoption on unversioned databases lacking `cases.bank_id`.
 
 ---
 
