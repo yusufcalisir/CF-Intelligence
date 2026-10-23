@@ -16,7 +16,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.infrastructure.models import Base
+from app.infrastructure.models import Base, CaseModel
 from app.infrastructure.repositories.alert_repository import AlertRepository
 from app.infrastructure.repositories.case_repository import CaseRepository
 from app.infrastructure.repositories.entity_repository import EntityRepository
@@ -303,7 +303,9 @@ async def test_case_link_alert_concurrency_conflicting_institutions(
     assert isinstance(failures[0], ValueError)
     assert "Cross-tenant alert linking rejected" in str(failures[0])
 
-    winning_bank = successes[0].bank_id
+    winning_case = successes[0]
+    assert isinstance(winning_case, CaseModel)
+    winning_bank = winning_case.bank_id
     assert winning_bank in ("bank_alpha", "bank_beta")
     losing_alert = "alert-beta-race" if winning_bank == "bank_alpha" else "alert-alpha-race"
     winning_alert = "alert-alpha-race" if winning_bank == "bank_alpha" else "alert-beta-race"

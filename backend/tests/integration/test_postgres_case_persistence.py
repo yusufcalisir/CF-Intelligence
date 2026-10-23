@@ -31,6 +31,7 @@ from app.infrastructure.database.migration_manager import (
     ALEMBIC_INI_PATH,
     BACKEND_DIR,
 )
+from app.infrastructure.models import CaseModel
 from app.infrastructure.repositories.case_repository import CaseRepository
 
 if TYPE_CHECKING:
@@ -486,6 +487,7 @@ async def test_postgresql_concurrent_conflicting_institutions_alert_linking(
     assert len(failures) == 1, f"Expected exactly 1 failure, got {len(failures)}: {results}"
 
     winning_case = successes[0]
+    assert isinstance(winning_case, CaseModel)
     assert isinstance(failures[0], ValueError)
     assert "Cross-tenant alert linking rejected" in str(failures[0])
 
