@@ -839,9 +839,30 @@ async def predict_transaction(
     generates alerts if fraud is suspected.
     """
     settings = get_settings()
-    is_production = settings.app_env.lower() in ("production", "prod")
+    is_production = (
+        settings.app_env.lower() in ("production", "prod")
+        or getattr(_settings, "app_env", "development").lower() in ("production", "prod")
+    )
+    fs_enabled = getattr(_settings, "feature_store_enabled", False) or settings.feature_store_enabled
 
     txn_dict = payload.model_dump()
+    if is_production and not fs_enabled:
+        missing_feats = [f for f in REQUIRED_ML_FEATURES if txn_dict.get(f) is None]
+        if missing_feats:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Production feature contract violation: Missing required features: {missing_feats}. "
+                    f"Features must be explicitly supplied or observed in online feature store."
+                ),
+            )
+        try:
+            preprocess_transaction(txn_dict, strict_categorical=True)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Production categorical validation failed: {exc}",
+            )
     principal, effective_tenant = resolve_effective_caller_tenant(
         request=request,
         caller_tenant=caller_tenant,
