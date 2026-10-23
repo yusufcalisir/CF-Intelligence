@@ -451,5 +451,65 @@ describe('AlertsPage Integration Test Suite', () => {
     // Should render the formatted error message without crashing React (Minified React Error #31)
     expect(screen.getByText(/String should match pattern/i)).toBeInTheDocument();
   });
+
+  it('informs analysts about partial escalation completion when follow-up operations fail', async () => {
+    const user = userEvent.setup();
+    const createCaseMock = vi.fn().mockResolvedValue({
+      id: 'case_part_123',
+      title: '[MERIDIAN TRUST] AML Case: VELOCITY_BURST - Tx tx_structuring_1001',
+      priority: 'p1_critical',
+      status: 'open',
+    });
+    const updateAlertStatusMock = vi.fn().mockRejectedValue(new Error('Alert status service unavailable'));
+    const addNoteMock = vi.fn().mockRejectedValue(new Error('Timeline database conflict'));
+    const addEvidenceMock = vi.fn().mockResolvedValue({ id: 'ev_part_1' });
+
+    vi.spyOn(queries, 'useCreateCase').mockReturnValue({
+      mutateAsync: createCaseMock,
+      isPending: false,
+    } as any);
+    vi.spyOn(queries, 'useUpdateAlertStatus').mockReturnValue({
+      mutateAsync: updateAlertStatusMock,
+      isPending: false,
+    } as any);
+    vi.spyOn(queries, 'useAddCaseNote').mockReturnValue({
+      mutateAsync: addNoteMock,
+      isPending: false,
+    } as any);
+    vi.spyOn(queries, 'useAddEvidence').mockReturnValue({
+      mutateAsync: addEvidenceMock,
+      isPending: false,
+    } as any);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AlertsPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    const alertCard = screen.getByText('VELOCITY_BURST');
+    await user.click(alertCard);
+
+    const escalateButtons = screen.getAllByRole('button', { name: /Escalate to AML Investigation Case/i });
+    await user.click(escalateButtons[0]!);
+
+    // Case creation succeeded once (no blind retry duplicates)
+    expect(createCaseMock).toHaveBeenCalledTimes(1);
+
+    // Follow-up operations attempted
+    expect(updateAlertStatusMock).toHaveBeenCalledTimes(1);
+    expect(addNoteMock).toHaveBeenCalledTimes(1);
+    expect(addEvidenceMock).toHaveBeenCalledTimes(1);
+
+    // Warning is saved to sessionStorage for cross-navigation retrievability
+    const storedWarning = sessionStorage.getItem('cfi_case_warning_case_part_123');
+    expect(storedWarning).toBeTruthy();
+    expect(storedWarning).toContain('Investigation case #case_par was successfully created');
+    expect(storedWarning).toContain('alert-status update');
+    expect(storedWarning).toContain('initial note');
+  });
 });
+
 

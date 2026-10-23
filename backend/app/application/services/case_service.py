@@ -364,6 +364,8 @@ class CaseManagementService:
         expected_status: CaseStatus | str | None = None,
         expected_version: int | None = None,
         expected_timeline_hash: str | None = None,
+        resolution_notes: str | None = None,
+        resolution_notes_author: str | None = None,
     ) -> Case:
         """Change case status with transition validation and dual-control signoff.
 
@@ -641,6 +643,28 @@ class CaseManagementService:
                 # Log the path in timeline metadata
                 metadata["sar_report_path"] = report_path
 
+            if resolution_notes and resolution_notes.strip():
+                clean_notes = resolution_notes.strip()
+                note_author = resolution_notes_author or (collected_signatures[0] if collected_signatures else actor)
+                note_content = (
+                    clean_notes
+                    if "Consensus Rationale:" in clean_notes
+                    else f"Four-Eyes Signoff Consensus Rationale: {clean_notes}"
+                )
+                note = CaseNote(
+                    case_id=case.id,
+                    author=note_author,
+                    content=note_content,
+                )
+                case.notes.append(note)
+                self._add_event(
+                    case,
+                    "note_added",
+                    f"Consensus rationale recorded by {note_author}",
+                    actor,
+                    {"note_id": note.id, "author": note_author},
+                )
+
             self._add_event(
                 case,
                 "status_changed",
@@ -728,6 +752,7 @@ class CaseManagementService:
         self,
         case_id: str,
         alert_id: str,
+        bank_id: str | None = None,
         expected_version: int | None = None,
     ) -> Case:
         """Link an additional alert to an existing case."""
@@ -740,11 +765,39 @@ class CaseManagementService:
                 )
             old_version = getattr(case, "version", 1)
 
+            # Resolve alert's institutional owner if not explicitly passed
+            effective_alert_bank = bank_id
+            if effective_alert_bank is None:
+                try:
+                    from app.application.services.alert_service import AlertIntelligenceService
+
+                    alert = AlertIntelligenceService().get_alert(alert_id)
+                    if alert and getattr(alert, "bank_id", None):
+                        effective_alert_bank = alert.bank_id
+                except Exception:
+                    pass
+
+            # Enforce tenant ownership consistency
+            if effective_alert_bank:
+                norm_alert_bank = effective_alert_bank.lower().replace("-", "_").strip()
+                if case.bank_id:
+                    norm_case_bank = case.bank_id.lower().replace("-", "_").strip()
+                    if norm_case_bank != norm_alert_bank:
+                        raise ValueError(
+                            f"Cross-tenant alert linking forbidden: Case '{case_id}' belongs to tenant '{case.bank_id}', "
+                            f"cannot link alert belonging to tenant '{effective_alert_bank}'."
+                        )
+                else:
+                    # Case is initially unbound; assign authoritative institutional owner
+                    case.bank_id = effective_alert_bank
+
             if alert_id not in case.alert_ids:
                 case.alert_ids.append(alert_id)
                 case.updated_at = datetime.now(UTC)
 
                 self._add_event(case, "alert_linked", f"Alert {alert_id[:8]} linked to case", "system")
+            elif effective_alert_bank and case.bank_id == effective_alert_bank:
+                case.updated_at = datetime.now(UTC)
 
             success = self._cases.update_conditional(
                 case.id,

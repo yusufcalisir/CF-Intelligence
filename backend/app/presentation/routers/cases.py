@@ -540,14 +540,9 @@ async def resolve_case(
             expected_status=req.expected_status,
             expected_version=req.expected_version,
             expected_timeline_hash=req.expected_timeline_hash,
+            resolution_notes=req.notes,
+            resolution_notes_author=f"supervisor:{req.primary_supervisor}",
         )
-        if getattr(req, "notes", None):
-            _case_service.add_note(
-                case_id,
-                author=f"supervisor:{req.primary_supervisor}",
-                content=f"Four-Eyes Signoff Consensus Rationale: {req.notes}",
-            )
-            case = _case_service.get_case(case_id) or case
         return _serialize_case(case)
     except CaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -678,24 +673,26 @@ async def link_alert(
 
     alert_svc = get_alert_service()
     alert = alert_svc.get_alert(req.alert_id)
-    if alert:
-        alert_bank = getattr(alert, "bank_id", None)
-        if alert_bank:
-            if caller_tenant:
-                enforce_tenant_isolation(caller_tenant, alert_bank)
-            if getattr(case, "bank_id", None):
-                enforce_tenant_isolation(case.bank_id, alert_bank)
-            else:
-                case.bank_id = alert_bank
+    if not alert:
+        raise HTTPException(status_code=404, detail=f"Alert not found: {req.alert_id}")
+
+    alert_bank = getattr(alert, "bank_id", None)
+    if alert_bank:
+        if caller_tenant:
+            enforce_tenant_isolation(caller_tenant, alert_bank)
+        if getattr(case, "bank_id", None):
+            enforce_tenant_isolation(case.bank_id, alert_bank)
 
     try:
-        case = _case_service.link_alert(case_id, req.alert_id)
+        case = _case_service.link_alert(case_id, req.alert_id, bank_id=alert_bank)
         return _serialize_case(case)
     except TerminalCaseImmutableError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except CaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
+        if "cross-tenant" in str(e).lower():
+            raise HTTPException(status_code=403, detail=str(e))
         raise HTTPException(status_code=404, detail=str(e))
 
 

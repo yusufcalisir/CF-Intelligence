@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select, update
 
@@ -79,19 +79,29 @@ class CaseRepository:
         await self.session.commit()
         return await self.get_by_id(case_id)
 
-    async def link_alert(self, case_id: str, alert_id: str) -> CaseModel | None:
+    async def link_alert(self, case_id: str, alert_id: str, bank_id: str | None = None) -> CaseModel | None:
         """Link an alert ID to the case."""
         case = await self.get_by_id(case_id)
         if case is None:
             return None
         alert_ids = list(case.alert_ids or [])
+        values_to_update: dict[str, Any] = {"updated_at": datetime.now(UTC)}
+        needs_update = False
         if alert_id not in alert_ids:
             alert_ids.append(alert_id)
             case.alert_ids = alert_ids
+            values_to_update["alert_ids"] = alert_ids
+            needs_update = True
+        if bank_id and not getattr(case, "bank_id", None):
+            case.bank_id = bank_id  # type: ignore[attr-defined]
+            if hasattr(CaseModel, "bank_id"):
+                values_to_update["bank_id"] = bank_id
+            needs_update = True
+        if needs_update:
             await self.session.execute(
                 update(CaseModel)
                 .where(CaseModel.id == case_id)
-                .values(alert_ids=alert_ids, updated_at=datetime.now(UTC))
+                .values(**values_to_update)
             )
             await self.session.commit()
         return await self.get_by_id(case_id)

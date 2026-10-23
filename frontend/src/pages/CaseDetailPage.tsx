@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   useCase,
@@ -39,6 +39,25 @@ const EVENT_ICONS: Record<string, string> = {
   note_added: '📝',
   alert_linked: '🔗',
 };
+
+// ── Case-Based Warning Persistence Helpers ────────────────
+export const getCaseWarningStorageKey = (caseId: string) => `cfi_case_warning_${caseId}`;
+
+export function loadCaseWarning(caseId: string | undefined): string | null {
+  if (!caseId || typeof window === 'undefined') return null;
+  try {
+    return window.sessionStorage.getItem(getCaseWarningStorageKey(caseId));
+  } catch {
+    return null;
+  }
+}
+
+export function clearCaseWarning(caseId: string | undefined): void {
+  if (!caseId || typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(getCaseWarningStorageKey(caseId));
+  } catch { /* ignore */ }
+}
 
 // ── Case-Based Copilot SAR Session Cache Helpers ───────────
 export const getCopilotCaseStorageKey = (caseId: string) => `cfi_copilot_case_${caseId}`;
@@ -84,6 +103,7 @@ export function clearCachedCopilotData(caseId: string | undefined): void {
 
 export default function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const location = useLocation();
   const { data: caseData, isLoading } = useCase(caseId);
   const addNote = useAddCaseNote();
   const updateStatus = useUpdateCaseStatus();
@@ -95,6 +115,26 @@ export default function CaseDetailPage() {
   const [isExportingXml, setIsExportingXml] = useState(false);
   const [xmlExportSuccess, setXmlExportSuccess] = useState<string | null>(null);
   const exportFinCEN = useExportFinCENXml();
+
+  // Partial escalation warning state (retrieved from router location state or sessionStorage)
+  const [partialWarning, setPartialWarning] = useState<string | null>(() => {
+    const navWarning = (location.state as { warning?: string } | null)?.warning;
+    return navWarning || loadCaseWarning(caseId);
+  });
+
+  useEffect(() => {
+    const navWarning = (location.state as { warning?: string } | null)?.warning;
+    if (navWarning) {
+      setPartialWarning(navWarning);
+    } else {
+      setPartialWarning(loadCaseWarning(caseId));
+    }
+  }, [caseId, location.state]);
+
+  const handleDismissWarning = () => {
+    clearCaseWarning(caseId);
+    setPartialWarning(null);
+  };
 
   // Agentic AML Copilot state with case-based session persistence (cfi_copilot_case_${caseId})
   const [copilotData, setCopilotData] = useState<CopilotQueryResponse | null>(() => {
@@ -347,6 +387,27 @@ export default function CaseDetailPage() {
 
   return (
     <div className="space-y-6">
+      {/* Partial Escalation Follow-Up Warning Banner */}
+      {partialWarning && (
+        <div
+          data-testid="partial-escalation-warning"
+          className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 flex items-center justify-between gap-2 animate-in fade-in"
+          role="alert"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base">⚠️</span>
+            <span>{partialWarning}</span>
+          </div>
+          <button
+            onClick={handleDismissWarning}
+            className="text-amber-400 hover:text-white text-xs font-bold p-1 rounded transition-colors"
+            aria-label="Dismiss warning"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}

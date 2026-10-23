@@ -20,6 +20,7 @@ import type { Alert } from '../api/types';
 export const ALERTS_SELECTED_ID_KEY = 'cfi_selected_alert_id';
 export const ALERTS_BANK_FILTER_KEY = 'cfi_alerts_bank_filter';
 export const ALERTS_SEVERITY_FILTER_KEY = 'cfi_alerts_severity_filter';
+export const getCaseWarningStorageKey = (caseId: string) => `cfi_case_warning_${caseId}`;
 
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'];
 
@@ -33,6 +34,7 @@ export default function AlertsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [escalatingAlertId, setEscalatingAlertId] = useState<string | null>(null);
   const [escalationError, setEscalationError] = useState<string | null>(null);
+  const [escalationWarning, setEscalationWarning] = useState<string | null>(null);
 
   // 1. Restore selected alert ID from URL search params (?alert_id=...) or sessionStorage across tab switches
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(() => {
@@ -216,6 +218,8 @@ export default function AlertsPage() {
 
       // Case creation succeeded and is persisted in genuine backend state.
       // Execute follow-up operations (alert status update, initial forensic note, telemetry evidence) safely:
+      const failedFollowUps: string[] = [];
+
       try {
         await updateAlertStatus.mutateAsync({
           alertId: alertToEscalate.id,
@@ -226,6 +230,7 @@ export default function AlertsPage() {
         });
       } catch (statusErr: unknown) {
         console.warn('Alert status update failed after case creation:', statusErr);
+        failedFollowUps.push('alert-status update');
       }
 
       try {
@@ -257,6 +262,7 @@ export default function AlertsPage() {
         });
       } catch (noteErr: unknown) {
         console.warn('Initial case note creation failed:', noteErr);
+        failedFollowUps.push('initial note');
       }
 
       try {
@@ -283,10 +289,20 @@ export default function AlertsPage() {
         });
       } catch (evErr: unknown) {
         console.warn('Telemetry evidence registration failed:', evErr);
+        failedFollowUps.push('evidence attachment');
       }
 
-      // Always navigate to the created case
-      navigate(`/cases/${newCase.id}`);
+      let warningMsg: string | null = null;
+      if (failedFollowUps.length > 0) {
+        warningMsg = `Investigation case #${newCase.id.slice(0, 8)} was successfully created, but secondary operations (${failedFollowUps.join(', ')}) could not be completed. The investigation case exists, but its ${failedFollowUps.join(' and ')} could not be completed.`;
+        setEscalationWarning(warningMsg);
+        try {
+          sessionStorage.setItem(getCaseWarningStorageKey(newCase.id), warningMsg);
+        } catch { /* ignore */ }
+      }
+
+      // Always navigate to the created case, passing partial warning in state if secondary operations failed
+      navigate(`/cases/${newCase.id}`, warningMsg ? { state: { warning: warningMsg } } : undefined);
     } catch (err: unknown) {
       console.error('Unexpected error during escalation workflow:', err);
       const detail = formatApiError(err, 'Failed to complete escalation workflow.');
@@ -347,12 +363,29 @@ export default function AlertsPage() {
 
       {/* Escalation Error Toast */}
       {escalationError && (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center justify-between gap-2 animate-in fade-in">
+        <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center justify-between gap-2 animate-in fade-in" role="alert">
           <span>❌ {escalationError}</span>
           <button
             onClick={() => setEscalationError(null)}
             className="text-rose-400 hover:text-white text-xs font-bold p-1 rounded"
             aria-label="Dismiss error"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Partial Escalation Warning Toast */}
+      {escalationWarning && (
+        <div data-testid="escalation-warning" className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 flex items-center justify-between gap-2 animate-in fade-in" role="alert">
+          <div className="flex items-center gap-2">
+            <span>⚠️</span>
+            <span>{escalationWarning}</span>
+          </div>
+          <button
+            onClick={() => setEscalationWarning(null)}
+            className="text-amber-400 hover:text-white text-xs font-bold p-1 rounded transition-colors"
+            aria-label="Dismiss warning"
           >
             ✕
           </button>

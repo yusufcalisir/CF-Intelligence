@@ -316,6 +316,27 @@ describe('CaseDetailPage', () => {
     // Verify sessionStorage item is removed
     expect(sessionStorage.getItem('cfi_copilot_case_case_001')).toBeNull();
   });
+
+  it('renders partial escalation warning banner retrieved from sessionStorage and allows dismissing it', async () => {
+    const warningMsg = 'Investigation case #case_001 was successfully created, but secondary operations (alert-status update, initial note) could not be completed.';
+    sessionStorage.setItem('cfi_case_warning_case_001', warningMsg);
+
+    render(<CaseDetailPage />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('partial-escalation-warning')).toBeInTheDocument();
+    });
+    expect(screen.getByText(warningMsg)).toBeInTheDocument();
+
+    // Click dismiss button
+    const dismissBtn = screen.getByRole('button', { name: /Dismiss warning/i });
+    fireEvent.click(dismissBtn);
+
+    // Verify warning is dismissed from UI and purged from sessionStorage
+    expect(screen.queryByTestId('partial-escalation-warning')).not.toBeInTheDocument();
+    expect(sessionStorage.getItem('cfi_case_warning_case_001')).toBeNull();
+  });
 });
+
 
 

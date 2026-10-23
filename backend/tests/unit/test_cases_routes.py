@@ -265,6 +265,17 @@ class TestCasesRoutes:
         assert resp_note.status_code == 200
         assert resp_note.json()["content"].startswith("Initial scoping")
 
+        # Seed valid alert before linking
+        from app.application.services.alert_service import _alert_to_dict
+        alert_svc = get_alert_service()
+        seeded_alert = Alert(
+            id="ALT-HASH-CHAIN-101",
+            bank_id=None,
+            severity=AlertSeverity.MEDIUM,
+            status=AlertStatus.NEW,
+        )
+        alert_svc._alert_store.set(seeded_alert.id, _alert_to_dict(seeded_alert))
+
         # Link alert
         resp_link = client.post(
             f"/api/v1/cases/{case.id}/alerts",
@@ -491,4 +502,138 @@ class TestCasesRoutes:
         assert any(consensus_text in n.get("content", "") for n in notes)
         matching_notes = [n for n in notes if consensus_text in n.get("content", "")]
         assert "supervisor:supervisor_1" in matching_notes[0]["author"]
+
+    def test_link_alert_persists_institutional_ownership_to_unbound_case(self, client: TestClient, clean_case_service):
+        """Verify linking an institutional alert to an unbound case persists bank_id and enforces tenant isolation."""
+        from app.application.services.alert_service import _alert_to_dict
+        alert_svc = get_alert_service()
+
+        # Alert belonging to bank_alpha
+        alert_alpha = Alert(
+            id="ALT-INSTITUTIONAL-ALPHA-99",
+            bank_id="bank_alpha",
+            severity=AlertSeverity.HIGH,
+            status=AlertStatus.NEW,
+        )
+        alert_svc._alert_store.set(alert_alpha.id, _alert_to_dict(alert_alpha))
+
+        # 1. Create initially unbound standalone case
+        case = clean_case_service.create_case(title="Initially Unbound AML Case")
+        assert case.bank_id is None
+
+        # 2. Link institutional alert to unbound case
+        resp_link = client.post(
+            f"/api/v1/cases/{case.id}/alerts",
+            json={"alert_id": alert_alpha.id},
+        )
+        assert resp_link.status_code == 200
+        link_data = resp_link.json()
+        assert alert_alpha.id in link_data["alert_ids"]
+        assert link_data["bank_id"] == "bank_alpha"
+
+        # 3. Reload stored case from clean service to verify authoritative persistence
+        persisted_case = clean_case_service.get_case(case.id)
+        assert persisted_case is not None
+        assert persisted_case.bank_id == "bank_alpha"
+
+        # 4. Detail access: cross-tenant caller from bank_beta must be rejected with 403
+        resp_cross_detail = client.get(
+            f"/api/v1/cases/{case.id}",
+            headers={"X-Tenant-ID": "bank_beta"},
+        )
+        assert resp_cross_detail.status_code == 403
+
+        # 5. Detail access: legitimate tenant bank_alpha succeeds
+        resp_alpha_detail = client.get(
+            f"/api/v1/cases/{case.id}",
+            headers={"X-Tenant-ID": "bank_alpha"},
+        )
+        assert resp_alpha_detail.status_code == 200
+        assert resp_alpha_detail.json()["bank_id"] == "bank_alpha"
+
+        # 6. Case listing: tenant isolation excludes case for bank_beta
+        resp_beta_list = client.get(
+            "/api/v1/cases",
+            headers={"X-Tenant-ID": "bank_beta"},
+        )
+        assert resp_beta_list.status_code == 200
+        beta_ids = [c["id"] for c in resp_beta_list.json()]
+        assert case.id not in beta_ids
+
+        # 7. Case listing: tenant isolation includes case for bank_alpha
+        resp_alpha_list = client.get(
+            "/api/v1/cases",
+            headers={"X-Tenant-ID": "bank_alpha"},
+        )
+        assert resp_alpha_list.status_code == 200
+        alpha_ids = [c["id"] for c in resp_alpha_list.json()]
+        assert case.id in alpha_ids
+
+    def test_link_alert_rejects_nonexistent_alert(self, client: TestClient, clean_case_service):
+        """Linking a nonexistent alert must return HTTP 404 rather than silently proceeding."""
+        case = clean_case_service.create_case(title="Case Missing Alert Test")
+        resp_link = client.post(
+            f"/api/v1/cases/{case.id}/alerts",
+            json={"alert_id": "ALT-DOES-NOT-EXIST-404"},
+        )
+        assert resp_link.status_code == 404
+        assert "not found" in resp_link.json()["detail"].lower()
+
+    def test_link_alert_preserves_standalone_case(self, client: TestClient, clean_case_service):
+        """Linking an alert without an institutional owner preserves standalone case semantics."""
+        from app.application.services.alert_service import _alert_to_dict
+        alert_svc = get_alert_service()
+
+        alert_standalone = Alert(
+            id="ALT-STANDALONE-001",
+            bank_id=None,
+            severity=AlertSeverity.LOW,
+            status=AlertStatus.NEW,
+        )
+        alert_svc._alert_store.set(alert_standalone.id, _alert_to_dict(alert_standalone))
+
+        case = clean_case_service.create_case(title="Standalone Case Preservation")
+        assert case.bank_id is None
+
+        resp_link = client.post(
+            f"/api/v1/cases/{case.id}/alerts",
+            json={"alert_id": alert_standalone.id},
+        )
+        assert resp_link.status_code == 200
+        assert resp_link.json()["bank_id"] is None
+
+        persisted = clean_case_service.get_case(case.id)
+        assert persisted is not None
+        assert persisted.bank_id is None
+
+    def test_four_eyes_resolution_atomic_failure_does_not_finalize(self, client: TestClient, clean_case_service):
+        """If resolution preconditions fail (optimistic version conflict), status and notes are not committed."""
+        case = clean_case_service.create_case(title="Four-Eyes Atomic Failure Case")
+        clean_case_service.change_status(case.id, CaseStatus.INVESTIGATING)
+        clean_case_service.change_status(case.id, CaseStatus.PENDING_REVIEW)
+
+        current_case = clean_case_service.get_case(case.id)
+        assert current_case is not None
+        actual_version = current_case.version
+
+        # Attempt resolve with stale version precondition
+        resp_fail = client.post(
+            f"/api/v1/cases/{case.id}/resolve",
+            json={
+                "resolution": "CONFIRMED_FRAUD",
+                "primary_supervisor": "supervisor_1",
+                "secondary_supervisor": "supervisor_2",
+                "actor": "analyst_99",
+                "notes": "Rationale that should not be saved on version failure",
+                "expected_version": actual_version + 99,
+            },
+        )
+        assert resp_fail.status_code == 409
+
+        # Case remains PENDING_REVIEW and no note is persisted
+        reloaded = clean_case_service.get_case(case.id)
+        assert reloaded is not None
+        assert reloaded.status == CaseStatus.PENDING_REVIEW
+        assert not any("Rationale that should not be saved" in n.content for n in reloaded.notes)
+
 
