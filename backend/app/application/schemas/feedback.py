@@ -112,6 +112,8 @@ class FeedbackStatsResponse(BaseModel):
     false_positive_count: int
     consumed_count: int
     unconsumed_count: int
+    validated_count: int = 0
+    reserved_count: int = 0
     priority_distribution: dict[int, int]
 
 

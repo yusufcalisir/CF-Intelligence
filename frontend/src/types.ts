@@ -123,6 +123,8 @@ export interface FeedbackStatsResponse {
   false_positive_count: number;
   consumed_count: number;
   unconsumed_count: number;
+  validated_count?: number;
+  reserved_count?: number;
   priority_distribution: Record<number, number>;
 }
 

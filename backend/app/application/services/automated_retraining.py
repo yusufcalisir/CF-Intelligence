@@ -34,8 +34,12 @@ class DriftEvaluationStatus:
     psi_status: str  # "DRIFT_DETECTED" | "NO_DRIFT"
     concept_status: str  # "DRIFT_DETECTED" | "NO_DRIFT"
     auc_monitoring_status: str  # "METRIC_AVAILABLE" | "METRIC_UNAVAILABLE"
-    accuracy_degradation_status: str  # "DEGRADATION_DETECTED" | "NO_DEGRADATION_DETECTED" | "MONITORING_INCOMPLETE"
-    monitoring_complete: bool  # True strictly when all candidate signals (including empirical AUC) are evaluated
+    accuracy_degradation_status: (
+        str  # "DEGRADATION_DETECTED" | "NO_DEGRADATION_DETECTED" | "MONITORING_INCOMPLETE"
+    )
+    monitoring_complete: (
+        bool  # True strictly when all candidate signals (including empirical AUC) are evaluated
+    )
     details: dict[str, Any] = field(default_factory=dict)
 
 
@@ -60,10 +64,14 @@ class DriftTriggeredRetrainingService:
         psi_threshold: float = 0.20,
         min_auc_threshold: float = 0.70,
         operational_service: Any | None = None,
+        feedback_pipeline: Any | None = None,
+        min_feedback_samples: int = 0,
     ) -> None:
         self.psi_threshold = psi_threshold
         self.min_auc_threshold = min_auc_threshold
         self.operational_service = operational_service
+        self.feedback_pipeline = feedback_pipeline
+        self.min_feedback_samples = min_feedback_samples
         self._jobs: dict[str, RetrainingJobRecord] = {}
         self._lock = threading.RLock()
 
@@ -212,6 +220,8 @@ class DriftTriggeredRetrainingService:
         operational_service: Any | None = None,
         participating_banks: list[str] | None = None,
         consortium_id: str | None = None,
+        feedback_pipeline: Any | None = None,
+        min_feedback_samples: int | None = None,
     ) -> dict[str, Any]:
         """Executes genuine automated FL retraining task producing a candidate model checkpoint.
 
@@ -220,8 +230,22 @@ class DriftTriggeredRetrainingService:
         Requires an authorized OperationalFederationService to execute genuine distributed training,
         evaluate holdout data, issue receipts, and register an inactive candidate.
         If operational_service is not supplied, fails closed with an explicit RuntimeError.
+
+        Staged Two-Phase Feedback Consumption:
+        If a feedback pipeline is supplied or configured on the service:
+        1. Validated feedback is reserved under this job_id for each participating bank.
+        2. If verified training finishes successfully (invariants 1-5 pass), reserved feedback is committed.
+        3. If training fails, throws an exception, or is cancelled, reserved feedback is released back to pool.
         """
         effective_service = operational_service or self.operational_service
+        effective_pipeline = (
+            feedback_pipeline if feedback_pipeline is not None else self.feedback_pipeline
+        )
+        effective_min = (
+            min_feedback_samples if min_feedback_samples is not None else self.min_feedback_samples
+        )
+        banks = list(participating_banks) if participating_banks else ["BANK_A", "BANK_B", "BANK_C"]
+
         with self._lock:
             if job_id not in self._jobs:
                 raise KeyError(f"Retraining job '{job_id}' does not exist.")
@@ -243,7 +267,42 @@ class DriftTriggeredRetrainingService:
                     "Fabricated training completion and synthetic ML metrics are strictly prohibited (AGENTS.md)."
                 )
 
+            # Two-phase feedback reservation
+            reserved_banks: list[str] = []
+            if effective_pipeline is not None:
+                for bank in banks:
+                    res_batch = effective_pipeline.reserve_retraining_batch(
+                        tenant_id=bank,
+                        job_id=job_id,
+                        batch_size=32,
+                        min_priority=1,
+                        stratified=True,
+                        require_validated=True,
+                    )
+                    count = res_batch.get("batch_size", 0)
+                    if effective_min > 0 and count < effective_min:
+                        # Insufficient verified data -> release any reservations and fail closed
+                        for b in reserved_banks:
+                            effective_pipeline.release_reserved_feedback(tenant_id=b, job_id=job_id)
+                        effective_pipeline.release_reserved_feedback(tenant_id=bank, job_id=job_id)
+                        record.status = "FAILED"
+                        record.details["failure_reason"] = (
+                            f"Insufficient verified feedback data for bank '{bank}': "
+                            f"got {count}, minimum required {effective_min}."
+                        )
+                        logger.error(
+                            "Retraining job %s failed closed: %s",
+                            job_id,
+                            record.details["failure_reason"],
+                        )
+                        raise RuntimeError(
+                            f"Retraining job '{job_id}' cannot execute: Insufficient verified feedback data for bank '{bank}' "
+                            f"({count} < {effective_min} minimum required)."
+                        )
+                    reserved_banks.append(bank)
+
             record.status = "RUNNING"
+            record.details["participating_banks"] = banks
 
         # Execute genuine operational federation outside the lock
         try:
@@ -252,7 +311,7 @@ class DriftTriggeredRetrainingService:
             fed_result = effective_service.execute_operational_federation(
                 simulation_id=sim_id,
                 num_rounds=target_rounds,
-                participating_banks=participating_banks or ["BANK_A", "BANK_B", "BANK_C"],
+                participating_banks=banks,
                 consortium_id=consortium_id,
             )
             if not isinstance(fed_result, dict):
@@ -340,6 +399,17 @@ class DriftTriggeredRetrainingService:
                     f"Operational federation for retraining job '{job_id}' violated Four-Eyes governance: automated retraining cannot automatically promote candidate to champion."
                 )
 
+            # Commit reserved feedback upon verified execution
+            if effective_pipeline is not None:
+                total_committed = 0
+                for b in banks:
+                    total_committed += effective_pipeline.commit_consumed_feedback(
+                        tenant_id=b,
+                        job_id=job_id,
+                        training_run_id=candidate_version_str,
+                    )
+                record.details["committed_feedback_samples"] = total_committed
+
             with self._lock:
                 record.status = "COMPLETED"
                 record.candidate_model_version = candidate_version_str
@@ -361,13 +431,22 @@ class DriftTriggeredRetrainingService:
                 "is_promoted_champion": False,
             }
         except Exception as exc:
+            # Release any reserved feedback on failure
+            if effective_pipeline is not None:
+                for b in banks:
+                    try:
+                        effective_pipeline.release_reserved_feedback(tenant_id=b, job_id=job_id)
+                    except Exception as rel_exc:
+                        logger.warning(
+                            "Failed to release reserved feedback for bank %s: %s", b, rel_exc
+                        )
             with self._lock:
                 record.status = "FAILED"
                 record.details["failure_exception"] = str(exc)
             raise
 
     def cancel_job(self, job_id: str, reason: str = "Cancelled by operator") -> bool:
-        """Cancels a pending or triggered retraining job."""
+        """Cancels a pending or triggered retraining job and releases reserved feedback."""
         with self._lock:
             if job_id not in self._jobs:
                 return False
@@ -376,6 +455,19 @@ class DriftTriggeredRetrainingService:
                 return False
             record.status = "CANCELLED"
             record.details["cancellation_reason"] = reason
+
+            if self.feedback_pipeline is not None:
+                banks = record.details.get("participating_banks") or ["BANK_A", "BANK_B", "BANK_C"]
+                for b in banks:
+                    try:
+                        self.feedback_pipeline.release_reserved_feedback(tenant_id=b, job_id=job_id)
+                    except Exception as rel_exc:
+                        logger.warning(
+                            "Failed to release reserved feedback on cancel for bank %s: %s",
+                            b,
+                            rel_exc,
+                        )
+
             logger.info("Cancelled retraining job %s (Reason: %s)", job_id, reason)
             return True
 

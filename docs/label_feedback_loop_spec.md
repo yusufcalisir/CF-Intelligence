@@ -100,6 +100,42 @@ item = pipeline.ingest_analyst_determination(
 
 ---
 
+## 🔄 Explicit Ground-Truth Lifecycle States
+
+To strictly uphold `AGENTS.md` (no fabricated runtime truth or premature state transitions), each feedback item traverses 5 verifiable lifecycle states:
+
+1. **`ANALYST_RECEIVED`**: Ingestion request received by the service or REST endpoint (`/api/v1/feedback/ingest`), validated against zero-PII requirements.
+2. **`DURABLY_RECORDED`**: Serialized to local on-premises tenant disk storage (`storage/{tenant_id}/label_buffer.json`).
+3. **`EVIDENCE_CORRELATED`**: Correlated with authoritative historical prediction evidence in `ModelEvaluationEngine` via genuine transaction ID.
+4. **`VALIDATED_FOR_TRAINING`**: Institutional alert ownership verified (`alert.bank_id == tenant_id`), confirming genuine operational provenance. Unindexed or cross-tenant alerts remain `validated_for_training=False`.
+5. **`CONSUMED_IN_TRAINING`**: Committed only after a genuine federated retraining round produces a verified candidate model checkpoint (`is_verified == True`).
+
+---
+
+## 🔒 Staged Two-Phase Feedback Reservation & Consumption
+
+Feedback items are protected from accidental double-counting or loss during distributed training runs via a two-phase protocol:
+
+- **Phase 1: Reservation (`reserve_retraining_batch`)**:
+  - When an automated or manual retraining job begins (`execute_retraining_pipeline`), validated feedback items are locked under `reserved_job_id = job_id`.
+  - Reserved items are excluded from other training batches while retaining their unconsumed status.
+  - Previewing or sampling never marks items as consumed.
+- **Phase 2a: Release on Failure or Cancellation (`release_reserved_feedback`)**:
+  - If training fails, throws an exception, or is cancelled, `release_reserved_feedback` clears `reserved_job_id`, safely returning all items to the eligible pool.
+- **Phase 2b: Atomic Commit on Verified Completion (`commit_consumed_feedback`)**:
+  - Only when operational federation finishes with status `COMPLETED` and `is_verified == True`, all reserved items transition to `status="CONSUMED_IN_TRAINING"`, `consumed_for_retraining=True`, and `consumed_training_run_id=candidate_model_version`.
+
+---
+
+## 🏛️ Model Governance & Non-Promotion Invariant
+
+Retraining pipelines produce **candidate** models only (`status: "candidate"`). In strict accordance with institutional Four-Eyes principles:
+- **No Automatic Promotion**: Retrained models are **never** automatically promoted to active champion.
+- **Governance Review**: Activation requires explicit dual-control authorization in the Model Governance workbench.
+- **Serving Isolation**: Active inference endpoints continue serving the verified champion model until formal promotion is authorized.
+
+---
+
 ## 🛡️ Differential Privacy & Security Invariants
 
 1. **Strict Zero-PII Boundary**:
@@ -116,6 +152,8 @@ item = pipeline.ingest_analyst_determination(
    - Buffer items maintain business-impact priority weights ($P \in \{1, 2, 3\}$).
    - Confirmed fraud verdicts default to $P = 3, w = 2.0$; false positive verdicts default to $P = 1, w = 1.0$.
    - Retraining batch sampling (`/api/v1/feedback/retraining-batch`) supports balanced stratification to prevent fraud class starvation during federated fine-tuning.
+5. **Idempotent Feedback Updates**:
+   - Re-ingesting feedback for an existing transaction or alert updates the determination and notes in-place without duplicating records or artificially inflating training sample counts.
 
 ```python
 # Differential Privacy Gradient Computation

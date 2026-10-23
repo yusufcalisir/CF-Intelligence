@@ -136,7 +136,6 @@ def _dict_to_case(d: dict[str, Any]) -> Case:
     return Case(**d_copy)
 
 
-
 # Valid status transitions
 _VALID_TRANSITIONS: dict[CaseStatus, set[CaseStatus]] = {
     CaseStatus.OPEN: {
@@ -190,7 +189,11 @@ def is_signature_stale(case: Case, sig: str) -> tuple[bool, str | None]:
     for idx, event in enumerate(case.timeline):
         if event.event_type == "supervisor_signed":
             event_sup = clean_identity(
-                str(event.metadata.get("supervisor_id", "") if isinstance(event.metadata, dict) else "")
+                str(
+                    event.metadata.get("supervisor_id", "")
+                    if isinstance(event.metadata, dict)
+                    else ""
+                )
             )
             if event_sup == clean_target:
                 sig_event_idx = idx
@@ -199,10 +202,13 @@ def is_signature_stale(case: Case, sig: str) -> tuple[bool, str | None]:
         sig_meta = getattr(case, "signature_metadata", {}).get(sig) or {}
         signed_ver = sig_meta.get("signed_version")
         if signed_ver is not None and getattr(case, "version", 1) > signed_ver:
-            return True, f"Dossier version advanced from {signed_ver} to {getattr(case, 'version', 1)}"
+            return (
+                True,
+                f"Dossier version advanced from {signed_ver} to {getattr(case, 'version', 1)}",
+            )
         return False, None
 
-    for event in case.timeline[sig_event_idx + 1:]:
+    for event in case.timeline[sig_event_idx + 1 :]:
         if event.event_type in MATERIAL_EVENT_TYPES:
             return True, (
                 f"Dossier was materially modified by '{event.event_type}' "
@@ -220,9 +226,15 @@ class CaseManagementService:
     immutable investigation timeline.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        feedback_pipeline: Any | None = None,
+        eval_engine: Any | None = None,
+    ) -> None:
         self._cases = RedisStore("case")
         self._lock = threading.RLock()
+        self._feedback_pipeline = feedback_pipeline
+        self._eval_engine = eval_engine
 
     def _add_event(
         self,
@@ -275,7 +287,14 @@ class CaseManagementService:
             self._add_event(case, "created", f"Case created: {title}", "system")
 
             self._cases.set(case.id, _case_to_dict(case))
-            logger.info("Created case %s: %s (priority=%s, risk=%.1f, bank=%s)", case.id[:8], title, priority.value, total_risk_score, bank_id)
+            logger.info(
+                "Created case %s: %s (priority=%s, risk=%.1f, bank=%s)",
+                case.id[:8],
+                title,
+                priority.value,
+                total_risk_score,
+                bank_id,
+            )
             return case
 
     def assign_case(
@@ -412,10 +431,20 @@ class CaseManagementService:
             # Consolidate supervisor signatures
             collected_signatures: list[str] = []
             if supervisor_signatures:
-                collected_signatures.extend([s.strip() for s in supervisor_signatures if s and s.strip()])
-            if supervisor_signature and supervisor_signature.strip() and supervisor_signature.strip() not in collected_signatures:
+                collected_signatures.extend(
+                    [s.strip() for s in supervisor_signatures if s and s.strip()]
+                )
+            if (
+                supervisor_signature
+                and supervisor_signature.strip()
+                and supervisor_signature.strip() not in collected_signatures
+            ):
                 collected_signatures.append(supervisor_signature.strip())
-            if second_supervisor_signature and second_supervisor_signature.strip() and second_supervisor_signature.strip() not in collected_signatures:
+            if (
+                second_supervisor_signature
+                and second_supervisor_signature.strip()
+                and second_supervisor_signature.strip() not in collected_signatures
+            ):
                 collected_signatures.append(second_supervisor_signature.strip())
 
             # Also include any previously attached supervisor signatures on the case
@@ -489,8 +518,16 @@ class CaseManagementService:
                     )
 
                     alert_svc = AlertIntelligenceService()
-                    feedback_pipeline = LocalLabelFeedbackPipeline()
-                    eval_engine = ModelEvaluationEngine(ModelRegistry())
+                    feedback_pipeline = (
+                        self._feedback_pipeline
+                        if self._feedback_pipeline is not None
+                        else LocalLabelFeedbackPipeline()
+                    )
+                    eval_engine = (
+                        self._eval_engine
+                        if self._eval_engine is not None
+                        else ModelEvaluationEngine(ModelRegistry())
+                    )
 
                     case_meta = getattr(case, "metadata", {}) or {}
                     sim_id = case_meta.get("simulation_id") if isinstance(case_meta, dict) else None
@@ -552,62 +589,77 @@ class CaseManagementService:
                     # Phase 2: Ingest and correlate feedback ONLY if all alerts were verified
                     if validation_passed and resolved_alerts and current_bank:
                         for alert in resolved_alerts:
-                            try:
-                                feedback_pipeline.ingest_analyst_determination(
-                                    tenant_id=current_bank,
-                                    alert_id=alert.id,
-                                    determination="CONFIRMED_FRAUD" if actual_label == 1 else "FALSE_POSITIVE",
-                                    notes=f"Closed by {actor} with supervisor signoff {collected_signatures}",
-                                    metadata={"alert_id": alert.id, "case_id": case.id},
-                                )
-                                feedback_buffer_recorded = True
-                            except Exception as pipe_exc:
-                                logger.warning("Feedback pipeline ingestion notice for alert %s: %s", alert.id, pipe_exc)
-
                             # Genuine transaction evidence ground-truth correlation:
-                            if not alert.transaction_id:
+                            logged = False
+                            if alert.transaction_id:
+                                actual_tx_id = alert.transaction_id
+                                target_sims = (
+                                    (sim_id, "default_sim")
+                                    if sim_id != "default_sim"
+                                    else (sim_id,)
+                                )
+                                for target_sim in target_sims:
+                                    try:
+                                        eval_engine.log_feedback(
+                                            simulation_id=target_sim,
+                                            transaction_id=actual_tx_id,
+                                            actual_label=actual_label,
+                                            bank_id=current_bank,
+                                        )
+                                        logged = True
+                                        prediction_evidence_recorded = True
+                                        break
+                                    except KeyError:
+                                        continue
+                                    except PermissionError:
+                                        logger.error(
+                                            "Cross-tenant feedback authorization failed: transaction %s bank %s mismatches caller",
+                                            actual_tx_id,
+                                            current_bank,
+                                        )
+                                        raise
+
+                                if not logged:
+                                    logger.debug(
+                                        "Transaction '%s' (alert %s) not present in evaluation store for simulation '%s'.",
+                                        actual_tx_id,
+                                        alert.id,
+                                        sim_id,
+                                    )
+                            else:
                                 logger.debug(
                                     "Cannot correlate ground-truth prediction evidence: Alert '%s' lacks genuine transaction ID.",
                                     alert.id,
                                 )
-                                continue
 
-                            actual_tx_id = alert.transaction_id
-                            logged = False
-                            target_sims = (sim_id, "default_sim") if sim_id != "default_sim" else (sim_id,)
-                            for target_sim in target_sims:
-                                try:
-                                    eval_engine.log_feedback(
-                                        simulation_id=target_sim,
-                                        transaction_id=actual_tx_id,
-                                        actual_label=actual_label,
-                                        bank_id=current_bank,
-                                    )
-                                    logged = True
-                                    prediction_evidence_recorded = True
-                                    break
-                                except KeyError:
-                                    continue
-                                except PermissionError:
-                                    logger.error(
-                                        "Cross-tenant feedback authorization failed: transaction %s bank %s mismatches caller",
-                                        actual_tx_id,
-                                        current_bank,
-                                    )
-                                    raise
-
-                            if not logged:
-                                logger.debug(
-                                    "Transaction '%s' (alert %s) not present in evaluation store for simulation '%s'.",
-                                    actual_tx_id,
+                            try:
+                                feedback_pipeline.ingest_analyst_determination(
+                                    tenant_id=current_bank,
+                                    alert_id=alert.id,
+                                    determination="CONFIRMED_FRAUD"
+                                    if actual_label == 1
+                                    else "FALSE_POSITIVE",
+                                    notes=f"Closed by {actor} with supervisor signoff {collected_signatures}",
+                                    metadata={"alert_id": alert.id, "case_id": case.id},
+                                    case_id=case.id,
+                                    validated_for_training=True,
+                                    prediction_evidence_correlated=logged,
+                                    source_provenance="CASE_RESOLUTION",
+                                )
+                                feedback_buffer_recorded = True
+                            except Exception as pipe_exc:
+                                logger.warning(
+                                    "Feedback pipeline ingestion notice for alert %s: %s",
                                     alert.id,
-                                    sim_id,
+                                    pipe_exc,
                                 )
                 except PermissionError:
                     raise
                 except Exception as exc:
                     logger.warning(
-                        "Failed to record retraining label feedback for case %s: %s", case_id[:8], exc
+                        "Failed to record retraining label feedback for case %s: %s",
+                        case_id[:8],
+                        exc,
                     )
                 metadata["retraining_feedback_recorded"] = feedback_buffer_recorded
                 metadata["feedback_buffer_recorded"] = feedback_buffer_recorded
@@ -645,7 +697,9 @@ class CaseManagementService:
 
             if resolution_notes and resolution_notes.strip():
                 clean_notes = resolution_notes.strip()
-                note_author = resolution_notes_author or (collected_signatures[0] if collected_signatures else actor)
+                note_author = resolution_notes_author or (
+                    collected_signatures[0] if collected_signatures else actor
+                )
                 note_content = (
                     clean_notes
                     if "Consensus Rationale:" in clean_notes
@@ -718,7 +772,10 @@ class CaseManagementService:
                     "reason": f"Invalid transition: {old_status.value} → {new_status.value}.",
                     "requires_four_eyes": False,
                 }
-            is_closure = new_status in (CaseStatus.CLOSED_CONFIRMED, CaseStatus.CLOSED_FALSE_POSITIVE)
+            is_closure = new_status in (
+                CaseStatus.CLOSED_CONFIRMED,
+                CaseStatus.CLOSED_FALSE_POSITIVE,
+            )
             if is_closure:
                 sigs = supervisor_signatures or []
                 if not sigs:
@@ -795,7 +852,9 @@ class CaseManagementService:
                 case.alert_ids.append(alert_id)
                 case.updated_at = datetime.now(UTC)
 
-                self._add_event(case, "alert_linked", f"Alert {alert_id[:8]} linked to case", "system")
+                self._add_event(
+                    case, "alert_linked", f"Alert {alert_id[:8]} linked to case", "system"
+                )
             elif effective_alert_bank and case.bank_id == effective_alert_bank:
                 case.updated_at = datetime.now(UTC)
 
@@ -908,7 +967,9 @@ class CaseManagementService:
             if case.notes:
                 lines.extend(["", "## Investigation Notes", ""])
                 for note in case.notes:
-                    lines.append(f"### {note.author} — {note.created_at.strftime('%Y-%m-%d %H:%M')}")
+                    lines.append(
+                        f"### {note.author} — {note.created_at.strftime('%Y-%m-%d %H:%M')}"
+                    )
                     lines.append(f"{note.content}")
                     lines.append("")
 
@@ -926,10 +987,11 @@ class CaseManagementService:
                 return _dict_to_case(val)
 
             # Synthesise fallback strictly for canonical demo cases if not found in active storage
-            is_canonical_demo = (
-                case_id.upper() in ("CASE-98492", "CASE-2026-001", "CASE-2026-004")
-                or case_id.lower().startswith("case_demo_")
-            )
+            is_canonical_demo = case_id.upper() in (
+                "CASE-98492",
+                "CASE-2026-001",
+                "CASE-2026-004",
+            ) or case_id.lower().startswith("case_demo_")
             if not is_canonical_demo:
                 return None
 

@@ -40,68 +40,80 @@ api_router = APIRouter(prefix="/v1/feedback", tags=["feedback"])
 
 _pipeline = LocalLabelFeedbackPipeline()
 
-FEEDBACK_INGEST_ROLES: frozenset[str] = frozenset({
-    "analyst",
-    "senior_analyst",
-    "lead_analyst",
-    "investigator",
-    "bank_admin",
-    "admin",
-    "operator",
-    "super_admin",
-})
+FEEDBACK_INGEST_ROLES: frozenset[str] = frozenset(
+    {
+        "analyst",
+        "senior_analyst",
+        "lead_analyst",
+        "investigator",
+        "bank_admin",
+        "admin",
+        "operator",
+        "super_admin",
+    }
+)
 
-FEEDBACK_READ_ROLES: frozenset[str] = frozenset({
-    "analyst",
-    "senior_analyst",
-    "lead_analyst",
-    "investigator",
-    "bank_admin",
-    "admin",
-    "operator",
-    "compliance_auditor",
-    "cross_bank_investigator",
-    "auditor",
-    "super_admin",
-})
+FEEDBACK_READ_ROLES: frozenset[str] = frozenset(
+    {
+        "analyst",
+        "senior_analyst",
+        "lead_analyst",
+        "investigator",
+        "bank_admin",
+        "admin",
+        "operator",
+        "compliance_auditor",
+        "cross_bank_investigator",
+        "auditor",
+        "super_admin",
+    }
+)
 
-FEEDBACK_SAMPLE_ROLES: frozenset[str] = frozenset({
-    "analyst",
-    "senior_analyst",
-    "lead_analyst",
-    "ml_lead",
-    "ml_engineer",
-    "bank_admin",
-    "admin",
-    "operator",
-    "super_admin",
-})
+FEEDBACK_SAMPLE_ROLES: frozenset[str] = frozenset(
+    {
+        "analyst",
+        "senior_analyst",
+        "lead_analyst",
+        "ml_lead",
+        "ml_engineer",
+        "bank_admin",
+        "admin",
+        "operator",
+        "super_admin",
+    }
+)
 
-FEEDBACK_CONSUME_ROLES: frozenset[str] = frozenset({
-    "admin",
-    "bank_admin",
-    "operator",
-    "lead_analyst",
-    "super_admin",
-})
+FEEDBACK_CONSUME_ROLES: frozenset[str] = frozenset(
+    {
+        "admin",
+        "bank_admin",
+        "operator",
+        "lead_analyst",
+        "super_admin",
+    }
+)
 
-FEEDBACK_GRADIENT_ROLES: frozenset[str] = frozenset({
-    "admin",
-    "bank_admin",
-    "operator",
-    "lead_analyst",
-    "ml_lead",
-    "ml_engineer",
-    "super_admin",
-})
+FEEDBACK_GRADIENT_ROLES: frozenset[str] = frozenset(
+    {
+        "admin",
+        "bank_admin",
+        "operator",
+        "lead_analyst",
+        "ml_lead",
+        "ml_engineer",
+        "super_admin",
+    }
+)
 
-FEEDBACK_CLEAR_ROLES: frozenset[str] = frozenset({
-    "admin",
-    "bank_admin",
-    "operator",
-    "lead_analyst",
-    "super_admin",
-})
+FEEDBACK_CLEAR_ROLES: frozenset[str] = frozenset(
+    {
+        "admin",
+        "bank_admin",
+        "operator",
+        "lead_analyst",
+        "super_admin",
+    }
+)
 
 # Backward-compatibility aliases
 FEEDBACK_OPERATOR_ROLES: frozenset[str] = FEEDBACK_GRADIENT_ROLES
@@ -189,6 +201,7 @@ def _authorize_feedback_request(
 
 # ── Ingestion & Submission ──────────────────────────────────────────────────
 
+
 async def _ingest_handler(
     payload: AnalystFeedbackIngestRequest,
     request: Request,
@@ -202,7 +215,67 @@ async def _ingest_handler(
         required_roles=FEEDBACK_INGEST_ROLES,
         action_name="ingest_feedback",
     )
+
+    validated_for_training = False
+    prediction_evidence_correlated = False
+
+    if payload.alert_id:
+        from app.application.services.alert_service import AlertIntelligenceService
+
+        alert_svc = AlertIntelligenceService()
+        alert = alert_svc.get_alert(payload.alert_id)
+        if alert is not None:
+            alert_bank = (alert.bank_id or "").lower().replace("-", "_")
+            auth_bank = authorized_tenant.lower().replace("-", "_")
+            if alert_bank and alert_bank != auth_bank:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"Cross-tenant alert feedback rejected: alert '{payload.alert_id}' belongs to bank "
+                        f"'{alert.bank_id}', but authorized tenant is '{authorized_tenant}'."
+                    ),
+                )
+            validated_for_training = True
+        else:
+            validated_for_training = False
+            logger.info(
+                "Feedback ingested for unindexed alert '%s': recorded durably but not validated for retraining.",
+                payload.alert_id,
+            )
+
+        if alert is not None and alert.transaction_id:
+            try:
+                from app.application.services.model_registry import (
+                    ModelEvaluationEngine,
+                    ModelRegistry,
+                )
+
+                eval_engine = ModelEvaluationEngine(ModelRegistry())
+                raw_det = (
+                    payload.determination.value
+                    if hasattr(payload.determination, "value")
+                    else str(payload.determination)
+                )
+                actual_label = 1 if raw_det == "CONFIRMED_FRAUD" else 0
+                for sim in ("default_sim", "sim_retrain_default"):
+                    try:
+                        eval_engine.log_feedback(
+                            simulation_id=sim,
+                            transaction_id=alert.transaction_id,
+                            actual_label=actual_label,
+                            bank_id=authorized_tenant,
+                        )
+                        prediction_evidence_correlated = True
+                        break
+                    except (KeyError, PermissionError):
+                        continue
+            except Exception as eval_exc:
+                logger.debug(
+                    "Evaluation engine correlation notice for alert %s: %s", alert.id, eval_exc
+                )
+
     try:
+        case_id = (payload.metadata or {}).get("case_id") if payload.metadata else None
         item = _pipeline.ingest_analyst_determination(
             tenant_id=authorized_tenant,
             transaction_id_hash=payload.transaction_id_hash,
@@ -214,8 +287,14 @@ async def _ingest_handler(
             notes=payload.notes,
             raw_attributes=payload.raw_attributes,
             metadata=payload.metadata,
+            case_id=case_id,
+            validated_for_training=validated_for_training,
+            prediction_evidence_correlated=prediction_evidence_correlated,
+            source_provenance="DIRECT_INGEST",
         )
         return AnalystFeedbackIngestResponse(status="success", item=item.to_dict())
+    except HTTPException:
+        raise
     except LabelPrivacyViolationError as exc:
         logger.warning("Zero-PII violation rejected in feedback ingestion: %s", exc)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -268,6 +347,7 @@ async def submit_feedback(
 
 
 # ── Statistics & Monitoring ─────────────────────────────────────────────────
+
 
 def _get_stats_handler(
     request: Request,
@@ -326,6 +406,7 @@ async def get_feedback_stats(
 
 # ── Retraining Batch Sampling ───────────────────────────────────────────────
 
+
 @router.post(
     "/retraining-batch",
     response_model=RetrainingBatchResponse,
@@ -348,7 +429,9 @@ async def sample_retraining_batch(
         target_tenant_id=payload.tenant_id,
         caller_tenant=caller_tenant,
         required_roles=required_roles,
-        action_name="consume_retraining_batch" if payload.mark_consumed else "sample_retraining_batch",
+        action_name="consume_retraining_batch"
+        if payload.mark_consumed
+        else "sample_retraining_batch",
     )
     batch_data = _pipeline.get_priority_retraining_batch(
         tenant_id=authorized_tenant,
@@ -361,6 +444,7 @@ async def sample_retraining_batch(
 
 
 # ── Differential Privacy Gradients ─────────────────────────────────────────
+
 
 @router.post(
     "/dp-gradient",
@@ -405,6 +489,7 @@ async def compute_dp_gradient(
 
 # ── Buffer Management ───────────────────────────────────────────────────────
 
+
 @router.delete(
     "/buffer/{tenant_id}",
     response_model=ClearFeedbackBufferResponse,
@@ -429,5 +514,6 @@ async def clear_feedback_buffer(
         action_name="clear_feedback_buffer",
     )
     cleared = _pipeline.clear_buffer(tenant_id=authorized_tenant)
-    return ClearFeedbackBufferResponse(status="success", tenant_id=authorized_tenant, cleared_count=cleared)
-
+    return ClearFeedbackBufferResponse(
+        status="success", tenant_id=authorized_tenant, cleared_count=cleared
+    )

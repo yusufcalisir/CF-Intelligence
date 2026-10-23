@@ -46,6 +46,14 @@ class LabelFeedbackItem:
     metadata: dict[str, Any] = field(default_factory=dict)
     recorded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     consumed_for_retraining: bool = False
+    status: str = "DURABLY_RECORDED"
+    validated_for_training: bool = False
+    prediction_evidence_correlated: bool = False
+    reserved_job_id: str | None = None
+    consumed_training_run_id: str | None = None
+    case_id: str | None = None
+    alert_id: str | None = None
+    source_provenance: str = "DIRECT_INGEST"
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes feedback item to JSON-compatible dictionary."""
@@ -57,8 +65,18 @@ class LabelFeedbackItem:
             "feature_vector": self.feature_vector,
             "notes": self.notes,
             "metadata": self.metadata,
-            "recorded_at": self.recorded_at.isoformat() if isinstance(self.recorded_at, datetime) else str(self.recorded_at),
+            "recorded_at": self.recorded_at.isoformat()
+            if isinstance(self.recorded_at, datetime)
+            else str(self.recorded_at),
             "consumed_for_retraining": self.consumed_for_retraining,
+            "status": self.status,
+            "validated_for_training": self.validated_for_training,
+            "prediction_evidence_correlated": self.prediction_evidence_correlated,
+            "reserved_job_id": self.reserved_job_id,
+            "consumed_training_run_id": self.consumed_training_run_id,
+            "case_id": self.case_id,
+            "alert_id": self.alert_id,
+            "source_provenance": self.source_provenance,
         }
 
     @classmethod
@@ -93,8 +111,15 @@ class LabelFeedbackItem:
             metadata=data.get("metadata", {}) or {},
             recorded_at=rec_at_dt,
             consumed_for_retraining=bool(data.get("consumed_for_retraining", False)),
+            status=data.get("status", "DURABLY_RECORDED"),
+            validated_for_training=bool(data.get("validated_for_training", False)),
+            prediction_evidence_correlated=bool(data.get("prediction_evidence_correlated", False)),
+            reserved_job_id=data.get("reserved_job_id"),
+            consumed_training_run_id=data.get("consumed_training_run_id"),
+            case_id=data.get("case_id"),
+            alert_id=data.get("alert_id"),
+            source_provenance=data.get("source_provenance", "DIRECT_INGEST"),
         )
-
 
 
 TENANT_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-]+$")
@@ -133,7 +158,9 @@ class LocalLabelFeedbackPipeline:
         self.privacy_guard = LabelPrivacyGuard()
         self._buffers: dict[str, list[LabelFeedbackItem]] = {}
         self._lock = threading.RLock()
-        self._storage_dir = Path(storage_dir or os.environ.get("CFI_LABEL_FEEDBACK_DIR", "storage/label_feedback"))
+        self._storage_dir = Path(
+            storage_dir or os.environ.get("CFI_LABEL_FEEDBACK_DIR", "storage/label_feedback")
+        )
         self._rng = random.Random(seed) if seed is not None else random.Random()
 
     def _get_tenant_file(self, tenant_id: str) -> Path:
@@ -158,7 +185,9 @@ class LocalLabelFeedbackPipeline:
                 json.dump(serialized, f, indent=2)
             temp_path.replace(target_path)
         except Exception as exc:
-            logger.warning("Failed to persist feedback buffer for tenant '%s': %s", clean_tenant, exc)
+            logger.warning(
+                "Failed to persist feedback buffer for tenant '%s': %s", clean_tenant, exc
+            )
 
     def ingest_analyst_determination(
         self,
@@ -173,11 +202,17 @@ class LocalLabelFeedbackPipeline:
         raw_attributes: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
         auto_persist: bool = True,
+        case_id: str | None = None,
+        validated_for_training: bool = False,
+        prediction_evidence_correlated: bool = False,
+        source_provenance: str = "DIRECT_INGEST",
     ) -> LabelFeedbackItem:
         """Ingests an analyst determination into local tenant label feedback buffer after zero-PII check.
 
         If transaction_id_hash is omitted but alert_id is provided, automatically derives
         a deterministic HMAC-SHA256 privacy hash satisfying the Zero-PII threshold (>= 32 chars).
+        Applies idempotency/deduplication: if an unconsumed determination already exists for this
+        transaction hash or alert ID, it is updated in-place rather than duplicating training observations.
         """
         # Resolve identifier
         if not transaction_id_hash and alert_id:
@@ -198,7 +233,11 @@ class LocalLabelFeedbackPipeline:
         if determination is None:
             raise ValueError("Determination label is mandatory and cannot be missing or None.")
         try:
-            label = determination if isinstance(determination, FeedbackLabel) else FeedbackLabel(determination)
+            label = (
+                determination
+                if isinstance(determination, FeedbackLabel)
+                else FeedbackLabel(determination)
+            )
         except ValueError as exc:
             raise ValueError(
                 f"Invalid determination '{determination}'. Expected one of: {[e.value for e in FeedbackLabel]}"
@@ -213,33 +252,244 @@ class LocalLabelFeedbackPipeline:
             weight = 2.0 if label == FeedbackLabel.CONFIRMED_FRAUD else 1.0
         weight = max(0.1, float(weight))
 
-        item = LabelFeedbackItem(
-            transaction_id_hash=transaction_id_hash,
-            label=label,
-            weight=weight,
-            priority=priority,
-            feature_vector=feature_vector,
-            notes=notes,
-            metadata=metadata or {},
-        )
+        status_str = "VALIDATED_FOR_TRAINING" if validated_for_training else "DURABLY_RECORDED"
 
         with self._lock:
             if tenant_id not in self._buffers:
                 self._buffers[tenant_id] = []
+
+            # Deduplication: inspect unconsumed, unreserved items for duplicate transaction or alert
+            existing_item: LabelFeedbackItem | None = None
+            for itm in self._buffers[tenant_id]:
+                if not itm.consumed_for_retraining and itm.reserved_job_id is None:
+                    if itm.transaction_id_hash == transaction_id_hash:
+                        existing_item = itm
+                        break
+                    if alert_id and itm.alert_id == alert_id:
+                        existing_item = itm
+                        break
+
+            if existing_item is not None:
+                existing_item.label = label
+                existing_item.weight = weight
+                existing_item.priority = priority
+                if feature_vector is not None:
+                    existing_item.feature_vector = feature_vector
+                if notes is not None:
+                    existing_item.notes = notes
+                if metadata:
+                    existing_item.metadata.update(metadata)
+                existing_item.recorded_at = datetime.now(UTC)
+                if validated_for_training:
+                    existing_item.validated_for_training = True
+                    existing_item.status = "VALIDATED_FOR_TRAINING"
+                if prediction_evidence_correlated:
+                    existing_item.prediction_evidence_correlated = True
+                if case_id:
+                    existing_item.case_id = case_id
+                if alert_id:
+                    existing_item.alert_id = alert_id
+                if source_provenance:
+                    existing_item.source_provenance = source_provenance
+
+                if auto_persist:
+                    self._save_tenant_buffer_unlocked(tenant_id)
+
+                logger.info(
+                    "Updated existing unconsumed feedback for tenant '%s' (TxHash: %s, Label: %s, Priority: %d)",
+                    tenant_id,
+                    transaction_id_hash[:8],
+                    label.value,
+                    priority,
+                )
+                return existing_item
+
+            item = LabelFeedbackItem(
+                transaction_id_hash=transaction_id_hash,
+                label=label,
+                weight=weight,
+                priority=priority,
+                feature_vector=feature_vector,
+                notes=notes,
+                metadata=metadata or {},
+                status=status_str,
+                validated_for_training=validated_for_training,
+                prediction_evidence_correlated=prediction_evidence_correlated,
+                case_id=case_id,
+                alert_id=alert_id,
+                source_provenance=source_provenance,
+            )
             self._buffers[tenant_id].append(item)
 
             if auto_persist:
                 self._save_tenant_buffer_unlocked(tenant_id)
 
         logger.info(
-            "Ingested feedback for tenant '%s' (TxHash: %s, Label: %s, Priority: %d, Weight: %.2f)",
+            "Ingested feedback for tenant '%s' (TxHash: %s, Label: %s, Priority: %d, Weight: %.2f, Status: %s)",
             tenant_id,
             transaction_id_hash[:8],
             label.value,
             priority,
             weight,
+            status_str,
         )
         return item
+
+    def reserve_retraining_batch(
+        self,
+        tenant_id: str,
+        job_id: str,
+        batch_size: int = 32,
+        min_priority: int = 1,
+        stratified: bool = True,
+        require_validated: bool = True,
+    ) -> dict[str, Any]:
+        """Reserves a prioritized batch of feedback items for a specific retraining job without permanently consuming them.
+
+        Items are marked with reserved_job_id. If training succeeds, commit_consumed_feedback
+        is called. If training fails or is cancelled, release_reserved_feedback releases them back.
+        """
+        clean_tenant = validate_tenant_id(tenant_id)
+        with self._lock:
+            if clean_tenant not in self._buffers or not self._buffers[clean_tenant]:
+                self.load_from_disk(clean_tenant)
+            buffer = self._buffers.get(clean_tenant, [])
+            candidates = [
+                item
+                for item in buffer
+                if not item.consumed_for_retraining
+                and item.reserved_job_id is None
+                and item.priority >= min_priority
+                and (not require_validated or item.validated_for_training)
+            ]
+
+            if not candidates:
+                return {
+                    "tenant_id": clean_tenant,
+                    "job_id": job_id,
+                    "batch_size": 0,
+                    "items": [],
+                    "fraud_count": 0,
+                    "false_positive_count": 0,
+                    "mean_priority": 0.0,
+                }
+
+            if stratified:
+                fraud_cand = sorted(
+                    [i for i in candidates if i.label == FeedbackLabel.CONFIRMED_FRAUD],
+                    key=lambda x: (-x.priority, -x.weight, x.recorded_at),
+                )
+                fp_cand = sorted(
+                    [i for i in candidates if i.label == FeedbackLabel.FALSE_POSITIVE],
+                    key=lambda x: (-x.priority, -x.weight, x.recorded_at),
+                )
+
+                half_batch = max(1, batch_size // 2)
+                selected_fraud = fraud_cand[:half_batch]
+                selected_fp = fp_cand[:half_batch]
+                batch = selected_fraud + selected_fp
+
+                remaining_capacity = batch_size - len(batch)
+                if remaining_capacity > 0:
+                    if len(fraud_cand) > half_batch:
+                        batch.extend(fraud_cand[half_batch : half_batch + remaining_capacity])
+                    elif len(fp_cand) > half_batch:
+                        batch.extend(fp_cand[half_batch : half_batch + remaining_capacity])
+            else:
+                sorted_candidates = sorted(
+                    candidates,
+                    key=lambda x: (-x.priority, -x.weight, x.recorded_at),
+                )
+                batch = sorted_candidates[:batch_size]
+
+            for item in batch:
+                item.reserved_job_id = job_id
+
+            self._save_tenant_buffer_unlocked(clean_tenant)
+
+            fraud_count = sum(1 for i in batch if i.label == FeedbackLabel.CONFIRMED_FRAUD)
+            fp_count = sum(1 for i in batch if i.label == FeedbackLabel.FALSE_POSITIVE)
+            mean_priority = round(sum(i.priority for i in batch) / len(batch), 2) if batch else 0.0
+
+            logger.info(
+                "Reserved %d feedback items for tenant '%s' under job '%s' (Fraud: %d, FP: %d)",
+                len(batch),
+                clean_tenant,
+                job_id,
+                fraud_count,
+                fp_count,
+            )
+            return {
+                "tenant_id": clean_tenant,
+                "job_id": job_id,
+                "batch_size": len(batch),
+                "items": [i.to_dict() for i in batch],
+                "fraud_count": fraud_count,
+                "false_positive_count": fp_count,
+                "mean_priority": mean_priority,
+            }
+
+    def commit_consumed_feedback(
+        self,
+        tenant_id: str,
+        job_id: str,
+        training_run_id: str | None = None,
+    ) -> int:
+        """Commits reserved feedback items as permanently consumed upon verified training completion."""
+        clean_tenant = validate_tenant_id(tenant_id)
+        with self._lock:
+            if clean_tenant not in self._buffers or not self._buffers[clean_tenant]:
+                self.load_from_disk(clean_tenant)
+            buffer = self._buffers.get(clean_tenant, [])
+            committed = 0
+            for item in buffer:
+                if item.reserved_job_id == job_id:
+                    item.consumed_for_retraining = True
+                    item.consumed_training_run_id = training_run_id or job_id
+                    item.reserved_job_id = None
+                    item.status = "CONSUMED_IN_TRAINING"
+                    committed += 1
+            if committed > 0:
+                self._save_tenant_buffer_unlocked(clean_tenant)
+                logger.info(
+                    "Committed %d consumed feedback items for tenant '%s' (job: %s, run: %s)",
+                    committed,
+                    clean_tenant,
+                    job_id,
+                    training_run_id,
+                )
+            return committed
+
+    def release_reserved_feedback(
+        self,
+        tenant_id: str,
+        job_id: str,
+    ) -> int:
+        """Releases reserved feedback items back to the unconsumed pool if training fails or is cancelled."""
+        clean_tenant = validate_tenant_id(tenant_id)
+        with self._lock:
+            if clean_tenant not in self._buffers or not self._buffers[clean_tenant]:
+                self.load_from_disk(clean_tenant)
+            buffer = self._buffers.get(clean_tenant, [])
+            released = 0
+            for item in buffer:
+                if item.reserved_job_id == job_id:
+                    item.reserved_job_id = None
+                    item.status = (
+                        "VALIDATED_FOR_TRAINING"
+                        if item.validated_for_training
+                        else "DURABLY_RECORDED"
+                    )
+                    released += 1
+            if released > 0:
+                self._save_tenant_buffer_unlocked(clean_tenant)
+                logger.info(
+                    "Released %d reserved feedback items for tenant '%s' (job: %s)",
+                    released,
+                    clean_tenant,
+                    job_id,
+                )
+            return released
 
     def get_priority_retraining_batch(
         self,
@@ -248,17 +498,23 @@ class LocalLabelFeedbackPipeline:
         mark_consumed: bool = False,
         min_priority: int = 1,
         stratified: bool = True,
+        require_validated: bool = False,
     ) -> dict[str, Any]:
         """Retrieves a prioritized batch of human-verified feedback items for local model retraining.
 
         Sorts by descending priority, weight, and chronological arrival, optionally balancing
         confirmed fraud and false positive samples to prevent class starvation.
+        Unreserved and unconsumed items are eligible.
         """
         with self._lock:
             buffer = self._buffers.get(tenant_id, [])
             candidates = [
-                item for item in buffer
-                if not item.consumed_for_retraining and item.priority >= min_priority
+                item
+                for item in buffer
+                if not item.consumed_for_retraining
+                and item.reserved_job_id is None
+                and item.priority >= min_priority
+                and (not require_validated or item.validated_for_training)
             ]
 
             if not candidates:
@@ -304,6 +560,7 @@ class LocalLabelFeedbackPipeline:
             if mark_consumed:
                 for item in batch:
                     item.consumed_for_retraining = True
+                    item.status = "CONSUMED_IN_TRAINING"
                 self._save_tenant_buffer_unlocked(tenant_id)
 
             fraud_count = sum(1 for i in batch if i.label == FeedbackLabel.CONFIRMED_FRAUD)
@@ -343,12 +600,16 @@ class LocalLabelFeedbackPipeline:
 
             # Calculate base gradient delta from positive/negative feedback ratio weighted by priority
             total_weight = sum(item.weight for item in buffer)
-            fraud_weight = sum(item.weight for item in buffer if item.label == FeedbackLabel.CONFIRMED_FRAUD)
+            fraud_weight = sum(
+                item.weight for item in buffer if item.label == FeedbackLabel.CONFIRMED_FRAUD
+            )
             total = len(buffer)
             raw_gradient = (fraud_weight / total_weight) * 0.1 if total_weight > 0 else 0.0
 
             # Derive analytical Gaussian Differential Privacy noise scale
-            sigma = self.privacy_guard.calculate_sigma(epsilon=epsilon, delta=delta, clip_norm=clip_norm)
+            sigma = self.privacy_guard.calculate_sigma(
+                epsilon=epsilon, delta=delta, clip_norm=clip_norm
+            )
             raw_deltas = [raw_gradient * (i + 1) for i in range(4)]
             dp_deltas = [round(d + self._rng.gauss(0, sigma * 0.01), 6) for d in raw_deltas]
 
@@ -378,6 +639,8 @@ class LocalLabelFeedbackPipeline:
             fp = sum(1 for i in buffer if i.label == FeedbackLabel.FALSE_POSITIVE)
             consumed = sum(1 for i in buffer if i.consumed_for_retraining)
             unconsumed = total - consumed
+            validated = sum(1 for i in buffer if i.validated_for_training)
+            reserved = sum(1 for i in buffer if i.reserved_job_id is not None)
 
             p_dist: dict[int, int] = {1: 0, 2: 0, 3: 0}
             for i in buffer:
@@ -390,6 +653,8 @@ class LocalLabelFeedbackPipeline:
                 "false_positive_count": fp,
                 "consumed_count": consumed,
                 "unconsumed_count": unconsumed,
+                "validated_count": validated,
+                "reserved_count": reserved,
                 "priority_distribution": p_dist,
             }
 
@@ -426,7 +691,9 @@ class LocalLabelFeedbackPipeline:
                 try:
                     target_path.unlink()
                 except Exception as exc:
-                    logger.warning("Could not delete persisted buffer file for '%s': %s", clean_tenant, exc)
+                    logger.warning(
+                        "Could not delete persisted buffer file for '%s': %s", clean_tenant, exc
+                    )
             return existing
 
     def save_to_disk(self, tenant_id: str) -> str:
@@ -449,8 +716,14 @@ class LocalLabelFeedbackPipeline:
                     data = json.load(f)
                 loaded_items = [LabelFeedbackItem.from_dict(item) for item in data]
                 self._buffers[clean_tenant] = loaded_items
-                logger.info("Loaded %d feedback items from disk for tenant '%s'", len(loaded_items), clean_tenant)
+                logger.info(
+                    "Loaded %d feedback items from disk for tenant '%s'",
+                    len(loaded_items),
+                    clean_tenant,
+                )
                 return len(loaded_items)
             except Exception as exc:
-                logger.error("Failed to load feedback buffer for tenant '%s': %s", clean_tenant, exc)
+                logger.error(
+                    "Failed to load feedback buffer for tenant '%s': %s", clean_tenant, exc
+                )
                 return 0
