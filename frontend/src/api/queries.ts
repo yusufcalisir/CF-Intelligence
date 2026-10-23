@@ -10,6 +10,7 @@ import type {
   BankInfo,
   ConsortiumStatusResponse,
   Case,
+  CaseCreatePayload,
   CaseSummary,
   CaseStatusUpdatePayload,
   CaseEscalatePayload,
@@ -650,7 +651,7 @@ export function useCase(id: string | undefined) {
 
 export function useCreateCase() {
   const queryClient = useQueryClient();
-  return useMutation<Case, Error, { title: string; priority?: string; alert_ids?: string[]; total_risk_score?: number }>({
+  return useMutation<Case, Error, CaseCreatePayload>({
     mutationFn: async (payload) => {
       const { data } = await apiClient.post('/api/v1/cases', payload);
       return data;

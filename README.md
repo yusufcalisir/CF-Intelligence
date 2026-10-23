@@ -609,6 +609,12 @@ Alerts scoring above the threshold trigger investigation workflows through a 6-s
 - Automates ISO 20022 `camt.056` Payment Cancellation Request generation for urgent fraud containment on the European SEPA Instant Credit Transfer rail.
 - Processes automated `pacs.004` Payment Return responses to reconcile frozen funds.
 
+### 11.4 Continuous Transaction-to-Investigation Workflow (`core_banking_gateway.py`, `predict.py`, `cases.py`)
+- **Ingress & Normalization:** Authenticates external core-banking webhooks (e.g. Mambu HMAC-SHA256) and normalizes ISO MCCs, channels, and jurisdiction corridors into canonical transaction records while stripping cleartext PII.
+- **Champion Serving & Prediction Evidence:** Dispatches normalized transactions to the authorized champion model with fail-closed HTTP 503 protection, recording prediction confidence, model version, and inference latency in `ModelEvaluationEngine`.
+- **Triage & Case Creation:** Evaluates composite risk across 9 signals via `RiskScoringEngine`, triggering automatic alerts (`HOLD` / `FLAG` decisions) in `AlertIntelligenceService`. Investigators escalate alerts into multi-tenant cases via `/api/v1/cases`.
+- **Four-Eyes Governance & Feedback Loop:** Terminal case resolutions (`CONFIRMED_FRAUD` / `FALSE_POSITIVE`) require dual-supervisor authorization and feed ground-truth labels back into `LocalLabelFeedbackPipeline` with differential privacy protections for local fine-tuning.
+
 ---
 
 ## 12. Database Architecture, High Availability & Disaster Recovery Operations

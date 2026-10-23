@@ -127,6 +127,7 @@ async def list_cases(
     return [
         CaseSummaryResponse(
             id=c.id,
+            bank_id=getattr(c, "bank_id", None),
             title=c.title,
             status=c.status.value,
             priority=c.priority.value,
@@ -797,6 +798,7 @@ async def get_case_evidence(
 def _serialize_case(case: Any) -> CaseResponse:
     return CaseResponse(
         id=case.id,
+        bank_id=getattr(case, "bank_id", None),
         title=case.title,
         status=case.status.value,
         priority=case.priority.value,

@@ -21,7 +21,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app.infrastructure.connectors.base_connector import NormalizedTransaction
@@ -74,6 +74,42 @@ class MambuWebhookResponse(BaseModel):
     currency: str | None = Field(default=None, description="Transaction currency")
     client_pseudonym: str | None = Field(default=None, description="Type-salted HMAC pseudonymized client key")
     received_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    risk_score: float | None = Field(default=None, description="Composite transaction risk score (0-1000)")
+    decision: str | None = Field(default=None, description="Automated triage decision: APPROVED, FLAG, or HOLD")
+    alert_id: str | None = Field(default=None, description="FININT alert ID if risk flagged or critical")
+    evaluated_by: str | None = Field(default=None, description="Evaluation engine routing or champion version descriptor")
+
+
+MCC_TO_MERCHANT_CATEGORY: dict[str, str] = {
+    "5411": "grocery",
+    "5732": "electronics",
+    "4511": "travel",
+    "5812": "dining",
+    "5541": "fuel",
+    "7832": "entertainment",
+    "8099": "healthcare",
+    "5651": "clothing",
+    "5021": "home",
+    "5511": "automotive",
+    "5944": "jewelry",
+    "7995": "gambling",
+    "6051": "crypto",
+    "4829": "wire_transfer",
+    "5311": "online_marketplace",
+    "4899": "subscription",
+    "6300": "insurance",
+    "8220": "education",
+    "8398": "charity",
+    "6011": "atm_withdrawal",
+}
+
+CHANNEL_TO_DEVICE_TYPE: dict[str, str] = {
+    "ONLINE": "web_browser",
+    "MOBILE": "mobile_app",
+    "ATM": "atm",
+    "POS": "pos_terminal",
+    "SWIFT": "phone_banking",
+}
 
 
 class ThoughtMachineWebhookResponse(BaseModel):
@@ -132,6 +168,7 @@ class CoreBankingHealthResponse(BaseModel):
 async def _handle_mambu_webhook(
     request: Request,
     x_mambu_signature: str | None,
+    background_tasks: BackgroundTasks | None = None,
 ) -> MambuWebhookResponse:
     """Internal implementation for Mambu webhook ingestion."""
     body_bytes = await request.body()
@@ -162,6 +199,72 @@ async def _handle_mambu_webhook(
         ) from val_err
 
     if isinstance(result, NormalizedTransaction):
+        mcc_raw = str(result.merchant_category_code or "5411")
+        mapped_category = MCC_TO_MERCHANT_CATEGORY.get(mcc_raw, "grocery")
+        mapped_channel = CHANNEL_TO_DEVICE_TYPE.get(str(result.channel_type).upper(), "web_browser")
+        effective_bank = result.bank_id or "bank_alpha"
+        hour_val = result.timestamp.hour if result.timestamp else 12
+
+        raw_cb = payload.get("chargeback_count")
+        cb_val = int(raw_cb) if raw_cb is not None else 0
+
+        raw_vel = payload.get("velocity")
+        vel_val = float(raw_vel) if raw_vel is not None else 1.0
+
+        raw_c_hist = payload.get("customer_history_score")
+        c_hist_val = float(raw_c_hist) if raw_c_hist is not None else 0.95
+
+        raw_age = payload.get("account_age_days")
+        age_val = int(raw_age) if raw_age is not None else 365
+
+        raw_m_risk = payload.get("merchant_risk_score")
+        if raw_m_risk is not None:
+            m_risk_val = float(raw_m_risk)
+        elif mapped_category in ("crypto", "gambling", "wire_transfer", "jewelry"):
+            m_risk_val = 0.85
+        else:
+            m_risk_val = 0.15
+
+        txn_features: dict[str, Any] = {
+            "transaction_id": result.transaction_id,
+            "customer_id": result.account_id,
+            "transaction_amount": float(result.amount),
+            "merchant_category": mapped_category,
+            "country_code": result.origin_country or "US",
+            "device_type": mapped_channel,
+            "velocity": vel_val,
+            "hour_of_day": hour_val,
+            "merchant_risk_score": m_risk_val,
+            "customer_history_score": c_hist_val,
+            "chargeback_count": cb_val,
+            "account_age_days": age_val,
+        }
+
+        from app.presentation.routers.predict import evaluate_transaction_risk_and_alerts
+
+        fraud_prob, score, risk_level, active_alert, alert_details, breakdown = (
+            evaluate_transaction_risk_and_alerts(
+                txn_dict=txn_features,
+                bank_id=effective_bank,
+                customer_ref=result.account_id,
+                background_tasks=background_tasks,
+                strict_production=False,
+            )
+        )
+
+        if score >= 700.0 or risk_level in ("CRITICAL", "HIGH"):
+            decision = "HOLD"
+        elif score >= 600.0 or risk_level == "MEDIUM":
+            decision = "FLAG"
+        else:
+            decision = "APPROVED"
+
+        eval_desc = (
+            f"champion_eval:{round(fraud_prob, 4)}"
+            if active_alert is None
+            else f"champion_alert:{active_alert.id[:8]}"
+        )
+
         return MambuWebhookResponse(
             status="ACCEPTED",
             event_type="TRANSACTION",
@@ -169,6 +272,10 @@ async def _handle_mambu_webhook(
             account_id=result.account_id,
             amount=result.amount,
             currency=result.currency,
+            risk_score=round(score, 2),
+            decision=decision,
+            alert_id=active_alert.id if active_alert else None,
+            evaluated_by=eval_desc,
         )
     elif isinstance(result, dict) and result.get("event_type") == "CLIENT_PSEUDONYMIZED":
         return MambuWebhookResponse(
@@ -314,19 +421,21 @@ def _handle_health() -> CoreBankingHealthResponse:
 @router.post("/mambu/webhook", response_model=MambuWebhookResponse, status_code=status.HTTP_200_OK)
 async def mambu_webhook(
     request: Request,
+    background_tasks: BackgroundTasks,
     x_mambu_signature: str | None = Header(None, alias="X-Mambu-Signature"),
 ) -> MambuWebhookResponse:
     """Ingest real-time Mambu v2 transactions, client registrations, and hold notifications."""
-    return await _handle_mambu_webhook(request, x_mambu_signature)
+    return await _handle_mambu_webhook(request, x_mambu_signature, background_tasks=background_tasks)
 
 
 @api_router.post("/mambu/webhook", response_model=MambuWebhookResponse, status_code=status.HTTP_200_OK)
 async def mambu_webhook_v1(
     request: Request,
+    background_tasks: BackgroundTasks,
     x_mambu_signature: str | None = Header(None, alias="X-Mambu-Signature"),
 ) -> MambuWebhookResponse:
     """Ingest real-time Mambu v2 webhook (API v1 prefix)."""
-    return await _handle_mambu_webhook(request, x_mambu_signature)
+    return await _handle_mambu_webhook(request, x_mambu_signature, background_tasks=background_tasks)
 
 
 @router.post("/thought-machine/webhook", response_model=ThoughtMachineWebhookResponse, status_code=status.HTTP_200_OK)

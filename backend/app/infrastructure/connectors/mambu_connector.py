@@ -196,7 +196,7 @@ class MambuConnector(BaseBankConnector):
             device_fingerprint=str(payload.get("deviceFingerprint") or ""),
             ip_subnet=str(payload.get("ipSubnet") or "10.0.0.0/24"),
             channel_type=channel if channel in ("ONLINE", "MOBILE", "ATM", "POS", "SWIFT") else "ONLINE",
-            bank_id=self.tenant_id,
+            bank_id=str(payload.get("bankId") or payload.get("tenantId") or self.tenant_id),
         )
         self._buffer.append(normalized)
         return normalized

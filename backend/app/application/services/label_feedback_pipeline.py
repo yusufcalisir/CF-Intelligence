@@ -393,6 +393,22 @@ class LocalLabelFeedbackPipeline:
                 "priority_distribution": p_dist,
             }
 
+    def get_feedback_buffer(self, tenant_id: str) -> list[dict[str, Any]]:
+        """Retrieves tenant feedback buffer items, loading from disk if in-memory buffer is empty."""
+        clean_tenant = validate_tenant_id(tenant_id)
+        with self._lock:
+            if clean_tenant not in self._buffers or not self._buffers[clean_tenant]:
+                self.load_from_disk(clean_tenant)
+            items = self._buffers.get(clean_tenant, [])
+            res = []
+            for item in items:
+                d = item.to_dict()
+                d["determination"] = d["label"]
+                if item.metadata and "alert_id" in item.metadata:
+                    d["alert_id"] = item.metadata["alert_id"]
+                res.append(d)
+            return res
+
     def get_buffer_size(self, tenant_id: str) -> int:
         """Retrieves tenant feedback buffer size."""
         clean_tenant = validate_tenant_id(tenant_id)

@@ -68,6 +68,7 @@ from app.dependencies import (
     TenantDep,
     enforce_tenant_quota,
 )
+from app.domain.investigation_entities import Alert
 from app.domain.model_serving_errors import (
     ModelAuthorizationError,
     ModelCompatibilityError,
@@ -482,31 +483,38 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
     return model
 
 
+def evaluate_transaction_risk_and_alerts(
+    txn_dict: dict[str, Any],
+    bank_id: str,
+    simulation_id: str | None = None,
+    background_tasks: BackgroundTasks | None = None,
+    customer_ref: str | None = None,
+    strict_production: bool | None = None,
+) -> tuple[float, float, str, Alert | None, AlertDetails | None, list[SignalBreakdown]]:
+    """Canonical transaction evaluation, champion inference, prediction logging, and alert triage.
 
-@router.post("/predict", response_model=TransactionPredictResponse)
-@api_router.post("/predict", response_model=TransactionPredictResponse)
-@limiter.limit("60/minute")
-async def predict_transaction(
-    request: Request,
-    response: Response,
-    payload: TransactionPredictRequest,
-    session: SessionDep,
-    background_tasks: BackgroundTasks,
-    x_api_key: str | None = Header(None, alias="X-API-Key"),
-    caller_tenant: TenantDep = None,
-    metered_tenant: str = Depends(enforce_tenant_quota),
-) -> TransactionPredictResponse:
-    """Evaluate a transaction in real-time.
-
-    Loads the currently active global model (or versioned model of a simulation),
-    evaluates fraud probability, computes composite risk score, and
-    generates alerts if fraud is suspected.
+    Ensures zero-mock adherence and feature representation parity across all transaction
+    ingress channels (REST /predict and core banking gateway webhooks).
     """
     settings = get_settings()
-    is_production = settings.app_env.lower() in ("production", "prod")
+    is_prod = (
+        strict_production
+        if strict_production is not None
+        else (settings.app_env.lower() in ("production", "prod"))
+    )
 
-    txn_dict = payload.model_dump()
-    if is_production and not settings.feature_store_enabled:
+    norm_bank = bank_id.lower().replace("-", "_").strip() if bank_id else "bank_alpha"
+    txn_id = str(txn_dict.get("transaction_id") or uuid.uuid4())
+    cust_id = (
+        customer_ref
+        or txn_dict.get("customer_id")
+        or txn_dict.get("account_id")
+        or "customer_1"
+    )
+    entity_hash = f"serving:{norm_bank}:{cust_id}"
+
+    # 1. Feature contract validation in production
+    if is_prod and not settings.feature_store_enabled:
         missing_feats = [f for f in REQUIRED_ML_FEATURES if txn_dict.get(f) is None]
         if missing_feats:
             raise HTTPException(
@@ -524,38 +532,10 @@ async def predict_transaction(
                 detail=f"Production categorical validation failed: {exc}",
             )
 
-    principal, effective_tenant = resolve_effective_caller_tenant(
-        request=request,
-        caller_tenant=caller_tenant,
-        requested_bank_id=payload.bank_id,
-        action_name="predict_transaction",
-    )
-    auth_sim_id, ownership = authorize_model_serving(
-        principal=principal,
-        caller_tenant=effective_tenant,
-        simulation_id=payload.simulation_id,
-        registry=_registry,
-        action_name="predict_transaction",
-    )
-
-    bank_id = effective_tenant or payload.bank_id
-    if not bank_id:
-        if is_production:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Institutional tenant identity is required for production prediction.",
-            )
-        bank_id = "serving_client"
-
-    txn_id = payload.transaction_id or str(uuid.uuid4())
-    customer_ref = payload.customer_id or payload.account_id or "customer_1"
-    entity_hash = f"serving:{bank_id}:{customer_ref}"
-
-    txn_dict = payload.model_dump()
-
-    # Online Feature Store: query real customer and merchant historical features if enabled
+    # 2. Online feature store enrichment if enabled
     if settings.feature_store_enabled:
-        merch_id = f"merch_{payload.merchant_category}" if payload.merchant_category else None
+        merch_cat = txn_dict.get("merchant_category")
+        merch_id = f"merch_{merch_cat}" if merch_cat else None
         try:
             online_feats = _feature_store.get_online_features(
                 [{"customer_id": entity_hash, **({"merchant_id": merch_id} if merch_id else {})}],
@@ -568,59 +548,54 @@ async def predict_transaction(
                     "merchant_risk_score",
                     "merchant_category",
                 ],
-                tenant_id=bank_id,
+                tenant_id=norm_bank,
             )
             if online_feats:
                 feats = online_feats[0]
-                if txn_dict.get("velocity") is None and feats.get("rolling_velocity_1h") is not None:
-                    txn_dict["velocity"] = feats["rolling_velocity_1h"]
-                if txn_dict.get("customer_history_score") is None and feats.get("customer_history_score") is not None:
-                    txn_dict["customer_history_score"] = feats["customer_history_score"]
-                if txn_dict.get("account_age_days") is None and feats.get("account_age_days") is not None:
-                    txn_dict["account_age_days"] = feats["account_age_days"]
-                if txn_dict.get("chargeback_count") is None and feats.get("chargeback_count") is not None:
-                    txn_dict["chargeback_count"] = feats["chargeback_count"]
-                if txn_dict.get("merchant_risk_score") is None and feats.get("merchant_risk_score") is not None:
-                    txn_dict["merchant_risk_score"] = feats["merchant_risk_score"]
-                if txn_dict.get("merchant_category") is None and feats.get("merchant_category") is not None:
-                    txn_dict["merchant_category"] = feats["merchant_category"]
+                for k, v in [
+                    ("velocity", feats.get("rolling_velocity_1h")),
+                    ("customer_history_score", feats.get("customer_history_score")),
+                    ("account_age_days", feats.get("account_age_days")),
+                    ("chargeback_count", feats.get("chargeback_count")),
+                    ("merchant_risk_score", feats.get("merchant_risk_score")),
+                    ("merchant_category", feats.get("merchant_category")),
+                ]:
+                    if txn_dict.get(k) is None and v is not None:
+                        txn_dict[k] = v
         except Exception as exc:
-            logger.debug("Feature Store online query failed in predict_transaction: %s", exc)
+            logger.debug("Feature Store online query failed: %s", exc)
 
-        # Schedule asynchronous feature ingestion — runs after response is sent
-        raw_m_risk = txn_dict.get("merchant_risk_score")
-        m_risk_val: float = float(raw_m_risk) if raw_m_risk is not None else 0.05
-        raw_c_hist = txn_dict.get("customer_history_score")
-        c_hist_val: float = float(raw_c_hist) if raw_c_hist is not None else 0.95
-        raw_cb = txn_dict.get("chargeback_count")
-        cb_val: int = int(raw_cb) if raw_cb is not None else 0
-        raw_age = txn_dict.get("account_age_days")
-        age_val: int = int(raw_age) if raw_age is not None else 365
+        if background_tasks is not None:
+            raw_m_risk = txn_dict.get("merchant_risk_score")
+            m_risk_val: float = float(raw_m_risk) if raw_m_risk is not None else 0.05
+            raw_c_hist = txn_dict.get("customer_history_score")
+            c_hist_val: float = float(raw_c_hist) if raw_c_hist is not None else 0.95
+            raw_cb = txn_dict.get("chargeback_count")
+            cb_val: int = int(raw_cb) if raw_cb is not None else 0
+            raw_age = txn_dict.get("account_age_days")
+            age_val: int = int(raw_age) if raw_age is not None else 365
 
-        background_tasks.add_task(
-            _feature_store.ingest_transaction,
-            customer_id=entity_hash,
-            amount=payload.transaction_amount,
-            merchant_id=merch_id or f"merch_{txn_dict.get('merchant_category', 'general')}",
-            merchant_category=str(txn_dict.get("merchant_category") or "grocery"),
-            merchant_risk_score=m_risk_val,
-            customer_history_score=c_hist_val,
-            chargeback_count=cb_val,
-            account_age_days=age_val,
-            transaction_id=txn_id,
-            tenant_id=bank_id,
-        )
+            background_tasks.add_task(
+                _feature_store.ingest_transaction,
+                customer_id=entity_hash,
+                amount=float(txn_dict.get("transaction_amount", 100.0)),
+                merchant_id=merch_id or f"merch_{txn_dict.get('merchant_category', 'general')}",
+                merchant_category=str(txn_dict.get("merchant_category") or "grocery"),
+                merchant_risk_score=m_risk_val,
+                customer_history_score=c_hist_val,
+                chargeback_count=cb_val,
+                account_age_days=age_val,
+                transaction_id=txn_id,
+                tenant_id=norm_bank,
+            )
 
-    # Enforce strict production feature contract vs dev defaults
-    if is_production:
+    # 3. Default features for non-production environments
+    if is_prod:
         missing_feats = [f for f in REQUIRED_ML_FEATURES if txn_dict.get(f) is None]
         if missing_feats:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    f"Production feature contract violation: Missing required features: {missing_feats}. "
-                    f"Features must be explicitly supplied or observed in online feature store."
-                ),
+                detail=f"Production feature contract violation: Missing required features: {missing_feats}",
             )
         try:
             preprocess_transaction(txn_dict, strict_categorical=True)
@@ -634,42 +609,48 @@ async def predict_transaction(
             if txn_dict.get(f) is None:
                 txn_dict[f] = default_val
 
-    # 1. Resolve cached active model instance and identity snapshot
+    # 4. Resolve champion model and forward pass
     try:
-        model, active_ident = _get_cached_serving_model_with_ident(auth_sim_id)
+        model, active_ident = _get_cached_serving_model_with_ident(simulation_id)
         network = getattr(model, "network", None)
         first_layer = None
         if isinstance(network, (torch.nn.Sequential, torch.nn.ModuleList, list)) and len(network) > 0:
             first_layer = network[0]
         input_dim = int(getattr(first_layer, "in_features", NUM_FEATURES))
-        input_tensor = preprocess_transaction(txn_dict, strict_categorical=is_production).to(_model_service.device)
+        input_tensor = preprocess_transaction(txn_dict, strict_categorical=is_prod).to(_model_service.device)
         if input_tensor.shape[1] != input_dim:
             raise ModelCompatibilityError(
                 f"Feature tensor dimension mismatch: input has {input_tensor.shape[1]} features, but model expects {input_dim}."
             )
 
-        # Measure Champion Latency
         champ_start = time.perf_counter()
         champ_prob = _eval_model(model, input_tensor)
         champ_latency = (time.perf_counter() - champ_start) * 1000
 
-        # Measure Challenger Latency (Shadow Deployment ONLY)
+        # 5. Challenger model shadow evaluation if available
         chall_prob = None
         chall_latency = None
         challenger_ver = None
         active_entry = None
-        if auth_sim_id:
-            manifest = _registry._load_manifest(auth_sim_id)
-            active_entry = next((e for e in manifest if (e.get("status") in ("champion", "active") and e.get("is_active")) or e.get("status") == "active"), None)
+        if simulation_id:
+            manifest = _registry._load_manifest(simulation_id)
+            active_entry = next(
+                (
+                    e
+                    for e in manifest
+                    if (e.get("status") in ("champion", "active") and e.get("is_active"))
+                    or e.get("status") == "active"
+                ),
+                None,
+            )
             challenger_entry = next((e for e in manifest if e.get("status") == "challenger"), None)
             if challenger_entry:
                 challenger_ver = challenger_entry["version"]
                 try:
-                    if is_production:
+                    if is_prod:
                         validate_production_admission(challenger_entry, context="predict_challenger_serving")
-
                     chall_model = _load_challenger_model(
-                        auth_sim_id, challenger_ver, dp_compatible=True
+                        simulation_id, challenger_ver, dp_compatible=True
                     )
                     chall_net = getattr(chall_model, "network", None)
                     chall_first = (
@@ -678,47 +659,33 @@ async def predict_transaction(
                         else None
                     )
                     chall_input_dim = int(getattr(chall_first, "in_features", NUM_FEATURES))
-
-                    chall_tensor = preprocess_transaction(txn_dict, strict_categorical=is_production).to(_model_service.device)
-                    if chall_tensor.shape[1] != chall_input_dim:
-                        logger.warning(
-                            "Challenger tensor dimension %d mismatches model expected dimension %d; skipping shadow evaluation.",
-                            chall_tensor.shape[1],
-                            chall_input_dim,
-                        )
-                    else:
+                    chall_tensor = preprocess_transaction(txn_dict, strict_categorical=is_prod).to(_model_service.device)
+                    if chall_tensor.shape[1] == chall_input_dim:
                         chall_start = time.perf_counter()
                         chall_prob = _eval_model(chall_model, chall_tensor)
                         chall_latency = (time.perf_counter() - chall_start) * 1000
                 except Exception as exc:
-                    logger.warning(
-                        "Failed to run challenger model version %d: %s",
-                        challenger_ver,
-                        exc,
-                    )
+                    logger.warning("Failed to run challenger model version %d: %s", challenger_ver, exc)
                     chall_prob = None
                     challenger_ver = None
 
-        # Authoritative production prediction must ALWAYS use currently authorized champion.
-        # Shadow predictions must NEVER replace champion probabilities in actual production risk scores,
-        # decisions, alerts, policy enforcement, or customer responses.
         fraud_prob = champ_prob
 
-        # Log prediction for shadow evaluation and rollback engine
-        sim_id_eval = auth_sim_id or "live_prod_v2"
+        # 6. Log prediction evidence in ModelEvaluationEngine
+        sim_id_eval = simulation_id or "live_prod_v2"
+        champ_ver_val = active_entry["version"] if active_entry else (active_ident.get("version") if active_ident else 1)
         _eval_engine.log_prediction(
             simulation_id=sim_id_eval,
             transaction_id=txn_id,
-            champion_version=active_entry["version"] if active_entry else (active_ident.get("version") if active_ident else 1),
+            champion_version=champ_ver_val,
             champion_prob=champ_prob,
             champion_latency_ms=champ_latency,
             challenger_version=challenger_ver,
             challenger_prob=chall_prob,
             challenger_latency_ms=chall_latency,
             routed_to="champion",
-            bank_id=bank_id,
+            bank_id=norm_bank,
         )
-
 
     except HTTPException:
         raise
@@ -747,22 +714,20 @@ async def predict_transaction(
             detail="Inference pipeline execution error.",
         )
 
-    # 4. Compute composite risk score
-    # Register historical signals context dynamically for the entity hash
+    # 7. Composite risk score computation
     cb_count = txn_dict.get("chargeback_count") or 0
     if cb_count > 0:
-        _risk_engine.register_chargeback(entity_hash, min(1.0, cb_count / 10.0), tenant_id=bank_id)
+        _risk_engine.register_chargeback(entity_hash, min(1.0, cb_count / 10.0), tenant_id=norm_bank)
         for _ in range(min(5, cb_count)):
-            _risk_engine.register_alert(entity_hash, tenant_id=bank_id)
-    _risk_engine.register_baseline(entity_hash, {"mean_amount": 100.0, "std_amount": 50.0}, tenant_id=bank_id)
+            _risk_engine.register_alert(entity_hash, tenant_id=norm_bank)
+    _risk_engine.register_baseline(entity_hash, {"mean_amount": 100.0, "std_amount": 50.0}, tenant_id=norm_bank)
 
     risk_score_obj = _risk_engine.score_transaction(
         transaction=txn_dict,
         ml_prediction=fraud_prob,
         entity_hash=entity_hash,
-        tenant_id=bank_id,
+        tenant_id=norm_bank,
     )
-
     score = risk_score_obj.score
     is_fraud_suspected = score >= 600.0
     if risk_score_obj.signals and all(s.weight == 0.0 for s in risk_score_obj.signals):
@@ -778,42 +743,38 @@ async def predict_transaction(
             else "LOW"
         )
 
-    # 5. Generate and publish alert in the shared intelligence layer if fraud suspected
-    alert_details = None
+    # 8. Alert generation and intelligence layer publication
+    active_alert: Alert | None = None
+    alert_details: AlertDetails | None = None
+    features_dict = {
+        "transaction_id": txn_id,
+        "customer_id": cust_id,
+        "merchant_category": txn_dict.get("merchant_category"),
+        "country_code": txn_dict.get("country_code"),
+        "device_type": txn_dict.get("device_type"),
+        "transaction_amount": float(txn_dict.get("transaction_amount", 0.0)),
+        "merchant_risk_score": txn_dict.get("merchant_risk_score"),
+        "customer_history_score": txn_dict.get("customer_history_score"),
+        "chargeback_count": cb_count,
+        "account_age_days": txn_dict.get("account_age_days"),
+    }
+
     if is_fraud_suspected:
         try:
-            features_dict = {
-                "transaction_id": txn_id,
-                "customer_id": payload.customer_id or payload.account_id or customer_ref,
-                "merchant_category": txn_dict.get("merchant_category"),
-                "country_code": txn_dict.get("country_code"),
-                "device_type": txn_dict.get("device_type"),
-                "transaction_amount": payload.transaction_amount,
-                "merchant_risk_score": txn_dict.get("merchant_risk_score"),
-                "customer_history_score": txn_dict.get("customer_history_score"),
-                "chargeback_count": cb_count,
-                "account_age_days": txn_dict.get("account_age_days"),
-            }
-
-            # Generate and persist the alert in Redis
             alerts = _alert_service.generate_alerts(
-                bank_id=bank_id,
+                bank_id=norm_bank,
                 transactions=[features_dict],
                 predictions=[score / 1000.0],
-                threshold=0.01,  # Set low threshold to guarantee alert creation
+                threshold=0.01,
             )
-
             if alerts:
                 active_alert = alerts[0]
-                # Publish anonymized indicator to the shared intelligence layer in background
-                background_tasks.add_task(_alert_service.publish_intelligence, active_alert)
-
-                # Generate the SHAP attribution explanation report
+                if background_tasks is not None:
+                    background_tasks.add_task(_alert_service.publish_intelligence, active_alert)
                 explanation_report = _explainability_service.explain_alert(
                     active_alert,
                     risk_signals=risk_score_obj.signals,
                 )
-
                 alert_details = AlertDetails(
                     alert_id=active_alert.id,
                     severity=active_alert.severity.value,
@@ -827,22 +788,11 @@ async def predict_transaction(
             logger.warning("Alert/Explainability pipeline degraded: %s", e)
     elif risk_level == "UNASSESSED":
         try:
-            features_dict = {
-                "transaction_id": txn_id,
-                "customer_id": payload.customer_id or payload.account_id or customer_ref,
-                "merchant_category": txn_dict.get("merchant_category"),
-                "country_code": txn_dict.get("country_code"),
-                "device_type": txn_dict.get("device_type"),
-                "transaction_amount": payload.transaction_amount,
-                "merchant_risk_score": txn_dict.get("merchant_risk_score"),
-                "customer_history_score": txn_dict.get("customer_history_score"),
-                "chargeback_count": cb_count,
-                "account_age_days": txn_dict.get("account_age_days"),
-            }
             unassessed_alert = _alert_service.generate_unassessed_hold_alert(
-                bank_id=bank_id,
+                bank_id=norm_bank,
                 transaction=features_dict,
             )
+            active_alert = unassessed_alert
             alert_details = AlertDetails(
                 alert_id=unassessed_alert.id,
                 severity=unassessed_alert.severity.value,
@@ -865,6 +815,69 @@ async def predict_transaction(
         )
         for s in risk_score_obj.signals
     ]
+
+    return (fraud_prob, score, risk_level, active_alert, alert_details, breakdown)
+
+
+@router.post("/predict", response_model=TransactionPredictResponse)
+@api_router.post("/predict", response_model=TransactionPredictResponse)
+@limiter.limit("60/minute")
+async def predict_transaction(
+    request: Request,
+    response: Response,
+    payload: TransactionPredictRequest,
+    session: SessionDep,
+    background_tasks: BackgroundTasks,
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    caller_tenant: TenantDep = None,
+    metered_tenant: str = Depends(enforce_tenant_quota),
+) -> TransactionPredictResponse:
+    """Evaluate a transaction in real-time.
+
+    Loads the currently active global model (or versioned model of a simulation),
+    evaluates fraud probability, computes composite risk score, and
+    generates alerts if fraud is suspected.
+    """
+    settings = get_settings()
+    is_production = settings.app_env.lower() in ("production", "prod")
+
+    txn_dict = payload.model_dump()
+    principal, effective_tenant = resolve_effective_caller_tenant(
+        request=request,
+        caller_tenant=caller_tenant,
+        requested_bank_id=payload.bank_id,
+        action_name="predict_transaction",
+    )
+    auth_sim_id, ownership = authorize_model_serving(
+        principal=principal,
+        caller_tenant=effective_tenant,
+        simulation_id=payload.simulation_id,
+        registry=_registry,
+        action_name="predict_transaction",
+    )
+
+    bank_id = effective_tenant or payload.bank_id
+    if not bank_id:
+        if is_production:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Institutional tenant identity is required for production prediction.",
+            )
+        bank_id = "serving_client"
+
+    txn_id = payload.transaction_id or str(uuid.uuid4())
+    customer_ref = payload.customer_id or payload.account_id or "customer_1"
+
+    predict_start = time.perf_counter()
+    fraud_prob, score, risk_level, active_alert, alert_details, breakdown = evaluate_transaction_risk_and_alerts(
+        txn_dict=txn_dict,
+        bank_id=bank_id,
+        simulation_id=auth_sim_id,
+        background_tasks=background_tasks,
+        customer_ref=customer_ref,
+        strict_production=is_production,
+    )
+    is_fraud_suspected = score >= 600.0
 
     # ── Dynamic Policy Rule Evaluation ────────
     policy_action = "HOLD_FOR_REVIEW" if risk_level == "UNASSESSED" else "ALLOW"
@@ -905,7 +918,7 @@ async def predict_transaction(
         alert_details=alert_details,
         policy_action=policy_action,
         triggered_rules=triggered_rules,
-        latency_ms=round((time.perf_counter() - champ_start) * 1000, 2),
+        latency_ms=round((time.perf_counter() - predict_start) * 1000, 2),
     )
 
 

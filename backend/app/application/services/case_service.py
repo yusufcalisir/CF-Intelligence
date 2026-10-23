@@ -9,7 +9,6 @@ complexity.
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import logging
 import os
@@ -477,40 +476,78 @@ class CaseManagementService:
 
                 feedback_recorded = False
                 try:
+                    from app.application.services.alert_service import AlertIntelligenceService
                     from app.application.services.label_feedback_pipeline import (
                         LocalLabelFeedbackPipeline,
                     )
-
-                    feedback_pipeline = LocalLabelFeedbackPipeline()
-                    tenant_id = getattr(case, "bank_id", "bank_alpha") or "bank_alpha"
-                    for alert_id in case.alert_ids:
-                        feedback_pipeline.ingest_analyst_determination(
-                            tenant_id=tenant_id,
-                            alert_id=alert_id,
-                            determination="CONFIRMED_FRAUD" if actual_label == 1 else "FALSE_POSITIVE",
-                            notes=f"Closed by {actor} with supervisor signoff {collected_signatures}",
-                        )
-                    feedback_recorded = True
-                except Exception as exc:
-                    logger.warning("Feedback pipeline ingestion notice: %s", exc)
-
-                try:
                     from app.application.services.model_registry import (
                         ModelEvaluationEngine,
                         ModelRegistry,
                     )
 
+                    alert_svc = AlertIntelligenceService()
+                    feedback_pipeline = LocalLabelFeedbackPipeline()
                     eval_engine = ModelEvaluationEngine(ModelRegistry())
 
-                    # Record ground truth label for all linked alerts/transactions if transaction exists in eval engine
+                    case_meta = getattr(case, "metadata", {}) or {}
+                    sim_id = case_meta.get("simulation_id") if isinstance(case_meta, dict) else None
+                    if not sim_id:
+                        sim_id = "live_prod_v2"
+
                     for alert_id in case.alert_ids:
-                        with contextlib.suppress(KeyError):
-                            eval_engine.log_feedback(
-                                simulation_id="default_sim",
-                                transaction_id=f"tx_{alert_id[:8]}",
-                                actual_label=actual_label,
+                        alert = alert_svc.get_alert(alert_id)
+                        actual_tx_id = alert.transaction_id if alert and alert.transaction_id else alert_id
+                        effective_bank = (
+                            getattr(case, "bank_id", None)
+                            or (alert.bank_id if alert else None)
+                            or "bank_alpha"
+                        )
+
+                        try:
+                            feedback_pipeline.ingest_analyst_determination(
+                                tenant_id=effective_bank,
+                                alert_id=alert_id,
+                                determination="CONFIRMED_FRAUD" if actual_label == 1 else "FALSE_POSITIVE",
+                                notes=f"Closed by {actor} with supervisor signoff {collected_signatures}",
+                                metadata={"alert_id": alert_id, "case_id": case.id},
                             )
-                    feedback_recorded = True
+                            feedback_recorded = True
+                        except Exception as pipe_exc:
+                            logger.warning("Feedback pipeline ingestion notice for alert %s: %s", alert_id, pipe_exc)
+
+                        # Record ground truth label for genuine transaction evidence in evaluation engine
+                        logged = False
+                        target_sims = (sim_id, "default_sim") if sim_id != "default_sim" else (sim_id,)
+                        for target_sim in target_sims:
+                            try:
+                                eval_engine.log_feedback(
+                                    simulation_id=target_sim,
+                                    transaction_id=actual_tx_id,
+                                    actual_label=actual_label,
+                                    bank_id=effective_bank,
+                                )
+                                logged = True
+                                feedback_recorded = True
+                                break
+                            except KeyError:
+                                continue
+                            except PermissionError:
+                                logger.error(
+                                    "Cross-tenant feedback authorization failed: transaction %s bank %s mismatches caller",
+                                    actual_tx_id,
+                                    effective_bank,
+                                )
+                                raise
+
+                        if not logged:
+                            logger.debug(
+                                "Transaction '%s' (alert %s) not present in evaluation store for simulation '%s'.",
+                                actual_tx_id,
+                                alert_id,
+                                sim_id,
+                            )
+                except PermissionError:
+                    raise
                 except Exception as exc:
                     logger.warning(
                         "Failed to record retraining label feedback for case %s: %s", case_id[:8], exc

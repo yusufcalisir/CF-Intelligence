@@ -258,6 +258,7 @@ class CaseResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: str
+    bank_id: str | None = None
     title: str
     status: str
     priority: str
@@ -282,6 +283,7 @@ class CaseSummaryResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: str
+    bank_id: str | None = None
     title: str
     status: str
     priority: str

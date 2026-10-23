@@ -200,6 +200,7 @@ export default function AlertsPage() {
         priority,
         alert_ids: [alertToEscalate.id],
         total_risk_score: alertToEscalate.risk_score,
+        bank_id: alertToEscalate.bank_id,
       });
 
       // 4. Update Alert status to 'escalated'

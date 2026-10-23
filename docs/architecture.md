@@ -962,6 +962,44 @@ To satisfy the stringent model risk governance mandates of **Federal Reserve SR 
 - **Software Correctness (`backend/tests/`)**: Unit, integration, chaos, and mutation tests execute deterministically against synthetic fixtures, asserting structural contracts, state machines, and security perimeters.
 - **Scientific Generalization (`benchmarks/`, `experiments/`)**: Decoupled statistical harnesses evaluate trained models against out-of-time splits across 8 canonical datasets (`paysim`, `ieee_cis`, `credit_card`, `elliptic`, `amlsim`, `synthaml`, `amlnet`, `cross_bank`), quantifying degradation under Dirichlet non-IID skew and Differential Privacy budgets.
 
+---
+
+## 19. Pilot Product Integration: End-to-End Transaction-to-Investigation Workflow
+
+The platform connects raw core-banking transaction ingress to investigator triage and continuous model learning via an integrated pipeline:
+
+```
+[ Core Banking Gateway ]  (HMAC-SHA256 Webhook: Mambu / Thought Machine)
+          │
+          ▼
+[ Normalization & PII Sanitization ] (Zero-Raw-PII Pseudonymization, MCC & Device Mapping)
+          │
+          ▼
+[ Champion Model Inference ] (Active Champion Forward Pass, Fail-Closed HTTP 503)
+          │
+          ▼
+[ Prediction Evidence Storage ] (ModelEvaluationEngine: champion_prob, version, latency)
+          │
+          ▼
+[ 9-Signal Composite Risk Scoring ] (RiskScoringEngine: 0-1000 score, explainability signals)
+          │
+          ▼
+[ Automated Alert Triage ] (AlertIntelligenceService: HOLD >= 700, FLAG >= 600, APPROVED < 600)
+          │
+          ▼
+[ Case Management Workbench ] (Analyst-Managed Case Creation, Alert Linking, Dual Signoff)
+          │
+          ▼
+[ Continuous Feedback & Retraining ] (LocalLabelFeedbackPipeline: DP Gradient Updates & Evidence Audit)
+```
+
+### Key Behavioral Guarantees
+1. **Institutional Tenancy:** Webhook signatures and incoming transaction tenants bind directly to verified bank partitions (`X-Bank-ID`, `bankId`), preventing cross-tenant leakage.
+2. **Model Integrity:** Inferences execute strictly through authorized champion models validated by Four-Eyes signoff (`validate_production_admission`); unverified or missing artifacts fail closed with HTTP 503.
+3. **Continuous Audit Trail:** Prediction evidence, generated alerts, investigation cases, and supervisor signoffs share deterministic correlation identifiers (`transaction_id`, `alert_id`, `case_id`).
+4. **Differential-Privacy Retraining:** Human-verified ground-truth labels (`CONFIRMED_FRAUD` / `FALSE_POSITIVE`) ingest into isolated per-tenant buffers with priority sampling and DP Gaussian noise injection ($\epsilon \le 1.0, \delta = 10^{-5}$).
+
+
 
 
 
