@@ -396,6 +396,10 @@ class CaseManagementService:
             old_status = case.status
             old_version = getattr(case, "version", 1)
             old_timeline_hash = case.timeline_hash
+            actual_label: int = 1 if new_status == CaseStatus.CLOSED_CONFIRMED else 0
+            resolved_alerts: list[Alert] = []
+            validation_passed: bool = False
+            current_bank: str | None = getattr(case, "bank_id", None)
 
             # Optimistic concurrency checks (Lost Update & Stale Approval Prevention)
             if expected_status:
@@ -514,7 +518,7 @@ class CaseManagementService:
 
                 alert_svc = AlertIntelligenceService()
                 case_bank = getattr(case, "bank_id", None)
-                resolved_alerts: list[Alert] = []
+                resolved_alerts = []
                 validation_passed = True
                 current_bank = case_bank
 
