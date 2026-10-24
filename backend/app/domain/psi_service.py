@@ -16,6 +16,100 @@ PSI_PRIME: int = (
     0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF
 )
 PRIME_BIT_LENGTH: int = 2048
+# Safe prime order q = (p - 1) // 2 for cyclic subgroup G_q of quadratic residues
+PSI_ORDER_Q: int = (PSI_PRIME - 1) // 2
+PSI_DOMAIN_SEPARATOR: bytes = b"CFI-DH-PSI-2048-v1-DOMAIN-SEPARATION"
+
+
+def hash_to_prime_subgroup(
+    identifier: str | bytes | int,
+    prime: int = PSI_PRIME,
+    order_q: int = PSI_ORDER_Q,
+) -> int:
+    """Map identifier strictly into the prime-order subgroup G_q of Z_p* (order q).
+
+    Uses domain-separated HMAC-SHA512 followed by modular squaring g = u^2 mod p.
+    Because p = 2q + 1 is a safe prime, all quadratic residues in Z_p* generate G_q.
+    This provably eliminates small-subgroup confinement attacks (g^q == 1 mod p).
+    """
+    import hmac
+
+    if isinstance(identifier, int):
+        raw = identifier.to_bytes((identifier.bit_length() + 7) // 8 or 1, "big")
+    elif isinstance(identifier, bytes):
+        raw = identifier
+    else:
+        raw = str(identifier).strip().encode("utf-8")
+
+    digest = hmac.new(PSI_DOMAIN_SEPARATOR, raw, hashlib.sha512).digest()
+    u = int.from_bytes(digest, "big") % (prime - 3) + 2
+    # Squaring modulo p guarantees u^2 is a quadratic residue in G_q
+    g = pow(u, 2, prime)
+    if g <= 1 or g >= prime - 1:
+        # Fallback to standard quadratic residue generator
+        g = pow(3, 2, prime)
+    return g
+
+
+def validate_group_element(
+    element_int: int,
+    prime: int = PSI_PRIME,
+    order_q: int = PSI_ORDER_Q,
+) -> bool:
+    """Validate that element belongs to cyclic prime-order subgroup G_q (order q).
+
+    Verifies:
+    1. Canonical range: 1 < element_int < prime - 1
+    2. Euler quadratic residue / prime-order condition: element_int^q == 1 mod p
+    """
+    if element_int <= 1 or element_int >= prime - 1:
+        return False
+    return pow(element_int, order_q, prime) == 1
+
+
+def derive_risk_payload_key(element_int: int, nonce: str) -> bytes:
+    """Derive a 256-bit symmetric encryption key from a matching group element and session nonce."""
+    import hmac
+
+    elem_bytes = element_int.to_bytes((PRIME_BIT_LENGTH + 7) // 8, "big")
+    salt = nonce.encode("utf-8")
+    info = b"CFI-PSI-RISK-PAYLOAD-AESGCM-KEY"
+    prk = hmac.new(salt, elem_bytes, hashlib.sha256).digest()
+    return hmac.new(prk, info + b"\x01", hashlib.sha256).digest()
+
+
+def encrypt_risk_payload(risk_context: dict[str, Any], key: bytes) -> str:
+    """Encrypt entity risk context using AES-256-GCM keyed to its specific blinded element."""
+    import json
+    import secrets
+
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    aesgcm = AESGCM(key)
+    iv = secrets.token_bytes(12)
+    plaintext = json.dumps(risk_context, sort_keys=True).encode("utf-8")
+    ciphertext = aesgcm.encrypt(iv, plaintext, None)
+    return f"{iv.hex()}:{ciphertext.hex()}"
+
+
+def decrypt_risk_payload(encrypted_payload: str, key: bytes) -> dict[str, Any] | None:
+    """Attempt decryption of entity risk context using derived key. Returns None on tag mismatch."""
+    import json
+
+    from cryptography.exceptions import InvalidTag
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    try:
+        parts = encrypted_payload.split(":")
+        if len(parts) != 2:
+            return None
+        iv = bytes.fromhex(parts[0])
+        ciphertext = bytes.fromhex(parts[1])
+        aesgcm = AESGCM(key)
+        decrypted = aesgcm.decrypt(iv, ciphertext, None)
+        return json.loads(decrypted.decode("utf-8"))
+    except (InvalidTag, ValueError, Exception):
+        return None
 
 
 def hash_to_group(identifier: str | bytes | int, prime: int = PSI_PRIME) -> int:
@@ -186,7 +280,14 @@ def __getattr__(name: str) -> Any:
 __all__ = [
     "PSI_PRIME",
     "PRIME_BIT_LENGTH",
+    "PSI_ORDER_Q",
+    "PSI_DOMAIN_SEPARATOR",
     "hash_to_group",
+    "hash_to_prime_subgroup",
+    "validate_group_element",
+    "derive_risk_payload_key",
+    "encrypt_risk_payload",
+    "decrypt_risk_payload",
     "parse_blinded_element",
     "blind_element",
     "double_blind_element",

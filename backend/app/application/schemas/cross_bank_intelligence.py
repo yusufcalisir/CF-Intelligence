@@ -17,6 +17,11 @@ def _strip_control(value: str) -> str:
 MatchCategory = Literal["EXACT_MATCH", "PROBABILISTIC_FUZZY", "NO_MATCH"]
 SanitizedRiskLevel = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNOBSERVED"]
 DisclosureMode = Literal["ATTRIBUTED_INSTITUTIONS", "ANONYMIZED_SUMMARY"]
+AssuranceLevel = Literal[
+    "PROTOCOL_PROTOTYPE",
+    "ISOLATED_INTEGRATION_VERIFIED",
+    "OPERATIONAL_PRIVACY_VERIFIED",
+]
 
 
 class CrossBankIntelligenceQueryRequest(BaseModel):
@@ -126,6 +131,10 @@ class CrossBankIntelligenceSignal(BaseModel):
     is_synthetic: bool = Field(
         default=False,
         description="True if signal was derived from synthetic or research simulation datasets.",
+    )
+    assurance_level: AssuranceLevel = Field(
+        default="ISOLATED_INTEGRATION_VERIFIED",
+        description="Verifiable security assurance level based on actual runtime environment.",
     )
     disclaimer: str = Field(
         default=(

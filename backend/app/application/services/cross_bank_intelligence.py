@@ -149,11 +149,44 @@ class CrossBankIntelligenceService:
     ) -> CrossBankIntelligenceSignal:
         """Execute authentic two-bank private matching across isolated institutional bank nodes.
 
-        Requires independent bank nodes, per-bank storage vaults, and KMS session key custody.
-        Zero raw identifiers or private keys are ever shared with the coordinator.
+        Enforces institutional tenant isolation, permitted analyst roles, actor integrity,
+        and requesting-bank entity ownership.
         """
+        clean_requesting = req.requesting_bank_id.lower().strip()
         auth_principal = self._authenticate_principal(principal=principal, auth_token=auth_token)
-        audited_actor = actor or auth_principal.principal_id
+        caller_bank = (auth_principal.tenant_id or "").lower().strip()
+
+        if not auth_principal.is_privileged and caller_bank != clean_requesting:
+            raise PermissionError(
+                f"Institutional impersonation rejected: Authenticated principal belongs to '{caller_bank}', "
+                f"cannot execute matching on behalf of institution '{req.requesting_bank_id}'."
+            )
+
+        if not any(r in PERMITTED_INTELLIGENCE_ROLES for r in auth_principal.roles):
+            raise PermissionError(
+                f"Principal '{auth_principal.principal_id}' lacks permitted intelligence query role. "
+                f"Permitted roles: {sorted(PERMITTED_INTELLIGENCE_ROLES)}."
+            )
+
+        if actor and actor.lower().strip() != auth_principal.principal_id.lower().strip():
+            raise PermissionError(
+                f"Caller-supplied actor identity ('{actor}') does not match authenticated principal ('{auth_principal.principal_id}')."
+            )
+
+        audited_actor = auth_principal.principal_id
+
+        # Verify entity ownership if entity is tracked in the registry
+        if req.query_entity_id and hasattr(self, "entity_service") and self.entity_service:
+            try:
+                ent = self.entity_service.get_entity(req.query_entity_id)
+                if ent and ent.bank_id.lower().strip() != clean_requesting:
+                    raise PermissionError(
+                        f"Requesting bank '{clean_requesting}' does not own entity '{req.query_entity_id}'."
+                    )
+            except Exception as exc:
+                if isinstance(exc, PermissionError):
+                    raise
+
         return self.matching_coordinator.execute_two_bank_private_matching(
             req=req,
             auth_token=auth_token,
@@ -629,6 +662,19 @@ class CrossBankIntelligenceService:
                 raise ConsortiumSecurityError(
                     "Simulated research signals cannot be attached to authoritative fraud investigation evidence or regulatory filings."
                 )
+
+        # 3e. Contain Protocol Prototype Results from Entering Authoritative Evidence
+        assurance_level = signal_data.get("assurance_level") or record.get("assurance_level")
+        is_authoritative_case = bool(
+            getattr(case, "is_authoritative", False)
+            or (getattr(case, "signature_metadata", {}) or {}).get("is_authoritative", False)
+            or case.status in (CaseStatus.ESCALATED, CaseStatus.SAR_FILED)
+        )
+        if assurance_level == "PROTOCOL_PROTOTYPE" and (is_authoritative_case or settings.is_production):
+            raise ConsortiumSecurityError(
+                "Protocol prototype matching results cannot enter authoritative case evidence or production regulatory filings. "
+                "Defensible evidence requires at least ISOLATED_INTEGRATION_VERIFIED assurance."
+            )
 
         # 4. Revalidate Current Consortium Governance & Revocation Status
         consortium_id = str(record.get("consortium_id", "")).lower().strip()

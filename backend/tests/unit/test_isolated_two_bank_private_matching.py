@@ -168,6 +168,8 @@ def institutional_setup(tmp_path: Path):
         institution_jurisdictions={"bank_a": "US", "bank_b": "US"},
         allow_institution_identity_sharing=True,
         revision=1,
+        approving_bank_id="bank_a",
+        auth_token=token_a,
     )
 
     # 2. Institutional Workers with isolated vaults and KMS sessions

@@ -241,12 +241,38 @@ class ConsortiumGovernanceService:
         allow_cross_border: bool = False,
         allow_institution_identity_sharing: bool = False,
         revision: int = 1,
+        approving_bank_id: str | None = None,
         auth_token: str | None = None,
         actor: str | None = None,
         trusted_context: Any | None = None,
     ) -> dict[str, Any]:
-        """Registers or updates an authoritative operational data-sharing grant for a consortium."""
+        """Registers or updates an authoritative operational data-sharing grant under verified governance authority."""
         clean_id = consortium_id.lower().strip()
+        if not auth_token and trusted_context is None:
+            raise PermissionError(
+                "Authentication required: Direct service operation 'register_operational_data_sharing_grant' "
+                "requires a valid Bearer auth_token or trusted internal context."
+            )
+
+        if auth_token and not approving_bank_id:
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            auth_svc = AuthenticationService.get_instance()
+            is_valid, claims, err = auth_svc.verify_access_token(auth_token)
+            if not is_valid or not claims:
+                raise PermissionError(f"Direct service authentication failed: {err}")
+            approving_bank_id = str(claims.get("bank_id", "")).lower().strip()
+
+        clean_approver = (approving_bank_id or "").lower().strip()
+        attr = self._verify_service_actor_bank(
+            expected_bank=clean_approver,
+            consortium_id=clean_id,
+            auth_token=auth_token,
+            actor=actor,
+            trusted_context=trusted_context,
+            action_name="register_operational_data_sharing_grant",
+        )
+
         purposes = allowed_purposes or ["AML_COLLABORATIVE_INVESTIGATION", "FRAUD_INVESTIGATION"]
         jurisdictions = institution_jurisdictions or {}
         default_allowed = list(dict.fromkeys(list(jurisdictions.values()) + ["eu-central-1", "us-east-1", "apac-singapore-1"]))
@@ -261,16 +287,104 @@ class ConsortiumGovernanceService:
             "allow_cross_border": bool(allow_cross_border),
             "allow_institution_identity_sharing": bool(allow_institution_identity_sharing),
             "registered_at": datetime.datetime.now(UTC).isoformat(),
+            "approved_by": attr["actor_id"],
+            "approving_bank_id": clean_approver,
+            "history": [],
         }
 
         def _mutate(consortia: dict[str, Consortium], proposals: dict[str, Any]) -> dict[str, Any]:
             if clean_id not in consortia:
                 raise ValueError(f"Consortium '{clean_id}' does not exist.")
             c = consortia[clean_id]
+            if clean_approver not in c.members:
+                raise PermissionError(
+                    f"Approving bank '{clean_approver}' is not an active member of consortium '{clean_id}'."
+                )
             if not hasattr(c, "metadata") or c.metadata is None:
                 c.metadata = {}
+
+            existing = c.metadata.get("operational_data_sharing_grant")
+            history: list[dict[str, Any]] = []
+            if existing and isinstance(existing, dict):
+                prev_rev = int(existing.get("revision", 1))
+                if int(revision) <= prev_rev:
+                    raise ValueError(
+                        f"Operational grant revision must be strictly monotonically increasing. "
+                        f"Current revision is {prev_rev}, attempted revision is {revision}."
+                    )
+                history = list(existing.get("history", []))
+                prior_snapshot = {k: v for k, v in existing.items() if k != "history"}
+                history.append(prior_snapshot)
+
+            grant_dict["history"] = history
             c.metadata["operational_data_sharing_grant"] = grant_dict
             return grant_dict
+
+        return self._store.atomic_mutate(_mutate)
+
+    def revoke_operational_data_sharing_grant(
+        self,
+        consortium_id: str,
+        grant_id: str,
+        revoking_bank_id: str | None = None,
+        reason: str = "operational_governance_revocation",
+        auth_token: str | None = None,
+        actor: str | None = None,
+        trusted_context: Any | None = None,
+    ) -> dict[str, Any]:
+        """Revokes an existing operational data-sharing grant under authenticated governance authority."""
+        clean_id = consortium_id.lower().strip()
+        if not auth_token and trusted_context is None:
+            raise PermissionError(
+                "Authentication required: Direct service operation 'revoke_operational_data_sharing_grant' "
+                "requires a valid Bearer auth_token or trusted internal context."
+            )
+
+        if auth_token and not revoking_bank_id:
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            auth_svc = AuthenticationService.get_instance()
+            is_valid, claims, err = auth_svc.verify_access_token(auth_token)
+            if not is_valid or not claims:
+                raise PermissionError(f"Direct service authentication failed: {err}")
+            revoking_bank_id = str(claims.get("bank_id", "")).lower().strip()
+
+        clean_revoker = (revoking_bank_id or "").lower().strip()
+        attr = self._verify_service_actor_bank(
+            expected_bank=clean_revoker,
+            consortium_id=clean_id,
+            auth_token=auth_token,
+            actor=actor,
+            trusted_context=trusted_context,
+            action_name="revoke_operational_data_sharing_grant",
+        )
+
+        def _mutate(consortia: dict[str, Consortium], proposals: dict[str, Any]) -> dict[str, Any]:
+            if clean_id not in consortia:
+                raise ValueError(f"Consortium '{clean_id}' does not exist.")
+            c = consortia[clean_id]
+            if clean_revoker not in c.members:
+                raise PermissionError(
+                    f"Revoking bank '{clean_revoker}' is not an active member of consortium '{clean_id}'."
+                )
+            if not hasattr(c, "metadata") or not c.metadata:
+                raise ValueError(f"No operational data-sharing grants found for consortium '{clean_id}'.")
+
+            existing = c.metadata.get("operational_data_sharing_grant")
+            if not existing or existing.get("grant_id") != grant_id.strip():
+                raise ValueError(f"Grant '{grant_id}' does not exist in consortium '{clean_id}'.")
+
+            history = list(existing.get("history", []))
+            prior_snapshot = {k: v for k, v in existing.items() if k != "history"}
+            history.append(prior_snapshot)
+
+            existing["is_active"] = False
+            existing["revoked_at"] = datetime.datetime.now(UTC).isoformat()
+            existing["revocation_reason"] = reason.strip()
+            existing["revoked_by"] = attr["actor_id"]
+            existing["history"] = history
+            c.metadata["operational_data_sharing_grant"] = existing
+            return existing
 
         return self._store.atomic_mutate(_mutate)
 
