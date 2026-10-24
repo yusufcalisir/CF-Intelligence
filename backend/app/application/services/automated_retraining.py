@@ -269,6 +269,8 @@ class DriftTriggeredRetrainingService:
 
             # Two-phase feedback reservation
             reserved_banks: list[str] = []
+            feedback_manifests: dict[str, dict[str, Any]] = {}
+            total_reserved = 0
             if effective_pipeline is not None:
                 for bank in banks:
                     res_batch = effective_pipeline.reserve_retraining_batch(
@@ -299,7 +301,17 @@ class DriftTriggeredRetrainingService:
                             f"Retraining job '{job_id}' cannot execute: Insufficient verified feedback data for bank '{bank}' "
                             f"({count} < {effective_min} minimum required)."
                         )
-                    reserved_banks.append(bank)
+                    if count > 0:
+                        reserved_banks.append(bank)
+                        total_reserved += count
+                        feedback_manifests[bank] = {
+                            "job_id": job_id,
+                            "bank_id": bank,
+                            "sample_count": count,
+                            "sample_hashes": [
+                                it["transaction_id_hash"] for it in res_batch.get("items", [])
+                            ],
+                        }
 
             record.status = "RUNNING"
             record.details["participating_banks"] = banks
@@ -308,12 +320,17 @@ class DriftTriggeredRetrainingService:
         try:
             target_rounds = record.details.get("target_rounds", 3)
             sim_id = f"sim_retrain_{job_id}"
-            fed_result = effective_service.execute_operational_federation(
-                simulation_id=sim_id,
-                num_rounds=target_rounds,
-                participating_banks=banks,
-                consortium_id=consortium_id,
-            )
+            fed_kwargs: dict[str, Any] = {
+                "job_id": job_id,
+                "simulation_id": sim_id,
+                "num_rounds": target_rounds,
+                "participating_banks": banks,
+                "consortium_id": consortium_id,
+            }
+            if feedback_manifests:
+                fed_kwargs["feedback_manifests"] = feedback_manifests
+
+            fed_result = effective_service.execute_operational_federation(**fed_kwargs)
             if not isinstance(fed_result, dict):
                 with self._lock:
                     record.status = "FAILED"
@@ -399,16 +416,63 @@ class DriftTriggeredRetrainingService:
                     f"Operational federation for retraining job '{job_id}' violated Four-Eyes governance: automated retraining cannot automatically promote candidate to champion."
                 )
 
-            # Commit reserved feedback upon verified execution
-            if effective_pipeline is not None:
-                total_committed = 0
-                for b in banks:
-                    total_committed += effective_pipeline.commit_consumed_feedback(
-                        tenant_id=b,
-                        job_id=job_id,
-                        training_run_id=candidate_version_str,
+            # Commit reserved feedback ONLY upon verified training execution evidence matching this job
+            has_feedback_reservation = bool(reserved_banks and total_reserved > 0)
+            lineage_verified = False
+            if has_feedback_reservation:
+                job_matches = fed_result.get("job_id") == job_id
+                fl_verified = fed_result.get("feedback_lineage_verified") is True
+                verified_jobs = fed_result.get("verified_feedback_jobs") or []
+                if job_matches and fl_verified and (job_id in verified_jobs):
+                    lineage_verified = True
+                else:
+                    lineage_verified = False
+                    logger.warning(
+                        "Retraining job %s completed, but feedback lineage was NOT verified. "
+                        "Reserved feedback will NOT be consumed (retained as unconsumed). "
+                        "Reason: job_matches=%s, fl_verified=%s, verified_jobs=%s",
+                        job_id,
+                        job_matches,
+                        fl_verified,
+                        verified_jobs,
                     )
-                record.details["committed_feedback_samples"] = total_committed
+
+            if has_feedback_reservation:
+                if lineage_verified and effective_pipeline is not None:
+                    total_committed = 0
+                    committed_banks: list[str] = []
+                    failed_banks: list[str] = []
+                    for b in reserved_banks:
+                        try:
+                            c = effective_pipeline.commit_consumed_feedback(
+                                tenant_id=b,
+                                job_id=job_id,
+                                training_run_id=candidate_version_str,
+                            )
+                            total_committed += c
+                            committed_banks.append(b)
+                        except Exception as c_exc:
+                            logger.error("Failed to commit consumed feedback for bank %s: %s", b, c_exc)
+                            failed_banks.append(b)
+                    record.details["feedback_consumed"] = True
+                    record.details["committed_feedback_samples"] = total_committed
+                    record.details["committed_banks"] = committed_banks
+                    if failed_banks:
+                        record.details["failed_commit_banks"] = failed_banks
+                else:
+                    # Retain feedback as unconsumed by safely releasing reservations
+                    if effective_pipeline is not None:
+                        for b in reserved_banks:
+                            effective_pipeline.release_reserved_feedback(tenant_id=b, job_id=job_id)
+                    record.details["feedback_consumed"] = False
+                    record.details["committed_feedback_samples"] = 0
+                    record.details["feedback_lineage_unverified_reason"] = (
+                        f"Operational federation result (job_id={fed_result.get('job_id')}) did not provide "
+                        f"verified feedback lineage evidence for job '{job_id}'."
+                    )
+            else:
+                record.details["feedback_consumed"] = False
+                record.details["committed_feedback_samples"] = 0
 
             with self._lock:
                 record.status = "COMPLETED"
@@ -429,6 +493,11 @@ class DriftTriggeredRetrainingService:
                 "metrics": dict(observed_metrics),
                 "evaluation_metrics": dict(observed_metrics),
                 "is_promoted_champion": False,
+                "feedback_consumed": record.details.get("feedback_consumed", False),
+                "committed_feedback_samples": record.details.get("committed_feedback_samples", 0),
+                "committed_banks": record.details.get("committed_banks", []),
+                "failed_commit_banks": record.details.get("failed_commit_banks", []),
+                "feedback_lineage_unverified_reason": record.details.get("feedback_lineage_unverified_reason"),
             }
         except Exception as exc:
             # Release any reserved feedback on failure

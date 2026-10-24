@@ -104,26 +104,33 @@ item = pipeline.ingest_analyst_determination(
 
 To strictly uphold `AGENTS.md` (no fabricated runtime truth or premature state transitions), each feedback item traverses 5 verifiable lifecycle states:
 
-1. **`ANALYST_RECEIVED`**: Ingestion request received by the service or REST endpoint (`/api/v1/feedback/ingest`), validated against zero-PII requirements.
-2. **`DURABLY_RECORDED`**: Serialized to local on-premises tenant disk storage (`storage/{tenant_id}/label_buffer.json`).
+1. **`ANALYST_RECEIVED`**: Ingestion request received by the service or REST endpoint (`/api/v1/feedback/ingest`), validated against zero-PII requirements. Direct analyst submissions default to `validated_for_training=False`.
+2. **`DURABLY_RECORDED`**: Serialized to local on-premises tenant disk storage (`storage/{tenant_id}/label_buffer.json`). Disk write failures raise `FeedbackPersistenceError` and roll back in-memory changes.
 3. **`EVIDENCE_CORRELATED`**: Correlated with authoritative historical prediction evidence in `ModelEvaluationEngine` via genuine transaction ID.
-4. **`VALIDATED_FOR_TRAINING`**: Institutional alert ownership verified (`alert.bank_id == tenant_id`), confirming genuine operational provenance. Unindexed or cross-tenant alerts remain `validated_for_training=False`.
-5. **`CONSUMED_IN_TRAINING`**: Committed only after a genuine federated retraining round produces a verified candidate model checkpoint (`is_verified == True`).
+4. **`VALIDATED_FOR_TRAINING`**: Institutional alert ownership and formal case resolution verified. Published strictly *after* successful CAS persistence (`update_conditional`). Uncommitted or rejected case transitions write zero feedback.
+5. **`CONSUMED_IN_TRAINING`**: Committed only after a genuine federated retraining round produces verified execution evidence matching the reserved `job_id` (`feedback_lineage_verified=True`). Unrelated runs release reservations back to the pool.
 
 ---
 
 ## 🔒 Staged Two-Phase Feedback Reservation & Consumption
 
-Feedback items are protected from accidental double-counting or loss during distributed training runs via a two-phase protocol:
+Feedback items are protected from accidental double-counting, premature consumption, or loss during distributed training runs via a strict two-phase protocol:
 
+- **Precondition: Post-Commit Publication**:
+  - In `CaseManagementService.change_status()`, feedback buffer recording and prediction correlation occur strictly *after* optimistic concurrency CAS persistence (`update_conditional`) commits.
+  - If CAS fails or validation rejects the transition, zero feedback items are written to the buffer.
+- **Prohibition on Direct Sampling Consumption**:
+  - Direct consumption during sampling is forbidden. Calling `get_priority_retraining_batch(mark_consumed=True)` raises `ValueError`, and `POST /api/v1/feedback/retraining-batch` rejects `mark_consumed=True` with `HTTP 400 Bad Request`.
+  - Batch sampling defaults to `require_validated=True`, shielding training batches from unverified allegations.
 - **Phase 1: Reservation (`reserve_retraining_batch`)**:
-  - When an automated or manual retraining job begins (`execute_retraining_pipeline`), validated feedback items are locked under `reserved_job_id = job_id`.
-  - Reserved items are excluded from other training batches while retaining their unconsumed status.
-  - Previewing or sampling never marks items as consumed.
-- **Phase 2a: Release on Failure or Cancellation (`release_reserved_feedback`)**:
-  - If training fails, throws an exception, or is cancelled, `release_reserved_feedback` clears `reserved_job_id`, safely returning all items to the eligible pool.
-- **Phase 2b: Atomic Commit on Verified Completion (`commit_consumed_feedback`)**:
-  - Only when operational federation finishes with status `COMPLETED` and `is_verified == True`, all reserved items transition to `status="CONSUMED_IN_TRAINING"`, `consumed_for_retraining=True`, and `consumed_training_run_id=candidate_model_version`.
+  - When an automated retraining job begins (`execute_retraining_pipeline`), validated feedback items are locked under `reserved_job_id = job_id`, recording `reserved_at` lease timestamps.
+  - Reserved items are shielded from concurrent batch selection while retaining their unconsumed status.
+- **Phase 2a: Release on Failure, Cancellation, or Unverified Lineage (`release_reserved_feedback`)**:
+  - If training fails, throws an exception, is cancelled, or if the operational federation result lacks verified lineage (`feedback_lineage_verified=False` or mismatching `job_id`), `release_reserved_feedback` clears `reserved_job_id` and restores status to `VALIDATED_FOR_TRAINING`.
+- **Phase 2b: Lineaged Atomic Commit on Verified Completion (`commit_consumed_feedback`)**:
+  - Only when operational federation finishes with status `COMPLETED`, `is_verified == True`, and matching `job_id` with verified feedback lineage, reserved items transition to `status="CONSUMED_IN_TRAINING"`, `consumed_for_retraining=True`, and `consumed_training_run_id=candidate_model_version`.
+- **Crash Recovery: Stale Lease Reclamation (`reclaim_stale_reservations`)**:
+  - If a worker node crashes mid-training, orphaned reservations older than `max_age_seconds` are reclaimed back to the pool, while actively executing worker leases in `active_job_ids` remain protected.
 
 ---
 

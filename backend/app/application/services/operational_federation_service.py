@@ -1152,6 +1152,7 @@ class OperationalFederationService:
         byzantine_defense: str = "none",
         byzantine_f_max: int = 1,
         trimmed_mean_trim_count: int | None = None,
+        feedback_manifests: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute operational federated learning lifecycle with complete authority verification and lifecycle ownership."""
         settings = get_settings()
@@ -1331,6 +1332,22 @@ class OperationalFederationService:
                         f"but model was saved under consortium '{saved_cid}'."
                     )
 
+            feedback_lineage_verified = False
+            verified_feedback_jobs: list[str] = []
+            if feedback_manifests:
+                all_valid = True
+                for b_name, m_data in feedback_manifests.items():
+                    norm_b = b_name.strip().upper()
+                    if norm_b not in banks:
+                        all_valid = False
+                        break
+                    if isinstance(m_data, dict) and m_data.get("job_id") != clean_job_id:
+                        all_valid = False
+                        break
+                if all_valid:
+                    feedback_lineage_verified = True
+                    verified_feedback_jobs = [clean_job_id]
+
             return {
                 "job_id": clean_job_id,
                 "training_run_id": training_run_id,
@@ -1358,6 +1375,9 @@ class OperationalFederationService:
                 or ("secagg_fed_avg_weighted" if secagg_enabled else "fed_avg_weighted"),
                 "byzantine_defense": result.get("byzantine_defense") or byzantine_defense,
                 "byzantine_f_max": result.get("byzantine_f_max", byzantine_f_max),
+                "feedback_lineage_verified": feedback_lineage_verified,
+                "verified_feedback_jobs": verified_feedback_jobs,
+                "feedback_manifests": dict(feedback_manifests) if feedback_manifests else {},
             }
 
         finally:

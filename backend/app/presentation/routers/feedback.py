@@ -235,7 +235,27 @@ async def _ingest_handler(
                         f"'{alert.bank_id}', but authorized tenant is '{authorized_tenant}'."
                     ),
                 )
-            validated_for_training = True
+            # Merely finding an alert with a matching tenant must not automatically establish an authoritative training label.
+            # Direct analyst submissions are recorded as unverified allegations (ineligible for retraining)
+            # unless backed by an approved terminal case determination (CLOSED_CONFIRMED / CLOSED_FALSE_POSITIVE).
+            case_id = (payload.metadata or {}).get("case_id") if payload.metadata else None
+            is_case_resolved = False
+            if case_id:
+                try:
+                    from app.application.services.case_service import CaseManagementService
+                    from app.domain.enums import CaseStatus
+
+                    case_svc = CaseManagementService()
+                    existing_case = case_svc.get_case(case_id)
+                    if existing_case and existing_case.status in (
+                        CaseStatus.CLOSED_CONFIRMED,
+                        CaseStatus.CLOSED_FALSE_POSITIVE,
+                    ):
+                        is_case_resolved = True
+                except Exception:
+                    is_case_resolved = False
+
+            validated_for_training = is_case_resolved
         else:
             validated_for_training = False
             logger.info(
@@ -419,22 +439,28 @@ async def sample_retraining_batch(
     caller_tenant: TenantDep = None,
 ) -> RetrainingBatchResponse:
     """Sample a prioritized, stratified batch of human-verified feedback items for local model retraining."""
-    required_roles = FEEDBACK_CONSUME_ROLES if payload.mark_consumed else FEEDBACK_SAMPLE_ROLES
+    if payload.mark_consumed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Direct consumption via mark_consumed=True is prohibited. Feedback consumption "
+                "requires staged reservation and verified training completion."
+            ),
+        )
+    required_roles = FEEDBACK_SAMPLE_ROLES
     _, authorized_tenant = _authorize_feedback_request(
         request=request,
         target_tenant_id=payload.tenant_id,
         caller_tenant=caller_tenant,
         required_roles=required_roles,
-        action_name="consume_retraining_batch"
-        if payload.mark_consumed
-        else "sample_retraining_batch",
+        action_name="sample_retraining_batch",
     )
     batch_data = _pipeline.get_priority_retraining_batch(
         tenant_id=authorized_tenant,
         batch_size=payload.batch_size,
-        mark_consumed=payload.mark_consumed,
         min_priority=payload.min_priority,
         stratified=payload.stratified,
+        require_validated=payload.require_validated,
     )
     return RetrainingBatchResponse(**batch_data)
 

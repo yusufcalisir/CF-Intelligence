@@ -59,6 +59,7 @@ def test_priority_queueing_and_weighted_retraining_batch_sampling(temp_storage_d
             alert_id=f"alt_standard_{i}",
             determination="FALSE_POSITIVE",
             priority=1,
+            validated_for_training=True,
         )
 
     # Ingest critical priority item (priority 3)
@@ -68,14 +69,24 @@ def test_priority_queueing_and_weighted_retraining_batch_sampling(temp_storage_d
         determination="CONFIRMED_FRAUD",
         priority=3,
         weight=5.0,
+        validated_for_training=True,
     )
+
+    # Invariant: Direct consumption during sampling is prohibited
+    with pytest.raises(ValueError, match=r"Direct consumption via get_priority_retraining_batch\(mark_consumed=True\) is prohibited"):
+        pipeline.get_priority_retraining_batch(
+            tenant_id=tenant,
+            batch_size=2,
+            mark_consumed=True,
+            stratified=False,
+        )
 
     # Sample batch with unstratified ordering
     batch_res = pipeline.get_priority_retraining_batch(
         tenant_id=tenant,
         batch_size=2,
-        mark_consumed=True,
         stratified=False,
+        require_validated=True,
     )
 
     assert batch_res["batch_size"] == 2
@@ -83,10 +94,24 @@ def test_priority_queueing_and_weighted_retraining_batch_sampling(temp_storage_d
     # First item in batch must be the highest priority item
     assert items[0]["transaction_id_hash"] == critical_item.transaction_id_hash
     assert items[0]["priority"] == 3
-    assert items[0]["consumed_for_retraining"] is True
+
+    # Authorized two-phase consumption: reserve and commit
+    pipeline.reserve_retraining_batch(
+        tenant_id=tenant,
+        job_id="job_prio_test",
+        batch_size=2,
+        require_validated=True,
+    )
+    pipeline.commit_consumed_feedback(
+        tenant_id=tenant,
+        job_id="job_prio_test",
+        training_run_id="candidate_run_prio",
+    )
 
     # Next batch should not include the already consumed critical item
-    next_batch = pipeline.get_priority_retraining_batch(tenant_id=tenant, batch_size=2, stratified=False)
+    next_batch = pipeline.get_priority_retraining_batch(
+        tenant_id=tenant, batch_size=2, stratified=False, require_validated=True
+    )
     for it in next_batch["items"]:
         assert it["transaction_id_hash"] != critical_item.transaction_id_hash
 
@@ -102,18 +127,21 @@ def test_stratified_batch_sampling_with_class_balance(temp_storage_dir: str) -> 
             tenant_id=tenant,
             alert_id=f"fp_alert_{i}",
             determination="FALSE_POSITIVE",
+            validated_for_training=True,
         )
     for i in range(2):
         pipeline.ingest_analyst_determination(
             tenant_id=tenant,
             alert_id=f"fraud_alert_{i}",
             determination="CONFIRMED_FRAUD",
+            validated_for_training=True,
         )
 
     batch_res = pipeline.get_priority_retraining_batch(
         tenant_id=tenant,
         batch_size=6,
         stratified=True,
+        require_validated=True,
     )
 
     assert batch_res["batch_size"] == 6

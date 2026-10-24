@@ -149,6 +149,10 @@ class RetrainingBatchRequest(BaseModel):
         default=True,
         description="Whether to balance fraud and false positive samples",
     )
+    require_validated: bool = Field(
+        default=False,
+        description="Whether to require items to be validated through Four-Eyes case resolution (default False for exploratory preview)",
+    )
 
 
 class RetrainingBatchResponse(BaseModel):

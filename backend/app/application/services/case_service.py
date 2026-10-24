@@ -504,166 +504,62 @@ class CaseManagementService:
                 # Retraining feedback loop: record confirmed analyst verdict label into retraining dataset
                 actual_label = 1 if new_status == CaseStatus.CLOSED_CONFIRMED else 0
                 metadata["retraining_feedback_label"] = actual_label
+                metadata["retraining_feedback_recorded"] = False
+                metadata["feedback_buffer_recorded"] = False
+                metadata["prediction_evidence_recorded"] = False
 
-                feedback_buffer_recorded = False
-                prediction_evidence_recorded = False
-                try:
-                    from app.application.services.alert_service import AlertIntelligenceService
-                    from app.application.services.label_feedback_pipeline import (
-                        LocalLabelFeedbackPipeline,
-                    )
-                    from app.application.services.model_registry import (
-                        ModelEvaluationEngine,
-                        ModelRegistry,
-                    )
+                # Phase 1: Pre-validate ALL linked alerts before committing case closure.
+                # Never produce a training label from an unresolved, missing, or cross-tenant alert.
+                from app.application.services.alert_service import AlertIntelligenceService
 
-                    alert_svc = AlertIntelligenceService()
-                    feedback_pipeline = (
-                        self._feedback_pipeline
-                        if self._feedback_pipeline is not None
-                        else LocalLabelFeedbackPipeline()
-                    )
-                    eval_engine = (
-                        self._eval_engine
-                        if self._eval_engine is not None
-                        else ModelEvaluationEngine(ModelRegistry())
-                    )
+                alert_svc = AlertIntelligenceService()
+                case_bank = getattr(case, "bank_id", None)
+                resolved_alerts: list[Alert] = []
+                validation_passed = True
+                current_bank = case_bank
 
-                    case_meta = getattr(case, "metadata", {}) or {}
-                    sim_id = case_meta.get("simulation_id") if isinstance(case_meta, dict) else None
-                    if not sim_id:
-                        sim_id = "live_prod_v2"
+                if not case.alert_ids:
+                    validation_passed = False
+                else:
+                    for alert_id in case.alert_ids:
+                        alert = alert_svc.get_alert(alert_id)
+                        if alert is None:
+                            logger.warning(
+                                "Case '%s' contains unresolved or missing alert '%s'; skipping retraining feedback.",
+                                case_id[:8],
+                                alert_id,
+                            )
+                            validation_passed = False
+                            break
 
-                    case_bank = getattr(case, "bank_id", None)
+                        alert_bank = alert.bank_id
+                        if not current_bank and alert_bank:
+                            current_bank = alert_bank
 
-                    # Phase 1: Pre-validate ALL linked alerts before ingesting ANY feedback
-                    # Prevents partial unauthorized writes on mixed valid/invalid alert lists.
-                    # Never produce a training label from an unresolved, missing, or cross-tenant alert.
-                    resolved_alerts: list[Alert] = []
-                    validation_passed = True
-                    current_bank = case_bank
-
-                    if not case.alert_ids:
-                        validation_passed = False
-                    else:
-                        for alert_id in case.alert_ids:
-                            alert = alert_svc.get_alert(alert_id)
-                            if alert is None:
-                                logger.warning(
-                                    "Case '%s' contains unresolved or missing alert '%s'; skipping retraining feedback.",
-                                    case_id[:8],
+                        if current_bank and alert_bank:
+                            norm_current_bank = current_bank.lower().replace("-", "_").strip()
+                            norm_alert_bank = alert_bank.lower().replace("-", "_").strip()
+                            if norm_current_bank != norm_alert_bank:
+                                logger.error(
+                                    "Cross-tenant alert feedback rejected: alert '%s' bank '%s' mismatches case bank '%s'",
                                     alert_id,
+                                    alert_bank,
+                                    current_bank,
                                 )
-                                validation_passed = False
-                                break
-
-                            alert_bank = alert.bank_id
-                            if not current_bank and alert_bank:
-                                current_bank = alert_bank
-
-                            if current_bank and alert_bank:
-                                norm_current_bank = current_bank.lower().replace("-", "_").strip()
-                                norm_alert_bank = alert_bank.lower().replace("-", "_").strip()
-                                if norm_current_bank != norm_alert_bank:
-                                    logger.error(
-                                        "Cross-tenant alert feedback rejected: alert '%s' bank '%s' mismatches case bank '%s'",
-                                        alert_id,
-                                        alert_bank,
-                                        current_bank,
-                                    )
-                                    raise PermissionError(
-                                        f"Cross-tenant alert feedback rejected: alert '{alert_id}' belongs to bank '{alert_bank}', "
-                                        f"but case '{case_id}' belongs to bank '{current_bank}'."
-                                    )
-                            elif not current_bank and not alert_bank:
-                                logger.warning(
-                                    "Case '%s' and alert '%s' lack authoritative bank identity; skipping retraining feedback.",
-                                    case_id[:8],
-                                    alert_id,
+                                raise PermissionError(
+                                    f"Cross-tenant alert feedback rejected: alert '{alert_id}' belongs to bank '{alert_bank}', "
+                                    f"but case '{case_id}' belongs to bank '{current_bank}'."
                                 )
-                                validation_passed = False
-                                break
+                        elif not current_bank and not alert_bank:
+                            logger.warning(
+                                "Case '%s' and alert '%s' lack authoritative bank identity; skipping retraining feedback.",
+                                case_id[:8],
+                                alert_id,
+                            )
+                            validation_passed = False
+                            break
 
-                            resolved_alerts.append(alert)
-
-                    # Phase 2: Ingest and correlate feedback ONLY if all alerts were verified
-                    if validation_passed and resolved_alerts and current_bank:
-                        for alert in resolved_alerts:
-                            # Genuine transaction evidence ground-truth correlation:
-                            logged = False
-                            if alert.transaction_id:
-                                actual_tx_id = alert.transaction_id
-                                target_sims = (
-                                    (sim_id, "default_sim")
-                                    if sim_id != "default_sim"
-                                    else (sim_id,)
-                                )
-                                for target_sim in target_sims:
-                                    try:
-                                        eval_engine.log_feedback(
-                                            simulation_id=target_sim,
-                                            transaction_id=actual_tx_id,
-                                            actual_label=actual_label,
-                                            bank_id=current_bank,
-                                        )
-                                        logged = True
-                                        prediction_evidence_recorded = True
-                                        break
-                                    except KeyError:
-                                        continue
-                                    except PermissionError:
-                                        logger.error(
-                                            "Cross-tenant feedback authorization failed: transaction %s bank %s mismatches caller",
-                                            actual_tx_id,
-                                            current_bank,
-                                        )
-                                        raise
-
-                                if not logged:
-                                    logger.debug(
-                                        "Transaction '%s' (alert %s) not present in evaluation store for simulation '%s'.",
-                                        actual_tx_id,
-                                        alert.id,
-                                        sim_id,
-                                    )
-                            else:
-                                logger.debug(
-                                    "Cannot correlate ground-truth prediction evidence: Alert '%s' lacks genuine transaction ID.",
-                                    alert.id,
-                                )
-
-                            try:
-                                feedback_pipeline.ingest_analyst_determination(
-                                    tenant_id=current_bank,
-                                    alert_id=alert.id,
-                                    determination="CONFIRMED_FRAUD"
-                                    if actual_label == 1
-                                    else "FALSE_POSITIVE",
-                                    notes=f"Closed by {actor} with supervisor signoff {collected_signatures}",
-                                    metadata={"alert_id": alert.id, "case_id": case.id},
-                                    case_id=case.id,
-                                    validated_for_training=True,
-                                    prediction_evidence_correlated=logged,
-                                    source_provenance="CASE_RESOLUTION",
-                                )
-                                feedback_buffer_recorded = True
-                            except Exception as pipe_exc:
-                                logger.warning(
-                                    "Feedback pipeline ingestion notice for alert %s: %s",
-                                    alert.id,
-                                    pipe_exc,
-                                )
-                except PermissionError:
-                    raise
-                except Exception as exc:
-                    logger.warning(
-                        "Failed to record retraining label feedback for case %s: %s",
-                        case_id[:8],
-                        exc,
-                    )
-                metadata["retraining_feedback_recorded"] = feedback_buffer_recorded
-                metadata["feedback_buffer_recorded"] = feedback_buffer_recorded
-                metadata["prediction_evidence_recorded"] = prediction_evidence_recorded
+                        resolved_alerts.append(alert)
             elif collected_signatures:
                 case.supervisor_signatures = collected_signatures
 
@@ -744,6 +640,119 @@ class CaseManagementService:
                     f"Precondition failed: Case '{case_id}' was concurrently modified "
                     f"at the persistence boundary (expected status={exp_status_str}, version={expected_version or old_version})."
                 )
+
+            # Phase 2: Post-commit feedback publication: strictly executed ONLY after successful CAS persistence
+            if new_status in (CaseStatus.CLOSED_CONFIRMED, CaseStatus.CLOSED_FALSE_POSITIVE):
+                feedback_buffer_recorded = False
+                prediction_evidence_recorded = False
+                try:
+                    from app.application.services.label_feedback_pipeline import (
+                        LocalLabelFeedbackPipeline,
+                    )
+                    from app.application.services.model_registry import (
+                        ModelEvaluationEngine,
+                        ModelRegistry,
+                    )
+
+                    feedback_pipeline = (
+                        self._feedback_pipeline
+                        if self._feedback_pipeline is not None
+                        else LocalLabelFeedbackPipeline()
+                    )
+                    eval_engine = (
+                        self._eval_engine
+                        if self._eval_engine is not None
+                        else ModelEvaluationEngine(ModelRegistry())
+                    )
+
+                    case_meta = getattr(case, "metadata", {}) or {}
+                    sim_id = case_meta.get("simulation_id") if isinstance(case_meta, dict) else None
+                    if not sim_id:
+                        sim_id = "live_prod_v2"
+
+                    if validation_passed and resolved_alerts and current_bank:
+                        for alert in resolved_alerts:
+                            logged = False
+                            if alert.transaction_id:
+                                actual_tx_id = alert.transaction_id
+                                target_sims = (
+                                    (sim_id, "default_sim")
+                                    if sim_id != "default_sim"
+                                    else (sim_id,)
+                                )
+                                for target_sim in target_sims:
+                                    try:
+                                        eval_engine.log_feedback(
+                                            simulation_id=target_sim,
+                                            transaction_id=actual_tx_id,
+                                            actual_label=actual_label,
+                                            bank_id=current_bank,
+                                        )
+                                        logged = True
+                                        prediction_evidence_recorded = True
+                                        break
+                                    except KeyError:
+                                        continue
+                                    except PermissionError:
+                                        logger.error(
+                                            "Cross-tenant feedback authorization failed: transaction %s bank %s mismatches caller",
+                                            actual_tx_id,
+                                            current_bank,
+                                        )
+                                        raise
+
+                                if not logged:
+                                    logger.debug(
+                                        "Transaction '%s' (alert %s) not present in evaluation store for simulation '%s'.",
+                                        actual_tx_id,
+                                        alert.id,
+                                        sim_id,
+                                    )
+                            else:
+                                logger.debug(
+                                    "Cannot correlate ground-truth prediction evidence: Alert '%s' lacks genuine transaction ID.",
+                                    alert.id,
+                                )
+
+                            try:
+                                feedback_pipeline.ingest_analyst_determination(
+                                    tenant_id=current_bank,
+                                    alert_id=alert.id,
+                                    determination="CONFIRMED_FRAUD"
+                                    if actual_label == 1
+                                    else "FALSE_POSITIVE",
+                                    notes=f"Closed by {actor} with supervisor signoff {collected_signatures}",
+                                    metadata={"alert_id": alert.id, "case_id": case.id},
+                                    case_id=case.id,
+                                    validated_for_training=True,
+                                    prediction_evidence_correlated=logged,
+                                    source_provenance="CASE_RESOLUTION",
+                                )
+                                feedback_buffer_recorded = True
+                            except Exception as pipe_exc:
+                                logger.warning(
+                                    "Feedback pipeline ingestion notice for alert %s: %s",
+                                    alert.id,
+                                    pipe_exc,
+                                )
+                except PermissionError:
+                    raise
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to record retraining label feedback for case %s: %s",
+                        case_id[:8],
+                        exc,
+                    )
+
+                # Update the committed event metadata truthfully and persist
+                if case.timeline:
+                    last_event = case.timeline[-1]
+                    last_event.metadata["retraining_feedback_recorded"] = feedback_buffer_recorded
+                    last_event.metadata["feedback_buffer_recorded"] = feedback_buffer_recorded
+                    last_event.metadata["prediction_evidence_recorded"] = prediction_evidence_recorded
+                    parent_h = last_event.metadata.get("parent_hash", "0" * 64)
+                    last_event.metadata["hash"] = _hash_event(last_event, parent_h)
+                    self._cases.set(case.id, _case_to_dict(case))
 
             logger.info("Case %s status: %s → %s", case_id[:8], old_status.value, new_status.value)
             return case
