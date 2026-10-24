@@ -179,11 +179,13 @@ def institutional_setup(tmp_path: Path):
         bank_id="bank_a",
         storage_root=storage_root,
         auth_secret=secret_a,
+        trusted_peer_keys={"bank_b": secret_b},
     )
     worker_b = IsolatedBankWorkerNode(
         bank_id="bank_b",
         storage_root=storage_root,
         auth_secret=secret_b,
+        trusted_peer_keys={"bank_a": secret_a},
     )
 
     # 3. Matching Coordinator
@@ -321,7 +323,7 @@ class TestIsolatedPrivateMatchingExecution:
         assert signal.is_synthetic is False
         assert signal.execution_mode == "VERIFIED_OPERATIONAL"
         assert "bank_b" in signal.contributing_institutions
-        assert signal.sanitized_risk_level == "CRITICAL"
+        assert signal.sanitized_risk_level == "UNAVAILABLE"
         assert "CROSS_BANK_ENTITY_OBSERVED" in signal.sanitized_typology_indicators
 
         # Zero raw PII exposure invariant

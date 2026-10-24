@@ -1204,11 +1204,12 @@ class EvidenceRegistryService:
             meta.get("is_synthetic") is True
             or meta.get("execution_mode") == "SIMULATED_RESEARCH"
             or meta.get("is_authoritative") is False
+            or meta.get("assurance_level") == "PROTOCOL_PROTOTYPE"
         ):
             from app.domain.consortium_governance import ConsortiumSecurityError
 
             raise ConsortiumSecurityError(
-                "Synthetic or simulated research records cannot be registered in authoritative case evidence ledger."
+                "Synthetic, simulated research, or unverified protocol prototype records cannot be registered in authoritative case evidence ledger."
             )
 
         # 2. Compute SHA-256 content hash
@@ -1269,7 +1270,9 @@ class EvidenceRegistryService:
                     if os.path.exists(temp_file):
                         with contextlib.suppress(OSError):
                             os.remove(temp_file)
-                    logger.error("Failed to durably persist evidence content to '%s': %s", file_path, e)
+                    logger.error(
+                        "Failed to durably persist evidence content to '%s': %s", file_path, e
+                    )
                     raise EvidencePersistenceError(
                         f"Evidence persistence failed: Could not durably write payload to '{file_path}': {e}"
                     ) from e

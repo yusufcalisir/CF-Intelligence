@@ -16,6 +16,7 @@ Implements defensible, independently executed two-bank private intelligence work
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 import hashlib
 import hmac
@@ -23,7 +24,10 @@ import json
 import logging
 import os
 import secrets
+import subprocess
+import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -50,10 +54,7 @@ from app.domain.investigation_entities import Entity
 from app.domain.psi_service import (
     PSI_PRIME,
     blind_element,
-    decrypt_risk_payload,
-    derive_risk_payload_key,
     double_blind_element,
-    encrypt_risk_payload,
     hash_to_prime_subgroup,
     validate_group_element,
 )
@@ -135,7 +136,7 @@ class VerifiedMatchReceipt:
     worker_a_signature: str
     worker_b_signature: str
     coordinator_signature: str = ""
-    matched_risk_level: str = "UNOBSERVED"
+    matched_risk_level: str = "UNAVAILABLE"
     matched_typologies: tuple[str, ...] = ()
     assurance_level: str = "ISOLATED_INTEGRATION_VERIFIED"
 
@@ -153,6 +154,7 @@ class IsolatedBankWorkerNode:
         storage_root: str | None = None,
         auth_secret: str | None = None,
         kms_service: KMSService | None = None,
+        trusted_peer_keys: dict[str, str] | None = None,
     ) -> None:
         if not bank_id or not bank_id.strip():
             raise ValueError("bank_id must be a non-empty string")
@@ -162,28 +164,61 @@ class IsolatedBankWorkerNode:
         os.makedirs(self.vault_dir, exist_ok=True)
 
         self._kms_session = TenantKMSSession(bank_id=self.bank_id, kms_service=kms_service)
-        self._auth_secret = auth_secret or f"inst_secret_{self.bank_id}_auth_token_2026"
+        # Worker private signing key: cryptographically generated if not provided, never predictable fallback
+        self._auth_secret = auth_secret or secrets.token_hex(32)
 
-        # Durable anti-replay nonces storage surviving restarts
+        # Peer verification keystore: independently provisioned trusted verification keys
+        self._trusted_peer_verification_keys: dict[str, str] = {
+            k.lower().strip(): v for k, v in (trusted_peer_keys or {}).items()
+        }
+
+        # Durable anti-replay nonces storage surviving restarts (fail-closed)
         self._replay_store_path = os.path.join(base_dir, self.bank_id, "replay_nonces.json")
         self._consumed_nonces: set[str] = set()
+        self._replay_lock = threading.Lock()
         if os.path.exists(self._replay_store_path):
             try:
                 with open(self._replay_store_path, encoding="utf-8") as f:
-                    self._consumed_nonces = set(json.load(f))
+                    content = f.read().strip()
+                    if content:
+                        self._consumed_nonces = set(json.loads(content))
             except Exception as exc:
-                logger.warning("Failed to load replay nonces from %s: %s", self._replay_store_path, exc)
+                raise ConsortiumSecurityError(
+                    f"Durable anti-replay store for institution '{self.bank_id}' is corrupt or unreadable: {exc}. "
+                    f"Failing closed to prevent replay vulnerabilities."
+                ) from exc
+
+    def enroll_trusted_peer(self, peer_bank_id: str, verification_key: str) -> None:
+        """Enroll an authoritative counterpart bank verification key in this worker's keystore."""
+        clean_id = peer_bank_id.lower().strip()
+        if not verification_key or len(verification_key.strip()) < 16:
+            raise ValueError(f"Invalid verification key for peer '{peer_bank_id}'")
+        self._trusted_peer_verification_keys[clean_id] = verification_key
 
     def _persist_consumed_nonce(self, nonce: str) -> None:
-        """Persist consumed nonce atomically to durable disk storage."""
-        self._consumed_nonces.add(nonce)
-        tmp_path = f"{self._replay_store_path}.tmp"
-        try:
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(sorted(list(self._consumed_nonces)), f)
-            os.replace(tmp_path, self._replay_store_path)
-        except Exception as exc:
-            logger.warning("Failed to atomically persist replay nonce: %s", exc)
+        """Persist consumed nonce atomically to durable disk storage, failing closed on disk errors."""
+        with self._replay_lock:
+            if nonce in self._consumed_nonces:
+                raise ConsortiumSecurityError(
+                    f"Replay attack detected: Nonce '{nonce}' has already been processed by institution '{self.bank_id}'."
+                )
+            new_nonces = set(self._consumed_nonces)
+            new_nonces.add(nonce)
+            tmp_path = f"{self._replay_store_path}.{secrets.token_hex(8)}.tmp"
+            try:
+                with open(tmp_path, "w", encoding="utf-8") as f:
+                    json.dump(sorted(list(new_nonces)), f)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(tmp_path, self._replay_store_path)
+                self._consumed_nonces.add(nonce)
+            except Exception as exc:
+                if os.path.exists(tmp_path):
+                    with contextlib.suppress(Exception):
+                        os.remove(tmp_path)
+                raise ConsortiumSecurityError(
+                    f"Failed to durably persist replay nonce for institution '{self.bank_id}': {exc}"
+                ) from exc
 
     def store_private_entity(self, entity: Entity | dict[str, Any]) -> str:
         """Store an authoritative entity strictly in this bank's isolated storage vault."""
@@ -201,9 +236,8 @@ class IsolatedBankWorkerNode:
 
         # Derive privacy_id deterministically if missing and raw_identifier is present
         if not ent_dict.get("privacy_id"):
-            raw_id = (
-                ent_dict.get("attributes", {}).get("raw_identifier")
-                or ent_dict.get("raw_identifier")
+            raw_id = ent_dict.get("attributes", {}).get("raw_identifier") or ent_dict.get(
+                "raw_identifier"
             )
             if raw_id:
                 ent_type = str(ent_dict.get("entity_type", "customer"))
@@ -308,12 +342,12 @@ class IsolatedBankWorkerNode:
     def process_counterpart_query(
         self,
         query: BlindedQueryMessage,
-        requester_auth_secret: str,
+        requester_auth_secret: str | None = None,
     ) -> CounterpartMatchResponse:
         """Stage 2: Applies second exponent (b) to query and blinds all local target entities.
 
-        Attaches individually encrypted risk payloads under keys derived from B_j.
-        Never aggregates maximum risk across unrelated counterpart entities.
+        Authenticates peer strictly using local trusted peer keystore (never request-supplied secret).
+        Preserves candidate confidentiality: Never publishes candidate risk payloads keyed to public elements.
         """
         if query.target_bank_id.lower().strip() != self.bank_id:
             raise PermissionError(
@@ -337,9 +371,16 @@ class IsolatedBankWorkerNode:
                 f"Expired query rejected by institution '{self.bank_id}': timestamp delta exceeds 300 seconds."
             )
 
-        # 3. Verify Requester Signature
+        # 3. Verify Requester Signature strictly using internal trusted peer keystore
+        peer_key = self._trusted_peer_verification_keys.get(
+            query.requesting_bank_id.lower().strip()
+        )
+        if not peer_key:
+            raise ConsortiumSecurityError(
+                f"Peer authentication failed: Institution '{query.requesting_bank_id}' has no trusted verification key enrolled."
+            )
         expected_sig = hmac.new(
-            requester_auth_secret.encode("utf-8"),
+            peer_key.encode("utf-8"),
             f"{query.job_id}:{query.consortium_id}:{query.requesting_bank_id}:"
             f"{query.target_bank_id}:{query.blinded_element_hex}:{query.nonce}:"
             f"{query.timestamp}:{query.purpose}".encode(),
@@ -354,16 +395,20 @@ class IsolatedBankWorkerNode:
         # 4. Validate incoming group element and apply Counterpart Modular Exponentiation: D = (H(x)^a)^b mod p
         query_blinded_int = int(query.blinded_element_hex, 16)
         if not validate_group_element(query_blinded_int):
-            raise ConsortiumSecurityError("Subgroup validation failed: Query element is not in prime-order subgroup.")
+            raise ConsortiumSecurityError(
+                "Subgroup validation failed: Query element is not in prime-order subgroup."
+            )
 
         private_exp = self._kms_session.get_psi_private_exponent()
         double_blinded_int = double_blind_element(query_blinded_int, private_exp, PSI_PRIME)
         if not validate_group_element(double_blinded_int):
-            raise ConsortiumSecurityError("Subgroup validation failed: Double blinded query element.")
+            raise ConsortiumSecurityError(
+                "Subgroup validation failed: Double blinded query element."
+            )
         double_blinded_hex = hex(double_blinded_int)
 
         # 5. Load all entities in target bank's private vault and blind: B_j = H_q(y_j)^b mod p
-        # Encrypt each candidate's exact risk context with key derived from B_j
+        # Candidate Confidentiality Invariant: Never encrypt candidate payloads under public keys or transmit candidate risk
         local_entities = self.list_private_entities()
         blinded_target_elements: list[str] = []
         encrypted_risk_payloads: dict[str, str] = {}
@@ -379,15 +424,6 @@ class IsolatedBankWorkerNode:
             b_hex = hex(b_val)
             blinded_target_elements.append(b_hex)
 
-            # Localized entity risk context (exact, not aggregated)
-            raw_typos = ent.get("typologies") or ent.get("attributes", {}).get("typologies", [])
-            ent_risk_payload = {
-                "risk_level": str(ent.get("risk_level", "low")).upper(),
-                "typologies": sorted(list(set(raw_typos))),
-            }
-            payload_key = derive_risk_payload_key(b_val, query.nonce)
-            encrypted_risk_payloads[b_hex] = encrypt_risk_payload(ent_risk_payload, payload_key)
-
         # Cryptographically permute order to prevent index linkage
         secrets.SystemRandom().shuffle(blinded_target_elements)
 
@@ -396,7 +432,7 @@ class IsolatedBankWorkerNode:
         resp_timestamp = now.isoformat()
         risk_context = {
             "target_entity_count": len(local_entities),
-            "payload_encryption": "AES-256-GCM-HKDF",
+            "payload_encryption": "NONE_DISCLOSED",
         }
 
         sorted_elements = ",".join(sorted(blinded_target_elements))
@@ -412,7 +448,7 @@ class IsolatedBankWorkerNode:
             hashlib.sha256,
         ).hexdigest()
 
-        # Persist consumed nonce to durable store
+        # Persist consumed nonce to durable store (fail-closed)
         self._persist_consumed_nonce(query.nonce)
 
         return CounterpartMatchResponse(
@@ -432,25 +468,34 @@ class IsolatedBankWorkerNode:
         self,
         query: BlindedQueryMessage,
         response: CounterpartMatchResponse,
-        counterpart_auth_secret: str,
+        counterpart_auth_secret: str | None = None,
     ) -> VerifiedMatchReceipt:
         """Stage 3: Applies private exponent (a) to counterpart elements and computes intersection.
 
-        Decrypts ONLY the matching entity's risk payload. Unrelated entities remain encrypted.
+        Authenticates counterpart strictly using local trusted peer keystore (never request-supplied secret).
+        Preserves candidate confidentiality: Does not decrypt unverified candidate payloads.
         """
         if response.job_id != query.job_id:
             raise ConsortiumSecurityError("Job ID mismatch between query and counterpart response.")
         if response.target_bank_id != query.target_bank_id:
             raise ConsortiumSecurityError("Target bank ID mismatch in counterpart response.")
 
-        # 1. Verify Counterpart Signature
+        # 1. Verify Counterpart Signature strictly using internal trusted peer keystore
+        peer_key = self._trusted_peer_verification_keys.get(response.target_bank_id.lower().strip())
+        if not peer_key:
+            raise ConsortiumSecurityError(
+                f"Peer authentication failed: Institution '{response.target_bank_id}' has no trusted verification key enrolled."
+            )
         sorted_elements = ",".join(sorted(response.blinded_target_elements_hex))
         payloads_str = json.dumps(response.encrypted_risk_payloads, sort_keys=True)
-        expected_resp_sig = hmac.new(
-            counterpart_auth_secret.encode("utf-8"),
+        canonical_resp = (
             f"{query.job_id}:{query.consortium_id}:{response.target_bank_id}:"
             f"{response.double_blinded_query_hex}:{sorted_elements}:{response.nonce}:"
-            f"{response.timestamp}:{json.dumps(response.sanitized_risk_context, sort_keys=True)}:{payloads_str}".encode(),
+            f"{response.timestamp}:{json.dumps(response.sanitized_risk_context, sort_keys=True)}:{payloads_str}"
+        )
+        expected_resp_sig = hmac.new(
+            peer_key.encode("utf-8"),
+            canonical_resp.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
 
@@ -464,8 +509,6 @@ class IsolatedBankWorkerNode:
         query_double_blinded_int = int(response.double_blinded_query_hex, 16)
 
         is_match = False
-        matching_b_val: int | None = None
-        matching_b_hex: str | None = None
 
         for b_hex in response.blinded_target_elements_hex:
             b_int = int(b_hex, 16)
@@ -474,38 +517,19 @@ class IsolatedBankWorkerNode:
             e_int = double_blind_element(b_int, private_exp, PSI_PRIME)
             if e_int == query_double_blinded_int:
                 is_match = True
-                matching_b_val = b_int
-                matching_b_hex = b_hex
                 break
 
         match_confidence = 1.0 if is_match else 0.0
 
-        # 3. Decrypt matching entity's risk context if match found
-        matched_risk_level = "UNOBSERVED"
+        # 3. Risk payload disclosure is UNAVAILABLE because candidate payloads cannot be securely bound
+        # to the match without leaking decryption keys in 1-round DH-PSI.
+        # Truthful disclosure invariant: Mark risk attributes UNAVAILABLE instead of fabricating context.
+        matched_risk_level = "UNAVAILABLE" if is_match else "UNOBSERVED"
         matched_typologies: list[str] = []
-
-        if is_match and matching_b_val is not None and matching_b_hex is not None:
-            matching_key = derive_risk_payload_key(matching_b_val, query.nonce)
-            enc_payload = response.encrypted_risk_payloads.get(matching_b_hex)
-            if enc_payload:
-                try:
-                    decrypted = decrypt_risk_payload(enc_payload, matching_key)
-                    if decrypted is not None:
-                        matched_risk_level = str(decrypted.get("risk_level", "LOW")).upper()
-                        matched_typologies = list(decrypted.get("typologies", []))
-                    else:
-                        matched_risk_level = "LOW"
-                except Exception as exc:
-                    logger.warning("Failed to decrypt matched entity risk payload: %s", exc)
-                    matched_risk_level = "LOW"
-            else:
-                matched_risk_level = "LOW"
 
         # 4. Generate verifiable execution receipt
         receipt_id = str(uuid.uuid4())
-        transcript_canonical = (
-            f"{query.compute_digest()}:{response.compute_digest()}:{is_match}:{match_confidence}:{matched_risk_level}"
-        )
+        transcript_canonical = f"{query.compute_digest()}:{response.compute_digest()}:{is_match}:{match_confidence}:{matched_risk_level}"
         transcript_digest = hashlib.sha256(transcript_canonical.encode("utf-8")).hexdigest()
         now_iso = datetime.datetime.now(UTC).isoformat()
 
@@ -536,16 +560,81 @@ class IsolatedBankWorkerNode:
 
 
 class InstitutionalWorkerDaemon:
-    """Daemon running inside an independent worker process exposing loopback HTTP transport."""
+    """Daemon running inside an independent worker OS process or thread exposing loopback HTTP transport."""
 
-    def __init__(self, node: IsolatedBankWorkerNode, host: str = "127.0.0.1", port: int = 0) -> None:
+    def __init__(
+        self,
+        node: IsolatedBankWorkerNode,
+        host: str = "127.0.0.1",
+        port: int = 0,
+        run_as_process: bool = False,
+    ) -> None:
         self.node = node
         self.host = host
         self.port = port
+        self.run_as_process = run_as_process
         self.server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
+        self._process: subprocess.Popen[str] | None = None
+        self.pid: int = os.getpid()
 
     def start(self) -> str:
+        if self.run_as_process:
+            storage_root = os.path.dirname(os.path.dirname(os.path.abspath(self.node.vault_dir)))
+            peers_json = json.dumps(self.node._trusted_peer_verification_keys)
+            cmd = [
+                sys.executable,
+                "-m",
+                "app.application.services.isolated_matching_service",
+                "--bank-id",
+                self.node.bank_id,
+                "--host",
+                self.host,
+                "--port",
+                str(self.port),
+                "--storage-root",
+                storage_root,
+                "--auth-secret",
+                self.node._auth_secret,
+                "--trusted-peers",
+                peers_json,
+            ]
+            backend_dir = os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            )
+            proc_env = os.environ.copy()
+            curr_pp = proc_env.get("PYTHONPATH", "")
+            proc_env["PYTHONPATH"] = (
+                f"{backend_dir}{os.pathsep}{curr_pp}" if curr_pp else backend_dir
+            )
+
+            self._process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+                cwd=backend_dir,
+                env=proc_env,
+            )
+            assert self._process.stdout is not None
+            line = self._process.stdout.readline()
+            if not line:
+                stderr_out = self._process.stderr.read() if self._process.stderr else ""
+                raise RuntimeError(
+                    f"Worker process failed to start for {self.node.bank_id}: {stderr_out}"
+                )
+            try:
+                meta = json.loads(line.strip())
+                self.port = int(meta["port"])
+                self.pid = int(meta["pid"])
+            except Exception as exc:
+                stderr_out = self._process.stderr.read() if self._process.stderr else ""
+                raise RuntimeError(
+                    f"Invalid worker startup response from {self.node.bank_id}: {line}. Stderr: {stderr_out}"
+                ) from exc
+            return f"http://{self.host}:{self.port}"
+
         node = self.node
         auth_secret = node._auth_secret
 
@@ -573,7 +662,11 @@ class InstitutionalWorkerDaemon:
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
-                    self.wfile.write(json.dumps({"status": "ONLINE", "bank_id": node.bank_id}).encode())
+                    self.wfile.write(
+                        json.dumps(
+                            {"status": "ONLINE", "bank_id": node.bank_id, "pid": os.getpid()}
+                        ).encode()
+                    )
                 else:
                     self.send_response(404)
                     self.end_headers()
@@ -602,21 +695,24 @@ class InstitutionalWorkerDaemon:
                         query_msg = BlindedQueryMessage(**q_data)
                         resp = node.process_counterpart_query(
                             query=query_msg,
-                            requester_auth_secret=data["requester_auth_secret"],
                         )
                         res = asdict(resp)
                     elif self.path == "/worker/finalize-match":
                         q_data = data["query"]
                         r_data = data["response"]
                         query_msg = BlindedQueryMessage(**q_data)
-                        r_data["blinded_target_elements_hex"] = tuple(r_data["blinded_target_elements_hex"])
+                        r_data["blinded_target_elements_hex"] = tuple(
+                            r_data["blinded_target_elements_hex"]
+                        )
                         resp_msg = CounterpartMatchResponse(**r_data)
                         receipt = node.finalize_match_evaluation(
                             query=query_msg,
                             response=resp_msg,
-                            counterpart_auth_secret=data["counterpart_auth_secret"],
                         )
                         res = asdict(receipt)
+                    elif self.path == "/worker/enroll-peer":
+                        node.enroll_trusted_peer(data["peer_bank_id"], data["verification_key"])
+                        res = {"status": "ENROLLED", "peer_bank_id": data["peer_bank_id"]}
                     else:
                         self.send_response(404)
                         self.end_headers()
@@ -636,14 +732,23 @@ class InstitutionalWorkerDaemon:
 
         self.server = ThreadingHTTPServer((self.host, self.port), Handler)
         self.port = self.server.server_address[1]
+        self.pid = os.getpid()
         self._thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self._thread.start()
         return f"http://{self.host}:{self.port}"
 
     def stop(self) -> None:
+        if self._process:
+            self._process.terminate()
+            try:
+                self._process.wait(timeout=3.0)
+            except Exception:
+                self._process.kill()
+            self._process = None
         if self.server:
             self.server.shutdown()
             self.server.server_close()
+            self.server = None
 
 
 class InstitutionalWorkerClient:
@@ -654,6 +759,25 @@ class InstitutionalWorkerClient:
         self.base_url = base_url.rstrip("/")
         self.auth_secret = auth_secret
         self._is_network_transport = True
+
+    def health_check(self) -> dict[str, Any]:
+        """Perform health check probe to worker node."""
+        url = f"{self.base_url}/health"
+        if not (url.startswith("http://") or url.startswith("https://")):
+            raise ValueError(f"Unsupported URL scheme for worker client: {url}")
+        req = urllib.request.Request(
+            url,
+            headers={"Authorization": f"Bearer {self.auth_secret}"},
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
+                body = resp.read()
+                return cast("dict[str, Any]", json.loads(body.decode("utf-8")))
+        except Exception as exc:
+            raise ConsortiumSecurityError(
+                f"Worker unreachable on health probe for '{self.bank_id}': {exc}"
+            ) from exc
 
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
@@ -686,7 +810,9 @@ class InstitutionalWorkerClient:
             except (ConsortiumSecurityError, PermissionError, ValueError):
                 raise
             except Exception:
-                raise ValueError(f"HTTP transport error from {self.bank_id} worker: {http_err}") from http_err
+                raise ValueError(
+                    f"HTTP transport error from {self.bank_id} worker: {http_err}"
+                ) from http_err
         except Exception as exc:
             raise ConsortiumSecurityError(
                 f"Institutional bank worker for '{self.bank_id}' is unreachable or timed out: {exc}"
@@ -696,6 +822,12 @@ class InstitutionalWorkerClient:
         ent_dict = entity.to_dict() if isinstance(entity, Entity) else dict(entity)
         res = self._post("/worker/store-entity", {"entity": ent_dict})
         return str(res["entity_id"])
+
+    def enroll_peer(self, peer_bank_id: str, verification_key: str) -> None:
+        self._post(
+            "/worker/enroll-peer",
+            {"peer_bank_id": peer_bank_id, "verification_key": verification_key},
+        )
 
     def initiate_blinded_query(
         self,
@@ -718,13 +850,12 @@ class InstitutionalWorkerClient:
     def process_counterpart_query(
         self,
         query: BlindedQueryMessage,
-        requester_auth_secret: str,
+        requester_auth_secret: str | None = None,
     ) -> CounterpartMatchResponse:
         res = self._post(
             "/worker/process-counterpart",
             {
                 "query": asdict(query),
-                "requester_auth_secret": requester_auth_secret,
             },
         )
         res["blinded_target_elements_hex"] = tuple(res["blinded_target_elements_hex"])
@@ -734,14 +865,13 @@ class InstitutionalWorkerClient:
         self,
         query: BlindedQueryMessage,
         response: CounterpartMatchResponse,
-        counterpart_auth_secret: str,
+        counterpart_auth_secret: str | None = None,
     ) -> VerifiedMatchReceipt:
         res = self._post(
             "/worker/finalize-match",
             {
                 "query": asdict(query),
                 "response": asdict(response),
-                "counterpart_auth_secret": counterpart_auth_secret,
             },
         )
         res["matched_typologies"] = tuple(res.get("matched_typologies", ()))
@@ -905,16 +1035,16 @@ class CrossBankMatchingCoordinator:
         )
 
         # 5. Stage 2: Bank B Worker computes Counterpart Match Response
+        # Note: Peer signatures are verified using Bank B's internal trusted peer keystore,
+        # never secrets supplied by the coordinator or in the request payload.
         counterpart_resp = worker_b.process_counterpart_query(
             query=query_msg,
-            requester_auth_secret=secret_a,
         )
 
         # 6. Stage 3: Bank A Worker finalizes match evaluation
         receipt = worker_a.finalize_match_evaluation(
             query=query_msg,
             response=counterpart_resp,
-            counterpart_auth_secret=secret_b,
         )
 
         # 7. Coordinator signs receipt attestation
@@ -927,7 +1057,9 @@ class CrossBankMatchingCoordinator:
         # 8. Determine Minimal Disclosed Intelligence Signal
         now = datetime.datetime.now(UTC)
         allow_identities = bool(disclosure_scope.get("allow_institution_identity", False))
-        disclosed_institutions = [clean_target] if (receipt.match_confirmed and allow_identities) else []
+        disclosed_institutions = (
+            [clean_target] if (receipt.match_confirmed and allow_identities) else []
+        )
         disclosure_mode_literal: DisclosureMode = (
             "ATTRIBUTED_INSTITUTIONS" if allow_identities else "ANONYMIZED_SUMMARY"
         )
@@ -941,7 +1073,9 @@ class CrossBankMatchingCoordinator:
         category_literal: MatchCategory = "EXACT_MATCH" if receipt.match_confirmed else "NO_MATCH"
         risk_literal: SanitizedRiskLevel = (
             cast("SanitizedRiskLevel", max_risk)
-            if max_risk in ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNOBSERVED")
+            if max_risk in ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNOBSERVED", "UNAVAILABLE")
+            else "UNAVAILABLE"
+            if receipt.match_confirmed
             else "UNOBSERVED"
         )
 
@@ -967,7 +1101,9 @@ class CrossBankMatchingCoordinator:
             provenance={
                 "query_timestamp": now.isoformat(),
                 "execution_environment": (
-                    "ISOLATED_MULTI_PROCESS_WORKER_NODES" if is_multi_process else "IN_PROCESS_PROTOTYPE"
+                    "ISOLATED_MULTI_PROCESS_WORKER_NODES"
+                    if is_multi_process
+                    else "IN_PROCESS_PROTOTYPE"
                 ),
                 "operational_status": "OPERATIONAL",
                 "governance_authority": f"consortium:{clean_consortium_id}",
@@ -979,7 +1115,9 @@ class CrossBankMatchingCoordinator:
                 "assurance_level": assurance_level_literal,
             },
             execution_mode="VERIFIED_OPERATIONAL",
-            attestation_status="ISOLATED_PROCESS_VERIFIED" if is_multi_process else "IN_PROCESS_PROTOTYPE",
+            attestation_status="ISOLATED_PROCESS_VERIFIED"
+            if is_multi_process
+            else "IN_PROCESS_PROTOTYPE",
             is_authoritative=True,
             is_synthetic=False,
             assurance_level=cast("Any", assurance_level_literal),
@@ -1037,3 +1175,46 @@ class CrossBankMatchingCoordinator:
             assurance_level_literal,
         )
         return signal
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Institutional Bank Worker Node Process")
+    parser.add_argument("--bank-id", required=True, help="Institutional bank identifier")
+    parser.add_argument("--host", default="127.0.0.1", help="Bind host")
+    parser.add_argument("--port", type=int, default=0, help="Bind port (0 for ephemeral)")
+    parser.add_argument("--storage-root", required=True, help="Path to base storage directory")
+    parser.add_argument("--auth-secret", required=True, help="Worker authentication secret")
+    parser.add_argument(
+        "--trusted-peers", default="{}", help="JSON mapping of trusted peer verification keys"
+    )
+
+    cli_args = parser.parse_args()
+    peers = json.loads(cli_args.trusted_peers)
+    cli_node = IsolatedBankWorkerNode(
+        bank_id=cli_args.bank_id,
+        storage_root=cli_args.storage_root,
+        auth_secret=cli_args.auth_secret,
+        trusted_peer_keys=peers,
+    )
+    cli_daemon = InstitutionalWorkerDaemon(
+        node=cli_node,
+        host=cli_args.host,
+        port=cli_args.port,
+        run_as_process=False,
+    )
+    cli_daemon.start()
+    startup_info = {
+        "status": "ONLINE",
+        "bank_id": cli_args.bank_id,
+        "port": cli_daemon.port,
+        "pid": os.getpid(),
+    }
+    sys.stdout.write(json.dumps(startup_info) + "\n")
+    sys.stdout.flush()
+    try:
+        while True:
+            time.sleep(1.0)
+    except (KeyboardInterrupt, SystemExit):
+        cli_daemon.stop()

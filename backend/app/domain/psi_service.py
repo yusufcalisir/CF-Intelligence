@@ -11,13 +11,25 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-# NIST SP 800-131A / RFC 3526 2048-bit MODP prime
-PSI_PRIME: int = (
-    0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF
+# NIST SP 800-131A / RFC 3526 2048-bit MODP prime (Group 14: 2^2048 - 2^1984 - 1 + 2^64 * { [2^1918 pi] + 124476 })
+PSI_PRIME_HEX: str = (
+    "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1"
+    "29024E088A67CC74020BBEA63B139B22514A08798E3404DD"
+    "EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245"
+    "E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED"
+    "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3D"
+    "C2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F"
+    "83655D23DCA3AD961C62F356208552BB9ED529077096966D"
+    "670C354E4ABC9804F1746C08CA18217C32905E462E36CE3B"
+    "E39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9"
+    "DE2BCBF6955817183995497CEA956AE515D2261898FA0510"
+    "15728E5A8AACAA68FFFFFFFFFFFFFFFF"
 )
-PRIME_BIT_LENGTH: int = 2048
+PSI_PRIME: int = int(PSI_PRIME_HEX, 16)
+PRIME_BIT_LENGTH: int = PSI_PRIME.bit_length()
 # Safe prime order q = (p - 1) // 2 for cyclic subgroup G_q of quadratic residues
 PSI_ORDER_Q: int = (PSI_PRIME - 1) // 2
+PSI_GENERATOR: int = 2
 PSI_DOMAIN_SEPARATOR: bytes = b"CFI-DH-PSI-2048-v1-DOMAIN-SEPARATION"
 
 
@@ -256,8 +268,7 @@ class DiffieHellmanPSIProtocol:
     ) -> list[int]:
         """Apply second party's modular exponentiation to already-blinded elements."""
         return [
-            double_blind_element(elem, second_exponent, self.prime)
-            for elem in blinded_elements
+            double_blind_element(elem, second_exponent, self.prime) for elem in blinded_elements
         ]
 
     def compute_intersection(
@@ -273,6 +284,7 @@ def __getattr__(name: str) -> Any:
     """Lazy resolver for PSIService to prevent circular top-level dependencies."""
     if name == "PSIService":
         from app.application.services.psi_service import PSIService
+
         return PSIService
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 

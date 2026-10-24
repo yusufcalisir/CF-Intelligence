@@ -15,7 +15,7 @@ def _strip_control(value: str) -> str:
 
 
 MatchCategory = Literal["EXACT_MATCH", "PROBABILISTIC_FUZZY", "NO_MATCH"]
-SanitizedRiskLevel = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNOBSERVED"]
+SanitizedRiskLevel = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNOBSERVED", "UNAVAILABLE"]
 DisclosureMode = Literal["ATTRIBUTED_INSTITUTIONS", "ANONYMIZED_SUMMARY"]
 AssuranceLevel = Literal[
     "PROTOCOL_PROTOTYPE",

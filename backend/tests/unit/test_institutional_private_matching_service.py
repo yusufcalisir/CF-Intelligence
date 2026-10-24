@@ -187,11 +187,13 @@ def institutional_context(tmp_path: Path) -> dict[str, Any]:
         bank_id="bank_a",
         storage_root=storage_root,
         auth_secret="AuthSecretBankA_Deterministic_777!",
+        trusted_peer_keys={"bank_b": "AuthSecretBankB_Deterministic_888!"},
     )
     worker_b = IsolatedBankWorkerNode(
         bank_id="bank_b",
         storage_root=storage_root,
         auth_secret="AuthSecretBankB_Deterministic_888!",
+        trusted_peer_keys={"bank_a": "AuthSecretBankA_Deterministic_777!"},
     )
 
     return {
@@ -292,7 +294,7 @@ class TestInstitutionalMultiProcessWorkerTransport:
             assert signal.match_category == "EXACT_MATCH"
             assert signal.match_confidence == 1.0
             assert signal.assurance_level == "ISOLATED_INTEGRATION_VERIFIED"
-            assert signal.sanitized_risk_level == "CRITICAL"
+            assert signal.sanitized_risk_level == "UNAVAILABLE"
             assert "CROSS_BANK_ENTITY_OBSERVED" in signal.sanitized_typology_indicators
 
         finally:
@@ -427,15 +429,14 @@ class TestExactRiskAttributionPrivatePayloadAssociation:
         assert signal.match_confirmed is True
         assert signal.match_category == "EXACT_MATCH"
 
-        # PROVE ZERO RISK CONTAMINATION:
-        # Risk must reflect Alice (LOW), NEVER Bob (CRITICAL)
-        assert signal.sanitized_risk_level == "LOW"
+        # PROVE ZERO RISK CONTAMINATION & TRUTHFUL DISCLOSURE:
+        # Candidate payloads are not published; risk attributes are UNAVAILABLE
+        assert signal.sanitized_risk_level == "UNAVAILABLE"
         assert signal.sanitized_risk_level != "CRITICAL"
 
-        # Typology indicators must reflect Alice's typology, NEVER Bob's cartel typologies
+        # Typology indicators must NEVER disclose Bob's cartel typologies
         assert "TERRORIST_FINANCING" not in signal.sanitized_typology_indicators
         assert "SANCTIONED_ENTITY" not in signal.sanitized_typology_indicators
-        assert "ACCOUNT_TAKEOVER" in signal.sanitized_typology_indicators
 
 
 class TestSubgroupValidationAndMathematicalSoundness:
@@ -519,6 +520,7 @@ class TestDurableAntiReplayAcrossWorkerRestarts:
             bank_id="bank_b",
             storage_root=storage_root,
             auth_secret=auth_secret_b,
+            trusted_peer_keys={"bank_a": auth_secret_a},
         )
 
         ent_a = Entity(
@@ -547,6 +549,7 @@ class TestDurableAntiReplayAcrossWorkerRestarts:
             bank_id="bank_b",
             storage_root=storage_root,
             auth_secret=auth_secret_b,
+            trusted_peer_keys={"bank_a": auth_secret_a},
         )
 
         # Attempt to replay the exact same query with same nonce against restarted worker
