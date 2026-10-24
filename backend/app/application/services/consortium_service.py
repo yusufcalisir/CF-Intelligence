@@ -279,13 +279,13 @@ class ConsortiumGovernanceService:
         grant_dict: dict[str, Any] = {
             "grant_id": grant_id.strip(),
             "authority": authority.strip(),
-            "revision": int(revision),
+            "revision": revision,
             "is_active": True,
             "allowed_purposes": [p.strip() for p in purposes],
             "institution_jurisdictions": {k.lower().strip(): v.strip() for k, v in jurisdictions.items()},
             "allowed_jurisdictions": [j.strip() for j in (allowed_jurisdictions or default_allowed)],
-            "allow_cross_border": bool(allow_cross_border),
-            "allow_institution_identity_sharing": bool(allow_institution_identity_sharing),
+            "allow_cross_border": allow_cross_border,
+            "allow_institution_identity_sharing": allow_institution_identity_sharing,
             "registered_at": datetime.datetime.now(UTC).isoformat(),
             "approved_by": attr["actor_id"],
             "approving_bank_id": clean_approver,
@@ -307,7 +307,7 @@ class ConsortiumGovernanceService:
             history: list[dict[str, Any]] = []
             if existing and isinstance(existing, dict):
                 prev_rev = int(existing.get("revision", 1))
-                if int(revision) <= prev_rev:
+                if revision <= prev_rev:
                     raise ValueError(
                         f"Operational grant revision must be strictly monotonically increasing. "
                         f"Current revision is {prev_rev}, attempted revision is {revision}."

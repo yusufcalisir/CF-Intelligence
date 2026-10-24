@@ -550,7 +550,7 @@ class InstitutionalWorkerDaemon:
         auth_secret = node._auth_secret
 
         class Handler(BaseHTTPRequestHandler):
-            def log_message(self, format_: str, *args: Any) -> None:
+            def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
                 pass  # suppress noisy stdout logs in test runner
 
             def _authenticate(self) -> bool:
@@ -657,6 +657,8 @@ class InstitutionalWorkerClient:
 
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
+        if not (url.startswith("http://") or url.startswith("https://")):
+            raise ValueError(f"Unsupported URL scheme for worker client: {url}")
         req_data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
             url,
@@ -668,7 +670,7 @@ class InstitutionalWorkerClient:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
                 body = resp.read()
                 return cast("dict[str, Any]", json.loads(body.decode("utf-8")))
         except urllib.error.HTTPError as http_err:
