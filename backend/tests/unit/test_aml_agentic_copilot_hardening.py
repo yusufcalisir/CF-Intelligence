@@ -216,7 +216,7 @@ class TestAMLAgenticCopilotHardening(unittest.TestCase):
             case_id=case.id,
             evidence_type="SWIFT_MT103",
             title="SWIFT MT103 Layering Transfer",
-            file_path="/var/data/evidence_swift_mt103.xml",
+            file_path="storage/evidence/evidence_swift_mt103.xml",
             content="<Document>Wire Transfer $85,000</Document>",
             uploaded_by="lead_investigator",
         )

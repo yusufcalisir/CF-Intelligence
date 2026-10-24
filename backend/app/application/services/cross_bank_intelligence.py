@@ -13,7 +13,7 @@ import logging
 import threading
 import uuid
 from datetime import UTC
-from typing import cast
+from typing import Any, cast
 
 from app.application.schemas.cross_bank_intelligence import (
     CrossBankEvidenceAttachResponse,
@@ -31,6 +31,9 @@ from app.application.services.case_service import (
 )
 from app.application.services.consortium_service import ConsortiumGovernanceService
 from app.application.services.entity_resolution import EntityResolutionService
+from app.application.services.isolated_matching_service import (
+    CrossBankMatchingCoordinator,
+)
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
     ConsortiumStatus,
@@ -70,6 +73,7 @@ class CrossBankIntelligenceService:
         case_service: CaseManagementService | None = None,
         evidence_service: EvidenceRegistryService | None = None,
         policy_engine: ConsortiumPolicyEngine | None = None,
+        matching_coordinator: CrossBankMatchingCoordinator | None = None,
     ) -> None:
         self.consortium_service = consortium_service or ConsortiumGovernanceService()
         self.entity_service = entity_service or EntityResolutionService()
@@ -78,7 +82,13 @@ class CrossBankIntelligenceService:
             case_service=self.case_service
         )
         self.policy_engine = policy_engine or ConsortiumPolicyEngine()
+        self.matching_coordinator = matching_coordinator or CrossBankMatchingCoordinator(
+            consortium_service=self.consortium_service,
+            policy_engine=self.policy_engine,
+        )
         self._signal_store = RedisStore("authoritative_signals")
+        self._synthetic_entity_store = RedisStore("synthetic_entities")
+        self._research_case_evidence_store = RedisStore("research_case_evidence")
         self._lock = threading.RLock()
 
     def _authenticate_principal(
@@ -161,10 +171,15 @@ class CrossBankIntelligenceService:
 
         # 2. Hardware Enclave & Operational Mode Attestation (Fail-Closed)
         if req.execution_mode == "VERIFIED_OPERATIONAL":
-            raise RuntimeError(
-                "Operational privacy attestation unavailable: Hardware enclaves (Intel SGX) and distributed "
-                "multi-party cryptographic PSI across independent physical bank nodes are not available in this software runtime. "
-                "Operation fails closed to prevent fabricated operational claims."
+            if req.require_hardware_attestation:
+                raise RuntimeError(
+                    "Hardware attestation unavailable: Physical hardware enclave is absent in this runtime. "
+                    "Production hardware attestation requirement failed closed."
+                )
+            return self.matching_coordinator.execute_two_bank_private_matching(
+                req=req,
+                auth_token=auth_token,
+                actor=audited_actor,
             )
 
         if req.require_hardware_attestation:
@@ -727,3 +742,39 @@ class CrossBankIntelligenceService:
             timeline_event_recorded=True,
             is_duplicate_submission=False,
         )
+
+    def attach_signal_to_research_case_evidence(
+        self,
+        case_id: str,
+        signal_id: str | None = None,
+        auth_token: str | None = None,
+        principal: AuthenticatedPrincipal | None = None,
+        notes: str | None = None,
+    ) -> dict[str, Any]:
+        """Attach research simulation signal into isolated non-operational research evidence store.
+
+        Maintains strict non-operational namespace isolation: research evidence is never written
+        to authoritative case evidence_ids or consumable by SAR regulatory pipelines.
+        """
+        auth_principal = self._authenticate_principal(principal=principal, auth_token=auth_token)
+        if not signal_id:
+            raise ValueError("Mandatory signal_id missing.")
+        record = self._signal_store.get(signal_id)
+        if not record:
+            raise ValueError(f"Signal '{signal_id}' not found in registry.")
+
+        ev_id = str(uuid.uuid4())
+        ev_entry: dict[str, Any] = {
+            "id": ev_id,
+            "case_id": case_id,
+            "signal_id": signal_id,
+            "notes": notes,
+            "attached_by": auth_principal.principal_id,
+            "attached_at": datetime.datetime.now(UTC).isoformat(),
+            "is_operational": False,
+            "evidence_type": "RESEARCH_CROSS_BANK_SIMULATION",
+            "metadata": record.get("signal_data", {}),
+        }
+        self._research_case_evidence_store.set(ev_id, ev_entry)
+        return ev_entry
+

@@ -138,7 +138,7 @@ class TestCopilotRoutes(unittest.TestCase):
             case_id=case.id,
             evidence_type="TRANSACTION_RECORD",
             title="Suspicious Structuring Batch",
-            file_path="/var/data/structuring_batch.json",
+            file_path="storage/evidence/structuring_batch.json",
             content="Transaction Structuring Evidence",
             uploaded_by="lead_investigator",
         )

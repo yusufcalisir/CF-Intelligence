@@ -316,8 +316,28 @@ Endpoints are registered with dual-routing prefixes (`/api/v1/intelligence/cross
 ### 6.2 Truthful Hardware vs. Software Execution Boundary
 
 In strict compliance with `AGENTS.md` Anti-Fabrication rules:
-- **Software Simulation:** The standard execution mode runs in-process commutative Diffie-Hellman PSI and MinHash LSH fuzzy matching. Signals generated in this mode are labeled with `hardware_attestation_status: "SIMULATED_SOFTWARE_ONLY"` and `emulation_mode: True`.
-- **Fail-Closed Hardware Boundary:** If an institutional caller sets `require_hardware_attestation: True`, the service refuses to fabricate hardware measurements and immediately raises `AttestationError` (`HTTP 412 Precondition Failed`), preventing unverified execution from masquerading as a physical hardware enclave.
+- **Software Simulation:** The standard simulation mode runs in-process commutative Diffie-Hellman PSI and MinHash LSH fuzzy matching over explicitly isolated synthetic datasets. Simulation requires explicit opt-in (`CFI_ENABLE_CROSS_BANK_SIMULATION=true`). Signals generated in this mode are labeled with `execution_mode: "SIMULATED_RESEARCH"` and `is_synthetic: True`. Research signals are preserved strictly in the non-operational `research_case_evidence_store` and can **never** be registered in the authoritative case evidence ledger or consumed by SAR/regulatory pipelines.
+- **Fail-Closed Hardware Boundary:** If an institutional caller sets `require_hardware_attestation: True`, the service refuses to fabricate hardware measurements and immediately raises `RuntimeError` (`HTTP 412 Precondition Failed`), preventing unverified execution from masquerading as a physical hardware enclave.
+
+### 6.3 Authentic Two-Bank Isolated Worker Architecture (DH-PSI)
+
+Milestone 4 introduces genuine multi-process institutional separation through [`IsolatedBankWorkerNode`](../backend/app/application/services/isolated_matching_service.py) and [`CrossBankMatchingCoordinator`](../backend/app/application/services/isolated_matching_service.py):
+
+1. **Storage Vault Separation:** Each participating bank worker operates strictly within its own isolated storage vault (`storage/{bank_id}/private_entities/`), with cross-tenant file loads failing closed (`PermissionError`).
+2. **KMS Tenant Session Isolation:** Each bank node accesses cryptographic keys strictly through a permanently bound [`TenantKMSSession`](../backend/app/application/services/kms_service.py). Cross-tenant key probes fail closed with access control violations.
+3. **2048-bit MODP Diffie-Hellman PSI:** Private Set Intersection executes in 3 stages:
+   - *Stage 1:* Bank A hashes local entity to group and blinds with private exponent $a$: $c = H(x)^a \pmod p$.
+   - *Stage 2:* Bank B verifies Bank A's HMAC signature and fresh nonce, applies exponent $b$ to get double-blinded query $D = c^b = H(x)^{ab} \pmod p$, blinds its own vault entities $B_j = H(y_j)^b \pmod p$, and permutes them cryptographically.
+   - *Stage 3:* Bank A verifies Bank B's signature, blinds counterpart elements with exponent $a$ ($E_j = B_j^a \pmod p$), and computes exact set intersection $D \in \{E_j\}$.
+4. **Attestation & Evidence Anchoring:** Generates a [`VerifiedMatchReceipt`](../backend/app/application/services/isolated_matching_service.py) with dual worker signatures and coordinator attestation. Only verified operational signals (`VERIFIED_OPERATIONAL`) are eligible for attachment to the authoritative case evidence ledger.
+
+### 6.4 Explicit Operational Data-Sharing Grant Governance
+
+To eliminate permissive global fallbacks:
+- Operational cross-bank intelligence queries require an explicit operational data-sharing grant registered via `register_operational_data_sharing_grant(consortium_id, grant_id, authority, revision, ...)`.
+- The grant must possess valid governing authority (e.g. FFIEC, BaFin, FCA) and monotonic revision history ($\ge 1$).
+- In the absence of an active operational grant, operational queries fail closed (`ConsortiumSecurityError`).
+- Authoritative institutional jurisdiction context is strictly mandatory; absence of verified jurisdiction terminates execution immediately to prevent unlawful cross-border data transfer.
 
 ---
 

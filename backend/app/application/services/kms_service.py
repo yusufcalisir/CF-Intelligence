@@ -75,14 +75,30 @@ class KMSService:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(keys, f, indent=2)
 
+    def _verify_tenant_access(self, target_bank_id: str, caller_tenant: str | None) -> None:
+        """Enforce strict institutional access control boundary on cryptographic keys."""
+        if caller_tenant is not None:
+            clean_caller = caller_tenant.lower().strip()
+            clean_target = target_bank_id.lower().strip()
+            if clean_caller != clean_target:
+                raise PermissionError(
+                    f"KMS access control violation: Caller tenant '{caller_tenant}' is not "
+                    f"authorized to access key material belonging to institution '{target_bank_id}'."
+                )
+
+    def get_tenant_session(self, bank_id: str) -> TenantKMSSession:
+        """Create an authenticated KMS session permanently bound to a specific tenant."""
+        return TenantKMSSession(bank_id=bank_id, kms_service=self)
+
     # ── Key accessors ─────────────────────────
 
-    def get_hmac_key(self, bank_id: str) -> str:
+    def get_hmac_key(self, bank_id: str, caller_tenant: str | None = None) -> str:
         """Return the HMAC-SHA256 key for privacy-preserving entity hashing.
 
         Generates a 256-bit key on first access and persists it in the
         bank's local vault.  This key never leaves the tenant boundary.
         """
+        self._verify_tenant_access(bank_id, caller_tenant)
         keys = self._load_keys(bank_id)
         if "hmac_key" not in keys:
             keys["hmac_key"] = secrets.token_hex(32)
@@ -90,12 +106,13 @@ class KMSService:
             logger.info("Generated new HMAC key for %s", bank_id)
         return keys["hmac_key"]
 
-    def get_psi_private_exponent(self, bank_id: str) -> int:
+    def get_psi_private_exponent(self, bank_id: str, caller_tenant: str | None = None) -> int:
         """Return the DH-PSI private scalar for modular exponentiation.
 
         Each bank has its own unique private exponent, generated once
         and stored in the local vault.
         """
+        self._verify_tenant_access(bank_id, caller_tenant)
         keys = self._load_keys(bank_id)
         if "psi_exponent" not in keys:
             exponent = secrets.randbelow(_PSI_PRIME - 2) + 2
@@ -104,12 +121,13 @@ class KMSService:
             logger.info("Generated new PSI private exponent for %s", bank_id)
         return int(keys["psi_exponent"])
 
-    def get_aggregation_mask_seed(self, bank_id: str) -> bytes:
+    def get_aggregation_mask_seed(self, bank_id: str, caller_tenant: str | None = None) -> bytes:
         """Return the seed bytes for secure aggregation mask generation.
 
         Used to initialize the NumPy RNG for pairwise mask generation
         in the federated learning secure aggregation protocol.
         """
+        self._verify_tenant_access(bank_id, caller_tenant)
         keys = self._load_keys(bank_id)
         if "aggregation_seed" not in keys:
             keys["aggregation_seed"] = secrets.token_hex(32)
@@ -117,7 +135,7 @@ class KMSService:
             logger.info("Generated new aggregation mask seed for %s", bank_id)
         return bytes.fromhex(keys["aggregation_seed"])
 
-    def derive_round_mask_seed(self, bank_id: str, round_id: int) -> bytes:
+    def derive_round_mask_seed(self, bank_id: str, round_id: int, caller_tenant: str | None = None) -> bytes:
         """Derives a round-specific mask seed using HKDF-SHA256.
 
         Prevents cross-round static mask seed persistence and update differencing attacks.
@@ -125,7 +143,8 @@ class KMSService:
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
-        master_seed = self.get_aggregation_mask_seed(bank_id)
+        self._verify_tenant_access(bank_id, caller_tenant)
+        master_seed = self.get_aggregation_mask_seed(bank_id, caller_tenant=caller_tenant)
         info = f"secagg_round_{round_id}".encode()
         hkdf = HKDF(
             algorithm=hashes.SHA256(),
@@ -137,7 +156,7 @@ class KMSService:
 
     # ── Envelope Encryption & Re-encryption ───
 
-    def get_envelope_key(self, bank_id: str) -> str:
+    def get_envelope_key(self, bank_id: str, caller_tenant: str | None = None) -> str:
         """Return current active Fernet envelope encryption key for bank."""
         keys = self._load_keys(bank_id)
         if "envelope_versions" not in keys or not keys["envelope_versions"]:
@@ -343,6 +362,41 @@ class KMSService:
         return hsm.derive_shared_secret(peer_public_key, key_label=scoped_label)
 
 
+
+class TenantKMSSession:
+    """Authenticated institutional KMS session scoped strictly to a single bank tenant.
+
+    Prevents cross-tenant key leakage by construction. Any request to access another
+    institution's keys through this session is rejected.
+    """
+
+    def __init__(self, bank_id: str, kms_service: KMSService | None = None) -> None:
+        if not bank_id or not bank_id.strip():
+            raise ValueError("bank_id must be a non-empty string")
+        self.bank_id = bank_id.lower().strip()
+        self._kms = kms_service or get_kms_service()
+
+    def get_hmac_key(self) -> str:
+        """Retrieve this tenant's HMAC key."""
+        return self._kms.get_hmac_key(self.bank_id, caller_tenant=self.bank_id)
+
+    def get_psi_private_exponent(self) -> int:
+        """Retrieve this tenant's DH-PSI private exponent."""
+        return self._kms.get_psi_private_exponent(self.bank_id, caller_tenant=self.bank_id)
+
+    def get_aggregation_mask_seed(self) -> bytes:
+        """Retrieve this tenant's aggregation mask seed."""
+        return self._kms.get_aggregation_mask_seed(self.bank_id, caller_tenant=self.bank_id)
+
+    def derive_round_mask_seed(self, round_id: int) -> bytes:
+        """Derive this tenant's round-specific mask seed."""
+        return self._kms.derive_round_mask_seed(self.bank_id, round_id, caller_tenant=self.bank_id)
+
+    def get_envelope_key(self) -> str:
+        """Retrieve this tenant's envelope encryption key."""
+        return self._kms.get_envelope_key(self.bank_id, caller_tenant=self.bank_id)
+
+
 # Module-level singleton for convenience
 _default_kms: KMSService | None = None
 
@@ -353,3 +407,4 @@ def get_kms_service() -> KMSService:
     if _default_kms is None:
         _default_kms = KMSService()
     return _default_kms
+

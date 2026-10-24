@@ -394,14 +394,14 @@ class Settings(BaseSettings):
         return self.app_env.lower() in ("production", "prod")
 
     def is_cross_bank_simulation_allowed(self) -> bool:
-        """Determines whether software-emulated cross-bank research simulation is permitted."""
+        """Determines whether software-emulated cross-bank research simulation is permitted.
+
+        Requires explicit opt-in via enable_cross_bank_simulation even in development or test.
+        Strictly forbidden in production environments.
+        """
         if self.is_production:
             return False
-        return self.enable_cross_bank_simulation or self.app_env.lower() in (
-            "development",
-            "test",
-            "testing",
-        )
+        return bool(self.enable_cross_bank_simulation)
 
     def validate_production_invariants(self) -> None:
         """Enforces security-by-default and fail-closed validation when operating in production or staging mode.

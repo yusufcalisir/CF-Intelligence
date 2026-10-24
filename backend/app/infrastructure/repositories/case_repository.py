@@ -146,12 +146,10 @@ class CaseRepository:
             if alert_id not in alert_ids:
                 new_alerts = [*alert_ids, alert_id]
                 values_to_update["alert_ids"] = new_alerts
-                case.alert_ids = new_alerts
                 needs_update = True
 
             if bank_id is not None and current_bank_id is None:
                 values_to_update["bank_id"] = bank_id
-                case.bank_id = bank_id
                 needs_update = True
 
             if not needs_update:

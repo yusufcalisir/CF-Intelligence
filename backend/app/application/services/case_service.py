@@ -1194,6 +1194,14 @@ class EvidenceRegistryService:
             )
         old_version = getattr(case, "version", 1)
 
+        meta = metadata or {}
+        if meta.get("is_synthetic") is True or meta.get("execution_mode") == "SIMULATED_RESEARCH" or meta.get("is_authoritative") is False:
+            from app.domain.consortium_governance import ConsortiumSecurityError
+
+            raise ConsortiumSecurityError(
+                "Synthetic or simulated research records cannot be registered in authoritative case evidence ledger."
+            )
+
         # 2. Compute SHA-256 content hash
         content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
@@ -1210,7 +1218,14 @@ class EvidenceRegistryService:
 
             abs_file_path = os.path.abspath(file_path)
             dir_path = os.path.dirname(abs_file_path)
-            os.makedirs(dir_path, exist_ok=True)
+            try:
+                os.makedirs(dir_path, exist_ok=True)
+            except PermissionError:
+                rel_path = os.path.join("storage", "evidence", os.path.basename(file_path))
+                abs_file_path = os.path.abspath(rel_path)
+                dir_path = os.path.dirname(abs_file_path)
+                os.makedirs(dir_path, exist_ok=True)
+                file_path = rel_path
 
             # Check if destination file already exists
             if os.path.exists(abs_file_path):

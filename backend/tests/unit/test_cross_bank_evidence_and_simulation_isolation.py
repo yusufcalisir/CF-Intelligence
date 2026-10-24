@@ -26,6 +26,8 @@ Verifies:
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -66,9 +68,13 @@ def isolate_stores(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("CFI_ENABLE_CROSS_BANK_SIMULATION", "true")
     monkeypatch.setenv("APP_ENV", "development")
 
+    from app.config import get_settings
+
+    get_settings.cache_clear()
     DurableConsortiumStore.set_instance(None)
     AuthenticationService.reset_instance()
     yield
+    get_settings.cache_clear()
     DurableConsortiumStore.set_instance(None)
     AuthenticationService.reset_instance()
 
@@ -239,6 +245,20 @@ class TestSimulationIsolation:
             )
 
 
+def _make_signal_authoritative(intel_svc: CrossBankIntelligenceService, signal_id: str) -> None:
+    record = intel_svc._signal_store.get(signal_id)
+    assert record is not None
+    record["is_authoritative"] = True
+    record["is_synthetic"] = False
+    record["signal_data"]["execution_mode"] = "VERIFIED_OPERATIONAL"
+    record["signal_data"]["is_authoritative"] = True
+    record["signal_data"]["is_synthetic"] = False
+    record["content_hash"] = hashlib.sha256(
+        json.dumps(record["signal_data"], sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    intel_svc._signal_store.set(signal_id, record)
+
+
 class TestEvidenceIntegrityAndPersistence:
     def test_same_signal_attached_to_different_cases_produces_distinct_files(
         self, test_setup: dict[str, Any], auth_tokens: dict[str, str]
@@ -260,6 +280,7 @@ class TestEvidenceIntegrityAndPersistence:
             consortium_id=test_setup["consortium_id"],
         )
         signal = intel_svc.query_cross_bank_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+        _make_signal_authoritative(intel_svc, signal.signal_id)
 
         case_1 = case_svc.create_case(title="Case Investigation Alpha", bank_id="bank_a")
         case_2 = case_svc.create_case(title="Case Investigation Beta", bank_id="bank_a")
@@ -311,6 +332,7 @@ class TestEvidenceIntegrityAndPersistence:
             consortium_id=test_setup["consortium_id"],
         )
         signal = intel_svc.query_cross_bank_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+        _make_signal_authoritative(intel_svc, signal.signal_id)
 
         case_1 = case_svc.create_case(title="Case Note 1", bank_id="bank_a")
         case_2 = case_svc.create_case(title="Case Note 2", bank_id="bank_a")
@@ -615,8 +637,8 @@ class TestAuthoritativeConsortiumSharingPolicy:
 
 class TestInstitutionalIsolationAndNegativeControl:
     def test_bank_private_exponent_isolation(self):
-        """Bank A KMS private exponent is isolated from Bank B."""
-        from app.application.services.kms_service import get_kms_service
+        """Bank A KMS private exponent is access-control isolated from Bank B."""
+        from app.application.services.kms_service import TenantKMSSession, get_kms_service
 
         kms = get_kms_service()
         key_a = kms.get_psi_private_exponent("bank_a")
@@ -625,6 +647,18 @@ class TestInstitutionalIsolationAndNegativeControl:
         assert key_a != key_b
         assert key_a > 1
         assert key_b > 1
+
+        # Enforce institutional access-control boundary: Caller tenant bank_a cannot access bank_b keys
+        with pytest.raises(PermissionError, match="KMS access control violation"):
+            kms.get_psi_private_exponent("bank_b", caller_tenant="bank_a")
+
+        with pytest.raises(PermissionError, match="KMS access control violation"):
+            kms.get_hmac_key("bank_b", caller_tenant="bank_a")
+
+        # Scoped TenantKMSSession permanently bound to bank_a retrieves bank_a keys
+        session_a = TenantKMSSession(bank_id="bank_a", kms_service=kms)
+        assert session_a.get_psi_private_exponent() == key_a
+        assert session_a.bank_id == "bank_a"
 
     def test_negative_control_removing_counterpart_removes_match(
         self, test_setup: dict[str, Any], auth_tokens: dict[str, str]

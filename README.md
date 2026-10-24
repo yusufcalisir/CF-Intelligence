@@ -551,6 +551,15 @@ Operationalizes consortium membership and privacy-preserving entity resolution i
 - **Fail-Closed Hardware Attestation Boundary:** Software emulation paths explicitly report `SIMULATED_SOFTWARE_ONLY` (`emulation_mode: True`). When institutional policy mandates physical enclave execution (`require_hardware_attestation: True`), the service fails closed with `HTTP 412 Precondition Failed` rather than fabricating hardware measurements.
 - **Evidence Registry Integration:** Anchors permitted intelligence signals into the institution's case ledger (`EvidenceRegistryService`) with SHA-256 digests, preserving Four-Eyes dual control and enforcing terminal case immutability (`HTTP 409 Conflict`).
 
+### 8.5 Authentic Two-Bank Private Matching Architecture & Operational Gating (`isolated_matching_service.py`)
+Provides authentic two-bank private intelligence execution without pooling raw records:
+- **Strict Storage Vault & KMS Isolation:** Participating banks execute independent worker nodes (`IsolatedBankWorkerNode`) loading entities strictly from isolated vaults (`storage/{bank_id}/private_entities/`). KMS access is locked to institutional tenants via `TenantKMSSession`. Cross-tenant key probes raise `PermissionError`.
+- **Authenticated 3-Stage DH-PSI:** 2048-bit MODP Diffie-Hellman Private Set Intersection. Mutual HMAC-SHA256 signatures, single-use 128-bit cryptographic nonces, and 300-second freshness windows guarantee transcript integrity and anti-replay defense.
+- **Verified Match Receipt Attestation:** Signs execution receipts with dual participating worker signatures and coordinator attestation. Only `VERIFIED_OPERATIONAL` signals are authorized for case evidence attachment.
+- **Explicit Operational Data-Sharing Grants:** Denies operational intelligence queries by default unless an active grant with governing authority (e.g. FFIEC, BaFin) and monotonic revision history is registered. Institutional jurisdictions are strictly mandatory.
+- **Strict Research Namespace Isolation:** Research simulations run strictly on isolated synthetic entities and record signals into non-operational `research_case_evidence_store`, preventing synthetic contamination of production case evidence or SAR regulatory filings.
+
+
 ---
 
 ## 9. 9-Signal Composite Risk Scoring Engine & Fast Explainability

@@ -179,6 +179,23 @@ class Entity:
     first_seen: datetime = field(default_factory=lambda: datetime.now(UTC))
     last_seen: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize entity attributes to a canonical dictionary representation."""
+        ent_type_val = self.entity_type.value if hasattr(self.entity_type, "value") else str(self.entity_type)
+        risk_val = self.risk_level.value if hasattr(self.risk_level, "value") else str(self.risk_level)
+        return {
+            "id": self.id,
+            "entity_type": ent_type_val,
+            "privacy_id": self.privacy_id,
+            "bank_id": self.bank_id,
+            "display_label": self.display_label,
+            "attributes": dict(self.attributes),
+            "risk_level": risk_val,
+            "alert_count": self.alert_count,
+            "first_seen": self.first_seen.isoformat() if hasattr(self.first_seen, "isoformat") else str(self.first_seen),
+            "last_seen": self.last_seen.isoformat() if hasattr(self.last_seen, "isoformat") else str(self.last_seen),
+        }
+
 
 @dataclass
 class Relationship:

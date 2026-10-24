@@ -230,6 +230,50 @@ class ConsortiumGovernanceService:
 
         return self._store.atomic_mutate(_mutate)
 
+    def register_operational_data_sharing_grant(
+        self,
+        consortium_id: str,
+        grant_id: str,
+        authority: str,
+        allowed_purposes: list[str] | None = None,
+        institution_jurisdictions: dict[str, str] | None = None,
+        allowed_jurisdictions: list[str] | None = None,
+        allow_cross_border: bool = False,
+        allow_institution_identity_sharing: bool = False,
+        revision: int = 1,
+        auth_token: str | None = None,
+        actor: str | None = None,
+        trusted_context: Any | None = None,
+    ) -> dict[str, Any]:
+        """Registers or updates an authoritative operational data-sharing grant for a consortium."""
+        clean_id = consortium_id.lower().strip()
+        purposes = allowed_purposes or ["AML_COLLABORATIVE_INVESTIGATION", "FRAUD_INVESTIGATION"]
+        jurisdictions = institution_jurisdictions or {}
+        default_allowed = list(dict.fromkeys(list(jurisdictions.values()) + ["eu-central-1", "us-east-1", "apac-singapore-1"]))
+        grant_dict: dict[str, Any] = {
+            "grant_id": grant_id.strip(),
+            "authority": authority.strip(),
+            "revision": int(revision),
+            "is_active": True,
+            "allowed_purposes": [p.strip() for p in purposes],
+            "institution_jurisdictions": {k.lower().strip(): v.strip() for k, v in jurisdictions.items()},
+            "allowed_jurisdictions": [j.strip() for j in (allowed_jurisdictions or default_allowed)],
+            "allow_cross_border": bool(allow_cross_border),
+            "allow_institution_identity_sharing": bool(allow_institution_identity_sharing),
+            "registered_at": datetime.datetime.now(UTC).isoformat(),
+        }
+
+        def _mutate(consortia: dict[str, Consortium], proposals: dict[str, Any]) -> dict[str, Any]:
+            if clean_id not in consortia:
+                raise ValueError(f"Consortium '{clean_id}' does not exist.")
+            c = consortia[clean_id]
+            if not hasattr(c, "metadata") or c.metadata is None:
+                c.metadata = {}
+            c.metadata["operational_data_sharing_grant"] = grant_dict
+            return grant_dict
+
+        return self._store.atomic_mutate(_mutate)
+
     def propose_membership_change(
         self,
         consortium_id: str,

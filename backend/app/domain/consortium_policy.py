@@ -256,6 +256,7 @@ class ConsortiumPolicyEngine:
         purpose: str = "AML_COLLABORATIVE_INVESTIGATION",
         requesting_jurisdiction: str | None = None,
         target_jurisdictions: dict[str, str] | None = None,
+        is_operational: bool = False,
     ) -> tuple[bool, list[str], dict[str, Any]]:
         """Evaluates whether an intelligence query satisfies consortium sharing governance policies.
 
@@ -265,9 +266,38 @@ class ConsortiumPolicyEngine:
         reasons: list[str] = []
         clean_requesting = requesting_bank.lower().strip()
         c_meta = getattr(consortium, "metadata", {}) or {}
-        sharing_policy = c_meta.get("intelligence_sharing_policy", {})
 
-        # 1. Consortium active status
+        # 1. Operational Sharing Grant Enforcement (Fail-closed: No fallback to permissive defaults)
+        operational_grant = c_meta.get("operational_data_sharing_grant")
+        if is_operational:
+            if not operational_grant or not isinstance(operational_grant, dict):
+                reasons.append(
+                    f"Consortium '{consortium.consortium_id}' lacks an explicit operational data-sharing grant. "
+                    "Operational intelligence queries are denied by default without explicit institutional consent."
+                )
+                return False, reasons, {}
+
+            if not operational_grant.get("is_active", True):
+                reasons.append(
+                    f"Operational data-sharing grant '{operational_grant.get('grant_id')}' is inactive or revoked."
+                )
+                return False, reasons, {}
+
+            if not operational_grant.get("authority") or not str(operational_grant.get("authority")).strip():
+                reasons.append(
+                    f"Operational data-sharing grant '{operational_grant.get('grant_id')}' lacks valid governing authority."
+                )
+                return False, reasons, {}
+
+            if not operational_grant.get("revision") or int(operational_grant.get("revision", 0)) < 1:
+                reasons.append(
+                    f"Operational data-sharing grant '{operational_grant.get('grant_id')}' lacks valid revision history."
+                )
+                return False, reasons, {}
+
+        sharing_policy = operational_grant if (is_operational and operational_grant) else c_meta.get("intelligence_sharing_policy", {})
+
+        # 2. Consortium active status
         from app.domain.consortium_governance import ConsortiumStatus
 
         if consortium.status != ConsortiumStatus.ACTIVE:
@@ -275,7 +305,7 @@ class ConsortiumPolicyEngine:
                 f"Consortium '{consortium.consortium_id}' is in non-active status '{consortium.status.value}'. Intelligence queries are prohibited."
             )
 
-        # 2. Requesting bank membership and eviction check (Immediate Revocation Enforcement)
+        # 3. Requesting bank membership and eviction check (Immediate Revocation Enforcement)
         if clean_requesting in consortium.removed_members:
             reasons.append(
                 f"Institution '{clean_requesting}' has been evicted/revoked from consortium '{consortium.consortium_id}'."
@@ -285,17 +315,20 @@ class ConsortiumPolicyEngine:
                 f"Institution '{clean_requesting}' is not an active member of consortium '{consortium.consortium_id}'."
             )
 
-        # 3. Purpose authorization (Authoritative per-consortium policy or default treaty, Deny by default)
+        # 4. Purpose authorization (Authoritative per-consortium policy or default treaty, Deny by default)
         allowed_purposes = (
             sharing_policy.get("allowed_purposes")
-            or self.intelligence_config.allowed_purposes
+            if (sharing_policy and "allowed_purposes" in sharing_policy)
+            else (
+                None if is_operational else self.intelligence_config.allowed_purposes
+            )
         )
-        if purpose not in allowed_purposes:
+        if not allowed_purposes or purpose not in allowed_purposes:
             reasons.append(
-                f"Intelligence query purpose '{purpose}' is not authorized under consortium governance policy. Permitted: {allowed_purposes}. Denied by default."
+                f"Intelligence query purpose '{purpose}' is not authorized under consortium governance policy. Permitted: {allowed_purposes or []}. Denied by default."
             )
 
-        # 4. Target banks membership and eviction check
+        # 5. Target banks membership and eviction check
         for tb in target_banks:
             clean_tb = tb.lower().strip()
             if clean_tb in consortium.removed_members:
@@ -307,7 +340,7 @@ class ConsortiumPolicyEngine:
                     f"Target institution '{clean_tb}' is not an active member of consortium '{consortium.consortium_id}'."
                 )
 
-        # 5. Cross-border sovereignty checks (No silent region fallbacks)
+        # 6. Cross-border sovereignty checks (Mandatory for operational queries; no silent region skipping)
         inst_jurisdictions = (
             sharing_policy.get("institution_jurisdictions")
             or c_meta.get("institution_jurisdictions")
@@ -323,17 +356,23 @@ class ConsortiumPolicyEngine:
             else (
                 sharing_policy.get("allow_cross_border_sharing")
                 if "allow_cross_border_sharing" in sharing_policy
-                else self.intelligence_config.allow_cross_border_intelligence
+                else (
+                    sharing_policy.get("allow_cross_border")
+                    if "allow_cross_border" in sharing_policy
+                    else self.intelligence_config.allow_cross_border_intelligence
+                )
             )
         )
 
         has_jurisdiction_context = bool(
-            requesting_jurisdiction
+            is_operational
+            or requesting_jurisdiction
             or target_jurisdictions
             or inst_jurisdictions
             or sharing_policy.get("enforce_jurisdiction", False)
             or ("allow_cross_border_sharing" in sharing_policy and not sharing_policy["allow_cross_border_sharing"])
             or ("allow_cross_border_intelligence" in sharing_policy and not sharing_policy["allow_cross_border_intelligence"])
+            or ("allow_cross_border" in sharing_policy and not sharing_policy["allow_cross_border"])
         )
 
         if has_jurisdiction_context:
