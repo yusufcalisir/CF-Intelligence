@@ -119,9 +119,7 @@ class CaseRepository:
         max_attempts = 5
         for attempt in range(max_attempts):
             # 1. Fetch case with row-level lock on supporting dialects (PostgreSQL FOR UPDATE)
-            stmt = select(CaseModel).where(CaseModel.id == case_id).with_for_update()
-            result = await self.session.execute(stmt)
-            case = result.scalar_one_or_none()
+            case = await self.get_by_id(case_id, for_update=True)
             if case is None:
                 return None
 
@@ -146,11 +144,14 @@ class CaseRepository:
             needs_update = False
 
             if alert_id not in alert_ids:
-                values_to_update["alert_ids"] = [*alert_ids, alert_id]
+                new_alerts = [*alert_ids, alert_id]
+                values_to_update["alert_ids"] = new_alerts
+                case.alert_ids = new_alerts
                 needs_update = True
 
             if bank_id is not None and current_bank_id is None:
                 values_to_update["bank_id"] = bank_id
+                case.bank_id = bank_id
                 needs_update = True
 
             if not needs_update:
@@ -184,7 +185,7 @@ class CaseRepository:
             update_res = await self.session.execute(update_stmt)
 
             rowcount = getattr(update_res, "rowcount", None)
-            if rowcount == 0:
+            if isinstance(rowcount, int) and rowcount == 0:
                 # Concurrent mutation detected. Rollback session state and evaluate conflict
                 await self.session.rollback()
                 fresh_case = await self.get_by_id(case_id)
@@ -244,9 +245,12 @@ class CaseRepository:
 
     # ── Read ──────────────────────────────────────────────────────────
 
-    async def get_by_id(self, case_id: str) -> CaseModel | None:
+    async def get_by_id(self, case_id: str, *, for_update: bool = False) -> CaseModel | None:
         """Fetch a single case by primary key."""
-        result = await self.session.execute(select(CaseModel).where(CaseModel.id == case_id))
+        stmt = select(CaseModel).where(CaseModel.id == case_id)
+        if for_update:
+            stmt = stmt.with_for_update()
+        result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
     async def list_by_assignee(

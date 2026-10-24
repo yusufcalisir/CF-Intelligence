@@ -394,7 +394,16 @@ async def sample_retraining_batch(
     request: Request,
     caller_tenant: TenantDep = None,
 ) -> RetrainingBatchResponse:
-    """Sample a prioritized, stratified batch of human-verified feedback items for local model retraining."""
+    required_roles = FEEDBACK_CONSUME_ROLES if payload.mark_consumed else FEEDBACK_SAMPLE_ROLES
+    _, authorized_tenant = _authorize_feedback_request(
+        request=request,
+        target_tenant_id=payload.tenant_id,
+        caller_tenant=caller_tenant,
+        required_roles=required_roles,
+        action_name="consume_retraining_batch"
+        if payload.mark_consumed
+        else "sample_retraining_batch",
+    )
     if payload.mark_consumed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -403,14 +412,6 @@ async def sample_retraining_batch(
                 "requires staged reservation and verified training completion."
             ),
         )
-    required_roles = FEEDBACK_SAMPLE_ROLES
-    _, authorized_tenant = _authorize_feedback_request(
-        request=request,
-        target_tenant_id=payload.tenant_id,
-        caller_tenant=caller_tenant,
-        required_roles=required_roles,
-        action_name="sample_retraining_batch",
-    )
     batch_data = _pipeline.get_priority_retraining_batch(
         tenant_id=authorized_tenant,
         batch_size=payload.batch_size,
