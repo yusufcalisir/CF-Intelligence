@@ -1195,7 +1195,16 @@ class EvidenceRegistryService:
         old_version = getattr(case, "version", 1)
 
         meta = metadata or {}
-        if meta.get("is_synthetic") is True or meta.get("execution_mode") == "SIMULATED_RESEARCH" or meta.get("is_authoritative") is False:
+        is_case_authoritative = bool(
+            getattr(case, "is_authoritative", False)
+            or (getattr(case, "signature_metadata", {}) or {}).get("is_authoritative", False)
+            or case.status in (CaseStatus.ESCALATED, CaseStatus.SAR_FILED)
+        )
+        if is_case_authoritative and (
+            meta.get("is_synthetic") is True
+            or meta.get("execution_mode") == "SIMULATED_RESEARCH"
+            or meta.get("is_authoritative") is False
+        ):
             from app.domain.consortium_governance import ConsortiumSecurityError
 
             raise ConsortiumSecurityError(
