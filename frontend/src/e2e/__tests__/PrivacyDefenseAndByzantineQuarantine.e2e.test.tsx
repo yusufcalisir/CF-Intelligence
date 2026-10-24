@@ -127,6 +127,6 @@ describe('E2E Business Flow 3: Privacy Defense, Byzantine Robustness & PSI Match
     const PsiWrapper = createWrapper('/psi');
     render(<PsiWrapper />);
     expect(await screen.findByText(/PSI Protocol Control Center/i)).toBeInTheDocument();
-    expect(screen.getByText(/Intel SGX Enclave Active/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cryptographic PSI Simulation/i)).toBeInTheDocument();
   });
 });

@@ -134,7 +134,7 @@ export default function PsiPage() {
   const [entityType, setEntityType] = useState(() => initialType || 'customer');
   const [enableFuzzy, setEnableFuzzy] = useState(true);
   const [fuzzyThreshold, setFuzzyThreshold] = useState(3);
-  const [enableTee, setEnableTee] = useState(true);
+  const [enableTee, setEnableTee] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [logsRunning, setLogsRunning] = useState(false);
 
@@ -222,7 +222,7 @@ export default function PsiPage() {
     setLogs([
       `[${now()}] Initiating Diffie-Hellman 2048-bit Private Set Intersection...`,
       `[${now()}] Source: ${bankA.toUpperCase()} ⟷ Target: ${bankB.toUpperCase()}`,
-      `[${now()}] Execution Mode: ${enableTee ? 'Intel SGX Secure Hardware Enclave' : 'Standard Diffie-Hellman Commutative Multiplying'}`,
+      `[${now()}] Execution Mode: ${enableTee ? 'Software-Emulated Enclave Execution (Research Simulation)' : 'Standard Diffie-Hellman Commutative Multiplying'}`,
       `[${now()}] Transmitting blinded hash elements across zero-trust boundary...`,
     ]);
     setLogsRunning(true);
@@ -243,7 +243,7 @@ export default function PsiPage() {
           const stats = data.stats;
           const newEntries: string[] = [
             `[${t}] Cryptographic set intersection completed successfully.`,
-            `[${t}] Attestation: ${stats?.attestation_verified ? 'Verified (SGX Quote Matched ✅)' : 'Active (Local Cryptographic Simulation)'}`,
+            `[${t}] Attestation: ${stats?.attestation_verified ? 'Hardware Attestation Quote Verified' : 'Active (Software Emulation / Benchmark Mode)'}`,
           ];
           if (stats?.mrenclave) {
             newEntries.push(`[${t}] MRENCLAVE: ${stats.mrenclave}`);
@@ -290,12 +290,24 @@ export default function PsiPage() {
             Reconcile customer & entity identities across banks without exposing PII.
           </p>
         </div>
-        <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+        <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
           </span>
-          Intel SGX Enclave Active
+          Cryptographic PSI Simulation (Software Emulation)
+        </div>
+      </div>
+
+      {/* Research & Simulation Disclaimer Banner */}
+      <div className="p-3.5 rounded-xl bg-amber-950/25 border border-amber-800/40 flex items-start gap-3 text-xs text-amber-200/90">
+        <span className="text-amber-400 font-bold text-sm mt-0.5">ℹ️</span>
+        <div>
+          <span className="font-semibold text-amber-300">Research & Benchmark Simulation Environment:</span>{' '}
+          This interactive playground evaluates blinded Diffie-Hellman and MinHash fuzzy set intersection in software emulation.
+          Physical hardware enclaves (Intel SGX) are absent in this runtime. For institutionally authorized cross-bank intelligence and immutable case evidence ledgers, use the{' '}
+          <Link to="/alerts" className="underline font-semibold text-amber-200 hover:text-white">
+            Authorized Cross-Bank Intelligence Workflow
+          </Link>.
         </div>
       </div>
 
@@ -422,8 +434,8 @@ export default function PsiPage() {
                 <div className="flex flex-col justify-end">
                   <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800">
                     <div className="flex flex-col">
-                      <span className="text-xs font-bold text-slate-300">Intel SGX Enclave (TEE)</span>
-                      <span className="text-[10px] text-slate-500">Accelerate inside secure enclave</span>
+                      <span className="text-xs font-bold text-slate-300">Emulated TEE Acceleration</span>
+                      <span className="text-[10px] text-slate-500">Software-emulated enclave benchmark</span>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -554,7 +566,7 @@ export default function PsiPage() {
                 <div className="flex flex-col">
                   <span className="text-[10px] text-slate-500 font-semibold uppercase">Accelerator</span>
                   <span className="text-sm font-bold text-indigo-400 font-mono">
-                    {runPSIMutation.data.stats.enclave_execution ? 'SGX TEE (15x)' : 'None (DH)'}
+                    {runPSIMutation.data.stats.enclave_execution ? 'Emulated TEE (Simulation)' : 'None (DH)'}
                   </span>
                 </div>
               </div>

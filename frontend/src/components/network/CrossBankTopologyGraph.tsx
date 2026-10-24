@@ -472,6 +472,17 @@ export default function CrossBankTopologyGraph({
   return (
     <div className={`flex flex-col gap-5 sm:gap-6 rounded-2xl border border-slate-800 bg-slate-900/90 p-3.5 sm:p-6 backdrop-blur-md shadow-2xl overflow-hidden w-full max-w-full ${className}`}>
       
+      {/* Empirical Benchmark Topology Indicator */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-indigo-950/40 border border-indigo-800/40 text-[11px] font-mono text-indigo-300">
+        <div className="flex items-center gap-2">
+          <span className="font-bold uppercase tracking-wider text-indigo-400">Synthetic Benchmark Topology</span>
+          <span className="text-slate-400 hidden sm:inline">• Empirical multi-hop AML blind-spot scenario evaluation</span>
+        </div>
+        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+          Simulation Matrix
+        </span>
+      </div>
+
       {/* Top Controls: Scenario Selector & Responsive Horizon Switcher */}
       <div className="flex flex-col gap-3.5 lg:flex-row lg:items-center lg:justify-between w-full">
         {/* Scenario Selector Pills - Mobile-friendly responsive 7-column grid without horizontal scrolling */}

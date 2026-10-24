@@ -12,10 +12,13 @@ import {
   useUpdateAlertStatus,
   useAddCaseNote,
   useAddEvidence,
+  useQueryCrossBankIntelligence,
+  useAttachCrossBankEvidence,
+  useCases,
 } from '../api/queries';
 import { formatApiError } from '../api/client';
 import { BANK_NAMES, SEVERITY_COLORS } from '../api/types';
-import type { Alert } from '../api/types';
+import type { Alert, CrossBankIntelligenceSignal } from '../api/types';
 
 export const ALERTS_SELECTED_ID_KEY = 'cfi_selected_alert_id';
 export const ALERTS_BANK_FILTER_KEY = 'cfi_alerts_bank_filter';
@@ -669,7 +672,62 @@ export function ExplainabilityPanel({
   hideEscalateButton?: boolean;
   isModal?: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<'attribution' | 'counterfactuals' | 'audit' | 'gnn'>('attribution');
+  const [activeTab, setActiveTab] = useState<'attribution' | 'counterfactuals' | 'audit' | 'gnn' | 'cross_bank'>('attribution');
+  const [intelSignal, setIntelSignal] = useState<CrossBankIntelligenceSignal | null>(null);
+  const [intelTargetBank, setIntelTargetBank] = useState<string>('');
+  const [intelConsortiumId, setIntelConsortiumId] = useState<string>('nordic_aml_ring');
+  const [attachSuccessHash, setAttachSuccessHash] = useState<string | null>(null);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [manualCaseId, setManualCaseId] = useState<string>('');
+
+  const queryIntelMutation = useQueryCrossBankIntelligence();
+  const attachEvidenceMutation = useAttachCrossBankEvidence();
+  const { data: casesList } = useCases();
+
+  const linkedCase = casesList?.find(
+    (c) => c.title?.includes(alert.id.slice(0, 8)) || (c as any).alert_ids?.includes(alert.id)
+  );
+
+  const handleQueryIntel = () => {
+    setAttachSuccessHash(null);
+    setAttachError(null);
+    const targetEntity = alert.involved_entity_ids?.[0] || alert.transaction_id || alert.id;
+    queryIntelMutation.mutate(
+      {
+        requesting_bank_id: alert.bank_id,
+        query_entity_id: targetEntity,
+        consortium_id: intelConsortiumId,
+        target_bank_id: intelTargetBank || undefined,
+        execution_mode: 'VERIFIED_OPERATIONAL',
+      },
+      {
+        onSuccess: (data) => {
+          setIntelSignal(data);
+        },
+      }
+    );
+  };
+
+  const handleAttachEvidence = (targetCaseId: string) => {
+    if (!intelSignal) return;
+    setAttachError(null);
+    attachEvidenceMutation.mutate(
+      {
+        case_id: targetCaseId,
+        signal: intelSignal,
+        analyst_notes: `Authorized cross-bank intelligence query during investigation of Alert ${alert.id}. Match: ${intelSignal.match_category} (${(intelSignal.match_confidence * 100).toFixed(0)}%).`,
+      },
+      {
+        onSuccess: (res) => {
+          setAttachSuccessHash(res.content_hash);
+        },
+        onError: (err) => {
+          setAttachError(formatApiError(err, 'Failed to attach evidence to case.'));
+        },
+      }
+    );
+  };
+
   const { data: report, isLoading: isReportLoading } = useAlertExplainability(alert.id);
   const { data: cfReport, isLoading: isCfLoading } = useAlertCounterfactuals(alert.id);
   const { data: auditReport, isLoading: isAuditLoading } = useAlertDecisionReplay(alert.id);
@@ -814,12 +872,13 @@ export function ExplainabilityPanel({
       )}
 
       {/* Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1.5 bg-slate-900/90 border border-slate-800 rounded-xl text-center text-xs font-bold">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 p-1.5 bg-slate-900/90 border border-slate-800 rounded-xl text-center text-xs font-bold">
         {[
           { id: 'attribution', label: 'Attribution' },
           { id: 'counterfactuals', label: 'Remediation' },
           { id: 'audit', label: 'Audit Replay' },
           { id: 'gnn', label: 'GNN Explainer' },
+          { id: 'cross_bank', label: 'Consortium Intel' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -1176,6 +1235,225 @@ export function ExplainabilityPanel({
                 </div>
               </div>
             </>
+          )}
+        </div>
+      )}
+      {/* Tab 5: Cross-Bank Consortium Intelligence */}
+      {activeTab === 'cross_bank' && (
+        <div className="space-y-4 text-xs">
+          <div className="p-3 bg-slate-900/90 rounded-xl border border-indigo-500/30 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-bold text-slate-200">
+              <span className="flex items-center gap-1.5 text-indigo-300">
+                <span>🛡️</span>
+                <span>Authorized Consortium Matching</span>
+              </span>
+              <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                Zero-Raw-PII Boundary
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Query verified counterpart intelligence across active consortium members without exposing cleartext PII, internal customer profiles, or account numbers.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+              <div>
+                <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1">Consortium ID</label>
+                <input
+                  type="text"
+                  value={intelConsortiumId}
+                  onChange={(e) => setIntelConsortiumId(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  placeholder="e.g. nordic_aml_ring"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1">Target Counterpart Bank (Optional)</label>
+                <input
+                  type="text"
+                  value={intelTargetBank}
+                  onChange={(e) => setIntelTargetBank(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  placeholder="All active members (or e.g. bank_b)"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleQueryIntel}
+                disabled={queryIntelMutation.isPending}
+                className="w-full py-2 px-3 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {queryIntelMutation.isPending ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Executing Privacy-Preserving Query...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔍</span>
+                    <span>Query Cross-Bank Intelligence</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {queryIntelMutation.isError && (
+              <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-800/40 text-rose-300 text-[11px]">
+                {formatApiError(queryIntelMutation.error, 'Failed to query consortium intelligence.')}
+              </div>
+            )}
+          </div>
+
+          {/* Intelligence Signal Display */}
+          {intelSignal && (
+            <div className="p-3.5 bg-slate-900/80 rounded-xl border border-slate-800 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                <span className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                  <span>📡</span> Verified Intelligence Signal
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                    intelSignal.match_confirmed
+                      ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                  }`}
+                >
+                  {intelSignal.match_category} ({(intelSignal.match_confidence * 100).toFixed(0)}%)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase block">Risk Level</span>
+                  <span
+                    className={`font-mono font-bold ${
+                      intelSignal.sanitized_risk_level === 'CRITICAL'
+                        ? 'text-rose-400'
+                        : intelSignal.sanitized_risk_level === 'HIGH'
+                        ? 'text-orange-400'
+                        : intelSignal.sanitized_risk_level === 'MEDIUM'
+                        ? 'text-amber-400'
+                        : 'text-slate-300'
+                    }`}
+                  >
+                    {intelSignal.sanitized_risk_level}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase block">Contributing Banks</span>
+                  <span className="font-mono text-slate-200">
+                    {intelSignal.contributing_institutions_count > 0
+                      ? intelSignal.contributing_institutions.map((b) => BANK_NAMES[b] || b).join(', ')
+                      : 'None (Unobserved)'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase block">Privacy Digest</span>
+                  <span className="font-mono text-slate-400 text-[10px] truncate block" title={intelSignal.privacy_hash_truncated}>
+                    {intelSignal.privacy_hash_truncated}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase block">Attestation Status</span>
+                  <span className="font-mono text-amber-300/80 text-[10px]">
+                    {intelSignal.hardware_enclave_active ? 'SGX Verified' : 'Software Emulation'}
+                  </span>
+                </div>
+              </div>
+
+              {intelSignal.sanitized_typology_indicators.length > 0 && (
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase block mb-1">Typology Indicators</span>
+                  <div className="flex flex-wrap gap-1">
+                    {intelSignal.sanitized_typology_indicators.map((ind) => (
+                      <span
+                        key={ind}
+                        className="px-2 py-0.5 rounded text-[9.5px] font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/20"
+                      >
+                        {ind}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <p className="text-[10px] text-slate-500 italic border-t border-slate-800/80 pt-2">
+                {intelSignal.disclaimer}
+              </p>
+
+              {/* Attach to Case Action */}
+              <div className="pt-2 border-t border-slate-800 space-y-2">
+                {linkedCase ? (
+                  <div className="space-y-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleAttachEvidence(linkedCase.id)}
+                      disabled={attachEvidenceMutation.isPending || !!attachSuccessHash}
+                      className="w-full py-1.5 px-3 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      {attachEvidenceMutation.isPending ? (
+                        <>
+                          <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Anchoring to Evidence Ledger...</span>
+                        </>
+                      ) : attachSuccessHash ? (
+                        <>
+                          <span>✅</span>
+                          <span>Anchored to Case #{linkedCase.id.slice(0, 8)}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>📎</span>
+                          <span>Anchor to Case #{linkedCase.id.slice(0, 8)} Evidence Ledger</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-[11px] text-slate-400">
+                      This alert is not yet escalated to an investigation case. Escalate the alert or provide an existing Case ID to attach this signal:
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={manualCaseId}
+                        onChange={(e) => setManualCaseId(e.target.value)}
+                        placeholder="Enter Case ID (e.g. case_123)"
+                        className="flex-1 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => manualCaseId && handleAttachEvidence(manualCaseId)}
+                        disabled={!manualCaseId || attachEvidenceMutation.isPending || !!attachSuccessHash}
+                        className="py-1.5 px-3 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                      >
+                        {attachEvidenceMutation.isPending ? 'Anchoring...' : 'Attach'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {attachSuccessHash && (
+                  <div className="p-2 rounded bg-emerald-950/40 border border-emerald-800/40 text-[10px] font-mono text-emerald-300">
+                    <div className="font-bold flex items-center gap-1">
+                      <span>🔒 SHA-256 Content Hash Anchored:</span>
+                    </div>
+                    <div className="truncate text-emerald-400 font-mono mt-0.5" title={attachSuccessHash}>
+                      {attachSuccessHash}
+                    </div>
+                  </div>
+                )}
+
+                {attachError && (
+                  <div className="p-2 rounded bg-rose-950/40 border border-rose-800/40 text-[10px] text-rose-300">
+                    {attachError}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
       )}

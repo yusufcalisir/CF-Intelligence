@@ -260,17 +260,80 @@ In strict adherence to the `AGENTS.md` runtime truth invariant, `_verify_service
 
 ---
 
-## 🧪 6. Automated Unit Test Suite Parity
+## 🔍 6. Authorized Cross-Bank Intelligence & Case Evidence Ledger
 
-The consortium governance and policy enforcement modules are verified across **41 automated unit tests**:
+The Cross-Bank Intelligence Service ([`CrossBankIntelligenceService`](../backend/app/application/services/cross_bank_intelligence.py)) operationalizes consortium membership by allowing authorized financial institutions to query and exchange privacy-preserving intelligence without pooling cleartext customer records or leaking counterpart PII.
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│               AUTHORIZED CROSS-BANK INTELLIGENCE & EVIDENCE ANCHORING                   │
+│                                                                                        │
+│   [ Analyst (Bank A) ]                                                                 │
+│           │                                                                            │
+│           ▼ POST /api/v1/intelligence/cross-bank/query                                 │
+│   ┌──────────────────────────────────────────────────────────────────────────────┐     │
+│   │ 1. Governance Boundary Evaluation                                            │     │
+│   │    - Requesting bank verified active member of consortium?                   │     │
+│   │    - Consortium state is ACTIVE?                                             │     │
+│   │    - Target counterpart bank active and not suspended/evicted?               │     │
+│   │    - Cross-consortium boundary isolation respected?                          │     │
+│   └──────────────────────────────────────┬───────────────────────────────────────┘     │
+│                                          │ Pass                                        │
+│                                          ▼                                             │
+│   ┌──────────────────────────────────────────────────────────────────────────────┐     │
+│   │ 2. Privacy & Attestation Boundary (Zero Raw PII)                             │     │
+│   │    - Software Emulation vs Hardware TEE Boundary:                            │     │
+│   │      If require_hardware_attestation=True and no physical enclave: FAIL CLOSED │   │
+│   │    - Exact & Fuzzy Entity Matching (MinHash LSH & DH-PSI)                    │     │
+│   │    - Output Sanitization: Strips raw names, tax IDs, accounts, phone numbers │     │
+│   │    - Produces Institution-Scoped Sanitized Risk Signals                      │     │
+│   └──────────────────────────────────────┬───────────────────────────────────────┘     │
+│                                          │ Verified Signal                             │
+│                                          ▼                                             │
+│   [ Analyst Investigation Workbench ] ──► POST /api/v1/cases/{id}/evidence/cross-bank  │
+│                                          │                                             │
+│                                          ▼                                             │
+│   ┌──────────────────────────────────────────────────────────────────────────────┐     │
+│   │ 3. Cryptographic Evidence Ledger Anchoring                                   │     │
+│   │    - Verified signal hashed into SHA-256 evidence entry                      │     │
+│   │    - Linked to institution-owned case with provenance metadata               │     │
+│   │    - Enforces Four-Eyes supervisor review and terminal immutability          │     │
+│   └──────────────────────────────────────────────────────────────────────────────┘     │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.1 Service Endpoints & Dual-Routing Topology
+
+Endpoints are registered with dual-routing prefixes (`/api/v1/intelligence/cross-bank` and `/v1/intelligence/cross-bank`):
+
+| Method | Path | Authorization & Preconditions | Execution Guarantee |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/query` | Bearer token with `analyst`, `investigator`, or `admin` role; active membership in requested consortium. | Executes privacy-preserving entity resolution against authorized consortium partners; returns sanitized risk signals. |
+| `POST` | `/attach-to-case` | Bearer token; owning bank matches authenticated tenant; target case exists and is not in a terminal state. | Records immutable SHA-256 evidence record in `EvidenceRegistryService` linked to the investigation case. |
+| `GET` | `/consortiums/{consortium_id}/policy` | Bearer token; authenticated institution must be an active member of `consortium_id`. | Returns active consortium data-sharing policy, permitted disclosure fields, and minimum confidence thresholds. |
+| `POST` | `/api/v1/cases/{case_id}/evidence/cross-bank-intelligence` | Case subresource route; verified ownership and state check. | Forwards validated cross-bank intelligence signal into case evidence ledger. |
+
+### 6.2 Truthful Hardware vs. Software Execution Boundary
+
+In strict compliance with `AGENTS.md` Anti-Fabrication rules:
+- **Software Simulation:** The standard execution mode runs in-process commutative Diffie-Hellman PSI and MinHash LSH fuzzy matching. Signals generated in this mode are labeled with `hardware_attestation_status: "SIMULATED_SOFTWARE_ONLY"` and `emulation_mode: True`.
+- **Fail-Closed Hardware Boundary:** If an institutional caller sets `require_hardware_attestation: True`, the service refuses to fabricate hardware measurements and immediately raises `AttestationError` (`HTTP 412 Precondition Failed`), preventing unverified execution from masquerading as a physical hardware enclave.
+
+---
+
+## 🧪 7. Automated Unit & Integration Test Suite Parity
+
+The consortium governance, policy enforcement, and cross-bank intelligence modules are verified across **53 automated tests**:
 
 ```bash
 python -m pytest \
   backend/tests/unit/test_consortium_governance.py \
   backend/tests/unit/test_consortium_governance_hardening.py \
   backend/tests/unit/test_consortium_policy.py \
-  backend/tests/unit/test_consortium_policy_hardening.py -v
-# 41 passed (100% Pass)
+  backend/tests/unit/test_consortium_policy_hardening.py \
+  backend/tests/unit/test_cross_bank_intelligence_workflow.py \
+  backend/tests/integration/test_cross_bank_intelligence_integration.py -v
+# 53 passed (100% Pass)
 ```
 
 | Test File | Test Function | Verification Scope |
@@ -302,3 +365,16 @@ python -m pytest \
 | `test_consortium_policy_hardening.py` | `test_restricted_features_blocked` | Rejects round attempts sharing raw PII attributes (SSN, IBAN). |
 | `test_consortium_policy_hardening.py` | `test_member_sample_counts_enforced` | Prevents free-rider participation by requiring minimum local sample volume. |
 | `test_consortium_policy_hardening.py` | `test_direct_cross_border_helper` | Validates `validate_cross_border_sharing` helper and DP enforcement safeguards. |
+| `test_cross_bank_intelligence_workflow.py` | `test_authorized_consortium_query_returns_sanitized_signals` | End-to-end authorized query yielding sanitized signals without leaking raw PII. |
+| `test_cross_bank_intelligence_workflow.py` | `test_unauthorized_non_member_bank_rejected` | Rejects query when requesting bank is not an admitted consortium member. |
+| `test_cross_bank_intelligence_workflow.py` | `test_revoked_member_access_rejected` | Blocks queries from revoked, evicted, or suspended institutions. |
+| `test_cross_bank_intelligence_workflow.py` | `test_cross_consortium_isolation_enforced` | Ensures queries cannot span across distinct, unlinked consortiums. |
+| `test_cross_bank_intelligence_workflow.py` | `test_fail_closed_on_unverified_hardware_attestation` | Enforces fail-closed exception when hardware TEE attestation is required but unverified. |
+| `test_cross_bank_intelligence_workflow.py` | `test_attach_evidence_to_active_case_succeeds` | Verifies attaching cross-bank signal to active investigation case ledger. |
+| `test_cross_bank_intelligence_workflow.py` | `test_attach_evidence_to_terminal_case_rejected` | Enforces terminal case immutability when attempting to attach new evidence. |
+| `test_cross_bank_intelligence_integration.py` | `test_query_endpoint_authorized_and_unauthorized_flow` | End-to-end REST API query flow asserting 200 OK for members and 403 for non-members. |
+| `test_cross_bank_intelligence_integration.py` | `test_query_endpoint_fails_closed_when_hardware_attestation_required` | Asserts REST API returns 412 Precondition Failed when real enclave attestation is requested. |
+| `test_cross_bank_intelligence_integration.py` | `test_attach_cross_bank_evidence_endpoint_flow` | REST API evidence attachment flow updating case ledger with SHA-256 evidence record. |
+| `test_cross_bank_intelligence_integration.py` | `test_attach_evidence_to_terminal_case_via_api_returns_409` | REST API terminal case immutability check returning 409 Conflict. |
+| `test_cross_bank_intelligence_integration.py` | `test_consortium_policy_endpoint` | REST API retrieval of active consortium data-sharing policy rules. |
+

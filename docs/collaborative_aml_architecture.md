@@ -874,9 +874,61 @@ Results are saved to `storage/benchmark_results.md` with ROC-AUC, PR-AUC, and F1
 
 ---
 
+## Cross-Bank Collaborative Intelligence & Case Evidence Ledger
+
+The cross-bank intelligence subsystem operationalizes democratic consortium governance into an active, privacy-preserving investigation workflow:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Analyst as Bank A Investigator
+    participant API as FastAPI Gateway
+    participant CBI as CrossBankIntelligenceService
+    participant Gov as ConsortiumGovernanceService
+    participant Entity as EntityResolutionService
+    participant Case as CaseWorkbench
+    participant Ledger as EvidenceRegistryService
+
+    Analyst->>API: POST /api/v1/intelligence/cross-bank/query
+    API->>CBI: query_cross_bank_intelligence(request, principal)
+    CBI->>Gov: get_consortium(consortium_id)
+    Gov-->>CBI: Consortium state (ACTIVE, members)
+    Note over CBI: Assert Bank A active member<br/>Assert Bank B active member<br/>Evaluate sharing policy
+    alt Hardware Attestation Requested & Missing
+        CBI-->>API: 412 Precondition Failed (AttestationError)
+        API-->>Analyst: Fail Closed
+    else Software Emulation Mode
+        CBI->>Entity: resolve_entity(query, target_bank)
+        Entity-->>CBI: Matching entities (confidence, category)
+        Note over CBI: Strip raw identifiers<br/>Generate sanitized signal
+        CBI-->>API: CrossBankIntelligenceQueryResponse
+        API-->>Analyst: Sanitized signals (Zero Raw PII)
+    end
+
+    Analyst->>API: POST /api/v1/cases/{case_id}/evidence/cross-bank-intelligence
+    API->>CBI: attach_evidence_to_case(payload, principal)
+    CBI->>Case: get_case(case_id)
+    Case-->>CBI: Case record (status, bank_id)
+    Note over CBI: Assert case not in terminal state<br/>Assert owning bank matches principal
+    CBI->>Ledger: record_evidence(case_id, signal_hash, metadata)
+    Ledger-->>CBI: EvidenceRecord (SHA-256 hash)
+    CBI-->>API: CrossBankEvidenceAttachResponse
+    API-->>Analyst: Evidence anchored to case
+```
+
+### Privacy & Anti-Fabrication Principles
+1. **Zero-Raw-PII Disclosure Guarantee:**
+   Cross-bank query responses never transmit raw customer names, tax identification numbers, cleartext account numbers, phone numbers, or private internal notes. Responses are strictly limited to sanitized match categories (e.g., `SUSPECTED_MULE_NETWORK`), normalized confidence scores ($0.0 - 1.0$), pseudonymized cross-bank indicators, and evidence timestamps.
+2. **Truthful Cryptographic Enclave Boundary:**
+   In compliance with `AGENTS.md` truthfulness rules, the system explicitly marks software-emulated Private Set Intersection and entity resolution as `SIMULATED_SOFTWARE_ONLY` (`emulation_mode: True`). When institutional policy mandates physical hardware enclave execution (`require_hardware_attestation: True`), the platform refuses to fabricate measurement quotes and fails closed with `AttestationError` (`HTTP 412 Precondition Failed`).
+3. **Immutable Evidence Anchoring:**
+   Signals evaluated by an analyst are hashed (SHA-256) and anchored to the institution's case evidence ledger via `EvidenceRegistryService`. Terminal cases (`CONFIRMED_FRAUD`, `FALSE_POSITIVE`, `CLOSED_NO_ACTION`) reject further mutations (`HTTP 409 Conflict`), preserving regulatory audit integrity under Four-Eyes dual control.
+
+---
+
 ## Automated Verification & Test Coverage Matrix
 
-All Phase 2 components are continuously verified through unit and integration suites under [backend/tests/unit/](../backend/tests/unit):
+All platform components are continuously verified through unit and integration suites under [backend/tests/unit/](../backend/tests/unit) and [backend/tests/integration/](../backend/tests/integration):
 
 | Test Suite | Targeted Module / Service | Verified Features | Test Count | Status |
 |:---|:---|:---|:---:|:---:|
@@ -899,7 +951,9 @@ All Phase 2 components are continuously verified through unit and integration su
 | [test_explainability_hardening.py](../backend/tests/unit/test_explainability_hardening.py) | `explainability_service`, `realtime_explainer` | Shapley efficiency, LIME Ridge surrogate, R^2 fidelity, RNG non-pollution, thread caching & purged mock edges | 10 | ✅ 100% Pass |
 | [test_case_management_workbench.py](../backend/tests/unit/test_case_management_workbench.py) | `case_workbench` | Case FSM transitions, four-eyes supervisor signatures (`SIG_SUPERVISOR_<ID>`) | 4 | ✅ 100% Pass |
 | [test_regulatory_reporter.py](../backend/tests/unit/test_regulatory_reporter.py) | `regulatory_reporter` | FinCEN SAR XML 2.0 serialization, XML structure & XSD schema validation | 5 | ✅ 100% Pass |
-| **Total Verified** | **19 Dedicated Suites** | **Collaborative AML Platform Architecture** | **166 Tests** | ✅ **100% Pass** |
+| [test_cross_bank_intelligence_workflow.py](../backend/tests/unit/test_cross_bank_intelligence_workflow.py) | `cross_bank_intelligence` | Consortium authority checks, zero raw PII sanitization, fail-closed TEE boundary, evidence ledger anchoring | 7 | ✅ 100% Pass |
+| [test_cross_bank_intelligence_integration.py](../backend/tests/integration/test_cross_bank_intelligence_integration.py) | `cross_bank_intelligence` | FastAPI REST integration flow, 403 non-member rejection, 412 TEE fail-closed, 409 terminal immutability | 5 | ✅ 100% Pass |
+| **Total Verified** | **21 Dedicated Suites** | **Collaborative AML Platform Architecture** | **178 Tests** | ✅ **100% Pass** |
 
 
 

@@ -826,6 +826,50 @@ async def get_case_evidence(
     return [EvidenceResponse(**ev) for ev in ev_list]
 
 
+@router.post(
+    "/{case_id}/evidence/cross-bank-intelligence",
+    response_model=dict[str, Any],
+    status_code=200,
+)
+@api_router.post(
+    "/{case_id}/evidence/cross-bank-intelligence",
+    response_model=dict[str, Any],
+    status_code=200,
+)
+async def attach_cross_bank_intelligence_to_case_subresource(
+    case_id: str,
+    payload: dict[str, Any],
+    actor: str = Query("analyst"),
+    caller_tenant: TenantDep = None,
+) -> dict[str, Any]:
+    """Attach verified cross-bank intelligence signal into case evidence ledger."""
+    from app.application.schemas.cross_bank_intelligence import CrossBankIntelligenceSignal
+    from app.presentation.routers.cross_bank_intelligence import get_cross_bank_intelligence_service
+
+    svc = get_cross_bank_intelligence_service()
+    raw_signal = payload.get("signal", payload)
+    signal = CrossBankIntelligenceSignal(**raw_signal)
+    notes = payload.get("notes")
+
+    try:
+        resp = svc.attach_signal_to_case_evidence(
+            case_id=case_id,
+            signal=signal,
+            actor=actor,
+            caller_bank_id=caller_tenant or signal.requesting_bank_id,
+            notes=notes,
+        )
+        return resp.model_dump()
+    except CaseNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+    except TerminalCaseImmutableError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
+    except PermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err)) from err
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
+
+
 def _serialize_case(case: Any) -> CaseResponse:
     return CaseResponse(
         id=case.id,

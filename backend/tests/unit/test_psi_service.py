@@ -95,6 +95,18 @@ class TestPSIService:
         assert stats["enclave_execution"] is True
         assert "mrenclave" in stats
         assert "mrsigner" in stats
-        assert stats["attestation_verified"] is True
+        assert stats["attestation_verified"] is False
+        assert stats["emulation_mode"] is True
+        assert stats["hardware_attestation_status"] == "SIMULATED_SOFTWARE_ONLY"
         # TEE matching only sends initial hashes (len_a + len_b) * 256 bytes
         assert stats["data_exchanged_bytes"] < 2048
+
+        # Invariant: strict hardware attestation must fail closed in software runtime
+        with pytest.raises(RuntimeError, match="Physical hardware enclave attestation unavailable"):
+            psi_service.run_psi(
+                "bank_a",
+                "bank_b",
+                EntityType.CUSTOMER,
+                enable_tee=True,
+                require_hardware_attestation=True,
+            )

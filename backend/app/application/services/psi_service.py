@@ -47,13 +47,21 @@ class PSIService:
         enable_tee: bool = False,
         enable_fuzzy: bool = False,
         fuzzy_threshold: int = 3,
+        require_hardware_attestation: bool = False,
     ) -> dict[str, Any]:
         """Execute simulated DH-PSI between Bank A and Bank B, with optional TEE enclave simulation.
 
         Supports both Exact-string hashing matching and multi-attribute Fuzzy PSI.
+        Truthfully identifies software-emulated enclaves and fails closed if physical hardware attestation is required.
         """
         if not bank_a_id or not bank_b_id:
             raise ValueError("bank_a_id and bank_b_id must be non-empty strings")
+
+        if require_hardware_attestation:
+            raise RuntimeError(
+                "Physical hardware enclave attestation unavailable: software emulation cannot satisfy "
+                "production hardware attestation requirement."
+            )
 
         start_time = time.perf_counter()
         stats: dict[str, Any] = {}
@@ -166,7 +174,10 @@ class PSIService:
                         {
                             "mrenclave": "0x8fae3f19114d7a8e84a28b101e6a0f1d8b9646d0bf1a0f53fbaff74205a405d0",
                             "mrsigner": "0xc4b220e897bd21ab163a3d5e2e8df81f7290c0ef49748bdf5f2a1b24d7bc902c",
-                            "attestation_verified": True,
+                            "attestation_verified": False,
+                            "emulation_mode": True,
+                            "hardware_attestation_status": "SIMULATED_SOFTWARE_ONLY",
+                            "simulation_notice": "In-process software simulation for benchmarking; physical hardware enclave attestation unavailable.",
                         }
                     )
 
@@ -205,7 +216,10 @@ class PSIService:
                         "enclave_execution": True,
                         "mrenclave": "0x8fae3f19114d7a8e84a28b101e6a0f1d8b9646d0bf1a0f53fbaff74205a405d0",
                         "mrsigner": "0xc4b220e897bd21ab163a3d5e2e8df81f7290c0ef49748bdf5f2a1b24d7bc902c",
-                        "attestation_verified": True,
+                        "attestation_verified": False,
+                        "emulation_mode": True,
+                        "hardware_attestation_status": "SIMULATED_SOFTWARE_ONLY",
+                        "simulation_notice": "In-process software simulation for benchmarking; physical hardware enclave attestation unavailable.",
                     }
                 else:
                     encrypted_a = []

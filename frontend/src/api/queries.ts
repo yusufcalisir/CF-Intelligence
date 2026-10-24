@@ -241,6 +241,10 @@ import type {
   AssetRecoverySummaryResponse,
   TimelineDataPointResponse,
   TypologyBreakdownResponse,
+  CrossBankIntelligenceSignal,
+  CrossBankIntelligenceQueryPayload,
+  CrossBankEvidenceAttachPayload,
+  CrossBankEvidenceAttachResponse,
 } from './types';
 
 
@@ -3487,3 +3491,40 @@ export function useAssetRecoveryBreakdown() {
     refetchInterval: 60_000,
   });
 }
+
+// ── Cross-Bank Intelligence (Authorized Consortium Workflow) ──
+
+export function useQueryCrossBankIntelligence() {
+  return useMutation<CrossBankIntelligenceSignal, Error, CrossBankIntelligenceQueryPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<CrossBankIntelligenceSignal>(
+        '/api/v1/intelligence/cross-bank/query',
+        payload,
+      );
+      return data;
+    },
+  });
+}
+
+export function useAttachCrossBankEvidence() {
+  const queryClient = useQueryClient();
+  return useMutation<CrossBankEvidenceAttachResponse, Error, CrossBankEvidenceAttachPayload>({
+    mutationFn: async ({ case_id, signal, analyst_notes, idempotency_key }) => {
+      const { data } = await apiClient.post<CrossBankEvidenceAttachResponse>(
+        `/api/v1/cases/${case_id}/evidence/cross-bank-intelligence`,
+        {
+          signal,
+          analyst_notes,
+          idempotency_key,
+        },
+      );
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['case', variables.case_id] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['evidence', variables.case_id] });
+    },
+  });
+}
+

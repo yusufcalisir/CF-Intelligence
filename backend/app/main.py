@@ -53,6 +53,7 @@ from app.presentation.routers import (
     compliance,
     coordinator,
     core_banking_gateway,
+    cross_bank_intelligence,
     dashboard,
     design_partner,
     diagnostics,
@@ -1418,6 +1419,8 @@ elif service_name == "identity-graph":
     app.include_router(entities.psi_api_router)
     app.include_router(graph.router)
     app.include_router(graph.api_router)
+    app.include_router(cross_bank_intelligence.router)
+    app.include_router(cross_bank_intelligence.api_router)
 
 elif service_name == "fraud-alert":
     app.include_router(health.router)
@@ -1427,6 +1430,8 @@ elif service_name == "fraud-alert":
     app.include_router(alerts.api_router)
     app.include_router(cases.router)
     app.include_router(cases.api_router)
+    app.include_router(cross_bank_intelligence.router)
+    app.include_router(cross_bank_intelligence.api_router)
     app.include_router(predict.router)
     app.include_router(predict.api_router)
     app.include_router(rules.router)
@@ -1478,6 +1483,8 @@ else:
     app.include_router(alerts.api_router)
     app.include_router(cases.router)
     app.include_router(cases.api_router)
+    app.include_router(cross_bank_intelligence.router)
+    app.include_router(cross_bank_intelligence.api_router)
     app.include_router(predict.router)
     app.include_router(predict.api_router)
     app.include_router(rules.router)

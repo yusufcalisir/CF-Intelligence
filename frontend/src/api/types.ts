@@ -3583,3 +3583,58 @@ export interface ComparativeBenchmarkResponse {
   silo_deficit_analysis: SiloDeficitAnalysis;
 }
 
+// ── Cross-Bank Intelligence (Authorized Consortium Workflow) ──
+
+export interface CrossBankIntelligenceSignal {
+  signal_id: string;
+  query_entity_id?: string | null;
+  privacy_hash_truncated: string;
+  consortium_id: string;
+  requesting_bank_id: string;
+  target_bank_id?: string | null;
+  match_confirmed: boolean;
+  match_category: 'EXACT_MATCH' | 'FUZZY_MATCH' | 'NO_MATCH' | 'INSUFFICIENT_DATA';
+  match_confidence: number;
+  contributing_institutions_count: number;
+  contributing_institutions: string[];
+  sanitized_risk_level: string;
+  sanitized_typology_indicators: string[];
+  observation_first_seen?: string | null;
+  observation_last_seen?: string | null;
+  attestation_status: 'VERIFIED_HARDWARE_SGX' | 'UNAVAILABLE_NO_HARDWARE_ENCLAVE' | 'SIMULATED_SOFTWARE_ONLY';
+  hardware_enclave_active: boolean;
+  evidence_hash: string;
+  disclaimer: string;
+  created_at: string;
+}
+
+export interface CrossBankIntelligenceQueryPayload {
+  requesting_bank_id: string;
+  query_entity_id?: string;
+  privacy_id?: string;
+  consortium_id: string;
+  target_bank_id?: string;
+  require_hardware_attestation?: boolean;
+  execution_mode?: 'DEMO_SIMULATED' | 'VERIFIED_OPERATIONAL';
+}
+
+export interface CrossBankEvidenceAttachPayload {
+  case_id: string;
+  signal: CrossBankIntelligenceSignal;
+  analyst_notes?: string;
+  idempotency_key?: string;
+}
+
+export interface CrossBankEvidenceAttachResponse {
+  evidence_id: string;
+  case_id: string;
+  evidence_type: string;
+  title: string;
+  content_hash: string;
+  uploaded_at: string;
+  uploaded_by: string;
+  case_version: number;
+  timeline_event_recorded: boolean;
+}
+
+

@@ -88,6 +88,7 @@ To prevent ambiguity between production-grade components, algorithmic research e
   - Secure Aggregation via Curve25519 pairwise Diffie-Hellman zero-sum masking and Shamir dropout recovery.
   - Byzantine consensus aggregators (`Krum`, `Coordinate-wise Trimmed Mean`, `Bulyan`) and Spectral SVD backdoor detection.
   - Relational graph intelligence via PyTorch `GraphSAGE` 2-hop neighborhood embeddings and MinHash LSH Fuzzy PSI.
+  - Cross-Bank Intelligence & Case Evidence Anchoring (`cross_bank_intelligence.py`): Consortium-authorized entity matching, zero-raw-PII signal exchange, fail-closed hardware attestation boundary, and SHA-256 case evidence ledger anchoring under Four-Eyes dual control.
   - Security perimeter: BOLA/IDOR tenant isolation, SSRF defense (RFC 1918 / loopback / cloud metadata blocking), slowapi rate limiting.
   - Enterprise persistence & messaging: PostgreSQL multi-tenant schema isolation, Redis Sentinel HA integration, Kafka streaming connectors with stale-worker reservation idempotency.
 
@@ -542,6 +543,13 @@ To discover overlapping high-risk entities across banks without exposing custome
 ### 8.3 Cross-Border Ultimate Beneficial Ownership (UBO) Graph Intelligence (`ubo_graph_service.py`)
 - Analyzes heterogeneous corporate ownership graphs combining natural persons, shell companies, and offshore jurisdictions.
 - Computes recursive shareholder equity propagation to reveal hidden controlling parties and PEP sanctions evasion networks.
+
+### 8.4 Authorized Cross-Bank Intelligence & Evidence Anchoring (`cross_bank_intelligence.py`)
+Operationalizes consortium membership and privacy-preserving entity resolution into an analyst investigation workflow:
+- **Consortium Membership & Negative Authorization:** Validates requesting bank authority, active consortium status, and counterpart bank eligibility via `DurableConsortiumStore`. Revoked, evicted, or suspended members fail closed with `HTTP 403 Forbidden`.
+- **Zero-Raw-PII Disclosure Guarantee:** Sanitizes matched entities to eliminate raw customer names, tax IDs, account numbers, and contact details. Outputs normalized risk confidence ($0.0 - 1.0$), category indicators (`SUSPECTED_MULE_NETWORK`, `ACCOUNT_TAKEOVER`), and observation timestamps.
+- **Fail-Closed Hardware Attestation Boundary:** Software emulation paths explicitly report `SIMULATED_SOFTWARE_ONLY` (`emulation_mode: True`). When institutional policy mandates physical enclave execution (`require_hardware_attestation: True`), the service fails closed with `HTTP 412 Precondition Failed` rather than fabricating hardware measurements.
+- **Evidence Registry Integration:** Anchors permitted intelligence signals into the institution's case ledger (`EvidenceRegistryService`) with SHA-256 digests, preserving Four-Eyes dual control and enforcing terminal case immutability (`HTTP 409 Conflict`).
 
 ---
 
@@ -1228,6 +1236,8 @@ The reports below document the internal scientific verification suites validatin
 | **European AML Rules** | `POST /api/v1/scenarios/european-aml/evaluate` | European AML Monitoring Scenario Rule Engine | Deterministic FATF/EBA rules | [Section 18.18 ↗](docs/api_reference.md#1818-european-aml-monitoring-scenario-library--hybrid-deterministic-rule-engine-api-apiv1scenarioseuropean-aml) |
 | **Asset Recovery** | `POST /api/v1/operations/asset-recovery/hold` | Collaborative FININT Asset Freeze & Containment | Immediate inter-bank hold | [Section 18.19 ↗](docs/api_reference.md#1819-asset-recovery--collaborative-finint-operational-hub-api-apiv1operationsasset-recovery) |
 | **FL Coordinator** | `GET /api/v1/coordinator/clients` | Bank Edge-Node Telemetry & Hyperparameters | Hardware-aware negotiation | [Section 18.20 ↗](docs/api_reference.md#1820-federated-learning-coordinator--bank-node-telemetry-api-apiv1coordinator) |
+| **Cross-Bank Intel** | `POST /api/v1/intelligence/cross-bank/query` | Authorized Consortium Entity Matching | Zero-raw-PII signal exchange | [Section 18.21 ↗](docs/api_reference.md#1821-authorized-cross-bank-intelligence-query) |
+| **Evidence Anchoring** | `POST /api/v1/intelligence/cross-bank/attach-to-case` | Cross-Bank Case Evidence Anchoring | SHA-256 evidence record | [Section 18.22 ↗](docs/api_reference.md#1822-cross-bank-case-evidence-anchoring) |
 
 ### 18.2 Representative Core Endpoint Blueprints
 
