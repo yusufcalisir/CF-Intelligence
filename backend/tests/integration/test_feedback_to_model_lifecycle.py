@@ -8,6 +8,7 @@ Verified holdout evaluation -> Governance review (No automatic champion promotio
 
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -717,4 +718,216 @@ def test_feedback_pipeline_persistence_failure_rollback_and_stale_reclamation(tm
     assert dead_item["status"] == "VALIDATED_FOR_TRAINING"
     assert active_item["reserved_job_id"] == "active_worker_job_42"
     assert active_item["status"] == "RESERVED_FOR_TRAINING"
+
+
+# ---------------------------------------------------------------------------
+# 11. Defect 1 Regression: Matching Manifest Metadata Lacking Worker Evidence Does NOT Consume Feedback
+# ---------------------------------------------------------------------------
+def test_matching_manifest_lacking_worker_evidence_does_not_consume_feedback(tmp_path: Path) -> None:
+    """Verifies that a genuine completed federation result matching manifest metadata
+    does NOT attest feedback lineage or consume feedback when genuine worker inclusion receipts are absent.
+    Retraining still completes successfully as generic drift retraining without automatic champion promotion.
+    """
+    storage_dir = str(tmp_path / "label_feedback")
+    pipeline = LocalLabelFeedbackPipeline(storage_dir=storage_dir)
+
+    # Ingest 3 validated feedback items for bank_alpha
+    for i in range(3):
+        pipeline.ingest_analyst_determination(
+            tenant_id="bank_alpha",
+            transaction_id_hash=f"hash_manifest_test_{i:02d}_000000000000000000000000000000",
+            determination="CONFIRMED_FRAUD",
+            validated_for_training=True,
+            source_provenance="CASE_RESOLUTION",
+        )
+
+    # Mock operational federation service returning completed result matching job_id and manifests,
+    # but with feedback_lineage_verified=False (as produced by OperationalFederationService when worker receipts are absent)
+    mock_op = MagicMock()
+
+    def _mock_op_exec(*args, **kwargs):
+        jid = kwargs.get("job_id")
+        return {
+            "status": "COMPLETED",
+            "job_id": jid,
+            "feedback_lineage_verified": False,  # No worker receipts
+            "verified_feedback_jobs": [],
+            "feedback_manifests": {
+                "bank_alpha": {
+                    "job_id": jid,
+                    "bank_id": "bank_alpha",
+                    "sample_count": 3,
+                }
+            },
+            "is_verified": True,
+            "candidate_model_version": "v4.0.0-rc1",
+            "evaluation_metrics": {"pr_auc": 0.89, "roc_auc": 0.92},
+            "saved_version": {"version": 4, "status": "candidate"},
+            "is_promoted_champion": False,
+        }
+
+    mock_op.execute_operational_federation.side_effect = _mock_op_exec
+
+    retraining_svc = DriftTriggeredRetrainingService(
+        psi_threshold=0.20,
+        operational_service=mock_op,
+        feedback_pipeline=pipeline,
+        min_feedback_samples=2,
+    )
+
+    job = retraining_svc.create_manual_job(reason="Test manifest without worker receipts")
+    result = retraining_svc.execute_retraining_pipeline(
+        job_id=job.job_id,
+        participating_banks=["bank_alpha"],
+    )
+
+    # Invariant: Generic retraining completed with candidate model
+    assert result["status"] == "COMPLETED"
+    assert result["candidate_model_version"] in ("v4", "v4.0.0-rc1")
+    assert result["is_promoted_champion"] is False
+
+    # Invariant: Feedback was NOT consumed due to lack of worker inclusion evidence
+    assert result["feedback_consumed"] is False
+    assert result["committed_feedback_samples"] == 0
+    assert "did not provide verified feedback lineage" in result.get("feedback_lineage_unverified_reason", "")
+
+    # Invariant: Reserved feedback was safely released back to unconsumed pool
+    stats = pipeline.get_buffer_stats("bank_alpha")
+    assert stats["consumed_count"] == 0
+    assert stats["reserved_count"] == 0
+    assert stats["unconsumed_count"] == 3
+
+
+# ---------------------------------------------------------------------------
+# 12. Defect 2 Regression: Direct Ingestion Client-Controlled Case Metadata Safeguards
+# ---------------------------------------------------------------------------
+def test_direct_ingest_client_controlled_case_metadata_safeguards(tmp_path: Path) -> None:
+    """Verifies that direct API submissions (/api/v1/feedback/ingest) are treated as unverified observations
+    and cannot authorize training labels via caller-supplied case_id, forged source_provenance, or flags.
+    """
+    case_svc = CaseManagementService()
+    alert_svc = AlertIntelligenceService()
+
+    # Create a real closed case in bank_alpha
+    alert_alpha = Alert(
+        id=f"alt_auth_alpha_{uuid.uuid4().hex[:8]}",
+        bank_id="bank_alpha",
+        transaction_id=f"tx_auth_alpha_{uuid.uuid4().hex[:8]}",
+        severity=AlertSeverity.HIGH,
+        status=AlertStatus.NEW,
+    )
+    alert_svc.create_alert(alert_alpha)
+
+    case_alpha = case_svc.create_case(
+        title="Authoritative Case Alpha",
+        priority=CasePriority.P2_HIGH,
+        alert_ids=[alert_alpha.id],
+        bank_id="bank_alpha",
+    )
+    case_svc.assign_case(case_alpha.id, investigator="lead_investigator_1")
+    case_svc.change_status(
+        case_id=case_alpha.id,
+        new_status=CaseStatus.INVESTIGATING,
+        actor="lead_investigator_1",
+    )
+    case_svc.change_status(
+        case_id=case_alpha.id,
+        new_status=CaseStatus.CLOSED_FALSE_POSITIVE,
+        actor="supervisor_1",
+        supervisor_signature="sig_sup_1",
+    )
+    closed_case = case_svc.get_case(case_alpha.id)
+    assert closed_case.status == CaseStatus.CLOSED_FALSE_POSITIVE
+
+    # Case B in bank_beta
+    case_beta = case_svc.create_case(
+        title="Case Beta",
+        priority=CasePriority.P3_MEDIUM,
+        alert_ids=[],
+        bank_id="bank_beta",
+    )
+    case_svc.assign_case(case_beta.id, investigator="beta_investigator")
+    case_svc.change_status(
+        case_id=case_beta.id,
+        new_status=CaseStatus.INVESTIGATING,
+        actor="beta_investigator",
+    )
+    case_svc.change_status(
+        case_id=case_beta.id,
+        new_status=CaseStatus.CLOSED_CONFIRMED,
+        actor="beta_supervisor",
+        supervisor_signature="sig_beta_sup",
+    )
+
+    # 1. Unrelated closed case: Caller passes metadata.case_id of closed_case for an unrelated transaction/alert
+    resp1 = client.post(
+        "/api/v1/feedback/ingest",
+        json={
+            "tenant_id": "bank_alpha",
+            "transaction_id_hash": "e111111111111111111111111111111111111111111111111111111111111111",
+            "determination": "CONFIRMED_FRAUD",
+            "metadata": {"case_id": closed_case.id},
+            "notes": "Direct submission claiming closed case relation",
+        },
+    )
+    assert resp1.status_code == 201
+    item1 = resp1.json()["item"]
+    assert item1["validated_for_training"] is False
+    assert item1["source_provenance"] == "DIRECT_INGEST"
+    assert item1["status"] == "DURABLY_RECORDED"
+
+    # 2. Different-tenant case: Caller from bank_alpha references case_beta
+    resp2 = client.post(
+        "/api/v1/feedback/ingest",
+        json={
+            "tenant_id": "bank_alpha",
+            "transaction_id_hash": "e222222222222222222222222222222222222222222222222222222222222222",
+            "determination": "CONFIRMED_FRAUD",
+            "metadata": {"case_id": case_beta.id},
+            "notes": "Direct submission referencing cross-tenant case",
+        },
+    )
+    assert resp2.status_code == 201
+    item2 = resp2.json()["item"]
+    assert item2["validated_for_training"] is False
+    assert item2["source_provenance"] == "DIRECT_INGEST"
+
+    # 3. Mismatched label: Closed case was CLOSED_FALSE_POSITIVE, caller passes CONFIRMED_FRAUD
+    resp3 = client.post(
+        "/api/v1/feedback/ingest",
+        json={
+            "tenant_id": "bank_alpha",
+            "alert_id": alert_alpha.id,
+            "determination": "CONFIRMED_FRAUD",
+            "metadata": {"case_id": closed_case.id},
+            "notes": "Direct submission attempting to invert case label",
+        },
+    )
+    assert resp3.status_code == 201
+    item3 = resp3.json()["item"]
+    # Even referencing matching alert and case, direct API cannot create authoritative training label
+    assert item3["validated_for_training"] is False
+    assert item3["source_provenance"] == "DIRECT_INGEST"
+
+    # 4. Forged metadata flags: Caller tries to spoof validated_for_training and CASE_RESOLUTION
+    resp4 = client.post(
+        "/api/v1/feedback/ingest",
+        json={
+            "tenant_id": "bank_alpha",
+            "transaction_id_hash": "e444444444444444444444444444444444444444444444444444444444444444",
+            "determination": "CONFIRMED_FRAUD",
+            "metadata": {
+                "case_id": closed_case.id,
+                "validated_for_training": True,
+                "source_provenance": "CASE_RESOLUTION",
+                "prediction_evidence_correlated": True,
+            },
+        },
+    )
+    assert resp4.status_code == 201
+    item4 = resp4.json()["item"]
+    assert item4["validated_for_training"] is False
+    assert item4["source_provenance"] == "DIRECT_INGEST"
+    assert item4["prediction_evidence_correlated"] is False
+
 

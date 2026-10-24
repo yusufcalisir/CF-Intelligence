@@ -216,6 +216,11 @@ async def _ingest_handler(
         action_name="ingest_feedback",
     )
 
+    # Authoritative training labels are created EXCLUSIVELY via trusted server-side terminal case resolution
+    # (CaseManagementService.change_status -> post-commit Four-Eyes publication path).
+    # Direct API submissions (/ingest, /submit) are unverified observations/allegations.
+    # A caller must NEVER create authoritative training ground truth by referencing an unrelated closed case,
+    # supplying forged metadata (e.g. metadata.case_id, source_provenance), or setting validation flags (AGENTS.md).
     validated_for_training = False
     prediction_evidence_correlated = False
 
@@ -235,60 +240,11 @@ async def _ingest_handler(
                         f"'{alert.bank_id}', but authorized tenant is '{authorized_tenant}'."
                     ),
                 )
-            # Merely finding an alert with a matching tenant must not automatically establish an authoritative training label.
-            # Direct analyst submissions are recorded as unverified allegations (ineligible for retraining)
-            # unless backed by an approved terminal case determination (CLOSED_CONFIRMED / CLOSED_FALSE_POSITIVE).
-            case_id = (payload.metadata or {}).get("case_id") if payload.metadata else None
-            is_case_resolved = False
-            if case_id:
-                try:
-                    from app.application.services.case_service import CaseManagementService
-                    from app.domain.enums import CaseStatus
-
-                    case_svc = CaseManagementService()
-                    existing_case = case_svc.get_case(case_id)
-                    if existing_case and existing_case.status in (
-                        CaseStatus.CLOSED_CONFIRMED,
-                        CaseStatus.CLOSED_FALSE_POSITIVE,
-                    ):
-                        is_case_resolved = True
-                except Exception:
-                    is_case_resolved = False
-
-            validated_for_training = is_case_resolved
         else:
-            validated_for_training = False
             logger.info(
-                "Feedback ingested for unindexed alert '%s': recorded durably but not validated for retraining.",
+                "Feedback ingested for unindexed alert '%s': recorded durably but unvalidated.",
                 payload.alert_id,
             )
-
-        if alert is not None and alert.transaction_id:
-            try:
-                from app.application.services.model_registry import (
-                    ModelEvaluationEngine,
-                    ModelRegistry,
-                )
-
-                eval_engine = ModelEvaluationEngine(ModelRegistry())
-                raw_det = str(getattr(payload.determination, "value", payload.determination))
-                actual_label = 1 if raw_det == "CONFIRMED_FRAUD" else 0
-                for sim in ("default_sim", "sim_retrain_default"):
-                    try:
-                        eval_engine.log_feedback(
-                            simulation_id=sim,
-                            transaction_id=alert.transaction_id,
-                            actual_label=actual_label,
-                            bank_id=authorized_tenant,
-                        )
-                        prediction_evidence_correlated = True
-                        break
-                    except (KeyError, PermissionError):
-                        continue
-            except Exception as eval_exc:
-                logger.debug(
-                    "Evaluation engine correlation notice for alert %s: %s", alert.id, eval_exc
-                )
 
     try:
         case_id = (payload.metadata or {}).get("case_id") if payload.metadata else None

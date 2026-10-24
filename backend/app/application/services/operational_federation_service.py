@@ -1335,18 +1335,61 @@ class OperationalFederationService:
             feedback_lineage_verified = False
             verified_feedback_jobs: list[str] = []
             if feedback_manifests:
-                all_valid = True
-                for b_name, m_data in feedback_manifests.items():
-                    norm_b = b_name.strip().upper()
-                    if norm_b not in banks:
-                        all_valid = False
-                        break
-                    if isinstance(m_data, dict) and m_data.get("job_id") != clean_job_id:
-                        all_valid = False
-                        break
-                if all_valid:
-                    feedback_lineage_verified = True
-                    verified_feedback_jobs = [clean_job_id]
+                # To attest feedback lineage, we require genuine worker execution receipts / training authority
+                # evidence proving actual inclusion of the reserved feedback samples in model training.
+                # Request consistency (matching job_id or participant bank names) alone MUST NEVER produce
+                # an authoritative training-inclusion attestation (AGENTS.md).
+                worker_feedback_evidence = (
+                    result.get("worker_feedback_evidence")
+                    or result.get("worker_feedback_receipts")
+                    or {}
+                )
+                if isinstance(worker_feedback_evidence, dict) and worker_feedback_evidence:
+                    all_manifests_verified = True
+                    for b_name, m_data in feedback_manifests.items():
+                        norm_b = b_name.strip().upper()
+                        if norm_b not in banks:
+                            all_manifests_verified = False
+                            break
+                        worker_ev = worker_feedback_evidence.get(b_name) or worker_feedback_evidence.get(norm_b)
+                        if not isinstance(worker_ev, dict):
+                            all_manifests_verified = False
+                            break
+                        # Validate worker evidence: job_id, bank, sample count / digest
+                        if worker_ev.get("job_id") != clean_job_id:
+                            all_manifests_verified = False
+                            break
+                        expected_count = m_data.get("sample_count", 0) if isinstance(m_data, dict) else 0
+                        actual_count = worker_ev.get("sample_count", 0)
+                        if expected_count > 0 and actual_count < expected_count:
+                            all_manifests_verified = False
+                            break
+                        manifest_hashes = m_data.get("sample_hashes") if isinstance(m_data, dict) else None
+                        worker_hashes = worker_ev.get("sample_hashes")
+                        if manifest_hashes and worker_hashes and set(manifest_hashes) != set(worker_hashes):
+                            all_manifests_verified = False
+                            break
+                    if all_manifests_verified:
+                        feedback_lineage_verified = True
+                        verified_feedback_jobs = [clean_job_id]
+                    else:
+                        feedback_lineage_verified = False
+                        verified_feedback_jobs = []
+                        logger.warning(
+                            "Feedback manifests provided for job '%s', but worker evidence validation failed. "
+                            "feedback_lineage_verified=False.",
+                            clean_job_id,
+                        )
+                else:
+                    # Genuine worker execution receipts are unavailable.
+                    # Manifest acceptance or coordinator metadata echo alone is NOT authoritative.
+                    feedback_lineage_verified = False
+                    verified_feedback_jobs = []
+                    logger.info(
+                        "Operational federation for job '%s' received feedback manifests, but lacks "
+                        "authoritative worker feedback inclusion receipts. feedback_lineage_verified remains False.",
+                        clean_job_id,
+                    )
 
             return {
                 "job_id": clean_job_id,

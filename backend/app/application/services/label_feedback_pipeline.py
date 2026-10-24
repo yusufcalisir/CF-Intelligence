@@ -292,6 +292,19 @@ class LocalLabelFeedbackPipeline:
                         break
 
             if existing_item is not None:
+                if (
+                    existing_item.validated_for_training
+                    and existing_item.source_provenance == "CASE_RESOLUTION"
+                    and source_provenance == "DIRECT_INGEST"
+                ):
+                    logger.warning(
+                        "Direct unverified ingest attempt ignored for authoritative CASE_RESOLUTION item "
+                        "tenant '%s', alert '%s' (AGENTS.md).",
+                        tenant_id,
+                        existing_item.alert_id,
+                    )
+                    return existing_item
+
                 prev_dict = existing_item.to_dict()
                 existing_item.label = label
                 existing_item.weight = weight

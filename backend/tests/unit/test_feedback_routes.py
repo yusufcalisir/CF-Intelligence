@@ -164,7 +164,7 @@ def test_retraining_batch_sampling_and_consumption() -> None:
     stats_resp1 = client.get(f"/api/v1/feedback/stats/{tenant}")
     assert stats_resp1.json()["unconsumed_count"] == 5
 
-    # Sample and mark consumed under /v1/feedback/retraining-batch
+    # Sample and mark consumed under /v1/feedback/retraining-batch is prohibited (HTTP 400 Bad Request)
     batch_resp2 = client.post(
         "/v1/feedback/retraining-batch",
         json={
@@ -174,13 +174,8 @@ def test_retraining_batch_sampling_and_consumption() -> None:
             "mark_consumed": True,
         },
     )
-    assert batch_resp2.status_code == 200
-    batch_data2 = batch_resp2.json()
-    assert batch_data2["batch_size"] == 5
-
-    # Buffer should now have 0 unconsumed items
-    stats_resp2 = client.get(f"/api/v1/feedback/stats/{tenant}")
-    assert stats_resp2.json()["unconsumed_count"] == 0
+    assert batch_resp2.status_code == 400
+    assert "mark_consumed=True is prohibited" in batch_resp2.json()["detail"]
 
 
 def test_dp_gradient_computation_and_noise_addition() -> None:
