@@ -170,6 +170,7 @@ class Consortium:
     members: dict[str, ConsortiumMember] = field(default_factory=dict)
     removed_members: dict[str, dict[str, Any]] = field(default_factory=dict)
     created_at: datetime.datetime = field(default_factory=lambda: datetime.datetime.now(UTC))
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.consortium_id = self.consortium_id.lower().strip()

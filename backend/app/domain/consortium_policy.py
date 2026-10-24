@@ -264,6 +264,8 @@ class ConsortiumPolicyEngine:
         """
         reasons: list[str] = []
         clean_requesting = requesting_bank.lower().strip()
+        c_meta = getattr(consortium, "metadata", {}) or {}
+        sharing_policy = c_meta.get("intelligence_sharing_policy", {})
 
         # 1. Consortium active status
         from app.domain.consortium_governance import ConsortiumStatus
@@ -273,7 +275,7 @@ class ConsortiumPolicyEngine:
                 f"Consortium '{consortium.consortium_id}' is in non-active status '{consortium.status.value}'. Intelligence queries are prohibited."
             )
 
-        # 2. Requesting bank membership and eviction check
+        # 2. Requesting bank membership and eviction check (Immediate Revocation Enforcement)
         if clean_requesting in consortium.removed_members:
             reasons.append(
                 f"Institution '{clean_requesting}' has been evicted/revoked from consortium '{consortium.consortium_id}'."
@@ -283,10 +285,14 @@ class ConsortiumPolicyEngine:
                 f"Institution '{clean_requesting}' is not an active member of consortium '{consortium.consortium_id}'."
             )
 
-        # 3. Purpose authorization (Deny by default)
-        if purpose not in self.intelligence_config.allowed_purposes:
+        # 3. Purpose authorization (Authoritative per-consortium policy or default treaty, Deny by default)
+        allowed_purposes = (
+            sharing_policy.get("allowed_purposes")
+            or self.intelligence_config.allowed_purposes
+        )
+        if purpose not in allowed_purposes:
             reasons.append(
-                f"Intelligence query purpose '{purpose}' is not authorized under consortium governance policy. Permitted: {self.intelligence_config.allowed_purposes}. Denied by default."
+                f"Intelligence query purpose '{purpose}' is not authorized under consortium governance policy. Permitted: {allowed_purposes}. Denied by default."
             )
 
         # 4. Target banks membership and eviction check
@@ -301,31 +307,80 @@ class ConsortiumPolicyEngine:
                     f"Target institution '{clean_tb}' is not an active member of consortium '{consortium.consortium_id}'."
                 )
 
-        # 5. Cross-border sovereignty checks
-        if requesting_jurisdiction or target_jurisdictions:
-            req_jur = requesting_jurisdiction or "eu-central-1"
-            if req_jur not in self.intelligence_config.allowed_jurisdictions:
-                reasons.append(
-                    f"Requesting institution operates in unapproved jurisdiction '{req_jur}'."
-                )
-            if target_jurisdictions:
-                for tb, tjur in target_jurisdictions.items():
-                    if tjur not in self.intelligence_config.allowed_jurisdictions:
-                        reasons.append(
-                            f"Target institution '{tb}' operates in unapproved jurisdiction '{tjur}'."
-                        )
-                    elif (
-                        tjur != req_jur
-                        and not self.intelligence_config.allow_cross_border_intelligence
-                    ):
-                        reasons.append(
-                            f"Cross-border intelligence disclosure between '{req_jur}' and '{tjur}' is prohibited without explicit consortium sovereignty treaty."
-                        )
+        # 5. Cross-border sovereignty checks (No silent region fallbacks)
+        inst_jurisdictions = (
+            sharing_policy.get("institution_jurisdictions")
+            or c_meta.get("institution_jurisdictions")
+            or {}
+        )
+        allowed_jurisdictions = (
+            sharing_policy.get("allowed_jurisdictions")
+            or self.intelligence_config.allowed_jurisdictions
+        )
+        allow_cross_border = (
+            sharing_policy.get("allow_cross_border_intelligence")
+            if "allow_cross_border_intelligence" in sharing_policy
+            else (
+                sharing_policy.get("allow_cross_border_sharing")
+                if "allow_cross_border_sharing" in sharing_policy
+                else self.intelligence_config.allow_cross_border_intelligence
+            )
+        )
 
-        # 6. Disclosure scope determination
+        has_jurisdiction_context = bool(
+            requesting_jurisdiction
+            or target_jurisdictions
+            or inst_jurisdictions
+            or sharing_policy.get("enforce_jurisdiction", False)
+            or ("allow_cross_border_sharing" in sharing_policy and not sharing_policy["allow_cross_border_sharing"])
+            or ("allow_cross_border_intelligence" in sharing_policy and not sharing_policy["allow_cross_border_intelligence"])
+        )
+
+        if has_jurisdiction_context:
+            req_jur = requesting_jurisdiction or inst_jurisdictions.get(clean_requesting)
+            if not req_jur:
+                reasons.append(
+                    f"Authoritative jurisdiction for requesting institution '{clean_requesting}' is not registered and was not supplied. Denied by default."
+                )
+            elif req_jur not in allowed_jurisdictions:
+                reasons.append(
+                    f"Requesting institution operates in unapproved jurisdiction '{req_jur}' (Allowed: {allowed_jurisdictions})."
+                )
+
+            for tb in target_banks:
+                clean_tb = tb.lower().strip()
+                tb_jur = (target_jurisdictions or {}).get(clean_tb) or inst_jurisdictions.get(clean_tb)
+                if not tb_jur:
+                    reasons.append(
+                        f"Authoritative jurisdiction for target institution '{clean_tb}' is not registered and was not supplied. Denied by default."
+                    )
+                elif tb_jur not in allowed_jurisdictions:
+                    reasons.append(
+                        f"Target institution '{clean_tb}' operates in unapproved jurisdiction '{tb_jur}' (Allowed: {allowed_jurisdictions})."
+                    )
+                elif req_jur and tb_jur != req_jur and not allow_cross_border:
+                    reasons.append(
+                        f"Cross-border intelligence disclosure between '{req_jur}' and '{tb_jur}' is prohibited without explicit consortium sovereignty treaty."
+                    )
+
+        # 6. Disclosure scope determination (Per-consortium governance overrides)
         allow_identities = bool(
-            getattr(consortium, "metadata", {}).get("allow_institution_identity_sharing")
-            or self.intelligence_config.allow_institution_identity_sharing
+            sharing_policy.get("allow_institution_identity_sharing")
+            if "allow_institution_identity_sharing" in sharing_policy
+            else (
+                c_meta.get("allow_institution_identity_sharing")
+                or self.intelligence_config.allow_institution_identity_sharing
+            )
+        )
+        allow_fuzzy = bool(
+            sharing_policy.get("allow_fuzzy_matching")
+            if "allow_fuzzy_matching" in sharing_policy
+            else self.intelligence_config.allow_fuzzy_matching
+        )
+        min_fuzzy_thresh = float(
+            sharing_policy.get("min_fuzzy_confidence_threshold")
+            if "min_fuzzy_confidence_threshold" in sharing_policy
+            else self.intelligence_config.min_fuzzy_confidence_threshold
         )
 
         disclosure_scope: dict[str, Any] = {
@@ -333,8 +388,8 @@ class ConsortiumPolicyEngine:
             "disclosure_mode": "ATTRIBUTED_INSTITUTIONS"
             if allow_identities
             else "ANONYMIZED_SUMMARY",
-            "allow_fuzzy_matching": self.intelligence_config.allow_fuzzy_matching,
-            "min_fuzzy_confidence_threshold": self.intelligence_config.min_fuzzy_confidence_threshold,
+            "allow_fuzzy_matching": allow_fuzzy,
+            "min_fuzzy_confidence_threshold": min_fuzzy_thresh,
         }
 
         is_valid = len(reasons) == 0

@@ -36,6 +36,7 @@ from app.domain.consortium_governance import (
     ConsortiumStatus,
 )
 from app.domain.consortium_policy import ConsortiumPolicyEngine
+from app.domain.enums import CaseStatus
 from app.domain.value_objects_investigation import (
     calculate_jaccard_similarity,
 )
@@ -172,6 +173,22 @@ class CrossBankIntelligenceService:
                 "Production hardware attestation requirement failed closed."
             )
 
+        # Enforce Research Simulation Boundary (Fail-Closed in Production)
+        from app.config import get_settings
+
+        settings = get_settings()
+        if req.execution_mode == "SIMULATED_RESEARCH":
+            if settings.is_production or settings.app_env.lower() in ("production", "prod"):
+                raise ConsortiumSecurityError(
+                    "Research simulation mode is strictly prohibited in production environments. "
+                    "Production operations require verified operational matching with cryptographic attestation."
+                )
+            if not settings.is_cross_bank_simulation_allowed():
+                raise ConsortiumSecurityError(
+                    "Research simulation mode is disabled in this environment. Explicit configuration opt-in "
+                    "(enable_cross_bank_simulation) in an approved research/development environment is required."
+                )
+
         # 3. Authoritative Consortium Governance & Active Membership
         consortium = self.consortium_service.get_consortium(clean_consortium_id)
         if not consortium:
@@ -258,6 +275,14 @@ class CrossBankIntelligenceService:
         if req.privacy_id and req.privacy_id.strip() != query_privacy_id:
             raise ValueError(
                 f"Supplied privacy_id does not match the authoritative hash for local entity '{req.query_entity_id}'."
+            )
+
+        # Prevent querying operational institutional entities via simulation mode
+        if req.execution_mode == "SIMULATED_RESEARCH" and bool(
+            (source_entity.attributes or {}).get("is_production_operational", False)
+        ):
+            raise ConsortiumSecurityError(
+                "Operational institutional entities cannot be queried via research simulation mode."
             )
 
         # 6. Execute Privacy-Preserving Matching Across Eligible Consortium Members
@@ -352,6 +377,14 @@ class CrossBankIntelligenceService:
             else "UNOBSERVED"
         )
 
+        is_synthetic = bool(
+            req.execution_mode == "SIMULATED_RESEARCH"
+            or (source_entity.attributes or {}).get("is_synthetic_research", False)
+        )
+        is_authoritative = (
+            req.execution_mode == "VERIFIED_OPERATIONAL" and not is_synthetic
+        )
+
         signal = CrossBankIntelligenceSignal(
             signal_id=signal_id,
             consortium_id=clean_consortium_id,
@@ -377,9 +410,17 @@ class CrossBankIntelligenceService:
                 "earliest_consortium_observation": first_obs,
                 "latest_consortium_observation": last_obs,
                 "governance_authority": f"consortium:{clean_consortium_id}",
+                "execution_environment": "SIMULATED_RESEARCH_SANDBOX"
+                if not is_authoritative
+                else "VERIFIED_OPERATIONAL",
+                "operational_status": "OPERATIONAL"
+                if is_authoritative
+                else "NON_OPERATIONAL_SYNTHETIC",
             },
-            execution_mode="SIMULATED_RESEARCH",
+            execution_mode=req.execution_mode,
             attestation_status="SOFTWARE_EMULATED",
+            is_authoritative=is_authoritative,
+            is_synthetic=is_synthetic,
         )
 
         # 8. Record in Durable Authoritative Signal Store (Anti-Forgery Registry)
@@ -399,6 +440,11 @@ class CrossBankIntelligenceService:
             "issued_at": now.isoformat(),
             "expires_at": expires_at,
             "content_hash": content_hash,
+            "is_authoritative": is_authoritative,
+            "is_synthetic": is_synthetic,
+            "operational_status": "OPERATIONAL"
+            if is_authoritative
+            else "NON_OPERATIONAL_SYNTHETIC",
             "attached_to_cases": [],
         }
         self._signal_store.set(signal_id, authoritative_record)
@@ -487,7 +533,38 @@ class CrossBankIntelligenceService:
                 f"Client-fabricated or unauthorized signal attachment rejected."
             )
 
-        # Expiry check
+        # 3a. Authoritative Signal Content Integrity & Tamper Verification
+        signal_data = record.get("signal_data")
+        if not signal_data or not isinstance(signal_data, dict):
+            raise ValueError(
+                f"Corrupted authoritative signal record '{resolved_signal_id}': missing signal_data payload."
+            )
+
+        recomputed_hash = hashlib.sha256(
+            json.dumps(signal_data, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        if recomputed_hash != record.get("content_hash"):
+            raise ConsortiumSecurityError(
+                f"Authoritative signal failed server-side tamper verification for '{resolved_signal_id}': "
+                f"canonical content digest mismatch. Stored record has been tampered with or corrupted."
+            )
+
+        # 3b. Required Institutional and Principal Bindings
+        sig_requesting_bank = str(record.get("requesting_bank_id", "")).lower().strip()
+        if not sig_requesting_bank or sig_requesting_bank != case_bank:
+            raise PermissionError(
+                f"Cross-tenant signal violation: Authoritative signal '{resolved_signal_id}' was issued to institution "
+                f"'{sig_requesting_bank}', cannot be attached to case belonging to institution '{case_bank}'."
+            )
+
+        if not record.get("consortium_id"):
+            raise ValueError(f"Corrupted signal '{resolved_signal_id}': missing consortium_id binding.")
+        if not record.get("query_entity_id"):
+            raise ValueError(f"Corrupted signal '{resolved_signal_id}': missing query_entity_id binding.")
+        if not record.get("issued_to_principal"):
+            raise ValueError(f"Corrupted signal '{resolved_signal_id}': missing issuing principal binding.")
+
+        # 3c. Expiry check
         now = datetime.datetime.now(UTC)
         expires_at = datetime.datetime.fromisoformat(record["expires_at"])
         if expires_at.tzinfo is None:
@@ -497,13 +574,31 @@ class CrossBankIntelligenceService:
                 f"Authoritative signal '{resolved_signal_id}' has expired. Queries must be refreshed before attachment."
             )
 
-        # Institutional binding check
-        sig_requesting_bank = str(record.get("requesting_bank_id", "")).lower().strip()
-        if sig_requesting_bank != case_bank:
-            raise PermissionError(
-                f"Cross-tenant signal violation: Authoritative signal '{resolved_signal_id}' was issued to institution "
-                f"'{sig_requesting_bank}', cannot be attached to case belonging to institution '{case_bank}'."
+        # 3d. Prevent Simulated Intelligence from Entering Authoritative Evidence or Production Filings
+        from app.config import get_settings
+
+        settings = get_settings()
+        is_signal_simulated = bool(
+            signal_data.get("execution_mode") == "SIMULATED_RESEARCH"
+            or not record.get("is_authoritative", True)
+            or record.get("is_synthetic", False)
+        )
+
+        if is_signal_simulated:
+            if settings.is_production or settings.app_env.lower() in ("production", "prod"):
+                raise ValueError(
+                    "Simulated research intelligence cannot be attached to fraud cases in production environments."
+                )
+
+            is_authoritative_case = bool(
+                getattr(case, "is_authoritative", False)
+                or (getattr(case, "signature_metadata", {}) or {}).get("is_authoritative", False)
+                or case.status in (CaseStatus.ESCALATED, CaseStatus.SAR_FILED)
             )
+            if is_authoritative_case:
+                raise ConsortiumSecurityError(
+                    "Simulated research signals cannot be attached to authoritative fraud investigation evidence or regulatory filings."
+                )
 
         # 4. Revalidate Current Consortium Governance & Revocation Status
         consortium_id = str(record.get("consortium_id", "")).lower().strip()
@@ -550,8 +645,7 @@ class CrossBankIntelligenceService:
                     is_duplicate_submission=True,
                 )
 
-        # 6. Durably Register Evidence with CAS Rollback Protection
-        signal_data = record["signal_data"]
+        # 6. Durably Register Evidence with CAS Rollback Protection & Collision-Resistant Paths
         payload = {
             "signal_id": resolved_signal_id,
             "consortium_id": consortium_id,
@@ -562,21 +656,31 @@ class CrossBankIntelligenceService:
             "attached_by": uploader,
             "attached_at": now.isoformat(),
             "idempotency_key": idempotency_key,
+            "is_authoritative": not is_signal_simulated,
+            "operational_status": "OPERATIONAL"
+            if not is_signal_simulated
+            else "NON_OPERATIONAL_SYNTHETIC",
         }
         content_json = json.dumps(payload, sort_keys=True, indent=2)
+        payload_digest = hashlib.sha256(content_json.encode("utf-8")).hexdigest()
+        file_path = f"storage/evidence/case_{case_id}_signal_{resolved_signal_id}_{payload_digest[:16]}.json"
         title = f"Consortium Intelligence Evidence ({consortium_id.upper()})"
 
         ev = self.evidence_service.register_evidence(
             case_id=case_id,
             evidence_type="CROSS_BANK_INTELLIGENCE",
             title=title,
-            file_path=f"storage/evidence/consortium_signal_{resolved_signal_id[:8]}.json",
+            file_path=file_path,
             content=content_json,
             uploaded_by=uploader,
             metadata={
                 "signal_id": resolved_signal_id,
                 "consortium_id": consortium_id,
                 "idempotency_key": idempotency_key,
+                "is_authoritative": not is_signal_simulated,
+                "operational_status": "OPERATIONAL"
+                if not is_signal_simulated
+                else "NON_OPERATIONAL_SYNTHETIC",
             },
         )
 

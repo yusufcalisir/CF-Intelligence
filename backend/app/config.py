@@ -41,6 +41,14 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("enable_demo_fallback", "cfi_enable_demo_fallback"),
         description="Explicit opt-in required to allow heuristic fallback for simulated workflows. Disabled by default in production.",
     )
+    enable_cross_bank_simulation: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "enable_cross_bank_simulation",
+            "cfi_enable_cross_bank_simulation",
+        ),
+        description="Explicit opt-in required to allow cross-bank research simulation. Strictly disabled in production.",
+    )
 
     # ── FastAPI & CORS ────────────────────────
     api_host: str = "0.0.0.0"  # nosec B104
@@ -385,6 +393,16 @@ class Settings(BaseSettings):
         """Return True if running in production mode."""
         return self.app_env.lower() in ("production", "prod")
 
+    def is_cross_bank_simulation_allowed(self) -> bool:
+        """Determines whether software-emulated cross-bank research simulation is permitted."""
+        if self.is_production:
+            return False
+        return self.enable_cross_bank_simulation or self.app_env.lower() in (
+            "development",
+            "test",
+            "testing",
+        )
+
     def validate_production_invariants(self) -> None:
         """Enforces security-by-default and fail-closed validation when operating in production or staging mode.
 
@@ -397,6 +415,9 @@ class Settings(BaseSettings):
 
         if self.app_debug:
             violations.append("app_debug must be False in production.")
+
+        if self.enable_cross_bank_simulation:
+            violations.append("enable_cross_bank_simulation must be False in production.")
 
         if self.payload_signing_secret in (
             "cfi_local_secret_key_2026_change_me_in_production",

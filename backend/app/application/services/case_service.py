@@ -38,6 +38,12 @@ class CaseNotFoundError(ValueError):
     pass
 
 
+class EvidencePersistenceError(RuntimeError):
+    """Raised when durable evidence file I/O or cryptographic verification fails."""
+
+    pass
+
+
 def _hash_event(event: CaseEvent, parent_hash: str) -> str:
     """Generate SHA-256 block hash for timeline event signing."""
     event_str = f"{event.timestamp.isoformat()}|{event.event_type}|{event.description}|{event.actor}|{parent_hash}"
@@ -1165,13 +1171,19 @@ class EvidenceRegistryService:
         uploaded_by: str = "analyst",
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Register new evidence and link to a case with cryptographic hash verification."""
+        """Register new evidence and link to a case with cryptographic hash verification.
+
+        Guarantees:
+        - Atomic and collision-resistant durable file persistence.
+        - Fail-closed semantics: Never reports evidence as registered if file write fails.
+        - CAS concurrency rollback without removing files owned by other registrations.
+        """
         import hashlib
         import os
         import uuid
         from datetime import UTC, datetime
 
-        # Ensure case exists
+        # 1. Ensure case exists and is open
         case = self._case_service.get_case(case_id)
         if not case:
             raise ValueError(f"Case not found: {case_id}")
@@ -1182,19 +1194,61 @@ class EvidenceRegistryService:
             )
         old_version = getattr(case, "version", 1)
 
-        # Compute SHA-256 content hash
+        # 2. Compute SHA-256 content hash
         content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
-        # Durably persist evidence payload to file system if path specified
+        # 3. Durably persist evidence payload to file system if path specified
         written_file: str | None = None
         if file_path:
-            try:
-                os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(content)
-                written_file = file_path
-            except OSError as e:
-                logger.warning(f"Could not persist evidence content to file '{file_path}': {e}")
+            norm_path = os.path.normpath(file_path)
+            # Guard against path traversal
+            parts = norm_path.replace("\\", "/").split("/")
+            if ".." in parts:
+                raise ValueError(
+                    f"Invalid evidence file path: Path traversal ('..') prohibited in '{file_path}'."
+                )
+
+            abs_file_path = os.path.abspath(file_path)
+            dir_path = os.path.dirname(abs_file_path)
+            os.makedirs(dir_path, exist_ok=True)
+
+            # Check if destination file already exists
+            if os.path.exists(abs_file_path):
+                try:
+                    with open(abs_file_path, encoding="utf-8") as f:
+                        existing_content = f.read()
+                    existing_hash = hashlib.sha256(existing_content.encode("utf-8")).hexdigest()
+                    if existing_hash != content_hash:
+                        raise EvidencePersistenceError(
+                            f"Evidence file collision rejected: file '{file_path}' already exists with different content digest."
+                        )
+                    # Content is identical: idempotent write reuse, do not mark as newly written for CAS rollback
+                    written_file = None
+                except OSError as e:
+                    raise EvidencePersistenceError(
+                        f"Failed to inspect existing evidence artifact '{file_path}': {e}"
+                    ) from e
+            else:
+                # Safe atomic file write: temp file in same directory, flush, fsync, os.replace
+                temp_file = os.path.join(
+                    dir_path,
+                    f".tmp_ev_{uuid.uuid4().hex}_{os.path.basename(abs_file_path)}",
+                )
+                try:
+                    with open(temp_file, "w", encoding="utf-8") as f:
+                        f.write(content)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(temp_file, abs_file_path)
+                    written_file = abs_file_path
+                except OSError as e:
+                    if os.path.exists(temp_file):
+                        with contextlib.suppress(OSError):
+                            os.remove(temp_file)
+                    logger.error("Failed to durably persist evidence content to '%s': %s", file_path, e)
+                    raise EvidencePersistenceError(
+                        f"Evidence persistence failed: Could not durably write payload to '{file_path}': {e}"
+                    ) from e
 
         evidence_id = str(uuid.uuid4())
         evidence_dict = {
@@ -1209,15 +1263,15 @@ class EvidenceRegistryService:
             "metadata": metadata or {},
         }
 
-        # Save evidence record
+        # 4. Save evidence record
         self._evidence_store.set(evidence_id, evidence_dict)
 
-        # Update case evidence listing
+        # 5. Update case evidence listing
         if not hasattr(case, "evidence_ids") or case.evidence_ids is None:
             case.evidence_ids = []
         case.evidence_ids.append(evidence_id)
 
-        # Record event in case timeline
+        # 6. Record event in case timeline
         event_meta = {"evidence_id": evidence_id, "content_hash": content_hash}
         if metadata:
             event_meta.update(metadata)
@@ -1230,14 +1284,14 @@ class EvidenceRegistryService:
             event_meta,
         )
 
-        # Save case
+        # 7. Save case with CAS optimistic concurrency
         success = self._case_service._cases.update_conditional(
             case.id,
             _case_to_dict(case),
             expected_version=old_version,
         )
         if not success:
-            # Roll back orphaned evidence record and remove written file
+            # Roll back orphaned evidence record and remove file ONLY if this invocation created it
             self._evidence_store.delete(evidence_id)
             if written_file and os.path.exists(written_file):
                 with contextlib.suppress(OSError):
@@ -1247,8 +1301,99 @@ class EvidenceRegistryService:
             )
         return evidence_dict
 
+    def get_evidence(self, evidence_id: str) -> dict[str, Any] | None:
+        """Retrieve authoritative evidence metadata record by ID."""
+        return self._evidence_store.get(evidence_id)
+
     def get_case_evidence(self, case_id: str) -> list[dict[str, Any]]:
         """Retrieve all evidence registered for a case."""
         raw_vals = self._evidence_store.list_values()
         case_ev = [ev for ev in raw_vals if ev.get("case_id") == case_id]
         return sorted(case_ev, key=lambda x: x.get("uploaded_at", ""))
+
+    def get_evidence_content(self, evidence_id: str) -> str:
+        """Retrieve and cryptographically verify authoritative evidence content from disk."""
+        import hashlib
+        import os
+
+        rec = self._evidence_store.get(evidence_id)
+        if not rec:
+            raise ValueError(f"Evidence '{evidence_id}' not found in registry.")
+
+        expected_hash = rec.get("content_hash")
+        file_path = rec.get("file_path")
+        if not file_path or not os.path.exists(file_path):
+            raise EvidencePersistenceError(
+                f"Authoritative evidence artifact '{file_path}' is missing from durable storage."
+            )
+
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                content = f.read()
+        except OSError as e:
+            raise EvidencePersistenceError(
+                f"Failed to read durable evidence file '{file_path}': {e}"
+            ) from e
+
+        actual_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        if actual_hash != expected_hash:
+            raise EvidencePersistenceError(
+                f"Cryptographic evidence tampering detected: Content hash of '{file_path}' "
+                f"({actual_hash}) does not match authoritative digest ({expected_hash})."
+            )
+        return content
+
+    def verify_evidence_integrity(self, evidence_id: str) -> dict[str, Any]:
+        """Verify the cryptographic integrity of an evidence artifact against disk content."""
+        import hashlib
+        import os
+
+        rec = self._evidence_store.get(evidence_id)
+        if not rec:
+            return {
+                "evidence_id": evidence_id,
+                "is_valid": False,
+                "intact": False,
+                "error": f"Evidence '{evidence_id}' not found in registry.",
+            }
+
+        expected_hash = rec.get("content_hash")
+        file_path = rec.get("file_path")
+        if not file_path or not os.path.exists(file_path):
+            return {
+                "evidence_id": evidence_id,
+                "is_valid": False,
+                "intact": False,
+                "file_path": file_path,
+                "error": f"Evidence file '{file_path}' is missing from durable storage.",
+            }
+
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                content = f.read()
+            actual_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            if actual_hash != expected_hash:
+                return {
+                    "evidence_id": evidence_id,
+                    "is_valid": False,
+                    "intact": False,
+                    "file_path": file_path,
+                    "expected_hash": expected_hash,
+                    "actual_hash": actual_hash,
+                    "error": "Digest mismatch: File on disk has been tampered with or corrupted.",
+                }
+            return {
+                "evidence_id": evidence_id,
+                "is_valid": True,
+                "intact": True,
+                "file_path": file_path,
+                "content_hash": actual_hash,
+            }
+        except OSError as e:
+            return {
+                "evidence_id": evidence_id,
+                "is_valid": False,
+                "intact": False,
+                "file_path": file_path,
+                "error": f"I/O read failure: {e}",
+            }

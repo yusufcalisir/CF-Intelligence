@@ -228,6 +228,7 @@ class DurableConsortiumStore:
             "created_at": c.created_at.isoformat()
             if hasattr(c.created_at, "isoformat")
             else str(c.created_at),
+            "metadata": getattr(c, "metadata", {}) or {},
         }
 
     def _deserialize_consortium(self, d: dict[str, Any]) -> Consortium:
@@ -251,6 +252,7 @@ class DurableConsortiumStore:
             members=members,
             removed_members=d.get("removed_members", {}),
             created_at=d.get("created_at", datetime.datetime.now(UTC)),
+            metadata=d.get("metadata", {}),
         )
         return c
 

@@ -119,6 +119,14 @@ class CrossBankIntelligenceSignal(BaseModel):
         ...,
         description="Hardware attestation status (UNAVAILABLE_NO_HARDWARE_ENCLAVE or SOFTWARE_EMULATED).",
     )
+    is_authoritative: bool = Field(
+        default=True,
+        description="True if signal represents authoritative operational intelligence; False for research simulations.",
+    )
+    is_synthetic: bool = Field(
+        default=False,
+        description="True if signal was derived from synthetic or research simulation datasets.",
+    )
     disclaimer: str = Field(
         default=(
             "Cross-bank intelligence is advisory and privacy-preserving. "
