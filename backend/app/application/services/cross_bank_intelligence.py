@@ -11,11 +11,14 @@ import logging
 import threading
 import uuid
 from datetime import UTC, datetime
+from typing import cast
 
 from app.application.schemas.cross_bank_intelligence import (
     CrossBankEvidenceAttachResponse,
     CrossBankIntelligenceQueryRequest,
     CrossBankIntelligenceSignal,
+    MatchCategory,
+    SanitizedRiskLevel,
 )
 from app.application.services.case_service import (
     CaseManagementService,
@@ -222,6 +225,17 @@ class CrossBankIntelligenceService:
         # Truncate privacy hash to avoid arbitrary enumeration/linkage
         truncated_hash = f"{query_privacy_id[:12]}..." if len(query_privacy_id) > 12 else query_privacy_id
 
+        category_literal: MatchCategory = (
+            cast("MatchCategory", matched_category)
+            if matched_category in ("EXACT_MATCH", "PROBABILISTIC_FUZZY", "NO_MATCH")
+            else "NO_MATCH"
+        )
+        risk_literal: SanitizedRiskLevel = (
+            cast("SanitizedRiskLevel", max_risk_level)
+            if max_risk_level in ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNOBSERVED")
+            else "UNOBSERVED"
+        )
+
         signal = CrossBankIntelligenceSignal(
             signal_id=signal_id,
             consortium_id=clean_consortium_id,
@@ -229,11 +243,11 @@ class CrossBankIntelligenceService:
             query_entity_id=req.query_entity_id,
             privacy_hash_truncated=truncated_hash,
             match_confirmed=len(contributing_banks) > 0,
-            match_category=matched_category if matched_category in ("EXACT_MATCH", "PROBABILISTIC_FUZZY", "NO_MATCH") else "NO_MATCH",
+            match_category=category_literal,
             match_confidence=matched_confidence,
             contributing_institutions_count=len(contributing_banks),
             contributing_institutions=sorted(list(contributing_banks)),
-            sanitized_risk_level=max_risk_level if max_risk_level in ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNOBSERVED") else "UNOBSERVED",
+            sanitized_risk_level=risk_literal,
             sanitized_typology_indicators=sorted(list(sanitized_typologies)),
             graph_context={
                 "has_incident_cross_bank_correlations": len(contributing_banks) > 0,

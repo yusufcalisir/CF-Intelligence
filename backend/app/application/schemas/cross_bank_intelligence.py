@@ -14,6 +14,10 @@ def _strip_control(value: str) -> str:
     return _SAFE_TEXT_RE.sub("", value)
 
 
+MatchCategory = Literal["EXACT_MATCH", "PROBABILISTIC_FUZZY", "NO_MATCH"]
+SanitizedRiskLevel = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNOBSERVED"]
+
+
 class CrossBankIntelligenceQueryRequest(BaseModel):
     """Request payload for authorized cross-bank intelligence query."""
 
@@ -69,7 +73,7 @@ class CrossBankIntelligenceSignal(BaseModel):
     query_entity_id: str | None = Field(default=None, description="Requesting bank's entity ID.")
     privacy_hash_truncated: str = Field(..., description="Truncated privacy-preserving hash.")
     match_confirmed: bool = Field(..., description="True if counterpart institution observes this entity.")
-    match_category: Literal["EXACT_MATCH", "PROBABILISTIC_FUZZY", "NO_MATCH"] = Field(
+    match_category: MatchCategory = Field(
         ..., description="Matching classification category."
     )
     match_confidence: float = Field(..., ge=0.0, le=1.0, description="Match confidence score [0.0, 1.0].")
@@ -80,7 +84,7 @@ class CrossBankIntelligenceSignal(BaseModel):
         default_factory=list,
         description="List of participating institution IDs if disclosure policy allows.",
     )
-    sanitized_risk_level: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNOBSERVED"] = Field(
+    sanitized_risk_level: SanitizedRiskLevel = Field(
         ..., description="Sanitized multi-institutional risk classification."
     )
     sanitized_typology_indicators: list[str] = Field(
