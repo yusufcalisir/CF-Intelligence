@@ -212,7 +212,11 @@ class CaseRepository:
                 continue
 
             await self.session.commit()
-            return await self.get_by_id(case_id)
+            if "alert_ids" in values_to_update:
+                case.alert_ids = values_to_update["alert_ids"]
+            if "bank_id" in values_to_update:
+                case.bank_id = values_to_update["bank_id"]
+            return await self.get_by_id(case_id) or case
 
         return await self.get_by_id(case_id)
 

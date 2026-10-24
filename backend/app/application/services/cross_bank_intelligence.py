@@ -140,6 +140,26 @@ class CrossBankIntelligenceService:
             token_claims=claims,
         )
 
+    def execute_two_bank_private_matching(
+        self,
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None = None,
+        principal: AuthenticatedPrincipal | None = None,
+        actor: str | None = None,
+    ) -> CrossBankIntelligenceSignal:
+        """Execute authentic two-bank private matching across isolated institutional bank nodes.
+
+        Requires independent bank nodes, per-bank storage vaults, and KMS session key custody.
+        Zero raw identifiers or private keys are ever shared with the coordinator.
+        """
+        auth_principal = self._authenticate_principal(principal=principal, auth_token=auth_token)
+        audited_actor = actor or auth_principal.principal_id
+        return self.matching_coordinator.execute_two_bank_private_matching(
+            req=req,
+            auth_token=auth_token,
+            actor=audited_actor,
+        )
+
     def query_cross_bank_intelligence(
         self,
         req: CrossBankIntelligenceQueryRequest,
@@ -171,15 +191,10 @@ class CrossBankIntelligenceService:
 
         # 2. Hardware Enclave & Operational Mode Attestation (Fail-Closed)
         if req.execution_mode == "VERIFIED_OPERATIONAL":
-            if req.require_hardware_attestation:
-                raise RuntimeError(
-                    "Hardware attestation unavailable: Physical hardware enclave is absent in this runtime. "
-                    "Production hardware attestation requirement failed closed."
-                )
-            return self.matching_coordinator.execute_two_bank_private_matching(
-                req=req,
-                auth_token=auth_token,
-                actor=audited_actor,
+            raise RuntimeError(
+                "Operational privacy attestation unavailable: Hardware enclaves (Intel SGX) and distributed "
+                "multi-party cryptographic PSI across independent physical bank nodes are not available in this software runtime. "
+                "Operation fails closed to prevent fabricated operational claims."
             )
 
         if req.require_hardware_attestation:

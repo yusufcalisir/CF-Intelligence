@@ -52,9 +52,14 @@ def isolate_stores(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator
     account_file = tmp_path / "account_unit_store.json"
     monkeypatch.setenv("CFI_CONSORTIUM_STORE_PATH", str(store_file))
     monkeypatch.setenv("CFI_ACCOUNT_STORE_PATH", str(account_file))
+    monkeypatch.setenv("CFI_ENABLE_CROSS_BANK_SIMULATION", "true")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
     DurableConsortiumStore.set_instance(None)
     AuthenticationService.reset_instance()
     yield
+    get_settings.cache_clear()
     DurableConsortiumStore.set_instance(None)
     AuthenticationService.reset_instance()
 

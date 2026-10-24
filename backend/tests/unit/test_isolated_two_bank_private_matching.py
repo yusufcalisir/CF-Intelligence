@@ -307,7 +307,7 @@ class TestIsolatedPrivateMatchingExecution:
             execution_mode="VERIFIED_OPERATIONAL",
         )
 
-        signal: CrossBankIntelligenceSignal = intel_svc.query_cross_bank_intelligence(
+        signal: CrossBankIntelligenceSignal = intel_svc.execute_two_bank_private_matching(
             req=req, auth_token=token_a
         )
 
@@ -364,7 +364,7 @@ class TestIsolatedPrivateMatchingExecution:
             execution_mode="VERIFIED_OPERATIONAL",
         )
 
-        signal = intel_svc.query_cross_bank_intelligence(req=req, auth_token=token_a)
+        signal = intel_svc.execute_two_bank_private_matching(req=req, auth_token=token_a)
 
         assert signal.match_confirmed is False
         assert signal.match_category == "NO_MATCH"
@@ -407,7 +407,7 @@ class TestIsolatedPrivateMatchingExecution:
         )
 
         # Initial match confirms
-        sig1 = intel_svc.query_cross_bank_intelligence(req=req, auth_token=token_a)
+        sig1 = intel_svc.execute_two_bank_private_matching(req=req, auth_token=token_a)
         assert sig1.match_confirmed is True
 
         # Remove counterpart entity file from Bank B's private vault
@@ -416,7 +416,7 @@ class TestIsolatedPrivateMatchingExecution:
             b_file.unlink()
 
         # Subsequent query yields NO_MATCH
-        sig2 = intel_svc.query_cross_bank_intelligence(req=req, auth_token=token_a)
+        sig2 = intel_svc.execute_two_bank_private_matching(req=req, auth_token=token_a)
         assert sig2.match_confirmed is False
         assert sig2.match_category == "NO_MATCH"
         assert sig2.match_confidence == 0.0
@@ -460,7 +460,7 @@ class TestConsortiumGovernanceGatingAndSecurityFailures:
         )
 
         with pytest.raises(ConsortiumSecurityError, match="evicted/revoked|not an active member"):
-            intel_svc.query_cross_bank_intelligence(req=req, auth_token=token_a)
+            intel_svc.execute_two_bank_private_matching(req=req, auth_token=token_a)
 
     def test_missing_operational_sharing_grant_denies_query(
         self, institutional_setup: dict[str, Any]
@@ -496,7 +496,7 @@ class TestConsortiumGovernanceGatingAndSecurityFailures:
         )
 
         with pytest.raises(ConsortiumSecurityError, match="operational data-sharing grant"):
-            intel_svc.query_cross_bank_intelligence(req=req, auth_token=token_a)
+            intel_svc.execute_two_bank_private_matching(req=req, auth_token=token_a)
 
     def test_missing_institutional_jurisdiction_denies_query(
         self, institutional_setup: dict[str, Any]
@@ -537,7 +537,7 @@ class TestConsortiumGovernanceGatingAndSecurityFailures:
         )
 
         with pytest.raises(ConsortiumSecurityError, match="jurisdiction"):
-            intel_svc.query_cross_bank_intelligence(req=req, auth_token=token_a)
+            intel_svc.execute_two_bank_private_matching(req=req, auth_token=token_a)
 
     def test_replay_attack_with_consumed_nonce_rejected(
         self, institutional_setup: dict[str, Any]
@@ -659,7 +659,7 @@ class TestAuthoritativeEvidenceBinding:
             execution_mode="VERIFIED_OPERATIONAL",
         )
 
-        signal = intel_svc.query_cross_bank_intelligence(req=req, auth_token=token_a)
+        signal = intel_svc.execute_two_bank_private_matching(req=req, auth_token=token_a)
         assert signal.is_authoritative is True
         assert signal.match_confirmed is True
 
@@ -721,7 +721,7 @@ class TestAuthoritativeEvidenceBinding:
             execution_mode="VERIFIED_OPERATIONAL",
         )
 
-        signal = intel_svc.query_cross_bank_intelligence(req=req, auth_token=token_a)
+        signal = intel_svc.execute_two_bank_private_matching(req=req, auth_token=token_a)
         case = case_svc.create_case(title="Idempotent Target Case", bank_id="bank_a")
 
         resp1 = intel_svc.attach_signal_to_case_evidence(
