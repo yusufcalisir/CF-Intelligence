@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.domain.consortium_governance import Consortium
@@ -58,11 +58,36 @@ class ConsortiumPolicyConfig:
             )
 
 
-class ConsortiumPolicyEngine:
-    """Evaluates consortium governance constraints prior to starting FL rounds."""
+@dataclass
+class IntelligenceSharingPolicyConfig:
+    """Policy rules governing cross-bank intelligence queries and disclosures."""
 
-    def __init__(self, config: ConsortiumPolicyConfig | None = None) -> None:
+    allowed_purposes: list[str] = field(
+        default_factory=lambda: [
+            "AML_COLLABORATIVE_INVESTIGATION",
+            "FRAUD_DEFENSE",
+            "SAR_PREPARATION",
+        ]
+    )
+    allow_institution_identity_sharing: bool = False
+    allow_fuzzy_matching: bool = True
+    min_fuzzy_confidence_threshold: float = 0.60
+    allow_cross_border_intelligence: bool = False
+    allowed_jurisdictions: list[str] = field(
+        default_factory=lambda: ["eu-central-1", "us-east-1", "apac-singapore-1"]
+    )
+
+
+class ConsortiumPolicyEngine:
+    """Evaluates consortium governance constraints prior to starting FL rounds and intelligence disclosures."""
+
+    def __init__(
+        self,
+        config: ConsortiumPolicyConfig | None = None,
+        intelligence_config: IntelligenceSharingPolicyConfig | None = None,
+    ) -> None:
         self.config = config or ConsortiumPolicyConfig()
+        self.intelligence_config = intelligence_config or IntelligenceSharingPolicyConfig()
 
     def validate_fl_round_preconditions(
         self,
@@ -98,7 +123,9 @@ class ConsortiumPolicyEngine:
             reasons.append(
                 f"Proposed DP epsilon ({round_epsilon}) is invalid. Must be strictly positive and finite (> 0.0)."
             )
-        elif round_epsilon > consortium.max_epsilon or round_epsilon > self.config.max_epsilon_budget:
+        elif (
+            round_epsilon > consortium.max_epsilon or round_epsilon > self.config.max_epsilon_budget
+        ):
             max_limit = min(consortium.max_epsilon, self.config.max_epsilon_budget)
             reasons.append(
                 f"Proposed DP epsilon ({round_epsilon:.2f}) exceeds max allowed limit ({max_limit:.2f})"
@@ -171,11 +198,19 @@ class ConsortiumPolicyEngine:
         reasons: list[str] = []
 
         if source_region not in self.config.allowed_regions:
-            reasons.append(f"Source region '{source_region}' is not in approved consortium jurisdictions.")
+            reasons.append(
+                f"Source region '{source_region}' is not in approved consortium jurisdictions."
+            )
         if destination_region not in self.config.allowed_regions:
-            reasons.append(f"Destination region '{destination_region}' is not in approved consortium jurisdictions.")
+            reasons.append(
+                f"Destination region '{destination_region}' is not in approved consortium jurisdictions."
+            )
 
-        if source_region != destination_region and not self.config.allow_cross_border_sharing and not is_dp_enforced:
+        if (
+            source_region != destination_region
+            and not self.config.allow_cross_border_sharing
+            and not is_dp_enforced
+        ):
             reasons.append(
                 f"Cross-border transfer from '{source_region}' to '{destination_region}' without Differential Privacy scrubbing is strictly prohibited."
             )
@@ -212,3 +247,95 @@ class ConsortiumPolicyEngine:
                 f"Consortium policy violation for '{consortium.consortium_id}': "
                 + "; ".join(reasons)
             )
+
+    def validate_intelligence_sharing(
+        self,
+        consortium: Consortium,
+        requesting_bank: str,
+        target_banks: list[str],
+        purpose: str = "AML_COLLABORATIVE_INVESTIGATION",
+        requesting_jurisdiction: str | None = None,
+        target_jurisdictions: dict[str, str] | None = None,
+    ) -> tuple[bool, list[str], dict[str, Any]]:
+        """Evaluates whether an intelligence query satisfies consortium sharing governance policies.
+
+        Returns:
+            tuple: (is_valid, reasons, disclosure_scope)
+        """
+        reasons: list[str] = []
+        clean_requesting = requesting_bank.lower().strip()
+
+        # 1. Consortium active status
+        from app.domain.consortium_governance import ConsortiumStatus
+
+        if consortium.status != ConsortiumStatus.ACTIVE:
+            reasons.append(
+                f"Consortium '{consortium.consortium_id}' is in non-active status '{consortium.status.value}'. Intelligence queries are prohibited."
+            )
+
+        # 2. Requesting bank membership and eviction check
+        if clean_requesting in consortium.removed_members:
+            reasons.append(
+                f"Institution '{clean_requesting}' has been evicted/revoked from consortium '{consortium.consortium_id}'."
+            )
+        elif clean_requesting not in consortium.members:
+            reasons.append(
+                f"Institution '{clean_requesting}' is not an active member of consortium '{consortium.consortium_id}'."
+            )
+
+        # 3. Purpose authorization (Deny by default)
+        if purpose not in self.intelligence_config.allowed_purposes:
+            reasons.append(
+                f"Intelligence query purpose '{purpose}' is not authorized under consortium governance policy. Permitted: {self.intelligence_config.allowed_purposes}. Denied by default."
+            )
+
+        # 4. Target banks membership and eviction check
+        for tb in target_banks:
+            clean_tb = tb.lower().strip()
+            if clean_tb in consortium.removed_members:
+                reasons.append(
+                    f"Target institution '{clean_tb}' has been evicted/revoked from consortium '{consortium.consortium_id}'."
+                )
+            elif clean_tb not in consortium.members:
+                reasons.append(
+                    f"Target institution '{clean_tb}' is not an active member of consortium '{consortium.consortium_id}'."
+                )
+
+        # 5. Cross-border sovereignty checks
+        if requesting_jurisdiction or target_jurisdictions:
+            req_jur = requesting_jurisdiction or "eu-central-1"
+            if req_jur not in self.intelligence_config.allowed_jurisdictions:
+                reasons.append(
+                    f"Requesting institution operates in unapproved jurisdiction '{req_jur}'."
+                )
+            if target_jurisdictions:
+                for tb, tjur in target_jurisdictions.items():
+                    if tjur not in self.intelligence_config.allowed_jurisdictions:
+                        reasons.append(
+                            f"Target institution '{tb}' operates in unapproved jurisdiction '{tjur}'."
+                        )
+                    elif (
+                        tjur != req_jur
+                        and not self.intelligence_config.allow_cross_border_intelligence
+                    ):
+                        reasons.append(
+                            f"Cross-border intelligence disclosure between '{req_jur}' and '{tjur}' is prohibited without explicit consortium sovereignty treaty."
+                        )
+
+        # 6. Disclosure scope determination
+        allow_identities = bool(
+            getattr(consortium, "metadata", {}).get("allow_institution_identity_sharing")
+            or self.intelligence_config.allow_institution_identity_sharing
+        )
+
+        disclosure_scope: dict[str, Any] = {
+            "allow_institution_identity": allow_identities,
+            "disclosure_mode": "ATTRIBUTED_INSTITUTIONS"
+            if allow_identities
+            else "ANONYMIZED_SUMMARY",
+            "allow_fuzzy_matching": self.intelligence_config.allow_fuzzy_matching,
+            "min_fuzzy_confidence_threshold": self.intelligence_config.min_fuzzy_confidence_threshold,
+        }
+
+        is_valid = len(reasons) == 0
+        return is_valid, reasons, disclosure_scope

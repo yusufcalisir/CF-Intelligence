@@ -4,6 +4,8 @@ Provides database sessions, services, and repositories as injectable
 dependencies. Keeps route handlers thin and testable.
 """
 
+from __future__ import annotations
+
 from collections.abc import AsyncGenerator
 from typing import Annotated
 
@@ -26,6 +28,7 @@ from app.infrastructure.database import active_tenant, get_async_session
 from app.infrastructure.repositories.bank_repository import BankRepository
 from app.infrastructure.repositories.metrics_repository import MetricsRepository
 from app.infrastructure.repositories.simulation_repository import SimulationRepository
+from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 
 # ── Settings ──────────────────────────────────
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -75,7 +78,11 @@ async def resolve_tenant(request: Request) -> str | None:
 
     settings = get_settings()
     is_production = getattr(settings, "app_env", "development").lower() in ("production", "prod")
-    if is_production and (request.headers.get("X-Tenant-ID") or request.headers.get("X-Bank-ID") or request.headers.get("X-API-Key")):
+    if is_production and (
+        request.headers.get("X-Tenant-ID")
+        or request.headers.get("X-Bank-ID")
+        or request.headers.get("X-API-Key")
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required. Unauthenticated headers cannot confer tenant authority.",
@@ -84,7 +91,6 @@ async def resolve_tenant(request: Request) -> str | None:
 
     active_tenant.set(target_tenant)
     return target_tenant
-
 
 
 def enforce_tenant_isolation(
@@ -101,7 +107,9 @@ def enforce_tenant_isolation(
     if not caller_tenant or not resource_bank_id:
         return
 
-    if roles and any(r in roles for r in ("super_admin", "cross_bank_investigator", "compliance_auditor")):
+    if roles and any(
+        r in roles for r in ("super_admin", "cross_bank_investigator", "compliance_auditor")
+    ):
         return
 
     norm_caller = caller_tenant.lower().replace("-", "_").strip()
@@ -142,7 +150,6 @@ async def get_optional_session() -> AsyncGenerator[AsyncSession | None, None]:
         if session_yielded:
             raise
         yield None
-
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -284,7 +291,9 @@ async def enforce_tenant_quota(
                     detail="Principal is not bound to an authorized tenant institution.",
                 )
 
-            selector = (request.headers.get("X-Tenant-ID") or request.headers.get("X-Bank-ID") or "").strip()
+            selector = (
+                request.headers.get("X-Tenant-ID") or request.headers.get("X-Bank-ID") or ""
+            ).strip()
             if selector:
                 norm_sel = selector.lower().replace("-", "_")
                 norm_ten = principal.tenant_id.lower().replace("-", "_")
@@ -299,7 +308,10 @@ async def enforce_tenant_quota(
         from app.config import get_settings
 
         settings = get_settings()
-        is_production = getattr(settings, "app_env", "development").lower() in ("production", "prod")
+        is_production = getattr(settings, "app_env", "development").lower() in (
+            "production",
+            "prod",
+        )
         if is_production:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -327,3 +339,48 @@ async def enforce_tenant_quota(
     request.state.metered_tenant = target_tenant
     return target_tenant
 
+
+async def require_authenticated_principal(request: Request) -> AuthenticatedPrincipal:
+    """Enforce that incoming request has an authenticated, valid principal bound to an institutional tenant.
+
+    Fails closed with HTTP 401 on missing, expired, revoked, or unverified credentials.
+    Fails closed with HTTP 403 on missing or conflicting institutional tenant authority.
+    """
+    from app.infrastructure.security.principal_auth import (
+        resolve_authenticated_principal,
+        resolve_authorized_tenant,
+    )
+
+    principal = getattr(request.state, "principal", None)
+    if principal is None:
+        principal, auth_err, auth_status = resolve_authenticated_principal(request)
+        if auth_err:
+            raise HTTPException(
+                status_code=auth_status,
+                detail=auth_err,
+                headers={"WWW-Authenticate": "Bearer"} if auth_status == 401 else None,
+            )
+        request.state.principal = principal
+
+    if not principal.is_authenticated or principal.principal_id == "anonymous":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Institutional authentication required. Bearer token or authorized workload identity must be provided.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    target_tenant, target_err, target_status = resolve_authorized_tenant(principal, request)
+    if target_err:
+        raise HTTPException(status_code=target_status, detail=target_err)
+
+    if not principal.tenant_id and not principal.is_privileged:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated principal is not bound to an authorized institutional tenant.",
+        )
+
+    active_tenant.set(target_tenant)
+    return principal
+
+
+PrincipalDep = Annotated[AuthenticatedPrincipal, Depends(require_authenticated_principal)]

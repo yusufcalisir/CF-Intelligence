@@ -44,7 +44,7 @@ from app.application.services.case_service import (
     _case_to_dict,
 )
 from app.application.services.idempotency import IdempotencyService
-from app.dependencies import TenantDep, enforce_tenant_isolation
+from app.dependencies import PrincipalDep, TenantDep, enforce_tenant_isolation
 from app.domain.enums import CasePriority, CaseStatus
 from app.domain.models.case import (
     DuplicateSupervisorSignatureError,
@@ -839,31 +839,41 @@ async def get_case_evidence(
 async def attach_cross_bank_intelligence_to_case_subresource(
     case_id: str,
     payload: dict[str, Any],
-    actor: str = Query("analyst"),
-    caller_tenant: TenantDep = None,
+    principal: PrincipalDep,
 ) -> dict[str, Any]:
-    """Attach verified cross-bank intelligence signal into case evidence ledger."""
-    from app.application.schemas.cross_bank_intelligence import CrossBankIntelligenceSignal
+    """Attach authoritative cross-bank intelligence signal into case evidence ledger."""
+    from app.domain.consortium_governance import ConsortiumSecurityError
     from app.presentation.routers.cross_bank_intelligence import get_cross_bank_intelligence_service
 
     svc = get_cross_bank_intelligence_service()
-    raw_signal = payload.get("signal", payload)
-    signal = CrossBankIntelligenceSignal(**raw_signal)
-    notes = payload.get("notes")
+    raw_signal_id = payload.get("signal_id")
+    if not raw_signal_id and isinstance(payload.get("signal"), dict):
+        raw_signal_id = payload["signal"].get("signal_id")
+
+    if not raw_signal_id or not isinstance(raw_signal_id, str):
+        raise HTTPException(
+            status_code=400,
+            detail="Missing required 'signal_id' in attachment payload. Direct client signal injection is prohibited.",
+        )
+
+    notes = payload.get("notes") or payload.get("analyst_notes")
+    idempotency_key = payload.get("idempotency_key")
 
     try:
         resp = svc.attach_signal_to_case_evidence(
             case_id=case_id,
-            signal=signal,
-            actor=actor,
-            caller_bank_id=caller_tenant or signal.requesting_bank_id,
+            signal_id=raw_signal_id,
+            principal=principal,
             notes=notes,
+            idempotency_key=idempotency_key,
         )
         return resp.model_dump()
     except CaseNotFoundError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err
     except TerminalCaseImmutableError as err:
         raise HTTPException(status_code=400, detail=str(err)) from err
+    except ConsortiumSecurityError as err:
+        raise HTTPException(status_code=403, detail=str(err)) from err
     except PermissionError as err:
         raise HTTPException(status_code=403, detail=str(err)) from err
     except ValueError as err:

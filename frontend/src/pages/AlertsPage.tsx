@@ -682,23 +682,23 @@ export function ExplainabilityPanel({
 
   const queryIntelMutation = useQueryCrossBankIntelligence();
   const attachEvidenceMutation = useAttachCrossBankEvidence();
-  const { data: casesList } = useCases();
-
-  const linkedCase = casesList?.find(
-    (c) => c.title?.includes(alert.id.slice(0, 8)) || (c as any).alert_ids?.includes(alert.id)
-  );
+  const { data: linkedCases } = useCases({ alert_id: alert.id });
+  const linkedCase = linkedCases?.[0];
 
   const handleQueryIntel = () => {
     setAttachSuccessHash(null);
     setAttachError(null);
-    const targetEntity = alert.involved_entity_ids?.[0] || alert.transaction_id || alert.id;
+    const targetEntity = alert.involved_entity_ids?.[0];
+    if (!targetEntity) return;
+
     queryIntelMutation.mutate(
       {
         requesting_bank_id: alert.bank_id,
         query_entity_id: targetEntity,
         consortium_id: intelConsortiumId,
         target_bank_id: intelTargetBank || undefined,
-        execution_mode: 'VERIFIED_OPERATIONAL',
+        purpose: 'AML_COLLABORATIVE_INVESTIGATION',
+        execution_mode: 'SIMULATED_RESEARCH',
       },
       {
         onSuccess: (data) => {
@@ -714,8 +714,8 @@ export function ExplainabilityPanel({
     attachEvidenceMutation.mutate(
       {
         case_id: targetCaseId,
-        signal: intelSignal,
-        analyst_notes: `Authorized cross-bank intelligence query during investigation of Alert ${alert.id}. Match: ${intelSignal.match_category} (${(intelSignal.match_confidence * 100).toFixed(0)}%).`,
+        signal_id: intelSignal.signal_id,
+        notes: `Authorized cross-bank intelligence query during investigation of Alert ${alert.id}. Match: ${intelSignal.match_category} (${(intelSignal.match_confidence * 100).toFixed(0)}%).`,
       },
       {
         onSuccess: (res) => {
@@ -1278,11 +1278,17 @@ export function ExplainabilityPanel({
               </div>
             </div>
 
+            {!alert.involved_entity_ids?.[0] && (
+              <div className="p-2.5 rounded-lg bg-amber-950/40 border border-amber-800/40 text-amber-300 text-[11px]">
+                ⚠️ No institution-owned entity identifier is linked to this alert. Cross-bank intelligence queries require a verified local entity belonging to this bank to prevent arbitrary counterpart probing.
+              </div>
+            )}
+
             <div className="pt-2">
               <button
                 type="button"
                 onClick={handleQueryIntel}
-                disabled={queryIntelMutation.isPending}
+                disabled={queryIntelMutation.isPending || !alert.involved_entity_ids?.[0]}
                 className="w-full py-2 px-3 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {queryIntelMutation.isPending ? (
@@ -1311,7 +1317,7 @@ export function ExplainabilityPanel({
             <div className="p-3.5 bg-slate-900/80 rounded-xl border border-slate-800 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
                 <span className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-                  <span>📡</span> Verified Intelligence Signal
+                  <span>📡</span> Research Simulation (Software Emulation)
                 </span>
                 <span
                   className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
@@ -1344,21 +1350,29 @@ export function ExplainabilityPanel({
                 <div>
                   <span className="text-[10px] text-slate-500 uppercase block">Contributing Banks</span>
                   <span className="font-mono text-slate-200">
-                    {intelSignal.contributing_institutions_count > 0
+                    {intelSignal.disclosure_mode === 'ATTRIBUTED_INSTITUTIONS' && intelSignal.contributing_institutions.length > 0
                       ? intelSignal.contributing_institutions.map((b) => BANK_NAMES[b] || b).join(', ')
+                      : intelSignal.contributing_institutions_count > 0
+                      ? `${intelSignal.contributing_institutions_count} Independent Bank(s) (Anonymized by Policy)`
                       : 'None (Unobserved)'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 uppercase block">Privacy Digest</span>
-                  <span className="font-mono text-slate-400 text-[10px] truncate block" title={intelSignal.privacy_hash_truncated}>
-                    {intelSignal.privacy_hash_truncated}
+                  <span className="text-[10px] text-slate-500 uppercase block">Execution Mode</span>
+                  <span className="font-mono text-cyan-300 text-[10px]">
+                    {intelSignal.execution_mode}
                   </span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 uppercase block">Attestation Status</span>
                   <span className="font-mono text-amber-300/80 text-[10px]">
-                    {intelSignal.hardware_enclave_active ? 'SGX Verified' : 'Software Emulation'}
+                    {intelSignal.attestation_status}
+                  </span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-[10px] text-slate-500 uppercase block">Privacy Digest</span>
+                  <span className="font-mono text-slate-400 text-[10px] truncate block" title={intelSignal.privacy_hash_truncated}>
+                    {intelSignal.privacy_hash_truncated}
                   </span>
                 </div>
               </div>

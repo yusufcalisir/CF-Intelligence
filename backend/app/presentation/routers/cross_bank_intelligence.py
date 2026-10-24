@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.application.schemas.cross_bank_intelligence import (
     CrossBankEvidenceAttachRequest,
@@ -20,7 +20,7 @@ from app.application.schemas.cross_bank_intelligence import (
 )
 from app.application.services.case_service import CaseNotFoundError, TerminalCaseImmutableError
 from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
-from app.dependencies import TenantDep, enforce_tenant_isolation
+from app.dependencies import PrincipalDep, enforce_tenant_isolation
 from app.domain.consortium_governance import ConsortiumSecurityError
 
 logger = logging.getLogger(__name__)
@@ -46,24 +46,24 @@ def get_cross_bank_intelligence_service() -> CrossBankIntelligenceService:
 )
 async def query_cross_bank_intelligence(
     req: CrossBankIntelligenceQueryRequest,
-    authorization: str | None = Header(None),
-    actor: str = Query("analyst", description="Audited operator initiating query"),
-    caller_tenant: TenantDep = None,
+    principal: PrincipalDep,
     service: CrossBankIntelligenceService = Depends(get_cross_bank_intelligence_service),
 ) -> CrossBankIntelligenceSignal:
-    """Execute authorized, privacy-preserving cross-bank intelligence query."""
-    if caller_tenant:
-        enforce_tenant_isolation(caller_tenant, req.requesting_bank_id)
+    """Execute authorized, privacy-preserving cross-bank intelligence query.
 
-    token = None
-    if authorization and authorization.lower().startswith("bearer "):
-        token = authorization[7:].strip()
+    Mandates:
+    - Authenticated institutional principal bound to requesting bank.
+    - Verified intelligence analyst or investigator role.
+    - Verified local institution-owned query entity.
+    """
+    caller_tenant = principal.tenant_id
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, req.requesting_bank_id, roles=principal.roles)
 
     try:
         return service.query_cross_bank_intelligence(
             req=req,
-            auth_token=token,
-            actor=actor,
+            principal=principal,
         )
     except ConsortiumSecurityError as err:
         raise HTTPException(
@@ -82,7 +82,7 @@ async def query_cross_bank_intelligence(
         ) from err
     except RuntimeError as err:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
             detail=str(err),
         ) from err
 
@@ -99,18 +99,17 @@ async def query_cross_bank_intelligence(
 )
 async def attach_intelligence_to_case(
     req: CrossBankEvidenceAttachRequest,
-    actor: str = Query("analyst", description="Audited investigator attaching evidence"),
-    caller_tenant: TenantDep = None,
+    principal: PrincipalDep,
     service: CrossBankIntelligenceService = Depends(get_cross_bank_intelligence_service),
 ) -> CrossBankEvidenceAttachResponse:
-    """Attach verified cross-bank intelligence signal into case evidence ledger."""
+    """Attach authoritative, server-issued cross-bank intelligence signal into case evidence ledger."""
     try:
         return service.attach_signal_to_case_evidence(
             case_id=req.case_id,
-            signal=req.signal,
-            actor=actor,
-            caller_bank_id=caller_tenant or req.signal.requesting_bank_id,
+            signal_id=req.signal_id,
+            principal=principal,
             notes=req.notes,
+            idempotency_key=req.idempotency_key,
         )
     except CaseNotFoundError as err:
         raise HTTPException(
@@ -120,6 +119,11 @@ async def attach_intelligence_to_case(
     except TerminalCaseImmutableError as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
+    except ConsortiumSecurityError as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
             detail=str(err),
         ) from err
     except PermissionError as err:
@@ -146,7 +150,7 @@ async def attach_intelligence_to_case(
 )
 async def get_consortium_sharing_policy(
     consortium_id: str,
-    caller_tenant: TenantDep = None,
+    principal: PrincipalDep,
     service: CrossBankIntelligenceService = Depends(get_cross_bank_intelligence_service),
 ) -> dict[str, Any]:
     """Inspect active consortium sharing policies, disclosure rules, and privacy guarantees."""
@@ -156,10 +160,12 @@ async def get_consortium_sharing_policy(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Consortium '{consortium_id}' not found.",
         )
-    if caller_tenant and caller_tenant.lower() not in c.members:
+
+    caller_tenant = (principal.tenant_id or "").lower().strip()
+    if not principal.is_privileged and (not caller_tenant or caller_tenant not in c.members):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Institution '{caller_tenant}' is not an authorized member of consortium '{consortium_id}'.",
+            detail=f"Institution '{caller_tenant}' is not an authorized member of consortium '{consortium_id}'. Access denied.",
         )
 
     return {

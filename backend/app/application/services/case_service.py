@@ -9,6 +9,7 @@ complexity.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import logging
 import os
@@ -753,7 +754,9 @@ class CaseManagementService:
                     last_event = case.timeline[-1]
                     last_event.metadata["retraining_feedback_recorded"] = feedback_buffer_recorded
                     last_event.metadata["feedback_buffer_recorded"] = feedback_buffer_recorded
-                    last_event.metadata["prediction_evidence_recorded"] = prediction_evidence_recorded
+                    last_event.metadata["prediction_evidence_recorded"] = (
+                        prediction_evidence_recorded
+                    )
                     parent_h = last_event.metadata.get("parent_hash", "0" * 64)
                     last_event.metadata["hash"] = _hash_event(last_event, parent_h)
                     self._cases.set(case.id, _case_to_dict(case))
@@ -1148,9 +1151,9 @@ class AuditService:
 class EvidenceRegistryService:
     """Registry service for immutable evidence documentation and cryptographic content hashing."""
 
-    def __init__(self) -> None:
+    def __init__(self, case_service: CaseManagementService | None = None) -> None:
         self._evidence_store = RedisStore("evidence")
-        self._case_service = CaseManagementService()
+        self._case_service = case_service or CaseManagementService()
 
     def register_evidence(
         self,
@@ -1160,9 +1163,11 @@ class EvidenceRegistryService:
         file_path: str,
         content: str,
         uploaded_by: str = "analyst",
+        metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Register new evidence and link to a case with cryptographic hash verification."""
         import hashlib
+        import os
         import uuid
         from datetime import UTC, datetime
 
@@ -1180,6 +1185,17 @@ class EvidenceRegistryService:
         # Compute SHA-256 content hash
         content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
+        # Durably persist evidence payload to file system if path specified
+        written_file: str | None = None
+        if file_path:
+            try:
+                os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+                written_file = file_path
+            except OSError as e:
+                logger.warning(f"Could not persist evidence content to file '{file_path}': {e}")
+
         evidence_id = str(uuid.uuid4())
         evidence_dict = {
             "id": evidence_id,
@@ -1190,9 +1206,10 @@ class EvidenceRegistryService:
             "content_hash": content_hash,
             "uploaded_by": uploaded_by,
             "uploaded_at": datetime.now(UTC).isoformat(),
+            "metadata": metadata or {},
         }
 
-        # Save evidence
+        # Save evidence record
         self._evidence_store.set(evidence_id, evidence_dict)
 
         # Update case evidence listing
@@ -1201,12 +1218,16 @@ class EvidenceRegistryService:
         case.evidence_ids.append(evidence_id)
 
         # Record event in case timeline
+        event_meta = {"evidence_id": evidence_id, "content_hash": content_hash}
+        if metadata:
+            event_meta.update(metadata)
+
         self._case_service._add_event(
             case,
             "evidence_added",
             f"Evidence '{title}' ({evidence_type}) registered. Content SHA-256: {content_hash[:8]}...",
             uploaded_by,
-            {"evidence_id": evidence_id, "content_hash": content_hash},
+            event_meta,
         )
 
         # Save case
@@ -1216,6 +1237,11 @@ class EvidenceRegistryService:
             expected_version=old_version,
         )
         if not success:
+            # Roll back orphaned evidence record and remove written file
+            self._evidence_store.delete(evidence_id)
+            if written_file and os.path.exists(written_file):
+                with contextlib.suppress(OSError):
+                    os.remove(written_file)
             raise InvalidCaseTransitionError(
                 f"Precondition failed: Case '{case_id}' was concurrently modified while registering evidence."
             )

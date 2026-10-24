@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from pathlib import Path
+
 import pytest
 
 from app.application.services.consortium_service import ConsortiumGovernanceService
@@ -12,6 +15,16 @@ from app.domain.consortium_policy import (
     ConsortiumPolicyViolation,
 )
 from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
+
+
+@pytest.fixture(autouse=True)
+def isolate_consortium_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    store_file = tmp_path / "consortium_policy_test_store.json"
+    monkeypatch.setenv("CFI_CONSORTIUM_STORE_PATH", str(store_file))
+    DurableConsortiumStore.set_instance(None)
+    yield
+    DurableConsortiumStore.set_instance(None)
 
 
 @pytest.fixture

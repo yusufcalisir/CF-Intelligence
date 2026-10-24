@@ -2,10 +2,12 @@
 
 Verifies:
 1. Dual-routing (/api/v1 and /v1 prefixes).
-2. End-to-end authorized intelligence queries across two institutional contexts.
-3. Strict tenant header isolation enforcement (preventing header spoofing).
-4. Evidence ledger integration and sub-resource binding.
-5. Consortium sharing policy endpoint and disclosure rules.
+2. End-to-end authorized intelligence queries across institutional boundaries.
+3. Strict institutional authentication (HTTP 401 on missing/invalid auth).
+4. Strict tenant header isolation enforcement (preventing header spoofing).
+5. Anti-forgery evidence ledger integration (rejecting unissued signals).
+6. Consortium sharing policy endpoint access control (HTTP 403 on non-members).
+7. Operational privacy mode fail-closed enforcement (HTTP 412 when hardware enclaves absent).
 """
 
 from __future__ import annotations
@@ -27,7 +29,9 @@ from app.main import app
 
 
 @pytest.fixture(autouse=True)
-def isolate_integration_stores(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def isolate_integration_stores(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Generator[None, None, None]:
     store_file = tmp_path / "consortium_integration_store.json"
     account_file = tmp_path / "account_integration_store.json"
     monkeypatch.setenv("CFI_CONSORTIUM_STORE_PATH", str(store_file))
@@ -50,7 +54,11 @@ def auth_tokens() -> dict[str, str]:
     u_a = auth_svc.get_user("integ_admin_a")
     if not u_a:
         u_a = auth_svc.register_user(
-            "integ_admin_a", "AdminPass123!", "bank_a", roles=["admin", "analyst"], clearance_level=3
+            "integ_admin_a",
+            "AdminPass123!",
+            "bank_a",
+            roles=["admin", "analyst"],
+            clearance_level=3,
         )
     else:
         u_a.roles = ["admin", "analyst"]
@@ -59,15 +67,33 @@ def auth_tokens() -> dict[str, str]:
     u_b = auth_svc.get_user("integ_admin_b")
     if not u_b:
         u_b = auth_svc.register_user(
-            "integ_admin_b", "AdminPass123!", "bank_b", roles=["admin", "analyst"], clearance_level=3
+            "integ_admin_b",
+            "AdminPass123!",
+            "bank_b",
+            roles=["admin", "analyst"],
+            clearance_level=3,
         )
     else:
         u_b.roles = ["admin", "analyst"]
         auth_svc.identity_store.save_user(u_b)
 
+    u_outsider = auth_svc.get_user("integ_outsider_c")
+    if not u_outsider:
+        u_outsider = auth_svc.register_user(
+            "integ_outsider_c",
+            "AdminPass123!",
+            "bank_c",
+            roles=["admin", "analyst"],
+            clearance_level=3,
+        )
+    else:
+        u_outsider.roles = ["admin", "analyst"]
+        auth_svc.identity_store.save_user(u_outsider)
+
     return {
         "bank_a": auth_svc.create_token_bundle(u_a).access_token,
         "bank_b": auth_svc.create_token_bundle(u_b).access_token,
+        "bank_c": auth_svc.create_token_bundle(u_outsider).access_token,
     }
 
 
@@ -135,7 +161,7 @@ class TestCrossBankIntelligenceIntegration:
             "query_entity_id": setup_consortium_entities["entity_a_id"],
             "consortium_id": "integ_alliance",
             "target_bank_id": "bank_b",
-            "execution_mode": "VERIFIED_OPERATIONAL",
+            "execution_mode": "SIMULATED_RESEARCH",
         }
         headers = {"Authorization": f"Bearer {auth_tokens['bank_a']}"}
 
@@ -147,10 +173,59 @@ class TestCrossBankIntelligenceIntegration:
             assert data["match_category"] == "EXACT_MATCH"
             assert data["match_confidence"] == 1.0
             assert data["contributing_institutions_count"] == 1
-            assert "bank_b" in data["contributing_institutions"]
-            assert data["sanitized_risk_level"] in ("CRITICAL", "HIGH")
-            assert data["attestation_status"] == "UNAVAILABLE_NO_HARDWARE_ENCLAVE"
+            assert data["execution_mode"] == "SIMULATED_RESEARCH"
+            assert data["attestation_status"] == "SOFTWARE_EMULATED"
             assert "advisory and privacy-preserving" in data["disclaimer"]
+
+    def test_http_query_unauthenticated_returns_401(
+        self,
+        client: TestClient,
+        setup_consortium_entities: dict[str, Any],
+    ) -> None:
+        """Test query without Authorization header returns HTTP 401 Unauthorized."""
+        payload = {
+            "requesting_bank_id": "bank_a",
+            "query_entity_id": setup_consortium_entities["entity_a_id"],
+            "consortium_id": "integ_alliance",
+        }
+        resp = client.post("/api/v1/intelligence/cross-bank/query", json=payload)
+        assert resp.status_code == 401
+
+    def test_http_tenant_header_without_auth_returns_401(
+        self,
+        client: TestClient,
+        setup_consortium_entities: dict[str, Any],
+    ) -> None:
+        """Test caller supplying X-Tenant-ID header without valid credentials returns HTTP 401."""
+        payload = {
+            "requesting_bank_id": "bank_a",
+            "query_entity_id": setup_consortium_entities["entity_a_id"],
+            "consortium_id": "integ_alliance",
+        }
+        resp = client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=payload,
+            headers={"X-Tenant-ID": "bank_a"},
+        )
+        assert resp.status_code == 401
+
+    def test_http_operational_mode_request_returns_412_precondition_failed(
+        self,
+        client: TestClient,
+        auth_tokens: dict[str, str],
+        setup_consortium_entities: dict[str, Any],
+    ) -> None:
+        """Test requesting VERIFIED_OPERATIONAL fails closed with HTTP 412 Precondition Failed."""
+        payload = {
+            "requesting_bank_id": "bank_a",
+            "query_entity_id": setup_consortium_entities["entity_a_id"],
+            "consortium_id": "integ_alliance",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+        }
+        headers = {"Authorization": f"Bearer {auth_tokens['bank_a']}"}
+        resp = client.post("/api/v1/intelligence/cross-bank/query", json=payload, headers=headers)
+        assert resp.status_code == 412
+        assert "Operational privacy attestation unavailable" in resp.json()["detail"]
 
     def test_http_query_unauthorized_consortium_returns_403(
         self,
@@ -174,7 +249,7 @@ class TestCrossBankIntelligenceIntegration:
         auth_tokens: dict[str, str],
         setup_consortium_entities: dict[str, Any],
     ) -> None:
-        """Test caller passing X-Tenant-ID for bank_b while requesting as bank_a is rejected."""
+        """Test caller passing X-Tenant-ID for bank_b while authenticated as bank_a is rejected."""
         payload = {
             "requesting_bank_id": "bank_a",
             "query_entity_id": setup_consortium_entities["entity_a_id"],
@@ -182,20 +257,37 @@ class TestCrossBankIntelligenceIntegration:
         }
         headers = {
             "Authorization": f"Bearer {auth_tokens['bank_a']}",
-            "X-Tenant-ID": "bank_b",  # Spoofed tenant header
+            "X-Tenant-ID": "bank_b",  # Conflicting tenant header
         }
         resp = client.post("/api/v1/intelligence/cross-bank/query", json=payload, headers=headers)
         assert resp.status_code == 403
 
-    def test_http_attach_signal_to_case_evidence_and_subresource(
+    def test_http_attach_authoritative_signal_to_case_evidence(
         self,
         client: TestClient,
         auth_tokens: dict[str, str],
         setup_consortium_entities: dict[str, Any],
     ) -> None:
-        """Test attaching verified cross-bank signal to an open case via both dedicated and subresource routes."""
+        """Test issuing an authoritative signal and attaching it via both routes."""
         from app.application.services.case_service import CaseManagementService
 
+        # 1. Issue authoritative signal
+        query_payload = {
+            "requesting_bank_id": "bank_a",
+            "query_entity_id": setup_consortium_entities["entity_a_id"],
+            "consortium_id": "integ_alliance",
+            "target_bank_id": "bank_b",
+            "execution_mode": "SIMULATED_RESEARCH",
+        }
+        q_resp = client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=query_payload,
+            headers={"Authorization": f"Bearer {auth_tokens['bank_a']}"},
+        )
+        assert q_resp.status_code == 200
+        signal_id = q_resp.json()["signal_id"]
+
+        # 2. Create case
         case_svc = CaseManagementService()
         case = case_svc.create_case(
             title="Consortium Mules Review",
@@ -204,64 +296,73 @@ class TestCrossBankIntelligenceIntegration:
             priority=CasePriority.P1_CRITICAL,
         )
 
-        signal_payload = {
-            "signal_id": "sig-integ-101",
-            "consortium_id": "integ_alliance",
-            "requesting_bank_id": "bank_a",
-            "query_entity_id": setup_consortium_entities["entity_a_id"],
-            "privacy_hash_truncated": "hash_abc...",
-            "match_confirmed": True,
-            "match_category": "EXACT_MATCH",
-            "match_confidence": 1.0,
-            "contributing_institutions_count": 1,
-            "contributing_institutions": ["bank_b"],
-            "sanitized_risk_level": "CRITICAL",
-            "sanitized_typology_indicators": ["CROSS_BANK_ENTITY_OBSERVED"],
-            "graph_context": {"sanitized_degree_band": "BILATERAL"},
-            "provenance": {"governance_authority": "consortium:integ_alliance"},
-            "execution_mode": "VERIFIED_OPERATIONAL",
-            "attestation_status": "UNAVAILABLE_NO_HARDWARE_ENCLAVE",
-        }
-
-        # 1. Attach via /api/v1/intelligence/cross-bank/attach-to-case
+        # 3. Attach via /api/v1/intelligence/cross-bank/attach-to-case
         attach_req = {
             "case_id": case.id,
-            "signal": signal_payload,
+            "signal_id": signal_id,
             "notes": "Linked from cross-bank match query.",
         }
         resp = client.post(
             "/api/v1/intelligence/cross-bank/attach-to-case",
             json=attach_req,
-            headers={"X-Tenant-ID": "bank_a"},
+            headers={"Authorization": f"Bearer {auth_tokens['bank_a']}"},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["case_id"] == case.id
+        assert data["signal_id"] == signal_id
         assert data["evidence_type"] == "CROSS_BANK_INTELLIGENCE"
         assert len(data["content_hash"]) == 64
         assert data["timeline_event_recorded"] is True
 
-        # 2. Attach via subresource /api/v1/cases/{case_id}/evidence/cross-bank-intelligence
+        # 4. Attach via subresource /api/v1/cases/{case_id}/evidence/cross-bank-intelligence (idempotent replay)
         resp_sub = client.post(
             f"/api/v1/cases/{case.id}/evidence/cross-bank-intelligence",
-            json={"signal": signal_payload, "notes": "Subresource attach verification"},
-            headers={"X-Tenant-ID": "bank_a"},
+            json={"signal_id": signal_id, "notes": "Subresource attach verification"},
+            headers={"Authorization": f"Bearer {auth_tokens['bank_a']}"},
         )
         assert resp_sub.status_code == 200
         data_sub = resp_sub.json()
         assert data_sub["case_id"] == case.id
-        assert data_sub["evidence_type"] == "CROSS_BANK_INTELLIGENCE"
+        assert data_sub["signal_id"] == signal_id
+        assert data_sub["is_duplicate_submission"] is True
 
-    def test_http_consortium_policy_endpoint(
+    def test_http_forged_signal_attachment_returns_400(
         self,
         client: TestClient,
+        auth_tokens: dict[str, str],
+    ) -> None:
+        """Test attempting to attach an unissued fabricated signal_id returns HTTP 400."""
+        from app.application.services.case_service import CaseManagementService
+
+        case_svc = CaseManagementService()
+        case = case_svc.create_case(title="Forgery Case", bank_id="bank_a")
+
+        attach_req = {
+            "case_id": case.id,
+            "signal_id": "fabricated-fake-signal-9999",
+            "notes": "Malicious forgery attempt",
+        }
+        resp = client.post(
+            "/api/v1/intelligence/cross-bank/attach-to-case",
+            json=attach_req,
+            headers={"Authorization": f"Bearer {auth_tokens['bank_a']}"},
+        )
+        assert resp.status_code == 400
+        assert "not found or was never issued" in resp.json()["detail"]
+
+    def test_http_consortium_policy_endpoint_access_control(
+        self,
+        client: TestClient,
+        auth_tokens: dict[str, str],
         setup_consortium_entities: dict[str, Any],
     ) -> None:
-        """Test GET policy returns disclosure limits and active member counts."""
+        """Test GET policy requires authenticated member and rejects non-member with HTTP 403."""
+        # 1. Member bank_a can view policy
         for prefix in ("/api/v1/intelligence/cross-bank", "/v1/intelligence/cross-bank"):
             resp = client.get(
                 f"{prefix}/consortiums/integ_alliance/policy",
-                headers={"X-Tenant-ID": "bank_a"},
+                headers={"Authorization": f"Bearer {auth_tokens['bank_a']}"},
             )
             assert resp.status_code == 200
             data = resp.json()
@@ -269,3 +370,11 @@ class TestCrossBankIntelligenceIntegration:
             assert data["active_member_count"] == 2
             assert data["permitted_disclosure"]["allow_raw_pii_sharing"] is False
             assert data["permitted_disclosure"]["allow_institution_scoped_signals"] is True
+
+        # 2. Non-member bank_c is rejected with HTTP 403
+        resp_c = client.get(
+            "/api/v1/intelligence/cross-bank/consortiums/integ_alliance/policy",
+            headers={"Authorization": f"Bearer {auth_tokens['bank_c']}"},
+        )
+        assert resp_c.status_code == 403
+        assert "not an authorized member" in resp_c.json()["detail"]

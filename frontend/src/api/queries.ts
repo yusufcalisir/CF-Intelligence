@@ -3509,12 +3509,12 @@ export function useQueryCrossBankIntelligence() {
 export function useAttachCrossBankEvidence() {
   const queryClient = useQueryClient();
   return useMutation<CrossBankEvidenceAttachResponse, Error, CrossBankEvidenceAttachPayload>({
-    mutationFn: async ({ case_id, signal, analyst_notes, idempotency_key }) => {
+    mutationFn: async ({ case_id, signal_id, notes, idempotency_key }) => {
       const { data } = await apiClient.post<CrossBankEvidenceAttachResponse>(
         `/api/v1/cases/${case_id}/evidence/cross-bank-intelligence`,
         {
-          signal,
-          analyst_notes,
+          signal_id,
+          notes,
           idempotency_key,
         },
       );

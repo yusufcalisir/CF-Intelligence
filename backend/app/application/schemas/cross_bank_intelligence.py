@@ -16,6 +16,7 @@ def _strip_control(value: str) -> str:
 
 MatchCategory = Literal["EXACT_MATCH", "PROBABILISTIC_FUZZY", "NO_MATCH"]
 SanitizedRiskLevel = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNOBSERVED"]
+DisclosureMode = Literal["ATTRIBUTED_INSTITUTIONS", "ANONYMIZED_SUMMARY"]
 
 
 class CrossBankIntelligenceQueryRequest(BaseModel):
@@ -30,15 +31,16 @@ class CrossBankIntelligenceQueryRequest(BaseModel):
         pattern=r"^[a-zA-Z0-9_\-]+$",
         description="Authoritative requesting institution ID.",
     )
-    query_entity_id: str | None = Field(
-        default=None,
+    query_entity_id: str = Field(
+        ...,
+        min_length=1,
         max_length=128,
-        description="Requesting bank's internal entity ID.",
+        description="Authoritative requesting bank internal entity ID. Must belong to requesting bank.",
     )
     privacy_id: str | None = Field(
         default=None,
         max_length=256,
-        description="Privacy-preserving HMAC hash of the suspect entity identifier.",
+        description="Optional expected privacy hash to verify against local entity.",
     )
     consortium_id: str = Field(
         default="consortium_alpha",
@@ -52,9 +54,14 @@ class CrossBankIntelligenceQueryRequest(BaseModel):
         max_length=64,
         description="Optional specific counterpart bank ID. If omitted, checks all active consortium participants.",
     )
+    purpose: str = Field(
+        default="AML_COLLABORATIVE_INVESTIGATION",
+        max_length=128,
+        description="Permitted intelligence query purpose under consortium sharing treaty.",
+    )
     execution_mode: Literal["VERIFIED_OPERATIONAL", "SIMULATED_RESEARCH"] = Field(
-        default="VERIFIED_OPERATIONAL",
-        description="Execution mode: VERIFIED_OPERATIONAL enforces active consortium governance.",
+        default="SIMULATED_RESEARCH",
+        description="Execution mode: VERIFIED_OPERATIONAL requires hardware enclave and multi-party PSI; SIMULATED_RESEARCH is software emulation.",
     )
     require_hardware_attestation: bool = Field(
         default=False,
@@ -72,17 +79,23 @@ class CrossBankIntelligenceSignal(BaseModel):
     requesting_bank_id: str = Field(..., description="Requesting bank ID.")
     query_entity_id: str | None = Field(default=None, description="Requesting bank's entity ID.")
     privacy_hash_truncated: str = Field(..., description="Truncated privacy-preserving hash.")
-    match_confirmed: bool = Field(..., description="True if counterpart institution observes this entity.")
-    match_category: MatchCategory = Field(
-        ..., description="Matching classification category."
+    match_confirmed: bool = Field(
+        ..., description="True if counterpart institution observes this entity."
     )
-    match_confidence: float = Field(..., ge=0.0, le=1.0, description="Match confidence score [0.0, 1.0].")
+    match_category: MatchCategory = Field(..., description="Matching classification category.")
+    match_confidence: float = Field(
+        ..., ge=0.0, le=1.0, description="Match confidence score [0.0, 1.0]."
+    )
     contributing_institutions_count: int = Field(
         ..., ge=0, description="Number of distinct independent institutions observing this entity."
     )
     contributing_institutions: list[str] = Field(
         default_factory=list,
         description="List of participating institution IDs if disclosure policy allows.",
+    )
+    disclosure_mode: DisclosureMode = Field(
+        default="ANONYMIZED_SUMMARY",
+        description="Disclosure granularity mode authorized by consortium policy.",
     )
     sanitized_risk_level: SanitizedRiskLevel = Field(
         ..., description="Sanitized multi-institutional risk classification."
@@ -99,9 +112,12 @@ class CrossBankIntelligenceSignal(BaseModel):
         default_factory=dict,
         description="Observation provenance timestamps and audit integrity metadata.",
     )
-    execution_mode: str = Field(..., description="Execution mode (VERIFIED_OPERATIONAL or SIMULATED_RESEARCH).")
+    execution_mode: str = Field(
+        ..., description="Execution mode (VERIFIED_OPERATIONAL or SIMULATED_RESEARCH)."
+    )
     attestation_status: str = Field(
-        ..., description="Hardware attestation status (UNAVAILABLE_NO_HARDWARE_ENCLAVE or SOFTWARE_EMULATED)."
+        ...,
+        description="Hardware attestation status (UNAVAILABLE_NO_HARDWARE_ENCLAVE or SOFTWARE_EMULATED).",
     )
     disclaimer: str = Field(
         default=(
@@ -118,9 +134,21 @@ class CrossBankEvidenceAttachRequest(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    case_id: str = Field(..., min_length=2, max_length=64, description="Target investigation case ID.")
-    signal: CrossBankIntelligenceSignal = Field(..., description="Verified cross-bank intelligence signal.")
-    notes: str | None = Field(default=None, max_length=1000, description="Optional analyst investigation note.")
+    case_id: str = Field(
+        ..., min_length=2, max_length=64, description="Target investigation case ID."
+    )
+    signal_id: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        description="Authoritative, server-issued cross-bank intelligence signal ID.",
+    )
+    notes: str | None = Field(
+        default=None, max_length=1000, description="Optional analyst investigation note."
+    )
+    idempotency_key: str | None = Field(
+        default=None, max_length=128, description="Optional idempotency key."
+    )
 
 
 class CrossBankEvidenceAttachResponse(BaseModel):
@@ -128,6 +156,7 @@ class CrossBankEvidenceAttachResponse(BaseModel):
 
     evidence_id: str
     case_id: str
+    signal_id: str
     evidence_type: str
     title: str
     content_hash: str
@@ -135,3 +164,4 @@ class CrossBankEvidenceAttachResponse(BaseModel):
     uploaded_by: str
     case_version: int
     timeline_event_recorded: bool
+    is_duplicate_submission: bool = False
