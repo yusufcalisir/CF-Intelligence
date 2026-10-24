@@ -824,6 +824,7 @@ def test_direct_ingest_client_controlled_case_metadata_safeguards(tmp_path: Path
         alert_ids=[alert_alpha.id],
         bank_id="bank_alpha",
     )
+    assert case_alpha is not None
     case_svc.assign_case(case_alpha.id, investigator="lead_investigator_1")
     case_svc.change_status(
         case_id=case_alpha.id,
@@ -837,6 +838,7 @@ def test_direct_ingest_client_controlled_case_metadata_safeguards(tmp_path: Path
         supervisor_signature="sig_sup_1",
     )
     closed_case = case_svc.get_case(case_alpha.id)
+    assert closed_case is not None
     assert closed_case.status == CaseStatus.CLOSED_FALSE_POSITIVE
 
     # Case B in bank_beta
@@ -846,6 +848,7 @@ def test_direct_ingest_client_controlled_case_metadata_safeguards(tmp_path: Path
         alert_ids=[],
         bank_id="bank_beta",
     )
+    assert case_beta is not None
     case_svc.assign_case(case_beta.id, investigator="beta_investigator")
     case_svc.change_status(
         case_id=case_beta.id,
