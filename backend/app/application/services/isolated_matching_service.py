@@ -2530,13 +2530,16 @@ class InstitutionalCoordinatorClient:
     """Client for invoking coordinator daemon over loopback/Docker network transport."""
 
     def __init__(self, base_url: str) -> None:
-        self.base_url = base_url.rstrip("/")
+        clean_url = base_url.rstrip("/")
+        if not (clean_url.startswith("http://") or clean_url.startswith("https://")):
+            raise ValueError(f"Unsupported URL scheme for coordinator client: {base_url}")
+        self.base_url = clean_url
 
     def health_check(self) -> dict[str, Any]:
         url = f"{self.base_url}/health"
         req = urllib.request.Request(url, method="GET")
         try:
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
                 body = resp.read()
                 return cast("dict[str, Any]", json.loads(body.decode("utf-8")))
         except Exception as exc:
@@ -2565,7 +2568,7 @@ class InstitutionalCoordinatorClient:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=20.0) as resp:
+            with urllib.request.urlopen(request, timeout=20.0) as resp:  # nosec B310
                 data = json.loads(resp.read().decode("utf-8"))
                 return CrossBankIntelligenceSignal(**data)
         except urllib.error.HTTPError as http_err:
