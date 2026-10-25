@@ -1049,14 +1049,15 @@ class CrossBankMatchingCoordinator:
         """
         clean_id = bank_id.lower().strip()
         self._workers[clean_id] = worker
-        token = (
+        resolved_token: str = str(
             matching_token
-            or getattr(worker, "matching_token", None)
-            or getattr(worker, "_matching_token", None)
+            or getattr(worker, "matching_token", "")
+            or getattr(worker, "_matching_token", "")
             or auth_secret
             or getattr(worker, "_auth_secret", "")
+            or ""
         )
-        self._matching_tokens[clean_id] = token
+        self._matching_tokens[clean_id] = resolved_token
 
     def get_worker(self, bank_id: str) -> Any:
         """Retrieve registered worker for institution, failing closed if unregistered."""
