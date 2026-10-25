@@ -647,22 +647,48 @@ class CrossBankIntelligenceService:
                 f"Authoritative signal '{resolved_signal_id}' has expired. Queries must be refreshed before attachment."
             )
 
-        # 3d. Prevent Prototype or Simulated Intelligence from Entering Case Evidence in Any Case State
+        # 3d. Prevent Prototype Matching Results from Entering Case Evidence in Any Case State
         assurance_level = signal_data.get("assurance_level") or record.get("assurance_level")
         execution_mode = signal_data.get("execution_mode") or record.get("execution_mode")
         is_authoritative = bool(record.get("is_authoritative", True) and signal_data.get("is_authoritative", True))
 
         if (
-            not is_authoritative
-            or assurance_level in ("PROTOCOL_PROTOTYPE", "RESEARCH_PROTOTYPE", "LOCAL_PROTOTYPE")
-            or execution_mode in ("RESEARCH_PROTOTYPE", "PROTOTYPE", "SIMULATED_RESEARCH")
-            or record.get("is_synthetic", False)
+            assurance_level in ("PROTOCOL_PROTOTYPE", "RESEARCH_PROTOTYPE", "LOCAL_PROTOTYPE")
+            or execution_mode in ("RESEARCH_PROTOTYPE", "PROTOTYPE")
         ):
             raise ConsortiumSecurityError(
                 "Protocol prototype matching results cannot enter case evidence in any case state "
                 "(ordinary open, escalated, or SAR). Defensible evidence requires verified operational "
                 "execution and independent cryptographic audit."
             )
+
+        # 3e. Prevent Simulated Research Intelligence from Entering Authoritative Case Evidence or Production Filings
+        from app.config import get_settings
+        from app.domain.enums import CaseStatus
+
+        settings = get_settings()
+        is_signal_simulated = bool(
+            execution_mode == "SIMULATED_RESEARCH"
+            or not is_authoritative
+            or record.get("is_synthetic", False)
+            or signal_data.get("is_synthetic", False)
+        )
+
+        if is_signal_simulated:
+            if settings.is_production or settings.app_env.lower() in ("production", "prod"):
+                raise ValueError(
+                    "Simulated research intelligence cannot be attached to fraud cases in production environments."
+                )
+
+            is_authoritative_case = bool(
+                getattr(case, "is_authoritative", False)
+                or (getattr(case, "signature_metadata", {}) or {}).get("is_authoritative", False)
+                or case.status in (CaseStatus.ESCALATED, CaseStatus.SAR_FILED)
+            )
+            if is_authoritative_case:
+                raise ConsortiumSecurityError(
+                    "Simulated research signals cannot be attached to authoritative fraud investigation evidence or regulatory filings."
+                )
 
         # 4. Revalidate Current Consortium Governance & Revocation Status
         consortium_id = str(record.get("consortium_id", "")).lower().strip()

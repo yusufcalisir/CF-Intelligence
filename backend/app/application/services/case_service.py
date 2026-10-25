@@ -1195,20 +1195,41 @@ class EvidenceRegistryService:
         old_version = getattr(case, "version", 1)
 
         meta = metadata or {}
-        is_prototype_or_unverified = (
-            meta.get("is_synthetic") is True
-            or meta.get("execution_mode") in ("SIMULATED_RESEARCH", "RESEARCH_PROTOTYPE", "PROTOTYPE")
-            or meta.get("is_authoritative") is False
-            or meta.get("assurance_level") in ("PROTOCOL_PROTOTYPE", "RESEARCH_PROTOTYPE", "LOCAL_PROTOTYPE")
-            or evidence_type in ("RESEARCH_PROTOTYPE", "SIMULATION")
+        # 1a. Contain Unverified Protocol Prototype Records across ALL Case States
+        is_prototype = bool(
+            meta.get("assurance_level") in ("PROTOCOL_PROTOTYPE", "RESEARCH_PROTOTYPE", "LOCAL_PROTOTYPE")
+            or meta.get("execution_mode") in ("RESEARCH_PROTOTYPE", "PROTOTYPE")
+            or evidence_type in ("RESEARCH_PROTOTYPE",)
         )
-        if is_prototype_or_unverified:
+        if is_prototype:
             from app.domain.consortium_governance import ConsortiumSecurityError
 
             raise ConsortiumSecurityError(
-                "Synthetic, simulated research, or unverified protocol prototype records cannot be registered "
-                "in case evidence ledger across any case status (open, escalated, or closed). "
-                "Defensible evidence requires verified operational execution and independent cryptographic audit."
+                "Protocol prototype matching results cannot enter case evidence in any case state "
+                "(ordinary open, escalated, or SAR). Defensible evidence requires verified operational "
+                "execution and independent cryptographic audit."
+            )
+
+        # 1b. Contain Synthetic or Simulated Research Records from Authoritative/SAR Cases or Production
+        from app.config import get_settings
+
+        settings = get_settings()
+        is_case_authoritative = bool(
+            getattr(case, "is_authoritative", False)
+            or (getattr(case, "signature_metadata", {}) or {}).get("is_authoritative", False)
+            or getattr(case, "status", None) in (CaseStatus.ESCALATED, CaseStatus.SAR_FILED)
+        )
+        is_simulated = bool(
+            meta.get("is_synthetic") is True
+            or meta.get("execution_mode") == "SIMULATED_RESEARCH"
+            or meta.get("is_authoritative") is False
+            or evidence_type == "SIMULATION"
+        )
+        if is_simulated and (is_case_authoritative or settings.is_production):
+            from app.domain.consortium_governance import ConsortiumSecurityError
+
+            raise ConsortiumSecurityError(
+                "Synthetic, simulated research, or unverified protocol prototype records cannot be registered in authoritative case evidence ledger."
             )
 
         # 2. Compute SHA-256 content hash

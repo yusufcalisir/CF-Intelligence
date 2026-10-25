@@ -1818,18 +1818,27 @@ class CrossBankMatchingCoordinator:
             )
 
             grant_scope_digest = compute_operational_grant_scope_digest(
+                grant_id=grant_id,
+                revision=grant_revision,
                 participating_banks=list(
                     operational_grant.get("participating_banks", [clean_requesting, clean_target])
                 ),
-                purpose=req.purpose,
-                permitted_jurisdictions=list(
-                    operational_grant.get("permitted_jurisdictions", ["EU", "US"])
+                allowed_purposes=list(
+                    operational_grant.get("allowed_purposes", [req.purpose])
                 ),
-                authorized_dataset_scope=operational_grant.get(
-                    "authorized_dataset_scope", "cross_bank_intelligence"
+                institution_jurisdictions=dict(
+                    operational_grant.get(
+                        "institution_jurisdictions",
+                        {clean_requesting: "EU", clean_target: "EU"},
+                    )
                 ),
-                disclosure_level=operational_grant.get("disclosure_level", "ANONYMIZED_SUMMARY"),
-                expires_at=operational_grant.get("expires_at", "2099-01-01T00:00:00Z"),
+                allowed_jurisdictions=list(
+                    operational_grant.get("allowed_jurisdictions", ["EU", "US"])
+                ),
+                allow_cross_border=bool(operational_grant.get("allow_cross_border", False)),
+                allow_institution_identity_sharing=bool(
+                    operational_grant.get("allow_institution_identity_sharing", False)
+                ),
             )
 
         session_ticket_id = str(uuid.uuid4())
