@@ -19,6 +19,7 @@ Verifies:
 
 from __future__ import annotations
 
+import dataclasses
 import datetime
 import hashlib
 import hmac
@@ -197,6 +198,7 @@ def test_stale_approval_rejected_after_scope_revision(tmp_path):
     )
 
     consortium = gov_svc.get_consortium(consortium.consortium_id)
+    assert consortium is not None
     is_valid, reasons, _ = policy_engine.validate_intelligence_sharing(
         consortium=consortium,
         requesting_bank="bank_a",
@@ -224,6 +226,7 @@ def test_stale_approval_rejected_after_scope_revision(tmp_path):
 
     # 4. Bank B has NOT approved revision 2 yet. Validation must FAIL CLOSED!
     consortium_r2 = gov_svc.get_consortium(consortium.consortium_id)
+    assert consortium_r2 is not None
     is_valid_r2, reasons_r2, _ = policy_engine.validate_intelligence_sharing(
         consortium=consortium_r2,
         requesting_bank="bank_a",
@@ -247,6 +250,7 @@ def test_stale_approval_rejected_after_scope_revision(tmp_path):
 
     # 6. Now matching is authorized under revision 2
     consortium_approved_r2 = gov_svc.get_consortium(consortium.consortium_id)
+    assert consortium_approved_r2 is not None
     is_valid_final, reasons_final, _ = policy_engine.validate_intelligence_sharing(
         consortium=consortium_approved_r2,
         requesting_bank="bank_a",
@@ -321,9 +325,7 @@ def test_worker_side_authorization_ticket_validation(tmp_path):
 
     # 3. Add valid target bank signature but missing requesting bank signature
     sig_b = worker_b.sign_operation_authorization_ticket(ticket)
-    ticket_with_b = OperationAuthorizationTicket(
-        **{**ticket.__dict__, "bank_approvals": {"bank_b": sig_b}}
-    )
+    ticket_with_b = dataclasses.replace(ticket, bank_approvals={"bank_b": sig_b})
     with pytest.raises(ConsortiumSecurityError, match="Requesting institution 'bank_a' authorization verification failed"):
         worker_b.verify_operation_authorization(
             ticket=ticket_with_b,
@@ -335,9 +337,7 @@ def test_worker_side_authorization_ticket_validation(tmp_path):
     # 4. Add valid requesting bank signature
     canonical_a = f"{ticket.canonical_digest()}:bank_a"
     sig_a = hmac.new(secret_a.encode(), canonical_a.encode(), hashlib.sha256).hexdigest()
-    valid_ticket = OperationAuthorizationTicket(
-        **{**ticket.__dict__, "bank_approvals": {"bank_a": sig_a, "bank_b": sig_b}}
-    )
+    valid_ticket = dataclasses.replace(ticket, bank_approvals={"bank_a": sig_a, "bank_b": sig_b})
 
     # Verification must succeed!
     worker_b.verify_operation_authorization(
@@ -348,8 +348,8 @@ def test_worker_side_authorization_ticket_validation(tmp_path):
     )
 
     # 5. Expired ticket is rejected
-    expired_ticket = OperationAuthorizationTicket(
-        **{**valid_ticket.__dict__, "expires_at": (now - datetime.timedelta(seconds=10)).isoformat()}
+    expired_ticket = dataclasses.replace(
+        valid_ticket, expires_at=(now - datetime.timedelta(seconds=10)).isoformat()
     )
     with pytest.raises(ConsortiumSecurityError, match="has expired"):
         worker_b.verify_operation_authorization(
@@ -360,9 +360,7 @@ def test_worker_side_authorization_ticket_validation(tmp_path):
         )
 
     # 6. Wrong target bank is rejected
-    wrong_bank_ticket = OperationAuthorizationTicket(
-        **{**valid_ticket.__dict__, "target_bank_id": "bank_c"}
-    )
+    wrong_bank_ticket = dataclasses.replace(valid_ticket, target_bank_id="bank_c")
     with pytest.raises(ConsortiumSecurityError, match="Target institution mismatch"):
         worker_b.verify_operation_authorization(
             ticket=wrong_bank_ticket,
@@ -411,9 +409,7 @@ def test_local_grant_revocation_at_worker_boundary(tmp_path):
     sig_a = hmac.new(
         secret_a.encode(), f"{ticket.canonical_digest()}:bank_a".encode(), hashlib.sha256
     ).hexdigest()
-    valid_ticket = OperationAuthorizationTicket(
-        **{**ticket.__dict__, "bank_approvals": {"bank_a": sig_a, "bank_b": sig_b}}
-    )
+    valid_ticket = dataclasses.replace(ticket, bank_approvals={"bank_a": sig_a, "bank_b": sig_b})
 
     # Before revocation: valid
     worker_b.verify_operation_authorization(

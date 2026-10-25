@@ -137,7 +137,9 @@ def test_workbench_stepwise_review_and_dual_signoff() -> None:
 
     # Escalate to ESCALATED
     service.escalate_case(case.case_id, "High synthetic score", "analyst_emma")
-    assert service.get_case(case.case_id).status == InvestigatorCaseStatus.ESCALATED
+    retrieved_case = service.get_case(case.case_id)
+    assert retrieved_case is not None
+    assert retrieved_case.status == InvestigatorCaseStatus.ESCALATED
 
     # Two distinct supervisor signatures required for resolution
     resolved = service.resolve_case(

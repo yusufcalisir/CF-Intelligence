@@ -244,7 +244,7 @@ class TestCoordinatorSecretDecouplingAndPermissionBoundaries:
             assert daemon._process is not None
             # Inspect actual process command line via daemon._process.args
             raw_args = daemon._process.args
-            cmdline = " ".join(raw_args) if isinstance(raw_args, list) else str(raw_args)
+            cmdline = " ".join(str(a) for a in raw_args) if isinstance(raw_args, list) else str(raw_args)
 
             # Verify credentials are NOT in command line
             assert "--auth-secret" not in cmdline

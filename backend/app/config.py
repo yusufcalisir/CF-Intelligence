@@ -401,7 +401,7 @@ class Settings(BaseSettings):
         """
         if self.is_production:
             return False
-        return bool(self.enable_cross_bank_simulation)
+        return self.enable_cross_bank_simulation
 
     def validate_production_invariants(self) -> None:
         """Enforces security-by-default and fail-closed validation when operating in production or staging mode.
