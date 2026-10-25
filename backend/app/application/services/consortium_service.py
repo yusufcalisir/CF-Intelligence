@@ -40,17 +40,17 @@ def compute_operational_grant_scope_digest(
 ) -> str:
     """Computes deterministic, canonical SHA-256 digest of an operational grant scope."""
     canonical = {
-        "grant_id": str(grant_id).strip(),
-        "revision": int(revision),
-        "participating_banks": sorted(list(set(str(b).lower().strip() for b in participating_banks))),
-        "allowed_purposes": sorted(list(set(str(p).strip() for p in allowed_purposes))),
+        "grant_id": grant_id.strip(),
+        "revision": revision,
+        "participating_banks": sorted(list(set(b.lower().strip() for b in participating_banks))),
+        "allowed_purposes": sorted(list(set(p.strip() for p in allowed_purposes))),
         "institution_jurisdictions": {
-            str(k).lower().strip(): str(v).strip()
+            k.lower().strip(): v.strip()
             for k, v in sorted(institution_jurisdictions.items())
         },
-        "allowed_jurisdictions": sorted(list(set(str(j).strip() for j in allowed_jurisdictions))),
-        "allow_cross_border": bool(allow_cross_border),
-        "allow_institution_identity_sharing": bool(allow_institution_identity_sharing),
+        "allowed_jurisdictions": sorted(list(set(j.strip() for j in allowed_jurisdictions))),
+        "allow_cross_border": allow_cross_border,
+        "allow_institution_identity_sharing": allow_institution_identity_sharing,
     }
     canonical_bytes = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(canonical_bytes).hexdigest()

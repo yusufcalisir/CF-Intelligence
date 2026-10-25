@@ -25,7 +25,7 @@ try:
     import private_set_intersection.python as openmined_psi  # type: ignore
 
     PSI_LIB_AVAILABLE = True
-except (ImportError, ModuleNotFoundError):
+except ImportError:
     openmined_psi = None  # type: ignore
     PSI_LIB_AVAILABLE = False
 
@@ -87,7 +87,7 @@ class OpenMinedPSIAdapter:
     ) -> bytes:
         """Compute blinded client Request message."""
         cls.ensure_available()
-        clean_items = [str(item).strip() for item in items if str(item).strip()]
+        clean_items = [item.strip() for item in items if item.strip()]
         if not clean_items:
             raise ValueError("Client PSI item list cannot be empty.")
         req = client_instance.CreateRequest(clean_items)
@@ -102,7 +102,7 @@ class OpenMinedPSIAdapter:
     ) -> bytes:
         """Compute server Setup message using GCS (Golomb Compressed Sets)."""
         cls.ensure_available()
-        clean_items = [str(item).strip() for item in items if str(item).strip()]
+        clean_items = [item.strip() for item in items if item.strip()]
         if not clean_items:
             # Handle empty server set cleanly
             clean_items = ["__cfi_empty_server_set_sentinel__"]

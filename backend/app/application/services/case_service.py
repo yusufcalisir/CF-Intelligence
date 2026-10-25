@@ -1196,7 +1196,7 @@ class EvidenceRegistryService:
 
         meta = metadata or {}
         # 1a. Contain Unverified Protocol Prototype Records across ALL Case States
-        is_prototype = bool(
+        is_prototype = (
             meta.get("assurance_level") in ("PROTOCOL_PROTOTYPE", "RESEARCH_PROTOTYPE", "LOCAL_PROTOTYPE")
             or meta.get("execution_mode") in ("RESEARCH_PROTOTYPE", "PROTOTYPE")
             or evidence_type in ("RESEARCH_PROTOTYPE",)
@@ -1214,12 +1214,12 @@ class EvidenceRegistryService:
         from app.config import get_settings
 
         settings = get_settings()
-        is_case_authoritative = bool(
-            getattr(case, "is_authoritative", False)
-            or (getattr(case, "signature_metadata", {}) or {}).get("is_authoritative", False)
+        is_case_authoritative = (
+            getattr(case, "is_authoritative", False) is True
+            or (getattr(case, "signature_metadata", {}) or {}).get("is_authoritative", False) is True
             or getattr(case, "status", None) in (CaseStatus.ESCALATED, CaseStatus.SAR_FILED)
         )
-        is_simulated = bool(
+        is_simulated = (
             meta.get("is_synthetic") is True
             or meta.get("execution_mode") == "SIMULATED_RESEARCH"
             or meta.get("is_authoritative") is False
