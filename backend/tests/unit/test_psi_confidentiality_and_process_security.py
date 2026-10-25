@@ -179,6 +179,12 @@ def security_test_context(tmp_path: Path) -> dict[str, Any]:
         approving_bank_id="bank_a",
         auth_token=token_a,
     )
+    gov_svc.approve_operational_data_sharing_grant(
+        consortium_id=consortium_id,
+        grant_id="grant_sec_001",
+        approving_bank_id="bank_b",
+        auth_token=token_b,
+    )
 
     secret_a = secrets.token_hex(32)
     secret_b = secrets.token_hex(32)
@@ -503,7 +509,8 @@ class TestIndependentOSProcessExecutionAndIsolation:
                 )
                 assert recovered_signal.match_confirmed is True
                 assert recovered_signal.match_category == "EXACT_MATCH"
-                assert recovered_signal.assurance_level == "ISOLATED_INTEGRATION_VERIFIED"
+                assert recovered_signal.assurance_level == "PROTOCOL_PROTOTYPE"
+                assert recovered_signal.is_authoritative is False
             finally:
                 daemon_b_restarted.stop()
 

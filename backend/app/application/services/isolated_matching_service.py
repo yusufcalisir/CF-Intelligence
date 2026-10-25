@@ -23,6 +23,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -34,6 +35,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import UTC
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any, cast
 
 from app.application.schemas.cross_bank_intelligence import (
@@ -64,6 +66,10 @@ from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChai
 from app.infrastructure.storage.storage_utils import get_storage_dir
 
 logger = logging.getLogger(__name__)
+
+SCOPE_MATCHING = "matching"
+SCOPE_DATA_INGESTION = "ingestion"
+SCOPE_ADMINISTRATION = "admin"
 
 
 @dataclass(frozen=True)
@@ -155,6 +161,9 @@ class IsolatedBankWorkerNode:
         auth_secret: str | None = None,
         kms_service: KMSService | None = None,
         trusted_peer_keys: dict[str, str] | None = None,
+        matching_token: str | None = None,
+        ingestion_token: str | None = None,
+        admin_token: str | None = None,
     ) -> None:
         if not bank_id or not bank_id.strip():
             raise ValueError("bank_id must be a non-empty string")
@@ -166,6 +175,18 @@ class IsolatedBankWorkerNode:
         self._kms_session = TenantKMSSession(bank_id=self.bank_id, kms_service=kms_service)
         # Worker private signing key: cryptographically generated if not provided, never predictable fallback
         self._auth_secret = auth_secret or secrets.token_hex(32)
+
+        # Scoped RPC authorization credentials (least-privilege separation)
+        self._matching_token = matching_token or f"match_{secrets.token_hex(24)}"
+        self._ingestion_token = ingestion_token or f"ingest_{secrets.token_hex(24)}"
+        self._admin_token = admin_token or f"admin_{secrets.token_hex(24)}"
+
+        self._token_scopes: dict[str, set[str]] = {
+            self._matching_token: {SCOPE_MATCHING},
+            self._ingestion_token: {SCOPE_DATA_INGESTION},
+            self._admin_token: {SCOPE_ADMINISTRATION},
+            self._auth_secret: {SCOPE_MATCHING, SCOPE_DATA_INGESTION, SCOPE_ADMINISTRATION},
+        }
 
         # Peer verification keystore: independently provisioned trusted verification keys
         self._trusted_peer_verification_keys: dict[str, str] = {
@@ -188,12 +209,48 @@ class IsolatedBankWorkerNode:
                     f"Failing closed to prevent replay vulnerabilities."
                 ) from exc
 
-    def enroll_trusted_peer(self, peer_bank_id: str, verification_key: str) -> None:
+    @property
+    def matching_token(self) -> str:
+        """Return the scoped matching token."""
+        return self._matching_token
+
+    @property
+    def ingestion_token(self) -> str:
+        """Return the scoped data ingestion token."""
+        return self._ingestion_token
+
+    @property
+    def admin_token(self) -> str:
+        """Return the scoped administration token."""
+        return self._admin_token
+
+    def get_token_scopes(self, token: str) -> set[str]:
+        """Return the authorized scopes for a given Bearer token."""
+        clean_token = token.strip()
+        for authorized_token, scopes in self._token_scopes.items():
+            if hmac.compare_digest(clean_token, authorized_token):
+                return scopes
+        return set()
+
+    def enroll_trusted_peer(
+        self, peer_bank_id: str, verification_key: str, allow_rotation: bool = False
+    ) -> None:
         """Enroll an authoritative counterpart bank verification key in this worker's keystore."""
         clean_id = peer_bank_id.lower().strip()
+        if not clean_id:
+            raise ValueError("peer_bank_id cannot be empty")
         if not verification_key or len(verification_key.strip()) < 16:
             raise ValueError(f"Invalid verification key for peer '{peer_bank_id}'")
-        self._trusted_peer_verification_keys[clean_id] = verification_key
+        if clean_id in self._trusted_peer_verification_keys and not allow_rotation:
+            raise ConsortiumSecurityError(
+                f"Peer institution '{clean_id}' is already enrolled in worker '{self.bank_id}'. "
+                "Unauthorized key replacement rejected without verified administrative key rotation."
+            )
+        self._trusted_peer_verification_keys[clean_id] = verification_key.strip()
+
+    def get_trusted_peer_key(self, peer_bank_id: str) -> str | None:
+        """Return the trusted verification key for an enrolled peer bank."""
+        return self._trusted_peer_verification_keys.get(peer_bank_id.lower().strip())
 
     def _persist_consumed_nonce(self, nonce: str) -> None:
         """Persist consumed nonce atomically to durable disk storage, failing closed on disk errors."""
@@ -220,6 +277,28 @@ class IsolatedBankWorkerNode:
                     f"Failed to durably persist replay nonce for institution '{self.bank_id}': {exc}"
                 ) from exc
 
+    def _sanitize_entity_id(self, entity_id: str) -> str:
+        """Validate and canonicalize entity identifier to prevent path traversal and data poisoning."""
+        clean_id = str(entity_id).strip()
+        if not clean_id or not re.match(r"^[a-zA-Z0-9_\-]+$", clean_id):
+            raise ValueError(
+                f"Invalid entity identifier '{entity_id}': Contains illegal characters or path traversal elements. "
+                "Only alphanumeric, hyphen, and underscore characters are permitted."
+            )
+        vault_path = Path(self.vault_dir).resolve()
+        target_path = (vault_path / f"{clean_id}.json").resolve()
+        try:
+            target_path.relative_to(vault_path)
+        except ValueError:
+            raise PermissionError(
+                f"Path traversal detected: Entity '{entity_id}' attempts to escape institutional vault '{self.bank_id}'."
+            )
+        if target_path.is_symlink():
+            raise PermissionError(
+                f"Symlink exploitation detected: Entity file '{target_path}' is a symbolic link."
+            )
+        return clean_id
+
     def store_private_entity(self, entity: Entity | dict[str, Any]) -> str:
         """Store an authoritative entity strictly in this bank's isolated storage vault."""
         ent_dict = entity.to_dict() if isinstance(entity, Entity) else dict(entity)
@@ -230,7 +309,8 @@ class IsolatedBankWorkerNode:
                 f"Isolated bank worker '{self.bank_id}' cannot store entity belonging to institution '{ent_bank}'."
             )
 
-        entity_id = ent_dict.get("id") or str(uuid.uuid4())
+        raw_ent_id = ent_dict.get("id") or str(uuid.uuid4())
+        entity_id = self._sanitize_entity_id(raw_ent_id)
         ent_dict["id"] = entity_id
         ent_dict["bank_id"] = self.bank_id
 
@@ -243,24 +323,29 @@ class IsolatedBankWorkerNode:
                 ent_type = str(ent_dict.get("entity_type", "customer"))
                 ent_dict["privacy_id"] = PrivacyPreservingIdentifier.compute(raw_id, ent_type)
 
-        path = os.path.join(self.vault_dir, f"{entity_id}.json")
+        vault_path = Path(self.vault_dir).resolve()
+        path = vault_path / f"{entity_id}.json"
         with open(path, "w", encoding="utf-8") as f:
             json.dump(ent_dict, f, indent=2)
         return entity_id
 
     def load_private_entity(self, entity_id: str) -> dict[str, Any]:
         """Load an authoritative entity strictly from this bank's isolated storage vault."""
-        path = os.path.join(self.vault_dir, f"{entity_id}.json")
-        if not os.path.exists(path):
+        clean_id = self._sanitize_entity_id(entity_id)
+        vault_path = Path(self.vault_dir).resolve()
+        path = vault_path / f"{clean_id}.json"
+        if not path.exists():
             raise ValueError(
-                f"Entity '{entity_id}' not found in isolated private storage of institution '{self.bank_id}'."
+                f"Entity '{clean_id}' not found in isolated private storage of institution '{self.bank_id}'."
             )
+        if path.is_symlink():
+            raise PermissionError(f"Symlink exploitation detected on entity '{clean_id}'.")
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
 
         if str(data.get("bank_id", "")).lower().strip() != self.bank_id:
             raise PermissionError(
-                f"Tenant isolation breach detected: Entity '{entity_id}' belongs to '{data.get('bank_id')}', "
+                f"Tenant isolation breach detected: Entity '{clean_id}' belongs to '{data.get('bank_id')}', "
                 f"cannot be loaded by worker '{self.bank_id}'."
             )
         return data
@@ -582,6 +667,8 @@ class InstitutionalWorkerDaemon:
         if self.run_as_process:
             storage_root = os.path.dirname(os.path.dirname(os.path.abspath(self.node.vault_dir)))
             peers_json = json.dumps(self.node._trusted_peer_verification_keys)
+            # Secrets and trusted peers are passed strictly via process environment variables,
+            # NEVER via process command-line arguments to prevent credential exposure in ps/top!
             cmd = [
                 sys.executable,
                 "-m",
@@ -594,10 +681,6 @@ class InstitutionalWorkerDaemon:
                 str(self.port),
                 "--storage-root",
                 storage_root,
-                "--auth-secret",
-                self.node._auth_secret,
-                "--trusted-peers",
-                peers_json,
             ]
             backend_dir = os.path.dirname(
                 os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -607,6 +690,11 @@ class InstitutionalWorkerDaemon:
             proc_env["PYTHONPATH"] = (
                 f"{backend_dir}{os.pathsep}{curr_pp}" if curr_pp else backend_dir
             )
+            proc_env["WORKER_AUTH_SECRET"] = self.node._auth_secret
+            proc_env["WORKER_MATCHING_TOKEN"] = self.node._matching_token
+            proc_env["WORKER_INGESTION_TOKEN"] = self.node._ingestion_token
+            proc_env["WORKER_ADMIN_TOKEN"] = self.node._admin_token
+            proc_env["WORKER_TRUSTED_PEERS_JSON"] = peers_json
 
             self._process = subprocess.Popen(
                 cmd,
@@ -636,13 +724,12 @@ class InstitutionalWorkerDaemon:
             return f"http://{self.host}:{self.port}"
 
         node = self.node
-        auth_secret = node._auth_secret
 
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
                 pass  # suppress noisy stdout logs in test runner
 
-            def _authenticate(self) -> bool:
+            def _authenticate(self, required_scope: str) -> bool:
                 auth_hdr = self.headers.get("Authorization", "")
                 if not auth_hdr.startswith("Bearer "):
                     self.send_response(401)
@@ -650,10 +737,22 @@ class InstitutionalWorkerDaemon:
                     self.wfile.write(b'{"error": "Unauthorized: Bearer token required"}')
                     return False
                 token = auth_hdr[7:].strip()
-                if not hmac.compare_digest(token, auth_secret):
+                scopes = node.get_token_scopes(token)
+                if not scopes:
                     self.send_response(403)
                     self.end_headers()
-                    self.wfile.write(b'{"error": "Forbidden: Invalid worker secret"}')
+                    self.wfile.write(b'{"error": "Forbidden: Invalid or unrecognized worker token"}')
+                    return False
+                if required_scope not in scopes:
+                    self.send_response(403)
+                    self.end_headers()
+                    self.wfile.write(
+                        json.dumps({
+                            "error": f"Forbidden: Token lacks required scope '{required_scope}'",
+                            "required_scope": required_scope,
+                            "permitted_scopes": sorted(list(scopes)),
+                        }).encode()
+                    )
                     return False
                 return True
 
@@ -672,8 +771,22 @@ class InstitutionalWorkerDaemon:
                     self.end_headers()
 
             def do_POST(self) -> None:
-                if not self._authenticate():
+                route_scopes = {
+                    "/worker/initiate-query": SCOPE_MATCHING,
+                    "/worker/process-counterpart": SCOPE_MATCHING,
+                    "/worker/finalize-match": SCOPE_MATCHING,
+                    "/worker/store-entity": SCOPE_DATA_INGESTION,
+                    "/worker/enroll-peer": SCOPE_ADMINISTRATION,
+                }
+                if self.path not in route_scopes:
+                    self.send_response(404)
+                    self.end_headers()
                     return
+
+                required_scope = route_scopes[self.path]
+                if not self._authenticate(required_scope):
+                    return
+
                 content_length = int(self.headers.get("Content-Length", 0))
                 body = self.rfile.read(content_length)
                 data = json.loads(body.decode("utf-8")) if body else {}
@@ -711,7 +824,11 @@ class InstitutionalWorkerDaemon:
                         )
                         res = asdict(receipt)
                     elif self.path == "/worker/enroll-peer":
-                        node.enroll_trusted_peer(data["peer_bank_id"], data["verification_key"])
+                        node.enroll_trusted_peer(
+                            data["peer_bank_id"],
+                            data["verification_key"],
+                            allow_rotation=data.get("allow_rotation", False),
+                        )
                         res = {"status": "ENROLLED", "peer_bank_id": data["peer_bank_id"]}
                     else:
                         self.send_response(404)
@@ -754,10 +871,22 @@ class InstitutionalWorkerDaemon:
 class InstitutionalWorkerClient:
     """Client communicating with an independent institutional worker over loopback HTTP transport."""
 
-    def __init__(self, bank_id: str, base_url: str, auth_secret: str) -> None:
+    def __init__(
+        self,
+        bank_id: str,
+        base_url: str,
+        auth_secret: str | None = None,
+        matching_token: str | None = None,
+        ingestion_token: str | None = None,
+        admin_token: str | None = None,
+    ) -> None:
         self.bank_id = bank_id.lower().strip()
         self.base_url = base_url.rstrip("/")
-        self.auth_secret = auth_secret
+        # The coordinator only receives matching_token; ingestion and admin tokens are stored if explicitly provisioned
+        self.matching_token = matching_token or auth_secret or ""
+        self.ingestion_token = ingestion_token or auth_secret or ""
+        self.admin_token = admin_token or auth_secret or ""
+        self.auth_secret = self.matching_token
         self._is_network_transport = True
 
     def health_check(self) -> dict[str, Any]:
@@ -767,7 +896,7 @@ class InstitutionalWorkerClient:
             raise ValueError(f"Unsupported URL scheme for worker client: {url}")
         req = urllib.request.Request(
             url,
-            headers={"Authorization": f"Bearer {self.auth_secret}"},
+            headers={"Authorization": f"Bearer {self.matching_token}"},
             method="GET",
         )
         try:
@@ -779,17 +908,18 @@ class InstitutionalWorkerClient:
                 f"Worker unreachable on health probe for '{self.bank_id}': {exc}"
             ) from exc
 
-    def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def _post(self, path: str, payload: dict[str, Any], token: str | None = None) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
         if not (url.startswith("http://") or url.startswith("https://")):
             raise ValueError(f"Unsupported URL scheme for worker client: {url}")
         req_data = json.dumps(payload).encode("utf-8")
+        req_token = token or self.matching_token
         req = urllib.request.Request(
             url,
             data=req_data,
             headers={
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.auth_secret}",
+                "Authorization": f"Bearer {req_token}",
             },
             method="POST",
         )
@@ -804,7 +934,7 @@ class InstitutionalWorkerClient:
                 err_type = err_body.get("error_type", "")
                 if "ConsortiumSecurityError" in err_type:
                     raise ConsortiumSecurityError(err_msg) from http_err
-                if "PermissionError" in err_type:
+                if "PermissionError" in err_type or http_err.code in (401, 403):
                     raise PermissionError(err_msg) from http_err
                 raise ValueError(err_msg) from http_err
             except (ConsortiumSecurityError, PermissionError, ValueError):
@@ -820,13 +950,18 @@ class InstitutionalWorkerClient:
 
     def store_private_entity(self, entity: Entity | dict[str, Any]) -> str:
         ent_dict = entity.to_dict() if isinstance(entity, Entity) else dict(entity)
-        res = self._post("/worker/store-entity", {"entity": ent_dict})
+        res = self._post("/worker/store-entity", {"entity": ent_dict}, token=self.ingestion_token)
         return str(res["entity_id"])
 
-    def enroll_peer(self, peer_bank_id: str, verification_key: str) -> None:
+    def enroll_peer(self, peer_bank_id: str, verification_key: str, allow_rotation: bool = False) -> None:
         self._post(
             "/worker/enroll-peer",
-            {"peer_bank_id": peer_bank_id, "verification_key": verification_key},
+            {
+                "peer_bank_id": peer_bank_id,
+                "verification_key": verification_key,
+                "allow_rotation": allow_rotation,
+            },
+            token=self.admin_token,
         )
 
     def initiate_blinded_query(
@@ -895,20 +1030,33 @@ class CrossBankMatchingCoordinator:
         self.policy_engine = policy_engine or ConsortiumPolicyEngine()
         self.storage_root = storage_root or get_storage_dir()
         self._signal_store = RedisStore("authoritative_signals")
+        self._prototype_store = RedisStore("research_prototype_signals")
         self._workers: dict[str, Any] = {}
-        self._worker_secrets: dict[str, str] = {}
+        self._matching_tokens: dict[str, str] = {}
         self._coordinator_secret = secrets.token_hex(32)
 
     def register_worker(
         self,
         bank_id: str,
         worker: Any,
-        auth_secret: str,
+        auth_secret: str | None = None,
+        matching_token: str | None = None,
     ) -> None:
-        """Register an authenticated isolated bank worker node or client."""
+        """Register an authenticated isolated bank worker node or client.
+
+        The coordinator ONLY receives matching capability tokens, never bank signing
+        keys or administrative/ingestion credentials.
+        """
         clean_id = bank_id.lower().strip()
         self._workers[clean_id] = worker
-        self._worker_secrets[clean_id] = auth_secret
+        token = (
+            matching_token
+            or getattr(worker, "matching_token", None)
+            or getattr(worker, "_matching_token", None)
+            or auth_secret
+            or getattr(worker, "_auth_secret", "")
+        )
+        self._matching_tokens[clean_id] = token
 
     def get_worker(self, bank_id: str) -> Any:
         """Retrieve registered worker for institution, failing closed if unregistered."""
@@ -994,7 +1142,7 @@ class CrossBankMatchingCoordinator:
                 f"Target institution '{clean_target}' is not an active member of consortium '{clean_consortium_id}'."
             )
 
-        # 2. Enforce Explicit Operational Data-Sharing Grant & Mandatory Jurisdiction
+        # 2. Enforce Explicit Bilateral Operational Data-Sharing Grant & Mandatory Jurisdiction
         is_valid_policy, policy_reasons, disclosure_scope = (
             self.policy_engine.validate_intelligence_sharing(
                 consortium=consortium,
@@ -1013,18 +1161,25 @@ class CrossBankMatchingCoordinator:
         worker_a = self.get_worker(clean_requesting)
         worker_b = self.get_worker(clean_target)
 
-        secret_a = self._worker_secrets.get(clean_requesting, getattr(worker_a, "auth_secret", ""))
-        secret_b = self._worker_secrets.get(clean_target, getattr(worker_b, "auth_secret", ""))
-        if not secret_a or not secret_b:
-            raise ConsortiumSecurityError("Institutional worker credentials are not configured.")
+        token_a = self._matching_tokens.get(
+            clean_requesting, getattr(worker_a, "matching_token", getattr(worker_a, "_matching_token", ""))
+        )
+        token_b = self._matching_tokens.get(
+            clean_target, getattr(worker_b, "matching_token", getattr(worker_b, "_matching_token", ""))
+        )
+        if not token_a or not token_b:
+            raise ConsortiumSecurityError("Institutional worker matching credentials are not configured.")
 
         # Determine execution assurance level based on actual worker boundary
         is_multi_process = getattr(worker_a, "_is_network_transport", False) and getattr(
             worker_b, "_is_network_transport", False
         )
-        assurance_level_literal: str = (
-            "ISOLATED_INTEGRATION_VERIFIED" if is_multi_process else "PROTOCOL_PROTOTYPE"
-        )
+        # DH-PSI-2048-MODP is an unreviewed protocol prototype.
+        # Under runtime truth, prototype outputs are strictly non-authoritative at issuance.
+        assurance_level_literal: str = "PROTOCOL_PROTOTYPE"
+        execution_mode_literal: str = "RESEARCH_PROTOTYPE"
+        operational_status_literal: str = "RESEARCH_PROTOTYPE"
+        is_authoritative_flag: bool = False
 
         # 4. Stage 1: Bank A Worker generates Blinded Query Message
         query_msg = worker_a.initiate_blinded_query(
@@ -1105,7 +1260,7 @@ class CrossBankMatchingCoordinator:
                     if is_multi_process
                     else "IN_PROCESS_PROTOTYPE"
                 ),
-                "operational_status": "OPERATIONAL",
+                "operational_status": operational_status_literal,
                 "governance_authority": f"consortium:{clean_consortium_id}",
                 "protocol": "DH-PSI-2048-MODP",
                 "job_id": query_msg.job_id,
@@ -1114,23 +1269,21 @@ class CrossBankMatchingCoordinator:
                 "coordinator_signature": coord_sig,
                 "assurance_level": assurance_level_literal,
             },
-            execution_mode="VERIFIED_OPERATIONAL",
-            attestation_status="ISOLATED_PROCESS_VERIFIED"
-            if is_multi_process
-            else "IN_PROCESS_PROTOTYPE",
-            is_authoritative=True,
+            execution_mode=execution_mode_literal,
+            attestation_status="IN_PROCESS_PROTOTYPE",
+            is_authoritative=is_authoritative_flag,
             is_synthetic=False,
             assurance_level=cast("Any", assurance_level_literal),
         )
 
-        # 9. Register in Durable Authoritative Signal Store
+        # 9. Register strictly in Research Prototype Store (NEVER in Authoritative Signal Store)
         signal_dict = signal.model_dump()
         expires_at = (now + datetime.timedelta(hours=24)).isoformat()
         content_hash = hashlib.sha256(
             json.dumps(signal_dict, sort_keys=True).encode("utf-8")
         ).hexdigest()
 
-        authoritative_record = {
+        prototype_record = {
             "signal_id": signal_id,
             "signal_data": signal_dict,
             "requesting_bank_id": clean_requesting,
@@ -1140,14 +1293,14 @@ class CrossBankMatchingCoordinator:
             "issued_at": now.isoformat(),
             "expires_at": expires_at,
             "content_hash": content_hash,
-            "is_authoritative": True,
+            "is_authoritative": is_authoritative_flag,
             "is_synthetic": False,
-            "operational_status": "OPERATIONAL",
+            "operational_status": operational_status_literal,
             "assurance_level": assurance_level_literal,
             "attached_to_cases": [],
             "receipt": asdict(receipt),
         }
-        self._signal_store.set(signal_id, authoritative_record)
+        self._prototype_store.set(signal_id, prototype_record)
 
         # 10. Audit Event
         ImmutableAuditChain.get_instance().append_event(
@@ -1185,17 +1338,29 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="127.0.0.1", help="Bind host")
     parser.add_argument("--port", type=int, default=0, help="Bind port (0 for ephemeral)")
     parser.add_argument("--storage-root", required=True, help="Path to base storage directory")
-    parser.add_argument("--auth-secret", required=True, help="Worker authentication secret")
+    parser.add_argument("--auth-secret", default=None, help="Worker authentication secret (deprecated on CLI; prefer env)")
+    parser.add_argument("--matching-token", default=None, help="Worker matching token")
+    parser.add_argument("--ingestion-token", default=None, help="Worker ingestion token")
+    parser.add_argument("--admin-token", default=None, help="Worker admin token")
     parser.add_argument(
-        "--trusted-peers", default="{}", help="JSON mapping of trusted peer verification keys"
+        "--trusted-peers", default=None, help="JSON mapping of trusted peer verification keys"
     )
 
     cli_args = parser.parse_args()
-    peers = json.loads(cli_args.trusted_peers)
+    env_auth = os.environ.get("WORKER_AUTH_SECRET") or cli_args.auth_secret or secrets.token_hex(32)
+    env_matching = os.environ.get("WORKER_MATCHING_TOKEN") or cli_args.matching_token
+    env_ingest = os.environ.get("WORKER_INGESTION_TOKEN") or cli_args.ingestion_token
+    env_admin = os.environ.get("WORKER_ADMIN_TOKEN") or cli_args.admin_token
+    env_peers = os.environ.get("WORKER_TRUSTED_PEERS_JSON") or cli_args.trusted_peers or "{}"
+    peers = json.loads(env_peers)
+
     cli_node = IsolatedBankWorkerNode(
         bank_id=cli_args.bank_id,
         storage_root=cli_args.storage_root,
-        auth_secret=cli_args.auth_secret,
+        auth_secret=env_auth,
+        matching_token=env_matching,
+        ingestion_token=env_ingest,
+        admin_token=env_admin,
         trusted_peer_keys=peers,
     )
     cli_daemon = InstitutionalWorkerDaemon(

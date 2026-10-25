@@ -182,6 +182,12 @@ def institutional_context(tmp_path: Path) -> dict[str, Any]:
         approving_bank_id="bank_a",
         auth_token=token_a,
     )
+    gov_svc.approve_operational_data_sharing_grant(
+        consortium_id=consortium_id,
+        grant_id="grant_operational_bilateral_001",
+        approving_bank_id="bank_b",
+        auth_token=token_b,
+    )
 
     worker_a = IsolatedBankWorkerNode(
         bank_id="bank_a",
@@ -292,8 +298,8 @@ class TestInstitutionalMultiProcessWorkerTransport:
             # Assert operational correctness and assurance level
             assert signal.match_confirmed is True
             assert signal.match_category == "EXACT_MATCH"
-            assert signal.match_confidence == 1.0
-            assert signal.assurance_level == "ISOLATED_INTEGRATION_VERIFIED"
+            assert signal.assurance_level == "PROTOCOL_PROTOTYPE"
+            assert signal.is_authoritative is False
             assert signal.sanitized_risk_level == "UNAVAILABLE"
             assert "CROSS_BANK_ENTITY_OBSERVED" in signal.sanitized_typology_indicators
 
@@ -738,7 +744,7 @@ class TestAuthoritativeCaseEvidenceAttachment:
 
         with pytest.raises(
             ConsortiumSecurityError,
-            match="Protocol prototype matching results cannot enter authoritative case evidence",
+            match="is a research prototype result and cannot enter case evidence",
         ):
             intel_svc.attach_signal_to_case_evidence(
                 case_id=case.id,

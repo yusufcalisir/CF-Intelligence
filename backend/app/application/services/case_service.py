@@ -1195,21 +1195,20 @@ class EvidenceRegistryService:
         old_version = getattr(case, "version", 1)
 
         meta = metadata or {}
-        is_case_authoritative = bool(
-            getattr(case, "is_authoritative", False)
-            or (getattr(case, "signature_metadata", {}) or {}).get("is_authoritative", False)
-            or case.status in (CaseStatus.ESCALATED, CaseStatus.SAR_FILED)
-        )
-        if is_case_authoritative and (
+        is_prototype_or_unverified = bool(
             meta.get("is_synthetic") is True
-            or meta.get("execution_mode") == "SIMULATED_RESEARCH"
+            or meta.get("execution_mode") in ("SIMULATED_RESEARCH", "RESEARCH_PROTOTYPE", "PROTOTYPE")
             or meta.get("is_authoritative") is False
-            or meta.get("assurance_level") == "PROTOCOL_PROTOTYPE"
-        ):
+            or meta.get("assurance_level") in ("PROTOCOL_PROTOTYPE", "RESEARCH_PROTOTYPE", "LOCAL_PROTOTYPE")
+            or evidence_type in ("RESEARCH_PROTOTYPE", "SIMULATION")
+        )
+        if is_prototype_or_unverified:
             from app.domain.consortium_governance import ConsortiumSecurityError
 
             raise ConsortiumSecurityError(
-                "Synthetic, simulated research, or unverified protocol prototype records cannot be registered in authoritative case evidence ledger."
+                "Synthetic, simulated research, or unverified protocol prototype records cannot be registered "
+                "in case evidence ledger across any case status (open, escalated, or closed). "
+                "Defensible evidence requires verified operational execution and independent cryptographic audit."
             )
 
         # 2. Compute SHA-256 content hash

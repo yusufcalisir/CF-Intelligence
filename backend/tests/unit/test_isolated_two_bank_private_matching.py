@@ -22,6 +22,9 @@ Verifies:
 
 from __future__ import annotations
 
+import datetime
+import hashlib
+import json
 import os
 import uuid
 from pathlib import Path
@@ -171,6 +174,13 @@ def institutional_setup(tmp_path: Path):
         approving_bank_id="bank_a",
         auth_token=token_a,
     )
+    # Bilateral institutional consent: Bank B records its approval
+    gov_svc.approve_operational_data_sharing_grant(
+        consortium_id=consortium_id,
+        grant_id="grant_operational_bilateral_001",
+        approving_bank_id="bank_b",
+        auth_token=token_b,
+    )
 
     # 2. Institutional Workers with isolated vaults and KMS sessions
     secret_a = "bank_a_auth_credential_key_2026"
@@ -319,9 +329,10 @@ class TestIsolatedPrivateMatchingExecution:
         assert signal.match_confirmed is True
         assert signal.match_category == "EXACT_MATCH"
         assert signal.match_confidence == 1.0
-        assert signal.is_authoritative is True
+        assert signal.is_authoritative is False
         assert signal.is_synthetic is False
-        assert signal.execution_mode == "VERIFIED_OPERATIONAL"
+        assert signal.execution_mode == "RESEARCH_PROTOTYPE"
+        assert signal.assurance_level == "PROTOCOL_PROTOTYPE"
         assert "bank_b" in signal.contributing_institutions
         assert signal.sanitized_risk_level == "UNAVAILABLE"
         assert "CROSS_BANK_ENTITY_OBSERVED" in signal.sanitized_typology_indicators
@@ -664,16 +675,73 @@ class TestAuthoritativeEvidenceBinding:
         )
 
         signal = intel_svc.execute_two_bank_private_matching(req=req, auth_token=token_a)
-        assert signal.is_authoritative is True
+        assert signal.is_authoritative is False
+        assert signal.assurance_level == "PROTOCOL_PROTOTYPE"
         assert signal.match_confirmed is True
 
         case = case_svc.create_case(title="Authoritative Fraud Case Alpha", bank_id="bank_a")
 
+        # 1. Prototype results are strictly blocked from case evidence ledger across all cases
+        with pytest.raises(ConsortiumSecurityError, match="research prototype|cannot enter case evidence"):
+            intel_svc.attach_signal_to_case_evidence(
+                case_id=case.id,
+                signal_id=signal.signal_id,
+                auth_token=token_a,
+                notes="Verified DH-PSI cross-bank correlation confirmed with counterpart Bank B.",
+            )
+
+        # 2. Authoritative operational signal attaches cleanly
+        auth_sig_id = str(uuid.uuid4())
+        auth_sig_data = {
+            "signal_id": auth_sig_id,
+            "consortium_id": consortium_id,
+            "requesting_bank_id": "bank_a",
+            "query_entity_id": "ent_evidence_target_a",
+            "privacy_hash_truncated": "hash_abc",
+            "match_confirmed": True,
+            "match_category": "EXACT_MATCH",
+            "match_confidence": 1.0,
+            "contributing_institutions_count": 1,
+            "contributing_institutions": ["bank_b"],
+            "disclosure_mode": "ATTRIBUTED_INSTITUTIONS",
+            "sanitized_risk_level": "UNAVAILABLE",
+            "sanitized_typology_indicators": ["CROSS_BANK_ENTITY_OBSERVED"],
+            "graph_context": {},
+            "provenance": {},
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "attestation_status": "HARDWARE_ENCLAVE_ATTESTED",
+            "is_authoritative": True,
+            "is_synthetic": False,
+            "assurance_level": "OPERATIONAL_PRIVACY_VERIFIED",
+        }
+        content_hash = hashlib.sha256(
+            json.dumps(auth_sig_data, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        intel_svc._signal_store.set(
+            auth_sig_id,
+            {
+                "signal_id": auth_sig_id,
+                "signal_data": auth_sig_data,
+                "requesting_bank_id": "bank_a",
+                "consortium_id": consortium_id,
+                "query_entity_id": "ent_evidence_target_a",
+                "issued_to_principal": "worker:bank_a",
+                "issued_at": datetime.datetime.now(datetime.UTC).isoformat(),
+                "expires_at": (datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=24)).isoformat(),
+                "content_hash": content_hash,
+                "is_authoritative": True,
+                "is_synthetic": False,
+                "operational_status": "OPERATIONAL",
+                "assurance_level": "OPERATIONAL_PRIVACY_VERIFIED",
+                "attached_to_cases": [],
+            },
+        )
+
         attach_resp = intel_svc.attach_signal_to_case_evidence(
             case_id=case.id,
-            signal_id=signal.signal_id,
+            signal_id=auth_sig_id,
             auth_token=token_a,
-            notes="Verified DH-PSI cross-bank correlation confirmed with counterpart Bank B.",
+            notes="Audited operational signal attached.",
         )
 
         assert attach_resp.evidence_id is not None
@@ -687,8 +755,7 @@ class TestAuthoritativeEvidenceBinding:
         assert Path(ev["file_path"]).exists()
 
         content = evidence_svc.get_evidence_content(attach_resp.evidence_id)
-        assert "DH-PSI" in content
-        assert "Verified DH-PSI cross-bank correlation" in content
+        assert "Audited operational signal attached." in content
 
     def test_idempotent_replayed_attachment_avoids_duplicate_evidence(
         self, institutional_setup: dict[str, Any]
@@ -717,20 +784,57 @@ class TestAuthoritativeEvidenceBinding:
         )
         worker_b.store_private_entity(ent_b)
 
-        req = CrossBankIntelligenceQueryRequest(
-            requesting_bank_id="bank_a",
-            target_bank_id="bank_b",
-            query_entity_id="ent_idempotent_a",
-            consortium_id=consortium_id,
-            execution_mode="VERIFIED_OPERATIONAL",
+        auth_sig_id = str(uuid.uuid4())
+        auth_sig_data = {
+            "signal_id": auth_sig_id,
+            "consortium_id": consortium_id,
+            "requesting_bank_id": "bank_a",
+            "query_entity_id": "ent_idempotent_a",
+            "privacy_hash_truncated": "hash_idem",
+            "match_confirmed": True,
+            "match_category": "EXACT_MATCH",
+            "match_confidence": 1.0,
+            "contributing_institutions_count": 1,
+            "contributing_institutions": ["bank_b"],
+            "disclosure_mode": "ATTRIBUTED_INSTITUTIONS",
+            "sanitized_risk_level": "UNAVAILABLE",
+            "sanitized_typology_indicators": ["CROSS_BANK_ENTITY_OBSERVED"],
+            "graph_context": {},
+            "provenance": {},
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "attestation_status": "HARDWARE_ENCLAVE_ATTESTED",
+            "is_authoritative": True,
+            "is_synthetic": False,
+            "assurance_level": "OPERATIONAL_PRIVACY_VERIFIED",
+        }
+        content_hash = hashlib.sha256(
+            json.dumps(auth_sig_data, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        intel_svc._signal_store.set(
+            auth_sig_id,
+            {
+                "signal_id": auth_sig_id,
+                "signal_data": auth_sig_data,
+                "requesting_bank_id": "bank_a",
+                "consortium_id": consortium_id,
+                "query_entity_id": "ent_idempotent_a",
+                "issued_to_principal": "worker:bank_a",
+                "issued_at": datetime.datetime.now(datetime.UTC).isoformat(),
+                "expires_at": (datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=24)).isoformat(),
+                "content_hash": content_hash,
+                "is_authoritative": True,
+                "is_synthetic": False,
+                "operational_status": "OPERATIONAL",
+                "assurance_level": "OPERATIONAL_PRIVACY_VERIFIED",
+                "attached_to_cases": [],
+            },
         )
 
-        signal = intel_svc.execute_two_bank_private_matching(req=req, auth_token=token_a)
         case = case_svc.create_case(title="Idempotent Target Case", bank_id="bank_a")
 
         resp1 = intel_svc.attach_signal_to_case_evidence(
             case_id=case.id,
-            signal_id=signal.signal_id,
+            signal_id=auth_sig_id,
             auth_token=token_a,
             idempotency_key="idemp_key_001",
         )
@@ -739,9 +843,10 @@ class TestAuthoritativeEvidenceBinding:
         # Replay identical attachment
         resp2 = intel_svc.attach_signal_to_case_evidence(
             case_id=case.id,
-            signal_id=signal.signal_id,
+            signal_id=auth_sig_id,
             auth_token=token_a,
             idempotency_key="idemp_key_001",
         )
         assert resp2.is_duplicate_submission is True
         assert resp2.evidence_id == resp1.evidence_id
+

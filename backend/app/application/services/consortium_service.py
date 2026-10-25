@@ -235,6 +235,7 @@ class ConsortiumGovernanceService:
         consortium_id: str,
         grant_id: str,
         authority: str,
+        participating_banks: list[str] | None = None,
         allowed_purposes: list[str] | None = None,
         institution_jurisdictions: dict[str, str] | None = None,
         allowed_jurisdictions: list[str] | None = None,
@@ -276,11 +277,26 @@ class ConsortiumGovernanceService:
         purposes = allowed_purposes or ["AML_COLLABORATIVE_INVESTIGATION", "FRAUD_INVESTIGATION"]
         jurisdictions = institution_jurisdictions or {}
         default_allowed = list(dict.fromkeys(list(jurisdictions.values()) + ["eu-central-1", "us-east-1", "apac-singapore-1"]))
+        part_banks = [b.lower().strip() for b in (participating_banks or list(jurisdictions.keys()) or [clean_approver])]
+        if clean_approver not in part_banks:
+            part_banks.append(clean_approver)
+
+        approval_record = {
+            "actor_id": attr["actor_id"],
+            "actor_institution": clean_approver,
+            "approved_at": datetime.datetime.now(UTC).isoformat(),
+            "roles": attr["effective_role"],
+        }
+
         grant_dict: dict[str, Any] = {
             "grant_id": grant_id.strip(),
             "authority": authority.strip(),
             "revision": revision,
             "is_active": True,
+            "participating_banks": sorted(list(set(part_banks))),
+            "approvals": {clean_approver: approval_record},
+            "revoked_by_institutions": [],
+            "revocation_history": [],
             "allowed_purposes": [p.strip() for p in purposes],
             "institution_jurisdictions": {k.lower().strip(): v.strip() for k, v in jurisdictions.items()},
             "allowed_jurisdictions": [j.strip() for j in (allowed_jurisdictions or default_allowed)],
@@ -307,6 +323,25 @@ class ConsortiumGovernanceService:
             history: list[dict[str, Any]] = []
             if existing and isinstance(existing, dict):
                 prev_rev = int(existing.get("revision", 1))
+                # Bilateral approval on existing grant without revision bump
+                if revision == prev_rev and existing.get("grant_id") == grant_id.strip():
+                    approvals = dict(existing.get("approvals", {}))
+                    approvals[clean_approver] = approval_record
+                    existing["approvals"] = approvals
+                    # Update jurisdictions or purposes if newly provided
+                    if institution_jurisdictions:
+                        existing["institution_jurisdictions"] = {
+                            **existing.get("institution_jurisdictions", {}),
+                            **grant_dict["institution_jurisdictions"],
+                        }
+                    revoked = list(existing.get("revoked_by_institutions", []))
+                    if clean_approver in revoked:
+                        revoked.remove(clean_approver)
+                    existing["revoked_by_institutions"] = revoked
+                    existing["is_active"] = True
+                    c.metadata["operational_data_sharing_grant"] = existing
+                    return existing
+
                 if revision <= prev_rev:
                     raise ValueError(
                         f"Operational grant revision must be strictly monotonically increasing. "
@@ -319,6 +354,66 @@ class ConsortiumGovernanceService:
             grant_dict["history"] = history
             c.metadata["operational_data_sharing_grant"] = grant_dict
             return grant_dict
+
+        return self._store.atomic_mutate(_mutate)
+
+    def approve_operational_data_sharing_grant(
+        self,
+        consortium_id: str,
+        grant_id: str,
+        approving_bank_id: str,
+        auth_token: str | None = None,
+        actor: str | None = None,
+        trusted_context: Any | None = None,
+    ) -> dict[str, Any]:
+        """Records authenticated bilateral approval from a participating institution."""
+        clean_id = consortium_id.lower().strip()
+        clean_bank = approving_bank_id.lower().strip()
+        attr = self._verify_service_actor_bank(
+            expected_bank=clean_bank,
+            consortium_id=clean_id,
+            auth_token=auth_token,
+            actor=actor,
+            trusted_context=trusted_context,
+            action_name="approve_operational_data_sharing_grant",
+        )
+
+        approval_record = {
+            "actor_id": attr["actor_id"],
+            "actor_institution": clean_bank,
+            "approved_at": datetime.datetime.now(UTC).isoformat(),
+            "roles": attr["effective_role"],
+        }
+
+        def _mutate(consortia: dict[str, Consortium], proposals: dict[str, Any]) -> dict[str, Any]:
+            if clean_id not in consortia:
+                raise ValueError(f"Consortium '{clean_id}' does not exist.")
+            c = consortia[clean_id]
+            if clean_bank not in c.members:
+                raise PermissionError(
+                    f"Approving bank '{clean_bank}' is not an active member of consortium '{clean_id}'."
+                )
+            existing = (c.metadata or {}).get("operational_data_sharing_grant")
+            if not existing or not isinstance(existing, dict):
+                raise ValueError(f"Operational data-sharing grant '{grant_id}' does not exist in consortium '{clean_id}'.")
+            if existing.get("grant_id") != grant_id.strip():
+                raise ValueError(f"Grant ID mismatch: active grant is '{existing.get('grant_id')}', not '{grant_id}'.")
+
+            approvals = dict(existing.get("approvals", {}))
+            approvals[clean_bank] = approval_record
+            existing["approvals"] = approvals
+
+            part_banks = set(existing.get("participating_banks", []))
+            part_banks.add(clean_bank)
+            existing["participating_banks"] = sorted(list(part_banks))
+
+            revoked = list(existing.get("revoked_by_institutions", []))
+            if clean_bank in revoked:
+                revoked.remove(clean_bank)
+            existing["revoked_by_institutions"] = revoked
+            existing["is_active"] = True
+            c.metadata["operational_data_sharing_grant"] = existing
+            return existing
 
         return self._store.atomic_mutate(_mutate)
 
@@ -377,6 +472,20 @@ class ConsortiumGovernanceService:
             history = list(existing.get("history", []))
             prior_snapshot = {k: v for k, v in existing.items() if k != "history"}
             history.append(prior_snapshot)
+
+            revoked_list = list(existing.get("revoked_by_institutions", []))
+            if clean_revoker not in revoked_list:
+                revoked_list.append(clean_revoker)
+            existing["revoked_by_institutions"] = revoked_list
+
+            revocations = list(existing.get("revocation_history", []))
+            revocations.append({
+                "revoked_by_actor": attr["actor_id"],
+                "revoked_by_institution": clean_revoker,
+                "reason": reason.strip(),
+                "revoked_at": datetime.datetime.now(UTC).isoformat(),
+            })
+            existing["revocation_history"] = revocations
 
             existing["is_active"] = False
             existing["revoked_at"] = datetime.datetime.now(UTC).isoformat()

@@ -295,6 +295,36 @@ class ConsortiumPolicyEngine:
                 )
                 return False, reasons, {}
 
+            # Bilateral / Multilateral Institutional Consent Validation
+            approvals = operational_grant.get("approvals", {})
+            revoked_institutions = set(operational_grant.get("revoked_by_institutions", []))
+
+            if clean_requesting in revoked_institutions:
+                reasons.append(
+                    f"Operational data-sharing consent was revoked by requesting institution '{clean_requesting}'."
+                )
+                return False, reasons, {}
+
+            if clean_requesting not in approvals:
+                reasons.append(
+                    f"Requesting bank '{clean_requesting}' has not approved operational data-sharing grant '{operational_grant.get('grant_id')}'."
+                )
+                return False, reasons, {}
+
+            for tb in target_banks:
+                clean_tb = tb.lower().strip()
+                if clean_tb in revoked_institutions:
+                    reasons.append(
+                        f"Operational data-sharing consent was revoked by counterpart institution '{clean_tb}'."
+                    )
+                    return False, reasons, {}
+                if clean_tb not in approvals:
+                    reasons.append(
+                        f"Target institution '{clean_tb}' has not approved operational data-sharing grant '{operational_grant.get('grant_id')}'. "
+                        f"Unilateral approval by '{clean_requesting}' does not constitute bilateral institutional consent."
+                    )
+                    return False, reasons, {}
+
         sharing_policy = operational_grant if (is_operational and operational_grant) else c_meta.get("intelligence_sharing_policy", {})
 
         # 2. Consortium active status

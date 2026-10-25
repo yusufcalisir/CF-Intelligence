@@ -39,7 +39,6 @@ from app.domain.consortium_governance import (
     ConsortiumStatus,
 )
 from app.domain.consortium_policy import ConsortiumPolicyEngine
-from app.domain.enums import CaseStatus
 from app.domain.value_objects_investigation import (
     calculate_jaccard_similarity,
 )
@@ -577,12 +576,8 @@ class CrossBankIntelligenceService:
                 f"or attach evidence to case '{case_id}' owned by institution '{case.bank_id}'."
             )
 
-        if not case.is_open:
-            raise TerminalCaseImmutableError(
-                f"Cannot attach cross-bank intelligence: Case '{case_id}' is finalized in terminal state '{case.status.value}'."
-            )
-
         # 3. Retrieve Authoritative Signal Server-Side (Anti-Forgery & Tamper Check)
+        # Block prototype results at the source across ALL case states (do not rely exclusively on case status)
         resolved_signal_id = signal_id or (signal.signal_id if signal else None)
         if not resolved_signal_id:
             raise ValueError(
@@ -591,9 +586,24 @@ class CrossBankIntelligenceService:
 
         record = self._signal_store.get(resolved_signal_id)
         if not record:
+            from app.infrastructure.redis_store import RedisStore
+
+            research_store = RedisStore("research_prototype_signals")
+            research_record = research_store.get(resolved_signal_id)
+            if research_record:
+                raise ConsortiumSecurityError(
+                    f"Signal '{resolved_signal_id}' is a research prototype result and cannot enter "
+                    "case evidence in any case state (ordinary open, escalated, or SAR). "
+                    "Defensible evidence requires verified operational execution and independent cryptographic audit."
+                )
             raise ValueError(
                 f"Authoritative signal '{resolved_signal_id}' not found or was never issued by an authorized intelligence query. "
                 f"Client-fabricated or unauthorized signal attachment rejected."
+            )
+
+        if not case.is_open:
+            raise TerminalCaseImmutableError(
+                f"Cannot attach cross-bank intelligence: Case '{case_id}' is finalized in terminal state '{case.status.value}'."
             )
 
         # 3a. Authoritative Signal Content Integrity & Tamper Verification
@@ -637,43 +647,21 @@ class CrossBankIntelligenceService:
                 f"Authoritative signal '{resolved_signal_id}' has expired. Queries must be refreshed before attachment."
             )
 
-        # 3d. Prevent Simulated Intelligence from Entering Authoritative Evidence or Production Filings
-        from app.config import get_settings
-
-        settings = get_settings()
-        is_signal_simulated = bool(
-            signal_data.get("execution_mode") == "SIMULATED_RESEARCH"
-            or not record.get("is_authoritative", True)
-            or record.get("is_synthetic", False)
-        )
-
-        if is_signal_simulated:
-            if settings.is_production or settings.app_env.lower() in ("production", "prod"):
-                raise ValueError(
-                    "Simulated research intelligence cannot be attached to fraud cases in production environments."
-                )
-
-            is_authoritative_case = bool(
-                getattr(case, "is_authoritative", False)
-                or (getattr(case, "signature_metadata", {}) or {}).get("is_authoritative", False)
-                or case.status in (CaseStatus.ESCALATED, CaseStatus.SAR_FILED)
-            )
-            if is_authoritative_case:
-                raise ConsortiumSecurityError(
-                    "Simulated research signals cannot be attached to authoritative fraud investigation evidence or regulatory filings."
-                )
-
-        # 3e. Contain Protocol Prototype Results from Entering Authoritative Evidence
+        # 3d. Prevent Prototype or Simulated Intelligence from Entering Case Evidence in Any Case State
         assurance_level = signal_data.get("assurance_level") or record.get("assurance_level")
-        is_authoritative_case = bool(
-            getattr(case, "is_authoritative", False)
-            or (getattr(case, "signature_metadata", {}) or {}).get("is_authoritative", False)
-            or case.status in (CaseStatus.ESCALATED, CaseStatus.SAR_FILED)
-        )
-        if assurance_level == "PROTOCOL_PROTOTYPE" and (is_authoritative_case or settings.is_production):
+        execution_mode = signal_data.get("execution_mode") or record.get("execution_mode")
+        is_authoritative = bool(record.get("is_authoritative", True) and signal_data.get("is_authoritative", True))
+
+        if (
+            not is_authoritative
+            or assurance_level in ("PROTOCOL_PROTOTYPE", "RESEARCH_PROTOTYPE", "LOCAL_PROTOTYPE")
+            or execution_mode in ("RESEARCH_PROTOTYPE", "PROTOTYPE", "SIMULATED_RESEARCH")
+            or record.get("is_synthetic", False)
+        ):
             raise ConsortiumSecurityError(
-                "Protocol prototype matching results cannot enter authoritative case evidence or production regulatory filings. "
-                "Defensible evidence requires at least ISOLATED_INTEGRATION_VERIFIED assurance."
+                "Protocol prototype matching results cannot enter case evidence in any case state "
+                "(ordinary open, escalated, or SAR). Defensible evidence requires verified operational "
+                "execution and independent cryptographic audit."
             )
 
         # 4. Revalidate Current Consortium Governance & Revocation Status
@@ -732,9 +720,9 @@ class CrossBankIntelligenceService:
             "attached_by": uploader,
             "attached_at": now.isoformat(),
             "idempotency_key": idempotency_key,
-            "is_authoritative": not is_signal_simulated,
+            "is_authoritative": is_authoritative,
             "operational_status": "OPERATIONAL"
-            if not is_signal_simulated
+            if is_authoritative
             else "NON_OPERATIONAL_SYNTHETIC",
         }
         content_json = json.dumps(payload, sort_keys=True, indent=2)
@@ -753,9 +741,9 @@ class CrossBankIntelligenceService:
                 "signal_id": resolved_signal_id,
                 "consortium_id": consortium_id,
                 "idempotency_key": idempotency_key,
-                "is_authoritative": not is_signal_simulated,
+                "is_authoritative": is_authoritative,
                 "operational_status": "OPERATIONAL"
-                if not is_signal_simulated
+                if is_authoritative
                 else "NON_OPERATIONAL_SYNTHETIC",
             },
         )
