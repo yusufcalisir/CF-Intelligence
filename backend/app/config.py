@@ -49,6 +49,15 @@ class Settings(BaseSettings):
         ),
         description="Explicit opt-in required to allow cross-bank research simulation. Strictly disabled in production.",
     )
+    cfi_coordinator_url: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "cfi_coordinator_url",
+            "coordinator_url",
+            "cfi_matching_coordinator_url",
+        ),
+        description="Base URL for the established PSI matching coordinator daemon.",
+    )
 
     # ── FastAPI & CORS ────────────────────────
     api_host: str = "0.0.0.0"  # nosec B104

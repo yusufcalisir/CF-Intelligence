@@ -135,12 +135,13 @@ class EstablishedPSIQueryMessage:
     purpose: str
     signature: str
     ticket: OperationAuthorizationTicket
+    confirmation_tag: str = ""
 
     def compute_digest(self) -> str:
         canonical = (
             f"{self.job_id}:{self.consortium_id}:{self.requesting_bank_id}:"
             f"{self.target_bank_id}:{self.psi_request_b64}:{self.nonce}:"
-            f"{self.timestamp}:{self.purpose}:{self.ticket.canonical_digest()}"
+            f"{self.timestamp}:{self.purpose}:{self.ticket.canonical_digest()}:{self.confirmation_tag}"
         )
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -157,12 +158,13 @@ class EstablishedPSICounterpartResponse:
     nonce: str
     timestamp: str
     signature: str
+    is_confirmed_exact: bool = False
 
     def compute_digest(self) -> str:
         canonical = (
             f"{self.job_id}:{self.consortium_id}:{self.target_bank_id}:"
             f"{self.psi_server_setup_b64}:{self.psi_response_b64}:{self.nonce}:"
-            f"{self.timestamp}"
+            f"{self.timestamp}:{self.is_confirmed_exact}"
         )
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -241,6 +243,8 @@ class VerifiedMatchReceipt:
     matched_risk_level: str = "UNAVAILABLE"
     matched_typologies: tuple[str, ...] = ()
     assurance_level: str = "ISOLATED_INTEGRATION_VERIFIED"
+    match_category: str = "EXACT_MATCH"
+    is_exact_confirmed: bool = True
 
 
 class IsolatedBankWorkerNode:
@@ -261,6 +265,7 @@ class IsolatedBankWorkerNode:
         ingestion_token: str | None = None,
         admin_token: str | None = None,
         require_operation_ticket: bool = False,
+        consortium_service: Any | None = None,
     ) -> None:
         if not bank_id or not bank_id.strip():
             raise ValueError("bank_id must be a non-empty string")
@@ -293,6 +298,16 @@ class IsolatedBankWorkerNode:
         self._require_operation_ticket = require_operation_ticket
         self._locally_revoked_grants: set[str] = set()
         self._active_psi_clients: dict[str, Any] = {}
+        if consortium_service is not None:
+            self._consortium_service = consortium_service
+        else:
+            try:
+                self._consortium_service = ConsortiumGovernanceService()
+            except Exception:
+                self._consortium_service = None
+        self._authorized_grants_path = os.path.join(base_dir, self.bank_id, "authorized_grants.json")
+        self._authorized_grants: dict[str, dict[str, Any]] = {}
+        self._load_authorized_grants()
 
         # Durable anti-replay nonces storage surviving restarts (fail-closed)
         self._replay_store_path = os.path.join(base_dir, self.bank_id, "replay_nonces.json")
@@ -353,12 +368,212 @@ class IsolatedBankWorkerNode:
         """Return the trusted verification key for an enrolled peer bank."""
         return self._trusted_peer_verification_keys.get(peer_bank_id.lower().strip())
 
+    def _load_authorized_grants(self) -> None:
+        """Load locally registered authorized grants from disk storage."""
+        if os.path.exists(self._authorized_grants_path):
+            try:
+                with open(self._authorized_grants_path, encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content:
+                        self._authorized_grants = json.loads(content)
+            except Exception as exc:
+                raise ConsortiumSecurityError(
+                    f"Durable authorized grants store for institution '{self.bank_id}' is corrupt or unreadable: {exc}. "
+                    "Failing closed to prevent unauthorized data sharing."
+                ) from exc
+
+    def _persist_authorized_grants(self) -> None:
+        """Atomically persist authorized grants to disk storage."""
+        tmp_path = f"{self._authorized_grants_path}.{secrets.token_hex(8)}.tmp"
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(self._authorized_grants, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, self._authorized_grants_path)
+        except Exception as exc:
+            if os.path.exists(tmp_path):
+                with contextlib.suppress(Exception):
+                    os.remove(tmp_path)
+            raise ConsortiumSecurityError(
+                f"Failed to durably persist authorized grants for institution '{self.bank_id}': {exc}"
+            ) from exc
+
+    def register_authorized_grant(
+        self,
+        consortium_id: str,
+        grant_id: str,
+        revision: int,
+        scope_digest: str,
+        permitted_counterparts: list[str],
+        permitted_purposes: list[str],
+        permitted_operations: list[str] | None = None,
+        expires_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Register an independently authorized institutional data-sharing grant at this worker."""
+        clean_grant = grant_id.strip()
+        if not clean_grant:
+            raise ValueError("grant_id must not be empty")
+        if not scope_digest or len(scope_digest.strip()) < 32:
+            raise ValueError("Invalid scope_digest: must be at least 32 characters")
+        record = {
+            "consortium_id": consortium_id.strip(),
+            "grant_id": clean_grant,
+            "revision": int(revision),
+            "scope_digest": scope_digest.strip(),
+            "permitted_counterparts": [c.lower().strip() for c in permitted_counterparts],
+            "permitted_purposes": [p.strip() for p in permitted_purposes],
+            "permitted_operations": [
+                op.strip()
+                for op in (
+                    permitted_operations
+                    or ["PRIVATE_SET_INTERSECTION", "ESTABLISHED_PSI", "PSI_MATCH"]
+                )
+            ],
+            "expires_at": expires_at,
+            "is_active": True,
+            "authorized_at": datetime.datetime.now(UTC).isoformat(),
+        }
+        self._authorized_grants[clean_grant] = record
+        self._persist_authorized_grants()
+        logger.info(
+            "Institution '%s' registered authorized operational grant '%s' (rev %d)",
+            self.bank_id,
+            clean_grant,
+            revision,
+        )
+        return record
+
+    def verify_grant_participation_authority(
+        self,
+        ticket: OperationAuthorizationTicket,
+        counterpart_id: str,
+        purpose: str,
+        operation: str = "PRIVATE_SET_INTERSECTION",
+    ) -> None:
+        """Independently verify institutional participation authority before signing or matching."""
+        clean_grant = ticket.grant_id.strip()
+        if clean_grant in self._locally_revoked_grants:
+            raise ConsortiumSecurityError(
+                f"Operational data sharing grant '{clean_grant}' has been locally revoked by institution '{self.bank_id}'. "
+                "Participation authority denied."
+            )
+        clean_counterpart = counterpart_id.lower().strip()
+
+        # If consortium service is available, verify against authoritative governance
+        if self._consortium_service:
+            consortium = self._consortium_service.get_consortium(ticket.consortium_id)
+            if consortium:
+                grants = getattr(consortium, "operational_data_sharing_grants", {}) or {}
+                meta_grant = consortium.metadata.get("operational_data_sharing_grant") or {}
+                gov_grant = grants.get(clean_grant) or (
+                    meta_grant if meta_grant.get("grant_id") == clean_grant else None
+                )
+                if gov_grant:
+                    if not gov_grant.get("is_active", True) or gov_grant.get("status") == "REVOKED":
+                        raise ConsortiumSecurityError(
+                            f"Grant '{clean_grant}' is revoked or inactive in consortium governance."
+                        )
+                    if self.bank_id in gov_grant.get("revoked_by_institutions", []):
+                        raise ConsortiumSecurityError(
+                            f"Grant '{clean_grant}' revoked by institution '{self.bank_id}'."
+                        )
+                    if clean_counterpart in gov_grant.get("revoked_by_institutions", []):
+                        raise ConsortiumSecurityError(
+                            f"Grant '{clean_grant}' revoked by counterpart '{clean_counterpart}'."
+                        )
+                    if gov_grant.get("revision") != ticket.grant_revision:
+                        raise ConsortiumSecurityError(
+                            f"Grant revision mismatch: expected {gov_grant.get('revision')}, got {ticket.grant_revision}."
+                        )
+                    if gov_grant.get("scope_digest") != ticket.grant_scope_digest:
+                        raise ConsortiumSecurityError(
+                            "Grant scope digest mismatch in authorization ticket."
+                        )
+                    part_banks = [b.lower().strip() for b in gov_grant.get("participating_banks", [])]
+                    if self.bank_id not in part_banks or clean_counterpart not in part_banks:
+                        raise ConsortiumSecurityError(
+                            f"Institution '{self.bank_id}' or counterpart '{clean_counterpart}' is not in participating banks."
+                        )
+                    if purpose not in gov_grant.get("allowed_purposes", []):
+                        raise ConsortiumSecurityError(
+                            f"Purpose '{purpose}' not permitted in grant '{clean_grant}'."
+                        )
+                    approvals = gov_grant.get("approvals", {})
+                    if self.bank_id not in approvals:
+                        raise ConsortiumSecurityError(
+                            f"Institution '{self.bank_id}' has not approved grant '{clean_grant}' revision {ticket.grant_revision}."
+                        )
+                    return
+
+        # Otherwise verify locally registered institutional approval
+        if clean_grant not in self._authorized_grants:
+            raise ConsortiumSecurityError(
+                f"Institution '{self.bank_id}' has not authorized operational grant '{clean_grant}' "
+                f"(revision {ticket.grant_revision}) for counterpart '{clean_counterpart}'. "
+                "Coordinator matching credentials cannot manufacture institutional participation."
+            )
+        auth = self._authorized_grants[clean_grant]
+        if not auth.get("is_active", True):
+            raise ConsortiumSecurityError(
+                f"Grant '{clean_grant}' is marked inactive for institution '{self.bank_id}'."
+            )
+        if auth.get("consortium_id") != ticket.consortium_id:
+            raise ConsortiumSecurityError(
+                f"Consortium mismatch in authorized grant: expected '{auth.get('consortium_id')}', got '{ticket.consortium_id}'."
+            )
+        if int(auth.get("revision", 1)) != ticket.grant_revision:
+            raise ConsortiumSecurityError(
+                f"Stale grant revision in authorization ticket: authorized {auth.get('revision')}, got {ticket.grant_revision}."
+            )
+        if auth.get("scope_digest") != ticket.grant_scope_digest:
+            raise ConsortiumSecurityError(
+                "Scope digest mismatch: Authorization ticket scope does not match institutionally approved grant scope."
+            )
+        if clean_counterpart not in [
+            b.lower().strip() for b in auth.get("permitted_counterparts", [])
+        ]:
+            raise ConsortiumSecurityError(
+                f"Counterpart '{clean_counterpart}' is not authorized under grant '{clean_grant}' for institution '{self.bank_id}'."
+            )
+        if purpose not in auth.get("permitted_purposes", []):
+            raise ConsortiumSecurityError(
+                f"Purpose '{purpose}' is not authorized under grant '{clean_grant}'."
+            )
+        if auth.get("expires_at"):
+            now = datetime.datetime.now(UTC)
+            exp = datetime.datetime.fromisoformat(auth["expires_at"])
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=UTC)
+            if now >= exp:
+                raise ConsortiumSecurityError(
+                    f"Institutional approval for grant '{clean_grant}' expired at {auth['expires_at']}."
+                )
+
+    def verify_match_confirmation_tag(self, tag: str, scope_digest: str) -> bool:
+        """Independently verify whether confirmation tag matches any entity in this bank's vault."""
+        if not tag or not scope_digest:
+            return False
+        clean_tag = tag.strip()
+        for ent in self.list_private_entities():
+            p_id = ent.get("privacy_id")
+            if p_id:
+                expected_tag = OpenMinedPSIAdapter.compute_match_confirmation_tag(
+                    p_id, scope_digest
+                )
+                if hmac.compare_digest(clean_tag, expected_tag):
+                    return True
+        return False
+
     def record_local_grant_revocation(self, grant_id: str) -> None:
         """Locally revoke an operational grant at this institutional boundary."""
         clean_id = grant_id.strip()
         if not clean_id:
             raise ValueError("grant_id must not be empty")
         self._locally_revoked_grants.add(clean_id)
+        if clean_id in self._authorized_grants:
+            self._authorized_grants[clean_id]["is_active"] = False
+            self._persist_authorized_grants()
         logger.info(
             "Institution '%s' locally revoked operational grant '%s'",
             self.bank_id,
@@ -400,6 +615,13 @@ class IsolatedBankWorkerNode:
             raise ConsortiumSecurityError(
                 "Invalid or missing immutable grant scope digest in authorization ticket."
             )
+        counterpart = target if self.bank_id == requester else requester
+        self.verify_grant_participation_authority(
+            ticket,
+            counterpart_id=counterpart,
+            purpose=ticket.purpose,
+            operation=ticket.operation,
+        )
         canonical = f"{ticket.canonical_digest()}:{self.bank_id}"
         return hmac.new(
             self._auth_secret.encode("utf-8"),
@@ -448,6 +670,12 @@ class IsolatedBankWorkerNode:
             raise ConsortiumSecurityError(
                 "Invalid or missing immutable grant scope digest in authorization ticket."
             )
+        self.verify_grant_participation_authority(
+            ticket,
+            counterpart_id=expected_requesting_bank,
+            purpose=expected_purpose,
+            operation=ticket.operation,
+        )
 
         # Verify target bank (self) approval signature
         expected_target_sig = hmac.new(
@@ -914,13 +1142,18 @@ class IsolatedBankWorkerNode:
         req_bytes = OpenMinedPSIAdapter.build_client_request(client, [privacy_id])
         psi_request_b64 = OpenMinedPSIAdapter.encode_b64(req_bytes)
 
+        # Compute exact match confirmation tag bound to grant scope digest
+        confirmation_tag = OpenMinedPSIAdapter.compute_match_confirmation_tag(
+            privacy_id, ticket.grant_scope_digest
+        )
+
         nonce = secrets.token_hex(16)
         timestamp = datetime.datetime.now(UTC).isoformat()
 
         canonical_text = (
             f"{ticket.job_id}:{consortium_id}:{self.bank_id}:"
             f"{clean_target}:{psi_request_b64}:{nonce}:"
-            f"{timestamp}:{purpose}:{ticket.canonical_digest()}"
+            f"{timestamp}:{purpose}:{ticket.canonical_digest()}:{confirmation_tag}"
         )
         sig = hmac.new(
             self._auth_secret.encode("utf-8"),
@@ -939,6 +1172,7 @@ class IsolatedBankWorkerNode:
             purpose=purpose,
             signature=sig,
             ticket=ticket,
+            confirmation_tag=confirmation_tag,
         )
 
     def process_established_psi_counterpart(
@@ -981,7 +1215,7 @@ class IsolatedBankWorkerNode:
             peer_key.encode("utf-8"),
             f"{query.job_id}:{query.consortium_id}:{query.requesting_bank_id}:"
             f"{query.target_bank_id}:{query.psi_request_b64}:{query.nonce}:"
-            f"{query.timestamp}:{query.purpose}:{query.ticket.canonical_digest()}".encode(),
+            f"{query.timestamp}:{query.purpose}:{query.ticket.canonical_digest()}:{query.confirmation_tag}".encode(),
             hashlib.sha256,
         ).hexdigest()
         if not hmac.compare_digest(expected_sig, query.signature):
@@ -1011,11 +1245,18 @@ class IsolatedBankWorkerNode:
             if ent.get("privacy_id")
         ]
 
-        # 7. Create server and compute setup + response
+        # 7. Create server and compute setup + response (FPR = 1e-9 per authoritative spec)
         server = OpenMinedPSIAdapter.create_server(reveal_intersection=True)
-        setup_bytes = OpenMinedPSIAdapter.build_server_setup(server, server_items, fpr=0.0001)
+        setup_bytes = OpenMinedPSIAdapter.build_server_setup(server, server_items, fpr=1e-9)
         req_bytes = OpenMinedPSIAdapter.decode_b64(query.psi_request_b64)
         resp_bytes = OpenMinedPSIAdapter.process_server_request(server, req_bytes)
+
+        # 7b. Independent match confirmation under grant scope digest
+        is_confirmed_exact = False
+        if query.confirmation_tag:
+            is_confirmed_exact = self.verify_match_confirmation_tag(
+                query.confirmation_tag, query.ticket.grant_scope_digest
+            )
 
         setup_b64 = OpenMinedPSIAdapter.encode_b64(setup_bytes)
         resp_b64 = OpenMinedPSIAdapter.encode_b64(resp_bytes)
@@ -1025,7 +1266,7 @@ class IsolatedBankWorkerNode:
 
         canonical_resp = (
             f"{query.job_id}:{query.consortium_id}:{self.bank_id}:"
-            f"{setup_b64}:{resp_b64}:{resp_nonce}:{resp_timestamp}"
+            f"{setup_b64}:{resp_b64}:{resp_nonce}:{resp_timestamp}:{is_confirmed_exact}"
         )
         resp_sig = hmac.new(
             self._auth_secret.encode("utf-8"),
@@ -1045,6 +1286,7 @@ class IsolatedBankWorkerNode:
             nonce=resp_nonce,
             timestamp=resp_timestamp,
             signature=resp_sig,
+            is_confirmed_exact=is_confirmed_exact,
         )
 
     def finalize_established_psi_evaluation(
@@ -1083,7 +1325,7 @@ class IsolatedBankWorkerNode:
 
         canonical_resp = (
             f"{response.job_id}:{response.consortium_id}:{response.target_bank_id}:"
-            f"{response.psi_server_setup_b64}:{response.psi_response_b64}:{response.nonce}:{response.timestamp}"
+            f"{response.psi_server_setup_b64}:{response.psi_response_b64}:{response.nonce}:{response.timestamp}:{response.is_confirmed_exact}"
         )
         expected_sig = hmac.new(
             peer_key.encode("utf-8"),
@@ -1110,14 +1352,26 @@ class IsolatedBankWorkerNode:
         )
 
         match_confirmed = len(matched_indices) > 0
-        match_confidence = 1.0 if match_confirmed else 0.0
+        if match_confirmed:
+            if response.is_confirmed_exact:
+                match_category = "EXACT_MATCH"
+                match_confidence = 1.0
+                is_exact_confirmed = True
+            else:
+                match_category = "PROBABILISTIC_FUZZY"
+                match_confidence = 0.999999999
+                is_exact_confirmed = False
+        else:
+            match_category = "NO_MATCH"
+            match_confidence = 0.0
+            is_exact_confirmed = False
 
         # Persist consumed response nonce
         self._persist_consumed_nonce(response.nonce)
 
         # 6. Compute transcript digest and receipt
         canonical_transcript = (
-            f"{query.compute_digest()}:{response.compute_digest()}:{match_confirmed}"
+            f"{query.compute_digest()}:{response.compute_digest()}:{match_confirmed}:{match_category}"
         )
         transcript_digest = hashlib.sha256(canonical_transcript.encode("utf-8")).hexdigest()
 
@@ -1125,7 +1379,7 @@ class IsolatedBankWorkerNode:
         receipt_id = str(uuid.uuid4())
         receipt_sig_a = hmac.new(
             self._auth_secret.encode("utf-8"),
-            f"{receipt_id}:{transcript_digest}:{match_confirmed}".encode(),
+            f"{receipt_id}:{transcript_digest}:{match_confirmed}:{match_category}".encode(),
             hashlib.sha256,
         ).hexdigest()
 
@@ -1146,6 +1400,8 @@ class IsolatedBankWorkerNode:
             matched_risk_level="UNAVAILABLE" if match_confirmed else "UNOBSERVED",
             matched_typologies=("CROSS_BANK_ENTITY_OBSERVED",) if match_confirmed else (),
             assurance_level="REVIEWED_ESTABLISHED_PSI_VERIFIED",
+            match_category=match_category,
+            is_exact_confirmed=is_exact_confirmed,
         )
 
 
@@ -1288,6 +1544,8 @@ class InstitutionalWorkerDaemon:
                     "/worker/sign-operation-ticket": SCOPE_MATCHING,
                     "/worker/sign-grant-approval": SCOPE_ADMINISTRATION,
                     "/worker/revoke-grant-locally": SCOPE_ADMINISTRATION,
+                    "/worker/authorize-grant": SCOPE_ADMINISTRATION,
+                    "/worker/confirm-match": SCOPE_MATCHING,
                 }
                 if self.path not in route_scopes:
                     self.send_response(404)
@@ -1392,6 +1650,24 @@ class InstitutionalWorkerDaemon:
                     elif self.path == "/worker/revoke-grant-locally":
                         node.record_local_grant_revocation(data["grant_id"])
                         res = {"status": "REVOKED", "grant_id": data["grant_id"]}
+                    elif self.path == "/worker/authorize-grant":
+                        rec = node.register_authorized_grant(
+                            consortium_id=data["consortium_id"],
+                            grant_id=data["grant_id"],
+                            revision=int(data["revision"]),
+                            scope_digest=data["scope_digest"],
+                            permitted_counterparts=data["permitted_counterparts"],
+                            permitted_purposes=data["permitted_purposes"],
+                            permitted_operations=data.get("permitted_operations"),
+                            expires_at=data.get("expires_at"),
+                        )
+                        res = {"status": "AUTHORIZED", "grant": rec}
+                    elif self.path == "/worker/confirm-match":
+                        is_confirmed = node.verify_match_confirmation_tag(
+                            tag=data["confirmation_tag"],
+                            scope_digest=data["scope_digest"],
+                        )
+                        res = {"is_confirmed": is_confirmed}
                     else:
                         self.send_response(404)
                         self.end_headers()
@@ -1551,6 +1827,46 @@ class InstitutionalWorkerClient:
             {"grant_id": grant_id},
             token=self.admin_token,
         )
+
+    def register_authorized_grant(
+        self,
+        consortium_id: str,
+        grant_id: str,
+        revision: int,
+        scope_digest: str,
+        permitted_counterparts: list[str],
+        permitted_purposes: list[str],
+        permitted_operations: list[str] | None = None,
+        expires_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Register an authorized operational grant on the remote worker daemon via admin scope."""
+        res = self._post(
+            "/worker/authorize-grant",
+            {
+                "consortium_id": consortium_id,
+                "grant_id": grant_id,
+                "revision": revision,
+                "scope_digest": scope_digest,
+                "permitted_counterparts": permitted_counterparts,
+                "permitted_purposes": permitted_purposes,
+                "permitted_operations": permitted_operations,
+                "expires_at": expires_at,
+            },
+            token=self.admin_token,
+        )
+        return cast("dict[str, Any]", res.get("grant", res))
+
+    def confirm_match(self, confirmation_tag: str, scope_digest: str) -> bool:
+        """Query counterpart worker to confirm exact match tag under grant scope digest."""
+        res = self._post(
+            "/worker/confirm-match",
+            {
+                "confirmation_tag": confirmation_tag,
+                "scope_digest": scope_digest,
+            },
+            token=self.matching_token,
+        )
+        return bool(res.get("is_confirmed", False))
 
     def initiate_blinded_query(
         self,
@@ -2111,18 +2427,185 @@ class CrossBankMatchingCoordinator:
         return signal
 
 
+class InstitutionalCoordinatorDaemon:
+    """Daemon running inside a restricted coordinator container exposing matching HTTP transport.
+
+    The coordinator has zero volume mounts and zero access to bank secrets or private entity vaults.
+    """
+
+    def __init__(
+        self,
+        coordinator: CrossBankMatchingCoordinator,
+        host: str = "0.0.0.0",
+        port: int = 8200,
+    ) -> None:
+        self.coordinator = coordinator
+        self.host = host
+        self.port = port
+        self.server: ThreadingHTTPServer | None = None
+        self._thread: threading.Thread | None = None
+        self.pid: int = os.getpid()
+
+    def start(self) -> str:
+        coord = self.coordinator
+
+        class CoordinatorHandler(BaseHTTPRequestHandler):
+            def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+                pass
+
+            def do_GET(self) -> None:
+                if self.path in ("/health", "/coordinator/health"):
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(
+                        json.dumps({
+                            "status": "ONLINE",
+                            "role": "coordinator",
+                            "registered_workers": list(coord._workers.keys()),
+                            "pid": os.getpid(),
+                        }).encode()
+                    )
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+
+            def do_POST(self) -> None:
+                if self.path != "/coordinator/execute-match":
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+
+                auth_hdr = self.headers.get("Authorization", "")
+                auth_token = auth_hdr[7:].strip() if auth_hdr.startswith("Bearer ") else ""
+                if not auth_token:
+                    self.send_response(401)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"error": "Unauthorized: Bearer auth_token required"}')
+                    return
+
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_length)
+                try:
+                    payload = json.loads(body.decode("utf-8")) if body else {}
+                    actor = payload.pop("_actor", None)
+                    req = CrossBankIntelligenceQueryRequest(**payload)
+                    signal = coord.execute_two_bank_private_matching(
+                        req=req,
+                        auth_token=auth_token,
+                        actor=actor,
+                    )
+                    res = signal.model_dump()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(res).encode())
+                except Exception as exc:
+                    self.send_response(400)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(
+                        json.dumps({
+                            "error": str(exc),
+                            "error_type": type(exc).__name__,
+                        }).encode()
+                    )
+
+        self.server = ThreadingHTTPServer((self.host, self.port), CoordinatorHandler)
+        self.port = self.server.server_address[1]
+        self.pid = os.getpid()
+        self._thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self._thread.start()
+        return f"http://{self.host}:{self.port}"
+
+    def stop(self) -> None:
+        if self.server:
+            self.server.shutdown()
+            self.server.server_close()
+            self.server = None
+
+
+class InstitutionalCoordinatorClient:
+    """Client for invoking coordinator daemon over loopback/Docker network transport."""
+
+    def __init__(self, base_url: str) -> None:
+        self.base_url = base_url.rstrip("/")
+
+    def health_check(self) -> dict[str, Any]:
+        url = f"{self.base_url}/health"
+        req = urllib.request.Request(url, method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                body = resp.read()
+                return cast("dict[str, Any]", json.loads(body.decode("utf-8")))
+        except Exception as exc:
+            raise ConsortiumSecurityError(
+                f"Coordinator daemon at '{self.base_url}' is unreachable: {exc}"
+            ) from exc
+
+    def execute_match(
+        self,
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str,
+        actor: str | None = None,
+    ) -> CrossBankIntelligenceSignal:
+        url = f"{self.base_url}/coordinator/execute-match"
+        body = req.model_dump()
+        if actor:
+            body["_actor"] = actor
+        req_data = json.dumps(body).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=req_data,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {auth_token}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=20.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return CrossBankIntelligenceSignal(**data)
+        except urllib.error.HTTPError as http_err:
+            try:
+                err_body = json.loads(http_err.read().decode())
+                err_msg = err_body.get("error", str(http_err))
+                err_type = err_body.get("error_type", "")
+                if "ConsortiumSecurityError" in err_type:
+                    raise ConsortiumSecurityError(err_msg) from http_err
+                if "PermissionError" in err_type or http_err.code in (401, 403):
+                    raise PermissionError(err_msg) from http_err
+                raise ValueError(err_msg) from http_err
+            except (ConsortiumSecurityError, PermissionError, ValueError):
+                raise
+            except Exception:
+                raise ValueError(f"HTTP transport error from coordinator: {http_err}") from http_err
+        except Exception as exc:
+            raise ConsortiumSecurityError(
+                f"Coordinator matching invocation failed on '{self.base_url}': {exc}"
+            ) from exc
+
+
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Institutional Bank Worker Node Process")
+    parser = argparse.ArgumentParser(description="Institutional Bank Worker or Coordinator Process")
+    parser.add_argument(
+        "--role",
+        default=os.environ.get("CFI_ROLE", "worker"),
+        choices=["worker", "coordinator"],
+        help="Process role: 'worker' or 'coordinator'",
+    )
     parser.add_argument(
         "--bank-id",
         default=os.environ.get("BANK_ID"),
-        help="Institutional bank identifier",
+        help="Institutional bank identifier (for worker role)",
     )
     parser.add_argument(
         "--host",
-        default=os.environ.get("WORKER_HOST", "127.0.0.1"),
+        default=os.environ.get("WORKER_HOST", "0.0.0.0"),
         help="Bind host",
     )
     parser.add_argument(
@@ -2136,7 +2619,11 @@ if __name__ == "__main__":
         default=os.environ.get("STORAGE_ROOT") or os.environ.get("CFI_STORAGE_DIR"),
         help="Path to base storage directory",
     )
-    parser.add_argument("--auth-secret", default=None, help="Worker authentication secret (deprecated on CLI; prefer env)")
+    parser.add_argument(
+        "--auth-secret",
+        default=None,
+        help="Worker authentication secret (deprecated on CLI; prefer env)",
+    )
     parser.add_argument("--matching-token", default=None, help="Worker matching token")
     parser.add_argument("--ingestion-token", default=None, help="Worker ingestion token")
     parser.add_argument("--admin-token", default=None, help="Worker admin token")
@@ -2144,44 +2631,125 @@ if __name__ == "__main__":
         "--trusted-peers", default=None, help="JSON mapping of trusted peer verification keys"
     )
 
-    cli_args = parser.parse_args()
-    if not cli_args.bank_id or not cli_args.storage_root:
-        parser.error(
-            "--bank-id and --storage-root must be specified via CLI or environment variables (BANK_ID, STORAGE_ROOT / CFI_STORAGE_DIR)"
-        )
-    env_auth = os.environ.get("WORKER_AUTH_SECRET") or cli_args.auth_secret or secrets.token_hex(32)
-    env_matching = os.environ.get("WORKER_MATCHING_TOKEN") or cli_args.matching_token
-    env_ingest = os.environ.get("WORKER_INGESTION_TOKEN") or cli_args.ingestion_token
-    env_admin = os.environ.get("WORKER_ADMIN_TOKEN") or cli_args.admin_token
-    env_peers = os.environ.get("WORKER_TRUSTED_PEERS_JSON") or cli_args.trusted_peers or "{}"
-    peers = json.loads(env_peers)
+    # Coordinator specific flags
+    parser.add_argument(
+        "--worker-a-bank",
+        default=os.environ.get("WORKER_A_BANK", "bank_a"),
+        help="Bank A identifier for coordinator",
+    )
+    parser.add_argument(
+        "--worker-a-url",
+        default=os.environ.get("WORKER_A_URL"),
+        help="Worker A base URL for coordinator",
+    )
+    parser.add_argument(
+        "--worker-a-token",
+        default=os.environ.get("WORKER_A_TOKEN"),
+        help="Worker A matching token for coordinator",
+    )
+    parser.add_argument(
+        "--worker-b-bank",
+        default=os.environ.get("WORKER_B_BANK", "bank_b"),
+        help="Bank B identifier for coordinator",
+    )
+    parser.add_argument(
+        "--worker-b-url",
+        default=os.environ.get("WORKER_B_URL"),
+        help="Worker B base URL for coordinator",
+    )
+    parser.add_argument(
+        "--worker-b-token",
+        default=os.environ.get("WORKER_B_TOKEN"),
+        help="Worker B matching token for coordinator",
+    )
 
-    cli_node = IsolatedBankWorkerNode(
-        bank_id=cli_args.bank_id,
-        storage_root=cli_args.storage_root,
-        auth_secret=env_auth,
-        matching_token=env_matching,
-        ingestion_token=env_ingest,
-        admin_token=env_admin,
-        trusted_peer_keys=peers,
-    )
-    cli_daemon = InstitutionalWorkerDaemon(
-        node=cli_node,
-        host=cli_args.host,
-        port=cli_args.port,
-        run_as_process=False,
-    )
-    cli_daemon.start()
-    startup_info = {
-        "status": "ONLINE",
-        "bank_id": cli_args.bank_id,
-        "port": cli_daemon.port,
-        "pid": os.getpid(),
-    }
-    sys.stdout.write(json.dumps(startup_info) + "\n")
-    sys.stdout.flush()
-    try:
-        while True:
-            time.sleep(1.0)
-    except (KeyboardInterrupt, SystemExit):
-        cli_daemon.stop()
+    cli_args = parser.parse_args()
+
+    if cli_args.role == "coordinator":
+        coord = CrossBankMatchingCoordinator()
+        if cli_args.worker_a_url:
+            client_a = InstitutionalWorkerClient(
+                bank_id=cli_args.worker_a_bank,
+                base_url=cli_args.worker_a_url,
+                matching_token=cli_args.worker_a_token or "",
+            )
+            coord.register_worker(
+                bank_id=cli_args.worker_a_bank,
+                worker=client_a,
+                matching_token=cli_args.worker_a_token,
+            )
+        if cli_args.worker_b_url:
+            client_b = InstitutionalWorkerClient(
+                bank_id=cli_args.worker_b_bank,
+                base_url=cli_args.worker_b_url,
+                matching_token=cli_args.worker_b_token or "",
+            )
+            coord.register_worker(
+                bank_id=cli_args.worker_b_bank,
+                worker=client_b,
+                matching_token=cli_args.worker_b_token,
+            )
+        coord_daemon = InstitutionalCoordinatorDaemon(
+            coordinator=coord,
+            host=cli_args.host,
+            port=cli_args.port or 8200,
+        )
+        coord_daemon.start()
+        startup_info = {
+            "status": "ONLINE",
+            "role": "coordinator",
+            "port": coord_daemon.port,
+            "pid": os.getpid(),
+        }
+        sys.stdout.write(json.dumps(startup_info) + "\n")
+        sys.stdout.flush()
+        try:
+            while True:
+                time.sleep(1.0)
+        except (KeyboardInterrupt, SystemExit):
+            coord_daemon.stop()
+    else:
+        if not cli_args.bank_id or not cli_args.storage_root:
+            parser.error(
+                "--bank-id and --storage-root must be specified via CLI or environment variables (BANK_ID, STORAGE_ROOT / CFI_STORAGE_DIR)"
+            )
+        env_auth = (
+            os.environ.get("WORKER_AUTH_SECRET")
+            or cli_args.auth_secret
+            or secrets.token_hex(32)
+        )
+        env_matching = os.environ.get("WORKER_MATCHING_TOKEN") or cli_args.matching_token
+        env_ingest = os.environ.get("WORKER_INGESTION_TOKEN") or cli_args.ingestion_token
+        env_admin = os.environ.get("WORKER_ADMIN_TOKEN") or cli_args.admin_token
+        env_peers = os.environ.get("WORKER_TRUSTED_PEERS_JSON") or cli_args.trusted_peers or "{}"
+        peers = json.loads(env_peers)
+
+        cli_node = IsolatedBankWorkerNode(
+            bank_id=cli_args.bank_id,
+            storage_root=cli_args.storage_root,
+            auth_secret=env_auth,
+            matching_token=env_matching,
+            ingestion_token=env_ingest,
+            admin_token=env_admin,
+            trusted_peer_keys=peers,
+        )
+        cli_daemon = InstitutionalWorkerDaemon(
+            node=cli_node,
+            host=cli_args.host,
+            port=cli_args.port,
+            run_as_process=False,
+        )
+        cli_daemon.start()
+        startup_info = {
+            "status": "ONLINE",
+            "bank_id": cli_args.bank_id,
+            "port": cli_daemon.port,
+            "pid": os.getpid(),
+        }
+        sys.stdout.write(json.dumps(startup_info) + "\n")
+        sys.stdout.flush()
+        try:
+            while True:
+                time.sleep(1.0)
+        except (KeyboardInterrupt, SystemExit):
+            cli_daemon.stop()

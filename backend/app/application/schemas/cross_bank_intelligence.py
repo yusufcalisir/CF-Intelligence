@@ -60,6 +60,11 @@ class CrossBankIntelligenceQueryRequest(BaseModel):
         max_length=64,
         description="Optional specific counterpart bank ID. If omitted, checks all active consortium participants.",
     )
+    case_id: str | None = Field(
+        default=None,
+        max_length=128,
+        description="Optional active case ID to bind and verify against the query.",
+    )
     purpose: str = Field(
         default="AML_COLLABORATIVE_INVESTIGATION",
         max_length=128,

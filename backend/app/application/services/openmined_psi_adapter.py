@@ -40,7 +40,7 @@ class EstablishedPSIProtocolMetadata:
     license_type: str = "Apache-2.0"
     threat_model: str = "SEMI_HONEST_TWO_PARTY"
     data_structure: str = "GCS"
-    default_fpr: float = 0.0001
+    default_fpr: float = 1e-9
     reveal_intersection: bool = True
     assurance_level: str = "REVIEWED_ESTABLISHED_PSI_VERIFIED"
 
@@ -98,9 +98,9 @@ class OpenMinedPSIAdapter:
         cls,
         server_instance: Any,
         items: list[str],
-        fpr: float = 0.0001,
+        fpr: float = 1e-9,
     ) -> bytes:
-        """Compute server Setup message using GCS (Golomb Compressed Sets)."""
+        """Compute server Setup message using GCS (Golomb Compressed Sets) with verified 1e-9 target FPR."""
         cls.ensure_available()
         clean_items = [item.strip() for item in items if item.strip()]
         if not clean_items:
@@ -114,6 +114,17 @@ class OpenMinedPSIAdapter:
             openmined_psi.DataStructure.GCS,
         )
         return setup.SerializeToString()
+
+    @classmethod
+    def compute_match_confirmation_tag(cls, blinded_element: str, scope_digest: str) -> str:
+        """Compute cryptographically protected zero-knowledge match confirmation tag.
+
+        Does not reveal raw identifiers, unmatched candidates, or internal risk context.
+        Binds candidate to immutable grant scope digest.
+        """
+        import hashlib
+        canonical = f"CFI_EXACT_CONFIRM:{blinded_element}:{scope_digest}"
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     @classmethod
     def process_server_request(

@@ -85,7 +85,7 @@ markers = [
 filterwarnings = [
     "ignore::DeprecationWarning:torch.jit.*:",
     "ignore::FutureWarning:torch.jit.*:",
-    "ignore::torch.jit.TracerWarning",
+    "ignore:.*:Warning:torch.jit.*:",
     "ignore::UserWarning:opacus.*:",
     "ignore::UserWarning:torch.sparse.*:",
     "ignore:.*Sparse invariant checks are implicitly disabled.*:UserWarning",

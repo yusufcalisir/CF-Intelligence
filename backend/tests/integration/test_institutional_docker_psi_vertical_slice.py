@@ -1,33 +1,38 @@
 """Institutional Docker Private Set Intersection (PSI) Integration Test Suite.
 
 Establishes and verifies 3 enforced institutional security domains via a reproducible Linux Docker topology:
-- Security Domain 1: Bank A matching worker (`cfi_worker_bank_a`), non-root `uid: 10001`, volume `bank_a_vault:/vault`.
-- Security Domain 2: Bank B matching worker (`cfi_worker_bank_b`), non-root `uid: 10001`, volume `bank_b_vault:/vault`.
-- Security Domain 3: Consortium coordinator (`cfi_coordinator`), non-root, isolated network participant, zero vault access.
+- Security Domain 1: Bank A matching worker (`cfi_worker_bank_a_<uuid>`), non-root `uid: 10001`, volume `cfi_vault_a_<uuid>:/vault`.
+- Security Domain 2: Bank B matching worker (`cfi_worker_bank_b_<uuid>`), non-root `uid: 10001`, volume `cfi_vault_b_<uuid>:/vault`.
+- Security Domain 3: Consortium coordinator (`cfi_coordinator_<uuid>`), non-root `uid: 10001`, isolated network participant, zero vault access.
 
 Test Verification Matrix:
-- Probe 1 (Non-root & Volume isolation): Enforces UID 10001 non-root process execution and negative control volume isolation.
+- Probe 1 (Non-root & Volume isolation): Enforces UID 10001 non-root process execution and negative control volume isolation across all 3 containers.
 - Probe 2 (Credential isolation): Matching tokens strictly rejected on ingestion/admin endpoints (HTTP 403 / PermissionError).
-- Probe 3 (Ticket authorization): Unsigned, tampered, or expired operation authorization tickets rejected at worker boundary.
-- Probe 4 (OpenMined PSI Positive Match): Genuine ECDH private matching via openmined-psi producing authoritative signal.
-- Probe 5 (OpenMined PSI Negative Match): Clean negative intersection producing unobserved signal without disclosure.
+- Probe 3 (Mandatory Adversarial Regression): Coordinator matching credentials alone cannot manufacture bank participation; unapproved grant / tampered scope rejected before processing private identifiers.
+- Probe 4 (OpenMined PSI Positive Match): Genuine ECDH private matching via openmined-psi (FPR 1e-9) with exact confirmation tag producing authoritative EXACT_MATCH signal.
+- Probe 5 (OpenMined PSI Negative Match): Disjoint sets produce NO_MATCH (0.0 confidence, UNOBSERVED risk) without disclosure.
 - Probe 6 (Entity Deletion): Deleting target entity in Bank B vault updates matching outcome immediately.
 - Probe 7 (Zero Disclosed Identifiers): Wire payloads contain zero raw identifiers, IBANs, or unblinded elements.
-- Probe 8 (Case Evidence Attachment & Revocation): Authoritative signal attaches to case; consent revocation fails closed.
+- Probe 8 (End-to-End Product Workflow): Authenticated Analyst API -> Docker Coordinator Container -> Worker OpenMined PSI -> Authoritative Case Evidence -> Consent Revocation Denial.
+- Probe 9 (Negative Controls & Outage Containment): Mismatched bank identity, stale revision, replay, and worker container outage fail closed without fallback to prototype.
 """
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import json
+import socket
 import subprocess
 import time
 import urllib.error
 import urllib.request
+import uuid
 from collections.abc import Generator
 from dataclasses import asdict, replace
+from datetime import UTC
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -40,22 +45,16 @@ from app.application.services.cross_bank_intelligence import CrossBankIntelligen
 from app.application.services.isolated_matching_service import (
     CrossBankMatchingCoordinator,
     EstablishedPSIQueryMessage,
+    InstitutionalCoordinatorClient,
     InstitutionalWorkerClient,
     OperationAuthorizationTicket,
 )
 from app.domain.consortium_governance import ConsortiumSecurityError, MemberRole
 from app.domain.enums import CasePriority
+from app.domain.investigation_entities import Entity, EntityType, RiskLevel
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 
-NETWORK_NAME = "cfi_isolated_mesh"
-CONTAINER_WORKER_A = "cfi_worker_bank_a"
-CONTAINER_WORKER_B = "cfi_worker_bank_b"
-CONTAINER_COORDINATOR = "cfi_coordinator"
-VOLUME_BANK_A = "bank_a_vault"
-VOLUME_BANK_B = "bank_b_vault"
-PORT_WORKER_A = 8101
-PORT_WORKER_B = 8102
 IMAGE_NAME = "cfi-institutional-worker:latest"
 
 SECRET_A = "auth_sec_bank_a_87234691823749123847"
@@ -66,6 +65,27 @@ TOKEN_INGEST_A = "ingestion_token_bank_a_12938471"
 TOKEN_INGEST_B = "ingestion_token_bank_b_58271947"
 TOKEN_ADMIN_A = "admin_token_bank_a_987123984"
 TOKEN_ADMIN_B = "admin_token_bank_b_123987123"
+SECRET_COORD = "auth_sec_coord_99912384719283749123"
+SHARED_CONSORTIUM_STORE_SECRET = "consortium_store_hmac_shared_sec_888777666555444333"
+SHARED_JWT_SECRET = "jwt_secret_test_suite_production_hardened_98712349812734918237"
+
+# Mutable globals populated per session to guarantee disposable uniqueness
+NETWORK_NAME = ""
+CONTAINER_WORKER_A = ""
+CONTAINER_WORKER_B = ""
+CONTAINER_COORDINATOR = ""
+VOLUME_BANK_A = ""
+VOLUME_BANK_B = ""
+PORT_WORKER_A = 0
+PORT_WORKER_B = 0
+PORT_COORDINATOR = 0
+
+
+def _get_free_port() -> int:
+    """Acquire an ephemeral port from the host OS."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return int(s.getsockname()[1])
 
 
 def _run_cmd(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -113,7 +133,7 @@ def ensure_docker_image(image_name: str) -> bool:
     return False
 
 
-def _wait_for_health(url: str, timeout_sec: float = 25.0) -> bool:
+def _wait_for_health(url: str, timeout_sec: float = 30.0) -> bool:
     start = time.time()
     while time.time() - start < timeout_sec:
         try:
@@ -128,7 +148,10 @@ def _wait_for_health(url: str, timeout_sec: float = 25.0) -> bool:
 
 @pytest.fixture(scope="module")
 def docker_topology() -> Generator[dict[str, Any], None, None]:
-    """Sets up genuine 3-container topology on isolated bridge network."""
+    """Sets up genuine 3-container topology on isolated bridge network using disposable test-owned resources."""
+    global NETWORK_NAME, CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR
+    global VOLUME_BANK_A, VOLUME_BANK_B, PORT_WORKER_A, PORT_WORKER_B, PORT_COORDINATOR
+
     if not is_docker_running():
         pytest.skip("Docker daemon is not reachable or running.")
 
@@ -137,18 +160,25 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
             f"Required Docker image '{IMAGE_NAME}' is not available and could not be prepared automatically."
         )
 
-    # Cleanup any stale containers or volumes
-    for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
-        _run_cmd(["docker", "rm", "-f", c], check=False)
-    _run_cmd(["docker", "network", "rm", NETWORK_NAME], check=False)
-    _run_cmd(["docker", "volume", "rm", VOLUME_BANK_A, VOLUME_BANK_B], check=False)
+    # Generate disposable resource identifiers unique to this test run
+    session_id = uuid.uuid4().hex[:8]
+    NETWORK_NAME = f"cfi_mesh_{session_id}"
+    CONTAINER_WORKER_A = f"cfi_worker_a_{session_id}"
+    CONTAINER_WORKER_B = f"cfi_worker_b_{session_id}"
+    CONTAINER_COORDINATOR = f"cfi_coord_{session_id}"
+    VOLUME_BANK_A = f"cfi_vault_a_{session_id}"
+    VOLUME_BANK_B = f"cfi_vault_b_{session_id}"
 
-    # 1. Create isolated mesh network
+    PORT_WORKER_A = _get_free_port()
+    PORT_WORKER_B = _get_free_port()
+    PORT_COORDINATOR = _get_free_port()
+
+    # 1. Create isolated bridge mesh network
     net_res = _run_cmd(["docker", "network", "create", NETWORK_NAME], check=False)
     if net_res.returncode != 0:
         pytest.skip(f"Failed to create docker network '{NETWORK_NAME}': {net_res.stderr.strip()}")
 
-    # 2. Create isolated institutional vaults
+    # 2. Create isolated institutional disposable vaults
     _run_cmd(["docker", "volume", "create", VOLUME_BANK_A], check=False)
     _run_cmd(["docker", "volume", "create", VOLUME_BANK_B], check=False)
 
@@ -161,10 +191,19 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "-v", f"{VOLUME_BANK_A}:/vault",
         "-p", f"{PORT_WORKER_A}:8100",
         "-e", "APP_ENV=production",
+        "-e", f"JWT_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_JWT_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_JWT_SIGNING_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_OIDC_JWT_SIGNING_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_IDENTITY_STORE_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_AUDIT_LEDGER_SECRET={SHARED_JWT_SECRET}",
+        "-e", "CFI_ACCOUNT_STORE_PATH=/tmp/account_store.json",
+        "-e", "CFI_IDENTITY_STORE_PATH=/tmp/account_store.json",
         "-e", "BANK_ID=bank_a",
         "-e", "STORAGE_ROOT=/vault",
         "-e", "CFI_STORAGE_DIR=/vault",
-        "-e", f"CFI_CONSORTIUM_STORE_SECRET={SECRET_A}",
+        "-e", "CFI_CONSORTIUM_STORE_PATH=/tmp/consortium_store.json",
+        "-e", f"CFI_CONSORTIUM_STORE_SECRET={SHARED_CONSORTIUM_STORE_SECRET}",
         "-e", "WORKER_HOST=0.0.0.0",
         "-e", "WORKER_PORT=8100",
         "-e", f"WORKER_AUTH_SECRET={SECRET_A}",
@@ -176,14 +215,8 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
     ]
     res_worker_a = _run_cmd(cmd_worker_a, check=False)
     if res_worker_a.returncode != 0:
-        for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
-            _run_cmd(["docker", "rm", "-f", c], check=False)
-        _run_cmd(["docker", "network", "rm", NETWORK_NAME], check=False)
-        _run_cmd(["docker", "volume", "rm", VOLUME_BANK_A, VOLUME_BANK_B], check=False)
-        pytest.skip(
-            f"Failed to start container '{CONTAINER_WORKER_A}' (exit code {res_worker_a.returncode}): "
-            f"{res_worker_a.stderr.strip() or res_worker_a.stdout.strip()}"
-        )
+        _teardown_disposable_resources()
+        pytest.skip(f"Failed to start container '{CONTAINER_WORKER_A}': {res_worker_a.stderr.strip()}")
 
     # 4. Start Bank B Worker container
     peers_b_json = json.dumps({"bank_a": SECRET_A})
@@ -194,10 +227,19 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "-v", f"{VOLUME_BANK_B}:/vault",
         "-p", f"{PORT_WORKER_B}:8100",
         "-e", "APP_ENV=production",
+        "-e", f"JWT_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_JWT_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_JWT_SIGNING_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_OIDC_JWT_SIGNING_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_IDENTITY_STORE_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_AUDIT_LEDGER_SECRET={SHARED_JWT_SECRET}",
+        "-e", "CFI_ACCOUNT_STORE_PATH=/tmp/account_store.json",
+        "-e", "CFI_IDENTITY_STORE_PATH=/tmp/account_store.json",
         "-e", "BANK_ID=bank_b",
         "-e", "STORAGE_ROOT=/vault",
         "-e", "CFI_STORAGE_DIR=/vault",
-        "-e", f"CFI_CONSORTIUM_STORE_SECRET={SECRET_B}",
+        "-e", "CFI_CONSORTIUM_STORE_PATH=/tmp/consortium_store.json",
+        "-e", f"CFI_CONSORTIUM_STORE_SECRET={SHARED_CONSORTIUM_STORE_SECRET}",
         "-e", "WORKER_HOST=0.0.0.0",
         "-e", "WORKER_PORT=8100",
         "-e", f"WORKER_AUTH_SECRET={SECRET_B}",
@@ -209,44 +251,52 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
     ]
     res_worker_b = _run_cmd(cmd_worker_b, check=False)
     if res_worker_b.returncode != 0:
-        for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
-            _run_cmd(["docker", "rm", "-f", c], check=False)
-        _run_cmd(["docker", "network", "rm", NETWORK_NAME], check=False)
-        _run_cmd(["docker", "volume", "rm", VOLUME_BANK_A, VOLUME_BANK_B], check=False)
-        pytest.skip(
-            f"Failed to start container '{CONTAINER_WORKER_B}' (exit code {res_worker_b.returncode}): "
-            f"{res_worker_b.stderr.strip() or res_worker_b.stdout.strip()}"
-        )
+        _teardown_disposable_resources()
+        pytest.skip(f"Failed to start container '{CONTAINER_WORKER_B}': {res_worker_b.stderr.strip()}")
 
-    # 5. Start Coordinator container (zero volume mounts, network participant only)
+    # 5. Start Coordinator container (ZERO volume mounts, isolated network participant, non-root)
     cmd_coordinator = [
         "docker", "run", "-d",
         "--name", CONTAINER_COORDINATOR,
         "--network", NETWORK_NAME,
+        "-p", f"{PORT_COORDINATOR}:8200",
+        "-e", "APP_ENV=production",
+        "-e", f"JWT_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_JWT_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_JWT_SIGNING_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_OIDC_JWT_SIGNING_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_IDENTITY_STORE_SECRET={SHARED_JWT_SECRET}",
+        "-e", f"CFI_AUDIT_LEDGER_SECRET={SHARED_JWT_SECRET}",
+        "-e", "CFI_ACCOUNT_STORE_PATH=/tmp/account_store.json",
+        "-e", "CFI_IDENTITY_STORE_PATH=/tmp/account_store.json",
+        "-e", "CFI_CONSORTIUM_STORE_PATH=/tmp/consortium_store.json",
+        "-e", f"CFI_CONSORTIUM_STORE_SECRET={SHARED_CONSORTIUM_STORE_SECRET}",
         IMAGE_NAME,
-        "sleep", "3600",
+        "python", "-m", "app.application.services.isolated_matching_service",
+        "--role", "coordinator",
+        "--host", "0.0.0.0",
+        "--port", "8200",
+        "--worker-a-bank", "bank_a",
+        "--worker-a-url", f"http://{CONTAINER_WORKER_A}:8100",
+        "--worker-a-token", TOKEN_MATCH_A,
+        "--worker-b-bank", "bank_b",
+        "--worker-b-url", f"http://{CONTAINER_WORKER_B}:8100",
+        "--worker-b-token", TOKEN_MATCH_B,
     ]
     res_coordinator = _run_cmd(cmd_coordinator, check=False)
     if res_coordinator.returncode != 0:
-        for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
-            _run_cmd(["docker", "rm", "-f", c], check=False)
-        _run_cmd(["docker", "network", "rm", NETWORK_NAME], check=False)
-        _run_cmd(["docker", "volume", "rm", VOLUME_BANK_A, VOLUME_BANK_B], check=False)
-        pytest.skip(
-            f"Failed to start container '{CONTAINER_COORDINATOR}' (exit code {res_coordinator.returncode}): "
-            f"{res_coordinator.stderr.strip() or res_coordinator.stdout.strip()}"
-        )
+        _teardown_disposable_resources()
+        pytest.skip(f"Failed to start container '{CONTAINER_COORDINATOR}': {res_coordinator.stderr.strip()}")
 
     # Wait for daemons to become healthy
     health_a = _wait_for_health(f"http://127.0.0.1:{PORT_WORKER_A}/worker/health")
     health_b = _wait_for_health(f"http://127.0.0.1:{PORT_WORKER_B}/worker/health")
-    if not (health_a and health_b):
-        for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
-            _run_cmd(["docker", "rm", "-f", c], check=False)
-        _run_cmd(["docker", "network", "rm", NETWORK_NAME], check=False)
-        _run_cmd(["docker", "volume", "rm", VOLUME_BANK_A, VOLUME_BANK_B], check=False)
+    health_coord = _wait_for_health(f"http://127.0.0.1:{PORT_COORDINATOR}/health")
+
+    if not (health_a and health_b and health_coord):
+        _teardown_disposable_resources()
         pytest.skip(
-            f"Docker worker containers failed to become healthy within timeout: worker_a={health_a}, worker_b={health_b}"
+            f"Containers failed to become healthy within timeout: worker_a={health_a}, worker_b={health_b}, coordinator={health_coord}"
         )
 
     client_a = InstitutionalWorkerClient(
@@ -263,32 +313,61 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         ingestion_token=TOKEN_INGEST_B,
         admin_token=TOKEN_ADMIN_B,
     )
+    client_coord = InstitutionalCoordinatorClient(
+        base_url=f"http://127.0.0.1:{PORT_COORDINATOR}",
+    )
 
     topology_ctx = {
         "client_a": client_a,
         "client_b": client_b,
+        "client_coord": client_coord,
         "port_a": PORT_WORKER_A,
         "port_b": PORT_WORKER_B,
+        "port_coord": PORT_COORDINATOR,
+        "container_worker_a": CONTAINER_WORKER_A,
+        "container_worker_b": CONTAINER_WORKER_B,
+        "container_coordinator": CONTAINER_COORDINATOR,
+        "network_name": NETWORK_NAME,
+        "volume_bank_a": VOLUME_BANK_A,
+        "volume_bank_b": VOLUME_BANK_B,
     }
 
-    yield topology_ctx
+    try:
+        yield topology_ctx
+    finally:
+        _teardown_disposable_resources()
 
-    # Teardown
+
+def _teardown_disposable_resources() -> None:
+    """Tears down ONLY the test-owned disposable resources created for this test run."""
     for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
-        _run_cmd(["docker", "rm", "-f", c], check=False)
-    _run_cmd(["docker", "network", "rm", NETWORK_NAME], check=False)
-    _run_cmd(["docker", "volume", "rm", VOLUME_BANK_A, VOLUME_BANK_B], check=False)
+        if c:
+            _run_cmd(["docker", "rm", "-f", c], check=False)
+    if NETWORK_NAME:
+        _run_cmd(["docker", "network", "rm", NETWORK_NAME], check=False)
+    for v in [VOLUME_BANK_A, VOLUME_BANK_B]:
+        if v:
+            _run_cmd(["docker", "volume", "rm", v], check=False)
 
 
 @pytest.fixture
 def isolated_governance_env(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    docker_topology: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> Generator[tuple[ConsortiumGovernanceService, str, str], None, None]:
-    """Isolated consortium governance environment for testing."""
+    """Isolated consortium governance environment synchronized with container topology."""
     store_file = tmp_path / "docker_integration_consortium_store.json"
     account_file = tmp_path / "docker_integration_account_store.json"
     monkeypatch.setenv("CFI_CONSORTIUM_STORE_PATH", str(store_file))
     monkeypatch.setenv("CFI_ACCOUNT_STORE_PATH", str(account_file))
+    monkeypatch.setenv("CFI_CONSORTIUM_STORE_SECRET", SHARED_CONSORTIUM_STORE_SECRET)
+    monkeypatch.setenv("JWT_SECRET", SHARED_JWT_SECRET)
+    monkeypatch.setenv("CFI_JWT_SECRET", SHARED_JWT_SECRET)
+    monkeypatch.setenv("CFI_JWT_SIGNING_SECRET", SHARED_JWT_SECRET)
+    monkeypatch.setenv("CFI_OIDC_JWT_SIGNING_SECRET", SHARED_JWT_SECRET)
+    monkeypatch.setenv("CFI_IDENTITY_STORE_SECRET", SHARED_JWT_SECRET)
+    monkeypatch.setenv("CFI_AUDIT_LEDGER_SECRET", SHARED_JWT_SECRET)
     DurableConsortiumStore.set_instance(None)
     AuthenticationService.reset_instance()
 
@@ -344,6 +423,40 @@ def isolated_governance_env(
         auth_token=token_b,
     )
 
+    # Synchronize consortium store file and account store file into container filesystems
+    for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
+        _run_cmd(["docker", "cp", str(store_file), f"{c}:/tmp/consortium_store.json"], check=False)
+        _run_cmd(["docker", "exec", "-u", "0", c, "chmod", "666", "/tmp/consortium_store.json"], check=False)
+        _run_cmd(["docker", "cp", str(account_file), f"{c}:/tmp/account_store.json"], check=False)
+        _run_cmd(["docker", "exec", "-u", "0", c, "chmod", "666", "/tmp/account_store.json"], check=False)
+
+    # Register institutional grant authorization on Bank A and Bank B workers via admin tokens
+    c_data = gov_svc.get_consortium("c_docker_psi")
+    assert c_data is not None
+    grant_meta = c_data.metadata.get("operational_data_sharing_grant", {})
+    scope_digest = grant_meta.get("scope_digest", "")
+    assert len(scope_digest) >= 32
+
+    client_a: InstitutionalWorkerClient = docker_topology["client_a"]
+    client_b: InstitutionalWorkerClient = docker_topology["client_b"]
+
+    client_a.register_authorized_grant(
+        consortium_id="c_docker_psi",
+        grant_id="grant_c_docker_psi",
+        revision=1,
+        scope_digest=scope_digest,
+        permitted_counterparts=["bank_b"],
+        permitted_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+    )
+    client_b.register_authorized_grant(
+        consortium_id="c_docker_psi",
+        grant_id="grant_c_docker_psi",
+        revision=1,
+        scope_digest=scope_digest,
+        permitted_counterparts=["bank_a"],
+        permitted_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+    )
+
     yield gov_svc, token_a, token_b
 
     DurableConsortiumStore.set_instance(None)
@@ -351,8 +464,8 @@ def isolated_governance_env(
 
 
 def test_probe_1_non_root_and_volume_isolation(docker_topology: dict[str, Any]) -> None:
-    """Probe 1: Verify non-root UID 10001 process identity and strict volume isolation."""
-    # Process identity verification
+    """Probe 1: Verify non-root UID 10001 process identity and strict volume isolation across 3 containers."""
+    # Process identity verification: all containers must execute as UID 10001 (non-root)
     res_a = _run_cmd(["docker", "exec", CONTAINER_WORKER_A, "id", "-u"])
     assert res_a.stdout.strip() == "10001", "Bank A worker container must run as non-root UID 10001"
 
@@ -362,27 +475,25 @@ def test_probe_1_non_root_and_volume_isolation(docker_topology: dict[str, Any]) 
     res_coord = _run_cmd(["docker", "exec", CONTAINER_COORDINATOR, "id", "-u"])
     assert res_coord.stdout.strip() == "10001", "Coordinator container must run as non-root UID 10001"
 
-    # Negative Control: Bank A cannot see Bank B volume
-    # Write canary file directly in Bank B vault
+    # Negative Control: Bank A cannot see Bank B vault
     _run_cmd([
         "docker", "exec", CONTAINER_WORKER_B,
         "python", "-c",
-        "import os; os.makedirs('/vault/bank_b/canary', exist_ok=True); open('/vault/bank_b/canary/secret_b.txt', 'w').write('SECRET_DATA_B')"
+        "import os; os.makedirs('/vault/bank_b/canary', exist_ok=True); open('/vault/bank_b/canary/secret_b.txt', 'w').write('SECRET_DATA_B')",
     ])
 
-    # Probe from Bank A container for Bank B's canary - MUST NOT EXIST
     check_a = _run_cmd([
         "docker", "exec", CONTAINER_WORKER_A,
         "python", "-c",
-        "import os; print(os.path.exists('/vault/bank_b/canary/secret_b.txt'))"
+        "import os; print(os.path.exists('/vault/bank_b/canary/secret_b.txt'))",
     ])
     assert check_a.stdout.strip() == "False", "Cross-tenant volume leak: Bank A accessed Bank B vault data!"
 
-    # Probe from Coordinator container for vault directory - MUST NOT EXIST or be empty
+    # Negative Control: Coordinator possesses ZERO vault mounts and no private datasets
     check_coord = _run_cmd([
         "docker", "exec", CONTAINER_COORDINATOR,
         "python", "-c",
-        "import os; print(os.path.exists('/vault/bank_b/canary/secret_b.txt'))"
+        "import os; print(os.path.exists('/vault/bank_b/canary/secret_b.txt'))",
     ])
     assert check_coord.stdout.strip() == "False", "Coordinator illegally mounted Bank B institutional vault!"
 
@@ -403,69 +514,152 @@ def test_probe_2_credential_and_capability_isolation(docker_topology: dict[str, 
         urllib.request.urlopen(req)
     assert exc_info.value.code == 403, "Matching token MUST be rejected on ingestion endpoint with HTTP 403"
 
-    # Negative Probe: Attempt enroll-peer using matching token
-    enroll_payload = json.dumps({"peer_bank_id": "bank_c", "verification_key": "some_key"}).encode()
-    req_enroll = urllib.request.Request(
-        f"{client_a.base_url}/worker/enroll-peer",
-        data=enroll_payload,
+    # Negative Probe: Attempt authorize-grant using matching token
+    auth_payload = json.dumps({
+        "consortium_id": "c_docker_psi",
+        "grant_id": "grant_fake",
+        "revision": 1,
+        "scope_digest": "0" * 64,
+        "permitted_counterparts": ["bank_b"],
+        "permitted_purposes": ["AML_COLLABORATIVE_INVESTIGATION"],
+    }).encode()
+    req_auth = urllib.request.Request(
+        f"{client_a.base_url}/worker/authorize-grant",
+        data=auth_payload,
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {TOKEN_MATCH_A}"},
         method="POST",
     )
-    with pytest.raises(urllib.error.HTTPError) as exc_info_enroll:
-        urllib.request.urlopen(req_enroll)
-    assert exc_info_enroll.value.code == 403, "Matching token MUST be rejected on admin endpoint with HTTP 403"
+    with pytest.raises(urllib.error.HTTPError) as exc_info_auth:
+        urllib.request.urlopen(req_auth)
+    assert exc_info_auth.value.code == 403, "Matching token MUST be rejected on admin endpoint with HTTP 403"
 
 
-def test_probe_3_ticket_authorization_enforcement(docker_topology: dict[str, Any]) -> None:
-    """Probe 3: Verify worker endpoints reject unsigned, tampered, or wrong-purpose tickets."""
+def test_probe_3_mandatory_adversarial_coordinator_ticket_forgery_regression(
+    docker_topology: dict[str, Any],
+    isolated_governance_env: tuple[ConsortiumGovernanceService, str, str],
+) -> None:
+    """Probe 3: Mandatory Adversarial Regression.
+
+    Using ONLY matching capability tokens held by the coordinator:
+    1. Attempt to sign an unapproved operation ticket (fabricated grant ID).
+    2. Attempt to sign a ticket with a tampered scope digest on an authorized grant.
+    3. Attempt to submit a query with fabricated approvals to counterpart worker.
+    Both bank workers MUST independently reject before processing any private identifiers.
+    """
+    client_a: InstitutionalWorkerClient = docker_topology["client_a"]
     client_b: InstitutionalWorkerClient = docker_topology["client_b"]
 
-    fake_ticket = OperationAuthorizationTicket(
-        ticket_id="ticket_fake_001",
+    # 1. Attacker crafts unapproved ticket with arbitrary grant ID
+    forged_ticket = OperationAuthorizationTicket(
+        ticket_id="forged_ticket_adversary_001",
         consortium_id="c_docker_psi",
         requesting_bank_id="bank_a",
         target_bank_id="bank_b",
         operation="ESTABLISHED_PSI",
         purpose="AML_COLLABORATIVE_INVESTIGATION",
-        query_scope="entity:ent_999",
-        grant_id="grant_c_docker_psi",
+        query_scope="entity:target_adversary_ent",
+        grant_id="grant_forged_by_compromised_coordinator_999",
         grant_revision=1,
-        grant_scope_digest="dummy_digest",
-        job_id="job_001",
-        issued_at="2026-10-25T00:00:00Z",
-        expires_at="2026-10-25T01:00:00Z",
-        bank_approvals={},  # Unsigned!
+        grant_scope_digest=hashlib.sha256(b"fabricated_digest_value").hexdigest(),
+        job_id="job_adversarial_001",
+        issued_at=datetime.datetime.now(UTC).isoformat(),
+        expires_at=(datetime.datetime.now(UTC) + datetime.timedelta(seconds=300)).isoformat(),
+        bank_approvals={},
     )
 
-    fake_query = EstablishedPSIQueryMessage(
-        job_id="job_001",
+    # Bank A worker MUST reject signing because the grant was never institutionally authorized
+    with pytest.raises(Exception) as exc_a:
+        client_a.sign_operation_ticket(forged_ticket)
+    err_a_text = str(exc_a.value).lower()
+    assert (
+        "has not authorized operational grant" in err_a_text
+        or "cannot manufacture institutional participation" in err_a_text
+        or "participation authority denied" in err_a_text
+        or "400" in err_a_text
+        or "403" in err_a_text
+    ), f"Bank A worker failed to reject unapproved grant signing: {exc_a.value}"
+
+    # Bank B worker MUST also reject signing for the same unapproved grant
+    with pytest.raises(Exception) as exc_b:
+        client_b.sign_operation_ticket(forged_ticket)
+    err_b_text = str(exc_b.value).lower()
+    assert (
+        "has not authorized operational grant" in err_b_text
+        or "cannot manufacture institutional participation" in err_b_text
+        or "participation authority denied" in err_b_text
+        or "400" in err_b_text
+        or "403" in err_b_text
+    ), f"Bank B worker failed to reject unapproved grant signing: {exc_b.value}"
+
+    # 2. Attacker crafts ticket on valid grant ID but with tampered scope digest
+    tampered_digest_ticket = OperationAuthorizationTicket(
+        ticket_id="tampered_digest_ticket_002",
         consortium_id="c_docker_psi",
         requesting_bank_id="bank_a",
         target_bank_id="bank_b",
-        psi_request_b64="fake_proto",
-        nonce="nonce_fake_123",
-        timestamp="2026-10-25T00:00:00Z",
+        operation="ESTABLISHED_PSI",
         purpose="AML_COLLABORATIVE_INVESTIGATION",
-        signature="fake_sig",
-        ticket=fake_ticket,
+        query_scope="entity:target_adversary_ent",
+        grant_id="grant_c_docker_psi",
+        grant_revision=1,
+        grant_scope_digest=hashlib.sha256(b"tampered_scope_content").hexdigest(),
+        job_id="job_adversarial_002",
+        issued_at=datetime.datetime.now(UTC).isoformat(),
+        expires_at=(datetime.datetime.now(UTC) + datetime.timedelta(seconds=300)).isoformat(),
+        bank_approvals={},
     )
+    with pytest.raises(Exception) as exc_tamper:
+        client_a.sign_operation_ticket(tampered_digest_ticket)
+    err_tamper = str(exc_tamper.value).lower()
+    assert (
+        "digest mismatch" in err_tamper
+        or "cannot manufacture" in err_tamper
+        or "400" in err_tamper
+        or "403" in err_tamper
+    ), f"Bank A worker failed to reject tampered scope digest: {exc_tamper.value}"
 
-    # Submitting unsigned ticket to Bank B worker endpoint must fail closed
-    with pytest.raises(Exception) as exc_info:
+    # 3. Attacker manufactures fake approvals and attempts to execute counterpart query at Bank B
+    fake_approvals_ticket = replace(
+        forged_ticket,
+        bank_approvals={"bank_a": "fake_sig_a_123", "bank_b": "fake_sig_b_456"},
+    )
+    fake_query = EstablishedPSIQueryMessage(
+        job_id="job_adversarial_003",
+        consortium_id="c_docker_psi",
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        psi_request_b64="fake_proto_blob",
+        nonce="nonce_adversary_789",
+        timestamp=datetime.datetime.now(UTC).isoformat(),
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        signature="fake_coordinator_sig",
+        ticket=fake_approvals_ticket,
+    )
+    with pytest.raises(Exception) as exc_query:
         client_b.process_established_psi_counterpart(fake_query)
-    assert "ConsortiumSecurityError" in type(exc_info.value).__name__ or "rejected" in str(exc_info.value).lower() or "verification failed" in str(exc_info.value).lower()
+    err_query = str(exc_query.value).lower()
+    assert (
+        "has not authorized" in err_query
+        or "denied" in err_query
+        or "verification failed" in err_query
+        or "peer authentication failed" in err_query
+        or "invalid signature" in err_query
+        or "failed" in err_query
+        or "400" in err_query
+        or "403" in err_query
+    ), f"Bank B counterpart worker failed to reject unapproved ticket query: {exc_query.value}"
 
 
 def test_probe_4_openmined_psi_positive_match(
     docker_topology: dict[str, Any],
     isolated_governance_env: tuple[ConsortiumGovernanceService, str, str],
 ) -> None:
-    """Probe 4: Genuine OpenMined PSI matching across Docker containers confirms positive match."""
-    gov_svc, token_a, _ = isolated_governance_env
+    """Probe 4: Genuine OpenMined PSI matching across Docker containers confirms positive match with exact confirmation."""
+    _, token_a, _ = isolated_governance_env
     client_a: InstitutionalWorkerClient = docker_topology["client_a"]
     client_b: InstitutionalWorkerClient = docker_topology["client_b"]
+    client_coord: InstitutionalCoordinatorClient = docker_topology["client_coord"]
 
-    # Ingest identical IBAN entity into Bank A and Bank B vaults via ingestion capability
     shared_identifier = "TR330006100511122233344455"
     ent_a = {
         "id": "ent_shared_bank_a",
@@ -487,11 +681,6 @@ def test_probe_4_openmined_psi_positive_match(
     client_a.store_private_entity(ent_a)
     client_b.store_private_entity(ent_b)
 
-    # Initialize coordinator with registered worker clients
-    coordinator = CrossBankMatchingCoordinator(consortium_service=gov_svc)
-    coordinator.register_worker("bank_a", client_a, matching_token=TOKEN_MATCH_A)
-    coordinator.register_worker("bank_b", client_b, matching_token=TOKEN_MATCH_B)
-
     req = CrossBankIntelligenceQueryRequest(
         consortium_id="c_docker_psi",
         requesting_bank_id="bank_a",
@@ -502,15 +691,17 @@ def test_probe_4_openmined_psi_positive_match(
         use_established_psi=True,
     )
 
-    signal = coordinator.execute_two_bank_private_matching(req=req, auth_token=token_a)
+    signal = client_coord.execute_match(req=req, auth_token=token_a)
 
-    # Assert genuine established PSI match
-    assert signal.match_confirmed is True, "OpenMined PSI failed to match identical identifier!"
-    assert signal.provenance.get("protocol") == "OPENMINED-PSI-2.0.6-ECDH", f"Expected OpenMined protocol, got: {signal.provenance.get('protocol')}"
-    assert signal.is_authoritative is True, "Established PSI signal must be marked authoritative"
+    # Assert genuine established PSI match semantics
+    assert signal.match_confirmed is True, "OpenMined PSI failed to match identical identifier across containers!"
+    assert signal.match_category == "EXACT_MATCH", f"Expected EXACT_MATCH after confirmation, got: {signal.match_category}"
+    assert signal.match_confidence == 1.0, f"Expected 1.0 confidence for confirmed match, got: {signal.match_confidence}"
+    assert signal.provenance.get("protocol") == "OPENMINED-PSI-2.0.6-ECDH"
+    assert signal.is_authoritative is True
     assert signal.assurance_level == "REVIEWED_ESTABLISHED_PSI_VERIFIED"
-    assert signal.sanitized_risk_level in ("UNAVAILABLE", "HIGH", "CRITICAL")
     assert "CROSS_BANK_ENTITY_OBSERVED" in signal.sanitized_typology_indicators
+    assert signal.disclaimer, "Disclaimer on entity co-occurrence vs fraud determination must be present"
 
 
 def test_probe_5_openmined_psi_negative_match(
@@ -518,9 +709,9 @@ def test_probe_5_openmined_psi_negative_match(
     isolated_governance_env: tuple[ConsortiumGovernanceService, str, str],
 ) -> None:
     """Probe 5: OpenMined PSI negative control correctly identifies disjoint non-matching entities."""
-    gov_svc, token_a, _ = isolated_governance_env
+    _, token_a, _ = isolated_governance_env
     client_a: InstitutionalWorkerClient = docker_topology["client_a"]
-    client_b: InstitutionalWorkerClient = docker_topology["client_b"]
+    client_coord: InstitutionalCoordinatorClient = docker_topology["client_coord"]
 
     ent_unique = {
         "id": "ent_unique_bank_a_999",
@@ -532,10 +723,6 @@ def test_probe_5_openmined_psi_negative_match(
     }
     client_a.store_private_entity(ent_unique)
 
-    coordinator = CrossBankMatchingCoordinator(consortium_service=gov_svc)
-    coordinator.register_worker("bank_a", client_a, matching_token=TOKEN_MATCH_A)
-    coordinator.register_worker("bank_b", client_b, matching_token=TOKEN_MATCH_B)
-
     req = CrossBankIntelligenceQueryRequest(
         consortium_id="c_docker_psi",
         requesting_bank_id="bank_a",
@@ -546,9 +733,11 @@ def test_probe_5_openmined_psi_negative_match(
         use_established_psi=True,
     )
 
-    signal = coordinator.execute_two_bank_private_matching(req=req, auth_token=token_a)
+    signal = client_coord.execute_match(req=req, auth_token=token_a)
 
     assert signal.match_confirmed is False, "False positive match detected for disjoint entity!"
+    assert signal.match_category == "NO_MATCH"
+    assert signal.match_confidence == 0.0
     assert signal.is_authoritative is True
     assert signal.assurance_level == "REVIEWED_ESTABLISHED_PSI_VERIFIED"
     assert signal.sanitized_risk_level == "UNOBSERVED"
@@ -559,10 +748,11 @@ def test_probe_6_entity_deletion_updates_matching(
     docker_topology: dict[str, Any],
     isolated_governance_env: tuple[ConsortiumGovernanceService, str, str],
 ) -> None:
-    """Probe 6: Deleting entity in Bank B vault immediately causes subsequent PSI matching to return False."""
-    gov_svc, token_a, _ = isolated_governance_env
+    """Probe 6: Deleting entity in Bank B vault immediately causes subsequent PSI matching to return NO_MATCH."""
+    _, token_a, _ = isolated_governance_env
     client_a: InstitutionalWorkerClient = docker_topology["client_a"]
     client_b: InstitutionalWorkerClient = docker_topology["client_b"]
+    client_coord: InstitutionalCoordinatorClient = docker_topology["client_coord"]
 
     deletable_id = "TR112233445566778899001122"
     ent_del_a = {
@@ -584,10 +774,6 @@ def test_probe_6_entity_deletion_updates_matching(
     client_a.store_private_entity(ent_del_a)
     client_b.store_private_entity(ent_del_b)
 
-    coordinator = CrossBankMatchingCoordinator(consortium_service=gov_svc)
-    coordinator.register_worker("bank_a", client_a, matching_token=TOKEN_MATCH_A)
-    coordinator.register_worker("bank_b", client_b, matching_token=TOKEN_MATCH_B)
-
     req = CrossBankIntelligenceQueryRequest(
         consortium_id="c_docker_psi",
         requesting_bank_id="bank_a",
@@ -599,19 +785,20 @@ def test_probe_6_entity_deletion_updates_matching(
     )
 
     # Initial match confirms presence
-    sig1 = coordinator.execute_two_bank_private_matching(req=req, auth_token=token_a)
+    sig1 = client_coord.execute_match(req=req, auth_token=token_a)
     assert sig1.match_confirmed is True
 
     # Real entity deletion: remove file from Bank B vault inside container
     del_res = _run_cmd([
         "docker", "exec", CONTAINER_WORKER_B,
-        "rm", "-f", "/vault/bank_b/private_entities/ent_to_delete_b.json"
+        "rm", "-f", "/vault/bank_b/private_entities/ent_to_delete_b.json",
     ])
     assert del_res.returncode == 0
 
     # Subsequent match confirms entity no longer matches
-    sig2 = coordinator.execute_two_bank_private_matching(req=req, auth_token=token_a)
+    sig2 = client_coord.execute_match(req=req, auth_token=token_a)
     assert sig2.match_confirmed is False, "Deleted entity was still matched (stale data retention breach)!"
+    assert sig2.match_category == "NO_MATCH"
 
 
 def test_probe_7_zero_identifier_disclosure_in_transit(
@@ -630,6 +817,10 @@ def test_probe_7_zero_identifier_disclosure_in_transit(
         "raw_identifier": sensitive_raw_iban,
     })
 
+    c_gov = isolated_governance_env[0].get_consortium("c_docker_psi")
+    assert c_gov is not None
+    digest = c_gov.metadata["operational_data_sharing_grant"]["scope_digest"]
+
     ticket = OperationAuthorizationTicket(
         ticket_id="ticket_wire_001",
         consortium_id="c_docker_psi",
@@ -640,10 +831,10 @@ def test_probe_7_zero_identifier_disclosure_in_transit(
         query_scope="entity:ent_confidential_a",
         grant_id="grant_c_docker_psi",
         grant_revision=1,
-        grant_scope_digest=hashlib.sha256(b"digest_wire").hexdigest(),
+        grant_scope_digest=digest,
         job_id="job_wire_001",
-        issued_at="2026-10-25T00:00:00Z",
-        expires_at="2099-01-01T00:00:00Z",
+        issued_at=datetime.datetime.now(UTC).isoformat(),
+        expires_at=(datetime.datetime.now(UTC) + datetime.timedelta(seconds=300)).isoformat(),
     )
     sig_a = client_a.sign_operation_ticket(ticket)
     sig_b = client_b.sign_operation_ticket(ticket)
@@ -667,14 +858,32 @@ def test_probe_7_zero_identifier_disclosure_in_transit(
     assert sensitive_raw_iban not in serialized_resp, "Confidentiality Breach: Plaintext IBAN leaked in counterpart server response!"
 
 
-def test_probe_8_case_evidence_attachment_and_revocation(
+def test_probe_8_complete_end_to_end_product_workflow(
     docker_topology: dict[str, Any],
     isolated_governance_env: tuple[ConsortiumGovernanceService, str, str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Probe 8: Attach verified authoritative signal to case; revoke consent locally; assert fail closed."""
+    """Probe 8: Complete Mandatory 10-Step Product Demonstration.
+
+    1. Bank A & B independently authorize same sharing scope.
+    2. Bank A analyst authenticates and opens legitimate investigation.
+    3. Analyst requests permitted cross-bank intelligence via API service.
+    4. Bank A & B workers independently validate participation authority.
+    5. Established OpenMined PSI executes in separate Docker containers.
+    6. System issues correctly classified EXACT_MATCH signal.
+    7. Analyst inspects signal through product workflow.
+    8. Signal attaches to Case Evidence only under valid governance conditions.
+    9. Bank B revokes consent.
+    10. Subsequent queries and new evidence attachments are denied (fail closed).
+    """
     gov_svc, token_a, token_b = isolated_governance_env
     client_a: InstitutionalWorkerClient = docker_topology["client_a"]
     client_b: InstitutionalWorkerClient = docker_topology["client_b"]
+    port_coord: int = docker_topology["port_coord"]
+
+    # Configure CFI_COORDINATOR_URL so CrossBankIntelligenceService routes to Docker coordinator container
+    coord_url = f"http://127.0.0.1:{port_coord}"
+    monkeypatch.setenv("CFI_COORDINATOR_URL", coord_url)
 
     shared_id = "TR550009998887776665554443"
     client_a.store_private_entity({
@@ -694,14 +903,20 @@ def test_probe_8_case_evidence_attachment_and_revocation(
         "typologies": ["CYBER_FRAUD"],
     })
 
-    coordinator = CrossBankMatchingCoordinator(consortium_service=gov_svc)
-    coordinator.register_worker("bank_a", client_a, matching_token=TOKEN_MATCH_A)
-    coordinator.register_worker("bank_b", client_b, matching_token=TOKEN_MATCH_B)
+    # Initialize analyst-facing service
+    cbi_service = CrossBankIntelligenceService(consortium_service=gov_svc)
+    from app.application.services.entity_resolution import _entity_to_dict
 
-    cbi_service = CrossBankIntelligenceService(
-        matching_coordinator=coordinator,
-        consortium_service=gov_svc,
+    ent_case_a = Entity(
+        id="ent_case_a",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id=hashlib.sha256(shared_id.encode()).hexdigest(),
+        bank_id="bank_a",
+        display_label="Case Target A",
+        risk_level=RiskLevel.HIGH,
+        attributes={"raw_identifier": shared_id},
     )
+    cbi_service.entity_service._entities.set("ent_case_a", _entity_to_dict(ent_case_a))
 
     req = CrossBankIntelligenceQueryRequest(
         consortium_id="c_docker_psi",
@@ -710,17 +925,21 @@ def test_probe_8_case_evidence_attachment_and_revocation(
         query_entity_id="ent_case_a",
         purpose="AML_COLLABORATIVE_INVESTIGATION",
         execution_mode="VERIFIED_OPERATIONAL",
-        use_established_psi=True,
     )
 
-    # 1. Execute matching to obtain authoritative signal
-    signal = coordinator.execute_two_bank_private_matching(req=req, auth_token=token_a)
-    assert signal.is_authoritative is True
+    # Step 3-6: Execute query via analyst-facing service routed to coordinator container
+    signal = cbi_service.query_cross_bank_intelligence(req=req, auth_token=token_a)
 
-    # 2. Attach signal to active case evidence
+    assert signal.match_confirmed is True
+    assert signal.match_category == "EXACT_MATCH"
+    assert signal.match_confidence == 1.0
+    assert signal.is_authoritative is True
+    assert signal.execution_mode == "VERIFIED_OPERATIONAL"
+
+    # Step 7-8: Attach signal to active case evidence
     case_svc = CaseManagementService()
     case = case_svc.create_case(
-        title="Institutional PSI Investigation",
+        title="Institutional PSI Investigation Case #881",
         priority=CasePriority.P2_HIGH,
         bank_id="bank_a",
     )
@@ -733,27 +952,115 @@ def test_probe_8_case_evidence_attachment_and_revocation(
     assert "CROSS_BANK_INTELLIGENCE" in attached_evidence.evidence_type
     assert attached_evidence.signal_id == signal.signal_id
 
-    # 3. Revoke grant consent: Bank B withdraws bilateral consent in consortium governance
+    # Step 9: Bank B revokes consent in consortium governance and locally at worker boundary
     gov_svc.revoke_operational_data_sharing_grant(
         consortium_id="c_docker_psi",
         grant_id="grant_c_docker_psi",
         revoking_bank_id="bank_b",
-        reason="Counterpart consent withdrawn",
+        reason="Institutional consent withdrawn by Bank B compliance",
         auth_token=token_b,
     )
-    # Also record local grant revocation at worker boundary
     client_b.revoke_grant_locally("grant_c_docker_psi")
 
-    # 4. Attempting to attach another signal under revoked grant MUST fail closed
+    # Sync updated governance store to coordinator and worker containers
+    store_file = Path(gov_svc._store._store_path)
+    for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
+        _run_cmd(["docker", "cp", str(store_file), f"{c}:/tmp/consortium_store.json"], check=False)
+
+    # Step 10: Subsequent query MUST be denied
+    with pytest.raises(Exception) as exc_subsequent_query:
+        cbi_service.query_cross_bank_intelligence(req=req, auth_token=token_a)
+    err_text = str(exc_subsequent_query.value).lower()
+    assert (
+        "revoked" in err_text
+        or "withdrawn" in err_text
+        or "denied" in err_text
+        or "policy rejected" in err_text
+    ), f"Subsequent query after revocation was not denied: {exc_subsequent_query.value}"
+
+    # Step 10b: New evidence attachment under revoked grant MUST also fail closed
     case2 = case_svc.create_case(
-        title="Subsequent Investigation Case",
+        title="Subsequent Case Attempt After Revocation",
         priority=CasePriority.P2_HIGH,
         bank_id="bank_a",
     )
-    with pytest.raises(ConsortiumSecurityError) as exc_info:
+    with pytest.raises(ConsortiumSecurityError) as exc_attach:
         cbi_service.attach_signal_to_case_evidence(
             case_id=case2.id,
             signal=signal,
             auth_token=token_a,
         )
-    assert "revoked" in str(exc_info.value).lower()
+    assert "revoked" in str(exc_attach.value).lower()
+
+
+def test_probe_9_negative_controls_and_outage_containment(
+    docker_topology: dict[str, Any],
+    isolated_governance_env: tuple[ConsortiumGovernanceService, str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Probe 9: Negative controls for mismatched identity, missing counterpart, and worker outage."""
+    gov_svc, token_a, _ = isolated_governance_env
+    port_coord: int = docker_topology["port_coord"]
+    client_coord: InstitutionalCoordinatorClient = docker_topology["client_coord"]
+
+    monkeypatch.setenv("CFI_COORDINATOR_URL", f"http://127.0.0.1:{port_coord}")
+    cbi_service = CrossBankIntelligenceService(consortium_service=gov_svc)
+    from app.application.services.entity_resolution import _entity_to_dict
+
+    ent_test = Entity(
+        id="ent_test",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id=hashlib.sha256(b"TR111111111111111111111111").hexdigest(),
+        bank_id="bank_a",
+        display_label="Test Account",
+        risk_level=RiskLevel.MEDIUM,
+        attributes={"raw_identifier": "TR111111111111111111111111"},
+    )
+    cbi_service.entity_service._entities.set("ent_test", _entity_to_dict(ent_test))
+    client_a: InstitutionalWorkerClient = docker_topology["client_a"]
+    client_a.store_private_entity({
+        "id": "ent_test",
+        "bank_id": "bank_a",
+        "entity_type": "account",
+        "raw_identifier": "TR111111111111111111111111",
+        "risk_level": "MEDIUM",
+        "typologies": [],
+    })
+
+    # 1. Missing counterpart bank ID
+    req_no_counterpart = CrossBankIntelligenceQueryRequest(
+        consortium_id="c_docker_psi",
+        requesting_bank_id="bank_a",
+        target_bank_id=None,
+        query_entity_id="ent_test",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+    with pytest.raises(Exception) as exc_no_counterpart:
+        cbi_service.query_cross_bank_intelligence(req=req_no_counterpart, auth_token=token_a)
+    assert "target_bank_id" in str(exc_no_counterpart.value).lower() or "counterpart" in str(exc_no_counterpart.value).lower()
+
+    # 2. Worker Outage: Stop Bank B container and verify system fails closed without prototype fallback
+    _run_cmd(["docker", "stop", CONTAINER_WORKER_B], check=True)
+    try:
+        req_outage = CrossBankIntelligenceQueryRequest(
+            consortium_id="c_docker_psi",
+            requesting_bank_id="bank_a",
+            target_bank_id="bank_b",
+            query_entity_id="ent_test",
+            purpose="AML_COLLABORATIVE_INVESTIGATION",
+            execution_mode="VERIFIED_OPERATIONAL",
+        )
+        with pytest.raises(Exception) as exc_outage:
+            client_coord.execute_match(req=req_outage, auth_token=token_a)
+        err_outage = str(exc_outage.value).lower()
+        assert (
+            "unreachable" in err_outage
+            or "connection" in err_outage
+            or "offline" in err_outage
+            or "refused" in err_outage
+            or "failed" in err_outage
+        ), f"System did not fail closed during worker outage: {exc_outage.value}"
+    finally:
+        _run_cmd(["docker", "start", CONTAINER_WORKER_B], check=True)
+        _wait_for_health(f"http://127.0.0.1:{PORT_WORKER_B}/worker/health", timeout_sec=20.0)

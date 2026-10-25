@@ -10,6 +10,7 @@ import datetime
 import hashlib
 import json
 import logging
+import os
 import threading
 import uuid
 from datetime import UTC
@@ -192,6 +193,213 @@ class CrossBankIntelligenceService:
             actor=audited_actor,
         )
 
+    def _execute_verified_operational_psi(
+        self,
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        """Route authorized intelligence query to established PSI operational worker topology."""
+        clean_requesting = req.requesting_bank_id.lower().strip()
+        clean_consortium_id = req.consortium_id.lower().strip()
+
+        # 1. Authoritative Consortium Governance & Active Membership
+        consortium = self.consortium_service.get_consortium(clean_consortium_id)
+        if not consortium:
+            raise ConsortiumSecurityError(
+                f"Consortium '{clean_consortium_id}' does not exist or has not been established."
+            )
+        if consortium.status != ConsortiumStatus.ACTIVE:
+            raise ConsortiumSecurityError(
+                f"Consortium '{clean_consortium_id}' is in non-active status '{consortium.status.value}'. "
+                "Cross-bank intelligence queries are prohibited."
+            )
+        if clean_requesting in consortium.removed_members:
+            raise ConsortiumSecurityError(
+                f"Institution '{clean_requesting}' has been revoked or evicted from consortium '{clean_consortium_id}'."
+            )
+        if clean_requesting not in consortium.members:
+            raise ConsortiumSecurityError(
+                f"Institution '{clean_requesting}' is not an active member of consortium '{clean_consortium_id}'."
+            )
+
+        # 2. Counterpart institution eligibility
+        if not req.target_bank_id:
+            raise ValueError(
+                "Mandatory target_bank_id missing: Operational established PSI requires an explicit counterpart institution."
+            )
+        clean_target = req.target_bank_id.lower().strip()
+        if clean_target == clean_requesting:
+            raise ValueError(
+                "Requesting institution and target counterpart institution cannot be identical."
+            )
+        if clean_target in consortium.removed_members:
+            raise ConsortiumSecurityError(
+                f"Target institution '{clean_target}' has been revoked from consortium '{clean_consortium_id}'."
+            )
+        if clean_target not in consortium.members:
+            raise ConsortiumSecurityError(
+                f"Target institution '{clean_target}' is not an active member of consortium '{clean_consortium_id}'."
+            )
+
+        # 3. Enforce Strict Bilateral Operational Data-Sharing Grant & Jurisdiction
+        is_valid_policy, policy_reasons, disclosure_scope = (
+            self.policy_engine.validate_intelligence_sharing(
+                consortium=consortium,
+                requesting_bank=clean_requesting,
+                target_banks=[clean_target],
+                purpose=req.purpose,
+                is_operational=True,
+            )
+        )
+        if not is_valid_policy:
+            raise ConsortiumSecurityError(
+                f"Consortium operational policy rejected query: {'; '.join(policy_reasons)}"
+            )
+
+        # 4. Local Entity Verification
+        if not req.query_entity_id or not req.query_entity_id.strip():
+            raise ValueError(
+                "Mandatory query_entity_id missing: Cross-bank queries must reference a verified local entity belonging to the requesting institution."
+            )
+
+        val = self.entity_service._entities.get(req.query_entity_id)
+        if not val:
+            raise ValueError(
+                f"Local entity '{req.query_entity_id}' not found in institution '{clean_requesting}' database. "
+                "Arbitrary privacy-hash or unverified entity probing is prohibited."
+            )
+
+        from app.application.services.entity_resolution import _dict_to_entity
+
+        source_entity = _dict_to_entity(val)
+        if source_entity.bank_id.lower().strip() != clean_requesting:
+            raise PermissionError(
+                f"Cross-tenant access violation: Entity '{req.query_entity_id}' belongs to "
+                f"'{source_entity.bank_id}', not requesting institution '{clean_requesting}'."
+            )
+
+        # 5. Case Verification if case_id specified
+        req_case_id = getattr(req, "case_id", None)
+        if req_case_id:
+            case = self.case_service.get_case(req_case_id, requesting_bank=clean_requesting)
+            if not case:
+                raise ValueError(f"Investigation case '{req_case_id}' not found.")
+            if not case.is_open:
+                raise TerminalCaseImmutableError(
+                    f"Invalid query: Case '{req_case_id}' is finalized in terminal state."
+                )
+
+        # 6. Route to Established PSI Coordinator Topology
+        from app.config import get_settings
+
+        settings = get_settings()
+        coordinator_url = getattr(settings, "cfi_coordinator_url", None) or os.getenv(
+            "CFI_COORDINATOR_URL"
+        )
+
+        est_req = req.model_copy(
+            update={
+                "target_bank_id": clean_target,
+                "target_bank_ids": [clean_target],
+                "execution_mode": "VERIFIED_OPERATIONAL",
+                "use_established_psi": True,
+            }
+        )
+
+        resolved_auth_token = auth_token or ""
+        if not resolved_auth_token:
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            auth_svc = AuthenticationService.get_instance()
+            user = auth_svc.get_user(audited_actor)
+            if user:
+                resolved_auth_token = auth_svc.create_token_bundle(user).access_token
+
+        if coordinator_url:
+            from app.application.services.isolated_matching_service import (
+                InstitutionalCoordinatorClient,
+            )
+
+            coord_client = InstitutionalCoordinatorClient(coordinator_url)
+            try:
+                coord_client.health_check()
+            except Exception as exc:
+                raise ConsortiumSecurityError(
+                    f"Operational established PSI coordinator at '{coordinator_url}' is unreachable or offline: {exc}. Failing closed."
+                ) from exc
+            signal = coord_client.execute_match(
+                req=est_req,
+                auth_token=resolved_auth_token,
+                actor=audited_actor,
+            )
+            # Record authoritative signal in local anti-forgery signal store
+            now = datetime.datetime.now(UTC)
+            signal_dict = signal.model_dump()
+            expires_at = (now + datetime.timedelta(hours=24)).isoformat()
+            content_hash = hashlib.sha256(
+                json.dumps(signal_dict, sort_keys=True).encode("utf-8")
+            ).hexdigest()
+            record = {
+                "signal_id": signal.signal_id,
+                "signal_data": signal_dict,
+                "requesting_bank_id": clean_requesting,
+                "consortium_id": clean_consortium_id,
+                "query_entity_id": req.query_entity_id,
+                "issued_to_principal": audited_actor,
+                "issued_at": now.isoformat(),
+                "expires_at": expires_at,
+                "content_hash": content_hash,
+                "is_authoritative": signal.is_authoritative,
+                "is_synthetic": False,
+                "operational_status": "OPERATIONAL" if signal.is_authoritative else "NON_OPERATIONAL_SYNTHETIC",
+                "attached_to_cases": [],
+            }
+            self._signal_store.set(signal.signal_id, record)
+            return signal
+
+        if self.matching_coordinator is not None:
+            try:
+                self.matching_coordinator.get_worker(clean_requesting)
+                self.matching_coordinator.get_worker(clean_target)
+                signal = self.matching_coordinator.execute_two_bank_private_matching(
+                    req=est_req,
+                    auth_token=resolved_auth_token,
+                    actor=audited_actor,
+                )
+                now = datetime.datetime.now(UTC)
+                signal_dict = signal.model_dump()
+                expires_at = (now + datetime.timedelta(hours=24)).isoformat()
+                content_hash = hashlib.sha256(
+                    json.dumps(signal_dict, sort_keys=True).encode("utf-8")
+                ).hexdigest()
+                record = {
+                    "signal_id": signal.signal_id,
+                    "signal_data": signal_dict,
+                    "requesting_bank_id": clean_requesting,
+                    "consortium_id": clean_consortium_id,
+                    "query_entity_id": req.query_entity_id,
+                    "issued_to_principal": audited_actor,
+                    "issued_at": now.isoformat(),
+                    "expires_at": expires_at,
+                    "content_hash": content_hash,
+                    "is_authoritative": signal.is_authoritative,
+                    "is_synthetic": False,
+                    "operational_status": "OPERATIONAL" if signal.is_authoritative else "NON_OPERATIONAL_SYNTHETIC",
+                    "attached_to_cases": [],
+                }
+                self._signal_store.set(signal.signal_id, record)
+                return signal
+            except ConsortiumSecurityError:
+                pass  # fall through to explicit fail-closed error
+
+        raise ConsortiumSecurityError(
+            "Established PSI operational worker topology is unavailable. "
+            "Neither CFI_COORDINATOR_URL nor registered operational worker nodes are configured. "
+            "Operation fails closed to prevent unverified prototype or simulated matching."
+        )
+
     def query_cross_bank_intelligence(
         self,
         req: CrossBankIntelligenceQueryRequest,
@@ -222,17 +430,18 @@ class CrossBankIntelligenceService:
         audited_actor = auth_principal.principal_id
 
         # 2. Hardware Enclave & Operational Mode Attestation (Fail-Closed)
-        if req.execution_mode == "VERIFIED_OPERATIONAL":
-            raise RuntimeError(
-                "Operational privacy attestation unavailable: Hardware enclaves (Intel SGX) and distributed "
-                "multi-party cryptographic PSI across independent physical bank nodes are not available in this software runtime. "
-                "Operation fails closed to prevent fabricated operational claims."
-            )
-
         if req.require_hardware_attestation:
             raise RuntimeError(
                 "Hardware attestation unavailable: Physical hardware enclave is absent in this runtime. "
                 "Production hardware attestation requirement failed closed."
+            )
+
+        if req.execution_mode == "VERIFIED_OPERATIONAL":
+            return self._execute_verified_operational_psi(
+                req=req,
+                auth_token=auth_token,
+                auth_principal=auth_principal,
+                audited_actor=audited_actor,
             )
 
         # Enforce Research Simulation Boundary (Fail-Closed in Production)

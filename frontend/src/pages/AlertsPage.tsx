@@ -676,6 +676,7 @@ export function ExplainabilityPanel({
   const [intelSignal, setIntelSignal] = useState<CrossBankIntelligenceSignal | null>(null);
   const [intelTargetBank, setIntelTargetBank] = useState<string>('');
   const [intelConsortiumId, setIntelConsortiumId] = useState<string>('nordic_aml_ring');
+  const [intelExecutionMode, setIntelExecutionMode] = useState<'VERIFIED_OPERATIONAL' | 'SIMULATED_RESEARCH'>('VERIFIED_OPERATIONAL');
   const [attachSuccessHash, setAttachSuccessHash] = useState<string | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [manualCaseId, setManualCaseId] = useState<string>('');
@@ -698,7 +699,8 @@ export function ExplainabilityPanel({
         consortium_id: intelConsortiumId,
         target_bank_id: intelTargetBank || undefined,
         purpose: 'AML_COLLABORATIVE_INVESTIGATION',
-        execution_mode: 'SIMULATED_RESEARCH',
+        execution_mode: intelExecutionMode,
+        require_established_psi: intelExecutionMode === 'VERIFIED_OPERATIONAL',
       },
       {
         onSuccess: (data) => {
@@ -1255,7 +1257,18 @@ export function ExplainabilityPanel({
               Query verified counterpart intelligence across active consortium members without exposing cleartext PII, internal customer profiles, or account numbers.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-800">
+              <div>
+                <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1">Execution Mode</label>
+                <select
+                  value={intelExecutionMode}
+                  onChange={(e) => setIntelExecutionMode(e.target.value as any)}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="VERIFIED_OPERATIONAL">Verified Operational (OpenMined PSI)</option>
+                  <option value="SIMULATED_RESEARCH">Simulated Research (Prototype)</option>
+                </select>
+              </div>
               <div>
                 <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1">Consortium ID</label>
                 <input
@@ -1299,15 +1312,19 @@ export function ExplainabilityPanel({
                 ) : (
                   <>
                     <span>🔍</span>
-                    <span>Query Cross-Bank Intelligence</span>
+                    <span>Query Cross-Bank Intelligence ({intelExecutionMode === 'VERIFIED_OPERATIONAL' ? 'Operational PSI' : 'Simulation'})</span>
                   </>
                 )}
               </button>
             </div>
 
             {queryIntelMutation.isError && (
-              <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-800/40 text-rose-300 text-[11px]">
-                {formatApiError(queryIntelMutation.error, 'Failed to query consortium intelligence.')}
+              <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-800/40 text-rose-300 text-[11px] space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <span>⛔</span>
+                  <span>Query Execution Failed</span>
+                </div>
+                <div>{formatApiError(queryIntelMutation.error, 'Failed to query consortium intelligence.')}</div>
               </div>
             )}
           </div>
@@ -1317,16 +1334,32 @@ export function ExplainabilityPanel({
             <div className="p-3.5 bg-slate-900/80 rounded-xl border border-slate-800 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
                 <span className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-                  <span>📡</span> Research Simulation (Software Emulation)
+                  {intelSignal.execution_mode === 'VERIFIED_OPERATIONAL' ? (
+                    <>
+                      <span>🛡️</span>
+                      <span className="text-emerald-400">Verified Operational Enclave (OpenMined PSI)</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>📡</span>
+                      <span className="text-amber-400">Research Prototype Simulation (Non-Operational)</span>
+                    </>
+                  )}
                 </span>
                 <span
                   className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                    intelSignal.match_confirmed
+                    intelSignal.match_category === 'EXACT_MATCH'
                       ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                      : intelSignal.match_category === 'PROBABILISTIC_FUZZY'
+                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
                       : 'bg-slate-800 text-slate-400 border border-slate-700'
                   }`}
                 >
-                  {intelSignal.match_category} ({(intelSignal.match_confidence * 100).toFixed(0)}%)
+                  {intelSignal.match_category === 'EXACT_MATCH' && 'VERIFIED EXACT MATCH (100%)'}
+                  {intelSignal.match_category === 'PROBABILISTIC_FUZZY' && 'PROBABILISTIC MATCH (FPR 1e-9)'}
+                  {intelSignal.match_category === 'NO_MATCH' && 'NO INTERSECTION OBSERVED (0%)'}
+                  {!['EXACT_MATCH', 'PROBABILISTIC_FUZZY', 'NO_MATCH'].includes(intelSignal.match_category) &&
+                    `${intelSignal.match_category} (${(intelSignal.match_confidence * 100).toFixed(0)}%)`}
                 </span>
               </div>
 

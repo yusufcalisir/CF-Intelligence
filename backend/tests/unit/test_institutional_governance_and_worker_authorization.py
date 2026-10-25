@@ -314,6 +314,25 @@ def test_worker_side_authorization_ticket_validation(tmp_path):
             expected_purpose="AML_COLLABORATIVE_INVESTIGATION",
         )
 
+    # 1b. Unapproved grant ticket rejected before checking signatures
+    with pytest.raises(ConsortiumSecurityError, match="has not authorized operational grant"):
+        worker_b.verify_operation_authorization(
+            ticket=ticket,
+            expected_job_id=job_id,
+            expected_requesting_bank="bank_a",
+            expected_purpose="AML_COLLABORATIVE_INVESTIGATION",
+        )
+
+    # Register authorized operational grant on worker B
+    worker_b.register_authorized_grant(
+        consortium_id="consortium_test",
+        grant_id=grant_id,
+        revision=1,
+        scope_digest=scope_digest,
+        permitted_counterparts=["bank_a"],
+        permitted_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+    )
+
     # 2. Ticket missing target bank approval signature
     with pytest.raises(ConsortiumSecurityError, match="Target institution 'bank_b' participation authority verification failed"):
         worker_b.verify_operation_authorization(
@@ -388,6 +407,16 @@ def test_local_grant_revocation_at_worker_boundary(tmp_path):
     grant_id = "grant_to_revoke"
     scope_digest = hashlib.sha256(b"scope_revocation").hexdigest()
     now = datetime.datetime.now(UTC)
+
+    # Register authorized grant on worker B
+    worker_b.register_authorized_grant(
+        consortium_id="consortium_test",
+        grant_id=grant_id,
+        revision=1,
+        scope_digest=scope_digest,
+        permitted_counterparts=["bank_a"],
+        permitted_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+    )
 
     ticket = OperationAuthorizationTicket(
         ticket_id="ticket_rev_1",
