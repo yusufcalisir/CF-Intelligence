@@ -22,6 +22,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
+import os
 import socket
 import subprocess
 import time
@@ -270,6 +271,7 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "-e", "CFI_IDENTITY_STORE_PATH=/tmp/account_store.json",
         "-e", "CFI_CONSORTIUM_STORE_PATH=/tmp/consortium_store.json",
         "-e", f"CFI_CONSORTIUM_STORE_SECRET={SHARED_CONSORTIUM_STORE_SECRET}",
+        "-e", f"CFI_COORDINATOR_SECRET={SECRET_COORD}",
         IMAGE_NAME,
         "python", "-m", "app.application.services.isolated_matching_service",
         "--role", "coordinator",
@@ -331,9 +333,19 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "volume_bank_b": VOLUME_BANK_B,
     }
 
+    # Provision backend service verification secrets for running containers
+    os.environ["CFI_WORKER_SECRET_BANK_A"] = SECRET_A
+    os.environ["CFI_WORKER_SECRET_BANK_B"] = SECRET_B
+    os.environ["CFI_PEER_KEY_BANK_B"] = SECRET_B
+    os.environ["CFI_COORDINATOR_SECRET"] = SECRET_COORD
+
     try:
         yield topology_ctx
     finally:
+        os.environ.pop("CFI_WORKER_SECRET_BANK_A", None)
+        os.environ.pop("CFI_WORKER_SECRET_BANK_B", None)
+        os.environ.pop("CFI_PEER_KEY_BANK_B", None)
+        os.environ.pop("CFI_COORDINATOR_SECRET", None)
         _teardown_disposable_resources()
 
 
@@ -694,8 +706,8 @@ def test_probe_4_openmined_psi_positive_match(
 
     # Assert genuine established PSI match semantics
     assert signal.match_confirmed is True, "OpenMined PSI failed to match identical identifier across containers!"
-    assert signal.match_category == "EXACT_MATCH", f"Expected EXACT_MATCH after confirmation, got: {signal.match_category}"
-    assert signal.match_confidence == 1.0, f"Expected 1.0 confidence for confirmed match, got: {signal.match_confidence}"
+    assert signal.match_category == "PROBABILISTIC_FUZZY", f"Expected PROBABILISTIC_FUZZY after OpenMined PSI matching, got: {signal.match_category}"
+    assert signal.match_confidence == 0.999999999, f"Expected 0.999999999 confidence for confirmed match, got: {signal.match_confidence}"
     assert signal.provenance.get("protocol") == "OPENMINED-PSI-2.0.6-ECDH"
     assert signal.is_authoritative is True
     assert signal.assurance_level == "REVIEWED_ESTABLISHED_PSI_VERIFIED"
@@ -850,11 +862,14 @@ def test_probe_7_zero_identifier_disclosure_in_transit(
     # Serialize query message to JSON as seen by network/coordinator
     serialized_query = json.dumps(asdict(query_msg))
     assert sensitive_raw_iban not in serialized_query, "Confidentiality Breach: Plaintext IBAN leaked in client query payload!"
+    assert "confirmation_tag" not in serialized_query, "Privacy Breach: Auxiliary confirmation tag found in query payload!"
 
     # Process counterpart query at Bank B
     counterpart_resp = client_b.process_established_psi_counterpart(query_msg)
     serialized_resp = json.dumps(asdict(counterpart_resp))
     assert sensitive_raw_iban not in serialized_resp, "Confidentiality Breach: Plaintext IBAN leaked in counterpart server response!"
+    assert "confirmation_tag" not in serialized_resp, "Privacy Breach: Auxiliary confirmation tag found in counterpart response!"
+    assert "is_confirmed_exact" not in serialized_resp, "Auxiliary exact confirmation field found in response!"
 
 
 def test_probe_8_complete_end_to_end_product_workflow(
@@ -930,8 +945,8 @@ def test_probe_8_complete_end_to_end_product_workflow(
     signal = cbi_service.query_cross_bank_intelligence(req=req, auth_token=token_a)
 
     assert signal.match_confirmed is True
-    assert signal.match_category == "EXACT_MATCH"
-    assert signal.match_confidence == 1.0
+    assert signal.match_category == "PROBABILISTIC_FUZZY"
+    assert signal.match_confidence == 0.999999999
     assert signal.is_authoritative is True
     assert signal.execution_mode == "VERIFIED_OPERATIONAL"
 
@@ -1063,3 +1078,216 @@ def test_probe_9_negative_controls_and_outage_containment(
     finally:
         _run_cmd(["docker", "start", CONTAINER_WORKER_B], check=True)
         _wait_for_health(f"http://127.0.0.1:{PORT_WORKER_B}/worker/health", timeout_sec=20.0)
+
+
+def test_probe_10_actual_user_facing_http_product_workflow(
+    docker_topology: dict[str, Any],
+    isolated_governance_env: tuple[ConsortiumGovernanceService, str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Probe 10: Complete User-Facing HTTP Product Workflow with Live 3-Container Topology.
+
+    Mandatory acceptance demonstration:
+    1. Independent bilateral grant scope registration (already active in governance fixture).
+    2. Bank A analyst authenticates via POST /api/v1/auth/login.
+    3. Analyst selects existing institution-owned investigation entity and open case.
+    4. Client invokes POST /api/v1/intelligence/cross-bank/query.
+    5. Backend authenticates principal and validates bank/entity/case ownership.
+    6. Live coordinator container invokes authorized bank workers.
+    7. OpenMined PSI executes across Docker containers with verified confidentiality.
+    8. Returned signal's execution provenance is independently verified via Result-Admission Contract.
+    9. Signal exhibits accurate match semantics (PROBABILISTIC_FUZZY, 0.999999999).
+    10. Client attaches signal via POST /api/v1/cases/{case_id}/evidence/cross-bank-intelligence.
+    11. Case evidence ledger reflects verified provenance.
+    12. Bank B revokes consent.
+    13. New queries and evidence attachments fail closed with HTTP 403 Forbidden.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.application.services.entity_resolution import _entity_to_dict
+    from app.main import app
+
+    gov_svc, token_a, token_b = isolated_governance_env
+    client_a: InstitutionalWorkerClient = docker_topology["client_a"]
+    client_b: InstitutionalWorkerClient = docker_topology["client_b"]
+    port_coord: int = docker_topology["port_coord"]
+
+    coord_url = f"http://127.0.0.1:{port_coord}"
+    monkeypatch.setenv("CFI_COORDINATOR_URL", coord_url)
+
+    # 1. Populate matching entity into Bank A and Bank B Docker vaults
+    shared_identifier = "TR770001234567890123456789"
+    ent_a_id = "ent_http_case_a"
+    ent_b_id = "ent_http_case_b"
+    client_a.store_private_entity({
+        "id": ent_a_id,
+        "bank_id": "bank_a",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "HIGH",
+        "typologies": ["TERRORIST_FINANCING"],
+    })
+    client_b.store_private_entity({
+        "id": ent_b_id,
+        "bank_id": "bank_b",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "CRITICAL",
+        "typologies": ["TERRORIST_FINANCING"],
+    })
+
+    # Register local institution-owned entity in local entity service
+    cbi_svc = CrossBankIntelligenceService(consortium_service=gov_svc)
+    ent_obj = Entity(
+        id=ent_a_id,
+        entity_type=EntityType.CUSTOMER,
+        privacy_id=hashlib.sha256(shared_identifier.encode()).hexdigest(),
+        bank_id="bank_a",
+        display_label="Investigation Subject Alpha",
+        risk_level=RiskLevel.HIGH,
+        attributes={"raw_identifier": shared_identifier},
+    )
+    cbi_svc.entity_service._entities.set(ent_a_id, _entity_to_dict(ent_obj))
+
+    # Bind cbi_svc into router dependency provider
+    from app.presentation.routers import cross_bank_intelligence as cbi_router_mod
+    monkeypatch.setattr(cbi_router_mod, "get_cross_bank_intelligence_service", lambda: cbi_svc)
+
+    with TestClient(app) as test_client:
+        # Step 2: Analyst authenticates through the actual application login path
+        login_resp = test_client.post(
+            "/api/v1/auth/login",
+            json={"username": "integ_user_a", "password": "Pass123!", "tenant_id": "bank_a"},
+        )
+        assert login_resp.status_code == 200, f"Login failed: {login_resp.text}"
+        auth_data = login_resp.json()
+        analyst_token = auth_data["access_token"]
+        auth_headers = {"Authorization": f"Bearer {analyst_token}"}
+
+        # Step 3: Create an open investigation case owned by Bank A
+        case_resp = test_client.post(
+            "/api/v1/cases",
+            json={
+                "title": "Cross-Bank Terrorist Financing Investigation Case #902",
+                "priority": "p1_critical",
+                "bank_id": "bank_a",
+            },
+            headers=auth_headers,
+        )
+        assert case_resp.status_code == 200, f"Case creation failed: {case_resp.text}"
+        case_id = case_resp.json()["id"]
+
+        # Step 4-8: Client invokes POST /api/v1/intelligence/cross-bank/query
+        query_payload = {
+            "consortium_id": "c_docker_psi",
+            "requesting_bank_id": "bank_a",
+            "target_bank_id": "bank_b",
+            "query_entity_id": ent_a_id,
+            "case_id": case_id,
+            "purpose": "AML_COLLABORATIVE_INVESTIGATION",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "use_established_psi": True,
+            "require_established_psi": True,
+            "protocol": "OPENMINED-PSI-2.0.6-ECDH",
+        }
+        query_resp = test_client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=query_payload,
+            headers=auth_headers,
+        )
+        assert query_resp.status_code == 200, f"Cross-bank query failed: {query_resp.text}"
+        signal_data = query_resp.json()
+
+        # Step 9: Verify accurate probabilistic match semantics and execution provenance
+        assert signal_data["match_confirmed"] is True
+        assert signal_data["match_category"] == "PROBABILISTIC_FUZZY"
+        assert signal_data["match_confidence"] == 0.999999999
+        assert signal_data["is_authoritative"] is True
+        assert signal_data["execution_mode"] == "VERIFIED_OPERATIONAL"
+        assert signal_data["assurance_level"] == "REVIEWED_ESTABLISHED_PSI_VERIFIED"
+        provenance = signal_data["provenance"]
+        assert provenance["protocol"] == "OPENMINED-PSI-2.0.6-ECDH"
+        assert provenance["worker_a_signature"]
+        assert provenance["worker_b_signature"]
+        assert provenance["coordinator_signature"]
+        assert provenance["receipt"]["receipt_id"]
+        assert "confirmation_tag" not in provenance
+        signal_id = signal_data["signal_id"]
+
+        # Step 10: Client attaches signal via case evidence HTTP endpoint
+        attach_resp = test_client.post(
+            f"/api/v1/cases/{case_id}/evidence/cross-bank-intelligence",
+            json={
+                "signal_id": signal_id,
+                "notes": "Verified cross-bank correlation attached to AML case",
+            },
+            headers=auth_headers,
+        )
+        assert attach_resp.status_code == 200, f"Evidence attachment failed: {attach_resp.text}"
+        attach_data = attach_resp.json()
+        assert attach_data["signal_id"] == signal_id
+
+        # Step 11: Case evidence reflects verified provenance
+        evidence_resp = test_client.get(
+            f"/api/v1/cases/{case_id}/evidence",
+            headers=auth_headers,
+        )
+        assert evidence_resp.status_code == 200
+        ev_items = evidence_resp.json()
+        matching_ev = [
+            ev for ev in ev_items
+            if ev.get("signal_id") == signal_id
+            or ev.get("source_id") == signal_id
+            or ev.get("metadata", {}).get("signal_id") == signal_id
+            or ev.get("id") == attach_data.get("evidence_id")
+        ]
+        assert len(matching_ev) > 0, "Attached cross-bank intelligence evidence not found in case evidence ledger!"
+
+        # Step 12: Bank B revokes consent
+        gov_svc.revoke_operational_data_sharing_grant(
+            consortium_id="c_docker_psi",
+            grant_id="grant_c_docker_psi",
+            revoking_bank_id="bank_b",
+            reason="Institutional revocation by Bank B DPO",
+            auth_token=token_b,
+        )
+        client_b.revoke_grant_locally("grant_c_docker_psi")
+
+        # Sync revocation to Docker containers
+        store_file = Path(gov_svc._store._store_path)
+        for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
+            _run_cmd(["docker", "cp", str(store_file), f"{c}:/tmp/consortium_store.json"], check=False)
+
+        # Step 13: Subsequent query fails closed with HTTP 403
+        revoked_query_resp = test_client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=query_payload,
+            headers=auth_headers,
+        )
+        assert revoked_query_resp.status_code == 403, (
+            f"Expected HTTP 403 Forbidden after consent revocation, got {revoked_query_resp.status_code}: {revoked_query_resp.text}"
+        )
+
+        # Step 13b: New evidence attachment under revoked grant also fails closed
+        case_resp2 = test_client.post(
+            "/api/v1/cases",
+            json={
+                "title": "Subsequent Case Attempt After Revocation",
+                "priority": "p2_high",
+                "bank_id": "bank_a",
+            },
+            headers=auth_headers,
+        )
+        assert case_resp2.status_code in (200, 201), f"Failed to create case_id2: {case_resp2.text}"
+        case_id2 = case_resp2.json()["id"]
+        revoked_attach_resp = test_client.post(
+            f"/api/v1/cases/{case_id2}/evidence/cross-bank-intelligence",
+            json={
+                "signal_id": signal_id,
+                "notes": "Attempt to attach under revoked grant",
+            },
+            headers=auth_headers,
+        )
+        assert revoked_attach_resp.status_code == 403, (
+            f"Expected HTTP 403 Forbidden on attachment after revocation, got {revoked_attach_resp.status_code}: {revoked_attach_resp.text}"
+        )

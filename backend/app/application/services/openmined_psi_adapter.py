@@ -116,17 +116,6 @@ class OpenMinedPSIAdapter:
         return setup.SerializeToString()
 
     @classmethod
-    def compute_match_confirmation_tag(cls, blinded_element: str, scope_digest: str) -> str:
-        """Compute cryptographically protected zero-knowledge match confirmation tag.
-
-        Does not reveal raw identifiers, unmatched candidates, or internal risk context.
-        Binds candidate to immutable grant scope digest.
-        """
-        import hashlib
-        canonical = f"CFI_EXACT_CONFIRM:{blinded_element}:{scope_digest}"
-        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-    @classmethod
     def process_server_request(
         cls,
         server_instance: Any,

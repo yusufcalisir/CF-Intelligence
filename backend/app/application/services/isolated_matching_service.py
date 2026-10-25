@@ -135,13 +135,12 @@ class EstablishedPSIQueryMessage:
     purpose: str
     signature: str
     ticket: OperationAuthorizationTicket
-    confirmation_tag: str = ""
 
     def compute_digest(self) -> str:
         canonical = (
             f"{self.job_id}:{self.consortium_id}:{self.requesting_bank_id}:"
             f"{self.target_bank_id}:{self.psi_request_b64}:{self.nonce}:"
-            f"{self.timestamp}:{self.purpose}:{self.ticket.canonical_digest()}:{self.confirmation_tag}"
+            f"{self.timestamp}:{self.purpose}:{self.ticket.canonical_digest()}"
         )
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -158,13 +157,12 @@ class EstablishedPSICounterpartResponse:
     nonce: str
     timestamp: str
     signature: str
-    is_confirmed_exact: bool = False
 
     def compute_digest(self) -> str:
         canonical = (
             f"{self.job_id}:{self.consortium_id}:{self.target_bank_id}:"
             f"{self.psi_server_setup_b64}:{self.psi_response_b64}:{self.nonce}:"
-            f"{self.timestamp}:{self.is_confirmed_exact}"
+            f"{self.timestamp}"
         )
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -243,8 +241,8 @@ class VerifiedMatchReceipt:
     matched_risk_level: str = "UNAVAILABLE"
     matched_typologies: tuple[str, ...] = ()
     assurance_level: str = "ISOLATED_INTEGRATION_VERIFIED"
-    match_category: str = "EXACT_MATCH"
-    is_exact_confirmed: bool = True
+    match_category: str = "PROBABILISTIC_FUZZY"
+    is_exact_confirmed: bool = False
 
 
 class IsolatedBankWorkerNode:
@@ -550,20 +548,6 @@ class IsolatedBankWorkerNode:
                     f"Institutional approval for grant '{clean_grant}' expired at {auth['expires_at']}."
                 )
 
-    def verify_match_confirmation_tag(self, tag: str, scope_digest: str) -> bool:
-        """Independently verify whether confirmation tag matches any entity in this bank's vault."""
-        if not tag or not scope_digest:
-            return False
-        clean_tag = tag.strip()
-        for ent in self.list_private_entities():
-            p_id = ent.get("privacy_id")
-            if p_id:
-                expected_tag = OpenMinedPSIAdapter.compute_match_confirmation_tag(
-                    p_id, scope_digest
-                )
-                if hmac.compare_digest(clean_tag, expected_tag):
-                    return True
-        return False
 
     def record_local_grant_revocation(self, grant_id: str) -> None:
         """Locally revoke an operational grant at this institutional boundary."""
@@ -1142,18 +1126,13 @@ class IsolatedBankWorkerNode:
         req_bytes = OpenMinedPSIAdapter.build_client_request(client, [privacy_id])
         psi_request_b64 = OpenMinedPSIAdapter.encode_b64(req_bytes)
 
-        # Compute exact match confirmation tag bound to grant scope digest
-        confirmation_tag = OpenMinedPSIAdapter.compute_match_confirmation_tag(
-            privacy_id, ticket.grant_scope_digest
-        )
-
         nonce = secrets.token_hex(16)
         timestamp = datetime.datetime.now(UTC).isoformat()
 
         canonical_text = (
             f"{ticket.job_id}:{consortium_id}:{self.bank_id}:"
             f"{clean_target}:{psi_request_b64}:{nonce}:"
-            f"{timestamp}:{purpose}:{ticket.canonical_digest()}:{confirmation_tag}"
+            f"{timestamp}:{purpose}:{ticket.canonical_digest()}"
         )
         sig = hmac.new(
             self._auth_secret.encode("utf-8"),
@@ -1172,7 +1151,6 @@ class IsolatedBankWorkerNode:
             purpose=purpose,
             signature=sig,
             ticket=ticket,
-            confirmation_tag=confirmation_tag,
         )
 
     def process_established_psi_counterpart(
@@ -1215,7 +1193,7 @@ class IsolatedBankWorkerNode:
             peer_key.encode("utf-8"),
             f"{query.job_id}:{query.consortium_id}:{query.requesting_bank_id}:"
             f"{query.target_bank_id}:{query.psi_request_b64}:{query.nonce}:"
-            f"{query.timestamp}:{query.purpose}:{query.ticket.canonical_digest()}:{query.confirmation_tag}".encode(),
+            f"{query.timestamp}:{query.purpose}:{query.ticket.canonical_digest()}".encode(),
             hashlib.sha256,
         ).hexdigest()
         if not hmac.compare_digest(expected_sig, query.signature):
@@ -1251,13 +1229,6 @@ class IsolatedBankWorkerNode:
         req_bytes = OpenMinedPSIAdapter.decode_b64(query.psi_request_b64)
         resp_bytes = OpenMinedPSIAdapter.process_server_request(server, req_bytes)
 
-        # 7b. Independent match confirmation under grant scope digest
-        is_confirmed_exact = False
-        if query.confirmation_tag:
-            is_confirmed_exact = self.verify_match_confirmation_tag(
-                query.confirmation_tag, query.ticket.grant_scope_digest
-            )
-
         setup_b64 = OpenMinedPSIAdapter.encode_b64(setup_bytes)
         resp_b64 = OpenMinedPSIAdapter.encode_b64(resp_bytes)
 
@@ -1266,7 +1237,7 @@ class IsolatedBankWorkerNode:
 
         canonical_resp = (
             f"{query.job_id}:{query.consortium_id}:{self.bank_id}:"
-            f"{setup_b64}:{resp_b64}:{resp_nonce}:{resp_timestamp}:{is_confirmed_exact}"
+            f"{setup_b64}:{resp_b64}:{resp_nonce}:{resp_timestamp}"
         )
         resp_sig = hmac.new(
             self._auth_secret.encode("utf-8"),
@@ -1286,7 +1257,6 @@ class IsolatedBankWorkerNode:
             nonce=resp_nonce,
             timestamp=resp_timestamp,
             signature=resp_sig,
-            is_confirmed_exact=is_confirmed_exact,
         )
 
     def finalize_established_psi_evaluation(
@@ -1325,7 +1295,7 @@ class IsolatedBankWorkerNode:
 
         canonical_resp = (
             f"{response.job_id}:{response.consortium_id}:{response.target_bank_id}:"
-            f"{response.psi_server_setup_b64}:{response.psi_response_b64}:{response.nonce}:{response.timestamp}:{response.is_confirmed_exact}"
+            f"{response.psi_server_setup_b64}:{response.psi_response_b64}:{response.nonce}:{response.timestamp}"
         )
         expected_sig = hmac.new(
             peer_key.encode("utf-8"),
@@ -1353,14 +1323,9 @@ class IsolatedBankWorkerNode:
 
         match_confirmed = len(matched_indices) > 0
         if match_confirmed:
-            if response.is_confirmed_exact:
-                match_category = "EXACT_MATCH"
-                match_confidence = 1.0
-                is_exact_confirmed = True
-            else:
-                match_category = "PROBABILISTIC_FUZZY"
-                match_confidence = 0.999999999
-                is_exact_confirmed = False
+            match_category = "PROBABILISTIC_FUZZY"
+            match_confidence = 0.999999999
+            is_exact_confirmed = False
         else:
             match_category = "NO_MATCH"
             match_confidence = 0.0
@@ -1383,13 +1348,19 @@ class IsolatedBankWorkerNode:
             hashlib.sha256,
         ).hexdigest()
 
+        bound_entity = (
+            query.ticket.query_scope.removeprefix("entity:")
+            if query.ticket and query.ticket.query_scope.startswith("entity:")
+            else ""
+        )
+
         return VerifiedMatchReceipt(
             receipt_id=receipt_id,
             job_id=query.job_id,
             consortium_id=query.consortium_id,
             requesting_bank_id=self.bank_id,
             target_bank_id=response.target_bank_id,
-            query_entity_id="",
+            query_entity_id=bound_entity,
             match_confirmed=match_confirmed,
             match_confidence=match_confidence,
             protocol="OPENMINED-PSI-2.0.6-ECDH",
@@ -1545,7 +1516,6 @@ class InstitutionalWorkerDaemon:
                     "/worker/sign-grant-approval": SCOPE_ADMINISTRATION,
                     "/worker/revoke-grant-locally": SCOPE_ADMINISTRATION,
                     "/worker/authorize-grant": SCOPE_ADMINISTRATION,
-                    "/worker/confirm-match": SCOPE_MATCHING,
                 }
                 if self.path not in route_scopes:
                     self.send_response(404)
@@ -1662,12 +1632,6 @@ class InstitutionalWorkerDaemon:
                             expires_at=data.get("expires_at"),
                         )
                         res = {"status": "AUTHORIZED", "grant": rec}
-                    elif self.path == "/worker/confirm-match":
-                        is_confirmed = node.verify_match_confirmation_tag(
-                            tag=data["confirmation_tag"],
-                            scope_digest=data["scope_digest"],
-                        )
-                        res = {"is_confirmed": is_confirmed}
                     else:
                         self.send_response(404)
                         self.end_headers()
@@ -1985,7 +1949,11 @@ class CrossBankMatchingCoordinator:
         self._prototype_store = RedisStore("research_prototype_signals")
         self._workers: dict[str, Any] = {}
         self._matching_tokens: dict[str, str] = {}
-        self._coordinator_secret = secrets.token_hex(32)
+        self._coordinator_secret = (
+            os.getenv("CFI_COORDINATOR_SECRET")
+            or os.getenv("COORDINATOR_AUTH_SECRET")
+            or secrets.token_hex(32)
+        )
 
     def register_worker(
         self,
@@ -2306,7 +2274,11 @@ class CrossBankMatchingCoordinator:
         if receipt.match_confirmed:
             typologies = sorted(list(set(typologies) | {"CROSS_BANK_ENTITY_OBSERVED"}))
 
-        category_literal: MatchCategory = "EXACT_MATCH" if receipt.match_confirmed else "NO_MATCH"
+        category_literal: MatchCategory = (
+            cast("MatchCategory", receipt.match_category)
+            if receipt.match_confirmed
+            else "NO_MATCH"
+        )
         risk_literal: SanitizedRiskLevel = (
             cast("SanitizedRiskLevel", max_risk)
             if max_risk in ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNOBSERVED", "UNAVAILABLE")
@@ -2350,10 +2322,20 @@ class CrossBankMatchingCoordinator:
                 "grant_revision": grant_revision,
                 "grant_scope_digest": grant_scope_digest,
                 "target_bank_id": clean_target,
+                "query_entity_id": req.query_entity_id,
                 "receipt_id": receipt.receipt_id,
                 "transcript_digest": receipt.transcript_digest,
                 "coordinator_signature": coord_sig,
+                "worker_a_signature": receipt.worker_a_signature,
+                "worker_b_signature": receipt.worker_b_signature,
                 "assurance_level": assurance_level_literal,
+                "receipt": asdict(receipt),
+                "ticket": asdict(ticket),
+                "fpr": 1e-9,
+                "probabilistic_uncertainty_note": (
+                    "Intersection detected via ECDH PSI with Golomb Compressed Sets. "
+                    "Subject to calibrated false positive bound 1e-9."
+                ),
             },
             execution_mode=execution_mode_literal,
             attestation_status="IN_PROCESS_PROTOTYPE" if not is_multi_process else "ISOLATED_MULTI_PROCESS",
@@ -2390,6 +2372,7 @@ class CrossBankMatchingCoordinator:
             "assurance_level": assurance_level_literal,
             "attached_to_cases": [],
             "receipt": asdict(receipt),
+            "ticket": asdict(ticket),
         }
 
         if is_authoritative_flag:

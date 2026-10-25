@@ -351,6 +351,7 @@ class EvidenceResponse(BaseModel):
     content_hash: str
     uploaded_by: str
     uploaded_at: str
+    metadata: dict[str, Any] = {}
 
 
 class InvestigatorAuditLogResponse(BaseModel):

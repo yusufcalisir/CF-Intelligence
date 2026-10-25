@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -89,6 +90,8 @@ class CrossBankIntelligenceService:
         self._signal_store = RedisStore("authoritative_signals")
         self._synthetic_entity_store = RedisStore("synthetic_entities")
         self._research_case_evidence_store = RedisStore("research_case_evidence")
+        self._admitted_receipts_store = RedisStore("admitted_operational_psi_receipts")
+        self._admitted_receipt_ids: set[str] = set()
         self._lock = threading.RLock()
 
     def _authenticate_principal(
@@ -339,28 +342,12 @@ class CrossBankIntelligenceService:
                 auth_token=resolved_auth_token,
                 actor=audited_actor,
             )
-            # Record authoritative signal in local anti-forgery signal store
-            now = datetime.datetime.now(UTC)
-            signal_dict = signal.model_dump()
-            expires_at = (now + datetime.timedelta(hours=24)).isoformat()
-            content_hash = hashlib.sha256(
-                json.dumps(signal_dict, sort_keys=True).encode("utf-8")
-            ).hexdigest()
-            record = {
-                "signal_id": signal.signal_id,
-                "signal_data": signal_dict,
-                "requesting_bank_id": clean_requesting,
-                "consortium_id": clean_consortium_id,
-                "query_entity_id": req.query_entity_id,
-                "issued_to_principal": audited_actor,
-                "issued_at": now.isoformat(),
-                "expires_at": expires_at,
-                "content_hash": content_hash,
-                "is_authoritative": signal.is_authoritative,
-                "is_synthetic": False,
-                "operational_status": "OPERATIONAL" if signal.is_authoritative else "NON_OPERATIONAL_SYNTHETIC",
-                "attached_to_cases": [],
-            }
+            # Enforce Verifiable Result-Admission Contract before local storage
+            record = self._admit_and_verify_operational_signal(
+                signal=signal,
+                expected_req=est_req,
+                audited_actor=audited_actor,
+            )
             self._signal_store.set(signal.signal_id, record)
             return signal
 
@@ -373,37 +360,313 @@ class CrossBankIntelligenceService:
                     auth_token=resolved_auth_token,
                     actor=audited_actor,
                 )
-                now = datetime.datetime.now(UTC)
-                signal_dict = signal.model_dump()
-                expires_at = (now + datetime.timedelta(hours=24)).isoformat()
-                content_hash = hashlib.sha256(
-                    json.dumps(signal_dict, sort_keys=True).encode("utf-8")
-                ).hexdigest()
-                record = {
-                    "signal_id": signal.signal_id,
-                    "signal_data": signal_dict,
-                    "requesting_bank_id": clean_requesting,
-                    "consortium_id": clean_consortium_id,
-                    "query_entity_id": req.query_entity_id,
-                    "issued_to_principal": audited_actor,
-                    "issued_at": now.isoformat(),
-                    "expires_at": expires_at,
-                    "content_hash": content_hash,
-                    "is_authoritative": signal.is_authoritative,
-                    "is_synthetic": False,
-                    "operational_status": "OPERATIONAL" if signal.is_authoritative else "NON_OPERATIONAL_SYNTHETIC",
-                    "attached_to_cases": [],
-                }
+                record = self._admit_and_verify_operational_signal(
+                    signal=signal,
+                    expected_req=est_req,
+                    audited_actor=audited_actor,
+                )
                 self._signal_store.set(signal.signal_id, record)
                 return signal
             except ConsortiumSecurityError:
-                pass  # fall through to explicit fail-closed error
+                raise
 
         raise ConsortiumSecurityError(
             "Established PSI operational worker topology is unavailable. "
             "Neither CFI_COORDINATOR_URL nor registered operational worker nodes are configured. "
             "Operation fails closed to prevent unverified prototype or simulated matching."
         )
+
+    def _admit_and_verify_operational_signal(
+        self,
+        signal: CrossBankIntelligenceSignal,
+        expected_req: CrossBankIntelligenceQueryRequest,
+        audited_actor: str,
+    ) -> dict[str, Any]:
+        """Cryptographically and governably admit an operational match signal.
+
+        Enforces:
+        1. Query Correlation: Requesting bank, target bank, entity ID, and consortium ID match expected_req.
+        2. Bilateral Governance & Consent: Consortium is active, member banks are enrolled, and bilateral grant terms match.
+        3. Identity & Entity Binding: Ticket ID, Job ID, and Receipt ID consistently bind the queried entity.
+        4. Established PSI Protocol: Must be OPENMINED-PSI-2.0.6-ECDH with REVIEWED_ESTABLISHED_PSI_VERIFIED assurance.
+        5. Participant Cryptographic Evidence:
+           - Worker A signature over receipt and transcript digest matches Bank A's institutional key.
+           - Worker B ticket authorization signature matches Bank B's enrolled verification key.
+           - Coordinator signature over receipt matches coordinator key.
+        6. Anti-Replay & Freshness: Receipt ID cannot be replayed, executed_at must be within 300s.
+        7. Fail-Closed on any mismatch or invalid cryptographic signature.
+        """
+        clean_requesting = expected_req.requesting_bank_id.lower().strip()
+        clean_target = (expected_req.target_bank_id or "").lower().strip()
+        clean_consortium_id = expected_req.consortium_id.lower().strip()
+
+        # 1. Query Correlation
+        if signal.consortium_id.lower().strip() != clean_consortium_id:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Consortium ID mismatch (expected '{clean_consortium_id}', got '{signal.consortium_id}')."
+            )
+        if signal.requesting_bank_id.lower().strip() != clean_requesting:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Requesting bank mismatch (expected '{clean_requesting}', got '{signal.requesting_bank_id}')."
+            )
+        if signal.query_entity_id != expected_req.query_entity_id:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Query entity ID mismatch (expected '{expected_req.query_entity_id}', got '{signal.query_entity_id}')."
+            )
+
+        provenance = signal.provenance or {}
+        prov_target = str(provenance.get("target_bank_id", "")).lower().strip()
+        if prov_target != clean_target:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Target counterpart bank mismatch (expected '{clean_target}', got '{prov_target}')."
+            )
+
+        # 2. Execution Evidence Presence
+        receipt = provenance.get("receipt")
+        ticket = provenance.get("ticket")
+        if not receipt or not isinstance(receipt, dict):
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Missing or corrupt authentic worker execution receipt."
+            )
+        if not ticket or not isinstance(ticket, dict):
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Missing or corrupt operational authorization ticket."
+            )
+
+        # 3. Bilateral Governance & Active Consent
+        consortium = self.consortium_service.get_consortium(clean_consortium_id)
+        if not consortium:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Consortium '{clean_consortium_id}' does not exist."
+            )
+        if consortium.status.value.upper() != "ACTIVE":
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Consortium '{clean_consortium_id}' is not active."
+            )
+        if clean_requesting in consortium.removed_members or clean_target in consortium.removed_members:
+            raise ConsortiumSecurityError(
+                "Adoption rejection: One or more participating banks have been evicted from the consortium."
+            )
+        if clean_requesting not in consortium.members or clean_target not in consortium.members:
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Participating banks are not active members of the consortium."
+            )
+
+        operational_grant = consortium.metadata.get("operational_data_sharing_grant") or {}
+        grant_id = operational_grant.get("grant_id", f"grant_{clean_consortium_id}")
+        grant_revision = int(operational_grant.get("revision", 1))
+        grant_scope_digest = operational_grant.get("scope_digest", "")
+        if not grant_scope_digest:
+            from app.application.services.consortium_service import (
+                compute_operational_grant_scope_digest,
+            )
+            grant_scope_digest = compute_operational_grant_scope_digest(
+                grant_id=grant_id,
+                revision=grant_revision,
+                participating_banks=list(operational_grant.get("participating_banks", [clean_requesting, clean_target])),
+                allowed_purposes=list(operational_grant.get("allowed_purposes", [expected_req.purpose])),
+                institution_jurisdictions=dict(operational_grant.get("institution_jurisdictions", {clean_requesting: "EU", clean_target: "EU"})),
+                allowed_jurisdictions=list(operational_grant.get("allowed_jurisdictions", ["EU", "US"])),
+                allow_cross_border=bool(operational_grant.get("allow_cross_border", False)),
+                allow_institution_identity_sharing=bool(operational_grant.get("allow_institution_identity_sharing", False)),
+            )
+
+        if ticket.get("grant_id") != grant_id:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Ticket grant ID mismatch (expected '{grant_id}', got '{ticket.get('grant_id')}')."
+            )
+        if int(ticket.get("grant_revision", 0)) != grant_revision:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Ticket grant revision mismatch (expected {grant_revision}, got {ticket.get('grant_revision')})."
+            )
+        if ticket.get("grant_scope_digest") != grant_scope_digest:
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Ticket grant scope digest mismatch with active consortium grant."
+            )
+
+        is_grant_active = bool(operational_grant.get("is_active", False) and operational_grant.get("status") != "REVOKED")
+        revoked_institutions = set(operational_grant.get("revoked_by_institutions") or [])
+        if not is_grant_active or clean_requesting in revoked_institutions or clean_target in revoked_institutions:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Bilateral operational consent for grant '{grant_id}' has been revoked."
+            )
+
+        # 4. Identity & Session Consistency Binding
+        prov_job_id = provenance.get("job_id")
+        prov_ticket_id = provenance.get("ticket_id")
+        prov_receipt_id = provenance.get("receipt_id")
+        if not prov_job_id or not prov_ticket_id or not prov_receipt_id:
+            raise ConsortiumSecurityError("Adoption rejection: Missing session binding identifiers in provenance.")
+
+        if ticket.get("ticket_id") != prov_ticket_id:
+            raise ConsortiumSecurityError("Adoption rejection: Ticket ID mismatch between ticket and provenance.")
+        if ticket.get("job_id") != prov_job_id or receipt.get("job_id") != prov_job_id:
+            raise ConsortiumSecurityError("Adoption rejection: Job ID mismatch across session artifacts.")
+        if receipt.get("receipt_id") != prov_receipt_id:
+            raise ConsortiumSecurityError("Adoption rejection: Receipt ID mismatch between receipt and provenance.")
+        if ticket.get("query_scope") != f"entity:{expected_req.query_entity_id}":
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Ticket query scope '{ticket.get('query_scope')}' does not match entity '{expected_req.query_entity_id}'."
+            )
+
+        # 5. Established PSI Protocol & Classification Invariants
+        if receipt.get("protocol") != "OPENMINED-PSI-2.0.6-ECDH" or provenance.get("protocol") != "OPENMINED-PSI-2.0.6-ECDH":
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Prohibited protocol '{receipt.get('protocol')}'. Established PSI requires 'OPENMINED-PSI-2.0.6-ECDH'."
+            )
+        if receipt.get("match_confirmed") != signal.match_confirmed:
+            raise ConsortiumSecurityError("Adoption rejection: Match confirmation status mismatch between signal and receipt.")
+        if receipt.get("match_category") != signal.match_category:
+            raise ConsortiumSecurityError("Adoption rejection: Match category mismatch between signal and receipt.")
+        if abs(float(receipt.get("match_confidence", 0.0)) - float(signal.match_confidence)) > 1e-6:
+            raise ConsortiumSecurityError("Adoption rejection: Match confidence mismatch between signal and receipt.")
+        if not signal.is_authoritative or receipt.get("assurance_level") != "REVIEWED_ESTABLISHED_PSI_VERIFIED":
+            raise ConsortiumSecurityError("Adoption rejection: Unverified assurance level or non-authoritative signal.")
+
+        # 6. Anti-Replay & Freshness
+        receipt_id = str(receipt.get("receipt_id", "")).strip()
+        if not receipt_id:
+            raise ConsortiumSecurityError("Adoption rejection: Empty receipt_id in execution evidence.")
+
+        if receipt_id in self._admitted_receipt_ids or self._admitted_receipts_store.get(receipt_id):
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Replay attack detected. Receipt '{receipt_id}' has already been admitted."
+            )
+
+        now = datetime.datetime.now(UTC)
+        executed_at_str = receipt.get("executed_at")
+        if not executed_at_str:
+            raise ConsortiumSecurityError("Adoption rejection: Missing executed_at timestamp in receipt.")
+        executed_at = datetime.datetime.fromisoformat(executed_at_str)
+        if executed_at.tzinfo is None:
+            executed_at = executed_at.replace(tzinfo=UTC)
+        if abs((now - executed_at).total_seconds()) > 300:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Execution evidence expired (timestamp: {executed_at_str})."
+            )
+
+        # 7. Cryptographic Verification of Participant & Coordinator Signatures
+        worker_a_secret = (
+            os.getenv(f"CFI_WORKER_SECRET_{clean_requesting.upper()}")
+            or os.getenv(f"WORKER_AUTH_SECRET_{clean_requesting.upper()}")
+            or os.getenv("WORKER_AUTH_SECRET")
+            or getattr(getattr(self.matching_coordinator, "_workers", {}).get(clean_requesting), "_auth_secret", "")
+        )
+        if not worker_a_secret:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Verification secret for requesting bank '{clean_requesting}' is not configured."
+            )
+        canonical_receipt_text = (
+            f"{receipt['receipt_id']}:{receipt['transcript_digest']}:{receipt['match_confirmed']}:{receipt['match_category']}"
+        )
+        expected_worker_a_sig = hmac.new(
+            worker_a_secret.encode("utf-8"),
+            canonical_receipt_text.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        worker_a_sig = receipt.get("worker_a_signature", "")
+        if not hmac.compare_digest(expected_worker_a_sig, worker_a_sig):
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Cryptographic verification failed for Requesting Bank worker execution signature."
+            )
+
+        worker_b_secret = (
+            os.getenv(f"CFI_PEER_KEY_{clean_target.upper()}")
+            or os.getenv(f"CFI_WORKER_SECRET_{clean_target.upper()}")
+            or os.getenv(f"WORKER_AUTH_SECRET_{clean_target.upper()}")
+            or (
+                getattr(getattr(self.matching_coordinator, "_workers", {}).get(clean_requesting), "_trusted_peer_verification_keys", {}).get(clean_target)
+                if self.matching_coordinator
+                else None
+            )
+        )
+        if not worker_b_secret:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Verification key for target bank '{clean_target}' is not configured."
+            )
+        approvals = ticket.get("bank_approvals") or {}
+        worker_b_ticket_sig = approvals.get(clean_target, "")
+        from app.application.services.isolated_matching_service import OperationAuthorizationTicket
+        unsigned_ticket = OperationAuthorizationTicket(
+            ticket_id=ticket["ticket_id"],
+            consortium_id=ticket["consortium_id"],
+            requesting_bank_id=ticket["requesting_bank_id"],
+            target_bank_id=ticket["target_bank_id"],
+            operation=ticket["operation"],
+            purpose=ticket["purpose"],
+            query_scope=ticket["query_scope"],
+            grant_id=ticket["grant_id"],
+            grant_revision=int(ticket["grant_revision"]),
+            grant_scope_digest=ticket["grant_scope_digest"],
+            job_id=ticket["job_id"],
+            issued_at=ticket["issued_at"],
+            expires_at=ticket["expires_at"],
+            bank_approvals={},
+        )
+        expected_worker_b_ticket_sig = hmac.new(
+            worker_b_secret.encode("utf-8"),
+            f"{unsigned_ticket.canonical_digest()}:{clean_target}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(expected_worker_b_ticket_sig, worker_b_ticket_sig):
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Cryptographic verification failed for Counterpart Bank worker authorization signature."
+            )
+
+        coord_secret = (
+            os.getenv("CFI_COORDINATOR_SECRET")
+            or os.getenv("COORDINATOR_AUTH_SECRET")
+            or getattr(self.matching_coordinator, "_coordinator_secret", "")
+        )
+        if not coord_secret:
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Verification secret for coordinator relay is not configured."
+            )
+        coord_sig = provenance.get("coordinator_signature") or receipt.get("coordinator_signature", "")
+        expected_coord_sig = hmac.new(
+            coord_secret.encode("utf-8"),
+            f"{receipt['receipt_id']}:{receipt['transcript_digest']}:{clean_consortium_id}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(expected_coord_sig, coord_sig):
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Cryptographic verification failed for Coordinator relay execution signature."
+            )
+
+        self._admitted_receipt_ids.add(receipt_id)
+        self._admitted_receipts_store.set(receipt_id, {"admitted_at": now.isoformat(), "signal_id": signal.signal_id})
+
+        signal_dict = signal.model_dump()
+        expires_at = (now + datetime.timedelta(hours=24)).isoformat()
+        content_hash = hashlib.sha256(
+            json.dumps(signal_dict, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+
+        return {
+            "signal_id": signal.signal_id,
+            "signal_data": signal_dict,
+            "requesting_bank_id": clean_requesting,
+            "target_bank_id": clean_target,
+            "consortium_id": clean_consortium_id,
+            "query_entity_id": expected_req.query_entity_id,
+            "grant_id": ticket["grant_id"],
+            "grant_revision": ticket["grant_revision"],
+            "grant_scope_digest": ticket["grant_scope_digest"],
+            "ticket_id": ticket["ticket_id"],
+            "job_id": ticket["job_id"],
+            "receipt_id": receipt["receipt_id"],
+            "issued_to_principal": audited_actor,
+            "issued_at": now.isoformat(),
+            "expires_at": expires_at,
+            "content_hash": content_hash,
+            "is_authoritative": signal.is_authoritative,
+            "is_synthetic": False,
+            "operational_status": "OPERATIONAL",
+            "assurance_level": signal.assurance_level,
+            "attached_to_cases": [],
+            "receipt": receipt,
+            "ticket": ticket,
+        }
 
     def query_cross_bank_intelligence(
         self,
