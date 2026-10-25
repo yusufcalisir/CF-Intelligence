@@ -682,6 +682,42 @@ class CrossBankIntelligenceService:
                 f"Institution '{case_bank}' is not an active member of consortium '{consortium_id}'."
             )
 
+        # 4b. Revalidate Operational Data-Sharing Grant & Bilateral Consent
+        grant_id = record.get("grant_id") or signal_data.get("provenance", {}).get("grant_id")
+        if grant_id:
+            grant = consortium.metadata.get("operational_data_sharing_grant") or {}
+            is_grant_active = bool(grant.get("is_active", False) and grant.get("status") != "REVOKED")
+            revoked_institutions = set(grant.get("revoked_by_institutions") or [])
+            target_bank = record.get("target_bank_id") or signal_data.get("provenance", {}).get("target_bank_id")
+            if (
+                grant.get("grant_id") != grant_id
+                or not is_grant_active
+                or (case_bank in revoked_institutions)
+                or (target_bank and target_bank in revoked_institutions)
+            ):
+                raise ConsortiumSecurityError(
+                    f"Operational consent for grant '{grant_id}' has been revoked or is no longer active in consortium '{consortium_id}'. "
+                    "Evidence attachment denied."
+                )
+            expected_rev = record.get("grant_revision") or signal_data.get("provenance", {}).get("grant_revision")
+            if expected_rev is not None and grant.get("revision") != expected_rev:
+                raise ConsortiumSecurityError(
+                    f"Operational grant '{grant_id}' revision changed (was {expected_rev}, now {grant.get('revision')}). "
+                    "Prior consent no longer authorizes evidence attachment without reapproval."
+                )
+            approvals = grant.get("approvals") or {}
+            if case_bank not in approvals:
+                raise ConsortiumSecurityError(
+                    f"Institution '{case_bank}' has not approved current grant revision for grant '{grant_id}'. "
+                    "Evidence attachment denied."
+                )
+            target_bank = record.get("target_bank_id") or signal_data.get("provenance", {}).get("target_bank_id")
+            if target_bank and target_bank not in approvals:
+                raise ConsortiumSecurityError(
+                    f"Target counterpart institution '{target_bank}' has not approved current grant revision for grant '{grant_id}'. "
+                    "Evidence attachment denied."
+                )
+
         # 5. Idempotent Submission Check (Prevent Duplicate Evidence Creation)
         existing_evidence = self.evidence_service.get_case_evidence(case_id)
         for ev in existing_evidence:

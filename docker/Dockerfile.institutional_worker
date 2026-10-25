@@ -1,0 +1,48 @@
+# Multi-Stage Hardened Dockerfile for CFI Institutional Private Matching Worker
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH="/app/backend" \
+    APP_ENV="production" \
+    HOME="/home/worker" \
+    CFI_STORAGE_DIR="/vault"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install verified OpenMined PSI and minimal worker dependencies
+RUN pip install --no-cache-dir \
+    openmined-psi==2.0.6 \
+    filelock>=3.13.0 \
+    fastapi>=0.115.0 \
+    uvicorn>=0.30.0 \
+    pydantic>=2.9.0 \
+    pydantic-settings>=2.5.0 \
+    httpx>=0.27.0 \
+    cryptography>=42.0.0 \
+    pyjwt>=2.8.0 \
+    bcrypt>=4.0.0 \
+    redis>=5.2.0
+
+# Create dedicated non-root institutional worker identity (uid: 10001, gid: 10001)
+RUN groupadd -g 10001 worker && \
+    useradd -u 10001 -g worker -m -d /home/worker -s /bin/sh worker && \
+    mkdir -p /vault /app/backend /home/worker && \
+    chmod 700 /vault && \
+    chown -R worker:worker /vault /home/worker /app
+
+# Copy application backend codebase with non-root ownership
+COPY --chown=worker:worker backend /app/backend
+
+USER worker
+
+EXPOSE 8100
+
+CMD ["python", "-m", "app.application.services.isolated_matching_service"]

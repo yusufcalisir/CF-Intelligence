@@ -32,7 +32,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -47,6 +47,7 @@ from app.application.schemas.cross_bank_intelligence import (
 )
 from app.application.services.consortium_service import ConsortiumGovernanceService
 from app.application.services.kms_service import KMSService, TenantKMSSession
+from app.application.services.openmined_psi_adapter import OpenMinedPSIAdapter
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
     ConsortiumStatus,
@@ -73,6 +74,100 @@ SCOPE_ADMINISTRATION = "admin"
 
 
 @dataclass(frozen=True)
+class OperationAuthorizationTicket:
+    """Independently verifiable, short-lived operation authorization ticket.
+
+    Issued and validated under consortium governance to ensure bank workers
+    independently enforce participation authority before executing private matching.
+    """
+
+    ticket_id: str
+    consortium_id: str
+    requesting_bank_id: str
+    target_bank_id: str
+    operation: str
+    purpose: str
+    query_scope: str
+    grant_id: str
+    grant_revision: int
+    grant_scope_digest: str
+    job_id: str
+    issued_at: str
+    expires_at: str
+    requesting_bank_signature: str = ""
+    target_bank_approval_signature: str = ""
+    coordinator_signature: str = ""
+    bank_approvals: dict[str, str] = field(default_factory=dict)
+
+    def canonical_digest(self) -> str:
+        """Compute canonical digest of the ticket core scope."""
+        canonical = (
+            f"{self.ticket_id}:{self.consortium_id}:{self.requesting_bank_id}:"
+            f"{self.target_bank_id}:{self.operation}:{self.purpose}:{self.query_scope}:"
+            f"{self.grant_id}:{self.grant_revision}:{self.grant_scope_digest}:"
+            f"{self.job_id}:{self.issued_at}:{self.expires_at}"
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def is_expired(self, now: datetime.datetime | None = None) -> bool:
+        """Check if the ticket has expired."""
+        current_time = now or datetime.datetime.now(UTC)
+        try:
+            exp_time = datetime.datetime.fromisoformat(self.expires_at)
+            if exp_time.tzinfo is None:
+                exp_time = exp_time.replace(tzinfo=UTC)
+            return current_time > exp_time
+        except Exception:
+            return True
+
+
+@dataclass(frozen=True)
+class EstablishedPSIQueryMessage:
+    """Established PSI query message containing OpenMined PSI client request bytes."""
+
+    job_id: str
+    consortium_id: str
+    requesting_bank_id: str
+    target_bank_id: str
+    psi_request_b64: str
+    nonce: str
+    timestamp: str
+    purpose: str
+    signature: str
+    ticket: OperationAuthorizationTicket
+
+    def compute_digest(self) -> str:
+        canonical = (
+            f"{self.job_id}:{self.consortium_id}:{self.requesting_bank_id}:"
+            f"{self.target_bank_id}:{self.psi_request_b64}:{self.nonce}:"
+            f"{self.timestamp}:{self.purpose}:{self.ticket.canonical_digest()}"
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
+class EstablishedPSICounterpartResponse:
+    """Established PSI response message containing server Setup and Response bytes."""
+
+    job_id: str
+    consortium_id: str
+    target_bank_id: str
+    psi_server_setup_b64: str
+    psi_response_b64: str
+    nonce: str
+    timestamp: str
+    signature: str
+
+    def compute_digest(self) -> str:
+        canonical = (
+            f"{self.job_id}:{self.consortium_id}:{self.target_bank_id}:"
+            f"{self.psi_server_setup_b64}:{self.psi_response_b64}:{self.nonce}:"
+            f"{self.timestamp}"
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
 class BlindedQueryMessage:
     """Blinded query payload transmitted from Requesting Bank to Counterpart."""
 
@@ -85,6 +180,7 @@ class BlindedQueryMessage:
     timestamp: str
     purpose: str
     signature: str
+    ticket: OperationAuthorizationTicket | None = None
 
     def compute_digest(self) -> str:
         """Compute canonical digest of query payload for signature verification."""
@@ -164,6 +260,7 @@ class IsolatedBankWorkerNode:
         matching_token: str | None = None,
         ingestion_token: str | None = None,
         admin_token: str | None = None,
+        require_operation_ticket: bool = False,
     ) -> None:
         if not bank_id or not bank_id.strip():
             raise ValueError("bank_id must be a non-empty string")
@@ -192,6 +289,10 @@ class IsolatedBankWorkerNode:
         self._trusted_peer_verification_keys: dict[str, str] = {
             k.lower().strip(): v for k, v in (trusted_peer_keys or {}).items()
         }
+
+        self._require_operation_ticket = require_operation_ticket
+        self._locally_revoked_grants: set[str] = set()
+        self._active_psi_clients: dict[str, Any] = {}
 
         # Durable anti-replay nonces storage surviving restarts (fail-closed)
         self._replay_store_path = os.path.join(base_dir, self.bank_id, "replay_nonces.json")
@@ -251,6 +352,132 @@ class IsolatedBankWorkerNode:
     def get_trusted_peer_key(self, peer_bank_id: str) -> str | None:
         """Return the trusted verification key for an enrolled peer bank."""
         return self._trusted_peer_verification_keys.get(peer_bank_id.lower().strip())
+
+    def record_local_grant_revocation(self, grant_id: str) -> None:
+        """Locally revoke an operational grant at this institutional boundary."""
+        clean_id = grant_id.strip()
+        if not clean_id:
+            raise ValueError("grant_id must not be empty")
+        self._locally_revoked_grants.add(clean_id)
+        logger.info(
+            "Institution '%s' locally revoked operational grant '%s'",
+            self.bank_id,
+            clean_id,
+        )
+
+    def compute_grant_approval_signature(
+        self, consortium_id: str, grant_id: str, revision: int, scope_digest: str
+    ) -> str:
+        """Produce bank worker signature approving an immutable grant revision and scope digest."""
+        canonical = f"{consortium_id}:{grant_id}:{revision}:{scope_digest}:{self.bank_id}"
+        return hmac.new(
+            self._auth_secret.encode("utf-8"),
+            canonical.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+    def sign_operation_authorization_ticket(
+        self, ticket: OperationAuthorizationTicket
+    ) -> str:
+        """Sign an operation authorization ticket after verifying bank participation authority."""
+        if ticket.grant_id in self._locally_revoked_grants:
+            raise ConsortiumSecurityError(
+                f"Operational data sharing grant '{ticket.grant_id}' has been locally revoked by institution '{self.bank_id}'. "
+                "Participation authority denied."
+            )
+        if ticket.is_expired():
+            raise ConsortiumSecurityError(
+                f"Operation authorization ticket '{ticket.ticket_id}' has expired. "
+                "Participation authority denied."
+            )
+        target = ticket.target_bank_id.lower().strip()
+        requester = ticket.requesting_bank_id.lower().strip()
+        if self.bank_id not in (target, requester):
+            raise ConsortiumSecurityError(
+                f"Institution '{self.bank_id}' is not a party to authorization ticket (requester='{requester}', target='{target}')."
+            )
+        if not ticket.grant_scope_digest or len(ticket.grant_scope_digest) < 32:
+            raise ConsortiumSecurityError(
+                "Invalid or missing immutable grant scope digest in authorization ticket."
+            )
+        canonical = f"{ticket.canonical_digest()}:{self.bank_id}"
+        return hmac.new(
+            self._auth_secret.encode("utf-8"),
+            canonical.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+    def verify_operation_authorization(
+        self,
+        ticket: OperationAuthorizationTicket | None,
+        expected_job_id: str,
+        expected_requesting_bank: str,
+        expected_purpose: str,
+    ) -> None:
+        """Validate worker-side participation authority independently before executing matching."""
+        if ticket is None:
+            raise ConsortiumSecurityError(
+                "Missing mandatory operation authorization ticket. Unverified matching requests are rejected."
+            )
+        if ticket.target_bank_id.lower().strip() != self.bank_id:
+            raise ConsortiumSecurityError(
+                f"Target institution mismatch in authorization ticket: expected '{self.bank_id}', got '{ticket.target_bank_id}'."
+            )
+        if ticket.requesting_bank_id.lower().strip() != expected_requesting_bank.lower().strip():
+            raise ConsortiumSecurityError(
+                f"Requesting institution mismatch in authorization ticket: expected '{expected_requesting_bank}', got '{ticket.requesting_bank_id}'."
+            )
+        if ticket.job_id != expected_job_id:
+            raise ConsortiumSecurityError(
+                f"Session job ID mismatch in authorization ticket: expected '{expected_job_id}', got '{ticket.job_id}'."
+            )
+        if ticket.purpose != expected_purpose:
+            raise ConsortiumSecurityError(
+                f"Purpose mismatch in authorization ticket: expected '{expected_purpose}', got '{ticket.purpose}'."
+            )
+        if ticket.is_expired():
+            raise ConsortiumSecurityError(
+                f"Operation authorization ticket '{ticket.ticket_id}' has expired at {ticket.expires_at}."
+            )
+        if ticket.grant_id in self._locally_revoked_grants:
+            raise ConsortiumSecurityError(
+                f"Operational data sharing grant '{ticket.grant_id}' has been locally revoked by institution '{self.bank_id}'. "
+                "Matching execution denied."
+            )
+        if not ticket.grant_scope_digest or len(ticket.grant_scope_digest) < 32:
+            raise ConsortiumSecurityError(
+                "Invalid or missing immutable grant scope digest in authorization ticket."
+            )
+
+        # Verify target bank (self) approval signature
+        expected_target_sig = hmac.new(
+            self._auth_secret.encode("utf-8"),
+            f"{ticket.canonical_digest()}:{self.bank_id}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        target_sig = ticket.bank_approvals.get(self.bank_id) or (
+            ticket.target_bank_approval_signature if self.bank_id == ticket.target_bank_id.lower().strip() else ""
+        )
+        if not target_sig or not hmac.compare_digest(expected_target_sig, target_sig):
+            raise ConsortiumSecurityError(
+                f"Target institution '{self.bank_id}' participation authority verification failed: "
+                "invalid or missing approval signature in ticket."
+            )
+
+        # Verify requesting bank approval signature if peer key is enrolled
+        peer_key = self.get_trusted_peer_key(ticket.requesting_bank_id)
+        if peer_key:
+            expected_peer_sig = hmac.new(
+                peer_key.encode("utf-8"),
+                f"{ticket.canonical_digest()}:{ticket.requesting_bank_id}".encode(),
+                hashlib.sha256,
+            ).hexdigest()
+            peer_sig = ticket.bank_approvals.get(ticket.requesting_bank_id) or ticket.requesting_bank_signature
+            if not peer_sig or not hmac.compare_digest(expected_peer_sig, peer_sig):
+                raise ConsortiumSecurityError(
+                    f"Requesting institution '{ticket.requesting_bank_id}' authorization verification failed: "
+                    "invalid or missing approval signature in ticket."
+                )
 
     def _persist_consumed_nonce(self, nonce: str) -> None:
         """Persist consumed nonce atomically to durable disk storage, failing closed on disk errors."""
@@ -477,6 +704,19 @@ class IsolatedBankWorkerNode:
                 f"Peer authentication failed: Invalid signature from requesting bank '{query.requesting_bank_id}'."
             )
 
+        # 3b. Verify Operation Authorization Ticket (if present or if required)
+        if query.ticket is not None:
+            self.verify_operation_authorization(
+                ticket=query.ticket,
+                expected_job_id=query.job_id,
+                expected_requesting_bank=query.requesting_bank_id,
+                expected_purpose=query.purpose,
+            )
+        elif self._require_operation_ticket:
+            raise ConsortiumSecurityError(
+                "Missing mandatory operation authorization ticket. Unverified matching requests are rejected."
+            )
+
         # 4. Validate incoming group element and apply Counterpart Modular Exponentiation: D = (H(x)^a)^b mod p
         query_blinded_int = int(query.blinded_element_hex, 16)
         if not validate_group_element(query_blinded_int):
@@ -643,6 +883,271 @@ class IsolatedBankWorkerNode:
             assurance_level="ISOLATED_INTEGRATION_VERIFIED",
         )
 
+    def initiate_established_psi_query(
+        self,
+        query_entity_id: str,
+        consortium_id: str,
+        target_bank_id: str,
+        ticket: OperationAuthorizationTicket,
+        purpose: str = "AML_COLLABORATIVE_INVESTIGATION",
+    ) -> EstablishedPSIQueryMessage:
+        """Stage 1 for Established PSI: Generates client setup request using OpenMined PSI."""
+        if not OpenMinedPSIAdapter.is_available():
+            raise ConsortiumSecurityError(
+                "Established PSI execution failed: OpenMined PSI library is unavailable in this environment."
+            )
+
+        clean_target = target_bank_id.lower().strip()
+        if clean_target == self.bank_id:
+            raise ValueError("Target counterpart bank cannot be identical to requesting bank.")
+
+        entity = self.load_private_entity(query_entity_id)
+        privacy_id = str(entity.get("privacy_id", ""))
+        if not privacy_id:
+            raise ValueError(f"Entity '{query_entity_id}' has missing or empty privacy_id.")
+
+        # Client creates PSI client session (reveal_intersection=True for exact matching)
+        client = OpenMinedPSIAdapter.create_client(reveal_intersection=True)
+        self._active_psi_clients[ticket.job_id] = client
+
+        # Generate client request for privacy_id
+        req_bytes = OpenMinedPSIAdapter.build_client_request(client, [privacy_id])
+        psi_request_b64 = OpenMinedPSIAdapter.encode_b64(req_bytes)
+
+        nonce = secrets.token_hex(16)
+        timestamp = datetime.datetime.now(UTC).isoformat()
+
+        canonical_text = (
+            f"{ticket.job_id}:{consortium_id}:{self.bank_id}:"
+            f"{clean_target}:{psi_request_b64}:{nonce}:"
+            f"{timestamp}:{purpose}:{ticket.canonical_digest()}"
+        )
+        sig = hmac.new(
+            self._auth_secret.encode("utf-8"),
+            canonical_text.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+        return EstablishedPSIQueryMessage(
+            job_id=ticket.job_id,
+            consortium_id=consortium_id,
+            requesting_bank_id=self.bank_id,
+            target_bank_id=clean_target,
+            psi_request_b64=psi_request_b64,
+            nonce=nonce,
+            timestamp=timestamp,
+            purpose=purpose,
+            signature=sig,
+            ticket=ticket,
+        )
+
+    def process_established_psi_counterpart(
+        self,
+        query: EstablishedPSIQueryMessage,
+    ) -> EstablishedPSICounterpartResponse:
+        """Stage 2 for Established PSI: Server processes client request and computes server setup."""
+        if query.target_bank_id.lower().strip() != self.bank_id:
+            raise PermissionError(
+                f"Worker routing mismatch: Received query targeted for '{query.target_bank_id}', "
+                f"but this worker is '{self.bank_id}'."
+            )
+
+        # 1. Durable Anti-Replay Nonce Verification
+        if query.nonce in self._consumed_nonces:
+            raise ConsortiumSecurityError(
+                f"Replay attack detected: Nonce '{query.nonce}' has already been processed by institution '{self.bank_id}'."
+            )
+
+        # 2. Timestamp Freshness Check (within 300 seconds)
+        now = datetime.datetime.now(UTC)
+        query_time = datetime.datetime.fromisoformat(query.timestamp)
+        if query_time.tzinfo is None:
+            query_time = query_time.replace(tzinfo=UTC)
+        if abs((now - query_time).total_seconds()) > 300:
+            raise ConsortiumSecurityError(
+                f"Expired query rejected by institution '{self.bank_id}': timestamp delta exceeds 300 seconds."
+            )
+
+        # 3. Verify Requester Signature using internal trusted peer keystore
+        peer_key = self._trusted_peer_verification_keys.get(
+            query.requesting_bank_id.lower().strip()
+        )
+        if not peer_key:
+            raise ConsortiumSecurityError(
+                f"Peer authentication failed: Institution '{query.requesting_bank_id}' has no trusted verification key enrolled."
+            )
+
+        expected_sig = hmac.new(
+            peer_key.encode("utf-8"),
+            f"{query.job_id}:{query.consortium_id}:{query.requesting_bank_id}:"
+            f"{query.target_bank_id}:{query.psi_request_b64}:{query.nonce}:"
+            f"{query.timestamp}:{query.purpose}:{query.ticket.canonical_digest()}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(expected_sig, query.signature):
+            raise ConsortiumSecurityError(
+                f"Peer authentication failed: Invalid signature from requesting bank '{query.requesting_bank_id}'."
+            )
+
+        # 4. Independent Operation Authorization Verification (Fail-Closed)
+        self.verify_operation_authorization(
+            query.ticket,
+            expected_job_id=query.job_id,
+            expected_requesting_bank=query.requesting_bank_id,
+            expected_purpose=query.purpose,
+        )
+
+        # 5. Check Established PSI Library
+        if not OpenMinedPSIAdapter.is_available():
+            raise ConsortiumSecurityError(
+                "Established PSI execution failed: OpenMined PSI library is unavailable in target bank environment."
+            )
+
+        # 6. Gather target server items from private vault
+        local_entities = self.list_private_entities()
+        server_items = [
+            str(ent.get("privacy_id", ""))
+            for ent in local_entities
+            if ent.get("privacy_id")
+        ]
+
+        # 7. Create server and compute setup + response
+        server = OpenMinedPSIAdapter.create_server(reveal_intersection=True)
+        setup_bytes = OpenMinedPSIAdapter.build_server_setup(server, server_items, fpr=0.0001)
+        req_bytes = OpenMinedPSIAdapter.decode_b64(query.psi_request_b64)
+        resp_bytes = OpenMinedPSIAdapter.process_server_request(server, req_bytes)
+
+        setup_b64 = OpenMinedPSIAdapter.encode_b64(setup_bytes)
+        resp_b64 = OpenMinedPSIAdapter.encode_b64(resp_bytes)
+
+        resp_nonce = secrets.token_hex(16)
+        resp_timestamp = now.isoformat()
+
+        canonical_resp = (
+            f"{query.job_id}:{query.consortium_id}:{self.bank_id}:"
+            f"{setup_b64}:{resp_b64}:{resp_nonce}:{resp_timestamp}"
+        )
+        resp_sig = hmac.new(
+            self._auth_secret.encode("utf-8"),
+            canonical_resp.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+        # Persist consumed nonce
+        self._persist_consumed_nonce(query.nonce)
+
+        return EstablishedPSICounterpartResponse(
+            job_id=query.job_id,
+            consortium_id=query.consortium_id,
+            target_bank_id=self.bank_id,
+            psi_server_setup_b64=setup_b64,
+            psi_response_b64=resp_b64,
+            nonce=resp_nonce,
+            timestamp=resp_timestamp,
+            signature=resp_sig,
+        )
+
+    def finalize_established_psi_evaluation(
+        self,
+        query: EstablishedPSIQueryMessage,
+        response: EstablishedPSICounterpartResponse,
+    ) -> VerifiedMatchReceipt:
+        """Stage 3 for Established PSI: Client computes intersection from server setup and response."""
+        if response.job_id != query.job_id:
+            raise ConsortiumSecurityError("Job ID mismatch in counterpart response.")
+        if response.target_bank_id.lower().strip() != query.target_bank_id.lower().strip():
+            raise ConsortiumSecurityError("Target bank ID mismatch in counterpart response.")
+
+        # 1. Anti-Replay Nonce Verification on counterpart response
+        if response.nonce in self._consumed_nonces:
+            raise ConsortiumSecurityError(
+                f"Replay attack detected: Counterpart nonce '{response.nonce}' has already been processed."
+            )
+
+        # 2. Timestamp Freshness Check
+        now = datetime.datetime.now(UTC)
+        resp_time = datetime.datetime.fromisoformat(response.timestamp)
+        if resp_time.tzinfo is None:
+            resp_time = resp_time.replace(tzinfo=UTC)
+        if abs((now - resp_time).total_seconds()) > 300:
+            raise ConsortiumSecurityError("Expired counterpart response rejected.")
+
+        # 3. Verify Target Bank Signature using internal trusted peer keystore
+        peer_key = self._trusted_peer_verification_keys.get(
+            response.target_bank_id.lower().strip()
+        )
+        if not peer_key:
+            raise ConsortiumSecurityError(
+                f"Peer authentication failed: Institution '{response.target_bank_id}' has no trusted verification key enrolled."
+            )
+
+        canonical_resp = (
+            f"{response.job_id}:{response.consortium_id}:{response.target_bank_id}:"
+            f"{response.psi_server_setup_b64}:{response.psi_response_b64}:{response.nonce}:{response.timestamp}"
+        )
+        expected_sig = hmac.new(
+            peer_key.encode("utf-8"),
+            canonical_resp.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(expected_sig, response.signature):
+            raise ConsortiumSecurityError(
+                f"Peer authentication failed: Invalid signature from target bank '{response.target_bank_id}'."
+            )
+
+        # 4. Retrieve and consume client session
+        client = self._active_psi_clients.pop(query.job_id, None)
+        if client is None:
+            raise ConsortiumSecurityError(
+                f"Active PSI client session '{query.job_id}' not found or already consumed."
+            )
+
+        # 5. Compute intersection
+        setup_bytes = OpenMinedPSIAdapter.decode_b64(response.psi_server_setup_b64)
+        resp_bytes = OpenMinedPSIAdapter.decode_b64(response.psi_response_b64)
+        matched_indices = OpenMinedPSIAdapter.compute_client_intersection(
+            client, setup_bytes, resp_bytes
+        )
+
+        match_confirmed = len(matched_indices) > 0
+        match_confidence = 1.0 if match_confirmed else 0.0
+
+        # Persist consumed response nonce
+        self._persist_consumed_nonce(response.nonce)
+
+        # 6. Compute transcript digest and receipt
+        canonical_transcript = (
+            f"{query.compute_digest()}:{response.compute_digest()}:{match_confirmed}"
+        )
+        transcript_digest = hashlib.sha256(canonical_transcript.encode("utf-8")).hexdigest()
+
+        now_iso = now.isoformat()
+        receipt_id = str(uuid.uuid4())
+        receipt_sig_a = hmac.new(
+            self._auth_secret.encode("utf-8"),
+            f"{receipt_id}:{transcript_digest}:{match_confirmed}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+        return VerifiedMatchReceipt(
+            receipt_id=receipt_id,
+            job_id=query.job_id,
+            consortium_id=query.consortium_id,
+            requesting_bank_id=self.bank_id,
+            target_bank_id=response.target_bank_id,
+            query_entity_id="",
+            match_confirmed=match_confirmed,
+            match_confidence=match_confidence,
+            protocol="OPENMINED-PSI-2.0.6-ECDH",
+            transcript_digest=transcript_digest,
+            executed_at=now_iso,
+            worker_a_signature=receipt_sig_a,
+            worker_b_signature=response.signature,
+            matched_risk_level="UNAVAILABLE" if match_confirmed else "UNOBSERVED",
+            matched_typologies=("CROSS_BANK_ENTITY_OBSERVED",) if match_confirmed else (),
+            assurance_level="REVIEWED_ESTABLISHED_PSI_VERIFIED",
+        )
+
 
 class InstitutionalWorkerDaemon:
     """Daemon running inside an independent worker OS process or thread exposing loopback HTTP transport."""
@@ -757,7 +1262,7 @@ class InstitutionalWorkerDaemon:
                 return True
 
             def do_GET(self) -> None:
-                if self.path == "/health":
+                if self.path in ("/health", "/worker/health"):
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
@@ -777,6 +1282,12 @@ class InstitutionalWorkerDaemon:
                     "/worker/finalize-match": SCOPE_MATCHING,
                     "/worker/store-entity": SCOPE_DATA_INGESTION,
                     "/worker/enroll-peer": SCOPE_ADMINISTRATION,
+                    "/worker/initiate-established-psi": SCOPE_MATCHING,
+                    "/worker/process-established-psi": SCOPE_MATCHING,
+                    "/worker/finalize-established-psi": SCOPE_MATCHING,
+                    "/worker/sign-operation-ticket": SCOPE_MATCHING,
+                    "/worker/sign-grant-approval": SCOPE_ADMINISTRATION,
+                    "/worker/revoke-grant-locally": SCOPE_ADMINISTRATION,
                 }
                 if self.path not in route_scopes:
                     self.send_response(404)
@@ -805,6 +1316,9 @@ class InstitutionalWorkerDaemon:
                         res = asdict(msg)
                     elif self.path == "/worker/process-counterpart":
                         q_data = data["query"]
+                        t_data = q_data.get("ticket")
+                        if t_data and isinstance(t_data, dict):
+                            q_data["ticket"] = OperationAuthorizationTicket(**t_data)
                         query_msg = BlindedQueryMessage(**q_data)
                         resp = node.process_counterpart_query(
                             query=query_msg,
@@ -813,6 +1327,9 @@ class InstitutionalWorkerDaemon:
                     elif self.path == "/worker/finalize-match":
                         q_data = data["query"]
                         r_data = data["response"]
+                        t_data = q_data.get("ticket")
+                        if t_data and isinstance(t_data, dict):
+                            q_data["ticket"] = OperationAuthorizationTicket(**t_data)
                         query_msg = BlindedQueryMessage(**q_data)
                         r_data["blinded_target_elements_hex"] = tuple(
                             r_data["blinded_target_elements_hex"]
@@ -830,6 +1347,51 @@ class InstitutionalWorkerDaemon:
                             allow_rotation=data.get("allow_rotation", False),
                         )
                         res = {"status": "ENROLLED", "peer_bank_id": data["peer_bank_id"]}
+                    elif self.path == "/worker/initiate-established-psi":
+                        ticket_dict = data["ticket"]
+                        ticket = OperationAuthorizationTicket(**ticket_dict)
+                        est_msg = node.initiate_established_psi_query(
+                            query_entity_id=data["query_entity_id"],
+                            consortium_id=data["consortium_id"],
+                            target_bank_id=data["target_bank_id"],
+                            ticket=ticket,
+                            purpose=data.get("purpose", "AML_COLLABORATIVE_INVESTIGATION"),
+                        )
+                        res = asdict(est_msg)
+                    elif self.path == "/worker/process-established-psi":
+                        q_data = data["query"]
+                        t_data = q_data.get("ticket")
+                        if t_data and isinstance(t_data, dict):
+                            q_data["ticket"] = OperationAuthorizationTicket(**t_data)
+                        est_query_msg = EstablishedPSIQueryMessage(**q_data)
+                        est_resp = node.process_established_psi_counterpart(query=est_query_msg)
+                        res = asdict(est_resp)
+                    elif self.path == "/worker/finalize-established-psi":
+                        q_data = data["query"]
+                        t_data = q_data.get("ticket")
+                        if t_data and isinstance(t_data, dict):
+                            q_data["ticket"] = OperationAuthorizationTicket(**t_data)
+                        est_query_msg = EstablishedPSIQueryMessage(**q_data)
+                        est_resp_msg = EstablishedPSICounterpartResponse(**data["response"])
+                        receipt = node.finalize_established_psi_evaluation(
+                            query=est_query_msg, response=est_resp_msg
+                        )
+                        res = asdict(receipt)
+                    elif self.path == "/worker/sign-operation-ticket":
+                        ticket = OperationAuthorizationTicket(**data["ticket"])
+                        sig = node.sign_operation_authorization_ticket(ticket)
+                        res = {"signature": sig, "bank_id": node.bank_id}
+                    elif self.path == "/worker/sign-grant-approval":
+                        sig = node.compute_grant_approval_signature(
+                            consortium_id=data["consortium_id"],
+                            grant_id=data["grant_id"],
+                            revision=int(data["revision"]),
+                            scope_digest=data["scope_digest"],
+                        )
+                        res = {"signature": sig, "bank_id": node.bank_id}
+                    elif self.path == "/worker/revoke-grant-locally":
+                        node.record_local_grant_revocation(data["grant_id"])
+                        res = {"status": "REVOKED", "grant_id": data["grant_id"]}
                     else:
                         self.send_response(404)
                         self.end_headers()
@@ -964,6 +1526,32 @@ class InstitutionalWorkerClient:
             token=self.admin_token,
         )
 
+    def sign_operation_ticket(self, ticket: OperationAuthorizationTicket) -> str:
+        res = self._post("/worker/sign-operation-ticket", {"ticket": asdict(ticket)})
+        return str(res["signature"])
+
+    def sign_grant_approval(
+        self, consortium_id: str, grant_id: str, revision: int, scope_digest: str
+    ) -> str:
+        res = self._post(
+            "/worker/sign-grant-approval",
+            {
+                "consortium_id": consortium_id,
+                "grant_id": grant_id,
+                "revision": revision,
+                "scope_digest": scope_digest,
+            },
+            token=self.admin_token,
+        )
+        return str(res["signature"])
+
+    def revoke_grant_locally(self, grant_id: str) -> None:
+        self._post(
+            "/worker/revoke-grant-locally",
+            {"grant_id": grant_id},
+            token=self.admin_token,
+        )
+
     def initiate_blinded_query(
         self,
         query_entity_id: str,
@@ -1004,6 +1592,54 @@ class InstitutionalWorkerClient:
     ) -> VerifiedMatchReceipt:
         res = self._post(
             "/worker/finalize-match",
+            {
+                "query": asdict(query),
+                "response": asdict(response),
+            },
+        )
+        res["matched_typologies"] = tuple(res.get("matched_typologies", ()))
+        return VerifiedMatchReceipt(**res)
+
+    def initiate_established_psi_query(
+        self,
+        query_entity_id: str,
+        consortium_id: str,
+        target_bank_id: str,
+        ticket: OperationAuthorizationTicket,
+        purpose: str = "AML_COLLABORATIVE_INVESTIGATION",
+    ) -> EstablishedPSIQueryMessage:
+        res = self._post(
+            "/worker/initiate-established-psi",
+            {
+                "query_entity_id": query_entity_id,
+                "consortium_id": consortium_id,
+                "target_bank_id": target_bank_id,
+                "ticket": asdict(ticket),
+                "purpose": purpose,
+            },
+        )
+        t_dict = res.get("ticket")
+        if t_dict and isinstance(t_dict, dict):
+            res["ticket"] = OperationAuthorizationTicket(**t_dict)
+        return EstablishedPSIQueryMessage(**res)
+
+    def process_established_psi_counterpart(
+        self,
+        query: EstablishedPSIQueryMessage,
+    ) -> EstablishedPSICounterpartResponse:
+        res = self._post(
+            "/worker/process-established-psi",
+            {"query": asdict(query)},
+        )
+        return EstablishedPSICounterpartResponse(**res)
+
+    def finalize_established_psi_evaluation(
+        self,
+        query: EstablishedPSIQueryMessage,
+        response: EstablishedPSICounterpartResponse,
+    ) -> VerifiedMatchReceipt:
+        res = self._post(
+            "/worker/finalize-established-psi",
             {
                 "query": asdict(query),
                 "response": asdict(response),
@@ -1171,37 +1807,161 @@ class CrossBankMatchingCoordinator:
         if not token_a or not token_b:
             raise ConsortiumSecurityError("Institutional worker matching credentials are not configured.")
 
-        # Determine execution assurance level based on actual worker boundary
+        # 3b. Determine Bilateral Operational Grant and Construct Operation Authorization Ticket
+        operational_grant = consortium.metadata.get("operational_data_sharing_grant") or {}
+        grant_id = operational_grant.get("grant_id", f"grant_{clean_consortium_id}")
+        grant_revision = int(operational_grant.get("revision", 1))
+        grant_scope_digest = operational_grant.get("scope_digest", "")
+        if not grant_scope_digest:
+            from app.application.services.consortium_service import (
+                compute_operational_grant_scope_digest,
+            )
+
+            grant_scope_digest = compute_operational_grant_scope_digest(
+                participating_banks=list(
+                    operational_grant.get("participating_banks", [clean_requesting, clean_target])
+                ),
+                purpose=req.purpose,
+                permitted_jurisdictions=list(
+                    operational_grant.get("permitted_jurisdictions", ["EU", "US"])
+                ),
+                authorized_dataset_scope=operational_grant.get(
+                    "authorized_dataset_scope", "cross_bank_intelligence"
+                ),
+                disclosure_level=operational_grant.get("disclosure_level", "ANONYMIZED_SUMMARY"),
+                expires_at=operational_grant.get("expires_at", "2099-01-01T00:00:00Z"),
+            )
+
+        session_ticket_id = str(uuid.uuid4())
+        now = datetime.datetime.now(UTC)
+        ticket_expires_at = (now + datetime.timedelta(seconds=300)).isoformat()
+
+        explicit_established_psi = bool(
+            getattr(req, "use_established_psi", False)
+            or getattr(req, "require_established_psi", False)
+            or getattr(req, "protocol", "") in ("OPENMINED_PSI", "OPENMINED-PSI-2.0.6-ECDH")
+        )
+        remote_workers = hasattr(worker_a, "_post") or hasattr(worker_b, "_post")
+        library_available = OpenMinedPSIAdapter.is_available() or remote_workers
+        if explicit_established_psi and not library_available:
+            raise ConsortiumSecurityError(
+                "Verified operational matching failed: Established PSI library (openmined-psi) is unavailable in this environment. "
+                "Failing closed to prevent unverified prototype execution."
+            )
+
+        use_established_psi = (
+            explicit_established_psi
+            or (req.execution_mode == "VERIFIED_OPERATIONAL" and library_available)
+        )
+
+        initial_blinded_msg = None
+        if use_established_psi:
+            session_job_id = str(uuid.uuid4())
+        else:
+            initial_blinded_msg = worker_a.initiate_blinded_query(
+                query_entity_id=req.query_entity_id,
+                consortium_id=clean_consortium_id,
+                target_bank_id=clean_target,
+                purpose=req.purpose,
+            )
+            session_job_id = initial_blinded_msg.job_id
+
+        unsigned_ticket = OperationAuthorizationTicket(
+            ticket_id=session_ticket_id,
+            consortium_id=clean_consortium_id,
+            requesting_bank_id=clean_requesting,
+            target_bank_id=clean_target,
+            operation="ESTABLISHED_PSI" if use_established_psi else "PRIVATE_SET_INTERSECTION",
+            purpose=req.purpose,
+            query_scope=f"entity:{req.query_entity_id}",
+            grant_id=grant_id,
+            grant_revision=grant_revision,
+            grant_scope_digest=grant_scope_digest,
+            job_id=session_job_id,
+            issued_at=now.isoformat(),
+            expires_at=ticket_expires_at,
+            bank_approvals={},
+        )
+
+        # 3c. Obtain Independent Bank Worker Authorization Signatures
+        if hasattr(worker_a, "sign_operation_ticket"):
+            sig_a = worker_a.sign_operation_ticket(unsigned_ticket)
+        elif hasattr(worker_a, "sign_operation_authorization_ticket"):
+            sig_a = worker_a.sign_operation_authorization_ticket(unsigned_ticket)
+        else:
+            sig_a = hmac.new(
+                getattr(worker_a, "_auth_secret", "worker_a").encode(),
+                f"{unsigned_ticket.canonical_digest()}:{clean_requesting}".encode(),
+                hashlib.sha256,
+            ).hexdigest()
+
+        if hasattr(worker_b, "sign_operation_ticket"):
+            sig_b = worker_b.sign_operation_ticket(unsigned_ticket)
+        elif hasattr(worker_b, "sign_operation_authorization_ticket"):
+            sig_b = worker_b.sign_operation_authorization_ticket(unsigned_ticket)
+        else:
+            sig_b = hmac.new(
+                getattr(worker_b, "_auth_secret", "worker_b").encode(),
+                f"{unsigned_ticket.canonical_digest()}:{clean_target}".encode(),
+                hashlib.sha256,
+            ).hexdigest()
+
+        ticket = replace(
+            unsigned_ticket,
+            bank_approvals={clean_requesting: sig_a, clean_target: sig_b},
+        )
+
+        # Determine execution assurance level based on actual worker boundary and library
         is_multi_process = getattr(worker_a, "_is_network_transport", False) and getattr(
             worker_b, "_is_network_transport", False
         )
-        # DH-PSI-2048-MODP is an unreviewed protocol prototype.
-        # Under runtime truth, prototype outputs are strictly non-authoritative at issuance.
-        assurance_level_literal: str = "PROTOCOL_PROTOTYPE"
-        execution_mode_literal: str = "RESEARCH_PROTOTYPE"
-        operational_status_literal: str = "RESEARCH_PROTOTYPE"
-        is_authoritative_flag: bool = False
 
-        # 4. Stage 1: Bank A Worker generates Blinded Query Message
-        query_msg = worker_a.initiate_blinded_query(
-            query_entity_id=req.query_entity_id,
-            consortium_id=clean_consortium_id,
-            target_bank_id=clean_target,
-            purpose=req.purpose,
-        )
+        # 4. Execute Selected Protocol Path
+        if use_established_psi:
+            remote_workers = hasattr(worker_a, "_post") or hasattr(worker_b, "_post")
+            if not (OpenMinedPSIAdapter.is_available() or remote_workers):
+                raise ConsortiumSecurityError(
+                    "Verified operational matching failed: Established PSI library (openmined-psi) is unavailable in this environment. "
+                    "Failing closed to prevent unverified prototype execution."
+                )
 
-        # 5. Stage 2: Bank B Worker computes Counterpart Match Response
-        # Note: Peer signatures are verified using Bank B's internal trusted peer keystore,
-        # never secrets supplied by the coordinator or in the request payload.
-        counterpart_resp = worker_b.process_counterpart_query(
-            query=query_msg,
-        )
+            query_msg = worker_a.initiate_established_psi_query(
+                query_entity_id=req.query_entity_id,
+                consortium_id=clean_consortium_id,
+                target_bank_id=clean_target,
+                ticket=ticket,
+                purpose=req.purpose,
+            )
+            counterpart_resp = worker_b.process_established_psi_counterpart(
+                query=query_msg,
+            )
+            receipt = worker_a.finalize_established_psi_evaluation(
+                query=query_msg,
+                response=counterpart_resp,
+            )
 
-        # 6. Stage 3: Bank A Worker finalizes match evaluation
-        receipt = worker_a.finalize_match_evaluation(
-            query=query_msg,
-            response=counterpart_resp,
-        )
+            protocol_literal = "OPENMINED-PSI-2.0.6-ECDH"
+            assurance_level_literal = "REVIEWED_ESTABLISHED_PSI_VERIFIED"
+            execution_mode_literal = "VERIFIED_OPERATIONAL"
+            operational_status_literal = "VERIFIED_OPERATIONAL"
+            is_authoritative_flag = True
+        else:
+            assert initial_blinded_msg is not None
+            query_msg = replace(initial_blinded_msg, ticket=ticket)
+
+            counterpart_resp = worker_b.process_counterpart_query(
+                query=query_msg,
+            )
+            receipt = worker_a.finalize_match_evaluation(
+                query=query_msg,
+                response=counterpart_resp,
+            )
+
+            protocol_literal = "DH-PSI-2048-MODP"
+            assurance_level_literal = "PROTOCOL_PROTOTYPE"
+            execution_mode_literal = "RESEARCH_PROTOTYPE"
+            operational_status_literal = "RESEARCH_PROTOTYPE"
+            is_authoritative_flag = False
 
         # 7. Coordinator signs receipt attestation
         coord_sig = hmac.new(
@@ -1211,7 +1971,6 @@ class CrossBankMatchingCoordinator:
         ).hexdigest()
 
         # 8. Determine Minimal Disclosed Intelligence Signal
-        now = datetime.datetime.now(UTC)
         allow_identities = bool(disclosure_scope.get("allow_institution_identity", False))
         disclosed_institutions = (
             [clean_target] if (receipt.match_confirmed and allow_identities) else []
@@ -1220,7 +1979,6 @@ class CrossBankMatchingCoordinator:
             "ATTRIBUTED_INSTITUTIONS" if allow_identities else "ANONYMIZED_SUMMARY"
         )
 
-        # Risk attribution is exact, bound strictly to the decrypted matched record (never entire dataset)
         max_risk = receipt.matched_risk_level if receipt.match_confirmed else "UNOBSERVED"
         typologies = list(receipt.matched_typologies) if receipt.match_confirmed else []
         if receipt.match_confirmed:
@@ -1263,32 +2021,42 @@ class CrossBankMatchingCoordinator:
                 ),
                 "operational_status": operational_status_literal,
                 "governance_authority": f"consortium:{clean_consortium_id}",
-                "protocol": "DH-PSI-2048-MODP",
+                "protocol": protocol_literal,
                 "job_id": query_msg.job_id,
+                "ticket_id": ticket.ticket_id,
+                "grant_id": grant_id,
+                "grant_revision": grant_revision,
+                "grant_scope_digest": grant_scope_digest,
+                "target_bank_id": clean_target,
                 "receipt_id": receipt.receipt_id,
                 "transcript_digest": receipt.transcript_digest,
                 "coordinator_signature": coord_sig,
                 "assurance_level": assurance_level_literal,
             },
             execution_mode=execution_mode_literal,
-            attestation_status="IN_PROCESS_PROTOTYPE",
+            attestation_status="IN_PROCESS_PROTOTYPE" if not is_multi_process else "ISOLATED_MULTI_PROCESS",
             is_authoritative=is_authoritative_flag,
             is_synthetic=False,
             assurance_level=cast("Any", assurance_level_literal),
         )
 
-        # 9. Register strictly in Research Prototype Store (NEVER in Authoritative Signal Store)
+        # 9. Register in Authoritative or Research Prototype Store based on verification status
         signal_dict = signal.model_dump()
         expires_at = (now + datetime.timedelta(hours=24)).isoformat()
         content_hash = hashlib.sha256(
             json.dumps(signal_dict, sort_keys=True).encode("utf-8")
         ).hexdigest()
 
-        prototype_record = {
+        record = {
             "signal_id": signal_id,
             "signal_data": signal_dict,
             "requesting_bank_id": clean_requesting,
+            "target_bank_id": clean_target,
             "consortium_id": clean_consortium_id,
+            "grant_id": grant_id,
+            "grant_revision": grant_revision,
+            "grant_scope_digest": grant_scope_digest,
+            "ticket_id": ticket.ticket_id,
             "query_entity_id": req.query_entity_id,
             "issued_to_principal": actor or f"worker:{clean_requesting}",
             "issued_at": now.isoformat(),
@@ -1301,7 +2069,11 @@ class CrossBankMatchingCoordinator:
             "attached_to_cases": [],
             "receipt": asdict(receipt),
         }
-        self._prototype_store.set(signal_id, prototype_record)
+
+        if is_authoritative_flag:
+            self._signal_store.set(signal_id, record)
+        else:
+            self._prototype_store.set(signal_id, record)
 
         # 10. Audit Event
         ImmutableAuditChain.get_instance().append_event(
@@ -1314,19 +2086,21 @@ class CrossBankMatchingCoordinator:
                 "requesting_bank_id": clean_requesting,
                 "target_bank_id": clean_target,
                 "match_confirmed": receipt.match_confirmed,
-                "protocol": "DH-PSI-2048-MODP",
+                "protocol": protocol_literal,
                 "receipt_id": receipt.receipt_id,
                 "assurance_level": assurance_level_literal,
+                "is_authoritative": is_authoritative_flag,
             },
         )
 
         logger.info(
-            "Isolated two-bank private matching completed: %s <-> %s (match=%s, receipt=%s, assurance=%s)",
+            "Isolated two-bank private matching completed: %s <-> %s (match=%s, receipt=%s, assurance=%s, auth=%s)",
             clean_requesting,
             clean_target,
             receipt.match_confirmed,
             receipt.receipt_id,
             assurance_level_literal,
+            is_authoritative_flag,
         )
         return signal
 
@@ -1335,10 +2109,27 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Institutional Bank Worker Node Process")
-    parser.add_argument("--bank-id", required=True, help="Institutional bank identifier")
-    parser.add_argument("--host", default="127.0.0.1", help="Bind host")
-    parser.add_argument("--port", type=int, default=0, help="Bind port (0 for ephemeral)")
-    parser.add_argument("--storage-root", required=True, help="Path to base storage directory")
+    parser.add_argument(
+        "--bank-id",
+        default=os.environ.get("BANK_ID"),
+        help="Institutional bank identifier",
+    )
+    parser.add_argument(
+        "--host",
+        default=os.environ.get("WORKER_HOST", "127.0.0.1"),
+        help="Bind host",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("WORKER_PORT", "0")),
+        help="Bind port (0 for ephemeral)",
+    )
+    parser.add_argument(
+        "--storage-root",
+        default=os.environ.get("STORAGE_ROOT") or os.environ.get("CFI_STORAGE_DIR"),
+        help="Path to base storage directory",
+    )
     parser.add_argument("--auth-secret", default=None, help="Worker authentication secret (deprecated on CLI; prefer env)")
     parser.add_argument("--matching-token", default=None, help="Worker matching token")
     parser.add_argument("--ingestion-token", default=None, help="Worker ingestion token")
@@ -1348,6 +2139,10 @@ if __name__ == "__main__":
     )
 
     cli_args = parser.parse_args()
+    if not cli_args.bank_id or not cli_args.storage_root:
+        parser.error(
+            "--bank-id and --storage-root must be specified via CLI or environment variables (BANK_ID, STORAGE_ROOT / CFI_STORAGE_DIR)"
+        )
     env_auth = os.environ.get("WORKER_AUTH_SECRET") or cli_args.auth_secret or secrets.token_hex(32)
     env_matching = os.environ.get("WORKER_MATCHING_TOKEN") or cli_args.matching_token
     env_ingest = os.environ.get("WORKER_INGESTION_TOKEN") or cli_args.ingestion_token

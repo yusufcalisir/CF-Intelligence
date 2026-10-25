@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import datetime
+import hashlib
+import json
 import logging
 import math
 import os
@@ -24,6 +26,34 @@ from app.domain.consortium_governance import (
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 
 logger = logging.getLogger(__name__)
+
+
+def compute_operational_grant_scope_digest(
+    grant_id: str,
+    revision: int,
+    participating_banks: list[str],
+    allowed_purposes: list[str],
+    institution_jurisdictions: dict[str, str],
+    allowed_jurisdictions: list[str],
+    allow_cross_border: bool,
+    allow_institution_identity_sharing: bool,
+) -> str:
+    """Computes deterministic, canonical SHA-256 digest of an operational grant scope."""
+    canonical = {
+        "grant_id": str(grant_id).strip(),
+        "revision": int(revision),
+        "participating_banks": sorted(list(set(str(b).lower().strip() for b in participating_banks))),
+        "allowed_purposes": sorted(list(set(str(p).strip() for p in allowed_purposes))),
+        "institution_jurisdictions": {
+            str(k).lower().strip(): str(v).strip()
+            for k, v in sorted(institution_jurisdictions.items())
+        },
+        "allowed_jurisdictions": sorted(list(set(str(j).strip() for j in allowed_jurisdictions))),
+        "allow_cross_border": bool(allow_cross_border),
+        "allow_institution_identity_sharing": bool(allow_institution_identity_sharing),
+    }
+    canonical_bytes = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(canonical_bytes).hexdigest()
 
 
 class ConsortiumGovernanceService:
@@ -274,32 +304,49 @@ class ConsortiumGovernanceService:
             action_name="register_operational_data_sharing_grant",
         )
 
-        purposes = allowed_purposes or ["AML_COLLABORATIVE_INVESTIGATION", "FRAUD_INVESTIGATION"]
+        purposes = sorted(list(set(p.strip() for p in (allowed_purposes or ["AML_COLLABORATIVE_INVESTIGATION", "FRAUD_INVESTIGATION"]))))
         jurisdictions = institution_jurisdictions or {}
         default_allowed = list(dict.fromkeys(list(jurisdictions.values()) + ["eu-central-1", "us-east-1", "apac-singapore-1"]))
         part_banks = [b.lower().strip() for b in (participating_banks or list(jurisdictions.keys()) or [clean_approver])]
         if clean_approver not in part_banks:
             part_banks.append(clean_approver)
+        part_banks = sorted(list(set(part_banks)))
+        clean_jurisdictions = {k.lower().strip(): v.strip() for k, v in sorted(jurisdictions.items())}
+        clean_allowed_jur = sorted(list(set(j.strip() for j in (allowed_jurisdictions or default_allowed))))
+
+        scope_digest = compute_operational_grant_scope_digest(
+            grant_id=grant_id,
+            revision=revision,
+            participating_banks=part_banks,
+            allowed_purposes=purposes,
+            institution_jurisdictions=clean_jurisdictions,
+            allowed_jurisdictions=clean_allowed_jur,
+            allow_cross_border=allow_cross_border,
+            allow_institution_identity_sharing=allow_institution_identity_sharing,
+        )
 
         approval_record = {
             "actor_id": attr["actor_id"],
             "actor_institution": clean_approver,
             "approved_at": datetime.datetime.now(UTC).isoformat(),
             "roles": attr["effective_role"],
+            "scope_digest": scope_digest,
+            "grant_revision": revision,
         }
 
         grant_dict: dict[str, Any] = {
             "grant_id": grant_id.strip(),
             "authority": authority.strip(),
             "revision": revision,
+            "scope_digest": scope_digest,
             "is_active": True,
-            "participating_banks": sorted(list(set(part_banks))),
+            "participating_banks": part_banks,
             "approvals": {clean_approver: approval_record},
             "revoked_by_institutions": [],
             "revocation_history": [],
-            "allowed_purposes": [p.strip() for p in purposes],
-            "institution_jurisdictions": {k.lower().strip(): v.strip() for k, v in jurisdictions.items()},
-            "allowed_jurisdictions": [j.strip() for j in (allowed_jurisdictions or default_allowed)],
+            "allowed_purposes": purposes,
+            "institution_jurisdictions": clean_jurisdictions,
+            "allowed_jurisdictions": clean_allowed_jur,
             "allow_cross_border": allow_cross_border,
             "allow_institution_identity_sharing": allow_institution_identity_sharing,
             "registered_at": datetime.datetime.now(UTC).isoformat(),
@@ -323,17 +370,31 @@ class ConsortiumGovernanceService:
             history: list[dict[str, Any]] = []
             if existing and isinstance(existing, dict):
                 prev_rev = int(existing.get("revision", 1))
-                # Bilateral approval on existing grant without revision bump
+                prev_scope_digest = existing.get("scope_digest")
+                if not prev_scope_digest:
+                    prev_scope_digest = compute_operational_grant_scope_digest(
+                        grant_id=existing.get("grant_id", grant_id),
+                        revision=prev_rev,
+                        participating_banks=existing.get("participating_banks", []),
+                        allowed_purposes=existing.get("allowed_purposes", []),
+                        institution_jurisdictions=existing.get("institution_jurisdictions", {}),
+                        allowed_jurisdictions=existing.get("allowed_jurisdictions", []),
+                        allow_cross_border=existing.get("allow_cross_border", False),
+                        allow_institution_identity_sharing=existing.get("allow_institution_identity_sharing", False),
+                    )
+                    existing["scope_digest"] = prev_scope_digest
+
+                # Scope is immutable per approval revision
                 if revision == prev_rev and existing.get("grant_id") == grant_id.strip():
+                    if scope_digest != prev_scope_digest:
+                        raise ValueError(
+                            f"Operational data sharing grant scope is immutable per revision. "
+                            f"Modifications to participants, purposes, jurisdictions, or cross-border settings "
+                            f"require an incremented revision. Current active revision is {prev_rev}."
+                        )
                     approvals = dict(existing.get("approvals", {}))
                     approvals[clean_approver] = approval_record
                     existing["approvals"] = approvals
-                    # Update jurisdictions or purposes if newly provided
-                    if institution_jurisdictions:
-                        existing["institution_jurisdictions"] = {
-                            **existing.get("institution_jurisdictions", {}),
-                            **grant_dict["institution_jurisdictions"],
-                        }
                     revoked = list(existing.get("revoked_by_institutions", []))
                     if clean_approver in revoked:
                         revoked.remove(clean_approver)
@@ -347,9 +408,15 @@ class ConsortiumGovernanceService:
                         f"Operational grant revision must be strictly monotonically increasing. "
                         f"Current revision is {prev_rev}, attempted revision is {revision}."
                     )
+                # Material changes or bumped revision: prior approvals from earlier revisions are stale
+                # and do NOT carry forward into the new revision.
                 history = list(existing.get("history", []))
                 prior_snapshot = {k: v for k, v in existing.items() if k != "history"}
                 history.append(prior_snapshot)
+                grant_dict["history"] = history
+                grant_dict["approvals"] = {clean_approver: approval_record}
+                c.metadata["operational_data_sharing_grant"] = grant_dict
+                return grant_dict
 
             grant_dict["history"] = history
             c.metadata["operational_data_sharing_grant"] = grant_dict
@@ -366,7 +433,7 @@ class ConsortiumGovernanceService:
         actor: str | None = None,
         trusted_context: Any | None = None,
     ) -> dict[str, Any]:
-        """Records authenticated bilateral approval from a participating institution."""
+        """Records authenticated bilateral approval from a participating institution bound to canonical scope."""
         clean_id = consortium_id.lower().strip()
         clean_bank = approving_bank_id.lower().strip()
         attr = self._verify_service_actor_bank(
@@ -377,13 +444,6 @@ class ConsortiumGovernanceService:
             trusted_context=trusted_context,
             action_name="approve_operational_data_sharing_grant",
         )
-
-        approval_record = {
-            "actor_id": attr["actor_id"],
-            "actor_institution": clean_bank,
-            "approved_at": datetime.datetime.now(UTC).isoformat(),
-            "roles": attr["effective_role"],
-        }
 
         def _mutate(consortia: dict[str, Consortium], proposals: dict[str, Any]) -> dict[str, Any]:
             if clean_id not in consortia:
@@ -398,6 +458,30 @@ class ConsortiumGovernanceService:
                 raise ValueError(f"Operational data-sharing grant '{grant_id}' does not exist in consortium '{clean_id}'.")
             if existing.get("grant_id") != grant_id.strip():
                 raise ValueError(f"Grant ID mismatch: active grant is '{existing.get('grant_id')}', not '{grant_id}'.")
+
+            rev = int(existing.get("revision", 1))
+            current_scope_digest = existing.get("scope_digest")
+            if not current_scope_digest:
+                current_scope_digest = compute_operational_grant_scope_digest(
+                    grant_id=existing.get("grant_id", grant_id),
+                    revision=rev,
+                    participating_banks=existing.get("participating_banks", []),
+                    allowed_purposes=existing.get("allowed_purposes", []),
+                    institution_jurisdictions=existing.get("institution_jurisdictions", {}),
+                    allowed_jurisdictions=existing.get("allowed_jurisdictions", []),
+                    allow_cross_border=existing.get("allow_cross_border", False),
+                    allow_institution_identity_sharing=existing.get("allow_institution_identity_sharing", False),
+                )
+                existing["scope_digest"] = current_scope_digest
+
+            approval_record = {
+                "actor_id": attr["actor_id"],
+                "actor_institution": clean_bank,
+                "approved_at": datetime.datetime.now(UTC).isoformat(),
+                "roles": attr["effective_role"],
+                "scope_digest": current_scope_digest,
+                "grant_revision": rev,
+            }
 
             approvals = dict(existing.get("approvals", {}))
             approvals[clean_bank] = approval_record

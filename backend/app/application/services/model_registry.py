@@ -25,7 +25,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-import torch
+try:
+    import torch
+except (ImportError, ModuleNotFoundError):
+    torch = None  # type: ignore[assignment]
 from filelock import FileLock
 
 from app.application.services.training_provenance_service import (

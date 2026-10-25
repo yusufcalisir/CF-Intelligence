@@ -298,6 +298,8 @@ class ConsortiumPolicyEngine:
             # Bilateral / Multilateral Institutional Consent Validation
             approvals = operational_grant.get("approvals", {})
             revoked_institutions = set(operational_grant.get("revoked_by_institutions", []))
+            grant_scope_digest = operational_grant.get("scope_digest")
+            grant_revision = int(operational_grant.get("revision", 1))
 
             if clean_requesting in revoked_institutions:
                 reasons.append(
@@ -305,9 +307,18 @@ class ConsortiumPolicyEngine:
                 )
                 return False, reasons, {}
 
-            if clean_requesting not in approvals:
+            req_approval = approvals.get(clean_requesting)
+            if not req_approval:
                 reasons.append(
                     f"Requesting bank '{clean_requesting}' has not approved operational data-sharing grant '{operational_grant.get('grant_id')}'."
+                )
+                return False, reasons, {}
+
+            if grant_scope_digest and req_approval.get("scope_digest") and req_approval.get("scope_digest") != grant_scope_digest:
+                reasons.append(
+                    f"Approval by requesting institution '{clean_requesting}' is stale for operational grant '{operational_grant.get('grant_id')}' "
+                    f"(approved digest: '{req_approval.get('scope_digest')}', current: '{grant_scope_digest}'). "
+                    "Re-approval of the updated revision is required."
                 )
                 return False, reasons, {}
 
@@ -318,10 +329,19 @@ class ConsortiumPolicyEngine:
                         f"Operational data-sharing consent was revoked by counterpart institution '{clean_tb}'."
                     )
                     return False, reasons, {}
-                if clean_tb not in approvals:
+                tb_approval = approvals.get(clean_tb)
+                if not tb_approval:
                     reasons.append(
                         f"Target institution '{clean_tb}' has not approved operational data-sharing grant '{operational_grant.get('grant_id')}'. "
                         f"Unilateral approval by '{clean_requesting}' does not constitute bilateral institutional consent."
+                    )
+                    return False, reasons, {}
+                if grant_scope_digest and tb_approval.get("scope_digest") and tb_approval.get("scope_digest") != grant_scope_digest:
+                    reasons.append(
+                        f"Approval by target institution '{clean_tb}' is stale for operational grant '{operational_grant.get('grant_id')}' "
+                        f"(approved revision {tb_approval.get('grant_revision')} with digest '{tb_approval.get('scope_digest')}', "
+                        f"current is revision {grant_revision} with digest '{grant_scope_digest}'). "
+                        f"Matching remains denied until target institution independently reapproves the new revision."
                     )
                     return False, reasons, {}
 
