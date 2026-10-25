@@ -283,9 +283,13 @@ class CrossBankIntelligenceService:
         # 5. Case Verification if case_id specified
         req_case_id = getattr(req, "case_id", None)
         if req_case_id:
-            case = self.case_service.get_case(req_case_id, requesting_bank=clean_requesting)
+            case = self.case_service.get_case(req_case_id)
             if not case:
                 raise ValueError(f"Investigation case '{req_case_id}' not found.")
+            if getattr(case, "bank_id", None) and case.bank_id.lower().strip() != clean_requesting:
+                raise PermissionError(
+                    f"Cross-tenant access violation: Case '{req_case_id}' belongs to '{case.bank_id}', not '{clean_requesting}'."
+                )
             if not case.is_open:
                 raise TerminalCaseImmutableError(
                     f"Invalid query: Case '{req_case_id}' is finalized in terminal state."

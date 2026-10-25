@@ -70,15 +70,15 @@ SHARED_CONSORTIUM_STORE_SECRET = "consortium_store_hmac_shared_sec_8887776665554
 SHARED_JWT_SECRET = "jwt_secret_test_suite_production_hardened_98712349812734918237"
 
 # Mutable globals populated per session to guarantee disposable uniqueness
-NETWORK_NAME = ""
-CONTAINER_WORKER_A = ""
-CONTAINER_WORKER_B = ""
-CONTAINER_COORDINATOR = ""
-VOLUME_BANK_A = ""
-VOLUME_BANK_B = ""
-PORT_WORKER_A = 0
-PORT_WORKER_B = 0
-PORT_COORDINATOR = 0
+NETWORK_NAME: str = ""
+CONTAINER_WORKER_A: str = ""
+CONTAINER_WORKER_B: str = ""
+CONTAINER_COORDINATOR: str = ""
+VOLUME_BANK_A: str = ""
+VOLUME_BANK_B: str = ""
+PORT_WORKER_A: int = 0
+PORT_WORKER_B: int = 0
+PORT_COORDINATOR: int = 0
 
 
 def _get_free_port() -> int:
