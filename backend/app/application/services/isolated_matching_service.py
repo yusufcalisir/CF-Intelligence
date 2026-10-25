@@ -419,7 +419,7 @@ class IsolatedBankWorkerNode:
         record = {
             "consortium_id": consortium_id.strip(),
             "grant_id": clean_grant,
-            "revision": int(revision),
+            "revision": revision,
             "scope_digest": scope_digest.strip(),
             "permitted_counterparts": [c.lower().strip() for c in permitted_counterparts],
             "permitted_purposes": [p.strip() for p in permitted_purposes],
@@ -2436,7 +2436,7 @@ class InstitutionalCoordinatorDaemon:
     def __init__(
         self,
         coordinator: CrossBankMatchingCoordinator,
-        host: str = "0.0.0.0",
+        host: str = "0.0.0.0",  # nosec B104
         port: int = 8200,
     ) -> None:
         self.coordinator = coordinator
@@ -2608,7 +2608,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--host",
-        default=os.environ.get("WORKER_HOST", "0.0.0.0"),
+        default=os.environ.get("WORKER_HOST", "0.0.0.0"),  # nosec B104
         help="Bind host",
     )
     parser.add_argument(
