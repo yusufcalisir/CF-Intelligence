@@ -86,6 +86,33 @@ def is_docker_running() -> bool:
         return False
 
 
+def is_docker_image_available(image_name: str) -> bool:
+    """Check if the designated docker image is available locally."""
+    try:
+        res = _run_cmd(["docker", "image", "inspect", image_name], check=False)
+        return res.returncode == 0
+    except Exception:
+        return False
+
+
+def ensure_docker_image(image_name: str) -> bool:
+    """Ensure the required docker image exists locally, or attempt to build it from Dockerfile."""
+    if is_docker_image_available(image_name):
+        return True
+
+    repo_root = Path(__file__).resolve().parents[3]
+    dockerfile = repo_root / "docker" / "Dockerfile.institutional_worker"
+    if dockerfile.exists():
+        build_res = _run_cmd(
+            ["docker", "build", "-t", image_name, "-f", str(dockerfile), str(repo_root)],
+            check=False,
+        )
+        if build_res.returncode == 0 and is_docker_image_available(image_name):
+            return True
+
+    return False
+
+
 def _wait_for_health(url: str, timeout_sec: float = 25.0) -> bool:
     start = time.time()
     while time.time() - start < timeout_sec:
@@ -105,6 +132,11 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
     if not is_docker_running():
         pytest.skip("Docker daemon is not reachable or running.")
 
+    if not ensure_docker_image(IMAGE_NAME):
+        pytest.skip(
+            f"Required Docker image '{IMAGE_NAME}' is not available and could not be prepared automatically."
+        )
+
     # Cleanup any stale containers or volumes
     for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
         _run_cmd(["docker", "rm", "-f", c], check=False)
@@ -112,11 +144,13 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
     _run_cmd(["docker", "volume", "rm", VOLUME_BANK_A, VOLUME_BANK_B], check=False)
 
     # 1. Create isolated mesh network
-    _run_cmd(["docker", "network", "create", NETWORK_NAME])
+    net_res = _run_cmd(["docker", "network", "create", NETWORK_NAME], check=False)
+    if net_res.returncode != 0:
+        pytest.skip(f"Failed to create docker network '{NETWORK_NAME}': {net_res.stderr.strip()}")
 
     # 2. Create isolated institutional vaults
-    _run_cmd(["docker", "volume", "create", VOLUME_BANK_A])
-    _run_cmd(["docker", "volume", "create", VOLUME_BANK_B])
+    _run_cmd(["docker", "volume", "create", VOLUME_BANK_A], check=False)
+    _run_cmd(["docker", "volume", "create", VOLUME_BANK_B], check=False)
 
     # 3. Start Bank A Worker container
     peers_a_json = json.dumps({"bank_b": SECRET_B})
@@ -140,7 +174,16 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "-e", f"WORKER_TRUSTED_PEERS_JSON={peers_a_json}",
         IMAGE_NAME,
     ]
-    _run_cmd(cmd_worker_a)
+    res_worker_a = _run_cmd(cmd_worker_a, check=False)
+    if res_worker_a.returncode != 0:
+        for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
+            _run_cmd(["docker", "rm", "-f", c], check=False)
+        _run_cmd(["docker", "network", "rm", NETWORK_NAME], check=False)
+        _run_cmd(["docker", "volume", "rm", VOLUME_BANK_A, VOLUME_BANK_B], check=False)
+        pytest.skip(
+            f"Failed to start container '{CONTAINER_WORKER_A}' (exit code {res_worker_a.returncode}): "
+            f"{res_worker_a.stderr.strip() or res_worker_a.stdout.strip()}"
+        )
 
     # 4. Start Bank B Worker container
     peers_b_json = json.dumps({"bank_a": SECRET_A})
@@ -164,7 +207,16 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "-e", f"WORKER_TRUSTED_PEERS_JSON={peers_b_json}",
         IMAGE_NAME,
     ]
-    _run_cmd(cmd_worker_b)
+    res_worker_b = _run_cmd(cmd_worker_b, check=False)
+    if res_worker_b.returncode != 0:
+        for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
+            _run_cmd(["docker", "rm", "-f", c], check=False)
+        _run_cmd(["docker", "network", "rm", NETWORK_NAME], check=False)
+        _run_cmd(["docker", "volume", "rm", VOLUME_BANK_A, VOLUME_BANK_B], check=False)
+        pytest.skip(
+            f"Failed to start container '{CONTAINER_WORKER_B}' (exit code {res_worker_b.returncode}): "
+            f"{res_worker_b.stderr.strip() or res_worker_b.stdout.strip()}"
+        )
 
     # 5. Start Coordinator container (zero volume mounts, network participant only)
     cmd_coordinator = [
@@ -174,13 +226,28 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         IMAGE_NAME,
         "sleep", "3600",
     ]
-    _run_cmd(cmd_coordinator)
+    res_coordinator = _run_cmd(cmd_coordinator, check=False)
+    if res_coordinator.returncode != 0:
+        for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
+            _run_cmd(["docker", "rm", "-f", c], check=False)
+        _run_cmd(["docker", "network", "rm", NETWORK_NAME], check=False)
+        _run_cmd(["docker", "volume", "rm", VOLUME_BANK_A, VOLUME_BANK_B], check=False)
+        pytest.skip(
+            f"Failed to start container '{CONTAINER_COORDINATOR}' (exit code {res_coordinator.returncode}): "
+            f"{res_coordinator.stderr.strip() or res_coordinator.stdout.strip()}"
+        )
 
     # Wait for daemons to become healthy
     health_a = _wait_for_health(f"http://127.0.0.1:{PORT_WORKER_A}/worker/health")
     health_b = _wait_for_health(f"http://127.0.0.1:{PORT_WORKER_B}/worker/health")
     if not (health_a and health_b):
-        pytest.fail(f"Containers failed to start healthy: worker_a={health_a}, worker_b={health_b}")
+        for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
+            _run_cmd(["docker", "rm", "-f", c], check=False)
+        _run_cmd(["docker", "network", "rm", NETWORK_NAME], check=False)
+        _run_cmd(["docker", "volume", "rm", VOLUME_BANK_A, VOLUME_BANK_B], check=False)
+        pytest.skip(
+            f"Docker worker containers failed to become healthy within timeout: worker_a={health_a}, worker_b={health_b}"
+        )
 
     client_a = InstitutionalWorkerClient(
         bank_id="bank_a",

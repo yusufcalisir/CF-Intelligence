@@ -1858,10 +1858,7 @@ class CrossBankMatchingCoordinator:
                 "Failing closed to prevent unverified prototype execution."
             )
 
-        use_established_psi = (
-            explicit_established_psi
-            or (req.execution_mode == "VERIFIED_OPERATIONAL" and library_available)
-        )
+        use_established_psi = explicit_established_psi
 
         initial_blinded_msg = None
         if use_established_psi:

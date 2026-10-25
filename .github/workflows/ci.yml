@@ -133,6 +133,10 @@ jobs:
         run: |
           pytest backend/tests/unit/test_ci_smoke_gates.py -v
 
+      - name: Build Institutional Worker Docker Image for Integration Tests
+        run: |
+          docker build -t cfi-institutional-worker:latest -f docker/Dockerfile.institutional_worker .
+
       - name: Run Backend Pytest Suite
         env:
           PYTHONPATH: ${{ github.workspace }}/backend:backend
@@ -291,6 +295,10 @@ jobs:
             fi
             sleep 1
           done
+
+      - name: Build Institutional Worker Docker Image for Integration Tests
+        run: |
+          docker build -t cfi-institutional-worker:latest -f docker/Dockerfile.institutional_worker .
 
       - name: Run Multi-Dimensional Coverage Audit
         env:

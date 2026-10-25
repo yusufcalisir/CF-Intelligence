@@ -73,6 +73,19 @@ class CrossBankIntelligenceQueryRequest(BaseModel):
         default=False,
         description="If True, strictly requires physical hardware enclave attestation; fails closed if unavailable.",
     )
+    use_established_psi: bool = Field(
+        default=False,
+        description="Whether to execute reviewed established PSI protocol (OpenMined PSI ECDH) instead of protocol prototype.",
+    )
+    require_established_psi: bool = Field(
+        default=False,
+        description="If True, strictly fails closed if reviewed established PSI is unavailable.",
+    )
+    protocol: str = Field(
+        default="",
+        max_length=64,
+        description="Optional explicit protocol selection (e.g. OPENMINED_PSI, DH-PSI-2048-MODP).",
+    )
 
 
 class CrossBankIntelligenceSignal(BaseModel):
