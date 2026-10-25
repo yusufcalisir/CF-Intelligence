@@ -279,7 +279,7 @@ class IsolatedBankWorkerNode:
 
     def _sanitize_entity_id(self, entity_id: str) -> str:
         """Validate and canonicalize entity identifier to prevent path traversal and data poisoning."""
-        clean_id = str(entity_id).strip()
+        clean_id = entity_id.strip()
         if not clean_id or not re.match(r"^[a-zA-Z0-9_\-]+$", clean_id):
             raise ValueError(
                 f"Invalid entity identifier '{entity_id}': Contains illegal characters or path traversal elements. "

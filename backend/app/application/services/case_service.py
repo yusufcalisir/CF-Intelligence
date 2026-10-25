@@ -1195,7 +1195,7 @@ class EvidenceRegistryService:
         old_version = getattr(case, "version", 1)
 
         meta = metadata or {}
-        is_prototype_or_unverified = bool(
+        is_prototype_or_unverified = (
             meta.get("is_synthetic") is True
             or meta.get("execution_mode") in ("SIMULATED_RESEARCH", "RESEARCH_PROTOTYPE", "PROTOTYPE")
             or meta.get("is_authoritative") is False
