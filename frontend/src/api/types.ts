@@ -3614,8 +3614,12 @@ export interface CrossBankIntelligenceQueryPayload {
   privacy_id?: string;
   consortium_id: string;
   target_bank_id?: string;
+  case_id?: string;
   purpose?: string;
   require_hardware_attestation?: boolean;
+  use_established_psi?: boolean;
+  require_established_psi?: boolean;
+  protocol?: string;
   execution_mode?: 'SIMULATED_RESEARCH' | 'VERIFIED_OPERATIONAL';
 }
 
