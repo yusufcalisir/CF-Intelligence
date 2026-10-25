@@ -286,9 +286,10 @@ class CrossBankIntelligenceService:
             case = self.case_service.get_case(req_case_id)
             if not case:
                 raise ValueError(f"Investigation case '{req_case_id}' not found.")
-            if getattr(case, "bank_id", None) and case.bank_id.lower().strip() != clean_requesting:
+            case_bank = getattr(case, "bank_id", None)
+            if case_bank and str(case_bank).lower().strip() != clean_requesting:
                 raise PermissionError(
-                    f"Cross-tenant access violation: Case '{req_case_id}' belongs to '{case.bank_id}', not '{clean_requesting}'."
+                    f"Cross-tenant access violation: Case '{req_case_id}' belongs to '{case_bank}', not '{clean_requesting}'."
                 )
             if not case.is_open:
                 raise TerminalCaseImmutableError(

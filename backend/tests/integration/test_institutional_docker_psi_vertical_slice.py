@@ -32,7 +32,7 @@ from collections.abc import Generator
 from dataclasses import asdict, replace
 from datetime import UTC
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import pytest
 
@@ -43,7 +43,6 @@ from app.application.services.consortium_service import (
 )
 from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
 from app.application.services.isolated_matching_service import (
-    CrossBankMatchingCoordinator,
     EstablishedPSIQueryMessage,
     InstitutionalCoordinatorClient,
     InstitutionalWorkerClient,
