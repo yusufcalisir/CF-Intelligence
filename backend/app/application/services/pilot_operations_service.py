@@ -67,10 +67,35 @@ class PilotOperationsService:
 
     def provision_pilot(
         self,
-        req: PilotProvisionRequest,
+        req: PilotProvisionRequest | None = None,
         principal: AuthenticatedPrincipal | None = None,
+        pilot_id: str | None = None,
+        consortium_id: str | None = None,
+        participating_institutions: list[str] | None = None,
+        allowed_purposes: list[str] | None = None,
+        allowed_jurisdictions: list[str] | None = None,
+        approved_synthetic_datasets: list[str] | None = None,
+        max_queries_total: int = 50,
+        max_queries_per_institution: int = 25,
+        duration_days: int = 14,
+        creator_actor: str | None = None,
+        **kwargs: Any,
     ) -> PilotEntity:
         """Provision a new two-bank pilot in DRAFT state."""
+        if req is None:
+            if not pilot_id or not consortium_id:
+                raise ValueError("Both pilot_id and consortium_id are mandatory to provision a pilot.")
+            req = PilotProvisionRequest(
+                pilot_id=pilot_id,
+                consortium_id=consortium_id,
+                participating_institutions=participating_institutions or ["bank_a", "bank_b"],
+                allowed_purposes=allowed_purposes or ["AML_INVESTIGATION"],
+                allowed_jurisdictions=allowed_jurisdictions or ["EU"],
+                approved_synthetic_datasets=approved_synthetic_datasets or [],
+                max_queries_total=max_queries_total,
+                max_queries_per_institution=max_queries_per_institution,
+                duration_days=duration_days,
+            )
         clean_pilot_id = req.pilot_id.strip()
         clean_consortium_id = req.consortium_id.lower().strip()
 

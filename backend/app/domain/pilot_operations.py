@@ -121,6 +121,7 @@ class PilotOperationalConfig:
     expires_at: str = ""
     query_quota_total: int = 50
     query_quota_per_institution: int = 25
+    scope_digest: str = ""
 
     def compute_scope_digest(self) -> str:
         """Computes deterministic, canonical SHA-256 digest of this pilot scope."""

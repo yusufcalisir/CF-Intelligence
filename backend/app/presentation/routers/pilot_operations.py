@@ -119,6 +119,30 @@ def _entity_to_response(entity: PilotEntity) -> PilotStatusResponse:
 
 
 @router.post(
+    "",
+    response_model=PilotStatusResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Provision a new two-bank controlled pilot in DRAFT state",
+)
+@router.post(
+    "/",
+    response_model=PilotStatusResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Provision a new two-bank controlled pilot in DRAFT state",
+)
+@api_router.post(
+    "",
+    response_model=PilotStatusResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Provision a new two-bank controlled pilot in DRAFT state",
+)
+@api_router.post(
+    "/",
+    response_model=PilotStatusResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Provision a new two-bank controlled pilot in DRAFT state",
+)
+@router.post(
     "/provision",
     response_model=PilotStatusResponse,
     status_code=status.HTTP_201_CREATED,

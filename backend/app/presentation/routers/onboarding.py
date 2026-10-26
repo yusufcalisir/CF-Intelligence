@@ -109,6 +109,16 @@ def _enforce_onboarding_access(
     response_model=BankCABundleResponse,
     summary="Download Consortium Root CA bundle for mTLS trust store",
 )
+@router.get(
+    "/consortium-ca",
+    response_model=BankCABundleResponse,
+    summary="Download Consortium Root CA certificate and fingerprint",
+)
+@api_router.get(
+    "/consortium-ca",
+    response_model=BankCABundleResponse,
+    summary="Download Consortium Root CA certificate and fingerprint",
+)
 async def get_ca_bundle() -> BankCABundleResponse:
     """Returns the persistent Consortium Root Certificate Authority certificate PEM and fingerprint."""
     from cryptography import x509
