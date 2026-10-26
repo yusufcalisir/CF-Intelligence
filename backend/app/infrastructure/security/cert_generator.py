@@ -11,6 +11,64 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
 
+import os
+import threading
+
+_consortium_ca_cache: tuple[str, str] | None = None
+_ca_lock = threading.Lock()
+
+
+def get_or_create_consortium_ca(
+    common_name: str = "CF-Intelligence Consortium Root CA",
+    days_valid: int = 3650,
+) -> tuple[str, str]:
+    """Retrieve or durably create a persistent Consortium Root CA certificate and private key.
+
+    Guarantees a stable root of trust across multiple retrievals rather than generating
+    ephemeral root CAs on each call, adhering to Milestone 5 Gate A PKI requirements.
+    """
+    global _consortium_ca_cache
+    with _ca_lock:
+        if _consortium_ca_cache is not None:
+            return _consortium_ca_cache
+
+        from app.infrastructure.storage.storage_utils import get_storage_dir
+
+        storage_dir = get_storage_dir()
+        certs_dir = os.path.join(storage_dir, "certs")
+        ca_cert_path = os.path.join(certs_dir, "consortium_ca.crt")
+        ca_key_path = os.path.join(certs_dir, "consortium_ca.key")
+
+        if os.path.exists(ca_cert_path) and os.path.exists(ca_key_path):
+            try:
+                with open(ca_cert_path, "r", encoding="utf-8") as f:
+                    ca_cert_pem = f.read().strip()
+                with open(ca_key_path, "r", encoding="utf-8") as f:
+                    ca_key_pem = f.read().strip()
+                if ca_cert_pem and ca_key_pem:
+                    _consortium_ca_cache = (ca_cert_pem, ca_key_pem)
+                    return _consortium_ca_cache
+            except Exception:
+                pass
+
+        # Generate persistent root CA
+        ca_cert_pem, ca_key_pem = generate_self_signed_pem(
+            common_name=common_name,
+            days_valid=days_valid,
+        )
+        try:
+            os.makedirs(certs_dir, exist_ok=True)
+            with open(ca_cert_path, "w", encoding="utf-8") as f:
+                f.write(ca_cert_pem)
+            with open(ca_key_path, "w", encoding="utf-8") as f:
+                f.write(ca_key_pem)
+        except Exception:
+            pass
+
+        _consortium_ca_cache = (ca_cert_pem, ca_key_pem)
+        return _consortium_ca_cache
+
+
 def generate_self_signed_pem(common_name: str, days_valid: int = 365) -> tuple[str, str]:
     """Generates valid X.509 certificate and RSA private key PEM pair."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -72,19 +130,13 @@ def sign_csr_pem(
     now = datetime.now(UTC)
     expires_at = now + timedelta(days=days_valid)
 
-    # Determine signing authority
-    if ca_cert_pem and ca_key_pem:
-        ca_cert = x509.load_pem_x509_certificate(ca_cert_pem.encode("utf-8"))
-        signing_key = serialization.load_pem_private_key(ca_key_pem.encode("utf-8"), password=None)
-        issuer_name = ca_cert.subject
-    else:
-        signing_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        issuer_name = x509.Name(
-            [
-                x509.NameAttribute(NameOID.COMMON_NAME, "CF-Intelligence Consortium Root CA"),
-                x509.NameAttribute(NameOID.ORGANIZATION_NAME, "CF-Intelligence Consortium"),
-            ]
-        )
+    # Determine signing authority using persistent Consortium Root CA by default
+    if not (ca_cert_pem and ca_key_pem):
+        ca_cert_pem, ca_key_pem = get_or_create_consortium_ca()
+
+    ca_cert = x509.load_pem_x509_certificate(ca_cert_pem.encode("utf-8"))
+    signing_key = serialization.load_pem_private_key(ca_key_pem.encode("utf-8"), password=None)
+    issuer_name = ca_cert.subject
 
     builder = (
         x509.CertificateBuilder()
@@ -120,4 +172,5 @@ def sign_csr_pem(
     fingerprint = f"SHA256:{cert.fingerprint(hashes.SHA256()).hex()}"
 
     return cert_pem, fingerprint, cert.not_valid_after_utc
+
 

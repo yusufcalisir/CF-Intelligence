@@ -70,6 +70,7 @@ from app.presentation.routers import (
     open_aml_adapter,
     optimization,
     payment_recall,
+    pilot_operations,
     predict,
     privacy_defense,
     psd2,
@@ -1485,6 +1486,8 @@ else:
     app.include_router(cases.api_router)
     app.include_router(cross_bank_intelligence.router)
     app.include_router(cross_bank_intelligence.api_router)
+    app.include_router(pilot_operations.router)
+    app.include_router(pilot_operations.api_router)
     app.include_router(predict.router)
     app.include_router(predict.api_router)
     app.include_router(rules.router)

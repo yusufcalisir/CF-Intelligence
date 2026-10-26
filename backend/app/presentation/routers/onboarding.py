@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: TC002
 
 from app.application.schemas.onboarding import (
@@ -29,6 +29,7 @@ from app.application.services.bank_onboarding_service import (
     InvalidCSRError,
 )
 from app.infrastructure.database import get_async_session
+from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,51 @@ __all__ = [
 ]
 
 
+def _enforce_onboarding_access(
+    request: Request,
+    target_bank_id: str | None = None,
+    required_role: str | None = None,
+) -> AuthenticatedPrincipal:
+    """Enforce institutional authentication, cross-tenant isolation, and administrative authorization."""
+    from app.infrastructure.security.principal_auth import (
+        resolve_authenticated_principal,
+    )
+
+    principal, auth_err, auth_status = resolve_authenticated_principal(request)
+    if auth_err:
+        raise HTTPException(status_code=auth_status, detail=auth_err)
+
+    if principal.is_authenticated:
+        # Cross-tenant isolation: Bank A user cannot administer Bank B
+        if target_bank_id and principal.tenant_id and not principal.is_privileged:
+            norm_caller = principal.tenant_id.lower().replace("-", "_").strip()
+            norm_target = target_bank_id.lower().replace("-", "_").strip()
+            if norm_caller != norm_target:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Cross-tenant bank management rejected: Institution '{principal.tenant_id}' cannot administer '{target_bank_id}'.",
+                )
+        if required_role and not principal.is_privileged:
+            gov_roles = {"admin", "super_admin", "compliance", "compliance_officer", "ml_lead", required_role}
+            if not any(r in gov_roles for r in principal.roles):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Principal '{principal.principal_id}' lacks required role for bank administration (required: {required_role}).",
+                )
+    else:
+        from app.config import get_settings
+
+        settings = get_settings()
+        is_production = getattr(settings, "app_env", "development").lower() in ("production", "prod")
+        if is_production:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required for institutional onboarding management.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    return principal
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 
@@ -64,13 +110,13 @@ __all__ = [
     summary="Download Consortium Root CA bundle for mTLS trust store",
 )
 async def get_ca_bundle() -> BankCABundleResponse:
-    """Returns the Consortium Root Certificate Authority certificate PEM and fingerprint."""
+    """Returns the persistent Consortium Root Certificate Authority certificate PEM and fingerprint."""
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes
 
-    from app.infrastructure.security.cert_generator import generate_self_signed_pem
+    from app.infrastructure.security.cert_generator import get_or_create_consortium_ca
 
-    ca_pem, _ = generate_self_signed_pem(
+    ca_pem, _ = get_or_create_consortium_ca(
         common_name="CF-Intelligence Consortium Root CA",
         days_valid=3650,
     )
@@ -101,6 +147,7 @@ async def get_ca_bundle() -> BankCABundleResponse:
 )
 async def register_bank(
     payload: BankRegisterRequest,
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
 ) -> Any:
     """Run full automated bank onboarding pipeline:
@@ -112,6 +159,7 @@ async def register_bank(
     5. Generate connector config YAML
     6. Activate bank node (ACTIVE)
     """
+    _enforce_onboarding_access(request, target_bank_id=payload.bank_id, required_role="admin")
     service = BankOnboardingService(session)
     try:
         # Step 1: Register
@@ -196,10 +244,12 @@ async def register_bank(
     summary="Retrieve onboarding bundle and configuration for an onboarded bank node",
 )
 async def get_onboarding_bundle(
+    request: Request,
     bank_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
     session: AsyncSession = Depends(get_async_session),
 ) -> Any:
     """Retrieve existing configuration bundle for a registered bank node."""
+    _enforce_onboarding_access(request, target_bank_id=bank_id)
     service = BankOnboardingService(session)
     b = await service.get_bank(bank_id)
     if not b:
@@ -239,9 +289,11 @@ async def get_onboarding_bundle(
     summary="List all registered bank nodes",
 )
 async def list_banks(
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
 ) -> Any:
     """Return all bank node registrations from persistent storage."""
+    _enforce_onboarding_access(request)
     service = BankOnboardingService(session)
     banks = await service.list_banks()
     return [
@@ -272,10 +324,12 @@ async def list_banks(
     summary="Get status of a single bank node",
 )
 async def get_bank_status(
+    request: Request,
     bank_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
     session: AsyncSession = Depends(get_async_session),
 ) -> Any:
     """Return detailed status for a specific bank node."""
+    _enforce_onboarding_access(request, target_bank_id=bank_id)
     service = BankOnboardingService(session)
     b = await service.get_bank(bank_id)
     if not b:
@@ -310,10 +364,12 @@ async def get_bank_status(
 )
 async def sign_bank_csr(
     payload: BankCSRSignRequest,
+    request: Request,
     bank_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
     session: AsyncSession = Depends(get_async_session),
 ) -> Any:
     """Signs an institutional X.509 Certificate Signing Request (CSR) for an onboarded bank node."""
+    _enforce_onboarding_access(request, target_bank_id=bank_id)
     service = BankOnboardingService(session)
     try:
         cert_pem, fingerprint, expires_at = await service.sign_csr(
@@ -358,10 +414,12 @@ async def sign_bank_csr(
     summary="Record institutional compliance verification",
 )
 async def verify_bank_node(
+    request: Request,
     bank_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
     session: AsyncSession = Depends(get_async_session),
 ) -> Any:
     """Record institutional compliance verification for a bank node."""
+    _enforce_onboarding_access(request, target_bank_id=bank_id, required_role="compliance")
     service = BankOnboardingService(session)
     try:
         b = await service.verify_bank(bank_id)
@@ -394,10 +452,12 @@ async def verify_bank_node(
     summary="Activate bank node",
 )
 async def activate_bank_node(
+    request: Request,
     bank_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
     session: AsyncSession = Depends(get_async_session),
 ) -> Any:
     """Activate an onboarded bank node."""
+    _enforce_onboarding_access(request, target_bank_id=bank_id, required_role="admin")
     service = BankOnboardingService(session)
     try:
         b = await service.activate_bank(bank_id)
@@ -430,10 +490,12 @@ async def activate_bank_node(
     summary="Suspend an active bank node",
 )
 async def suspend_bank_node(
+    request: Request,
     bank_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
     session: AsyncSession = Depends(get_async_session),
 ) -> Any:
     """Suspend an active bank node."""
+    _enforce_onboarding_access(request, target_bank_id=bank_id, required_role="admin")
     service = BankOnboardingService(session)
     try:
         b = await service.suspend_bank(bank_id)
@@ -464,10 +526,12 @@ async def suspend_bank_node(
     summary="Rotate mTLS certificate for a bank node",
 )
 async def rotate_bank_cert(
+    request: Request,
     bank_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
     session: AsyncSession = Depends(get_async_session),
 ) -> Any:
     """Rotate mTLS certificate for an active bank node."""
+    _enforce_onboarding_access(request, target_bank_id=bank_id, required_role="admin")
     service = BankOnboardingService(session)
     b = await service.get_bank(bank_id)
     if not b:

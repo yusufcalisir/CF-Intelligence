@@ -390,3 +390,30 @@ class AuditEventModel(Base):
         default=lambda: datetime.now(UTC),
         index=True,
     )
+
+
+# ── Milestone 5: Controlled Two-Bank Pilot Operations ───────────────────────
+
+
+class PilotOperationsModel(Base):
+    """Persistent record of controlled two-bank pilot operations."""
+
+    __tablename__ = "pilot_operations"
+
+    pilot_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    consortium_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    scope_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    queries_executed: Mapped[int] = mapped_column(Integer, default=0)
+    queries_denied: Mapped[int] = mapped_column(Integer, default=0)
+    data_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+    )
+

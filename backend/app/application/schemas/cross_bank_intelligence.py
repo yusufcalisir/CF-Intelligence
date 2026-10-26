@@ -91,6 +91,12 @@ class CrossBankIntelligenceQueryRequest(BaseModel):
         max_length=64,
         description="Optional explicit protocol selection (e.g. OPENMINED_PSI, DH-PSI-2048-MODP).",
     )
+    pilot_id: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Optional active controlled two-bank pilot ID governing this execution.",
+    )
+
 
 
 class CrossBankIntelligenceSignal(BaseModel):

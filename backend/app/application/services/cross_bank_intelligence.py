@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import threading
+import time
 import uuid
 from datetime import UTC
 from typing import Any, cast
@@ -307,6 +308,20 @@ class CrossBankIntelligenceService:
                 )
 
         # 6. Route to Established PSI Coordinator Topology
+        pilot_svc = None
+        if req.pilot_id:
+            from app.application.services.pilot_operations_service import (
+                PilotOperationsService,
+            )
+
+            pilot_svc = PilotOperationsService.get_instance()
+            pilot_svc.validate_pilot_query(
+                pilot_id=req.pilot_id,
+                requesting_bank=clean_requesting,
+                target_bank=clean_target,
+                purpose=req.purpose,
+            )
+
         from app.config import get_settings
 
         settings = get_settings()
@@ -332,56 +347,89 @@ class CrossBankIntelligenceService:
             if user:
                 resolved_auth_token = auth_svc.create_token_bundle(user).access_token
 
-        if coordinator_url:
-            from app.application.services.isolated_matching_service import (
-                InstitutionalCoordinatorClient,
-            )
+        t0 = time.perf_counter()
+        try:
+            if coordinator_url:
+                from app.application.services.isolated_matching_service import (
+                    InstitutionalCoordinatorClient,
+                )
 
-            coord_client = InstitutionalCoordinatorClient(coordinator_url)
-            try:
-                coord_client.health_check()
-            except Exception as exc:
-                raise ConsortiumSecurityError(
-                    f"Operational established PSI coordinator at '{coordinator_url}' is unreachable or offline: {exc}. Failing closed."
-                ) from exc
-            signal = coord_client.execute_match(
-                req=est_req,
-                auth_token=resolved_auth_token,
-                actor=audited_actor,
-            )
-            # Enforce Verifiable Result-Admission Contract before local storage
-            record = self._admit_and_verify_operational_signal(
-                signal=signal,
-                expected_req=est_req,
-                audited_actor=audited_actor,
-            )
-            self._signal_store.set(signal.signal_id, record)
-            return signal
-
-        if self.matching_coordinator is not None:
-            try:
-                self.matching_coordinator.get_worker(clean_requesting)
-                self.matching_coordinator.get_worker(clean_target)
-                signal = self.matching_coordinator.execute_two_bank_private_matching(
+                coord_client = InstitutionalCoordinatorClient(coordinator_url)
+                try:
+                    coord_client.health_check()
+                except Exception as exc:
+                    raise ConsortiumSecurityError(
+                        f"Operational established PSI coordinator at '{coordinator_url}' is unreachable or offline: {exc}. Failing closed."
+                    ) from exc
+                signal = coord_client.execute_match(
                     req=est_req,
                     auth_token=resolved_auth_token,
                     actor=audited_actor,
                 )
+                # Enforce Verifiable Result-Admission Contract before local storage
                 record = self._admit_and_verify_operational_signal(
                     signal=signal,
                     expected_req=est_req,
                     audited_actor=audited_actor,
                 )
+                if req.pilot_id:
+                    record["pilot_id"] = req.pilot_id
                 self._signal_store.set(signal.signal_id, record)
+                if pilot_svc and req.pilot_id:
+                    duration_ms = (time.perf_counter() - t0) * 1000.0
+                    pilot_svc.record_query_outcome(
+                        pilot_id=req.pilot_id,
+                        success=True,
+                        is_match=bool(signal.match_found),
+                        latency_ms=duration_ms,
+                    )
                 return signal
-            except ConsortiumSecurityError:
-                raise
 
-        raise ConsortiumSecurityError(
-            "Established PSI operational worker topology is unavailable. "
-            "Neither CFI_COORDINATOR_URL nor registered operational worker nodes are configured. "
-            "Operation fails closed to prevent unverified prototype or simulated matching."
-        )
+            if self.matching_coordinator is not None:
+                try:
+                    self.matching_coordinator.get_worker(clean_requesting)
+                    self.matching_coordinator.get_worker(clean_target)
+                    signal = self.matching_coordinator.execute_two_bank_private_matching(
+                        req=est_req,
+                        auth_token=resolved_auth_token,
+                        actor=audited_actor,
+                    )
+                    record = self._admit_and_verify_operational_signal(
+                        signal=signal,
+                        expected_req=est_req,
+                        audited_actor=audited_actor,
+                    )
+                    if req.pilot_id:
+                        record["pilot_id"] = req.pilot_id
+                    self._signal_store.set(signal.signal_id, record)
+                    if pilot_svc and req.pilot_id:
+                        duration_ms = (time.perf_counter() - t0) * 1000.0
+                        pilot_svc.record_query_outcome(
+                            pilot_id=req.pilot_id,
+                            success=True,
+                            is_match=bool(signal.match_found),
+                            latency_ms=duration_ms,
+                        )
+                    return signal
+                except ConsortiumSecurityError:
+                    raise
+
+            raise ConsortiumSecurityError(
+                "Established PSI operational worker topology is unavailable. "
+                "Neither CFI_COORDINATOR_URL nor registered operational worker nodes are configured. "
+                "Operation fails closed to prevent unverified prototype or simulated matching."
+            )
+        except Exception as exc:
+            if pilot_svc and req.pilot_id:
+                duration_ms = (time.perf_counter() - t0) * 1000.0
+                pilot_svc.record_query_outcome(
+                    pilot_id=req.pilot_id,
+                    success=False,
+                    is_match=False,
+                    latency_ms=duration_ms,
+                    error=str(exc),
+                )
+            raise
 
     def _admit_and_verify_operational_signal(
         self,
@@ -807,6 +855,7 @@ class CrossBankIntelligenceService:
             "attached_to_cases": [],
             "receipt": receipt,
             "ticket": ticket,
+            "pilot_id": getattr(expected_req, "pilot_id", None),
         }
 
     def query_cross_bank_intelligence(
@@ -1270,6 +1319,30 @@ class CrossBankIntelligenceService:
             raise ValueError(
                 f"Authoritative signal '{resolved_signal_id}' has expired. Queries must be refreshed before attachment."
             )
+
+        # 3c-ii. Pilot Governance Enforcement
+        pilot_id = record.get("pilot_id")
+        if pilot_id:
+            from app.application.services.pilot_operations_service import (
+                PilotOperationsService,
+            )
+            from app.domain.pilot_operations import PilotStatus
+
+            pilot_svc = PilotOperationsService.get_instance()
+            governing_pilot = pilot_svc.get_pilot(pilot_id)
+            if not governing_pilot:
+                raise ConsortiumSecurityError(
+                    f"Governing pilot '{pilot_id}' not found. Cannot attach unverified pilot signal."
+                )
+            if governing_pilot.status != PilotStatus.ACTIVE:
+                raise ConsortiumSecurityError(
+                    f"Governing pilot '{pilot_id}' is in non-active status '{governing_pilot.status.value}'. "
+                    "Evidence attachment rejected."
+                )
+            if governing_pilot.has_expired():
+                raise ConsortiumSecurityError(
+                    f"Governing pilot '{pilot_id}' has expired. Evidence attachment rejected."
+                )
 
         # 3d. Prevent Prototype Matching Results from Entering Case Evidence in Any Case State
         assurance_level = signal_data.get("assurance_level") or record.get("assurance_level")

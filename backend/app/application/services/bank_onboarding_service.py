@@ -311,6 +311,17 @@ health_port: 8080
         assert updated is not None
         return updated
 
+    async def is_bank_active(self, bank_id: str) -> bool:
+        """Check whether a bank node is currently registered and ACTIVE.
+
+        Returns False if bank does not exist or is in PENDING_VERIFICATION,
+        SUSPENDED, or OFFBOARDED status, adhering to Milestone 5 fail-closed rules.
+        """
+        b = await self.get_bank(bank_id)
+        if not b:
+            return False
+        return b.status == BankStatus.ACTIVE
+
     async def get_bank(self, bank_id: str) -> BankRegistration | None:
         """Fetch bank registration by ID."""
         model = await self._get_model(bank_id)
