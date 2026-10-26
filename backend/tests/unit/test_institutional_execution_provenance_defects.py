@@ -325,9 +325,9 @@ def test_defect_demonstration_symmetric_secret_requirement(monkeypatch: pytest.M
     monkeypatch.delenv("CFI_WORKER_SECRET_BANK_B", raising=False)
     monkeypatch.delenv("WORKER_AUTH_SECRET_BANK_B", raising=False)
 
-    # Worker nodes possess private keys
-    ident_a = InstitutionalSigningIdentity.from_seed("bank_a", CONTRACT_SECRET_A)
-    ident_b = InstitutionalSigningIdentity.from_seed("bank_b", CONTRACT_SECRET_B)
+    # Worker nodes possess private keys generated independently
+    ident_a = InstitutionalSigningIdentity.generate("bank_a")
+    ident_b = InstitutionalSigningIdentity.generate("bank_b")
 
     # Analyst service holds ONLY public keys in InstitutionalVerificationRegistry
     registry = InstitutionalVerificationRegistry()

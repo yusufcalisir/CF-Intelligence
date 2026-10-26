@@ -304,20 +304,25 @@ class IsolatedBankWorkerNode:
         # Worker private signing key: cryptographically generated if not provided, never predictable fallback
         self._auth_secret = auth_secret or secrets.token_hex(32)
 
-        # Asymmetric institutional signing identity
+        # Asymmetric institutional signing identity (strictly tenant-sovereign)
         signing_key_candidate = (
             signing_key
             or os.environ.get(f"CFI_WORKER_SIGNING_KEY_{self.bank_id.upper()}")
             or os.environ.get("WORKER_SIGNING_KEY")
         )
         if isinstance(signing_key_candidate, InstitutionalSigningIdentity):
-            self._signing_identity = signing_key_candidate
+            self._signing_identity: InstitutionalSigningIdentity | None = signing_key_candidate
         elif isinstance(signing_key_candidate, str) and len(signing_key_candidate.strip()) == 64:
             self._signing_identity = InstitutionalSigningIdentity.from_private_hex(self.bank_id, signing_key_candidate)
-        elif self._auth_secret:
-            self._signing_identity = InstitutionalSigningIdentity.from_seed(self.bank_id, self._auth_secret)
         else:
-            self._signing_identity = InstitutionalSigningIdentity.generate(self.bank_id)
+            key_file = (
+                os.environ.get("WORKER_SIGNING_KEY_FILE")
+                or os.environ.get(f"CFI_WORKER_SIGNING_KEY_FILE_{self.bank_id.upper()}")
+            )
+            if key_file and os.path.exists(key_file):
+                self._signing_identity = InstitutionalSigningIdentity.from_private_key_file(self.bank_id, key_file)
+            else:
+                self._signing_identity = None
 
         # Scoped RPC authorization credentials (least-privilege separation)
         self._matching_token = matching_token or f"match_{secrets.token_hex(24)}"
@@ -370,6 +375,29 @@ class IsolatedBankWorkerNode:
                 ) from exc
 
     @property
+    def public_key_hex(self) -> str:
+        """Return the hex representation of the worker's public verification key."""
+        if self._signing_identity is None:
+            raise ConsortiumSecurityError(
+                f"Worker node '{self.bank_id}' has no provisioned signing key. Fails closed."
+            )
+        return self._signing_identity.public_key_hex
+
+    def enroll_signing_identity(
+        self, signing_identity: InstitutionalSigningIdentity | str
+    ) -> None:
+        """Explicitly enroll an institutional signing identity as part of an authorized enrollment workflow."""
+        if isinstance(signing_identity, InstitutionalSigningIdentity):
+            self._signing_identity = signing_identity
+        elif isinstance(signing_identity, str) and len(signing_identity.strip()) == 64:
+            self._signing_identity = InstitutionalSigningIdentity.from_private_hex(self.bank_id, signing_identity)
+        else:
+            raise ValueError(
+                "Invalid institutional signing identity: must be InstitutionalSigningIdentity "
+                "or 64-character private hex."
+            )
+
+    @property
     def matching_token(self) -> str:
         """Return the scoped matching token."""
         return self._matching_token
@@ -399,13 +427,18 @@ class IsolatedBankWorkerNode:
         clean_id = peer_bank_id.lower().strip()
         if not clean_id:
             raise ValueError("peer_bank_id cannot be empty")
-        if not verification_key or len(verification_key.strip()) < 16:
-            raise ValueError(f"Invalid verification key for peer '{peer_bank_id}'")
+        if not verification_key or len(verification_key.strip()) != 64:
+            raise ValueError(
+                f"Invalid verification key for peer '{peer_bank_id}': expected 64-char hex public verification key."
+            )
         if clean_id in self._trusted_peer_verification_keys and not allow_rotation:
             raise ConsortiumSecurityError(
                 f"Peer institution '{clean_id}' is already enrolled in worker '{self.bank_id}'. "
                 "Unauthorized key replacement rejected without verified administrative key rotation."
             )
+        self._peer_registry.register_public_key(
+            clean_id, verification_key.strip(), allow_overwrite=allow_rotation
+        )
         self._trusted_peer_verification_keys[clean_id] = verification_key.strip()
 
     def get_trusted_peer_key(self, peer_bank_id: str) -> str | None:
@@ -480,6 +513,7 @@ class IsolatedBankWorkerNode:
             "is_active": True,
             "authorized_at": datetime.datetime.now(UTC).isoformat(),
         }
+        self._locally_revoked_grants.discard(clean_grant)
         self._authorized_grants[clean_grant] = record
         self._persist_authorized_grants()
         logger.info(
@@ -616,10 +650,12 @@ class IsolatedBankWorkerNode:
         self, consortium_id: str, grant_id: str, revision: int, scope_digest: str
     ) -> str:
         """Produce bank worker signature approving an immutable grant revision and scope digest."""
-        canonical = f"{consortium_id}:{grant_id}:{revision}:{scope_digest}:{self.bank_id}"
+        canonical_bytes = f"{consortium_id}:{grant_id}:{revision}:{scope_digest}:{self.bank_id}".encode("utf-8")
+        if self._signing_identity is not None:
+            return self._signing_identity.sign(canonical_bytes)
         return hmac.new(
             self._auth_secret.encode("utf-8"),
-            canonical.encode("utf-8"),
+            canonical_bytes,
             hashlib.sha256,
         ).hexdigest()
 
@@ -654,10 +690,12 @@ class IsolatedBankWorkerNode:
             purpose=ticket.purpose,
             operation=ticket.operation,
         )
-        canonical = f"{ticket.canonical_digest()}:{self.bank_id}"
+        canonical_bytes = f"{ticket.canonical_digest()}:{self.bank_id}".encode("utf-8")
+        if self._signing_identity is not None:
+            return self._signing_identity.sign(canonical_bytes)
         return hmac.new(
             self._auth_secret.encode("utf-8"),
-            canonical.encode("utf-8"),
+            canonical_bytes,
             hashlib.sha256,
         ).hexdigest()
 
@@ -710,30 +748,45 @@ class IsolatedBankWorkerNode:
         )
 
         # Verify target bank (self) approval signature
-        expected_target_sig = hmac.new(
-            self._auth_secret.encode("utf-8"),
-            f"{ticket.canonical_digest()}:{self.bank_id}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
         target_sig = ticket.bank_approvals.get(self.bank_id) or (
             ticket.target_bank_approval_signature if self.bank_id == ticket.target_bank_id.lower().strip() else ""
         )
-        if not target_sig or not hmac.compare_digest(expected_target_sig, target_sig):
+        target_canonical = f"{ticket.canonical_digest()}:{self.bank_id}".encode("utf-8")
+        target_valid = False
+        if self._signing_identity is not None and target_sig:
+            target_valid = self._signing_identity.verify(target_sig, target_canonical)
+        if not target_valid and target_sig:
+            expected_target_sig = hmac.new(
+                self._auth_secret.encode("utf-8"),
+                target_canonical,
+                hashlib.sha256,
+            ).hexdigest()
+            target_valid = hmac.compare_digest(expected_target_sig, target_sig)
+        if not target_valid:
             raise ConsortiumSecurityError(
                 f"Target institution '{self.bank_id}' participation authority verification failed: "
                 "invalid or missing approval signature in ticket."
             )
 
         # Verify requesting bank approval signature if peer key is enrolled
-        peer_key = self.get_trusted_peer_key(ticket.requesting_bank_id)
-        if peer_key:
-            expected_peer_sig = hmac.new(
-                peer_key.encode("utf-8"),
-                f"{ticket.canonical_digest()}:{ticket.requesting_bank_id}".encode(),
-                hashlib.sha256,
-            ).hexdigest()
-            peer_sig = ticket.bank_approvals.get(ticket.requesting_bank_id) or ticket.requesting_bank_signature
-            if not peer_sig or not hmac.compare_digest(expected_peer_sig, peer_sig):
+        req_bank = ticket.requesting_bank_id.lower().strip()
+        peer_sig = ticket.bank_approvals.get(req_bank) or ticket.requesting_bank_signature
+        peer_enrolled = self._peer_registry.has_key(req_bank) or (self.get_trusted_peer_key(req_bank) is not None)
+        if peer_enrolled and peer_sig:
+            peer_canonical = f"{ticket.canonical_digest()}:{ticket.requesting_bank_id}".encode("utf-8")
+            peer_valid = False
+            if self._peer_registry.has_key(req_bank):
+                peer_valid = self._peer_registry.verify_signature(req_bank, peer_sig, peer_canonical)
+            if not peer_valid:
+                peer_key = self.get_trusted_peer_key(req_bank)
+                if peer_key:
+                    expected_peer_sig = hmac.new(
+                        peer_key.encode("utf-8"),
+                        peer_canonical,
+                        hashlib.sha256,
+                    ).hexdigest()
+                    peer_valid = hmac.compare_digest(expected_peer_sig, peer_sig)
+            if not peer_valid:
                 raise ConsortiumSecurityError(
                     f"Requesting institution '{ticket.requesting_bank_id}' authorization verification failed: "
                     "invalid or missing approval signature in ticket."
@@ -888,16 +941,19 @@ class IsolatedBankWorkerNode:
         nonce = secrets.token_hex(16)
         timestamp = datetime.datetime.now(UTC).isoformat()
 
-        canonical_text = (
+        canonical_bytes = (
             f"{job_id}:{consortium_id}:{self.bank_id}:"
             f"{clean_target}:{blinded_hex}:{nonce}:"
-            f"{timestamp}:{purpose}"
+            f"{timestamp}:{purpose}".encode("utf-8")
         )
-        signature = hmac.new(
-            self._auth_secret.encode("utf-8"),
-            canonical_text.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
+        if self._signing_identity is not None:
+            signature = self._signing_identity.sign(canonical_bytes)
+        else:
+            signature = hmac.new(
+                self._auth_secret.encode("utf-8"),
+                canonical_bytes,
+                hashlib.sha256,
+            ).hexdigest()
 
         return BlindedQueryMessage(
             job_id=job_id,
@@ -944,22 +1000,29 @@ class IsolatedBankWorkerNode:
             )
 
         # 3. Verify Requester Signature strictly using internal trusted peer keystore
-        peer_key = self._trusted_peer_verification_keys.get(
-            query.requesting_bank_id.lower().strip()
-        )
-        if not peer_key:
+        req_bank = query.requesting_bank_id.lower().strip()
+        peer_key = self._trusted_peer_verification_keys.get(req_bank)
+        if not peer_key and not self._peer_registry.has_key(req_bank):
             raise ConsortiumSecurityError(
                 f"Peer authentication failed: Institution '{query.requesting_bank_id}' has no trusted verification key enrolled."
             )
-        expected_sig = hmac.new(
-            peer_key.encode("utf-8"),
+        canonical_bytes = (
             f"{query.job_id}:{query.consortium_id}:{query.requesting_bank_id}:"
             f"{query.target_bank_id}:{query.blinded_element_hex}:{query.nonce}:"
-            f"{query.timestamp}:{query.purpose}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
+            f"{query.timestamp}:{query.purpose}".encode("utf-8")
+        )
+        sig_valid = False
+        if self._peer_registry.has_key(req_bank):
+            sig_valid = self._peer_registry.verify_signature(req_bank, query.signature, canonical_bytes)
+        if not sig_valid and peer_key:
+            expected_sig = hmac.new(
+                peer_key.encode("utf-8"),
+                canonical_bytes,
+                hashlib.sha256,
+            ).hexdigest()
+            sig_valid = hmac.compare_digest(expected_sig, query.signature)
 
-        if not hmac.compare_digest(expected_sig, query.signature):
+        if not sig_valid:
             raise ConsortiumSecurityError(
                 f"Peer authentication failed: Invalid signature from requesting bank '{query.requesting_bank_id}'."
             )
@@ -1179,16 +1242,19 @@ class IsolatedBankWorkerNode:
         nonce = secrets.token_hex(16)
         timestamp = datetime.datetime.now(UTC).isoformat()
 
-        canonical_text = (
+        canonical_bytes = (
             f"{ticket.job_id}:{consortium_id}:{self.bank_id}:"
             f"{clean_target}:{psi_request_b64}:{nonce}:"
-            f"{timestamp}:{purpose}:{ticket.canonical_digest()}"
+            f"{timestamp}:{purpose}:{ticket.canonical_digest()}".encode("utf-8")
         )
-        sig = hmac.new(
-            self._auth_secret.encode("utf-8"),
-            canonical_text.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
+        if self._signing_identity is not None:
+            sig = self._signing_identity.sign(canonical_bytes)
+        else:
+            sig = hmac.new(
+                self._auth_secret.encode("utf-8"),
+                canonical_bytes,
+                hashlib.sha256,
+            ).hexdigest()
 
         return EstablishedPSIQueryMessage(
             job_id=ticket.job_id,
@@ -1231,22 +1297,30 @@ class IsolatedBankWorkerNode:
             )
 
         # 3. Verify Requester Signature using internal trusted peer keystore
-        peer_key = self._trusted_peer_verification_keys.get(
-            query.requesting_bank_id.lower().strip()
-        )
-        if not peer_key:
+        req_bank = query.requesting_bank_id.lower().strip()
+        peer_key = self._trusted_peer_verification_keys.get(req_bank)
+        if not peer_key and not self._peer_registry.has_key(req_bank):
             raise ConsortiumSecurityError(
                 f"Peer authentication failed: Institution '{query.requesting_bank_id}' has no trusted verification key enrolled."
             )
 
-        expected_sig = hmac.new(
-            peer_key.encode("utf-8"),
+        canonical_bytes = (
             f"{query.job_id}:{query.consortium_id}:{query.requesting_bank_id}:"
             f"{query.target_bank_id}:{query.psi_request_b64}:{query.nonce}:"
-            f"{query.timestamp}:{query.purpose}:{query.ticket.canonical_digest()}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
-        if not hmac.compare_digest(expected_sig, query.signature):
+            f"{query.timestamp}:{query.purpose}:{query.ticket.canonical_digest()}".encode("utf-8")
+        )
+        sig_valid = False
+        if self._peer_registry.has_key(req_bank):
+            sig_valid = self._peer_registry.verify_signature(req_bank, query.signature, canonical_bytes)
+        if not sig_valid and peer_key:
+            expected_sig = hmac.new(
+                peer_key.encode("utf-8"),
+                canonical_bytes,
+                hashlib.sha256,
+            ).hexdigest()
+            sig_valid = hmac.compare_digest(expected_sig, query.signature)
+
+        if not sig_valid:
             raise ConsortiumSecurityError(
                 f"Peer authentication failed: Invalid signature from requesting bank '{query.requesting_bank_id}'."
             )
@@ -1309,6 +1383,11 @@ class IsolatedBankWorkerNode:
             timestamp=resp_timestamp,
         )
         counterpart_evidence_digest = hashlib.sha256(canonical_evidence).hexdigest()
+        if self._signing_identity is None:
+            raise ConsortiumSecurityError(
+                f"Institutional signing key not provisioned for worker '{self.bank_id}'. "
+                "Counterpart execution fails closed to prevent unauthenticated execution evidence."
+            )
         resp_sig = self._signing_identity.sign(canonical_evidence)
 
         # Persist consumed nonce
@@ -1489,6 +1568,11 @@ class IsolatedBankWorkerNode:
             executed_at=now_iso,
         )
         evaluated_result_digest = hashlib.sha256(canonical_evaluated).hexdigest()
+        if self._signing_identity is None:
+            raise ConsortiumSecurityError(
+                f"Institutional signing key not provisioned for worker '{self.bank_id}'. "
+                "Match finalization fails closed to prevent unauthenticated execution evidence."
+            )
         receipt_sig_a = self._signing_identity.sign(canonical_evaluated)
 
         counterpart_evidence_dict = {
@@ -1594,6 +1678,8 @@ class InstitutionalWorkerDaemon:
                 f"{backend_dir}{os.pathsep}{curr_pp}" if curr_pp else backend_dir
             )
             proc_env["WORKER_AUTH_SECRET"] = self.node._auth_secret
+            if self.node._signing_identity is not None:
+                proc_env["WORKER_SIGNING_KEY"] = self.node._signing_identity.private_key_hex
             proc_env["WORKER_MATCHING_TOKEN"] = self.node._matching_token
             proc_env["WORKER_INGESTION_TOKEN"] = self.node._ingestion_token
             proc_env["WORKER_ADMIN_TOKEN"] = self.node._admin_token
@@ -1669,6 +1755,20 @@ class InstitutionalWorkerDaemon:
                             {"status": "ONLINE", "bank_id": node.bank_id, "pid": os.getpid()}
                         ).encode()
                     )
+                elif self.path in ("/worker/public-key", "/public-key"):
+                    try:
+                        pub_hex = node.public_key_hex
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/json")
+                        self.end_headers()
+                        self.wfile.write(
+                            json.dumps({"bank_id": node.bank_id, "public_key_hex": pub_hex}).encode()
+                        )
+                    except ConsortiumSecurityError as exc:
+                        self.send_response(503)
+                        self.send_header("Content-Type", "application/json")
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"error": str(exc)}).encode())
                 else:
                     self.send_response(404)
                     self.end_headers()
@@ -2794,6 +2894,11 @@ if __name__ == "__main__":
     parser.add_argument("--ingestion-token", default=None, help="Worker ingestion token")
     parser.add_argument("--admin-token", default=None, help="Worker admin token")
     parser.add_argument(
+        "--signing-key",
+        default=os.environ.get("WORKER_SIGNING_KEY"),
+        help="Institutional sovereign Ed25519 private signing key (64 hex characters)",
+    )
+    parser.add_argument(
         "--trusted-peers", default=None, help="JSON mapping of trusted peer verification keys"
     )
 
@@ -2887,6 +2992,11 @@ if __name__ == "__main__":
         env_matching = os.environ.get("WORKER_MATCHING_TOKEN") or cli_args.matching_token
         env_ingest = os.environ.get("WORKER_INGESTION_TOKEN") or cli_args.ingestion_token
         env_admin = os.environ.get("WORKER_ADMIN_TOKEN") or cli_args.admin_token
+        env_signing = (
+            os.environ.get("WORKER_SIGNING_KEY")
+            or cli_args.signing_key
+            or os.environ.get(f"CFI_WORKER_SIGNING_KEY_{cli_args.bank_id.upper()}")
+        )
         env_peers = os.environ.get("WORKER_TRUSTED_PEERS_JSON") or cli_args.trusted_peers or "{}"
         peers = json.loads(env_peers)
 
@@ -2894,6 +3004,7 @@ if __name__ == "__main__":
             bank_id=cli_args.bank_id,
             storage_root=cli_args.storage_root,
             auth_secret=env_auth,
+            signing_key=env_signing,
             matching_token=env_matching,
             ingestion_token=env_ingest,
             admin_token=env_admin,

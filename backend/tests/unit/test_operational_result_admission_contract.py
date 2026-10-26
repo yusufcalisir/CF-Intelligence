@@ -60,12 +60,15 @@ SECRET_A = "auth_sec_bank_a_81729384719283749182"
 SECRET_B = "auth_sec_bank_b_98127394812739481273"
 SECRET_COORD = "auth_sec_coord_99912384719283749123"
 
+TEST_SIGNING_IDENTITY_A = InstitutionalSigningIdentity.generate("bank_a")
+TEST_SIGNING_IDENTITY_B = InstitutionalSigningIdentity.generate("bank_b")
+
 
 @pytest.fixture(autouse=True)
 def setup_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CFI_WORKER_SECRET_BANK_A", SECRET_A)
-    monkeypatch.setenv("CFI_PEER_KEY_BANK_B", SECRET_B)
-    monkeypatch.setenv("CFI_WORKER_SECRET_BANK_B", SECRET_B)
+    monkeypatch.setenv("CFI_INSTITUTION_PUBLIC_KEY_BANK_A", TEST_SIGNING_IDENTITY_A.public_key_hex)
+    monkeypatch.setenv("CFI_INSTITUTION_PUBLIC_KEY_BANK_B", TEST_SIGNING_IDENTITY_B.public_key_hex)
+    monkeypatch.setenv("CFI_PEER_KEY_BANK_B", TEST_SIGNING_IDENTITY_B.public_key_hex)
     monkeypatch.setenv("CFI_COORDINATOR_SECRET", SECRET_COORD)
     monkeypatch.setenv("WORKER_AUTH_SECRET", SECRET_A)
     monkeypatch.setenv("COORDINATOR_AUTH_SECRET", SECRET_COORD)
@@ -102,8 +105,8 @@ def _build_authentic_test_signal(
     grant_id = f"grant_{consortium_id}"
     grant_revision = 1
 
-    ident_a = sign_a or InstitutionalSigningIdentity.from_seed(requesting_bank_id, SECRET_A)
-    ident_b = sign_b or InstitutionalSigningIdentity.from_seed(target_bank_id, SECRET_B)
+    ident_a = sign_a or TEST_SIGNING_IDENTITY_A
+    ident_b = sign_b or TEST_SIGNING_IDENTITY_B
 
     scope_digest = compute_operational_grant_scope_digest(
         grant_id=grant_id,
@@ -414,8 +417,8 @@ def _create_mock_consortium_service(consortium_id: str = "c_alpha") -> Consortiu
 def _create_cbi_service(consortium_id: str = "c_alpha") -> CrossBankIntelligenceService:
     gov = _create_mock_consortium_service(consortium_id)
     reg = InstitutionalVerificationRegistry()
-    reg.register_public_key("bank_a", InstitutionalSigningIdentity.from_seed("bank_a", SECRET_A).public_key)
-    reg.register_public_key("bank_b", InstitutionalSigningIdentity.from_seed("bank_b", SECRET_B).public_key)
+    reg.register_public_key("bank_a", TEST_SIGNING_IDENTITY_A.public_key)
+    reg.register_public_key("bank_b", TEST_SIGNING_IDENTITY_B.public_key)
     return CrossBankIntelligenceService(consortium_service=gov, institutional_registry=reg)
 
 
@@ -649,8 +652,8 @@ def test_adversarial_substituting_new_institutional_public_key_fails() -> None:
     """Requirement 8: Substituting a new institutional public key fails without authorized rotation."""
     gov = _create_mock_consortium_service("c_alpha")
     reg = InstitutionalVerificationRegistry()
-    reg.register_public_key("bank_a", InstitutionalSigningIdentity.from_seed("bank_a", SECRET_A).public_key)
-    reg.register_public_key("bank_b", InstitutionalSigningIdentity.from_seed("bank_b", SECRET_B).public_key)
+    reg.register_public_key("bank_a", TEST_SIGNING_IDENTITY_A.public_key)
+    reg.register_public_key("bank_b", TEST_SIGNING_IDENTITY_B.public_key)
 
     # Attacker tries to un-authenticatedly replace bank_b key in registry
     evil_identity = InstitutionalSigningIdentity.generate("bank_b")
@@ -730,8 +733,8 @@ def test_revoked_consent_rejects_admission() -> None:
     grant["revoked_by_institutions"] = ["bank_b"]
 
     reg = InstitutionalVerificationRegistry()
-    reg.register_public_key("bank_a", InstitutionalSigningIdentity.from_seed("bank_a", SECRET_A).public_key)
-    reg.register_public_key("bank_b", InstitutionalSigningIdentity.from_seed("bank_b", SECRET_B).public_key)
+    reg.register_public_key("bank_a", TEST_SIGNING_IDENTITY_A.public_key)
+    reg.register_public_key("bank_b", TEST_SIGNING_IDENTITY_B.public_key)
     cbi = CrossBankIntelligenceService(consortium_service=gov, institutional_registry=reg)
     signal, req, _, _, _ = _build_authentic_test_signal("c_alpha")
 
@@ -741,3 +744,214 @@ def test_revoked_consent_rejects_admission() -> None:
             expected_req=req,
             audited_actor="analyst_alice",
         )
+
+
+# =========================================================================
+# MILESTONE 4 FINAL BOUNDED SECURITY REMEDIATION ADVERSARIAL TESTS
+# =========================================================================
+
+
+def test_adversarial_peer_cannot_reconstruct_counterpart_signing_key_or_forge_signature() -> None:
+    """P0 Requirement: Bank A possesses all legitimate matching and peer credentials,
+    but cannot reconstruct Bank B's signing key or produce a Bank B signature accepted by registry.
+    Reciprocal test: Bank B possesses Bank A's credentials, cannot forge Bank A's signature.
+    """
+    bank_a_signing = InstitutionalSigningIdentity.generate("bank_a")
+    bank_b_signing = InstitutionalSigningIdentity.generate("bank_b")
+
+    registry = InstitutionalVerificationRegistry()
+    registry.register_public_key("bank_a", bank_a_signing.public_key)
+    registry.register_public_key("bank_b", bank_b_signing.public_key)
+
+    # Bank A possesses legitimate matching and counterpart context
+    canonical_evidence = canonical_counterpart_evidence_bytes(
+        version="1.0",
+        consortium_id="c_alpha",
+        grant_id="grant_c_alpha",
+        grant_revision=1,
+        grant_scope_digest="scope_123",
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        job_id="job_777",
+        ticket_digest="ticket_777",
+        psi_server_setup_hash="setup_777",
+        psi_response_hash="resp_777",
+        protocol="OPENMINED-PSI-2.0.6-ECDH",
+        nonce="nonce_777",
+        timestamp="2026-10-26T00:00:00Z",
+    )
+
+    # Bank A attempts to forge Bank B's signature using HMAC credentials
+    forged_hmac_sig = hmac.new(b"auth_sec_bank_b", canonical_evidence, hashlib.sha256).hexdigest()
+    assert not registry.verify_signature("bank_b", forged_hmac_sig, canonical_evidence), (
+        "Registry accepted an HMAC credential signature as an authoritative Ed25519 signature!"
+    )
+
+    # Bank A attempts to forge Bank B's signature using its own Ed25519 key
+    forged_bank_a_sig = bank_a_signing.sign(canonical_evidence)
+    assert not registry.verify_signature("bank_b", forged_bank_a_sig, canonical_evidence), (
+        "Registry accepted Bank A's signature as Bank B's signature!"
+    )
+
+    # Seed derivation from shared secrets is strictly forbidden
+    with pytest.raises(PermissionError, match="Deriving institutional signing keys from shared secrets .* is strictly prohibited"):
+        InstitutionalSigningIdentity.from_seed("bank_b", "auth_sec_bank_b")
+
+    # Reciprocal attack: Bank B tries to forge Bank A evaluated result signature
+    canonical_evaluated = canonical_evaluated_result_bytes(
+        version="1.0",
+        receipt_id="rcp_888",
+        job_id="job_888",
+        consortium_id="c_alpha",
+        grant_id="grant_c_alpha",
+        grant_revision=1,
+        grant_scope_digest="scope_123",
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        query_entity_id="ent_888",
+        ticket_digest="ticket_888",
+        counterpart_evidence_digest="cp_888",
+        match_confirmed=True,
+        match_category="PROBABILISTIC_FUZZY",
+        match_confidence=0.999999999,
+        matched_risk_level="HIGH",
+        matched_typologies=("MONEY_LAUNDERING",),
+        disclosure_mode="ATTRIBUTED_INSTITUTIONS",
+        contributing_institutions=("bank_b",),
+        protocol="OPENMINED-PSI-2.0.6-ECDH",
+        assurance_level="REVIEWED_ESTABLISHED_PSI_VERIFIED",
+        executed_at="2026-10-26T00:00:00Z",
+    )
+    forged_bank_b_sig = bank_b_signing.sign(canonical_evaluated)
+    assert not registry.verify_signature("bank_a", forged_bank_b_sig, canonical_evaluated), (
+        "Registry accepted Bank B's signature as Bank A's signature!"
+    )
+
+
+def test_adversarial_coordinator_cannot_forge_bank_signatures_using_matching_tokens() -> None:
+    """P0 Requirement: The coordinator cannot forge either bank's execution signature
+    using its matching tokens or routing secrets.
+    """
+    bank_a_signing = InstitutionalSigningIdentity.generate("bank_a")
+    registry = InstitutionalVerificationRegistry()
+    registry.register_public_key("bank_a", bank_a_signing.public_key)
+
+    canonical_msg = b"EVALUATED_OUTCOME_DATA"
+    coord_matching_token = "match_token_999888777"
+    forged_sig = hmac.new(coord_matching_token.encode(), canonical_msg, hashlib.sha256).hexdigest()
+
+    assert not registry.verify_signature("bank_a", forged_sig, canonical_msg), (
+        "Registry accepted coordinator HMAC token as Bank A execution signature!"
+    )
+
+
+def test_adversarial_registry_rejects_arbitrary_string_credentials_and_seeds() -> None:
+    """P0 Requirement: Registry rejects arbitrary strings, passwords, HMAC credentials,
+    and seed-like credentials as public verification keys.
+    """
+    reg = InstitutionalVerificationRegistry()
+
+    # Passwords or arbitrary text
+    with pytest.raises(ValueError, match="String credentials, passwords, HMAC secrets, and seeds are strictly rejected"):
+        reg.register_public_key("bank_a", "password123")
+
+    with pytest.raises(ValueError, match="String credentials, passwords, HMAC secrets, and seeds are strictly rejected"):
+        reg.register_public_key("bank_b", "auth_secret_shared_with_peers")
+
+    # Private key material strictly prohibited
+    priv = ed25519.Ed25519PrivateKey.generate()
+    with pytest.raises(PermissionError, match="Security boundary violation: Private key material cannot be registered"):
+        reg.register_public_key("bank_c", priv)  # type: ignore[arg-type]
+
+
+def test_adversarial_registry_prevents_unauthorized_key_replacement() -> None:
+    """P0 Requirement: Registry prevents replacement of an existing institutional
+    public key through ordinary registration. Authorized rotation must succeed.
+    """
+    bank_signing = InstitutionalSigningIdentity.generate("bank_b")
+    reg = InstitutionalVerificationRegistry()
+    reg.register_public_key("bank_b", bank_signing.public_key)
+
+    # Attack: Attacker generates a new key and tries to overwrite Bank B's key via normal registration
+    evil_signing = InstitutionalSigningIdentity.generate("bank_b")
+    with pytest.raises(ConsortiumSecurityError, match="Unauthorized key replacement via ordinary registration is prohibited"):
+        reg.register_public_key("bank_b", evil_signing.public_key)
+
+    # Legitimate path: Authorized rotation signed by current key
+    new_signing = InstitutionalSigningIdentity.generate("bank_b")
+    current_version = reg._key_versions["bank_b"]
+    challenge = f"ROTATE:bank_b:{new_signing.public_key_hex}:{current_version + 1}".encode()
+    valid_rotation_sig = bank_signing.sign(challenge)
+
+    reg.rotate_public_key("bank_b", new_signing.public_key, valid_rotation_sig)
+    assert reg.get_public_key_hex("bank_b") == new_signing.public_key_hex
+    assert reg._key_versions["bank_b"] == current_version + 1
+
+
+def test_adversarial_signal_integrity_attacks_fail_admission() -> None:
+    """P1 Requirements: 5 Required Attacks using genuine signed PSI response:
+    1. Change contributing-institution count.
+    2. Forge graph correlation indicator or inflated degree band.
+    3. Elevate attestation status or operational assurance level.
+    4. Inject attributed counterpart when disclosure is anonymous.
+    5. Modify additional material evidence field (risk level).
+    """
+    cbi = _create_cbi_service("c_alpha")
+
+    # Attack 1: Change contributing-institutions count (e.g. claim 5 banks observed)
+    sig_1, req_1, _, _, _ = _build_authentic_test_signal("c_alpha")
+    sig_1.contributing_institutions_count = 5
+    with pytest.raises(ConsortiumSecurityError, match="Contributing institutions count mismatch"):
+        cbi._admit_and_verify_operational_signal(signal=sig_1, expected_req=req_1, audited_actor="analyst")
+
+    # Attack 2a: Forge graph correlation indicator (claim cross-bank correlation when no match)
+    sig_2a, req_2a, _, _, _ = _build_authentic_test_signal("c_alpha", match_confirmed=False, match_category="NO_MATCH", match_confidence=0.0)
+    sig_2a.graph_context["has_incident_cross_bank_correlations"] = True
+    with pytest.raises(ConsortiumSecurityError, match="Graph context correlation forgery detected"):
+        cbi._admit_and_verify_operational_signal(signal=sig_2a, expected_req=req_2a, audited_actor="analyst")
+
+    # Attack 2b: Inflate relationship degree band to CONSORTIUM_WIDE
+    sig_2b, req_2b, _, _, _ = _build_authentic_test_signal("c_alpha")
+    sig_2b.graph_context["sanitized_degree_band"] = "CONSORTIUM_WIDE"
+    with pytest.raises(ConsortiumSecurityError, match="Inflated graph relationship degree"):
+        cbi._admit_and_verify_operational_signal(signal=sig_2b, expected_req=req_2b, audited_actor="analyst")
+
+    # Attack 3a: Elevate attestation status to HARDWARE_ENCLAVE_VERIFIED without hardware enclave
+    sig_3a, req_3a, _, _, _ = _build_authentic_test_signal("c_alpha")
+    sig_3a.attestation_status = "HARDWARE_ENCLAVE_VERIFIED"
+    with pytest.raises(ConsortiumSecurityError, match="Elevated or unverified attestation status"):
+        cbi._admit_and_verify_operational_signal(signal=sig_3a, expected_req=req_3a, audited_actor="analyst")
+
+    # Attack 3b: Elevate assurance level to HARDWARE_CONFIDENTIAL_COMPUTE
+    sig_3b, req_3b, _, _, _ = _build_authentic_test_signal("c_alpha")
+    sig_3b.assurance_level = "HARDWARE_CONFIDENTIAL_COMPUTE"  # type: ignore[assignment]
+    with pytest.raises(ConsortiumSecurityError, match="Unverified assurance level"):
+        cbi._admit_and_verify_operational_signal(signal=sig_3b, expected_req=req_3b, audited_actor="analyst")
+
+    # Attack 4: Inject attributed counterpart when disclosure is anonymous
+    sig_4, req_4, _, _, _ = _build_authentic_test_signal("c_alpha", disclosure_mode="ANONYMIZED_SUMMARY")
+    sig_4.contributing_institutions = ["bank_b"]  # attacker tries to unmask counterpart
+    with pytest.raises(ConsortiumSecurityError, match="Attributed institutions injected into signal under anonymous disclosure mode"):
+        cbi._admit_and_verify_operational_signal(signal=sig_4, expected_req=req_4, audited_actor="analyst")
+
+    # Attack 5: Tamper risk level without valid signature
+    sig_5, req_5, _, _, _ = _build_authentic_test_signal("c_alpha", sanitized_risk_level="LOW")
+    sig_5.sanitized_risk_level = "CRITICAL"
+    with pytest.raises(ConsortiumSecurityError, match="Sanitized risk level mismatch"):
+        cbi._admit_and_verify_operational_signal(signal=sig_5, expected_req=req_5, audited_actor="analyst")
+
+
+def test_missing_signing_key_fails_closed_in_worker_node(tmp_path: Path) -> None:
+    """P0 Requirement: Missing institutional signing key provisioning causes worker to fail closed,
+    rather than silently fabricating a new key.
+    """
+    from app.application.services.isolated_matching_service import IsolatedBankWorkerNode
+
+    worker = IsolatedBankWorkerNode(
+        bank_id="bank_unprovisioned",
+        storage_root=str(tmp_path),
+        signing_key=None,
+    )
+
+    with pytest.raises(ConsortiumSecurityError, match="Worker node 'bank_unprovisioned' has no provisioned signing key"):
+        _ = worker.public_key_hex

@@ -535,8 +535,25 @@ class CrossBankIntelligenceService:
             raise ConsortiumSecurityError("Adoption rejection: Match category mismatch between signal and receipt.")
         if abs(float(receipt.get("match_confidence", 0.0)) - float(signal.match_confidence)) > 1e-6:
             raise ConsortiumSecurityError("Adoption rejection: Match confidence mismatch between signal and receipt.")
-        if not signal.is_authoritative or receipt.get("assurance_level") != "REVIEWED_ESTABLISHED_PSI_VERIFIED":
-            raise ConsortiumSecurityError("Adoption rejection: Unverified assurance level or non-authoritative signal.")
+        if signal.execution_mode != "VERIFIED_OPERATIONAL":
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Invalid execution mode '{signal.execution_mode}'. Operational admission requires 'VERIFIED_OPERATIONAL'."
+            )
+        if not signal.is_authoritative or signal.is_synthetic:
+            raise ConsortiumSecurityError("Adoption rejection: Operational signal must be authoritative and non-synthetic.")
+        if signal.assurance_level != "REVIEWED_ESTABLISHED_PSI_VERIFIED" or receipt.get("assurance_level") != "REVIEWED_ESTABLISHED_PSI_VERIFIED":
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Unverified assurance level (signal: '{signal.assurance_level}', receipt: '{receipt.get('assurance_level')}')."
+            )
+        allowed_attestation_statuses = {
+            "ISOLATED_MULTI_PROCESS",
+            "SOFTWARE_EMULATED",
+            "UNAVAILABLE_NO_HARDWARE_ENCLAVE",
+        }
+        if signal.attestation_status not in allowed_attestation_statuses:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Elevated or unverified attestation status '{signal.attestation_status}'. Operational runtime lacks validated hardware enclave evidence."
+            )
 
         # Cryptographically bound signal fields validation
         receipt_risk = receipt.get(
@@ -563,11 +580,43 @@ class CrossBankIntelligenceService:
                 f"Adoption rejection: Disclosure mode mismatch (signal: '{signal.disclosure_mode}', receipt: '{receipt_disclosure_mode}')."
             )
 
-        receipt_institutions = set(receipt.get("contributing_institutions") or [])
-        signal_institutions = set(signal.contributing_institutions or [])
-        if receipt_institutions != signal_institutions:
+        receipt_institutions = list(receipt.get("contributing_institutions") or [])
+        signal_institutions = list(signal.contributing_institutions or [])
+        if signal.disclosure_mode == "ANONYMIZED_SUMMARY":
+            if len(signal_institutions) > 0:
+                raise ConsortiumSecurityError(
+                    "Adoption rejection: Attributed institutions injected into signal under anonymous disclosure mode."
+                )
+            if len(receipt_institutions) > 0:
+                raise ConsortiumSecurityError(
+                    "Adoption rejection: Attributed institutions present in receipt under anonymous disclosure mode."
+                )
+        if set(receipt_institutions) != set(signal_institutions):
             raise ConsortiumSecurityError(
                 f"Adoption rejection: Contributing institutions mismatch (signal: {signal_institutions}, receipt: {receipt_institutions})."
+            )
+
+        expected_count = len(receipt_institutions) if receipt_disclosure_mode == "ATTRIBUTED_INSTITUTIONS" else (1 if signal.match_confirmed else 0)
+        if signal.contributing_institutions_count != expected_count:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Contributing institutions count mismatch (signal: {signal.contributing_institutions_count}, expected: {expected_count})."
+            )
+
+        # Graph Context Integrity Verification
+        graph_ctx = signal.graph_context or {}
+        has_correlations = graph_ctx.get("has_incident_cross_bank_correlations")
+        if has_correlations is not None and bool(has_correlations) != signal.match_confirmed:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Graph context correlation forgery detected (graph correlation: {has_correlations}, match confirmed: {signal.match_confirmed})."
+            )
+        degree_band = graph_ctx.get("sanitized_degree_band")
+        if not signal.match_confirmed and degree_band not in (None, "", "ISOLATED"):
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Inflated graph relationship degree '{degree_band}' for unconfirmed match."
+            )
+        if signal.match_confirmed and degree_band not in (None, "", "BILATERAL"):
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Inflated graph relationship degree '{degree_band}' beyond verified bilateral execution."
             )
 
         # 6. Anti-Replay & Freshness
@@ -712,6 +761,23 @@ class CrossBankIntelligenceService:
         self._admitted_receipts_store.set(receipt_id, {"admitted_at": now.isoformat(), "signal_id": signal.signal_id})
 
         signal_dict = signal.model_dump()
+        # Authoritative server-side normalization before persistence
+        signal_dict["contributing_institutions_count"] = expected_count
+        signal_dict["contributing_institutions"] = list(receipt.get("contributing_institutions") or [])
+        signal_dict["disclosure_mode"] = receipt_disclosure_mode
+        signal_dict["sanitized_risk_level"] = receipt_risk
+        signal_dict["sanitized_typology_indicators"] = sorted(list(receipt_typologies))
+        signal_dict["match_confirmed"] = bool(receipt.get("match_confirmed", False))
+        signal_dict["match_category"] = receipt.get("match_category", "NO_MATCH")
+        signal_dict["match_confidence"] = float(receipt.get("match_confidence", 0.0))
+        signal_dict["assurance_level"] = receipt.get("assurance_level", "REVIEWED_ESTABLISHED_PSI_VERIFIED")
+        signal_dict["execution_mode"] = "VERIFIED_OPERATIONAL"
+        signal_dict["is_authoritative"] = True
+        signal_dict["is_synthetic"] = False
+        signal_dict["graph_context"] = {
+            "has_incident_cross_bank_correlations": bool(receipt.get("match_confirmed", False)),
+            "sanitized_degree_band": "BILATERAL" if receipt.get("match_confirmed", False) else "ISOLATED",
+        }
         expires_at = (now + datetime.timedelta(hours=24)).isoformat()
         content_hash = hashlib.sha256(
             json.dumps(signal_dict, sort_keys=True).encode("utf-8")
@@ -782,9 +848,9 @@ class CrossBankIntelligenceService:
         if req.execution_mode == "VERIFIED_OPERATIONAL":
             if not req.target_bank_id:
                 raise RuntimeError(
-                    "Operational privacy attestation unavailable: Hardware enclaves (Intel SGX) and distributed "
-                    "multi-party cryptographic PSI across independent physical bank nodes are not available in this software runtime. "
-                    "Operation fails closed to prevent fabricated operational claims."
+                    "Operational privacy attestation unavailable: Target counterpart institution (target_bank_id) missing, "
+                    "and hardware enclaves (Intel SGX) or distributed multi-party cryptographic PSI across independent "
+                    "physical bank nodes are not available in this software runtime. Operation fails closed to prevent fabricated operational claims."
                 )
             return self._execute_verified_operational_psi(
                 req=req,

@@ -189,6 +189,15 @@ class InstitutionalSigningIdentity:
         self.public_key_hex = raw_pub.hex()
 
     @property
+    def private_key_hex(self) -> str:
+        """Return the 64-character raw hex representation of the private key."""
+        return self._private_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption(),
+        ).hex()
+
+    @property
     def public_key(self) -> ed25519.Ed25519PublicKey:
         """Expose public verification key."""
         return self._public_key
@@ -198,21 +207,65 @@ class InstitutionalSigningIdentity:
         sig = self._private_key.sign(message)
         return sig.hex()
 
+    def verify(self, signature_hex: str, message: bytes) -> bool:
+        """Verify an Ed25519 signature against this identity's public verification key."""
+        try:
+            self._public_key.verify(bytes.fromhex(signature_hex.strip()), message)
+            return True
+        except Exception:
+            return False
+
     @classmethod
     def from_seed(cls, bank_id: str, secret: str) -> InstitutionalSigningIdentity:
-        """Derive an Ed25519 signing identity from an authoritative seed secret."""
-        if not secret or not secret.strip():
-            raise ValueError("Seed secret cannot be empty.")
-        seed = hashlib.sha256(b"CFI-INSTITUTION-SIGNING-SEED-V1:" + secret.encode("utf-8")).digest()
-        priv = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
-        return cls(bank_id=bank_id, private_key=priv)
+        """Reject deterministic seed derivation to guarantee independent institutional key sovereignty."""
+        raise PermissionError(
+            "Security policy violation: Deriving institutional signing keys from shared secrets "
+            "or seeds is strictly prohibited. Institutional keys must be generated independently "
+            "using generate(), from_private_hex(), or from_private_key_file() to prevent counterpart "
+            "or coordinator key compromise."
+        )
 
     @classmethod
     def from_private_hex(cls, bank_id: str, hex_key: str) -> InstitutionalSigningIdentity:
         """Load an Ed25519 signing identity from a 64-char hex string (32 raw bytes)."""
-        raw_bytes = bytes.fromhex(hex_key.strip())
+        clean_hex = hex_key.strip()
+        if len(clean_hex) != 64:
+            raise ValueError(
+                f"Invalid private key hex length: {len(clean_hex)}. Expected 64 hex characters (32 raw bytes)."
+            )
+        raw_bytes = bytes.fromhex(clean_hex)
         priv = ed25519.Ed25519PrivateKey.from_private_bytes(raw_bytes)
         return cls(bank_id=bank_id, private_key=priv)
+
+    @classmethod
+    def from_private_bytes(cls, bank_id: str, raw_bytes: bytes) -> InstitutionalSigningIdentity:
+        """Load an Ed25519 signing identity from 32 raw private bytes."""
+        if len(raw_bytes) != 32:
+            raise ValueError(
+                f"Invalid private key byte length: {len(raw_bytes)}. Expected exactly 32 bytes."
+            )
+        priv = ed25519.Ed25519PrivateKey.from_private_bytes(raw_bytes)
+        return cls(bank_id=bank_id, private_key=priv)
+
+    @classmethod
+    def from_private_key_file(cls, bank_id: str, file_path: str) -> InstitutionalSigningIdentity:
+        """Load an Ed25519 signing identity from a local file containing 64-char hex or 32 raw bytes."""
+        import os
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Signing key file not found: {file_path}")
+        with open(file_path, "rb") as f:
+            content = f.read().strip()
+        if len(content) == 32:
+            return cls.from_private_bytes(bank_id, content)
+        content_str = content.decode("utf-8").strip()
+        return cls.from_private_hex(bank_id, content_str)
+
+    def save_private_key_file(self, file_path: str) -> None:
+        """Save the raw private key hex securely to a file."""
+        import os
+        os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(self.private_key_hex)
 
     @classmethod
     def generate(cls, bank_id: str) -> InstitutionalSigningIdentity:
@@ -221,24 +274,53 @@ class InstitutionalSigningIdentity:
         return cls(bank_id=bank_id, private_key=priv)
 
 
+class EnrolledInstitutionalPublicKey:
+    """Authoritative metadata binding for an enrolled institutional public verification key."""
+
+    def __init__(
+        self,
+        bank_id: str,
+        public_key: ed25519.Ed25519PublicKey,
+        public_key_hex: str,
+        version: int = 1,
+        enrolled_at: str | None = None,
+        trust_source: str = "DIRECT_BOOTSTRAP",
+        is_revoked: bool = False,
+    ) -> None:
+        self.bank_id = bank_id.lower().strip()
+        self.public_key = public_key
+        self.public_key_hex = public_key_hex
+        self.version = version
+        import datetime
+        self.enrolled_at = enrolled_at or datetime.datetime.now(datetime.UTC).isoformat()
+        self.trust_source = trust_source
+        self.is_revoked = is_revoked
+
+
 class InstitutionalVerificationRegistry:
     """Registry holding ONLY trusted public verification keys for institutional members.
 
     Enforces strict key custody:
     - Never stores, receives, or exposes private signing keys.
     - Rejects any attempt to register private key material.
-    - Fails closed if an un-enrolled institution signature is queried.
+    - Accepts ONLY valid Ed25519 public key representations (64-char hex, 32 raw bytes, or Ed25519PublicKey).
+    - Strictly rejects arbitrary strings, passwords, HMAC credentials, and seeds.
+    - Fails closed if an un-enrolled or revoked institution signature is queried.
+    - Prevents unauthenticated replacement of enrolled institutional keys.
     """
 
     def __init__(self) -> None:
+        self._enrolled_keys: dict[str, EnrolledInstitutionalPublicKey] = {}
         self._public_keys: dict[str, ed25519.Ed25519PublicKey] = {}
         self._key_versions: dict[str, int] = {}
 
     def register_public_key(
         self,
         bank_id: str,
-        public_key: ed25519.Ed25519PublicKey | str,
+        public_key: ed25519.Ed25519PublicKey | str | bytes,
         version: int = 1,
+        trust_source: str = "DIRECT_BOOTSTRAP",
+        allow_overwrite: bool = False,
     ) -> None:
         """Enroll or update an institution's public verification key."""
         clean_bank_id = bank_id.lower().strip()
@@ -251,48 +333,100 @@ class InstitutionalVerificationRegistry:
                 "in the public verification registry."
             )
 
+        if clean_bank_id in self._enrolled_keys and not allow_overwrite:
+            current_v = self._enrolled_keys[clean_bank_id].version
+            raise ConsortiumSecurityError(
+                f"Institution '{clean_bank_id}' is already enrolled with public verification key version {current_v}. "
+                "Unauthorized key replacement via ordinary registration is prohibited. "
+                "Key updates require authorized rotation via rotate_public_key()."
+            )
+
         pub_obj: ed25519.Ed25519PublicKey
-        if isinstance(public_key, str):
-            raw_str = public_key.strip()
-            # If 64 hex chars, load directly
-            if len(raw_str) == 64:
-                pub_obj = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(raw_str))
-            else:
-                # Deterministic seed derivation fallback
-                seed = hashlib.sha256(b"CFI-INSTITUTION-SIGNING-SEED-V1:" + raw_str.encode("utf-8")).digest()
-                pub_obj = ed25519.Ed25519PrivateKey.from_private_bytes(seed).public_key()
-        elif isinstance(public_key, ed25519.Ed25519PublicKey):
+        if isinstance(public_key, ed25519.Ed25519PublicKey):
             pub_obj = public_key
+        elif isinstance(public_key, bytes):
+            if len(public_key) != 32:
+                raise ValueError(
+                    f"Invalid public key byte length: {len(public_key)}. Expected exactly 32 bytes for Ed25519."
+                )
+            pub_obj = ed25519.Ed25519PublicKey.from_public_bytes(public_key)
+        elif isinstance(public_key, str):
+            raw_str = public_key.strip()
+            if len(raw_str) != 64:
+                raise ValueError(
+                    f"Invalid public verification key for institution '{clean_bank_id}': "
+                    f"expected 64-character hex string (32 raw bytes), received length {len(raw_str)}. "
+                    "String credentials, passwords, HMAC secrets, and seeds are strictly rejected."
+                )
+            try:
+                raw_bytes = bytes.fromhex(raw_str)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid hex string for institutional public verification key: {exc}"
+                ) from exc
+            pub_obj = ed25519.Ed25519PublicKey.from_public_bytes(raw_bytes)
         else:
             raise TypeError(f"Invalid public key type: {type(public_key)}")
 
+        pub_hex = pub_obj.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        ).hex()
+
+        enrolled = EnrolledInstitutionalPublicKey(
+            bank_id=clean_bank_id,
+            public_key=pub_obj,
+            public_key_hex=pub_hex,
+            version=version,
+            trust_source=trust_source,
+            is_revoked=False,
+        )
+
+        self._enrolled_keys[clean_bank_id] = enrolled
         self._public_keys[clean_bank_id] = pub_obj
         self._key_versions[clean_bank_id] = version
 
     def rotate_public_key(
         self,
         bank_id: str,
-        new_public_key: ed25519.Ed25519PublicKey | str,
+        new_public_key: ed25519.Ed25519PublicKey | str | bytes,
         rotation_authorization_signature: str,
     ) -> None:
         """Rotate an enrolled public key with cryptographic authorization from the previous key."""
         clean_bank_id = bank_id.lower().strip()
-        current_pub = self._public_keys.get(clean_bank_id)
-        if not current_pub:
+        current = self._enrolled_keys.get(clean_bank_id)
+        if not current:
             raise ConsortiumSecurityError(
                 f"Cannot rotate key: Institution '{clean_bank_id}' has no enrolled key."
             )
+        if current.is_revoked:
+            raise ConsortiumSecurityError(
+                f"Cannot rotate key: Enrolled verification key for '{clean_bank_id}' has been revoked."
+            )
 
         new_pub_obj: ed25519.Ed25519PublicKey
-        if isinstance(new_public_key, str):
-            raw_str = new_public_key.strip()
-            if len(raw_str) == 64:
-                new_pub_obj = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(raw_str))
-            else:
-                seed = hashlib.sha256(b"CFI-INSTITUTION-SIGNING-SEED-V1:" + raw_str.encode("utf-8")).digest()
-                new_pub_obj = ed25519.Ed25519PrivateKey.from_private_bytes(seed).public_key()
-        elif isinstance(new_public_key, ed25519.Ed25519PublicKey):
+        if isinstance(new_public_key, ed25519.Ed25519PublicKey):
             new_pub_obj = new_public_key
+        elif isinstance(new_public_key, bytes):
+            if len(new_public_key) != 32:
+                raise ValueError(
+                    f"Invalid new public key byte length: {len(new_public_key)}. Expected 32 bytes."
+                )
+            new_pub_obj = ed25519.Ed25519PublicKey.from_public_bytes(new_public_key)
+        elif isinstance(new_public_key, str):
+            raw_str = new_public_key.strip()
+            if len(raw_str) != 64:
+                raise ValueError(
+                    f"Invalid new public verification key for institution '{clean_bank_id}': "
+                    f"expected 64-character hex string (32 raw bytes), received length {len(raw_str)}."
+                )
+            try:
+                raw_bytes = bytes.fromhex(raw_str)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid hex string for new institutional public verification key: {exc}"
+                ) from exc
+            new_pub_obj = ed25519.Ed25519PublicKey.from_public_bytes(raw_bytes)
         else:
             raise TypeError(f"Invalid public key type: {type(new_public_key)}")
 
@@ -301,41 +435,83 @@ class InstitutionalVerificationRegistry:
             format=serialization.PublicFormat.Raw,
         ).hex()
 
-        current_version = self._key_versions.get(clean_bank_id, 1)
-        challenge = f"ROTATE:{clean_bank_id}:{new_raw_hex}:{current_version + 1}".encode()
+        next_version = current.version + 1
+        challenge = f"ROTATE:{clean_bank_id}:{new_raw_hex}:{next_version}".encode()
 
         try:
-            current_pub.verify(bytes.fromhex(rotation_authorization_signature.strip()), challenge)
+            current.public_key.verify(bytes.fromhex(rotation_authorization_signature.strip()), challenge)
         except (InvalidSignature, ValueError) as exc:
             raise ConsortiumSecurityError(
                 f"Key rotation authorization failed for institution '{clean_bank_id}': invalid authorization signature."
             ) from exc
 
+        enrolled = EnrolledInstitutionalPublicKey(
+            bank_id=clean_bank_id,
+            public_key=new_pub_obj,
+            public_key_hex=new_raw_hex,
+            version=next_version,
+            trust_source="AUTHORIZED_ROTATION",
+            is_revoked=False,
+        )
+
+        self._enrolled_keys[clean_bank_id] = enrolled
         self._public_keys[clean_bank_id] = new_pub_obj
-        self._key_versions[clean_bank_id] = current_version + 1
+        self._key_versions[clean_bank_id] = next_version
+
+    def revoke_public_key(self, bank_id: str, reason: str = "GOVERNANCE_REVOCATION") -> None:
+        """Mark an institution's public verification key as revoked."""
+        clean_bank_id = bank_id.lower().strip()
+        current = self._enrolled_keys.get(clean_bank_id)
+        if not current:
+            raise ConsortiumSecurityError(
+                f"Cannot revoke key: Institution '{clean_bank_id}' has no enrolled key."
+            )
+        revoked_item = EnrolledInstitutionalPublicKey(
+            bank_id=clean_bank_id,
+            public_key=current.public_key,
+            public_key_hex=current.public_key_hex,
+            version=current.version,
+            enrolled_at=current.enrolled_at,
+            trust_source=f"REVOKED:{reason}",
+            is_revoked=True,
+        )
+        self._enrolled_keys[clean_bank_id] = revoked_item
 
     def get_public_key(self, bank_id: str) -> ed25519.Ed25519PublicKey:
         """Retrieve the trusted public verification key for an institution.
 
-        Fails closed with ConsortiumSecurityError if un-enrolled.
+        Fails closed with ConsortiumSecurityError if un-enrolled or revoked.
+        Never derives keys from shared secrets or HMAC credentials.
         """
         clean_bank_id = bank_id.lower().strip()
-        pub = self._public_keys.get(clean_bank_id)
-        if pub is not None:
-            return pub
+        enrolled = self._enrolled_keys.get(clean_bank_id)
+        if enrolled is not None:
+            if enrolled.is_revoked:
+                raise ConsortiumSecurityError(
+                    f"Institutional public verification key for bank '{clean_bank_id}' has been revoked. "
+                    "Operational admission fails closed."
+                )
+            return enrolled.public_key
 
-        # Check environment variable for institutional public verification key
+        # Check environment variable strictly for valid institutional public verification keys
         import os
 
         env_key = (
             os.getenv(f"CFI_INSTITUTION_PUBLIC_KEY_{clean_bank_id.upper()}")
+            or os.getenv(f"CFI_PEER_PUBLIC_KEY_{clean_bank_id.upper()}")
             or os.getenv(f"CFI_PEER_KEY_{clean_bank_id.upper()}")
-            or os.getenv(f"CFI_WORKER_SECRET_{clean_bank_id.upper()}")
-            or os.getenv(f"WORKER_AUTH_SECRET_{clean_bank_id.upper()}")
         )
-        if env_key:
-            self.register_public_key(clean_bank_id, env_key)
-            return self._public_keys[clean_bank_id]
+        if env_key and len(env_key.strip()) == 64:
+            try:
+                self.register_public_key(
+                    clean_bank_id,
+                    env_key.strip(),
+                    trust_source="ENVIRONMENT_BOOTSTRAP",
+                    allow_overwrite=False,
+                )
+                return self._enrolled_keys[clean_bank_id].public_key
+            except Exception:
+                pass
 
         raise ConsortiumSecurityError(
             f"Institutional public verification key not found for bank '{clean_bank_id}'. "
@@ -360,11 +536,15 @@ class InstitutionalVerificationRegistry:
         ).hex()
 
     def snapshot_public_keys(self) -> dict[str, str]:
-        """Return a mapping of bank_id to public key hex for enrolled institutions."""
+        """Return a mapping of bank_id to public key hex for enrolled active institutions."""
         return {
-            b_id: k.public_bytes(
-                encoding=serialization.Encoding.Raw,
-                format=serialization.PublicFormat.Raw,
-            ).hex()
-            for b_id, k in self._public_keys.items()
+            b_id: k.public_key_hex
+            for b_id, k in self._enrolled_keys.items()
+            if not k.is_revoked
         }
+
+    def has_key(self, bank_id: str) -> bool:
+        """Return True if an institutional public verification key is enrolled and not revoked."""
+        clean = bank_id.lower().strip()
+        enrolled = self._enrolled_keys.get(clean)
+        return enrolled is not None and not enrolled.is_revoked

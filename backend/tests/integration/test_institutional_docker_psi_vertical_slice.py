@@ -51,6 +51,7 @@ from app.application.services.isolated_matching_service import (
 )
 from app.domain.consortium_governance import ConsortiumSecurityError, MemberRole
 from app.domain.enums import CasePriority
+from app.domain.institutional_identity import InstitutionalSigningIdentity
 from app.domain.investigation_entities import Entity, EntityType, RiskLevel
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
@@ -182,8 +183,12 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
     _run_cmd(["docker", "volume", "create", VOLUME_BANK_A], check=False)
     _run_cmd(["docker", "volume", "create", VOLUME_BANK_B], check=False)
 
+    # 2b. Generate sovereign asymmetric signing identities for Bank A and Bank B
+    ident_a = InstitutionalSigningIdentity.generate("bank_a")
+    ident_b = InstitutionalSigningIdentity.generate("bank_b")
+
     # 3. Start Bank A Worker container
-    peers_a_json = json.dumps({"bank_b": SECRET_B})
+    peers_a_json = json.dumps({"bank_b": ident_b.public_key_hex})
     cmd_worker_a = [
         "docker", "run", "-d",
         "--name", CONTAINER_WORKER_A,
@@ -207,6 +212,7 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "-e", "WORKER_HOST=0.0.0.0",
         "-e", "WORKER_PORT=8100",
         "-e", f"WORKER_AUTH_SECRET={SECRET_A}",
+        "-e", f"WORKER_SIGNING_KEY={ident_a.private_key_hex}",
         "-e", f"WORKER_MATCHING_TOKEN={TOKEN_MATCH_A}",
         "-e", f"WORKER_INGESTION_TOKEN={TOKEN_INGEST_A}",
         "-e", f"WORKER_ADMIN_TOKEN={TOKEN_ADMIN_A}",
@@ -219,7 +225,7 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         pytest.skip(f"Failed to start container '{CONTAINER_WORKER_A}': {res_worker_a.stderr.strip()}")
 
     # 4. Start Bank B Worker container
-    peers_b_json = json.dumps({"bank_a": SECRET_A})
+    peers_b_json = json.dumps({"bank_a": ident_a.public_key_hex})
     cmd_worker_b = [
         "docker", "run", "-d",
         "--name", CONTAINER_WORKER_B,
@@ -243,6 +249,7 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "-e", "WORKER_HOST=0.0.0.0",
         "-e", "WORKER_PORT=8100",
         "-e", f"WORKER_AUTH_SECRET={SECRET_B}",
+        "-e", f"WORKER_SIGNING_KEY={ident_b.private_key_hex}",
         "-e", f"WORKER_MATCHING_TOKEN={TOKEN_MATCH_B}",
         "-e", f"WORKER_INGESTION_TOKEN={TOKEN_INGEST_B}",
         "-e", f"WORKER_ADMIN_TOKEN={TOKEN_ADMIN_B}",
@@ -333,18 +340,16 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "volume_bank_b": VOLUME_BANK_B,
     }
 
-    # Provision backend service verification secrets for running containers
-    os.environ["CFI_WORKER_SECRET_BANK_A"] = SECRET_A
-    os.environ["CFI_WORKER_SECRET_BANK_B"] = SECRET_B
-    os.environ["CFI_PEER_KEY_BANK_B"] = SECRET_B
+    # Provision backend service verification public keys (ZERO private key material on analyst host)
+    os.environ["CFI_INSTITUTION_PUBLIC_KEY_BANK_A"] = ident_a.public_key_hex
+    os.environ["CFI_INSTITUTION_PUBLIC_KEY_BANK_B"] = ident_b.public_key_hex
     os.environ["CFI_COORDINATOR_SECRET"] = SECRET_COORD
 
     try:
         yield topology_ctx
     finally:
-        os.environ.pop("CFI_WORKER_SECRET_BANK_A", None)
-        os.environ.pop("CFI_WORKER_SECRET_BANK_B", None)
-        os.environ.pop("CFI_PEER_KEY_BANK_B", None)
+        os.environ.pop("CFI_INSTITUTION_PUBLIC_KEY_BANK_A", None)
+        os.environ.pop("CFI_INSTITUTION_PUBLIC_KEY_BANK_B", None)
         os.environ.pop("CFI_COORDINATOR_SECRET", None)
         _teardown_disposable_resources()
 
