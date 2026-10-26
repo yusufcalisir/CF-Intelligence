@@ -17,6 +17,8 @@ import json
 import logging
 import os
 import threading
+import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import UTC
 from typing import Any

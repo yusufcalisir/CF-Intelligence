@@ -472,7 +472,9 @@ def test_admission_race_midflight_pause_fails_closed(containment_env: dict[str, 
 
     # 7. Resume the pilot: previous rejected signal must NOT become attachable
     svc.resume_pilot(pilot_id="pilot_race_test", principal=containment_env["principal_op"])
-    assert svc.get_pilot("pilot_race_test").status == PilotStatus.ACTIVE
+    resumed_pilot = svc.get_pilot("pilot_race_test")
+    assert resumed_pilot is not None
+    assert resumed_pilot.status == PilotStatus.ACTIVE
 
     with pytest.raises(ConsortiumSecurityError):
         intel_svc.attach_signal_to_case_evidence(
@@ -498,6 +500,7 @@ def test_admission_race_midflight_pause_fails_closed(containment_env: dict[str, 
         signal_id=fresh_sig_id,
     )
     fresh_res = svc.store.get_query_reservation(fresh_res_id)
+    assert fresh_res is not None
     assert fresh_res["status"] == "COMMITTED"
     assert fresh_res["signal_id"] == fresh_sig_id
 
@@ -622,6 +625,7 @@ def test_grant_revision_change_invalidates_active_pilot(containment_env: dict[st
 
     # Mutate grant revision in consortium governance
     c = gov.get_consortium("c_containment")
+    assert c is not None
     grant = c.metadata["operational_data_sharing_grant"]
     grant["revision"] = 2
     gov.store.save_consortium(c)
@@ -646,6 +650,7 @@ def test_grant_institution_removal_rejects_query(containment_env: dict[str, Any]
 
     # Remove bank_b from participating banks in grant
     c = gov.get_consortium("c_containment")
+    assert c is not None
     grant = c.metadata["operational_data_sharing_grant"]
     grant["participating_banks"] = ["bank_a"]  # bank_b removed!
     gov.store.save_consortium(c)
