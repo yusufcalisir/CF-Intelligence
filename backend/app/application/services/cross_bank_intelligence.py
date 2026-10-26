@@ -41,6 +41,11 @@ from app.domain.consortium_governance import (
     ConsortiumStatus,
 )
 from app.domain.consortium_policy import ConsortiumPolicyEngine
+from app.domain.institutional_identity import (
+    InstitutionalVerificationRegistry,
+    canonical_counterpart_evidence_bytes,
+    canonical_evaluated_result_bytes,
+)
 from app.domain.value_objects_investigation import (
     calculate_jaccard_similarity,
 )
@@ -75,6 +80,7 @@ class CrossBankIntelligenceService:
         evidence_service: EvidenceRegistryService | None = None,
         policy_engine: ConsortiumPolicyEngine | None = None,
         matching_coordinator: CrossBankMatchingCoordinator | None = None,
+        institutional_registry: InstitutionalVerificationRegistry | None = None,
     ) -> None:
         self.consortium_service = consortium_service or ConsortiumGovernanceService()
         self.entity_service = entity_service or EntityResolutionService()
@@ -87,6 +93,7 @@ class CrossBankIntelligenceService:
             consortium_service=self.consortium_service,
             policy_engine=self.policy_engine,
         )
+        self.institutional_registry = institutional_registry or InstitutionalVerificationRegistry()
         self._signal_store = RedisStore("authoritative_signals")
         self._synthetic_entity_store = RedisStore("synthetic_entities")
         self._research_case_evidence_store = RedisStore("research_case_evidence")
@@ -508,6 +515,14 @@ class CrossBankIntelligenceService:
             raise ConsortiumSecurityError(
                 f"Adoption rejection: Ticket query scope '{ticket.get('query_scope')}' does not match entity '{expected_req.query_entity_id}'."
             )
+        if (
+            receipt.get("query_entity_id") != expected_req.query_entity_id
+            or signal.query_entity_id != expected_req.query_entity_id
+            or (provenance.get("query_entity_id") is not None and provenance.get("query_entity_id") != expected_req.query_entity_id)
+        ):
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Query entity identifier mismatch between signal/receipt/provenance and expected request."
+            )
 
         # 5. Established PSI Protocol & Classification Invariants
         if receipt.get("protocol") != "OPENMINED-PSI-2.0.6-ECDH" or provenance.get("protocol") != "OPENMINED-PSI-2.0.6-ECDH":
@@ -522,6 +537,38 @@ class CrossBankIntelligenceService:
             raise ConsortiumSecurityError("Adoption rejection: Match confidence mismatch between signal and receipt.")
         if not signal.is_authoritative or receipt.get("assurance_level") != "REVIEWED_ESTABLISHED_PSI_VERIFIED":
             raise ConsortiumSecurityError("Adoption rejection: Unverified assurance level or non-authoritative signal.")
+
+        # Cryptographically bound signal fields validation
+        receipt_risk = receipt.get(
+            "matched_risk_level", "UNAVAILABLE" if signal.match_confirmed else "UNOBSERVED"
+        )
+        if signal.sanitized_risk_level != receipt_risk:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Sanitized risk level mismatch (signal: '{signal.sanitized_risk_level}', receipt: '{receipt_risk}')."
+            )
+
+        receipt_typologies = set(receipt.get("matched_typologies") or [])
+        signal_typologies = set(signal.sanitized_typology_indicators or [])
+        if receipt_typologies != signal_typologies:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Typology mismatch (signal: {signal_typologies}, receipt: {receipt_typologies})."
+            )
+
+        receipt_disclosure_mode = receipt.get(
+            "disclosure_mode",
+            "ATTRIBUTED_INSTITUTIONS" if signal.match_confirmed else "ANONYMIZED_SUMMARY",
+        )
+        if signal.disclosure_mode != receipt_disclosure_mode:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Disclosure mode mismatch (signal: '{signal.disclosure_mode}', receipt: '{receipt_disclosure_mode}')."
+            )
+
+        receipt_institutions = set(receipt.get("contributing_institutions") or [])
+        signal_institutions = set(signal.contributing_institutions or [])
+        if receipt_institutions != signal_institutions:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Contributing institutions mismatch (signal: {signal_institutions}, receipt: {receipt_institutions})."
+            )
 
         # 6. Anti-Replay & Freshness
         receipt_id = str(receipt.get("receipt_id", "")).strip()
@@ -545,48 +592,16 @@ class CrossBankIntelligenceService:
                 f"Adoption rejection: Execution evidence expired (timestamp: {executed_at_str})."
             )
 
-        # 7. Cryptographic Verification of Participant & Coordinator Signatures
-        worker_a_secret = (
-            os.getenv(f"CFI_WORKER_SECRET_{clean_requesting.upper()}")
-            or os.getenv(f"WORKER_AUTH_SECRET_{clean_requesting.upper()}")
-            or os.getenv("WORKER_AUTH_SECRET")
-            or getattr(getattr(self.matching_coordinator, "_workers", {}).get(clean_requesting), "_auth_secret", "")
-        )
-        if not worker_a_secret:
+        # 7. Asymmetric Cryptographic Verification of Bank B Counterpart Evidence and Bank A Evaluated Outcome
+        # 7a. Bank B Counterpart Evidence Verification
+        counterpart_evidence = receipt.get("counterpart_evidence") or provenance.get("counterpart_evidence")
+        if not counterpart_evidence or not isinstance(counterpart_evidence, dict):
             raise ConsortiumSecurityError(
-                f"Adoption rejection: Verification secret for requesting bank '{clean_requesting}' is not configured."
-            )
-        canonical_receipt_text = (
-            f"{receipt['receipt_id']}:{receipt['transcript_digest']}:{receipt['match_confirmed']}:{receipt['match_category']}"
-        )
-        expected_worker_a_sig = hmac.new(
-            worker_a_secret.encode("utf-8"),
-            canonical_receipt_text.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
-        worker_a_sig = receipt.get("worker_a_signature", "")
-        if not hmac.compare_digest(expected_worker_a_sig, worker_a_sig):
-            raise ConsortiumSecurityError(
-                "Adoption rejection: Cryptographic verification failed for Requesting Bank worker execution signature."
+                "Adoption rejection: Missing authenticated counterpart execution evidence from target institution."
             )
 
-        worker_b_secret = (
-            os.getenv(f"CFI_PEER_KEY_{clean_target.upper()}")
-            or os.getenv(f"CFI_WORKER_SECRET_{clean_target.upper()}")
-            or os.getenv(f"WORKER_AUTH_SECRET_{clean_target.upper()}")
-            or (
-                getattr(getattr(self.matching_coordinator, "_workers", {}).get(clean_requesting), "_trusted_peer_verification_keys", {}).get(clean_target)
-                if self.matching_coordinator
-                else None
-            )
-        )
-        if not worker_b_secret:
-            raise ConsortiumSecurityError(
-                f"Adoption rejection: Verification key for target bank '{clean_target}' is not configured."
-            )
-        approvals = ticket.get("bank_approvals") or {}
-        worker_b_ticket_sig = approvals.get(clean_target, "")
         from app.application.services.isolated_matching_service import OperationAuthorizationTicket
+
         unsigned_ticket = OperationAuthorizationTicket(
             ticket_id=ticket["ticket_id"],
             consortium_id=ticket["consortium_id"],
@@ -603,35 +618,95 @@ class CrossBankIntelligenceService:
             expires_at=ticket["expires_at"],
             bank_approvals={},
         )
-        expected_worker_b_ticket_sig = hmac.new(
-            worker_b_secret.encode("utf-8"),
-            f"{unsigned_ticket.canonical_digest()}:{clean_target}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
-        if not hmac.compare_digest(expected_worker_b_ticket_sig, worker_b_ticket_sig):
+        ticket_canonical_digest = unsigned_ticket.canonical_digest()
+
+        canonical_b_evidence = canonical_counterpart_evidence_bytes(
+            version=str(counterpart_evidence.get("version", "1.0")),
+            consortium_id=clean_consortium_id,
+            grant_id=ticket["grant_id"],
+            grant_revision=int(ticket["grant_revision"]),
+            grant_scope_digest=ticket["grant_scope_digest"],
+            requesting_bank_id=clean_requesting,
+            target_bank_id=clean_target,
+            job_id=ticket["job_id"],
+            ticket_digest=ticket_canonical_digest,
+            psi_server_setup_hash=str(counterpart_evidence.get("psi_server_setup_hash", "")),
+            psi_response_hash=str(counterpart_evidence.get("psi_response_hash", "")),
+            protocol="OPENMINED-PSI-2.0.6-ECDH",
+            nonce=str(counterpart_evidence.get("nonce", "")),
+            timestamp=str(counterpart_evidence.get("timestamp", "")),
+        )
+        expected_counterpart_evidence_digest = hashlib.sha256(canonical_b_evidence).hexdigest()
+        receipt_counterpart_digest = receipt.get("counterpart_evidence_digest", "")
+        if receipt_counterpart_digest and receipt_counterpart_digest != expected_counterpart_evidence_digest:
             raise ConsortiumSecurityError(
-                "Adoption rejection: Cryptographic verification failed for Counterpart Bank worker authorization signature."
+                "Adoption rejection: Counterpart evidence digest mismatch in execution receipt."
             )
 
+        worker_b_sig = counterpart_evidence.get("worker_b_signature") or receipt.get("worker_b_signature", "")
+        if not worker_b_sig:
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Missing Bank B cryptographic signature on counterpart PSI evidence."
+            )
+
+        if not self.institutional_registry.verify_signature(clean_target, worker_b_sig, canonical_b_evidence):
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Cryptographic verification failed for Counterpart Bank B execution evidence."
+            )
+
+        # 7b. Bank A Evaluated Outcome Verification
+        canonical_a_evaluated = canonical_evaluated_result_bytes(
+            version=str(receipt.get("version", "1.0")),
+            receipt_id=receipt_id,
+            job_id=ticket["job_id"],
+            consortium_id=clean_consortium_id,
+            grant_id=ticket["grant_id"],
+            grant_revision=int(ticket["grant_revision"]),
+            grant_scope_digest=ticket["grant_scope_digest"],
+            requesting_bank_id=clean_requesting,
+            target_bank_id=clean_target,
+            query_entity_id=expected_req.query_entity_id,
+            ticket_digest=ticket_canonical_digest,
+            counterpart_evidence_digest=expected_counterpart_evidence_digest,
+            match_confirmed=signal.match_confirmed,
+            match_category=signal.match_category,
+            match_confidence=signal.match_confidence,
+            matched_risk_level=receipt_risk,
+            matched_typologies=tuple(receipt.get("matched_typologies") or ()),
+            disclosure_mode=receipt_disclosure_mode,
+            contributing_institutions=tuple(receipt.get("contributing_institutions") or ()),
+            protocol="OPENMINED-PSI-2.0.6-ECDH",
+            assurance_level="REVIEWED_ESTABLISHED_PSI_VERIFIED",
+            executed_at=executed_at_str,
+        )
+        worker_a_sig = receipt.get("worker_a_signature", "")
+        if not worker_a_sig:
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Missing Bank A cryptographic signature on evaluated result."
+            )
+
+        if not self.institutional_registry.verify_signature(clean_requesting, worker_a_sig, canonical_a_evaluated):
+            raise ConsortiumSecurityError(
+                "Adoption rejection: Cryptographic verification failed for Requesting Bank A evaluated outcome signature."
+            )
+
+        # 7c. Coordinator Routing Attestation (if coordinator secret configured)
         coord_secret = (
             os.getenv("CFI_COORDINATOR_SECRET")
             or os.getenv("COORDINATOR_AUTH_SECRET")
             or getattr(self.matching_coordinator, "_coordinator_secret", "")
         )
-        if not coord_secret:
-            raise ConsortiumSecurityError(
-                "Adoption rejection: Verification secret for coordinator relay is not configured."
-            )
         coord_sig = provenance.get("coordinator_signature") or receipt.get("coordinator_signature", "")
-        expected_coord_sig = hmac.new(
-            coord_secret.encode("utf-8"),
-            f"{receipt['receipt_id']}:{receipt['transcript_digest']}:{clean_consortium_id}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
-        if not hmac.compare_digest(expected_coord_sig, coord_sig):
-            raise ConsortiumSecurityError(
-                "Adoption rejection: Cryptographic verification failed for Coordinator relay execution signature."
-            )
+        if coord_secret and coord_sig:
+            expected_coord_sig = hmac.new(
+                coord_secret.encode("utf-8"),
+                f"{receipt['receipt_id']}:{receipt['transcript_digest']}:{clean_consortium_id}".encode(),
+                hashlib.sha256,
+            ).hexdigest()
+            if not hmac.compare_digest(expected_coord_sig, coord_sig):
+                raise ConsortiumSecurityError(
+                    "Adoption rejection: Cryptographic verification failed for Coordinator relay execution signature."
+                )
 
         self._admitted_receipt_ids.add(receipt_id)
         self._admitted_receipts_store.set(receipt_id, {"admitted_at": now.isoformat(), "signal_id": signal.signal_id})

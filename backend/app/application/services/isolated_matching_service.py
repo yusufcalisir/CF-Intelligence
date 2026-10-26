@@ -53,6 +53,12 @@ from app.domain.consortium_governance import (
     ConsortiumStatus,
 )
 from app.domain.consortium_policy import ConsortiumPolicyEngine
+from app.domain.institutional_identity import (
+    InstitutionalSigningIdentity,
+    InstitutionalVerificationRegistry,
+    canonical_counterpart_evidence_bytes,
+    canonical_evaluated_result_bytes,
+)
 from app.domain.investigation_entities import Entity
 from app.domain.psi_service import (
     PSI_PRIME,
@@ -147,7 +153,7 @@ class EstablishedPSIQueryMessage:
 
 @dataclass(frozen=True)
 class EstablishedPSICounterpartResponse:
-    """Established PSI response message containing server Setup and Response bytes."""
+    """Established PSI response message containing server Setup, Response bytes, and Bank B signed evidence."""
 
     job_id: str
     consortium_id: str
@@ -157,8 +163,19 @@ class EstablishedPSICounterpartResponse:
     nonce: str
     timestamp: str
     signature: str
+    requesting_bank_id: str = ""
+    grant_id: str = ""
+    grant_revision: int = 1
+    grant_scope_digest: str = ""
+    ticket_digest: str = ""
+    psi_server_setup_hash: str = ""
+    psi_response_hash: str = ""
+    counterpart_evidence_digest: str = ""
+    version: str = "1.0"
 
     def compute_digest(self) -> str:
+        if self.counterpart_evidence_digest:
+            return self.counterpart_evidence_digest
         canonical = (
             f"{self.job_id}:{self.consortium_id}:{self.target_bank_id}:"
             f"{self.psi_server_setup_b64}:{self.psi_response_b64}:{self.nonce}:"
@@ -243,6 +260,16 @@ class VerifiedMatchReceipt:
     assurance_level: str = "ISOLATED_INTEGRATION_VERIFIED"
     match_category: str = "PROBABILISTIC_FUZZY"
     is_exact_confirmed: bool = False
+    grant_id: str = ""
+    grant_revision: int = 1
+    grant_scope_digest: str = ""
+    ticket_digest: str = ""
+    counterpart_evidence_digest: str = ""
+    counterpart_evidence: dict[str, Any] = field(default_factory=dict)
+    disclosure_mode: str = "ATTRIBUTED_INSTITUTIONS"
+    contributing_institutions: tuple[str, ...] = ()
+    evaluated_result_digest: str = ""
+    version: str = "1.0"
 
 
 class IsolatedBankWorkerNode:
@@ -264,6 +291,7 @@ class IsolatedBankWorkerNode:
         admin_token: str | None = None,
         require_operation_ticket: bool = False,
         consortium_service: Any | None = None,
+        signing_key: InstitutionalSigningIdentity | str | None = None,
     ) -> None:
         if not bank_id or not bank_id.strip():
             raise ValueError("bank_id must be a non-empty string")
@@ -275,6 +303,21 @@ class IsolatedBankWorkerNode:
         self._kms_session = TenantKMSSession(bank_id=self.bank_id, kms_service=kms_service)
         # Worker private signing key: cryptographically generated if not provided, never predictable fallback
         self._auth_secret = auth_secret or secrets.token_hex(32)
+
+        # Asymmetric institutional signing identity
+        signing_key_candidate = (
+            signing_key
+            or os.environ.get(f"CFI_WORKER_SIGNING_KEY_{self.bank_id.upper()}")
+            or os.environ.get("WORKER_SIGNING_KEY")
+        )
+        if isinstance(signing_key_candidate, InstitutionalSigningIdentity):
+            self._signing_identity = signing_key_candidate
+        elif isinstance(signing_key_candidate, str) and len(signing_key_candidate.strip()) == 64:
+            self._signing_identity = InstitutionalSigningIdentity.from_private_hex(self.bank_id, signing_key_candidate)
+        elif self._auth_secret:
+            self._signing_identity = InstitutionalSigningIdentity.from_seed(self.bank_id, self._auth_secret)
+        else:
+            self._signing_identity = InstitutionalSigningIdentity.generate(self.bank_id)
 
         # Scoped RPC authorization credentials (least-privilege separation)
         self._matching_token = matching_token or f"match_{secrets.token_hex(24)}"
@@ -292,6 +335,9 @@ class IsolatedBankWorkerNode:
         self._trusted_peer_verification_keys: dict[str, str] = {
             k.lower().strip(): v for k, v in (trusted_peer_keys or {}).items()
         }
+        self._peer_registry = InstitutionalVerificationRegistry()
+        for p_bank, p_key in self._trusted_peer_verification_keys.items():
+            self._peer_registry.register_public_key(p_bank, p_key)
 
         self._require_operation_ticket = require_operation_ticket
         self._locally_revoked_grants: set[str] = set()
@@ -407,6 +453,7 @@ class IsolatedBankWorkerNode:
         permitted_purposes: list[str],
         permitted_operations: list[str] | None = None,
         expires_at: str | None = None,
+        allow_institution_identity_sharing: bool = False,
     ) -> dict[str, Any]:
         """Register an independently authorized institutional data-sharing grant at this worker."""
         clean_grant = grant_id.strip()
@@ -429,6 +476,7 @@ class IsolatedBankWorkerNode:
                 )
             ],
             "expires_at": expires_at,
+            "allow_institution_identity_sharing": bool(allow_institution_identity_sharing),
             "is_active": True,
             "authorized_at": datetime.datetime.now(UTC).isoformat(),
         }
@@ -1235,15 +1283,31 @@ class IsolatedBankWorkerNode:
         resp_nonce = secrets.token_hex(16)
         resp_timestamp = now.isoformat()
 
-        canonical_resp = (
-            f"{query.job_id}:{query.consortium_id}:{self.bank_id}:"
-            f"{setup_b64}:{resp_b64}:{resp_nonce}:{resp_timestamp}"
+        setup_hash = hashlib.sha256(setup_bytes).hexdigest()
+        resp_hash = hashlib.sha256(resp_bytes).hexdigest()
+        ticket_digest = query.ticket.canonical_digest() if query.ticket else ""
+        grant_id = query.ticket.grant_id if query.ticket else ""
+        grant_revision = int(query.ticket.grant_revision) if query.ticket else 1
+        grant_scope_digest = query.ticket.grant_scope_digest if query.ticket else ""
+
+        canonical_evidence = canonical_counterpart_evidence_bytes(
+            version="1.0",
+            consortium_id=query.consortium_id,
+            grant_id=grant_id,
+            grant_revision=grant_revision,
+            grant_scope_digest=grant_scope_digest,
+            requesting_bank_id=query.requesting_bank_id,
+            target_bank_id=self.bank_id,
+            job_id=query.job_id,
+            ticket_digest=ticket_digest,
+            psi_server_setup_hash=setup_hash,
+            psi_response_hash=resp_hash,
+            protocol="OPENMINED-PSI-2.0.6-ECDH",
+            nonce=resp_nonce,
+            timestamp=resp_timestamp,
         )
-        resp_sig = hmac.new(
-            self._auth_secret.encode("utf-8"),
-            canonical_resp.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
+        counterpart_evidence_digest = hashlib.sha256(canonical_evidence).hexdigest()
+        resp_sig = self._signing_identity.sign(canonical_evidence)
 
         # Persist consumed nonce
         self._persist_consumed_nonce(query.nonce)
@@ -1257,6 +1321,15 @@ class IsolatedBankWorkerNode:
             nonce=resp_nonce,
             timestamp=resp_timestamp,
             signature=resp_sig,
+            requesting_bank_id=query.requesting_bank_id,
+            grant_id=grant_id,
+            grant_revision=grant_revision,
+            grant_scope_digest=grant_scope_digest,
+            ticket_digest=ticket_digest,
+            psi_server_setup_hash=setup_hash,
+            psi_response_hash=resp_hash,
+            counterpart_evidence_digest=counterpart_evidence_digest,
+            version="1.0",
         )
 
     def finalize_established_psi_evaluation(
@@ -1284,25 +1357,40 @@ class IsolatedBankWorkerNode:
         if abs((now - resp_time).total_seconds()) > 300:
             raise ConsortiumSecurityError("Expired counterpart response rejected.")
 
-        # 3. Verify Target Bank Signature using internal trusted peer keystore
-        peer_key = self._trusted_peer_verification_keys.get(
-            response.target_bank_id.lower().strip()
-        )
-        if not peer_key:
-            raise ConsortiumSecurityError(
-                f"Peer authentication failed: Institution '{response.target_bank_id}' has no trusted verification key enrolled."
-            )
+        # 3. Verify Target Bank Signature using peer registry
+        setup_bytes = OpenMinedPSIAdapter.decode_b64(response.psi_server_setup_b64)
+        resp_bytes = OpenMinedPSIAdapter.decode_b64(response.psi_response_b64)
+        setup_hash = hashlib.sha256(setup_bytes).hexdigest()
+        resp_hash = hashlib.sha256(resp_bytes).hexdigest()
 
-        canonical_resp = (
-            f"{response.job_id}:{response.consortium_id}:{response.target_bank_id}:"
-            f"{response.psi_server_setup_b64}:{response.psi_response_b64}:{response.nonce}:{response.timestamp}"
+        ticket_digest = query.ticket.canonical_digest() if query.ticket else ""
+        grant_id = getattr(response, "grant_id", "") or (query.ticket.grant_id if query.ticket else "")
+        grant_revision = int(getattr(response, "grant_revision", 1) or (query.ticket.grant_revision if query.ticket else 1))
+        grant_scope_digest = getattr(response, "grant_scope_digest", "") or (query.ticket.grant_scope_digest if query.ticket else "")
+        req_bank = getattr(response, "requesting_bank_id", "") or query.requesting_bank_id
+
+        canonical_evidence = canonical_counterpart_evidence_bytes(
+            version=getattr(response, "version", "1.0"),
+            consortium_id=response.consortium_id,
+            grant_id=grant_id,
+            grant_revision=grant_revision,
+            grant_scope_digest=grant_scope_digest,
+            requesting_bank_id=req_bank,
+            target_bank_id=response.target_bank_id,
+            job_id=response.job_id,
+            ticket_digest=ticket_digest,
+            psi_server_setup_hash=setup_hash,
+            psi_response_hash=resp_hash,
+            protocol="OPENMINED-PSI-2.0.6-ECDH",
+            nonce=response.nonce,
+            timestamp=response.timestamp,
         )
-        expected_sig = hmac.new(
-            peer_key.encode("utf-8"),
-            canonical_resp.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
-        if not hmac.compare_digest(expected_sig, response.signature):
+        counterpart_evidence_digest = hashlib.sha256(canonical_evidence).hexdigest()
+
+        # Independently verify target bank signature on counterpart evidence
+        if not self._peer_registry.verify_signature(
+            response.target_bank_id, response.signature, canonical_evidence
+        ):
             raise ConsortiumSecurityError(
                 f"Peer authentication failed: Invalid signature from target bank '{response.target_bank_id}'."
             )
@@ -1315,8 +1403,6 @@ class IsolatedBankWorkerNode:
             )
 
         # 5. Compute intersection
-        setup_bytes = OpenMinedPSIAdapter.decode_b64(response.psi_server_setup_b64)
-        resp_bytes = OpenMinedPSIAdapter.decode_b64(response.psi_response_b64)
         matched_indices = OpenMinedPSIAdapter.compute_client_intersection(
             client, setup_bytes, resp_bytes
         )
@@ -1335,24 +1421,96 @@ class IsolatedBankWorkerNode:
         self._persist_consumed_nonce(response.nonce)
 
         # 6. Compute transcript digest and receipt
-        canonical_transcript = (
-            f"{query.compute_digest()}:{response.compute_digest()}:{match_confirmed}:{match_category}"
-        )
-        transcript_digest = hashlib.sha256(canonical_transcript.encode("utf-8")).hexdigest()
-
         now_iso = now.isoformat()
         receipt_id = str(uuid.uuid4())
-        receipt_sig_a = hmac.new(
-            self._auth_secret.encode("utf-8"),
-            f"{receipt_id}:{transcript_digest}:{match_confirmed}:{match_category}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
-
         bound_entity = (
             query.ticket.query_scope.removeprefix("entity:")
             if query.ticket and query.ticket.query_scope.startswith("entity:")
             else ""
         )
+        matched_risk_level = "UNAVAILABLE" if match_confirmed else "UNOBSERVED"
+        matched_typologies = ("CROSS_BANK_ENTITY_OBSERVED",) if match_confirmed else ()
+
+        # Determine whether institution identity sharing is permitted by grant/governance
+        allow_identities = False
+        clean_grant = (query.ticket.grant_id if query.ticket else "") or getattr(response, "grant_id", "")
+        if clean_grant:
+            if clean_grant in self._authorized_grants:
+                allow_identities = bool(
+                    self._authorized_grants[clean_grant].get("allow_institution_identity_sharing", False)
+                )
+            elif self._consortium_service:
+                consortium = self._consortium_service.get_consortium(query.consortium_id)
+                if consortium:
+                    grants = getattr(consortium, "operational_data_sharing_grants", {}) or {}
+                    meta_grant = consortium.metadata.get("operational_data_sharing_grant") or {}
+                    gov_grant = grants.get(clean_grant) or (
+                        meta_grant if meta_grant.get("grant_id") == clean_grant else None
+                    )
+                    if gov_grant:
+                        allow_identities = bool(
+                            gov_grant.get("allow_institution_identity_sharing", False)
+                        )
+
+        if match_confirmed and allow_identities:
+            disclosure_mode = "ATTRIBUTED_INSTITUTIONS"
+            contributing_institutions = (response.target_bank_id,)
+        else:
+            disclosure_mode = "ANONYMIZED_SUMMARY"
+            contributing_institutions = ()
+        assurance_level = "REVIEWED_ESTABLISHED_PSI_VERIFIED"
+        protocol = "OPENMINED-PSI-2.0.6-ECDH"
+
+        canonical_evaluated = canonical_evaluated_result_bytes(
+            version="1.0",
+            receipt_id=receipt_id,
+            job_id=query.job_id,
+            consortium_id=query.consortium_id,
+            grant_id=grant_id,
+            grant_revision=grant_revision,
+            grant_scope_digest=grant_scope_digest,
+            requesting_bank_id=self.bank_id,
+            target_bank_id=response.target_bank_id,
+            query_entity_id=bound_entity,
+            ticket_digest=ticket_digest,
+            counterpart_evidence_digest=counterpart_evidence_digest,
+            match_confirmed=match_confirmed,
+            match_category=match_category,
+            match_confidence=match_confidence,
+            matched_risk_level=matched_risk_level,
+            matched_typologies=matched_typologies,
+            disclosure_mode=disclosure_mode,
+            contributing_institutions=contributing_institutions,
+            protocol=protocol,
+            assurance_level=assurance_level,
+            executed_at=now_iso,
+        )
+        evaluated_result_digest = hashlib.sha256(canonical_evaluated).hexdigest()
+        receipt_sig_a = self._signing_identity.sign(canonical_evaluated)
+
+        counterpart_evidence_dict = {
+            "version": getattr(response, "version", "1.0"),
+            "consortium_id": response.consortium_id,
+            "grant_id": grant_id,
+            "grant_revision": grant_revision,
+            "grant_scope_digest": grant_scope_digest,
+            "requesting_bank_id": req_bank,
+            "target_bank_id": response.target_bank_id,
+            "job_id": response.job_id,
+            "ticket_digest": ticket_digest,
+            "psi_server_setup_hash": setup_hash,
+            "psi_response_hash": resp_hash,
+            "protocol": protocol,
+            "nonce": response.nonce,
+            "timestamp": response.timestamp,
+            "counterpart_evidence_digest": counterpart_evidence_digest,
+            "worker_b_signature": response.signature,
+        }
+
+        canonical_transcript = (
+            f"{query.compute_digest()}:{response.compute_digest()}:{match_confirmed}:{match_category}"
+        )
+        transcript_digest = hashlib.sha256(canonical_transcript.encode("utf-8")).hexdigest()
 
         return VerifiedMatchReceipt(
             receipt_id=receipt_id,
@@ -1363,16 +1521,26 @@ class IsolatedBankWorkerNode:
             query_entity_id=bound_entity,
             match_confirmed=match_confirmed,
             match_confidence=match_confidence,
-            protocol="OPENMINED-PSI-2.0.6-ECDH",
+            protocol=protocol,
             transcript_digest=transcript_digest,
             executed_at=now_iso,
             worker_a_signature=receipt_sig_a,
             worker_b_signature=response.signature,
-            matched_risk_level="UNAVAILABLE" if match_confirmed else "UNOBSERVED",
-            matched_typologies=("CROSS_BANK_ENTITY_OBSERVED",) if match_confirmed else (),
-            assurance_level="REVIEWED_ESTABLISHED_PSI_VERIFIED",
+            matched_risk_level=matched_risk_level,
+            matched_typologies=matched_typologies,
+            assurance_level=assurance_level,
             match_category=match_category,
             is_exact_confirmed=is_exact_confirmed,
+            grant_id=grant_id,
+            grant_revision=grant_revision,
+            grant_scope_digest=grant_scope_digest,
+            ticket_digest=ticket_digest,
+            counterpart_evidence_digest=counterpart_evidence_digest,
+            counterpart_evidence=counterpart_evidence_dict,
+            disclosure_mode=disclosure_mode,
+            contributing_institutions=contributing_institutions,
+            evaluated_result_digest=evaluated_result_digest,
+            version="1.0",
         )
 
 
@@ -1630,6 +1798,9 @@ class InstitutionalWorkerDaemon:
                             permitted_purposes=data["permitted_purposes"],
                             permitted_operations=data.get("permitted_operations"),
                             expires_at=data.get("expires_at"),
+                            allow_institution_identity_sharing=bool(
+                                data.get("allow_institution_identity_sharing", False)
+                            ),
                         )
                         res = {"status": "AUTHORIZED", "grant": rec}
                     else:
@@ -1802,6 +1973,7 @@ class InstitutionalWorkerClient:
         permitted_purposes: list[str],
         permitted_operations: list[str] | None = None,
         expires_at: str | None = None,
+        allow_institution_identity_sharing: bool = False,
     ) -> dict[str, Any]:
         """Register an authorized operational grant on the remote worker daemon via admin scope."""
         res = self._post(
@@ -1815,6 +1987,7 @@ class InstitutionalWorkerClient:
                 "permitted_purposes": permitted_purposes,
                 "permitted_operations": permitted_operations,
                 "expires_at": expires_at,
+                "allow_institution_identity_sharing": allow_institution_identity_sharing,
             },
             token=self.admin_token,
         )
@@ -2259,6 +2432,7 @@ class CrossBankMatchingCoordinator:
             f"{receipt.receipt_id}:{receipt.transcript_digest}:{clean_consortium_id}".encode(),
             hashlib.sha256,
         ).hexdigest()
+        receipt = replace(receipt, coordinator_signature=coord_sig)
 
         # 8. Determine Minimal Disclosed Intelligence Signal
         allow_identities = bool(disclosure_scope.get("allow_institution_identity", False))
@@ -2328,6 +2502,9 @@ class CrossBankMatchingCoordinator:
                 "coordinator_signature": coord_sig,
                 "worker_a_signature": receipt.worker_a_signature,
                 "worker_b_signature": receipt.worker_b_signature,
+                "counterpart_evidence": receipt.counterpart_evidence,
+                "counterpart_evidence_digest": receipt.counterpart_evidence_digest,
+                "evaluated_result_digest": receipt.evaluated_result_digest,
                 "assurance_level": assurance_level_literal,
                 "receipt": asdict(receipt),
                 "ticket": asdict(ticket),
