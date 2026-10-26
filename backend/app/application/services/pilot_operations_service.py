@@ -184,12 +184,20 @@ class PilotOperationsService:
         pilot_id: str,
         principal: AuthenticatedPrincipal | None = None,
         preflight_req: PilotPreflightRequest | None = None,
+        operator_actor: str | None = None,
+        **kwargs: Any,
     ) -> PilotEntity:
         """Execute preflight readiness verification for a provisioned pilot."""
         entity = self._get_required_pilot(pilot_id)
         if entity.status not in (PilotStatus.DRAFT, PilotStatus.PREFLIGHT, PilotStatus.AWAITING_APPROVAL):
             raise InvalidPilotTransitionError(
                 f"Cannot run preflight for pilot '{pilot_id}' in status '{entity.status.value}'."
+            )
+
+        if entity.status == PilotStatus.DRAFT:
+            entity.transition_to(
+                PilotStatus.PREFLIGHT,
+                "Executing preflight readiness probes.",
             )
 
         checks: list[PreflightCheckResult] = []

@@ -36,7 +36,7 @@ class PilotStatus(str, Enum):
 
 
 VALID_PILOT_TRANSITIONS: dict[PilotStatus, set[PilotStatus]] = {
-    PilotStatus.DRAFT: {PilotStatus.PREFLIGHT, PilotStatus.ABORTED},
+    PilotStatus.DRAFT: {PilotStatus.PREFLIGHT, PilotStatus.AWAITING_APPROVAL, PilotStatus.FAILED, PilotStatus.ABORTED},
     PilotStatus.PREFLIGHT: {PilotStatus.AWAITING_APPROVAL, PilotStatus.FAILED, PilotStatus.ABORTED},
     PilotStatus.AWAITING_APPROVAL: {PilotStatus.AUTHORIZED, PilotStatus.DRAFT, PilotStatus.PREFLIGHT, PilotStatus.ABORTED},
     PilotStatus.AUTHORIZED: {PilotStatus.ACTIVE, PilotStatus.ABORTED},
@@ -125,6 +125,13 @@ class PilotOperationalConfig:
 
     def compute_scope_digest(self) -> str:
         """Computes deterministic, canonical SHA-256 digest of this pilot scope."""
+        if isinstance(self.approved_datasets, dict):
+            datasets_norm: Any = {k.lower().strip(): v for k, v in sorted(self.approved_datasets.items())}
+        elif isinstance(self.approved_datasets, list):
+            datasets_norm = sorted([str(d).lower().strip() for d in self.approved_datasets])
+        else:
+            datasets_norm = str(self.approved_datasets)
+
         canonical = {
             "pilot_id": self.pilot_id.strip(),
             "revision": self.revision,
@@ -132,7 +139,7 @@ class PilotOperationalConfig:
             "participating_institutions": sorted([b.lower().strip() for b in self.participating_institutions]),
             "allowed_purposes": sorted([p.strip() for p in self.allowed_purposes]),
             "allowed_jurisdictions": sorted([j.strip() for j in self.allowed_jurisdictions]),
-            "approved_datasets": {k.lower().strip(): v for k, v in sorted(self.approved_datasets.items())},
+            "approved_datasets": datasets_norm,
             "authorized_operators": sorted([op.strip() for op in self.authorized_operators]),
             "operational_grant_id": self.operational_grant_id.strip(),
             "grant_revision": self.grant_revision,

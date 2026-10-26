@@ -161,6 +161,12 @@ async def provision_pilot(
 ) -> PilotStatusResponse:
     """Provision a new two-bank controlled pilot with immutable configuration and scope digest."""
     principal = _resolve_principal_or_fail(request)
+    permitted_roles = {"admin", "security_officer", "system_admin", "compliance"}
+    if not (principal.is_privileged or any(r in permitted_roles for r in principal.roles)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Principal '{principal.principal_id}' lacks permitted role to provision pilots.",
+        )
     try:
         entity = service.provision_pilot(req=payload, principal=principal)
         return _entity_to_response(entity)
@@ -225,12 +231,12 @@ async def approve_pilot(
             signature=payload.signature,
         )
         return _entity_to_response(entity)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except PermissionError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except (InvalidPilotTransitionError, PilotAuthorizationError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.post(
@@ -253,12 +259,12 @@ async def activate_pilot(
     try:
         entity = service.activate_pilot(pilot_id=pilot_id, principal=principal)
         return _entity_to_response(entity)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except PermissionError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except (InvalidPilotTransitionError, PilotAuthorizationError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.post(

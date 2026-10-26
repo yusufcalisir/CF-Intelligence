@@ -214,8 +214,8 @@ def test_gate_a_secure_onboarding_and_identity_boundary(
         ca_resp2 = client.get("/v1/onboarding/consortium-ca")
         assert ca_resp1.status_code == 200
         assert ca_resp2.status_code == 200
-        assert ca_resp1.json()["certificate_pem"] == ca_resp2.json()["certificate_pem"]
-        assert ca_resp1.json()["fingerprint_sha256"] == ca_resp2.json()["fingerprint_sha256"]
+        assert ca_resp1.json()["root_ca_pem"] == ca_resp2.json()["root_ca_pem"]
+        assert ca_resp1.json()["ca_fingerprint"] == ca_resp2.json()["ca_fingerprint"]
 
         # 2. Register Bank Alpha and Bank Beta by Consortium Operator
         reg_a = client.post(
