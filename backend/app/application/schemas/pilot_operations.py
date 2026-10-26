@@ -58,9 +58,8 @@ class PilotApprovalRequest(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def unify_institution(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            if not data.get("approving_institution") and data.get("institution_id"):
-                data["approving_institution"] = data["institution_id"]
+        if isinstance(data, dict) and not data.get("approving_institution") and data.get("institution_id"):
+            data["approving_institution"] = data["institution_id"]
         return data
 
 

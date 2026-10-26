@@ -14,7 +14,6 @@ import logging
 import os
 import sqlite3
 import threading
-from typing import Any
 
 from app.domain.pilot_operations import PilotEntity, PilotStatus
 from app.infrastructure.storage.storage_utils import get_storage_dir

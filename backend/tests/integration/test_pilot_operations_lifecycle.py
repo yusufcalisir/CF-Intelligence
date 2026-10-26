@@ -10,28 +10,16 @@ Verifies the complete end-to-end operational pilot slice across all 6 acceptance
 
 from __future__ import annotations
 
-import datetime
 import hashlib
 import json
-import os
-import time
 import uuid
 from collections.abc import Generator
-from datetime import UTC
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.application.schemas.cross_bank_intelligence import CrossBankIntelligenceQueryRequest
-from app.application.schemas.pilot_operations import (
-    PilotApprovalRequest,
-    PilotKillSwitchRequest,
-    PilotProvisionRequest,
-)
-from app.application.services.bank_onboarding_service import BankOnboardingService
-from app.application.services.case_service import CaseManagementService
 from app.application.services.consortium_service import ConsortiumGovernanceService
 from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
 from app.application.services.isolated_matching_service import (
@@ -41,7 +29,7 @@ from app.application.services.pilot_operations_service import (
     PilotGovernanceError,
     PilotOperationsService,
 )
-from app.domain.consortium_governance import ConsortiumSecurityError, MemberRole
+from app.domain.consortium_governance import MemberRole
 from app.domain.institutional_identity import InstitutionalSigningIdentity
 from app.domain.investigation_entities import Entity, EntityType, RiskLevel
 from app.domain.pilot_operations import PilotStatus
@@ -52,16 +40,10 @@ from app.main import app
 
 # Import Docker topology fixtures from test_institutional_docker_psi_vertical_slice
 from tests.integration.test_institutional_docker_psi_vertical_slice import (
-    CONTAINER_WORKER_A,
-    CONTAINER_WORKER_B,
-    CONTAINER_COORDINATOR,
-    IMAGE_NAME,
-    PORT_WORKER_B,
     SHARED_CONSORTIUM_STORE_SECRET,
     SHARED_JWT_SECRET,
     _run_cmd,
     _wait_for_health,
-    docker_topology,
 )
 
 
@@ -210,7 +192,6 @@ def test_gate_a_secure_onboarding_and_identity_boundary(
     """Gate A: Verify institutional enrollment, cross-tenant isolation, and credential protection."""
     token_op = pilot_test_env["token_op"]
     token_admin_a = pilot_test_env["token_admin_a"]
-    token_admin_b = pilot_test_env["token_admin_b"]
 
     with TestClient(app) as client:
         # 1. Consortium Root CA identity is stable across calls
@@ -454,8 +435,6 @@ def test_gate_c_and_d_real_docker_investigation_workflow(
     """Gate C & D: Live 3-container topology execution with genuine OpenMined PSI and case evidence."""
     pilot_svc: PilotOperationsService = pilot_test_env["pilot_svc"]
     gov_svc: ConsortiumGovernanceService = pilot_test_env["gov_svc"]
-    token_op = pilot_test_env["token_op"]
-    token_admin_a = pilot_test_env["token_admin_a"]
     token_admin_b = pilot_test_env["token_admin_b"]
     token_analyst_a = pilot_test_env["token_analyst_a"]
 
@@ -653,9 +632,6 @@ def test_gate_e_operational_resilience_and_incident_containment(
     """Gate E: Outage containment (Worker B stops), fail-closed, and restart persistence."""
     pilot_svc: PilotOperationsService = pilot_test_env["pilot_svc"]
     gov_svc: ConsortiumGovernanceService = pilot_test_env["gov_svc"]
-    token_op = pilot_test_env["token_op"]
-    token_admin_a = pilot_test_env["token_admin_a"]
-    token_admin_b = pilot_test_env["token_admin_b"]
     token_analyst_a = pilot_test_env["token_analyst_a"]
     client_a: InstitutionalWorkerClient = docker_topology["client_a"]
     client_b: InstitutionalWorkerClient = docker_topology["client_b"]

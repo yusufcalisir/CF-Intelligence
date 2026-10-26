@@ -12,16 +12,16 @@ Implements Milestone 5 Controlled Pilot Operations:
 from __future__ import annotations
 
 import datetime
-from datetime import UTC
-from enum import Enum
 import hashlib
 import json
 import math
 from dataclasses import asdict, dataclass, field
+from datetime import UTC
+from enum import StrEnum
 from typing import Any
 
 
-class PilotStatus(str, Enum):
+class PilotStatus(StrEnum):
     """Authoritative lifecycle states for controlled two-bank pilot operations."""
 
     DRAFT = "DRAFT"

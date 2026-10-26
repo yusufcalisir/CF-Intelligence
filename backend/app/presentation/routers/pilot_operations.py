@@ -26,9 +26,7 @@ from app.application.schemas.pilot_operations import (
     PilotTelemetrySummary,
     PreflightCheckItem,
 )
-from app.application.services.consortium_service import ConsortiumGovernanceService
 from app.application.services.pilot_operations_service import PilotOperationsService
-from app.domain.institutional_identity import InstitutionalVerificationRegistry
 from app.domain.pilot_operations import (
     InvalidPilotTransitionError,
     PilotAuthorizationError,
@@ -42,7 +40,6 @@ from app.infrastructure.security.principal_auth import (
     AuthenticatedPrincipal,
     resolve_authenticated_principal,
 )
-from app.infrastructure.storage.durable_pilot_store import DurablePilotStore
 
 logger = logging.getLogger(__name__)
 

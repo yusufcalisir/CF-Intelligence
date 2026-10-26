@@ -13,21 +13,18 @@ Adheres strictly to .agents/AGENTS.md:
 from __future__ import annotations
 
 import datetime
-from datetime import UTC
 import logging
 import threading
+from datetime import UTC
 from typing import Any
 
 from app.application.schemas.pilot_operations import (
-    PilotApprovalItem,
     PilotPreflightRequest,
     PilotProvisionRequest,
-    PilotStatusResponse,
     PilotTelemetrySummary,
-    PreflightCheckItem,
 )
 from app.application.services.consortium_service import ConsortiumGovernanceService
-from app.domain.consortium_governance import ConsortiumSecurityError, ConsortiumStatus
+from app.domain.consortium_governance import ConsortiumStatus
 from app.domain.institutional_identity import InstitutionalVerificationRegistry
 from app.domain.pilot_operations import (
     InvalidPilotTransitionError,
@@ -36,7 +33,6 @@ from app.domain.pilot_operations import (
     PilotEntity,
     PilotExecutionReceipt,
     PilotExpiredError,
-    PilotGovernanceError,
     PilotOperationalConfig,
     PilotQuotaExceededError,
     PilotStatus,

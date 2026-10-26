@@ -22,28 +22,21 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app.application.schemas.pilot_operations import (
-    PilotApprovalRequest,
-    PilotKillSwitchRequest,
-    PilotProvisionRequest,
-)
 from app.application.services.consortium_service import ConsortiumGovernanceService
 from app.application.services.pilot_operations_service import (
-    InvalidPilotTransitionError,
     PilotAuthorizationError,
     PilotExpiredError,
-    PilotGovernanceError,
     PilotOperationsService,
     PilotQuotaExceededError,
 )
 from app.domain.consortium_governance import MemberRole
+from app.domain.institutional_identity import InstitutionalSigningIdentity
 from app.domain.pilot_operations import (
     PilotApprovalRecord,
     PilotEntity,
     PilotOperationalConfig,
     PilotStatus,
 )
-from app.domain.institutional_identity import InstitutionalSigningIdentity
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 from app.infrastructure.storage.durable_pilot_store import DurablePilotStore

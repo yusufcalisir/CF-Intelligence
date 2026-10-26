@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import threading
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
@@ -9,10 +11,6 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
-
-
-import os
-import threading
 
 _consortium_ca_cache: tuple[str, str] | None = None
 _ca_lock = threading.Lock()
@@ -41,9 +39,9 @@ def get_or_create_consortium_ca(
 
         if os.path.exists(ca_cert_path) and os.path.exists(ca_key_path):
             try:
-                with open(ca_cert_path, "r", encoding="utf-8") as f:
+                with open(ca_cert_path, encoding="utf-8") as f:
                     ca_cert_pem = f.read().strip()
-                with open(ca_key_path, "r", encoding="utf-8") as f:
+                with open(ca_key_path, encoding="utf-8") as f:
                     ca_key_pem = f.read().strip()
                 if ca_cert_pem and ca_key_pem:
                     _consortium_ca_cache = (ca_cert_pem, ca_key_pem)
