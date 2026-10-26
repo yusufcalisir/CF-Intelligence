@@ -43,6 +43,7 @@ from app.domain.pilot_operations import (
     PilotOperationalConfig,
     PilotStatus,
 )
+from app.domain.institutional_identity import InstitutionalSigningIdentity
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 from app.infrastructure.storage.durable_pilot_store import DurablePilotStore
@@ -121,6 +122,10 @@ def unit_pilot_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str,
 
     pilot_store = DurablePilotStore(str(pilot_db_file))
     pilot_svc = PilotOperationsService(pilot_store=pilot_store, consortium_service=gov_svc)
+    id_a = InstitutionalSigningIdentity.generate("bank_a")
+    id_b = InstitutionalSigningIdentity.generate("bank_b")
+    pilot_svc.institutional_registry.register_public_key("bank_a", id_a.public_key)
+    pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key)
     PilotOperationsService._instance = pilot_svc
 
     return {

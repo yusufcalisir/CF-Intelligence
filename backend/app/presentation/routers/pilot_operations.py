@@ -34,7 +34,9 @@ from app.domain.pilot_operations import (
     PilotAuthorizationError,
     PilotEntity,
     PilotExpiredError,
+    PilotGovernanceError,
     PilotQuotaExceededError,
+    PilotStatus,
 )
 from app.infrastructure.security.principal_auth import (
     AuthenticatedPrincipal,
@@ -54,11 +56,7 @@ __all__ = [
 
 
 def _get_pilot_service() -> PilotOperationsService:
-    return PilotOperationsService(
-        store=DurablePilotStore.get_instance(),
-        consortium_service=ConsortiumGovernanceService(),
-        institutional_registry=InstitutionalVerificationRegistry(),
-    )
+    return PilotOperationsService.get_instance()
 
 
 def _resolve_principal_or_fail(request: Request) -> AuthenticatedPrincipal:
@@ -77,6 +75,7 @@ def _entity_to_response(entity: PilotEntity) -> PilotStatusResponse:
         status_reason=entity.status_reason,
         scope_digest=entity.scope_digest,
         is_fully_approved=entity.is_fully_approved(),
+        passed=all(c.passed for c in entity.preflight_checks) if entity.preflight_checks else (entity.status != PilotStatus.FAILED),
         queries_executed=entity.queries_executed,
         queries_denied=entity.queries_denied,
         queries_total_quota=entity.config.query_quota_total,
@@ -198,10 +197,10 @@ async def run_preflight(
     try:
         entity = service.run_preflight(pilot_id=pilot_id, principal=principal, preflight_req=payload)
         return _entity_to_response(entity)
+    except (InvalidPilotTransitionError, PilotGovernanceError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except InvalidPilotTransitionError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post(
@@ -231,7 +230,7 @@ async def approve_pilot(
             signature=payload.signature,
         )
         return _entity_to_response(entity)
-    except (InvalidPilotTransitionError, PilotAuthorizationError) as exc:
+    except (InvalidPilotTransitionError, PilotAuthorizationError, PilotGovernanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
@@ -259,7 +258,7 @@ async def activate_pilot(
     try:
         entity = service.activate_pilot(pilot_id=pilot_id, principal=principal)
         return _entity_to_response(entity)
-    except (InvalidPilotTransitionError, PilotAuthorizationError) as exc:
+    except (InvalidPilotTransitionError, PilotAuthorizationError, PilotGovernanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
@@ -288,10 +287,10 @@ async def pause_pilot(
     try:
         entity = service.pause_pilot(pilot_id=pilot_id, reason=payload.reason, principal=principal)
         return _entity_to_response(entity)
+    except (InvalidPilotTransitionError, PilotGovernanceError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except InvalidPilotTransitionError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post(
@@ -314,10 +313,10 @@ async def resume_pilot(
     try:
         entity = service.resume_pilot(pilot_id=pilot_id, principal=principal)
         return _entity_to_response(entity)
+    except (InvalidPilotTransitionError, PilotAuthorizationError, PilotExpiredError, PilotQuotaExceededError, PilotGovernanceError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except (InvalidPilotTransitionError, PilotAuthorizationError, PilotExpiredError, PilotQuotaExceededError) as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post(
@@ -341,6 +340,8 @@ async def abort_pilot(
     try:
         entity = service.abort_pilot(pilot_id=pilot_id, reason=payload.reason, principal=principal)
         return _entity_to_response(entity)
+    except (InvalidPilotTransitionError, PilotGovernanceError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
@@ -365,6 +366,8 @@ async def complete_pilot(
     try:
         entity = service.complete_pilot(pilot_id=pilot_id, principal=principal)
         return _entity_to_response(entity)
+    except (InvalidPilotTransitionError, PilotGovernanceError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 

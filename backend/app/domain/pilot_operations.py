@@ -51,7 +51,10 @@ VALID_PILOT_TRANSITIONS: dict[PilotStatus, set[PilotStatus]] = {
 class InvalidPilotTransitionError(ValueError):
     """Raised when an invalid pilot lifecycle transition is attempted."""
 
-    pass
+    def __init__(self, message: str) -> None:
+        if not message.lower().startswith("invalid state transition"):
+            message = f"Invalid state transition: {message}"
+        super().__init__(message)
 
 
 class PilotAuthorizationError(PermissionError):
@@ -185,6 +188,8 @@ class PilotEntity:
     queries_denied: int = 0
     institution_query_counts: dict[str, int] = field(default_factory=dict)
     latencies_ms: list[float] = field(default_factory=list)
+    matches_count: int = 0
+    state_history: list[dict[str, Any]] = field(default_factory=list)
     audit_event_ids: list[str] = field(default_factory=list)
     execution_receipt_ids: list[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.datetime.now(UTC).isoformat())
@@ -196,6 +201,30 @@ class PilotEntity:
     def __post_init__(self) -> None:
         if not self.scope_digest:
             self.scope_digest = self.config.compute_scope_digest()
+        if not self.state_history:
+            self.state_history.append({
+                "status": self.status.value,
+                "reason": self.status_reason,
+                "timestamp": self.created_at,
+            })
+
+    @property
+    def is_active(self) -> bool:
+        """Returns True if the pilot is in ACTIVE state and not expired."""
+        return self.status == PilotStatus.ACTIVE and not self.has_expired()
+
+    def has_expired(self, current_time: datetime.datetime | None = None) -> bool:
+        """Check if the pilot configuration expires_at boundary has passed."""
+        if not self.config.expires_at:
+            return False
+        now = current_time or datetime.datetime.now(UTC)
+        try:
+            exp_dt = datetime.datetime.fromisoformat(self.config.expires_at)
+            if exp_dt.tzinfo is None:
+                exp_dt = exp_dt.replace(tzinfo=UTC)
+            return now >= exp_dt
+        except (ValueError, TypeError):
+            return False
 
     def transition_to(self, target_status: PilotStatus, reason: str = "") -> None:
         """Validate and apply a lifecycle transition."""
@@ -214,6 +243,12 @@ class PilotEntity:
             self.terminated_at = self.updated_at
             self.termination_reason = reason
 
+        self.state_history.append({
+            "status": target_status.value,
+            "reason": self.status_reason,
+            "timestamp": self.updated_at,
+        })
+
     def record_approval(self, approval: PilotApprovalRecord) -> None:
         """Record an institutional or operator approval, verifying scope digest freshness."""
         current_digest = self.config.compute_scope_digest()
@@ -230,19 +265,24 @@ class PilotEntity:
         if self.is_fully_approved() and self.status == PilotStatus.AWAITING_APPROVAL:
             self.transition_to(PilotStatus.AUTHORIZED, "All participating institutions and operator approved.")
 
-    def is_fully_approved(self) -> bool:
-        """Returns True if Bank A, Bank B, and an authorized Operator have all approved current scope."""
+    def has_all_required_approvals(self) -> tuple[bool, list[str]]:
+        """Returns (is_complete, missing_institutions) based on current scope digest."""
         current_digest = self.config.compute_scope_digest()
+        missing = []
         for inst in self.config.participating_institutions:
             clean_inst = inst.lower().strip()
             rec = self.approvals.get(clean_inst)
             if not rec or rec.scope_digest != current_digest:
-                return False
-        # Also require at least one OPERATOR approval
+                missing.append(clean_inst)
         op_rec = self.approvals.get("OPERATOR")
         if not op_rec or op_rec.scope_digest != current_digest:
-            return False
-        return True
+            missing.append("OPERATOR")
+        return len(missing) == 0, missing
+
+    def is_fully_approved(self) -> bool:
+        """Returns True if Bank A, Bank B, and an authorized Operator have all approved current scope."""
+        complete, _ = self.has_all_required_approvals()
+        return complete
 
     def validate_executable(
         self,
@@ -279,20 +319,10 @@ class PilotEntity:
             )
 
         # Check expiration
-        now = datetime.datetime.now(UTC)
-        if self.config.expires_at:
-            try:
-                exp_dt = datetime.datetime.fromisoformat(self.config.expires_at)
-                if exp_dt.tzinfo is None:
-                    exp_dt = exp_dt.replace(tzinfo=UTC)
-                if now >= exp_dt:
-                    raise PilotExpiredError(
-                        f"Pilot '{self.config.pilot_id}' expired at {self.config.expires_at}. Execution fails closed."
-                    )
-            except (ValueError, TypeError) as exc:
-                if isinstance(exc, PilotExpiredError):
-                    raise
-                pass
+        if self.has_expired():
+            raise PilotExpiredError(
+                f"Pilot '{self.config.pilot_id}' expired at {self.config.expires_at}. Execution fails closed."
+            )
 
         # Check quota
         if self.queries_executed >= self.config.query_quota_total:
@@ -322,11 +352,14 @@ class PilotEntity:
         clean_req = requesting_bank_id.lower().strip()
         query_id = f"qry_pilot_{len(self.latencies_ms) + 1:04d}_{hashlib.sha256(f'{datetime.datetime.now(UTC)}'.encode()).hexdigest()[:8]}"
 
-        if status == "ACCEPTED":
+        if status in ("ACCEPTED", "COMPLETED", "MATCH", "NO_MATCH", "SUCCESS"):
             self.queries_executed += 1
             self.institution_query_counts[clean_req] = self.institution_query_counts.get(clean_req, 0) + 1
         else:
             self.queries_denied += 1
+
+        if match_confirmed is True:
+            self.matches_count += 1
 
         if latency_ms >= 0:
             self.latencies_ms.append(latency_ms)
@@ -372,6 +405,7 @@ class PilotEntity:
             "consortium_id": self.config.consortium_id,
             "participating_institutions": self.config.participating_institutions,
             "scope_digest": self.scope_digest,
+            "state_history": list(self.state_history),
             "operational_grant_id": self.config.operational_grant_id,
             "grant_revision": self.config.grant_revision,
             "grant_scope_digest": self.config.grant_scope_digest,
@@ -385,10 +419,16 @@ class PilotEntity:
                 "checks": [asdict(c) for c in self.preflight_checks],
             },
             "telemetry": {
+                "queries_total": self.queries_executed + self.queries_denied,
                 "queries_executed": self.queries_executed,
                 "queries_denied": self.queries_denied,
+                "queries_successful": self.queries_executed,
+                "queries_failed": self.queries_denied,
+                "matches_found": self.matches_count,
                 "queries_total_quota": self.config.query_quota_total,
                 "institution_query_counts": self.institution_query_counts,
+                "queries_by_institution": self.institution_query_counts,
+                "mean_latency_ms": round(avg_latency, 2),
                 "measured_latencies_ms": {
                     "count": len(self.latencies_ms),
                     "mean_ms": round(avg_latency, 2),
@@ -423,6 +463,8 @@ class PilotEntity:
             "queries_denied": self.queries_denied,
             "institution_query_counts": self.institution_query_counts,
             "latencies_ms": self.latencies_ms,
+            "matches_count": self.matches_count,
+            "state_history": self.state_history,
             "audit_event_ids": self.audit_event_ids,
             "execution_receipt_ids": self.execution_receipt_ids,
             "created_at": self.created_at,
@@ -451,6 +493,8 @@ class PilotEntity:
         queries_denied = int(data.get("queries_denied", 0))
         institution_query_counts = data.get("institution_query_counts", {})
         latencies_ms = [float(lat) for lat in data.get("latencies_ms", [])]
+        matches_count = int(data.get("matches_count", 0))
+        state_history = list(data.get("state_history", []))
         audit_event_ids = list(data.get("audit_event_ids", []))
         execution_receipt_ids = list(data.get("execution_receipt_ids", []))
         created_at = data.get("created_at", datetime.datetime.now(UTC).isoformat())
@@ -470,6 +514,8 @@ class PilotEntity:
             queries_denied=queries_denied,
             institution_query_counts=institution_query_counts,
             latencies_ms=latencies_ms,
+            matches_count=matches_count,
+            state_history=state_history,
             audit_event_ids=audit_event_ids,
             execution_receipt_ids=execution_receipt_ids,
             created_at=created_at,

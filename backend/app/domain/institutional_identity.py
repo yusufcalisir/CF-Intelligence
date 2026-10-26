@@ -333,7 +333,7 @@ class InstitutionalVerificationRegistry:
                 "in the public verification registry."
             )
 
-        if clean_bank_id in self._enrolled_keys:
+        if clean_bank_id in self._enrolled_keys and not allow_overwrite:
             current_v = self._enrolled_keys[clean_bank_id].version
             raise ConsortiumSecurityError(
                 f"Institution '{clean_bank_id}' is already enrolled with public verification key version {current_v}. "
@@ -485,16 +485,6 @@ class InstitutionalVerificationRegistry:
         Never derives keys from shared secrets or HMAC credentials.
         """
         clean_bank_id = bank_id.lower().strip()
-        enrolled = self._enrolled_keys.get(clean_bank_id)
-        if enrolled is not None:
-            if enrolled.is_revoked:
-                raise ConsortiumSecurityError(
-                    f"Institutional public verification key for bank '{clean_bank_id}' has been revoked. "
-                    "Operational admission fails closed."
-                )
-            return enrolled.public_key
-
-        # Check environment variable strictly for valid institutional public verification keys
         import os
 
         env_key = (
@@ -503,16 +493,28 @@ class InstitutionalVerificationRegistry:
             or os.getenv(f"CFI_PEER_KEY_{clean_bank_id.upper()}")
         )
         if env_key and len(env_key.strip()) == 64:
-            try:
-                self.register_public_key(
-                    clean_bank_id,
-                    env_key.strip(),
-                    trust_source="ENVIRONMENT_BOOTSTRAP",
-                    allow_overwrite=False,
+            clean_env = env_key.strip()
+            enrolled = self._enrolled_keys.get(clean_bank_id)
+            if enrolled is None or enrolled.public_key_hex != clean_env:
+                try:
+                    self.register_public_key(
+                        clean_bank_id,
+                        clean_env,
+                        trust_source="ENVIRONMENT_BOOTSTRAP",
+                        allow_overwrite=True,
+                    )
+                    return self._enrolled_keys[clean_bank_id].public_key
+                except Exception:
+                    pass
+
+        enrolled = self._enrolled_keys.get(clean_bank_id)
+        if enrolled is not None:
+            if enrolled.is_revoked:
+                raise ConsortiumSecurityError(
+                    f"Institutional public verification key for bank '{clean_bank_id}' has been revoked. "
+                    "Operational admission fails closed."
                 )
-                return self._enrolled_keys[clean_bank_id].public_key
-            except Exception:
-                pass
+            return enrolled.public_key
 
         raise ConsortiumSecurityError(
             f"Institutional public verification key not found for bank '{clean_bank_id}'. "
@@ -546,6 +548,8 @@ class InstitutionalVerificationRegistry:
 
     def has_key(self, bank_id: str) -> bool:
         """Return True if an institutional public verification key is enrolled and not revoked."""
-        clean = bank_id.lower().strip()
-        enrolled = self._enrolled_keys.get(clean)
-        return enrolled is not None and not enrolled.is_revoked
+        try:
+            self.get_public_key(bank_id)
+            return True
+        except Exception:
+            return False

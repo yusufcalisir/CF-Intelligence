@@ -379,8 +379,11 @@ class CrossBankIntelligenceService:
                     duration_ms = (time.perf_counter() - t0) * 1000.0
                     pilot_svc.record_query_outcome(
                         pilot_id=req.pilot_id,
+                        requesting_bank_id=clean_requesting,
+                        target_bank_id=clean_target,
+                        purpose=req.purpose,
                         success=True,
-                        is_match=bool(signal.match_found),
+                        is_match=bool(getattr(signal, "match_confirmed", False)),
                         latency_ms=duration_ms,
                     )
                 return signal

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class PilotProvisionRequest(BaseModel):
@@ -15,7 +15,8 @@ class PilotProvisionRequest(BaseModel):
     participating_institutions: list[str] = Field(default_factory=lambda: ["bank_a", "bank_b"], min_length=2)
     allowed_purposes: list[str] = Field(default_factory=lambda: ["AML_COLLABORATIVE_INVESTIGATION"])
     allowed_jurisdictions: list[str] = Field(default_factory=lambda: ["eu-central-1"])
-    approved_datasets: dict[str, Any] = Field(default_factory=dict)
+    approved_datasets: dict[str, Any] | list[str] = Field(default_factory=dict)
+    approved_synthetic_datasets: list[str] | dict[str, Any] | None = None
     authorized_operators: list[str] = Field(default_factory=list)
     operational_grant_id: str = Field(default="")
     topology: dict[str, Any] = Field(default_factory=dict)
@@ -23,6 +24,20 @@ class PilotProvisionRequest(BaseModel):
     expires_at: str = Field(default="")
     query_quota_total: int = Field(default=50, ge=1)
     query_quota_per_institution: int = Field(default=25, ge=1)
+    max_queries_total: int | None = None
+    max_queries_per_institution: int | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def unify_datasets(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("approved_datasets") and data.get("approved_synthetic_datasets"):
+                data["approved_datasets"] = data["approved_synthetic_datasets"]
+            if data.get("max_queries_total") is not None and not data.get("query_quota_total"):
+                data["query_quota_total"] = data["max_queries_total"]
+            if data.get("max_queries_per_institution") is not None and not data.get("query_quota_per_institution"):
+                data["query_quota_per_institution"] = data["max_queries_per_institution"]
+        return data
 
 
 class PilotPreflightRequest(BaseModel):
@@ -35,9 +50,18 @@ class PilotPreflightRequest(BaseModel):
 class PilotApprovalRequest(BaseModel):
     """Payload for institutional or operator approval."""
 
-    approving_institution: str = Field(..., min_length=2, max_length=32)
+    approving_institution: str = Field(default="", max_length=32)
+    institution_id: str | None = None
     notes: str = Field(default="", max_length=500)
     signature: str = Field(default="")
+
+    @model_validator(mode="before")
+    @classmethod
+    def unify_institution(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("approving_institution") and data.get("institution_id"):
+                data["approving_institution"] = data["institution_id"]
+        return data
 
 
 class PilotKillSwitchRequest(BaseModel):
@@ -73,6 +97,7 @@ class PilotStatusResponse(BaseModel):
     status_reason: str
     scope_digest: str
     is_fully_approved: bool
+    passed: bool = True
     queries_executed: int
     queries_denied: int
     queries_total_quota: int
@@ -96,12 +121,20 @@ class PilotTelemetrySummary(BaseModel):
 
     pilot_id: str
     status: str
-    queries_executed: int
-    queries_denied: int
-    query_quota_total: int
-    quota_remaining: int
-    mean_latency_ms: float
-    p95_latency_ms: float
-    institution_query_counts: dict[str, int]
+    queries_executed: int = 0
+    queries_denied: int = 0
+    queries_total: int = 0
+    queries_successful: int = 0
+    queries_failed: int = 0
+    matches_found: int = 0
+    queries_by_institution: dict[str, int] = Field(default_factory=dict)
+    query_quota_total: int = 0
+    quota_remaining: int = 0
+    mean_latency_ms: float = 0.0
+    p95_latency_ms: float = 0.0
+    institution_query_counts: dict[str, int] = Field(default_factory=dict)
     last_operation_at: str | None = None
-    bilateral_authorization_valid: bool
+    bilateral_authorization_valid: bool = True
+
+    def __getitem__(self, item: str) -> Any:
+        return getattr(self, item)
