@@ -26,7 +26,6 @@ from typing import Any
 import pytest
 
 from app.domain.institutional_identity import (
-    InstitutionalSigningIdentity,
     canonical_worker_readiness_bytes,
 )
 from tests.integration.conftest import (
