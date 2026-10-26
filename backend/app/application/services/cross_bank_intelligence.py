@@ -780,6 +780,12 @@ class CrossBankIntelligenceService:
             )
 
         if req.execution_mode == "VERIFIED_OPERATIONAL":
+            if not req.target_bank_id:
+                raise RuntimeError(
+                    "Operational privacy attestation unavailable: Hardware enclaves (Intel SGX) and distributed "
+                    "multi-party cryptographic PSI across independent physical bank nodes are not available in this software runtime. "
+                    "Operation fails closed to prevent fabricated operational claims."
+                )
             return self._execute_verified_operational_psi(
                 req=req,
                 auth_token=auth_token,

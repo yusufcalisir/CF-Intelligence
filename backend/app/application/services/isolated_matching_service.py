@@ -1141,6 +1141,8 @@ class IsolatedBankWorkerNode:
             matched_risk_level=matched_risk_level,
             matched_typologies=tuple(matched_typologies),
             assurance_level="ISOLATED_INTEGRATION_VERIFIED",
+            match_category="EXACT_MATCH" if is_match else "NO_MATCH",
+            is_exact_confirmed=is_match,
         )
 
     def initiate_established_psi_query(
