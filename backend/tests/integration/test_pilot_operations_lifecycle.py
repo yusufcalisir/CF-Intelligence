@@ -1067,10 +1067,16 @@ def test_gate_e_operational_resilience_and_incident_containment(
 
         # 3. & 4. & 5. Hold actual execution immediately before result finalization using deterministic hook
         hook_called_for_pilot = []
+        captured_precommit_signal_id = []
+        captured_precommit_receipt_id = []
 
-        def _deterministic_pause_hook(effective_pilot_id: str) -> None:
+        def _deterministic_pause_hook(effective_pilot_id: str, sig_id: str | None = None, rcp_id: str | None = None) -> None:
             if effective_pilot_id == race_pilot_id:
                 hook_called_for_pilot.append(effective_pilot_id)
+                if sig_id:
+                    captured_precommit_signal_id.append(sig_id)
+                if rcp_id:
+                    captured_precommit_receipt_id.append(rcp_id)
                 # 5. PAUSE the pilot through its authorized HTTP endpoint
                 pause_http_resp = test_client.post(
                     f"/api/v1/pilots/{race_pilot_id}/pause",
@@ -1105,6 +1111,8 @@ def test_gate_e_operational_resilience_and_incident_containment(
 
         # 7. Assert query cannot issue an authoritative successful result
         assert len(hook_called_for_pilot) == 1, "Synchronization hook was not invoked before admission"
+        assert len(captured_precommit_signal_id) == 1, "Pre-commit hook captured genuine would-be signal ID"
+        assert len(captured_precommit_receipt_id) == 1, "Pre-commit hook captured genuine receipt ID"
         assert race_query_resp.status_code in (400, 403, 409), f"Query should have failed closed: {race_query_resp.text}"
         assert "paused" in race_query_resp.text.lower() or "governance" in race_query_resp.text.lower()
 
@@ -1126,16 +1134,17 @@ def test_gate_e_operational_resilience_and_incident_containment(
                 assert sig_rec.get("admission_status") != "COMMITTED"
                 assert sig_rec.get("is_attachable") is not True
 
-        # 10. Verify that the actual case evidence endpoint rejects the result
+        # 10. Verify that the actual case evidence endpoint rejects the result using actual would-be signal ID
+        actual_uncommitted_sig_id = captured_precommit_signal_id[0] if captured_precommit_signal_id else f"uncommitted_sig_{race_pilot_id}"
         attach_race_denied = test_client.post(
             f"/api/v1/cases/{case_race_id}/evidence/cross-bank-intelligence",
             json={
-                "signal_id": f"uncommitted_sig_{race_pilot_id}",
+                "signal_id": actual_uncommitted_sig_id,
                 "notes": "Attempting to attach uncommitted mid-flight signal",
             },
             headers=auth_headers,
         )
-        assert attach_race_denied.status_code in (400, 404), f"Case attachment should have been rejected: {attach_race_denied.text}"
+        assert attach_race_denied.status_code in (400, 403, 404), f"Case attachment should have been rejected: {attach_race_denied.text}"
 
         # 11. RESUME only after valid authenticated readiness checks
         resume_http_resp = test_client.post(
@@ -1147,6 +1156,17 @@ def test_gate_e_operational_resilience_and_incident_containment(
         assert resume_http_resp.json()["status"] == "ACTIVE"
         p_resumed_check = pilot_svc.get_pilot(race_pilot_id)
         assert p_resumed_check is not None and p_resumed_check.status == PilotStatus.ACTIVE
+
+        # Verify that previous rejected signal CANNOT be attached after RESUME
+        attach_race_revive_denied = test_client.post(
+            f"/api/v1/cases/{case_race_id}/evidence/cross-bank-intelligence",
+            json={
+                "signal_id": actual_uncommitted_sig_id,
+                "notes": "Attempting to revive uncommitted signal after resume",
+            },
+            headers=auth_headers,
+        )
+        assert attach_race_revive_denied.status_code in (400, 403, 404), f"Pre-commit rejected signal must not revive: {attach_race_revive_denied.text}"
 
         # 12. Verify that a fresh authorized PSI query can succeed and attach legitimately
         cbi_svc._before_result_admission_hook = None  # Remove pause hook for normal run
@@ -1160,14 +1180,14 @@ def test_gate_e_operational_resilience_and_incident_containment(
         assert fresh_signal["match_confirmed"] is True
         fresh_sig_id = fresh_signal["signal_id"]
 
-        # Verify durable reservation is now COMMITTED
+        # Verify durable reservation is now PUBLISHED
         with pilot_store._lock, pilot_store._get_connection() as conn:
             cur = conn.execute(
-                "SELECT status, signal_id FROM pilot_query_reservations WHERE pilot_id = ? AND status = 'COMMITTED';",
+                "SELECT status, signal_id FROM pilot_query_reservations WHERE pilot_id = ? AND status = 'PUBLISHED';",
                 (race_pilot_id,),
             )
             committed_row = cur.fetchone()
-            assert committed_row is not None, "Reservation must be COMMITTED for fresh successful query"
+            assert committed_row is not None, "Reservation must be PUBLISHED for fresh successful query"
             assert committed_row["signal_id"] == fresh_sig_id
 
         # Attach to case evidence legitimately
@@ -1201,6 +1221,237 @@ def test_gate_e_operational_resilience_and_incident_containment(
         )
         assert omission_resp.status_code in (400, 403), f"Omission query should have failed: {omission_resp.text}"
         assert "paused" in omission_resp.text.lower() or "governance" in omission_resp.text.lower()
+
+        # ==============================================================================
+        # Step 7: Deterministic Real Execution Post-Commit Publication Race Verification
+        # Exercises the exact race boundary: pilot transitions to PAUSED after SQLite query
+        # reservation becomes COMMITTED but before resulting authoritative signal is published to Redis.
+        # ==============================================================================
+        post_commit_pilot_id = "pilot_resilience_post_commit_01"
+        post_commit_pilot_ent = pilot_svc.provision_pilot(
+            pilot_id=post_commit_pilot_id,
+            consortium_id="consortium_pilot_m5",
+            participating_institutions=["bank_a", "bank_b"],
+            allowed_purposes=["AML_INVESTIGATION"],
+            allowed_jurisdictions=["EU"],
+            approved_synthetic_datasets=["syn_a_v1", "syn_b_v1"],
+            max_queries_total=10,
+            max_queries_per_institution=5,
+            duration_days=7,
+            principal=pilot_test_env["principal_op"],
+            topology={
+                "bank_a_worker_url": f"http://127.0.0.1:{docker_topology['port_a']}",
+                "bank_b_worker_url": f"http://127.0.0.1:{docker_topology['port_b']}",
+                "coordinator_url": coord_url,
+            },
+        )
+        pilot_svc.run_preflight(post_commit_pilot_id, principal=pilot_test_env["principal_op"])
+        sig_pc_a = id_a.sign(canonical_pilot_approval_bytes(
+            pilot_id=post_commit_pilot_id,
+            scope_digest=post_commit_pilot_ent.scope_digest,
+            config_revision=post_commit_pilot_ent.config.revision,
+            approving_bank_id="bank_a",
+            approving_principal_id="admin_bank_a",
+        ))
+        sig_pc_b = id_b.sign(canonical_pilot_approval_bytes(
+            pilot_id=post_commit_pilot_id,
+            scope_digest=post_commit_pilot_ent.scope_digest,
+            config_revision=post_commit_pilot_ent.config.revision,
+            approving_bank_id="bank_b",
+            approving_principal_id="admin_bank_b",
+        ))
+        pilot_svc.approve_pilot(post_commit_pilot_id, "bank_a", principal=pilot_test_env["principal_a"], signature=sig_pc_a)
+        pilot_svc.approve_pilot(post_commit_pilot_id, "bank_b", principal=pilot_test_env["principal_b"], signature=sig_pc_b)
+        pilot_svc.approve_pilot(post_commit_pilot_id, "consortium", principal=pilot_test_env["principal_op"])
+        pilot_svc.activate_pilot(post_commit_pilot_id, principal=pilot_test_env["principal_op"])
+        p_pc_active = pilot_svc.get_pilot(post_commit_pilot_id)
+        assert p_pc_active is not None and p_pc_active.status == PilotStatus.ACTIVE
+
+        # Ingest sovereign private entity for post-commit race into Docker worker vaults
+        shared_pc_iban = "DE55443322110099887766"
+        ent_pc_a_id = "ent_post_commit_subj_a"
+        ent_pc_b_id = "ent_post_commit_subj_b"
+        client_a.store_private_entity({
+            "id": ent_pc_a_id,
+            "bank_id": "bank_a",
+            "entity_type": "account",
+            "raw_identifier": shared_pc_iban,
+            "risk_level": "HIGH",
+            "typologies": ["CORRUPTION"],
+        })
+        client_b.store_private_entity({
+            "id": ent_pc_b_id,
+            "bank_id": "bank_b",
+            "entity_type": "account",
+            "raw_identifier": shared_pc_iban,
+            "risk_level": "CRITICAL",
+            "typologies": ["CORRUPTION"],
+        })
+        ent_pc_obj = Entity(
+            id=ent_pc_a_id,
+            entity_type=EntityType.CUSTOMER,
+            privacy_id=hashlib.sha256(shared_pc_iban.encode()).hexdigest(),
+            bank_id="bank_a",
+            display_label="Post Commit Race Subject",
+            risk_level=RiskLevel.HIGH,
+            attributes={"raw_identifier": shared_pc_iban},
+        )
+        cbi_svc.entity_service._entities.set(ent_pc_a_id, _entity_to_dict(ent_pc_obj))
+
+        case_pc_resp = test_client.post(
+            "/api/v1/cases",
+            json={
+                "title": "Post Commit Publication Race Case",
+                "priority": "p2_high",
+                "bank_id": "bank_a",
+            },
+            headers=auth_headers,
+        )
+        assert case_pc_resp.status_code == 200, f"Case creation failed: {case_pc_resp.text}"
+        case_pc_id = case_pc_resp.json()["id"]
+
+        # Register deterministic post-commit pre-publication synchronization hook
+        pc_hook_called = []
+        captured_pc_sig_id = []
+        captured_pc_rcp_id = []
+
+        def _deterministic_post_commit_pause_hook(effective_pilot_id: str, sig_id: str, rcp_id: str) -> None:
+            if effective_pilot_id == post_commit_pilot_id:
+                pc_hook_called.append(effective_pilot_id)
+                captured_pc_sig_id.append(sig_id)
+                captured_pc_rcp_id.append(rcp_id)
+                # PAUSE the pilot through its authorized HTTP endpoint AFTER SQLite commit
+                # but BEFORE authoritative Redis publication!
+                pause_http_resp = test_client.post(
+                    f"/api/v1/pilots/{post_commit_pilot_id}/pause",
+                    json={"reason": "Adversarial post-commit pre-publication pause race verification"},
+                    headers=op_headers,
+                )
+                assert pause_http_resp.status_code == 200
+                assert pause_http_resp.json()["status"] == "PAUSED"
+
+        cbi_svc._before_signal_publication_hook = _deterministic_post_commit_pause_hook
+
+        pc_query_payload = {
+            "consortium_id": "consortium_pilot_m5",
+            "requesting_bank_id": "bank_a",
+            "target_bank_id": "bank_b",
+            "query_entity_id": ent_pc_a_id,
+            "case_id": case_pc_id,
+            "purpose": "AML_INVESTIGATION",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "use_established_psi": True,
+            "require_established_psi": True,
+            "protocol": "OPENMINED-PSI-2.0.6-ECDH",
+            "pilot_id": post_commit_pilot_id,
+        }
+
+        # Dispatch real PSI query: execution completes and commits in SQLite, then pause intercepts publication
+        pc_query_resp = test_client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=pc_query_payload,
+            headers=auth_headers,
+        )
+
+        # Assert query fails closed
+        assert len(pc_hook_called) == 1, "Post-commit hook was not invoked"
+        assert len(captured_pc_sig_id) == 1, "Failed to capture genuine would-be signal ID"
+        assert len(captured_pc_rcp_id) == 1, "Failed to capture genuine receipt ID"
+        rej_post_commit_sig_id = captured_pc_sig_id[0]
+        rej_post_commit_rcp_id = captured_pc_rcp_id[0]
+        assert len(rej_post_commit_rcp_id) > 0
+        assert pc_query_resp.status_code in (400, 403), f"Query should have failed closed: {pc_query_resp.text}"
+        assert "paused" in pc_query_resp.text.lower() or "governance" in pc_query_resp.text.lower()
+
+        # Verify durable reservation is in PUBLICATION_REJECTED status in SQLite
+        with pilot_store._lock, pilot_store._get_connection() as conn:
+            cur = conn.execute(
+                "SELECT status, rejection_reason, signal_id, receipt_id FROM pilot_query_reservations WHERE pilot_id = ? ORDER BY reserved_at DESC LIMIT 1;",
+                (post_commit_pilot_id,),
+            )
+            pc_res_row = cur.fetchone()
+            assert pc_res_row is not None, "Durable reservation record must exist"
+            assert pc_res_row["status"] == "PUBLICATION_REJECTED", "Reservation must be PUBLICATION_REJECTED when paused prior to publication"
+            assert "prior to authoritative signal publication" in str(pc_res_row["rejection_reason"])
+
+        # Verify no attachable authoritative signal is visible in Redis store
+        stored_rejected_sig = cbi_svc._signal_store.get(rej_post_commit_sig_id)
+        if stored_rejected_sig is not None:
+            assert stored_rejected_sig.get("is_authoritative") is not True
+            assert stored_rejected_sig.get("is_attachable") is not True
+            assert stored_rejected_sig.get("admission_status") != "COMMITTED"
+            assert stored_rejected_sig.get("publication_status") == "PUBLICATION_REJECTED"
+
+        # Verify case evidence attachment is REJECTED using the EXACT genuine captured signal ID
+        attach_pc_denied = test_client.post(
+            f"/api/v1/cases/{case_pc_id}/evidence/cross-bank-intelligence",
+            json={
+                "signal_id": rej_post_commit_sig_id,
+                "notes": "Attempting to attach post-commit rejected signal",
+            },
+            headers=auth_headers,
+        )
+        assert attach_pc_denied.status_code in (400, 403), f"Case attachment must be rejected: {attach_pc_denied.text}"
+
+        # RESUME the pilot via authenticated HTTP endpoint with readiness verification
+        resume_pc_resp = test_client.post(
+            f"/api/v1/pilots/{post_commit_pilot_id}/resume",
+            json={"reason": "Cleared post-commit pause race containment"},
+            headers=op_headers,
+        )
+        assert resume_pc_resp.status_code == 200
+        assert resume_pc_resp.json()["status"] == "ACTIVE"
+
+        # Verify the rejected publication CANNOT reappear or become attachable after RESUME
+        attach_pc_revive_denied = test_client.post(
+            f"/api/v1/cases/{case_pc_id}/evidence/cross-bank-intelligence",
+            json={
+                "signal_id": rej_post_commit_sig_id,
+                "notes": "Attempting to revive post-commit rejected signal after pilot resumed",
+            },
+            headers=auth_headers,
+        )
+        assert attach_pc_revive_denied.status_code in (400, 403), f"Rejected signal must NOT revive: {attach_pc_revive_denied.text}"
+
+        # Execute fresh authorized query and verify normal publication and evidence attachment
+        cbi_svc._before_signal_publication_hook = None
+        fresh_pc_query_resp = test_client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=pc_query_payload,
+            headers=auth_headers,
+        )
+        assert fresh_pc_query_resp.status_code == 200, f"Fresh query post-resume failed: {fresh_pc_query_resp.text}"
+        fresh_pc_signal = fresh_pc_query_resp.json()
+        assert fresh_pc_signal["match_confirmed"] is True
+        fresh_pc_sig_id = fresh_pc_signal["signal_id"]
+
+        # Verify durable reservation is now PUBLISHED in SQLite
+        with pilot_store._lock, pilot_store._get_connection() as conn:
+            cur = conn.execute(
+                "SELECT status, signal_id, receipt_id FROM pilot_query_reservations WHERE pilot_id = ? AND status = 'PUBLISHED';",
+                (post_commit_pilot_id,),
+            )
+            pub_pc_row = cur.fetchone()
+            assert pub_pc_row is not None, "Reservation must be PUBLISHED for fresh successful query"
+            assert pub_pc_row["signal_id"] == fresh_pc_sig_id
+
+        # Verify signal in Redis is authoritative and attachable
+        pub_pc_sig = cbi_svc._signal_store.get(fresh_pc_sig_id)
+        assert pub_pc_sig is not None
+        assert pub_pc_sig.get("is_authoritative") is True
+        assert pub_pc_sig.get("is_attachable") is True
+        assert pub_pc_sig.get("publication_status") == "PUBLISHED"
+
+        # Legitimate case evidence attachment succeeds
+        attach_pc_ok = test_client.post(
+            f"/api/v1/cases/{case_pc_id}/evidence/cross-bank-intelligence",
+            json={
+                "signal_id": fresh_pc_sig_id,
+                "notes": "Legitimate post-commit post-resume evidence attachment",
+            },
+            headers=auth_headers,
+        )
+        assert attach_pc_ok.status_code == 200, f"Fresh evidence attachment failed: {attach_pc_ok.text}"
 
 
 # ==============================================================================

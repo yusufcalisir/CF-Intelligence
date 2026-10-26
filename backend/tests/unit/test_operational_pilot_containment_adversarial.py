@@ -566,12 +566,26 @@ def test_attachment_verifies_durable_reservation_and_signal_binding(containment_
         "pilot_id": "pilot_binding_test",
         "reservation_id": res_id,
         "admission_status": "COMMITTED",
+        "publication_status": "PUBLISHED",
         "is_authoritative": True,
         "is_attachable": True,
         "expires_at": (datetime.now(UTC) + timedelta(minutes=30)).isoformat(),
     }
     intel_svc._signal_store.set(tampered_sig_id, tampered_record)
 
+    # 1. While reservation status is COMMITTED (not yet PUBLISHED): rejected
+    with pytest.raises(ConsortiumSecurityError) as exc_unpub:
+        intel_svc.attach_signal_to_case_evidence(
+            case_id="case_01",
+            signal_id=tampered_sig_id,
+            case_bank="bank_a",
+        )
+    assert "not published" in str(exc_unpub.value).lower()
+
+    # 2. Authorize publication for legitimate_sig
+    svc.authorize_and_record_signal_publication(res_id, "pilot_binding_test", "legitimate_sig", "rcp_ok")
+
+    # 3. Now reservation is PUBLISHED, but bound to legitimate_sig, so tampered_sig_id is rejected for mismatch
     with pytest.raises(ConsortiumSecurityError) as exc:
         intel_svc.attach_signal_to_case_evidence(
             case_id="case_01",

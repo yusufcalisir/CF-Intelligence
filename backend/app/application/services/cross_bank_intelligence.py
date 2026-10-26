@@ -15,7 +15,6 @@ import os
 import threading
 import time
 import uuid
-from collections.abc import Callable
 from datetime import UTC
 from typing import Any, cast
 
@@ -112,7 +111,8 @@ class CrossBankIntelligenceService:
         self._research_case_evidence_store = RedisStore("research_case_evidence")
         self._admitted_receipts_store = RedisStore("admitted_operational_psi_receipts")
         self._admitted_receipt_ids: set[str] = set()
-        self._before_result_admission_hook: Callable[[str], None] | None = None
+        self._before_result_admission_hook: Any = None
+        self._before_signal_publication_hook: Any = None
         self._lock = threading.RLock()
 
     def _authenticate_principal(
@@ -396,9 +396,18 @@ class CrossBankIntelligenceService:
                     actor=audited_actor,
                 )
 
+                resolved_receipt_id = (
+                    getattr(signal, "receipt_id", None)
+                    or (signal.provenance.get("receipt_id") if isinstance(getattr(signal, "provenance", None), dict) else None)
+                    or ""
+                )
+
                 # Kill-switch revalidation immediately before authoritative result admission
                 if self._before_result_admission_hook is not None and active_pilot_id:
-                    self._before_result_admission_hook(active_pilot_id)
+                    try:
+                        self._before_result_admission_hook(active_pilot_id, signal.signal_id, resolved_receipt_id)
+                    except TypeError:
+                        self._before_result_admission_hook(active_pilot_id)
 
                 if active_pilot_id and pilot_svc:
                     pilot_svc.revalidate_pilot_active(
@@ -414,11 +423,6 @@ class CrossBankIntelligenceService:
                     expected_req=est_req,
                     audited_actor=audited_actor,
                 )
-                resolved_receipt_id = (
-                    getattr(signal, "receipt_id", None)
-                    or (signal.provenance.get("receipt_id") if isinstance(getattr(signal, "provenance", None), dict) else None)
-                    or ""
-                )
                 if active_pilot_id:
                     record["pilot_id"] = active_pilot_id
                     if governing_pilot:
@@ -430,6 +434,7 @@ class CrossBankIntelligenceService:
                     record["query_entity_id"] = getattr(est_req, "query_entity_id", getattr(est_req, "entity_id", ""))
                     record["receipt_id"] = resolved_receipt_id
                     record["admission_status"] = "PENDING_COMMIT"
+                    record["publication_status"] = "PENDING_COMMIT"
                     record["is_authoritative"] = False
                     record["is_attachable"] = False
 
@@ -445,19 +450,48 @@ class CrossBankIntelligenceService:
                             signal_id=signal.signal_id,
                             case_id=req_case_id,
                         )
-                        reservation_id = None
                     except Exception as commit_exc:
                         record["admission_status"] = "REJECTED"
+                        record["publication_status"] = "COMMIT_FAILED"
                         record["is_authoritative"] = False
                         record["is_attachable"] = False
                         record["rejection_reason"] = f"Reservation commit failure: {commit_exc}"
                         self._signal_store.set(signal.signal_id, record)
                         raise
 
+                    committed_res_id = reservation_id
+                    reservation_id = None  # prevent release_query_reservation from treating it as uncommitted in-flight
+
+                    # Post-commit publication boundary:
+                    # Test-only synchronization hook after reservation commit and before publication
+                    if self._before_signal_publication_hook is not None:
+                        try:
+                            self._before_signal_publication_hook(active_pilot_id, signal.signal_id, resolved_receipt_id)
+                        except TypeError:
+                            self._before_signal_publication_hook(active_pilot_id)
+
+                    try:
+                        pilot_svc.authorize_and_record_signal_publication(
+                            reservation_id=committed_res_id,
+                            pilot_id=active_pilot_id,
+                            signal_id=signal.signal_id,
+                            receipt_id=resolved_receipt_id,
+                        )
+                    except Exception as pub_exc:
+                        record["admission_status"] = "REJECTED"
+                        record["publication_status"] = "PUBLICATION_REJECTED"
+                        record["is_authoritative"] = False
+                        record["is_attachable"] = False
+                        record["rejection_reason"] = f"Publication rejected: {pub_exc}"
+                        self._signal_store.set(signal.signal_id, record)
+                        raise
+
                 record["admission_status"] = "COMMITTED"
+                record["publication_status"] = "PUBLISHED"
                 record["is_authoritative"] = True
                 record["is_attachable"] = True
                 record["committed_at"] = datetime.datetime.now(UTC).isoformat()
+                record["published_at"] = datetime.datetime.now(UTC).isoformat()
                 self._signal_store.set(signal.signal_id, record)
                 return signal
 
@@ -471,9 +505,18 @@ class CrossBankIntelligenceService:
                         actor=audited_actor,
                     )
 
+                    resolved_receipt_id = (
+                        getattr(signal, "receipt_id", None)
+                        or (signal.provenance.get("receipt_id") if isinstance(getattr(signal, "provenance", None), dict) else None)
+                        or ""
+                    )
+
                     # Kill-switch revalidation immediately before authoritative result admission
                     if self._before_result_admission_hook is not None and active_pilot_id:
-                        self._before_result_admission_hook(active_pilot_id)
+                        try:
+                            self._before_result_admission_hook(active_pilot_id, signal.signal_id, resolved_receipt_id)
+                        except TypeError:
+                            self._before_result_admission_hook(active_pilot_id)
 
                     if active_pilot_id and pilot_svc:
                         pilot_svc.revalidate_pilot_active(
@@ -488,11 +531,6 @@ class CrossBankIntelligenceService:
                         expected_req=est_req,
                         audited_actor=audited_actor,
                     )
-                    resolved_receipt_id = (
-                        getattr(signal, "receipt_id", None)
-                        or (signal.provenance.get("receipt_id") if isinstance(getattr(signal, "provenance", None), dict) else None)
-                        or ""
-                    )
                     if active_pilot_id:
                         record["pilot_id"] = active_pilot_id
                         if governing_pilot:
@@ -504,6 +542,7 @@ class CrossBankIntelligenceService:
                         record["query_entity_id"] = getattr(est_req, "query_entity_id", getattr(est_req, "entity_id", ""))
                         record["receipt_id"] = resolved_receipt_id
                         record["admission_status"] = "PENDING_COMMIT"
+                        record["publication_status"] = "PENDING_COMMIT"
                         record["is_authoritative"] = False
                         record["is_attachable"] = False
 
@@ -519,19 +558,48 @@ class CrossBankIntelligenceService:
                                 signal_id=signal.signal_id,
                                 case_id=req_case_id,
                             )
-                            reservation_id = None
                         except Exception as commit_exc:
                             record["admission_status"] = "REJECTED"
+                            record["publication_status"] = "COMMIT_FAILED"
                             record["is_authoritative"] = False
                             record["is_attachable"] = False
                             record["rejection_reason"] = f"Reservation commit failure: {commit_exc}"
                             self._signal_store.set(signal.signal_id, record)
                             raise
 
+                        committed_res_id = reservation_id
+                        reservation_id = None  # prevent release_query_reservation from treating it as uncommitted in-flight
+
+                        # Post-commit publication boundary:
+                        # Test-only synchronization hook after reservation commit and before publication
+                        if self._before_signal_publication_hook is not None:
+                            try:
+                                self._before_signal_publication_hook(active_pilot_id, signal.signal_id, resolved_receipt_id)
+                            except TypeError:
+                                self._before_signal_publication_hook(active_pilot_id)
+
+                        try:
+                            pilot_svc.authorize_and_record_signal_publication(
+                                reservation_id=committed_res_id,
+                                pilot_id=active_pilot_id,
+                                signal_id=signal.signal_id,
+                                receipt_id=resolved_receipt_id,
+                            )
+                        except Exception as pub_exc:
+                            record["admission_status"] = "REJECTED"
+                            record["publication_status"] = "PUBLICATION_REJECTED"
+                            record["is_authoritative"] = False
+                            record["is_attachable"] = False
+                            record["rejection_reason"] = f"Publication rejected: {pub_exc}"
+                            self._signal_store.set(signal.signal_id, record)
+                            raise
+
                     record["admission_status"] = "COMMITTED"
+                    record["publication_status"] = "PUBLISHED"
                     record["is_authoritative"] = True
                     record["is_attachable"] = True
                     record["committed_at"] = datetime.datetime.now(UTC).isoformat()
+                    record["published_at"] = datetime.datetime.now(UTC).isoformat()
                     self._signal_store.set(signal.signal_id, record)
                     return signal
                 except ConsortiumSecurityError:
@@ -1531,9 +1599,11 @@ class CrossBankIntelligenceService:
                 raise ConsortiumSecurityError(
                     f"Durable execution reservation '{res_id}' for pilot '{pilot_id}' not found."
                 )
-            if durable_res.get("status") != "COMMITTED":
+            res_status = durable_res.get("status")
+            if res_status != "PUBLISHED":
                 raise ConsortiumSecurityError(
-                    f"Execution reservation '{res_id}' is in status '{durable_res.get('status')}', not COMMITTED. Evidence attachment rejected."
+                    f"Execution reservation '{res_id}' for pilot '{pilot_id}' publication status is '{res_status}', "
+                    f"not PUBLISHED. Evidence admission requires genuinely finalized authoritative publication."
                 )
             if durable_res.get("signal_id") != resolved_signal_id:
                 raise ConsortiumSecurityError(

@@ -1329,6 +1329,36 @@ class PilotOperationsService:
             case_id=case_id,
         )
 
+    def authorize_and_record_signal_publication(
+        self,
+        reservation_id: str,
+        pilot_id: str,
+        signal_id: str,
+        receipt_id: str,
+    ) -> None:
+        """Atomically authorize and record signal publication under exclusive store lock."""
+        self.store.authorize_and_record_publication(
+            reservation_id=reservation_id,
+            pilot_id=pilot_id,
+            signal_id=signal_id,
+            receipt_id=receipt_id,
+        )
+
+    def record_publication_status(
+        self,
+        reservation_id: str,
+        pilot_id: str,
+        status: str,
+        rejection_reason: str | None = None,
+    ) -> None:
+        """Explicitly record publication status on durable reservation."""
+        self.store.record_publication_status(
+            reservation_id=reservation_id,
+            pilot_id=pilot_id,
+            status=status,
+            rejection_reason=rejection_reason,
+        )
+
     def release_query_reservation(
         self,
         reservation_id: str,
