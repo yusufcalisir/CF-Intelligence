@@ -2067,6 +2067,21 @@ class InstitutionalWorkerClient:
                 f"Worker unreachable on health probe for '{self.bank_id}': {exc}"
             ) from exc
 
+    def get_public_key(self) -> str:
+        """Fetch worker institutional sovereign Ed25519 public key."""
+        url = f"{self.base_url}/worker/public-key"
+        if not (url.startswith("http://") or url.startswith("https://")):
+            raise ValueError(f"Unsupported URL scheme for worker client: {url}")
+        req = urllib.request.Request(url, method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
+                data = json.loads(resp.read().decode("utf-8"))
+                return str(data["public_key_hex"])
+        except Exception as exc:
+            raise ConsortiumSecurityError(
+                f"Worker unreachable on public-key probe for '{self.bank_id}': {exc}"
+            ) from exc
+
     def _post(self, path: str, payload: dict[str, Any], token: str | None = None) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
         if not (url.startswith("http://") or url.startswith("https://")):
@@ -2838,7 +2853,7 @@ class InstitutionalCoordinatorDaemon:
                 query_params = urllib.parse.parse_qs(parsed_url.query)
                 nonce = query_params.get("nonce", [""])[0]
 
-                if parsed_url.path in ("/health", "/coordinator/health"):
+                if parsed_url.path in ("/health", "/coordinator/health", "/topology", "/coordinator/topology"):
                     now_iso = datetime.datetime.now(UTC).isoformat()
                     coord_id = str(getattr(coord, "coordinator_id", "coordinator")).strip()
                     proto = "OPENMINED-PSI-2.0.6-ECDH"
@@ -2944,6 +2959,19 @@ class InstitutionalCoordinatorClient:
 
     def health_check(self) -> dict[str, Any]:
         url = f"{self.base_url}/health"
+        req = urllib.request.Request(url, method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
+                body = resp.read()
+                return cast("dict[str, Any]", json.loads(body.decode("utf-8")))
+        except Exception as exc:
+            raise ConsortiumSecurityError(
+                f"Coordinator daemon at '{self.base_url}' is unreachable: {exc}"
+            ) from exc
+
+    def get_topology(self) -> dict[str, Any]:
+        """Fetch registered worker topology metadata from coordinator daemon."""
+        url = f"{self.base_url}/coordinator/health"
         req = urllib.request.Request(url, method="GET")
         try:
             with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
@@ -3077,6 +3105,21 @@ if __name__ == "__main__":
         default=os.environ.get("WORKER_B_TOKEN"),
         help="Worker B matching token for coordinator",
     )
+    parser.add_argument(
+        "--worker-c-bank",
+        default=os.environ.get("WORKER_C_BANK", "bank_c"),
+        help="Bank C identifier for coordinator",
+    )
+    parser.add_argument(
+        "--worker-c-url",
+        default=os.environ.get("WORKER_C_URL"),
+        help="Worker C base URL for coordinator",
+    )
+    parser.add_argument(
+        "--worker-c-token",
+        default=os.environ.get("WORKER_C_TOKEN"),
+        help="Worker C matching token for coordinator",
+    )
 
     cli_args = parser.parse_args()
 
@@ -3103,6 +3146,17 @@ if __name__ == "__main__":
                 bank_id=cli_args.worker_b_bank,
                 worker=client_b,
                 matching_token=cli_args.worker_b_token,
+            )
+        if cli_args.worker_c_url:
+            client_c = InstitutionalWorkerClient(
+                bank_id=cli_args.worker_c_bank,
+                base_url=cli_args.worker_c_url,
+                matching_token=cli_args.worker_c_token or "",
+            )
+            coord.register_worker(
+                bank_id=cli_args.worker_c_bank,
+                worker=client_c,
+                matching_token=cli_args.worker_c_token,
             )
         coord_daemon = InstitutionalCoordinatorDaemon(
             coordinator=coord,
