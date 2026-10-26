@@ -139,6 +139,10 @@ class AuditLogEntry:
     def resource_id(self) -> str:
         return self.target_id
 
+    @property
+    def digest(self) -> str:
+        return self.curr_hash
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "index": self.index,
@@ -979,6 +983,16 @@ class ImmutableAuditChain:
     def reconstruct_resource_history(self, target_id: str) -> list[AuditLogEntry]:
         """Reconstruct full chronological audit trail for a specific resource."""
         return self.query_events(target_id=target_id)
+
+    def get_event(self, event_id: str) -> AuditLogEntry | None:
+        """Retrieve a specific audit event by its unique event_id."""
+        file_lock = _get_audit_file_lock(self._lock_path) if self._lock_path else contextlib.nullcontext()
+        with self._lock, file_lock:
+            self._reload_unlocked()
+            for entry in self.chain:
+                if entry.event_id == event_id:
+                    return entry
+            return None
 
     def verify_proof_hash(self, proof_hash: str) -> bool:
         """Verifies whether a given cryptographic proof hash exists in the chain or is valid."""

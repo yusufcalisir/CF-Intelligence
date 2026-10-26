@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import datetime
 import logging
+import os
 import threading
+import urllib.request
 from datetime import UTC
 from typing import Any
 
@@ -37,6 +39,7 @@ from app.domain.pilot_operations import (
     PilotQuotaExceededError,
     PilotStatus,
     PreflightCheckResult,
+    canonical_pilot_approval_bytes,
 )
 from app.domain.pilot_operations import (
     PilotGovernanceError as PilotGovernanceError,
@@ -71,6 +74,22 @@ class PilotOperationsService:
         self.institutional_registry = institutional_registry or InstitutionalVerificationRegistry()
         self._audit_chain = ImmutableAuditChain.get_instance()
         self._lock = threading.RLock()
+
+    def _probe_node_health(self, url: str | None, expected_type: str = "worker") -> tuple[bool, str]:
+        """Probe actual HTTP readiness of a topology worker or coordinator."""
+        if not url:
+            return True, "NOT_CONFIGURED"
+        clean_url = url.rstrip("/")
+        probe_path = f"{clean_url}/worker/health" if expected_type == "worker" else f"{clean_url}/health"
+        try:
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            req = urllib.request.Request(probe_path, method="GET")
+            with opener.open(req, timeout=0.8) as resp:
+                if resp.status == 200:
+                    return True, f"ONLINE (status={resp.status})"
+                return False, f"UNHEALTHY (status={resp.status})"
+        except Exception as exc:
+            return False, f"OFFLINE ({exc})"
 
     def provision_pilot(
         self,
@@ -279,6 +298,34 @@ class PilotOperationsService:
             details=f"Total: {entity.config.query_quota_total}, Per-Inst: {entity.config.query_quota_per_institution}",
         ))
 
+        # 7. Live Infrastructure Readiness & Topology Reachability Probes
+        topo = entity.config.topology or {}
+        bank_a_url = topo.get("bank_a_worker_url") or topo.get("bank_a_url") or os.getenv("CFI_WORKER_A_URL") or os.getenv("CFI_BANK_A_URL")
+        bank_b_url = topo.get("bank_b_worker_url") or topo.get("bank_b_url") or os.getenv("CFI_WORKER_B_URL") or os.getenv("CFI_BANK_B_URL")
+        coord_url = topo.get("coordinator_url") or os.getenv("CFI_COORDINATOR_URL")
+
+        if bank_a_url:
+            a_ok, a_det = self._probe_node_health(bank_a_url, "worker")
+            checks.append(PreflightCheckResult(
+                check_name="BANK_A_WORKER_REACHABLE",
+                passed=a_ok,
+                details=f"Worker A ({bank_a_url}): {a_det}",
+            ))
+        if bank_b_url:
+            b_ok, b_det = self._probe_node_health(bank_b_url, "worker")
+            checks.append(PreflightCheckResult(
+                check_name="BANK_B_WORKER_REACHABLE",
+                passed=b_ok,
+                details=f"Worker B ({bank_b_url}): {b_det}",
+            ))
+        if coord_url:
+            c_ok, c_det = self._probe_node_health(coord_url, "coordinator")
+            checks.append(PreflightCheckResult(
+                check_name="COORDINATOR_REACHABLE",
+                passed=c_ok,
+                details=f"Coordinator ({coord_url}): {c_det}",
+            ))
+
         entity.preflight_checks = checks
         all_passed = all(c.passed for c in checks)
 
@@ -325,27 +372,34 @@ class PilotOperationsService:
         clean_inst = approving_institution.lower().strip()
         is_operator = clean_inst in ("operator", "pilot_operator", "admin", "consortium")
 
-        auth_principal: AuthenticatedPrincipal | None = None
-        if isinstance(principal, AuthenticatedPrincipal):
-            auth_principal = principal
-        elif isinstance(principal, str):
-            approver_actor = principal
+        if not isinstance(principal, AuthenticatedPrincipal) or not principal.is_authenticated:
+            raise PermissionError(
+                "Authentication required: Independent institutional approval requires an authenticated principal."
+            )
 
-        if auth_principal:
-            caller_tenant = (auth_principal.tenant_id or "").lower().strip()
-            if not is_operator:
-                if not auth_principal.is_privileged and caller_tenant != clean_inst:
-                    raise PermissionError(
-                        f"Cross-bank approval rejected: Principal from institution '{caller_tenant}' "
-                        f"cannot approve pilot on behalf of '{approving_institution}'."
-                    )
-            else:
-                gov_roles = {"admin", "super_admin", "ml_lead", "operator", "pilot_operator", "security_officer", "compliance", "system_admin"}
-                roles = getattr(auth_principal, "roles", []) or []
-                if not auth_principal.is_privileged and not any(r in gov_roles for r in roles):
-                    raise PermissionError(
-                        f"Principal '{auth_principal.principal_id}' lacks operator authority to grant OPERATOR pilot approval."
-                    )
+        caller_tenant = (principal.tenant_id or "").lower().strip()
+        if not is_operator:
+            # Institution approval: strictly require caller_tenant == clean_inst
+            # An operator or admin cannot manufacture a bank's institutional approval!
+            if caller_tenant != clean_inst:
+                raise PermissionError(
+                    f"Cross-bank approval rejected: Principal from institution '{caller_tenant}' "
+                    f"cannot approve pilot on behalf of '{approving_institution}'. "
+                    "Consortium operators and platform administrators cannot manufacture institutional approvals."
+                )
+            inst_roles = {"admin", "super_admin", "compliance", "compliance_officer", "security_officer", "institutional_approver"}
+            roles = getattr(principal, "roles", []) or []
+            if not principal.is_privileged and not any(r in inst_roles for r in roles):
+                raise PermissionError(
+                    f"Principal '{principal.principal_id}' lacks required institutional approval role for '{approving_institution}'."
+                )
+        else:
+            gov_roles = {"admin", "super_admin", "ml_lead", "operator", "pilot_operator", "security_officer", "compliance", "system_admin"}
+            roles = getattr(principal, "roles", []) or []
+            if not principal.is_privileged and not any(r in gov_roles for r in roles):
+                raise PermissionError(
+                    f"Principal '{principal.principal_id}' lacks operator authority to grant OPERATOR pilot approval."
+                )
 
         entity = self._get_required_pilot(pilot_id)
         if entity.status not in (PilotStatus.AWAITING_APPROVAL, PilotStatus.PREFLIGHT, PilotStatus.DRAFT):
@@ -354,8 +408,35 @@ class PilotOperationsService:
             )
 
         target_inst_key = "OPERATOR" if is_operator else clean_inst
-        approver_id = auth_principal.principal_id if auth_principal else (approver_actor or f"automated_{target_inst_key}")
-        approver_role = "operator" if is_operator else (auth_principal.roles[0] if auth_principal and auth_principal.roles else "institutional_approver")
+        if not is_operator and clean_inst not in [b.lower().strip() for b in entity.config.participating_institutions]:
+            raise PermissionError(
+                f"Institution '{clean_inst}' is not a participating bank of pilot '{pilot_id}'."
+            )
+
+        challenge_bytes = canonical_pilot_approval_bytes(
+            pilot_id=entity.config.pilot_id,
+            revision=entity.config.revision,
+            scope_digest=entity.config.compute_scope_digest(),
+            approver_institution=target_inst_key,
+            approver_id=principal.principal_id,
+        )
+
+        has_key = self.institutional_registry.has_key(clean_inst)
+        if signature:
+            verified = self.institutional_registry.verify_signature(clean_inst, signature, challenge_bytes)
+            if not verified:
+                raise PilotAuthorizationError(
+                    f"Cryptographic signature verification failed for institution '{clean_inst}'. "
+                    "Approval signature is invalid or does not match enrolled public key."
+                )
+        elif has_key and not is_operator:
+            raise PilotAuthorizationError(
+                f"Missing cryptographic signature: Institution '{clean_inst}' has an enrolled Ed25519 verification key. "
+                "Approval must be cryptographically signed."
+            )
+
+        approver_id = principal.principal_id
+        approver_role = "operator" if is_operator else (principal.roles[0] if principal.roles else "institutional_approver")
 
         approval_rec = PilotApprovalRecord(
             approver_id=approver_id,
@@ -555,6 +636,25 @@ class PilotOperationsService:
         if entity.queries_executed >= entity.config.query_quota_total:
             raise PilotQuotaExceededError("Pilot quota already exhausted. Cannot resume.")
 
+        # Live infrastructure readiness verification before resumption
+        topo = entity.config.topology or {}
+        bank_a_url = topo.get("bank_a_worker_url") or topo.get("bank_a_url") or os.getenv("CFI_WORKER_A_URL") or os.getenv("CFI_BANK_A_URL")
+        bank_b_url = topo.get("bank_b_worker_url") or topo.get("bank_b_url") or os.getenv("CFI_WORKER_B_URL") or os.getenv("CFI_BANK_B_URL")
+        coord_url = topo.get("coordinator_url") or os.getenv("CFI_COORDINATOR_URL")
+
+        if bank_a_url:
+            ok, det = self._probe_node_health(bank_a_url, "worker")
+            if not ok:
+                raise PilotGovernanceError(f"Cannot resume pilot '{pilot_id}': Bank A worker at '{bank_a_url}' is unreachable ({det}).")
+        if bank_b_url:
+            ok, det = self._probe_node_health(bank_b_url, "worker")
+            if not ok:
+                raise PilotGovernanceError(f"Cannot resume pilot '{pilot_id}': Bank B worker at '{bank_b_url}' is unreachable ({det}).")
+        if coord_url:
+            ok, det = self._probe_node_health(coord_url, "coordinator")
+            if not ok:
+                raise PilotGovernanceError(f"Cannot resume pilot '{pilot_id}': Coordinator at '{coord_url}' is unreachable ({det}).")
+
         entity.transition_to(PilotStatus.ACTIVE, "Resumed after health and authorization revalidation.")
 
         actor_id = principal.principal_id if isinstance(principal, AuthenticatedPrincipal) else (principal if principal else "operator")
@@ -668,6 +768,127 @@ class PilotOperationsService:
 
         return entity
 
+    def find_active_or_scoped_pilot(
+        self,
+        requesting_bank: str,
+        target_bank: str,
+        purpose: str,
+        pilot_id: str | None = None,
+    ) -> PilotEntity | None:
+        """Find governing pilot for the institutional pair and purpose.
+
+        If pilot_id is supplied, retrieves that exact pilot.
+        Otherwise, inspects active pilots for institutional match.
+        """
+        clean_req = requesting_bank.lower().strip()
+        clean_target = target_bank.lower().strip()
+
+        if pilot_id:
+            entity = self.store.get_pilot(pilot_id.strip())
+            if not entity:
+                raise PilotGovernanceError(f"Governing pilot '{pilot_id}' not found.")
+            return entity
+
+        active_pilots = self.store.get_active_pilots()
+        for p in active_pilots:
+            p_insts = {b.lower().strip() for b in p.config.participating_institutions}
+            if clean_req in p_insts and clean_target in p_insts and purpose in p.config.allowed_purposes:
+                return p
+        return None
+
+    def revalidate_pilot_active(
+        self,
+        pilot_id: str,
+        requesting_bank: str,
+        target_bank: str,
+        purpose: str,
+    ) -> PilotEntity:
+        """Revalidate effective pilot authorization immediately before authoritative signal admission."""
+        entity = self._get_required_pilot(pilot_id)
+        if entity.status != PilotStatus.ACTIVE:
+            raise PilotGovernanceError(
+                f"Kill switch activated: Pilot '{pilot_id}' is in non-active status '{entity.status.value}'. "
+                f"Reason: {entity.status_reason}. Authoritative signal admission rejected."
+            )
+        if entity.has_expired():
+            raise PilotExpiredError(
+                f"Kill switch activated: Pilot '{pilot_id}' expired. Authoritative signal admission rejected."
+            )
+        entity.validate_executable(requesting_bank, target_bank, purpose)
+
+        consortium = self.consortium_service.get_consortium(entity.config.consortium_id)
+        if not consortium or consortium.status != ConsortiumStatus.ACTIVE:
+            raise PilotAuthorizationError(
+                f"Underlying consortium '{entity.config.consortium_id}' is not ACTIVE. Admission rejected."
+            )
+        c_meta = getattr(consortium, "metadata", {}) or {}
+        op_grant = c_meta.get("operational_data_sharing_grant") or {}
+        if not op_grant or not op_grant.get("is_active", True):
+            raise PilotAuthorizationError("Underlying operational data sharing grant is inactive or revoked.")
+
+        revoked = set(op_grant.get("revoked_by_institutions", []))
+        if requesting_bank.lower().strip() in revoked:
+            raise PilotAuthorizationError(f"Requesting bank '{requesting_bank}' revoked operational consent.")
+        if target_bank.lower().strip() in revoked:
+            raise PilotAuthorizationError(f"Counterpart bank '{target_bank}' revoked operational consent.")
+
+        return entity
+
+    def reserve_query_slot(
+        self,
+        pilot_id: str,
+        requesting_bank: str,
+        target_bank: str,
+        purpose: str,
+        reservation_id: str | None = None,
+    ) -> tuple[PilotEntity, str]:
+        """Atomically reserve execution slot in durable store."""
+        import uuid
+        res_id = reservation_id or f"res_{uuid.uuid4().hex[:12]}"
+        return self.store.reserve_query_slot(
+            pilot_id=pilot_id,
+            requesting_bank_id=requesting_bank,
+            target_bank_id=target_bank,
+            purpose=purpose,
+            reservation_id=res_id,
+        )
+
+    def commit_query_reservation(
+        self,
+        reservation_id: str,
+        pilot_id: str,
+        receipt_id: str,
+        latency_ms: float,
+        match_confirmed: bool | None,
+        signal_id: str | None = None,
+        case_id: str | None = None,
+    ) -> tuple[PilotEntity, PilotExecutionReceipt]:
+        """Commit an in-flight reservation upon successful PSI execution and result admission."""
+        return self.store.commit_query_reservation(
+            reservation_id=reservation_id,
+            pilot_id=pilot_id,
+            receipt_id=receipt_id,
+            latency_ms=latency_ms,
+            match_confirmed=match_confirmed,
+            signal_id=signal_id,
+            case_id=case_id,
+        )
+
+    def release_query_reservation(
+        self,
+        reservation_id: str,
+        pilot_id: str,
+        reason: str = "FAILED",
+        is_denied: bool = True,
+    ) -> None:
+        """Release reservation upon error or mid-flight abort."""
+        self.store.release_query_reservation(
+            reservation_id=reservation_id,
+            pilot_id=pilot_id,
+            reason=reason,
+            is_denied=is_denied,
+        )
+
     def record_query_outcome(
         self,
         pilot_id: str,
@@ -682,6 +903,8 @@ class PilotOperationsService:
         success: bool | None = None,
         is_match: bool | None = None,
         requesting_bank: str | None = None,
+        signal_id: str | None = None,
+        case_id: str | None = None,
         **kwargs: Any,
     ) -> PilotExecutionReceipt:
         """Record query latency, counts, and receipt in persistent pilot store."""
@@ -705,6 +928,8 @@ class PilotOperationsService:
                 match_confirmed=match_confirmed,
                 receipt_id=receipt_id,
                 reason=reason,
+                signal_id=signal_id,
+                case_id=case_id,
             )
             self.store.save_pilot(entity)
             return receipt
@@ -722,9 +947,27 @@ class PilotOperationsService:
         return self.store.get_active_pilots()
 
     def export_audit_dossier(self, pilot_id: str) -> dict[str, Any]:
-        """Export durable audit dossier."""
+        """Export durable audit dossier with enriched immutable audit events."""
         entity = self._get_required_pilot(pilot_id)
-        return entity.export_audit_dossier()
+        dossier = entity.export_audit_dossier()
+        audit_events = []
+        for eid in entity.audit_event_ids:
+            evt = self._audit_chain.get_event(eid) if hasattr(self._audit_chain, "get_event") else None
+            if evt:
+                audit_events.append({
+                    "event_id": getattr(evt, "event_id", eid),
+                    "event_type": getattr(evt, "event_type", ""),
+                    "actor_id": getattr(evt, "actor_id", getattr(evt, "actor", "")),
+                    "action": getattr(evt, "action", ""),
+                    "resource_id": getattr(evt, "resource_id", getattr(evt, "target_id", "")),
+                    "timestamp": getattr(evt, "timestamp", ""),
+                    "digest": getattr(evt, "digest", getattr(evt, "curr_hash", "")),
+                    "event_digest": getattr(evt, "digest", getattr(evt, "curr_hash", "")),
+                })
+        dossier["audit_trail"] = audit_events
+        dossier["audit_events"] = audit_events
+        dossier["execution_receipts"] = entity.execution_receipts
+        return dossier
 
     def get_telemetry_summary(self, pilot_id: str) -> PilotTelemetrySummary:
         """Compile live operational telemetry summary for pilot visibility."""

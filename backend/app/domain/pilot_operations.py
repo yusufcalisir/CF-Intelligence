@@ -104,6 +104,28 @@ class PilotApprovalRecord:
     notes: str = ""
 
 
+def canonical_pilot_approval_bytes(
+    pilot_id: str,
+    revision: int | None = None,
+    scope_digest: str = "",
+    approver_institution: str = "",
+    approver_id: str = "",
+    *,
+    config_revision: int | None = None,
+    approving_bank_id: str | None = None,
+    approving_principal_id: str | None = None,
+) -> bytes:
+    """Canonical UTF-8 message challenge for Ed25519 institutional pilot approval."""
+    rev = revision if revision is not None else (config_revision if config_revision is not None else 1)
+    inst = approving_bank_id or approver_institution
+    actor = approving_principal_id or approver_id
+    canonical = (
+        f"PILOT_APPROVAL:{pilot_id.strip()}:{rev}:{scope_digest.strip()}:"
+        f"{inst.lower().strip()}:{actor.strip()}"
+    )
+    return canonical.encode("utf-8")
+
+
 @dataclass
 class PilotOperationalConfig:
     """Immutable operational configuration binding a two-bank pilot execution."""
@@ -166,11 +188,13 @@ class PilotExecutionReceipt:
     requesting_bank_id: str
     target_bank_id: str
     purpose: str
-    status: str  # ACCEPTED | DENIED | FAILED | ABORTED
+    status: str  # ACCEPTED | DENIED | FAILED | ABORTED | COMPLETED
     match_confirmed: bool | None
     latency_ms: float
     receipt_id: str | None = None
     reason: str | None = None
+    signal_id: str | None = None
+    case_id: str | None = None
     executed_at: str = field(default_factory=lambda: datetime.datetime.now(UTC).isoformat())
 
 
@@ -192,6 +216,8 @@ class PilotEntity:
     state_history: list[dict[str, Any]] = field(default_factory=list)
     audit_event_ids: list[str] = field(default_factory=list)
     execution_receipt_ids: list[str] = field(default_factory=list)
+    execution_receipts: list[dict[str, Any]] = field(default_factory=list)
+    state_version: int = 1
     created_at: str = field(default_factory=lambda: datetime.datetime.now(UTC).isoformat())
     updated_at: str = field(default_factory=lambda: datetime.datetime.now(UTC).isoformat())
     activated_at: str | None = None
@@ -212,6 +238,11 @@ class PilotEntity:
     def is_active(self) -> bool:
         """Returns True if the pilot is in ACTIVE state and not expired."""
         return self.status == PilotStatus.ACTIVE and not self.has_expired()
+
+    @property
+    def config_revision(self) -> int:
+        """Returns configuration revision number."""
+        return self.config.revision
 
     def has_expired(self, current_time: datetime.datetime | None = None) -> bool:
         """Check if the pilot configuration expires_at boundary has passed."""
@@ -266,17 +297,27 @@ class PilotEntity:
             self.transition_to(PilotStatus.AUTHORIZED, "All participating institutions and operator approved.")
 
     def has_all_required_approvals(self) -> tuple[bool, list[str]]:
-        """Returns (is_complete, missing_institutions) based on current scope digest."""
+        """Returns (is_complete, missing_institutions) based on current scope digest and independent authority."""
         current_digest = self.config.compute_scope_digest()
         missing = []
+        approver_identities: set[str] = set()
+
         for inst in self.config.participating_institutions:
             clean_inst = inst.lower().strip()
             rec = self.approvals.get(clean_inst)
-            if not rec or rec.scope_digest != current_digest:
+            if not rec or rec.scope_digest != current_digest or rec.approver_institution != clean_inst:
                 missing.append(clean_inst)
+            else:
+                approver_identities.add(rec.approver_id.lower().strip())
+
         op_rec = self.approvals.get("OPERATOR")
-        if not op_rec or op_rec.scope_digest != current_digest:
+        if not op_rec or op_rec.scope_digest != current_digest or op_rec.approver_institution != "OPERATOR":
             missing.append("OPERATOR")
+        else:
+            op_actor = op_rec.approver_id.lower().strip()
+            if len(self.config.participating_institutions) >= 2 and op_actor in approver_identities and len(approver_identities) == 1:
+                missing.append("INDEPENDENT_INSTITUTIONAL_AUTHORITY")
+
         return len(missing) == 0, missing
 
     def is_fully_approved(self) -> bool:
@@ -347,6 +388,8 @@ class PilotEntity:
         match_confirmed: bool | None = None,
         receipt_id: str | None = None,
         reason: str | None = None,
+        signal_id: str | None = None,
+        case_id: str | None = None,
     ) -> PilotExecutionReceipt:
         """Record query latency, counts, and receipt."""
         clean_req = requesting_bank_id.lower().strip()
@@ -367,8 +410,6 @@ class PilotEntity:
         if receipt_id:
             self.execution_receipt_ids.append(receipt_id)
 
-        self.updated_at = datetime.datetime.now(UTC).isoformat()
-
         receipt = PilotExecutionReceipt(
             query_id=query_id,
             pilot_id=self.config.pilot_id,
@@ -380,7 +421,11 @@ class PilotEntity:
             latency_ms=latency_ms,
             receipt_id=receipt_id,
             reason=reason,
+            signal_id=signal_id,
+            case_id=case_id,
         )
+        self.execution_receipts.append(asdict(receipt))
+        self.updated_at = datetime.datetime.now(UTC).isoformat()
         return receipt
 
     def export_audit_dossier(self) -> dict[str, Any]:
@@ -440,6 +485,7 @@ class PilotEntity:
             "audit_trail": {
                 "audit_event_ids": self.audit_event_ids,
                 "execution_receipt_ids": self.execution_receipt_ids,
+                "execution_receipts": self.execution_receipts,
             },
             "lifecycle_timestamps": {
                 "created_at": self.created_at,
@@ -467,6 +513,8 @@ class PilotEntity:
             "state_history": self.state_history,
             "audit_event_ids": self.audit_event_ids,
             "execution_receipt_ids": self.execution_receipt_ids,
+            "execution_receipts": self.execution_receipts,
+            "state_version": self.state_version,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "activated_at": self.activated_at,
@@ -497,6 +545,8 @@ class PilotEntity:
         state_history = list(data.get("state_history", []))
         audit_event_ids = list(data.get("audit_event_ids", []))
         execution_receipt_ids = list(data.get("execution_receipt_ids", []))
+        execution_receipts = list(data.get("execution_receipts", []))
+        state_version = int(data.get("state_version", 1))
         created_at = data.get("created_at", datetime.datetime.now(UTC).isoformat())
         updated_at = data.get("updated_at", datetime.datetime.now(UTC).isoformat())
         activated_at = data.get("activated_at")
@@ -518,6 +568,8 @@ class PilotEntity:
             state_history=state_history,
             audit_event_ids=audit_event_ids,
             execution_receipt_ids=execution_receipt_ids,
+            execution_receipts=execution_receipts,
+            state_version=state_version,
             created_at=created_at,
             updated_at=updated_at,
             activated_at=activated_at,

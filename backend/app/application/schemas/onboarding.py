@@ -57,7 +57,7 @@ class BankOnboardingBundleResponse(BaseModel):
     data_residency_region: str
     cert_fingerprint: str
     mtls_cert_pem: str
-    mtls_key_pem: str
+    mtls_key_pem: str = ""
     connector_config_yaml: str
     coordinator_endpoint: str
     # Frontend compatibility aliases
@@ -85,7 +85,7 @@ class CertRotationResponse(BaseModel):
 
     bank_id: str
     mtls_cert_pem: str
-    mtls_key_pem: str
+    mtls_key_pem: str = ""
     cert_fingerprint: str
 
 

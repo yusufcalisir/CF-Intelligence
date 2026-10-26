@@ -338,6 +338,8 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "network_name": NETWORK_NAME,
         "volume_bank_a": VOLUME_BANK_A,
         "volume_bank_b": VOLUME_BANK_B,
+        "ident_a": ident_a,
+        "ident_b": ident_b,
     }
 
     # Provision backend service verification public keys (ZERO private key material on analyst host)

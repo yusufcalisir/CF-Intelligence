@@ -1184,11 +1184,23 @@ class TenantAccessControlMiddleware:
         "/v1/inference/quota",
     })
 
+    _ALWAYS_PROTECTED_PREFIXES = (
+        "/api/v1/pilots",
+        "/v1/pilots",
+        "/pilots",
+        "/api/v1/onboarding",
+        "/v1/onboarding",
+        "/onboarding",
+    )
+
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
     def _is_protected_path(self, path: str, is_prod: bool = False) -> bool:
         clean_path = path.rstrip("/") or "/"
+        # Endpoints strictly protected across all operating environments
+        if any(clean_path == p or clean_path.startswith(p + "/") for p in self._ALWAYS_PROTECTED_PREFIXES):
+            return True
         # Private quota inspection always requires authentication
         if clean_path in self._PRIVATE_QUOTA_PATHS:
             return True
@@ -1356,6 +1368,8 @@ from app.presentation.routers import copilot, datasets, feedback
 app.include_router(auth.router)
 app.include_router(onboarding.router)
 app.include_router(onboarding.api_router)
+app.include_router(pilot_operations.router)
+app.include_router(pilot_operations.api_router)
 app.include_router(design_partner.router)
 app.include_router(design_partner.api_router)
 app.include_router(diagnostics.router)

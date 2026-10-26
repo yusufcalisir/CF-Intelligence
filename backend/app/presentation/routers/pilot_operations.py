@@ -60,7 +60,61 @@ def _resolve_principal_or_fail(request: Request) -> AuthenticatedPrincipal:
     principal, auth_err, auth_status = resolve_authenticated_principal(request)
     if auth_err:
         raise HTTPException(status_code=auth_status, detail=auth_err)
+    if not principal.is_authenticated:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required for pilot operations.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return principal
+
+
+def _enforce_pilot_read_access(principal: AuthenticatedPrincipal, entity: PilotEntity) -> None:
+    """Enforce institutional tenant isolation for pilot read access."""
+    if principal.is_privileged:
+        return
+    caller_tenant = (principal.tenant_id or "").lower().strip()
+    if caller_tenant in ("consortium", "operator", "admin", "system"):
+        return
+    participating = [b.lower().strip() for b in entity.config.participating_institutions]
+    if caller_tenant not in participating:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Cross-tenant pilot access rejected: Principal institution '{caller_tenant}' "
+                   f"is not a participant of pilot '{entity.config.pilot_id}'.",
+        )
+
+
+def _enforce_operator_role(principal: AuthenticatedPrincipal, action: str) -> None:
+    """Require operator/admin authority for privileged pilot state transitions."""
+    gov_roles = {"admin", "super_admin", "operator", "pilot_operator", "security_officer", "compliance", "system_admin"}
+    roles = set(principal.roles or [])
+    caller_tenant = (principal.tenant_id or "").lower().strip()
+    is_op_tenant = caller_tenant in ("consortium", "operator", "admin", "system")
+    if not principal.is_privileged and (not is_op_tenant or not (roles & gov_roles)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Principal '{principal.principal_id}' lacks operator authority to {action} pilot.",
+        )
+
+
+def _enforce_pause_authority(principal: AuthenticatedPrincipal, entity: PilotEntity) -> None:
+    """Require emergency pause authority: operator OR participating bank compliance/security."""
+    if principal.is_privileged:
+        return
+    caller_tenant = (principal.tenant_id or "").lower().strip()
+    roles = set(principal.roles or [])
+    operator_roles = {"admin", "super_admin", "operator", "pilot_operator", "security_officer", "compliance", "system_admin"}
+    if caller_tenant in ("consortium", "operator", "admin", "system") and (roles & operator_roles):
+        return
+    participating = [b.lower().strip() for b in entity.config.participating_institutions]
+    bank_pause_roles = {"admin", "compliance", "compliance_officer", "security_officer", "risk_lead"}
+    if caller_tenant in participating and (roles & bank_pause_roles):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"Principal '{principal.principal_id}' lacks emergency pause authority for pilot '{entity.config.pilot_id}'.",
+    )
 
 
 def _entity_to_response(entity: PilotEntity) -> PilotStatusResponse:
@@ -252,6 +306,7 @@ async def activate_pilot(
 ) -> PilotStatusResponse:
     """Authorized operator activates the pilot to permit operational matching queries."""
     principal = _resolve_principal_or_fail(request)
+    _enforce_operator_role(principal, "activate")
     try:
         entity = service.activate_pilot(pilot_id=pilot_id, principal=principal)
         return _entity_to_response(entity)
@@ -281,6 +336,10 @@ async def pause_pilot(
 ) -> PilotStatusResponse:
     """Pause an active pilot immediately, denying all new matching queries."""
     principal = _resolve_principal_or_fail(request)
+    entity = service.get_pilot(pilot_id)
+    if not entity:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Pilot '{pilot_id}' not found.")
+    _enforce_pause_authority(principal, entity)
     try:
         entity = service.pause_pilot(pilot_id=pilot_id, reason=payload.reason, principal=principal)
         return _entity_to_response(entity)
@@ -307,10 +366,11 @@ async def resume_pilot(
 ) -> PilotStatusResponse:
     """Resume a paused pilot after checking infrastructure health and unexpired authority."""
     principal = _resolve_principal_or_fail(request)
+    _enforce_operator_role(principal, "resume")
     try:
         entity = service.resume_pilot(pilot_id=pilot_id, principal=principal)
         return _entity_to_response(entity)
-    except (InvalidPilotTransitionError, PilotAuthorizationError, PilotExpiredError, PilotQuotaExceededError) as exc:
+    except (InvalidPilotTransitionError, PilotAuthorizationError, PilotExpiredError, PilotQuotaExceededError, PilotGovernanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -334,6 +394,7 @@ async def abort_pilot(
 ) -> PilotStatusResponse:
     """Abort a pilot permanently, preserving complete audit history."""
     principal = _resolve_principal_or_fail(request)
+    _enforce_operator_role(principal, "abort")
     try:
         entity = service.abort_pilot(pilot_id=pilot_id, reason=payload.reason, principal=principal)
         return _entity_to_response(entity)
@@ -360,6 +421,7 @@ async def complete_pilot(
 ) -> PilotStatusResponse:
     """Mark a pilot as successfully completed."""
     principal = _resolve_principal_or_fail(request)
+    _enforce_operator_role(principal, "complete")
     try:
         entity = service.complete_pilot(pilot_id=pilot_id, principal=principal)
         return _entity_to_response(entity)
@@ -380,13 +442,16 @@ async def complete_pilot(
     summary="Get operational status and configuration of a pilot",
 )
 async def get_pilot_status(
+    request: Request,
     pilot_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
     service: PilotOperationsService = Depends(_get_pilot_service),
 ) -> PilotStatusResponse:
     """Retrieve operational status, approvals, and preflight results for a pilot."""
+    principal = _resolve_principal_or_fail(request)
     entity = service.get_pilot(pilot_id)
     if not entity:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Pilot '{pilot_id}' not found.")
+    _enforce_pilot_read_access(principal, entity)
     return _entity_to_response(entity)
 
 
@@ -401,10 +466,16 @@ async def get_pilot_status(
     summary="Get live operational telemetry and query latencies for a pilot",
 )
 async def get_pilot_telemetry(
+    request: Request,
     pilot_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
     service: PilotOperationsService = Depends(_get_pilot_service),
 ) -> PilotTelemetrySummary:
     """Inspect query metrics, mean latency, p95 latency, and remaining quota."""
+    principal = _resolve_principal_or_fail(request)
+    entity = service.get_pilot(pilot_id)
+    if not entity:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Pilot '{pilot_id}' not found.")
+    _enforce_pilot_read_access(principal, entity)
     try:
         return service.get_telemetry_summary(pilot_id)
     except ValueError as exc:
@@ -422,10 +493,23 @@ async def get_pilot_telemetry(
     summary="Export durable, redacted completion and audit evidence dossier",
 )
 async def export_pilot_dossier(
+    request: Request,
     pilot_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
     service: PilotOperationsService = Depends(_get_pilot_service),
 ) -> dict[str, Any]:
     """Export complete auditable dossier for independent reviewer inspection."""
+    principal = _resolve_principal_or_fail(request)
+    entity = service.get_pilot(pilot_id)
+    if not entity:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Pilot '{pilot_id}' not found.")
+    _enforce_pilot_read_access(principal, entity)
+    dossier_roles = {"admin", "super_admin", "compliance", "compliance_officer", "auditor", "security_officer", "operator", "pilot_operator"}
+    roles = set(principal.roles or [])
+    if not principal.is_privileged and not (roles & dossier_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Principal '{principal.principal_id}' lacks auditor or compliance role to export pilot dossier.",
+        )
     try:
         return service.export_audit_dossier(pilot_id)
     except ValueError as exc:
@@ -443,8 +527,14 @@ async def export_pilot_dossier(
     summary="List all pilots",
 )
 async def list_pilots(
+    request: Request,
     service: PilotOperationsService = Depends(_get_pilot_service),
 ) -> list[PilotStatusResponse]:
-    """List all pilots in persistent storage."""
+    """List all pilots in persistent storage with tenant-scoped filtering."""
+    principal = _resolve_principal_or_fail(request)
+    caller_tenant = (principal.tenant_id or "").lower().strip()
+    is_op = principal.is_privileged or caller_tenant in ("consortium", "operator", "admin", "system")
     pilots = service.list_pilots()
+    if not is_op:
+        pilots = [p for p in pilots if caller_tenant in [b.lower().strip() for b in p.config.participating_institutions]]
     return [_entity_to_response(p) for p in pilots]

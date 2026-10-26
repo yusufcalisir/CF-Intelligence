@@ -32,8 +32,9 @@ from app.application.services.pilot_operations_service import (
 from app.domain.consortium_governance import MemberRole
 from app.domain.institutional_identity import InstitutionalSigningIdentity
 from app.domain.investigation_entities import Entity, EntityType, RiskLevel
-from app.domain.pilot_operations import PilotStatus
+from app.domain.pilot_operations import PilotStatus, canonical_pilot_approval_bytes
 from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 from app.infrastructure.storage.durable_pilot_store import DurablePilotStore
 from app.main import app
@@ -121,6 +122,28 @@ def pilot_test_env(
     token_analyst_a = auth_svc.create_token_bundle(u_analyst_a).access_token
     token_admin_b = auth_svc.create_token_bundle(u_admin_b).access_token
 
+    principal_op = AuthenticatedPrincipal(
+        principal_id="pilot_operator_01",
+        tenant_id="consortium",
+        roles=["admin", "operator", "system_admin"],
+        is_authenticated=True,
+        auth_method="jwt",
+    )
+    principal_a = AuthenticatedPrincipal(
+        principal_id="admin_bank_a",
+        tenant_id="bank_a",
+        roles=["admin", "compliance"],
+        is_authenticated=True,
+        auth_method="jwt",
+    )
+    principal_b = AuthenticatedPrincipal(
+        principal_id="admin_bank_b",
+        tenant_id="bank_b",
+        roles=["admin", "compliance"],
+        is_authenticated=True,
+        auth_method="jwt",
+    )
+
     # Setup consortium
     gov_svc = ConsortiumGovernanceService()
     consortium_id = "consortium_pilot_m5"
@@ -180,6 +203,11 @@ def pilot_test_env(
         "token_admin_a": token_admin_a,
         "token_analyst_a": token_analyst_a,
         "token_admin_b": token_admin_b,
+        "id_a": id_a,
+        "id_b": id_b,
+        "principal_op": principal_op,
+        "principal_a": principal_a,
+        "principal_b": principal_b,
     }
 
 
@@ -194,9 +222,13 @@ def test_gate_a_secure_onboarding_and_identity_boundary(
     token_admin_a = pilot_test_env["token_admin_a"]
 
     with TestClient(app) as client:
-        # 1. Consortium Root CA identity is stable across calls
-        ca_resp1 = client.get("/v1/onboarding/consortium-ca")
-        ca_resp2 = client.get("/v1/onboarding/consortium-ca")
+        # 0. Unauthenticated access to onboarding endpoints must fail closed (401)
+        assert client.get("/v1/onboarding/consortium-ca").status_code == 401
+        assert client.post("/v1/onboarding/register", json={}).status_code == 401
+
+        # 1. Consortium Root CA identity is stable across calls (authenticated)
+        ca_resp1 = client.get("/v1/onboarding/consortium-ca", headers={"Authorization": f"Bearer {token_op}"})
+        ca_resp2 = client.get("/v1/onboarding/consortium-ca", headers={"Authorization": f"Bearer {token_op}"})
         assert ca_resp1.status_code == 200
         assert ca_resp2.status_code == 200
         assert ca_resp1.json()["root_ca_pem"] == ca_resp2.json()["root_ca_pem"]
@@ -218,6 +250,8 @@ def test_gate_a_secure_onboarding_and_identity_boundary(
             headers={"Authorization": f"Bearer {token_op}"},
         )
         assert reg_a.status_code == 201, f"Registration failed: {reg_a.text}"
+        assert reg_a.json().get("mtls_key_pem", "") == ""
+        assert "private_key_pem" not in reg_a.json() or reg_a.json().get("private_key_pem", "") == ""
 
         reg_b = client.post(
             "/v1/onboarding/register",
@@ -231,6 +265,8 @@ def test_gate_a_secure_onboarding_and_identity_boundary(
             headers={"Authorization": f"Bearer {token_op}"},
         )
         assert reg_b.status_code == 201, f"Registration failed: {reg_b.text}"
+        assert reg_b.json().get("mtls_key_pem", "") == ""
+        assert "private_key_pem" not in reg_b.json() or reg_b.json().get("private_key_pem", "") == ""
 
         # 3. Cross-Tenant Isolation: Bank A admin cannot view or enroll Bank B credentials
         enroll_cross = client.post(
@@ -333,20 +369,80 @@ def test_gate_b_pilot_state_machine_and_kill_switch(
         assert preflight_resp.json()["passed"] is True
         assert preflight_resp.json()["status"] in ("PREFLIGHT", "AWAITING_APPROVAL")
 
-        # Step 4: Independent Bilateral Approvals
-        # 4a. Bank A Approves
+        # Step 4: Independent Bilateral Approvals & Attack Defense
+        # 4.0 Unauthenticated approval attempt must fail closed (401)
+        app_unauth = client.post(
+            "/api/v1/pilots/pilot_two_bank_test_01/approve",
+            json={"institution_id": "bank_a", "signature": "fake", "notes": "Unauth"},
+        )
+        assert app_unauth.status_code == 401
+
+        # 4.1 Mandatory attack: Consortium Operator attempts to approve on behalf of Bank A (must fail 403)
+        app_spoof_a = client.post(
+            "/api/v1/pilots/pilot_two_bank_test_01/approve",
+            json={"institution_id": "bank_a", "signature": "abc", "notes": "Operator spoofing Bank A"},
+            headers={"Authorization": f"Bearer {token_op}"},
+        )
+        assert app_spoof_a.status_code == 403
+        assert (
+            "cross-bank" in app_spoof_a.text.lower()
+            or "cross-tenant" in app_spoof_a.text.lower()
+            or "cannot approve" in app_spoof_a.text.lower()
+            or "forbidden" in app_spoof_a.text.lower()
+        )
+
+        # 4.2 Empty or arbitrary signature strings must be rejected (400)
+        app_empty_sig = client.post(
+            "/api/v1/pilots/pilot_two_bank_test_01/approve",
+            json={"institution_id": "bank_a", "signature": "", "notes": "Empty sig"},
+            headers={"Authorization": f"Bearer {token_admin_a}"},
+        )
+        assert app_empty_sig.status_code == 400
+
+        app_bad_sig = client.post(
+            "/api/v1/pilots/pilot_two_bank_test_01/approve",
+            json={"institution_id": "bank_a", "signature": "00" * 32, "notes": "Invalid cryptographic signature"},
+            headers={"Authorization": f"Bearer {token_admin_a}"},
+        )
+        assert app_bad_sig.status_code == 400
+
+        # Compute authentic institutional signatures
+        pilot_ent = pilot_svc.get_pilot("pilot_two_bank_test_01")
+        assert pilot_ent is not None
+        id_a = pilot_test_env["id_a"]
+        id_b = pilot_test_env["id_b"]
+
+        sig_bytes_a = canonical_pilot_approval_bytes(
+            pilot_id="pilot_two_bank_test_01",
+            scope_digest=pilot_ent.scope_digest,
+            config_revision=pilot_ent.config.revision,
+            approving_bank_id="bank_a",
+            approving_principal_id="admin_bank_a",
+        )
+        sig_a = id_a.sign(sig_bytes_a)
+
+        sig_bytes_b = canonical_pilot_approval_bytes(
+            pilot_id="pilot_two_bank_test_01",
+            scope_digest=pilot_ent.scope_digest,
+            config_revision=pilot_ent.config.revision,
+            approving_bank_id="bank_b",
+            approving_principal_id="admin_bank_b",
+        )
+        sig_b = id_b.sign(sig_bytes_b)
+
+        # 4a. Bank A Approves with authentic Ed25519 signature
         app_a = client.post(
             "/api/v1/pilots/pilot_two_bank_test_01/approve",
-            json={"institution_id": "bank_a", "notes": "Bank A board approval for pilot"},
+            json={"institution_id": "bank_a", "signature": sig_a, "notes": "Bank A board approval for pilot"},
             headers={"Authorization": f"Bearer {token_admin_a}"},
         )
         assert app_a.status_code == 200
         assert app_a.json()["status"] == "AWAITING_APPROVAL"
 
-        # 4b. Bank B Approves
+        # 4b. Bank B Approves with authentic Ed25519 signature
         app_b = client.post(
             "/api/v1/pilots/pilot_two_bank_test_01/approve",
-            json={"institution_id": "bank_b", "notes": "Bank B compliance approval for pilot"},
+            json={"institution_id": "bank_b", "signature": sig_b, "notes": "Bank B compliance approval for pilot"},
             headers={"Authorization": f"Bearer {token_admin_b}"},
         )
         assert app_b.status_code == 200
@@ -385,6 +481,14 @@ def test_gate_b_pilot_state_machine_and_kill_switch(
         )
         assert pause_resp.status_code == 200
         assert pause_resp.json()["status"] == "PAUSED"
+
+        # Unauthorized analyst cannot resume paused pilot (403)
+        res_unauth = client.post(
+            "/api/v1/pilots/pilot_two_bank_test_01/resume",
+            json={"reason": "Analyst illegal resume attempt"},
+            headers={"Authorization": f"Bearer {pilot_test_env['token_analyst_a']}"},
+        )
+        assert res_unauth.status_code == 403
 
         # Query validation fails while PAUSED
         with pytest.raises(PilotGovernanceError) as exc_pause:
@@ -481,7 +585,7 @@ def test_gate_c_and_d_real_docker_investigation_workflow(
 
     # 1. Provision & Authorize Live Pilot
     pilot_id = "pilot_docker_live_01"
-    pilot_svc.provision_pilot(
+    pilot_ent = pilot_svc.provision_pilot(
         pilot_id=pilot_id,
         consortium_id="consortium_pilot_m5",
         participating_institutions=["bank_a", "bank_b"],
@@ -491,13 +595,32 @@ def test_gate_c_and_d_real_docker_investigation_workflow(
         max_queries_total=10,
         max_queries_per_institution=5,
         duration_days=7,
-        creator_actor="pilot_operator_01",
+        principal=pilot_test_env["principal_op"],
     )
-    pilot_svc.run_preflight(pilot_id, operator_actor="pilot_operator_01")
-    pilot_svc.approve_pilot(pilot_id, "bank_a", "admin_bank_a", "Bank A approval")
-    pilot_svc.approve_pilot(pilot_id, "bank_b", "admin_bank_b", "Bank B approval")
-    pilot_svc.approve_pilot(pilot_id, "consortium", "pilot_operator_01", "Operator approval")
-    pilot_svc.activate_pilot(pilot_id, "pilot_operator_01")
+    pilot_svc.run_preflight(pilot_id, principal=pilot_test_env["principal_op"])
+
+    id_a = docker_topology.get("ident_a") or pilot_test_env["id_a"]
+    id_b = docker_topology.get("ident_b") or pilot_test_env["id_b"]
+    pilot_svc.institutional_registry.register_public_key("bank_a", id_a.public_key, allow_overwrite=True)
+    pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key, allow_overwrite=True)
+    sig_a = id_a.sign(canonical_pilot_approval_bytes(
+        pilot_id=pilot_id,
+        scope_digest=pilot_ent.scope_digest,
+        config_revision=pilot_ent.config.revision,
+        approving_bank_id="bank_a",
+        approving_principal_id="admin_bank_a",
+    ))
+    sig_b = id_b.sign(canonical_pilot_approval_bytes(
+        pilot_id=pilot_id,
+        scope_digest=pilot_ent.scope_digest,
+        config_revision=pilot_ent.config.revision,
+        approving_bank_id="bank_b",
+        approving_principal_id="admin_bank_b",
+    ))
+    pilot_svc.approve_pilot(pilot_id, "bank_a", principal=pilot_test_env["principal_a"], signature=sig_a, notes="Bank A approval")
+    pilot_svc.approve_pilot(pilot_id, "bank_b", principal=pilot_test_env["principal_b"], signature=sig_b, notes="Bank B approval")
+    pilot_svc.approve_pilot(pilot_id, "consortium", principal=pilot_test_env["principal_op"], notes="Operator approval")
+    pilot_svc.activate_pilot(pilot_id, principal=pilot_test_env["principal_op"])
 
     # 2. Store matching entity in Bank A and Bank B Docker vaults
     shared_iban = "DE89370400440532013000"
@@ -603,6 +726,20 @@ def test_gate_c_and_d_real_docker_investigation_workflow(
         assert telemetry["queries_by_institution"]["bank_a"] == 1
         assert telemetry["mean_latency_ms"] > 0
 
+        # Step 7b: Server-Controlled Pilot Binding: Request omitting pilot_id must NOT bypass active pilot
+        query_payload_no_pilot = dict(query_payload)
+        del query_payload_no_pilot["pilot_id"]
+        query_resp_bound = test_client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=query_payload_no_pilot,
+            headers=auth_headers,
+        )
+        assert query_resp_bound.status_code == 200, f"Server-controlled pilot query failed: {query_resp_bound.text}"
+        # Verified: Query without pilot_id was automatically bound to active pilot and recorded in quota
+        telemetry_bound = pilot_svc.get_telemetry_summary(pilot_id)
+        assert telemetry_bound["queries_total"] == 2
+        assert telemetry_bound["queries_by_institution"]["bank_a"] == 2
+
         # Step 8: Bank B Revokes Consent Mid-Pilot
         gov_svc.revoke_operational_data_sharing_grant(
             consortium_id="consortium_pilot_m5",
@@ -676,7 +813,7 @@ def test_gate_e_operational_resilience_and_incident_containment(
 
     # 1. Provision & Activate Resilience Pilot
     pilot_id = "pilot_resilience_01"
-    pilot_svc.provision_pilot(
+    pilot_ent = pilot_svc.provision_pilot(
         pilot_id=pilot_id,
         consortium_id="consortium_pilot_m5",
         participating_institutions=["bank_a", "bank_b"],
@@ -686,13 +823,32 @@ def test_gate_e_operational_resilience_and_incident_containment(
         max_queries_total=10,
         max_queries_per_institution=5,
         duration_days=7,
-        creator_actor="pilot_operator_01",
+        principal=pilot_test_env["principal_op"],
     )
-    pilot_svc.run_preflight(pilot_id, operator_actor="pilot_operator_01")
-    pilot_svc.approve_pilot(pilot_id, "bank_a", "admin_bank_a", "Approved A")
-    pilot_svc.approve_pilot(pilot_id, "bank_b", "admin_bank_b", "Approved B")
-    pilot_svc.approve_pilot(pilot_id, "consortium", "pilot_operator_01", "Approved Op")
-    pilot_svc.activate_pilot(pilot_id, "pilot_operator_01")
+    pilot_svc.run_preflight(pilot_id, principal=pilot_test_env["principal_op"])
+
+    id_a = docker_topology.get("ident_a") or pilot_test_env["id_a"]
+    id_b = docker_topology.get("ident_b") or pilot_test_env["id_b"]
+    pilot_svc.institutional_registry.register_public_key("bank_a", id_a.public_key, allow_overwrite=True)
+    pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key, allow_overwrite=True)
+    sig_a = id_a.sign(canonical_pilot_approval_bytes(
+        pilot_id=pilot_id,
+        scope_digest=pilot_ent.scope_digest,
+        config_revision=pilot_ent.config.revision,
+        approving_bank_id="bank_a",
+        approving_principal_id="admin_bank_a",
+    ))
+    sig_b = id_b.sign(canonical_pilot_approval_bytes(
+        pilot_id=pilot_id,
+        scope_digest=pilot_ent.scope_digest,
+        config_revision=pilot_ent.config.revision,
+        approving_bank_id="bank_b",
+        approving_principal_id="admin_bank_b",
+    ))
+    pilot_svc.approve_pilot(pilot_id, "bank_a", principal=pilot_test_env["principal_a"], signature=sig_a, notes="Approved A")
+    pilot_svc.approve_pilot(pilot_id, "bank_b", principal=pilot_test_env["principal_b"], signature=sig_b, notes="Approved B")
+    pilot_svc.approve_pilot(pilot_id, "consortium", principal=pilot_test_env["principal_op"], notes="Approved Op")
+    pilot_svc.activate_pilot(pilot_id, principal=pilot_test_env["principal_op"])
 
     # Register local entity
     cbi_svc = CrossBankIntelligenceService(consortium_service=gov_svc)
@@ -749,7 +905,7 @@ def test_gate_e_operational_resilience_and_incident_containment(
             _wait_for_health(f"http://127.0.0.1:{docker_topology['port_b']}/worker/health", timeout_sec=25.0)
 
         # Step 5: Test ACID Persistence across service restart
-        pilot_svc.pause_pilot(pilot_id, "pilot_operator_01", "Testing persistence across restart")
+        pilot_svc.pause_pilot(pilot_id, principal=pilot_test_env["principal_op"], reason="Testing persistence across restart")
         pilot_db_file = pilot_test_env["pilot_db_file"]
 
         # Simulate process reboot with fresh PilotOperationsService instance reading from DB
@@ -767,14 +923,60 @@ def test_gate_e_operational_resilience_and_incident_containment(
 # Gate F — Pilot Evidence & Durable Audit Dossier Export
 # ==============================================================================
 def test_gate_f_audit_dossier_and_evidence_export(
+    docker_topology: dict[str, Any],
     pilot_test_env: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Gate F: Full audit dossier export, state transition log, and absence of raw secrets."""
+    """Gate F: Full audit dossier export referencing genuine PSI receipts, case evidence, and zero raw secrets."""
     pilot_svc: PilotOperationsService = pilot_test_env["pilot_svc"]
+    gov_svc: ConsortiumGovernanceService = pilot_test_env["gov_svc"]
     token_op = pilot_test_env["token_op"]
+    token_analyst_a = pilot_test_env["token_analyst_a"]
+    port_coord: int = docker_topology["port_coord"]
 
+    coord_url = f"http://127.0.0.1:{port_coord}"
+    monkeypatch.setenv("CFI_COORDINATOR_URL", coord_url)
+
+    # 0. Sync store files into containers and register authorized grant on workers
+    store_file = pilot_test_env["consortium_store_file"]
+    account_file = pilot_test_env["account_store_file"]
+    c_worker_a = docker_topology["container_worker_a"]
+    c_worker_b = docker_topology["container_worker_b"]
+    c_coord = docker_topology["container_coordinator"]
+    for c in [c_worker_a, c_worker_b, c_coord]:
+        _run_cmd(["docker", "cp", str(store_file), f"{c}:/tmp/consortium_store.json"], check=False)
+        _run_cmd(["docker", "exec", "-u", "0", c, "chmod", "666", "/tmp/consortium_store.json"], check=False)
+        _run_cmd(["docker", "cp", str(account_file), f"{c}:/tmp/account_store.json"], check=False)
+        _run_cmd(["docker", "exec", "-u", "0", c, "chmod", "666", "/tmp/account_store.json"], check=False)
+
+    client_a: InstitutionalWorkerClient = docker_topology["client_a"]
+    client_b: InstitutionalWorkerClient = docker_topology["client_b"]
+
+    c_data = gov_svc.get_consortium("consortium_pilot_m5")
+    assert c_data is not None
+    grant_meta = c_data.metadata.get("operational_data_sharing_grant", {})
+    scope_digest = grant_meta.get("scope_digest", "")
+
+    client_a.register_authorized_grant(
+        consortium_id="consortium_pilot_m5",
+        grant_id=pilot_test_env["grant_id"],
+        revision=1,
+        scope_digest=scope_digest,
+        permitted_counterparts=["bank_b"],
+        permitted_purposes=["AML_INVESTIGATION"],
+    )
+    client_b.register_authorized_grant(
+        consortium_id="consortium_pilot_m5",
+        grant_id=pilot_test_env["grant_id"],
+        revision=1,
+        scope_digest=scope_digest,
+        permitted_counterparts=["bank_a"],
+        permitted_purposes=["AML_INVESTIGATION"],
+    )
+
+    # 1. Provision Pilot
     pilot_id = "pilot_dossier_01"
-    pilot_svc.provision_pilot(
+    pilot_ent = pilot_svc.provision_pilot(
         pilot_id=pilot_id,
         consortium_id="consortium_pilot_m5",
         participating_institutions=["bank_a", "bank_b"],
@@ -784,25 +986,140 @@ def test_gate_f_audit_dossier_and_evidence_export(
         max_queries_total=10,
         max_queries_per_institution=5,
         duration_days=7,
-        creator_actor="pilot_operator_01",
+        principal=pilot_test_env["principal_op"],
     )
-    pilot_svc.run_preflight(pilot_id, operator_actor="pilot_operator_01")
-    pilot_svc.approve_pilot(pilot_id, "bank_a", "admin_bank_a", "Approved A")
-    pilot_svc.approve_pilot(pilot_id, "bank_b", "admin_bank_b", "Approved B")
-    pilot_svc.approve_pilot(pilot_id, "consortium", "pilot_operator_01", "Approved Op")
-    pilot_svc.activate_pilot(pilot_id, "pilot_operator_01")
-    pilot_svc.record_query_outcome(pilot_id, success=True, is_match=True, latency_ms=45.2)
-    pilot_svc.complete_pilot(pilot_id, "pilot_operator_01", "Pilot completed successfully")
+    pilot_svc.run_preflight(pilot_id, principal=pilot_test_env["principal_op"])
+
+    # 2. Independent Bilateral Approvals with genuine Ed25519 signatures
+    id_a = docker_topology.get("ident_a") or pilot_test_env["id_a"]
+    id_b = docker_topology.get("ident_b") or pilot_test_env["id_b"]
+    pilot_svc.institutional_registry.register_public_key("bank_a", id_a.public_key, allow_overwrite=True)
+    pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key, allow_overwrite=True)
+    sig_a = id_a.sign(canonical_pilot_approval_bytes(
+        pilot_id=pilot_id,
+        scope_digest=pilot_ent.scope_digest,
+        config_revision=pilot_ent.config.revision,
+        approving_bank_id="bank_a",
+        approving_principal_id="admin_bank_a",
+    ))
+    sig_b = id_b.sign(canonical_pilot_approval_bytes(
+        pilot_id=pilot_id,
+        scope_digest=pilot_ent.scope_digest,
+        config_revision=pilot_ent.config.revision,
+        approving_bank_id="bank_b",
+        approving_principal_id="admin_bank_b",
+    ))
+    pilot_svc.approve_pilot(pilot_id, "bank_a", principal=pilot_test_env["principal_a"], signature=sig_a, notes="Approved A")
+    pilot_svc.approve_pilot(pilot_id, "bank_b", principal=pilot_test_env["principal_b"], signature=sig_b, notes="Approved B")
+    pilot_svc.approve_pilot(pilot_id, "consortium", principal=pilot_test_env["principal_op"], notes="Approved Op")
+    pilot_svc.activate_pilot(pilot_id, principal=pilot_test_env["principal_op"])
+
+    # 3. Setup genuine entity in Docker vaults and CrossBankIntelligenceService
+    shared_iban = "DE89370400440532013000"
+    ent_id = "ent_dossier_a"
+    client_a.store_private_entity({
+        "id": ent_id,
+        "bank_id": "bank_a",
+        "entity_type": "account",
+        "raw_identifier": shared_iban,
+        "risk_level": "HIGH",
+        "typologies": ["TERRORIST_FINANCING"],
+    })
+    client_b.store_private_entity({
+        "id": "ent_dossier_b",
+        "bank_id": "bank_b",
+        "entity_type": "account",
+        "raw_identifier": shared_iban,
+        "risk_level": "CRITICAL",
+        "typologies": ["TERRORIST_FINANCING"],
+    })
+
+    cbi_svc = CrossBankIntelligenceService(consortium_service=gov_svc)
+    ent_obj = Entity(
+        id=ent_id,
+        entity_type=EntityType.CUSTOMER,
+        privacy_id=hashlib.sha256(shared_iban.encode()).hexdigest(),
+        bank_id="bank_a",
+        display_label="Dossier Subject",
+        risk_level=RiskLevel.HIGH,
+        attributes={"raw_identifier": shared_iban},
+    )
+    from app.application.services.entity_resolution import _entity_to_dict
+    cbi_svc.entity_service._entities.set(ent_id, _entity_to_dict(ent_obj))
+
+    from app.presentation.routers import cross_bank_intelligence as cbi_router_mod
+    monkeypatch.setattr(cbi_router_mod, "get_cross_bank_intelligence_service", lambda: cbi_svc)
 
     with TestClient(app) as client:
+        auth_headers_analyst = {"Authorization": f"Bearer {token_analyst_a}"}
+        auth_headers_op = {"Authorization": f"Bearer {token_op}"}
+
+        # 4. Open investigation case
+        case_resp = client.post(
+            "/api/v1/cases",
+            json={
+                "title": "Gate F Authentic Pilot Case Investigation",
+                "priority": "p1_critical",
+                "bank_id": "bank_a",
+            },
+            headers=auth_headers_analyst,
+        )
+        assert case_resp.status_code == 200, f"Case creation failed: {case_resp.text}"
+        case_id = case_resp.json()["id"]
+
+        # 5. Execute genuine OpenMined PSI query on synthetic data
+        query_payload = {
+            "consortium_id": "consortium_pilot_m5",
+            "requesting_bank_id": "bank_a",
+            "target_bank_id": "bank_b",
+            "query_entity_id": ent_id,
+            "case_id": case_id,
+            "purpose": "AML_INVESTIGATION",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "use_established_psi": True,
+            "require_established_psi": True,
+            "protocol": "OPENMINED-PSI-2.0.6-ECDH",
+            "pilot_id": pilot_id,
+        }
+        query_resp = client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=query_payload,
+            headers=auth_headers_analyst,
+        )
+        assert query_resp.status_code == 200, f"Cross-bank query failed: {query_resp.text}"
+        signal_data = query_resp.json()
+        signal_id = signal_data["signal_id"]
+        receipt_id = signal_data.get("receipt_id") or signal_data.get("provenance", {}).get("receipt_id", "")
+        assert receipt_id, "Genuine PSI execution receipt ID must be present in signal response"
+
+        # 6. Attach genuine signal to Case Evidence
+        attach_resp = client.post(
+            f"/api/v1/cases/{case_id}/evidence/cross-bank-intelligence",
+            json={
+                "signal_id": signal_id,
+                "notes": "Gate F authentic pilot execution match evidence",
+            },
+            headers=auth_headers_analyst,
+        )
+        assert attach_resp.status_code == 200, f"Evidence attachment failed: {attach_resp.text}"
+
+        # 7. Complete pilot through authenticated operator API
+        comp_resp = client.post(
+            f"/api/v1/pilots/{pilot_id}/complete",
+            json={"reason": "Milestone 5 operational pilot successfully completed"},
+            headers=auth_headers_op,
+        )
+        assert comp_resp.status_code == 200, f"Pilot completion failed: {comp_resp.text}"
+
+        # 8. Export Audit Dossier
         dossier_resp = client.get(
             f"/api/v1/pilots/{pilot_id}/dossier",
-            headers={"Authorization": f"Bearer {token_op}"},
+            headers=auth_headers_op,
         )
         assert dossier_resp.status_code == 200, f"Dossier export failed: {dossier_resp.text}"
         dossier = dossier_resp.json()
 
-        # 1. Structure Verification
+        # 9. Structure & Provenance Verification
         assert dossier["pilot_id"] == pilot_id
         assert dossier["status"] == "COMPLETED"
         assert dossier["scope_digest"]
@@ -810,9 +1127,30 @@ def test_gate_f_audit_dossier_and_evidence_export(
         assert len(dossier["approvals"]) == 3
         assert dossier["telemetry"]["queries_total"] == 1
         assert dossier["telemetry"]["matches_found"] == 1
+        measured_latency = dossier["telemetry"]["mean_latency_ms"]
+        assert measured_latency > 0, "Telemetry mean latency must be measured and positive"
+        assert measured_latency != 45.2, "Latency must NOT be fabricated illustrative 45.2 ms value"
 
-        # 2. Confidentiality Verification (Zero raw secrets, tokens, or PII)
+        # 10. Execution Receipts Binding Verification
+        exec_receipts = dossier.get("execution_receipts", [])
+        assert len(exec_receipts) >= 1, "Dossier must persist and export genuine execution receipts"
+        matching_receipt = next((r for r in exec_receipts if r["receipt_id"] == receipt_id), None)
+        assert matching_receipt is not None, f"Dossier execution receipts must contain genuine receipt ID {receipt_id}"
+        assert matching_receipt["signal_id"] == signal_id
+        assert matching_receipt["case_id"] == case_id
+        assert matching_receipt["match_confirmed"] is True
+
+        # 11. Audit Trail Digest Verification
+        audit_trail = dossier.get("audit_trail", [])
+        assert len(audit_trail) > 0, "Audit trail must not be empty"
+        for evt in audit_trail:
+            assert "event_id" in evt
+            assert "event_digest" in evt
+            assert len(evt["event_digest"]) == 64, "Event digest must be valid SHA-256 hash"
+
+        # 12. Confidentiality Verification (Zero raw secrets, tokens, or PII)
         dossier_text = json.dumps(dossier)
         assert "private_key" not in dossier_text.lower()
         assert "password" not in dossier_text.lower()
         assert "token" not in dossier_text.lower() or "token_bundle" not in dossier_text.lower()
+

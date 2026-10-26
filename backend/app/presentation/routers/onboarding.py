@@ -83,16 +83,11 @@ def _enforce_onboarding_access(
                     detail=f"Principal '{principal.principal_id}' lacks required role for bank administration (required: {required_role}).",
                 )
     else:
-        from app.config import get_settings
-
-        settings = get_settings()
-        is_production = getattr(settings, "app_env", "development").lower() in ("production", "prod")
-        if is_production:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required for institutional onboarding management.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required for institutional onboarding management.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return principal
 
 
@@ -211,11 +206,11 @@ async def register_bank(
             data_residency_region=payload.data_residency_region,
             cert_fingerprint=activated.cert_fingerprint or "",
             mtls_cert_pem=cert_pem,
-            mtls_key_pem=key_pem,
+            mtls_key_pem="",
             connector_config_yaml=config_yaml,
             coordinator_endpoint="https://coordinator.cf-intelligence.io:50051",
             certificate_pem=cert_pem,
-            private_key_pem=key_pem,
+            private_key_pem="",
         )
 
     except BankAlreadyExistsError as exc:
@@ -561,6 +556,6 @@ async def rotate_bank_cert(
     return CertRotationResponse(
         bank_id=bank_id,
         mtls_cert_pem=cert_pem,
-        mtls_key_pem=key_pem,
+        mtls_key_pem="",
         cert_fingerprint=updated.cert_fingerprint or "",
     )

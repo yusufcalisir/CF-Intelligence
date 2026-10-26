@@ -4,9 +4,13 @@ Verifies:
 - State machine transition boundaries & invalid transition rejection.
 - Independent multi-party approval requirements (Bank A, Bank B, Operator).
 - Forged and stale approval rejection under configuration revision.
+- Mandatory attack: Operator attempting to approve for banks fails closed.
+- Invalid, missing, or empty cryptographic signatures fail closed.
 - Quota exhaustion (total quota and per-institution quota).
 - Expiration time enforcement (fails closed).
-- Kill switch controls (PAUSE, RESUME, ABORT).
+- Kill switch controls (PAUSE, RESUME, ABORT) and mid-flight pause race containment.
+- Atomic concurrency reservations in durable SQLite store.
+- Onboarding private-key redaction and unconditional authentication enforcement.
 - Pilot query authorization gating (institution allowlist, purpose restriction).
 - Tamper-evident scope digest computation.
 - FastAPI endpoints for pilot provisioning, preflight, approval, activation, kill switch, and dossier export.
@@ -14,6 +18,7 @@ Verifies:
 
 from __future__ import annotations
 
+import concurrent.futures
 import datetime
 from datetime import UTC
 from pathlib import Path
@@ -34,10 +39,13 @@ from app.domain.institutional_identity import InstitutionalSigningIdentity
 from app.domain.pilot_operations import (
     PilotApprovalRecord,
     PilotEntity,
+    PilotGovernanceError,
     PilotOperationalConfig,
     PilotStatus,
+    canonical_pilot_approval_bytes,
 )
 from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 from app.infrastructure.storage.durable_pilot_store import DurablePilotStore
 from app.main import app
@@ -70,7 +78,7 @@ def unit_pilot_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str,
 
     auth_svc = AuthenticationService.get_instance()
     u_op = auth_svc.register_user(
-        "unit_operator", "Pass123!", "consortium", roles=["admin", "security_officer"]
+        "unit_operator", "Pass123!", "consortium", roles=["admin", "security_officer", "operator"]
     )
     u_a = auth_svc.register_user("unit_bank_a_admin", "Pass123!", "bank_a", roles=["admin"])
     u_b = auth_svc.register_user("unit_bank_b_admin", "Pass123!", "bank_b", roles=["admin"])
@@ -80,6 +88,35 @@ def unit_pilot_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str,
     token_a = auth_svc.create_token_bundle(u_a).access_token
     token_b = auth_svc.create_token_bundle(u_b).access_token
     token_hacker = auth_svc.create_token_bundle(u_hacker).access_token
+
+    principal_op = AuthenticatedPrincipal(
+        principal_id="unit_operator",
+        tenant_id="consortium",
+        roles=["admin", "security_officer", "operator"],
+        is_authenticated=True,
+        auth_method="jwt",
+    )
+    principal_a = AuthenticatedPrincipal(
+        principal_id="unit_bank_a_admin",
+        tenant_id="bank_a",
+        roles=["admin"],
+        is_authenticated=True,
+        auth_method="jwt",
+    )
+    principal_b = AuthenticatedPrincipal(
+        principal_id="unit_bank_b_admin",
+        tenant_id="bank_b",
+        roles=["admin"],
+        is_authenticated=True,
+        auth_method="jwt",
+    )
+    principal_hacker = AuthenticatedPrincipal(
+        principal_id="unit_hacker",
+        tenant_id="bank_c",
+        roles=["analyst"],
+        is_authenticated=True,
+        auth_method="jwt",
+    )
 
     gov_svc = ConsortiumGovernanceService()
     gov_svc.create_consortium(
@@ -124,11 +161,29 @@ def unit_pilot_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str,
     return {
         "pilot_svc": pilot_svc,
         "gov_svc": gov_svc,
+        "pilot_db_file": pilot_db_file,
+        "id_a": id_a,
+        "id_b": id_b,
+        "principal_op": principal_op,
+        "principal_a": principal_a,
+        "principal_b": principal_b,
+        "principal_hacker": principal_hacker,
         "token_op": token_op,
         "token_a": token_a,
         "token_b": token_b,
         "token_hacker": token_hacker,
     }
+
+
+def _sign(pilot: PilotEntity, inst: str, identity: InstitutionalSigningIdentity, approver_id: str) -> str:
+    challenge = canonical_pilot_approval_bytes(
+        pilot_id=pilot.config.pilot_id,
+        revision=pilot.config.revision,
+        scope_digest=pilot.scope_digest,
+        approver_institution=inst.lower().strip(),
+        approver_id=approver_id,
+    )
+    return identity.sign(challenge)
 
 
 def test_scope_digest_deterministic_and_tamper_evident() -> None:
@@ -176,7 +231,7 @@ def test_missing_institutional_approval_rejects_activation(unit_pilot_env: dict[
     svc: PilotOperationsService = unit_pilot_env["pilot_svc"]
     pilot_id = "pilot_missing_approval"
 
-    svc.provision_pilot(
+    pilot = svc.provision_pilot(
         pilot_id=pilot_id,
         consortium_id="c_unit",
         participating_institutions=["bank_a", "bank_b"],
@@ -188,8 +243,15 @@ def test_missing_institutional_approval_rejects_activation(unit_pilot_env: dict[
     )
     svc.run_preflight(pilot_id, operator_actor="unit_operator")
 
-    # Only Bank A approves, Bank B has not approved
-    svc.approve_pilot(pilot_id, "bank_a", "unit_bank_a_admin", "Bank A approval")
+    # Only Bank A approves with valid principal and signature, Bank B has not approved
+    sig_a = _sign(pilot, "bank_a", unit_pilot_env["id_a"], "unit_bank_a_admin")
+    svc.approve_pilot(
+        pilot_id=pilot_id,
+        approving_institution="bank_a",
+        principal=unit_pilot_env["principal_a"],
+        notes="Bank A approval",
+        signature=sig_a,
+    )
 
     with pytest.raises(PilotAuthorizationError) as exc:
         svc.activate_pilot(pilot_id, operator_actor="unit_operator")
@@ -206,7 +268,7 @@ def test_stale_approval_rejected_on_scope_revision(unit_pilot_env: dict[str, Any
             participating_institutions=["bank_a", "bank_b"],
             allowed_purposes=["AML_INVESTIGATION"],
             allowed_jurisdictions=["EU"],
-            approved_datasets=["ds_1"],
+            approved_datasets={"ds_1": "hash1"},
             query_quota_total=10,
             query_quota_per_institution=5,
             scope_digest="digest_rev_1_abc123",
@@ -229,12 +291,93 @@ def test_stale_approval_rejected_on_scope_revision(unit_pilot_env: dict[str, Any
     assert "bank_a" in missing, "Stale approval must be treated as missing"
 
 
+def test_mandatory_attack_operator_cannot_approve_for_banks(unit_pilot_env: dict[str, Any]) -> None:
+    """Mandatory Attack: The consortium operator attempts to approve for Bank A, Bank B, and itself.
+
+    This must fail before activation. Consortium operators and platform administrators cannot manufacture
+    either bank's institutional approval.
+    """
+    svc: PilotOperationsService = unit_pilot_env["pilot_svc"]
+    pilot_id = "pilot_operator_spoof_attack"
+
+    svc.provision_pilot(
+        pilot_id=pilot_id,
+        consortium_id="c_unit",
+        participating_institutions=["bank_a", "bank_b"],
+        allowed_purposes=["AML_INVESTIGATION"],
+        allowed_jurisdictions=["EU"],
+        approved_synthetic_datasets=["ds_syn"],
+    )
+    svc.run_preflight(pilot_id)
+
+    # Operator attempts to approve on behalf of Bank A -> MUST FAIL CLOSED
+    with pytest.raises(PermissionError) as exc_a:
+        svc.approve_pilot(
+            pilot_id=pilot_id,
+            approving_institution="bank_a",
+            principal=unit_pilot_env["principal_op"],
+            notes="Malicious operator forging Bank A approval",
+        )
+    assert "cross-bank approval rejected" in str(exc_a.value).lower() or "cannot approve" in str(exc_a.value).lower()
+
+    # Operator attempts to approve on behalf of Bank B -> MUST FAIL CLOSED
+    with pytest.raises(PermissionError) as exc_b:
+        svc.approve_pilot(
+            pilot_id=pilot_id,
+            approving_institution="bank_b",
+            principal=unit_pilot_env["principal_op"],
+            notes="Malicious operator forging Bank B approval",
+        )
+    assert "cross-bank approval rejected" in str(exc_b.value).lower() or "cannot approve" in str(exc_b.value).lower()
+
+    # Activation must fail closed because neither bank approved
+    with pytest.raises(PilotAuthorizationError) as exc_act:
+        svc.activate_pilot(pilot_id, operator_actor="unit_operator")
+    assert "missing approval" in str(exc_act.value).lower()
+
+
+def test_invalid_and_empty_signatures_rejected(unit_pilot_env: dict[str, Any]) -> None:
+    """Approvals with empty or arbitrary signature strings must be rejected when keys are enrolled."""
+    svc: PilotOperationsService = unit_pilot_env["pilot_svc"]
+    pilot_id = "pilot_sig_verification_test"
+
+    svc.provision_pilot(
+        pilot_id=pilot_id,
+        consortium_id="c_unit",
+        participating_institutions=["bank_a", "bank_b"],
+        allowed_purposes=["AML_INVESTIGATION"],
+        allowed_jurisdictions=["EU"],
+        approved_synthetic_datasets=["ds_syn"],
+    )
+    svc.run_preflight(pilot_id)
+
+    # Bank A attempts empty signature
+    with pytest.raises(PilotAuthorizationError) as exc_empty:
+        svc.approve_pilot(
+            pilot_id=pilot_id,
+            approving_institution="bank_a",
+            principal=unit_pilot_env["principal_a"],
+            signature="",
+        )
+    assert "cryptographic signature" in str(exc_empty.value).lower()
+
+    # Bank A attempts arbitrary garbage signature
+    with pytest.raises(PilotAuthorizationError) as exc_bad:
+        svc.approve_pilot(
+            pilot_id=pilot_id,
+            approving_institution="bank_a",
+            principal=unit_pilot_env["principal_a"],
+            signature="arbitrary_garbage_hex_string_12345",
+        )
+    assert "verification failed" in str(exc_bad.value).lower() or "invalid" in str(exc_bad.value).lower()
+
+
 def test_quota_exhaustion_fails_closed(unit_pilot_env: dict[str, Any]) -> None:
     """Exceeding pilot query quota or institutional quota must fail closed."""
     svc: PilotOperationsService = unit_pilot_env["pilot_svc"]
     pilot_id = "pilot_quota_test"
 
-    svc.provision_pilot(
+    pilot = svc.provision_pilot(
         pilot_id=pilot_id,
         consortium_id="c_unit",
         participating_institutions=["bank_a", "bank_b"],
@@ -245,9 +388,13 @@ def test_quota_exhaustion_fails_closed(unit_pilot_env: dict[str, Any]) -> None:
         max_queries_per_institution=1,
     )
     svc.run_preflight(pilot_id)
-    svc.approve_pilot(pilot_id, "bank_a", "admin_a")
-    svc.approve_pilot(pilot_id, "bank_b", "admin_b")
-    svc.approve_pilot(pilot_id, "consortium", "operator")
+
+    sig_a = _sign(pilot, "bank_a", unit_pilot_env["id_a"], "unit_bank_a_admin")
+    sig_b = _sign(pilot, "bank_b", unit_pilot_env["id_b"], "unit_bank_b_admin")
+
+    svc.approve_pilot(pilot_id, "bank_a", principal=unit_pilot_env["principal_a"], signature=sig_a)
+    svc.approve_pilot(pilot_id, "bank_b", principal=unit_pilot_env["principal_b"], signature=sig_b)
+    svc.approve_pilot(pilot_id, "consortium", principal=unit_pilot_env["principal_op"])
     svc.activate_pilot(pilot_id)
 
     # First query for Bank A succeeds
@@ -265,7 +412,6 @@ def test_expiration_enforcement(unit_pilot_env: dict[str, Any]) -> None:
     svc: PilotOperationsService = unit_pilot_env["pilot_svc"]
     pilot_id = "pilot_expired_test"
 
-    # Expired 1 hour ago
     past_time = (datetime.datetime.now(UTC) - datetime.timedelta(hours=1)).isoformat()
     entity = svc.provision_pilot(
         pilot_id=pilot_id,
@@ -291,7 +437,7 @@ def test_wrong_purpose_and_unauthorized_institutions(unit_pilot_env: dict[str, A
     svc: PilotOperationsService = unit_pilot_env["pilot_svc"]
     pilot_id = "pilot_policy_test"
 
-    svc.provision_pilot(
+    pilot = svc.provision_pilot(
         pilot_id=pilot_id,
         consortium_id="c_unit",
         participating_institutions=["bank_a", "bank_b"],
@@ -300,9 +446,13 @@ def test_wrong_purpose_and_unauthorized_institutions(unit_pilot_env: dict[str, A
         approved_synthetic_datasets=["ds_syn"],
     )
     svc.run_preflight(pilot_id)
-    svc.approve_pilot(pilot_id, "bank_a", "admin_a")
-    svc.approve_pilot(pilot_id, "bank_b", "admin_b")
-    svc.approve_pilot(pilot_id, "consortium", "operator")
+
+    sig_a = _sign(pilot, "bank_a", unit_pilot_env["id_a"], "unit_bank_a_admin")
+    sig_b = _sign(pilot, "bank_b", unit_pilot_env["id_b"], "unit_bank_b_admin")
+
+    svc.approve_pilot(pilot_id, "bank_a", principal=unit_pilot_env["principal_a"], signature=sig_a)
+    svc.approve_pilot(pilot_id, "bank_b", principal=unit_pilot_env["principal_b"], signature=sig_b)
+    svc.approve_pilot(pilot_id, "consortium", principal=unit_pilot_env["principal_op"])
     svc.activate_pilot(pilot_id)
 
     # Wrong purpose
@@ -360,3 +510,170 @@ def test_api_endpoints_authorization_and_isolation(unit_pilot_env: dict[str, Any
             headers={"Authorization": f"Bearer {token_a}"},
         )
         assert app_cross.status_code == 403
+
+
+def test_unauthenticated_pilot_endpoints_rejected(unit_pilot_env: dict[str, Any]) -> None:
+    """Every pilot management and data endpoint must return 401 when called without authentication."""
+    with TestClient(app) as client:
+        assert client.get("/api/v1/pilots").status_code == 401
+        assert client.get("/api/v1/pilots/any_pilot").status_code == 401
+        assert client.get("/api/v1/pilots/any_pilot/status").status_code == 401
+        assert client.get("/api/v1/pilots/any_pilot/telemetry").status_code == 401
+        assert client.get("/api/v1/pilots/any_pilot/dossier").status_code == 401
+        assert client.post("/api/v1/pilots/any_pilot/pause", json={"reason": "test"}).status_code == 401
+        assert client.post("/api/v1/pilots/any_pilot/resume", json={"reason": "test"}).status_code == 401
+        assert client.post("/api/v1/pilots/any_pilot/abort", json={"reason": "test"}).status_code == 401
+        assert client.post("/api/v1/pilots/any_pilot/complete", json={"reason": "test"}).status_code == 401
+
+
+def test_atomic_concurrency_quota_reservations(unit_pilot_env: dict[str, Any]) -> None:
+    """Atomic quota enforcement: With 1 remaining slot, only 1 concurrent process can reserve it."""
+    svc: PilotOperationsService = unit_pilot_env["pilot_svc"]
+    pilot_id = "pilot_atomic_concurrency_test"
+
+    pilot = svc.provision_pilot(
+        pilot_id=pilot_id,
+        consortium_id="c_unit",
+        participating_institutions=["bank_a", "bank_b"],
+        allowed_purposes=["AML_INVESTIGATION"],
+        allowed_jurisdictions=["EU"],
+        approved_synthetic_datasets=["ds_syn"],
+        max_queries_total=1,  # EXACTLY 1 slot
+        max_queries_per_institution=1,
+    )
+    svc.run_preflight(pilot_id)
+    sig_a = _sign(pilot, "bank_a", unit_pilot_env["id_a"], "unit_bank_a_admin")
+    sig_b = _sign(pilot, "bank_b", unit_pilot_env["id_b"], "unit_bank_b_admin")
+    svc.approve_pilot(pilot_id, "bank_a", principal=unit_pilot_env["principal_a"], signature=sig_a)
+    svc.approve_pilot(pilot_id, "bank_b", principal=unit_pilot_env["principal_b"], signature=sig_b)
+    svc.approve_pilot(pilot_id, "consortium", principal=unit_pilot_env["principal_op"])
+    svc.activate_pilot(pilot_id)
+
+    results: list[str] = []
+    errors: list[Exception] = []
+
+    def attempt_reservation(thread_idx: int) -> None:
+        try:
+            _, res_id = svc.reserve_query_slot(
+                pilot_id=pilot_id,
+                requesting_bank="bank_a",
+                target_bank="bank_b",
+                purpose="AML_INVESTIGATION",
+            )
+            results.append(res_id)
+        except Exception as exc:
+            errors.append(exc)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(attempt_reservation, i) for i in range(5)]
+        concurrent.futures.wait(futures)
+
+    assert len(results) == 1, f"Exactly 1 reservation must succeed under atomic immediate lock, got {len(results)}"
+    assert len(errors) == 4, f"4 reservations must be rejected, got {len(errors)}"
+    for err in errors:
+        assert isinstance(err, PilotQuotaExceededError)
+
+
+def test_kill_switch_mid_flight_pause_race(unit_pilot_env: dict[str, Any]) -> None:
+    """Kill Switch Race Test: A pause during an in-flight computation prevents authoritative result admission."""
+    svc: PilotOperationsService = unit_pilot_env["pilot_svc"]
+    pilot_id = "pilot_kill_switch_race_test"
+
+    pilot = svc.provision_pilot(
+        pilot_id=pilot_id,
+        consortium_id="c_unit",
+        participating_institutions=["bank_a", "bank_b"],
+        allowed_purposes=["AML_INVESTIGATION"],
+        allowed_jurisdictions=["EU"],
+        approved_synthetic_datasets=["ds_syn"],
+        max_queries_total=10,
+        max_queries_per_institution=5,
+    )
+    svc.run_preflight(pilot_id)
+    sig_a = _sign(pilot, "bank_a", unit_pilot_env["id_a"], "unit_bank_a_admin")
+    sig_b = _sign(pilot, "bank_b", unit_pilot_env["id_b"], "unit_bank_b_admin")
+    svc.approve_pilot(pilot_id, "bank_a", principal=unit_pilot_env["principal_a"], signature=sig_a)
+    svc.approve_pilot(pilot_id, "bank_b", principal=unit_pilot_env["principal_b"], signature=sig_b)
+    svc.approve_pilot(pilot_id, "consortium", principal=unit_pilot_env["principal_op"])
+    svc.activate_pilot(pilot_id)
+
+    # 1. Start execution: Atomic slot is reserved
+    _, res_id = svc.reserve_query_slot(
+        pilot_id=pilot_id,
+        requesting_bank="bank_a",
+        target_bank="bank_b",
+        purpose="AML_INVESTIGATION",
+    )
+    assert res_id
+
+    # 2. Kill switch activated while PSI is computing in flight!
+    svc.pause_pilot(
+        pilot_id=pilot_id,
+        principal=unit_pilot_env["principal_op"],
+        reason="Emergency operational pause triggered during matching",
+    )
+
+    # 3. Post-computation result arrival: Admission must FAIL CLOSED!
+    with pytest.raises(PilotGovernanceError) as exc_commit:
+        svc.commit_query_reservation(
+            reservation_id=res_id,
+            pilot_id=pilot_id,
+            receipt_id="rec_race_test_01",
+            latency_ms=25.0,
+            match_confirmed=True,
+        )
+    assert "kill switch activated" in str(exc_commit.value).lower()
+
+    # 4. In-flight reservation must be marked ABORTED, not COMMITTED
+    with svc.store._get_connection() as conn:
+        row = conn.execute(
+            "SELECT status FROM pilot_query_reservations WHERE reservation_id = ?;", (res_id,)
+        ).fetchone()
+        assert row is not None
+        assert row["status"] == "ABORTED"
+
+
+def test_onboarding_private_key_redacted_and_unauthenticated_blocked(unit_pilot_env: dict[str, Any]) -> None:
+    """Bank registration must never transmit institutional private signing or TLS keys, and requires auth."""
+    import uuid
+    token_op = unit_pilot_env["token_op"]
+    test_bank_id = f"bank_test_redact_{uuid.uuid4().hex[:6]}"
+
+    with TestClient(app) as client:
+        # Unauthenticated registration must be rejected
+        resp_unauth = client.post(
+            "/v1/onboarding/register",
+            json={
+                "bank_id": test_bank_id,
+                "legal_name": "Test Bank Redact",
+                "jurisdiction": "EU",
+                "data_residency_region": "eu-central-1",
+                "contact_email": "ops@testbank.com",
+            },
+        )
+        assert resp_unauth.status_code == 401
+
+        # Authenticated registration returns certificates but NEVER private keys
+        resp_auth = client.post(
+            "/v1/onboarding/register",
+            json={
+                "bank_id": test_bank_id,
+                "legal_name": "Test Bank Redact",
+                "jurisdiction": "EU",
+                "data_residency_region": "eu-central-1",
+                "contact_email": "ops@testbank.com",
+            },
+            headers={"Authorization": f"Bearer {token_op}"},
+        )
+        assert resp_auth.status_code == 201
+        data = resp_auth.json()
+        assert data.get("mtls_key_pem", "") == "", "Private mTLS key must NOT be returned in HTTP response"
+        assert "private_key_pem" not in data or data.get("private_key_pem") == "", "Private key must NOT be returned"
+        assert data.get("mtls_cert_pem"), "Public certificate must be present"
+        # Root CA is retrieved from consortium-ca endpoint
+        ca_resp = client.get(
+            "/v1/onboarding/consortium-ca",
+            headers={"Authorization": f"Bearer {token_op}"},
+        )
+        assert ca_resp.status_code == 200
+        assert ca_resp.json().get("root_ca_pem"), "Root CA certificate must be present"

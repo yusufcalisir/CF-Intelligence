@@ -307,16 +307,31 @@ class CrossBankIntelligenceService:
                     f"Invalid query: Case '{req_case_id}' is finalized in terminal state."
                 )
 
-        # 6. Route to Established PSI Coordinator Topology
-        pilot_svc = None
-        if req.pilot_id:
-            from app.application.services.pilot_operations_service import (
-                PilotOperationsService,
-            )
+        # 6. Route to Established PSI Coordinator Topology with Pilot Governance Enforcement
+        from app.application.services.pilot_operations_service import (
+            PilotOperationsService,
+        )
 
-            pilot_svc = PilotOperationsService.get_instance()
+        pilot_svc = PilotOperationsService.get_instance()
+        governing_pilot = pilot_svc.find_active_or_scoped_pilot(
+            requesting_bank=clean_requesting,
+            target_bank=clean_target,
+            purpose=req.purpose,
+            pilot_id=req.pilot_id,
+        )
+
+        active_pilot_id: str | None = None
+        reservation_id: str | None = None
+        if governing_pilot is not None:
+            active_pilot_id = governing_pilot.config.pilot_id
             pilot_svc.validate_pilot_query(
-                pilot_id=req.pilot_id,
+                pilot_id=active_pilot_id,
+                requesting_bank=clean_requesting,
+                target_bank=clean_target,
+                purpose=req.purpose,
+            )
+            governing_pilot, reservation_id = pilot_svc.reserve_query_slot(
+                pilot_id=active_pilot_id,
                 requesting_bank=clean_requesting,
                 target_bank=clean_target,
                 purpose=req.purpose,
@@ -366,26 +381,51 @@ class CrossBankIntelligenceService:
                     auth_token=resolved_auth_token,
                     actor=audited_actor,
                 )
+
+                # Kill-switch revalidation immediately before authoritative result admission
+                if active_pilot_id and pilot_svc:
+                    pilot_svc.revalidate_pilot_active(
+                        pilot_id=active_pilot_id,
+                        requesting_bank=clean_requesting,
+                        target_bank=clean_target,
+                        purpose=req.purpose,
+                    )
+
                 # Enforce Verifiable Result-Admission Contract before local storage
                 record = self._admit_and_verify_operational_signal(
                     signal=signal,
                     expected_req=est_req,
                     audited_actor=audited_actor,
                 )
-                if req.pilot_id:
-                    record["pilot_id"] = req.pilot_id
+                resolved_receipt_id = (
+                    getattr(signal, "receipt_id", None)
+                    or (signal.provenance.get("receipt_id") if isinstance(getattr(signal, "provenance", None), dict) else None)
+                    or ""
+                )
+                if active_pilot_id:
+                    record["pilot_id"] = active_pilot_id
+                    if governing_pilot:
+                        record["pilot_revision"] = governing_pilot.config.revision
+                        record["pilot_scope_digest"] = governing_pilot.scope_digest
+                    record["reservation_id"] = reservation_id
+                    record["target_bank_id"] = clean_target
+                    record["requesting_bank_id"] = clean_requesting
+                    record["query_entity_id"] = getattr(est_req, "query_entity_id", getattr(est_req, "entity_id", ""))
+                    record["receipt_id"] = resolved_receipt_id
                 self._signal_store.set(signal.signal_id, record)
-                if pilot_svc and req.pilot_id:
+
+                if pilot_svc and active_pilot_id and reservation_id:
                     duration_ms = (time.perf_counter() - t0) * 1000.0
-                    pilot_svc.record_query_outcome(
-                        pilot_id=req.pilot_id,
-                        requesting_bank_id=clean_requesting,
-                        target_bank_id=clean_target,
-                        purpose=req.purpose,
-                        success=True,
-                        is_match=bool(getattr(signal, "match_confirmed", False)),
+                    pilot_svc.commit_query_reservation(
+                        reservation_id=reservation_id,
+                        pilot_id=active_pilot_id,
+                        receipt_id=resolved_receipt_id,
                         latency_ms=duration_ms,
+                        match_confirmed=bool(getattr(signal, "match_confirmed", False)),
+                        signal_id=signal.signal_id,
+                        case_id=req_case_id,
                     )
+                    reservation_id = None
                 return signal
 
             if self.matching_coordinator is not None:
@@ -397,22 +437,50 @@ class CrossBankIntelligenceService:
                         auth_token=resolved_auth_token,
                         actor=audited_actor,
                     )
+
+                    # Kill-switch revalidation immediately before authoritative result admission
+                    if active_pilot_id and pilot_svc:
+                        pilot_svc.revalidate_pilot_active(
+                            pilot_id=active_pilot_id,
+                            requesting_bank=clean_requesting,
+                            target_bank=clean_target,
+                            purpose=req.purpose,
+                        )
+
                     record = self._admit_and_verify_operational_signal(
                         signal=signal,
                         expected_req=est_req,
                         audited_actor=audited_actor,
                     )
-                    if req.pilot_id:
-                        record["pilot_id"] = req.pilot_id
+                    resolved_receipt_id = (
+                        getattr(signal, "receipt_id", None)
+                        or (signal.provenance.get("receipt_id") if isinstance(getattr(signal, "provenance", None), dict) else None)
+                        or ""
+                    )
+                    if active_pilot_id:
+                        record["pilot_id"] = active_pilot_id
+                        if governing_pilot:
+                            record["pilot_revision"] = governing_pilot.config.revision
+                            record["pilot_scope_digest"] = governing_pilot.scope_digest
+                        record["reservation_id"] = reservation_id
+                        record["target_bank_id"] = clean_target
+                        record["requesting_bank_id"] = clean_requesting
+                        record["query_entity_id"] = getattr(est_req, "query_entity_id", getattr(est_req, "entity_id", ""))
+                        record["receipt_id"] = resolved_receipt_id
                     self._signal_store.set(signal.signal_id, record)
-                    if pilot_svc and req.pilot_id:
+
+                    if pilot_svc and active_pilot_id and reservation_id:
                         duration_ms = (time.perf_counter() - t0) * 1000.0
-                        pilot_svc.record_query_outcome(
-                            pilot_id=req.pilot_id,
-                            success=True,
-                            is_match=signal.match_confirmed,
+                        pilot_svc.commit_query_reservation(
+                            reservation_id=reservation_id,
+                            pilot_id=active_pilot_id,
+                            receipt_id=resolved_receipt_id,
                             latency_ms=duration_ms,
+                            match_confirmed=bool(getattr(signal, "match_confirmed", False)),
+                            signal_id=signal.signal_id,
+                            case_id=req_case_id,
                         )
+                        reservation_id = None
                     return signal
                 except ConsortiumSecurityError:
                     raise
@@ -423,14 +491,11 @@ class CrossBankIntelligenceService:
                 "Operation fails closed to prevent unverified prototype or simulated matching."
             )
         except Exception as exc:
-            if pilot_svc and req.pilot_id:
-                duration_ms = (time.perf_counter() - t0) * 1000.0
-                pilot_svc.record_query_outcome(
-                    pilot_id=req.pilot_id,
-                    success=False,
-                    is_match=False,
-                    latency_ms=duration_ms,
-                    error=str(exc),
+            if pilot_svc and active_pilot_id and reservation_id:
+                pilot_svc.release_query_reservation(
+                    reservation_id=reservation_id,
+                    pilot_id=active_pilot_id,
+                    reason=str(exc),
                 )
             raise
 
@@ -1323,15 +1388,29 @@ class CrossBankIntelligenceService:
                 f"Authoritative signal '{resolved_signal_id}' has expired. Queries must be refreshed before attachment."
             )
 
-        # 3c-ii. Pilot Governance Enforcement
-        pilot_id = record.get("pilot_id")
-        if pilot_id:
-            from app.application.services.pilot_operations_service import (
-                PilotOperationsService,
-            )
-            from app.domain.pilot_operations import PilotStatus
+        # 3c-ii. Pilot Governance & Kill Switch Enforcement
+        from app.application.services.pilot_operations_service import (
+            PilotOperationsService,
+        )
+        from app.domain.consortium_governance import ConsortiumStatus
+        from app.domain.pilot_operations import PilotStatus
 
-            pilot_svc = PilotOperationsService.get_instance()
+        pilot_svc = PilotOperationsService.get_instance()
+        pilot_id = record.get("pilot_id")
+        req_b = str(record.get("requesting_bank_id") or sig_requesting_bank).lower().strip()
+        tgt_b = str(record.get("target_bank_id") or "").lower().strip()
+        purp = str(record.get("purpose") or "")
+
+        if not pilot_id and req_b and tgt_b:
+            p_scoped = pilot_svc.find_active_or_scoped_pilot(
+                requesting_bank=req_b,
+                target_bank=tgt_b,
+                purpose=purp,
+            )
+            if p_scoped:
+                pilot_id = p_scoped.config.pilot_id
+
+        if pilot_id:
             governing_pilot = pilot_svc.get_pilot(pilot_id)
             if not governing_pilot:
                 raise ConsortiumSecurityError(
@@ -1340,12 +1419,26 @@ class CrossBankIntelligenceService:
             if governing_pilot.status != PilotStatus.ACTIVE:
                 raise ConsortiumSecurityError(
                     f"Governing pilot '{pilot_id}' is in non-active status '{governing_pilot.status.value}'. "
-                    "Evidence attachment rejected."
+                    f"Reason: {governing_pilot.status_reason}. Evidence attachment rejected."
                 )
             if governing_pilot.has_expired():
                 raise ConsortiumSecurityError(
                     f"Governing pilot '{pilot_id}' has expired. Evidence attachment rejected."
                 )
+
+            # Recheck consortium and operational consent
+            consortium = pilot_svc.consortium_service.get_consortium(governing_pilot.config.consortium_id)
+            if not consortium or consortium.status != ConsortiumStatus.ACTIVE:
+                raise ConsortiumSecurityError(
+                    f"Underlying consortium '{governing_pilot.config.consortium_id}' is not ACTIVE. Evidence attachment rejected."
+                )
+            c_meta = getattr(consortium, "metadata", {}) or {}
+            op_grant = c_meta.get("operational_data_sharing_grant") or {}
+            if not op_grant.get("is_active", True):
+                raise ConsortiumSecurityError("Operational data sharing grant is inactive or revoked. Evidence attachment rejected.")
+            revoked = set(op_grant.get("revoked_by_institutions", []))
+            if req_b in revoked or tgt_b in revoked:
+                raise ConsortiumSecurityError("Operational consent has been revoked by participating institution. Evidence attachment rejected.")
 
         # 3d. Prevent Prototype Matching Results from Entering Case Evidence in Any Case State
         assurance_level = signal_data.get("assurance_level") or record.get("assurance_level")
