@@ -275,12 +275,39 @@ class ConsortiumPolicyEngine:
                 operational_grant = consortium.find_pairwise_operational_grant(clean_requesting, clean_tb)
             if not operational_grant:
                 pairwise_dict = c_meta.get("pairwise_operational_grants", {})
+                found_pairwise: dict[str, Any] | None = None
                 for g in pairwise_dict.values():
-                    if isinstance(g, dict) and set(g.get("participating_banks", [])) == {clean_requesting, clean_tb}:
-                        operational_grant = g
-                        break
+                    if isinstance(g, dict):
+                        g_parts = {
+                            b.lower().strip()
+                            for b in g.get("participating_banks", [])
+                            if str(b).strip()
+                        }
+                        if not g_parts:
+                            inst_a = str(g.get("institution_a", "")).lower().strip()
+                            inst_b = str(g.get("institution_b", "")).lower().strip()
+                            g_parts = {inst_a, inst_b} - {""}
+                        if g_parts == {clean_requesting, clean_tb}:
+                            if g.get("is_active", True) and not g.get("revoked_by_institutions"):
+                                found_pairwise = g
+                                break
+                            if found_pairwise is None:
+                                found_pairwise = g
+                operational_grant = found_pairwise
 
-        if not operational_grant:
+            # Fall back to legacy operational grant ONLY when NO explicit pairwise grant exists AND
+            # the legacy grant contains exactly two distinct institutions matching the requested pair.
+            if not operational_grant:
+                legacy = c_meta.get("operational_data_sharing_grant")
+                if legacy and isinstance(legacy, dict):
+                    legacy_parts = {
+                        b.lower().strip()
+                        for b in legacy.get("participating_banks", [])
+                        if str(b).strip()
+                    }
+                    if len(legacy_parts) == 2 and legacy_parts == {clean_requesting, clean_tb}:
+                        operational_grant = legacy
+        elif not is_operational:
             operational_grant = c_meta.get("operational_data_sharing_grant")
 
         if is_operational:

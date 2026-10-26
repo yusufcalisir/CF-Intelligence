@@ -851,3 +851,276 @@ def test_legacy_two_bank_operational_grant_compatibility(
         is_operational=True,
     )
     assert not is_valid_c
+
+
+def test_broad_multibank_legacy_grant_cannot_authorize_pairwise_sharing(
+    auth_tokens: dict[str, str],
+) -> None:
+    """A broad legacy operational grant with >=3 institutions must NEVER authorize pairwise sharing.
+
+    Verifies:
+    1. A legacy grant containing {bank_a, bank_b, bank_c} does NOT authorize A-C, B-C, or A-B via
+       legacy fallback in resolve_pairwise_authorization or validate_intelligence_sharing.
+    2. An explicit bilateral pairwise grant between A and C, independently approved by both,
+       succeeds without authorizing other pairs.
+    """
+    service = ConsortiumGovernanceService()
+    _setup_three_bank_consortium(service, auth_tokens)
+
+    # Register a broad 3-bank legacy grant
+    service.register_operational_data_sharing_grant(
+        consortium_id="cfi-tri-consortium",
+        grant_id="legacy_tri_grant_01",
+        authority="SEC_FINRA",
+        participating_banks=["bank_a", "bank_b", "bank_c"],
+        allowed_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+        allowed_jurisdictions=["eu-central-1", "us-east-1"],
+        institution_jurisdictions={"bank_a": "eu-central-1", "bank_b": "eu-central-1", "bank_c": "us-east-1"},
+        allow_cross_border=True,
+        allow_institution_identity_sharing=True,
+        approving_bank_id="bank_a",
+        revision=1,
+        auth_token=auth_tokens["bank_a"],
+    )
+    service.approve_operational_data_sharing_grant(
+        consortium_id="cfi-tri-consortium",
+        grant_id="legacy_tri_grant_01",
+        approving_bank_id="bank_b",
+        auth_token=auth_tokens["bank_b"],
+    )
+    service.approve_operational_data_sharing_grant(
+        consortium_id="cfi-tri-consortium",
+        grant_id="legacy_tri_grant_01",
+        approving_bank_id="bank_c",
+        auth_token=auth_tokens["bank_c"],
+    )
+
+    # Pairwise authorization must fail closed for all pairs despite 3-bank legacy approval
+    is_auth_ac, reason_ac, grant_ac = service.resolve_pairwise_authorization(
+        consortium_id="cfi-tri-consortium",
+        requesting_bank_id="bank_a",
+        counterpart_bank_id="bank_c",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+    )
+    assert not is_auth_ac
+    assert grant_ac is None
+    assert "No authorized operational data-sharing grant exists" in reason_ac
+
+    is_auth_bc, reason_bc, grant_bc = service.resolve_pairwise_authorization(
+        consortium_id="cfi-tri-consortium",
+        requesting_bank_id="bank_b",
+        counterpart_bank_id="bank_c",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+    )
+    assert not is_auth_bc
+    assert grant_bc is None
+
+    is_auth_ab, reason_ab, grant_ab = service.resolve_pairwise_authorization(
+        consortium_id="cfi-tri-consortium",
+        requesting_bank_id="bank_a",
+        counterpart_bank_id="bank_b",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+    )
+    assert not is_auth_ab
+    assert grant_ab is None
+
+    # ConsortiumPolicyEngine.validate_intelligence_sharing must also fail closed
+    policy_engine = ConsortiumPolicyEngine()
+    consortium = service.get_consortium("cfi-tri-consortium")
+    assert consortium is not None
+
+    is_valid_ac, reasons_ac, _ = policy_engine.validate_intelligence_sharing(
+        consortium=consortium,
+        requesting_bank="bank_a",
+        target_banks=["bank_c"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        is_operational=True,
+    )
+    assert not is_valid_ac
+    assert any("lacks an explicit operational data-sharing grant" in r for r in reasons_ac)
+
+    # Now register an explicit bilateral pairwise grant between bank_a and bank_c
+    service.register_pairwise_operational_grant(
+        consortium_id="cfi-tri-consortium",
+        grant_id="pairwise_ac_explicit",
+        institution_a="bank_a",
+        institution_b="bank_c",
+        authority="SEC_FINRA",
+        allowed_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+        allowed_jurisdictions=["eu-central-1", "us-east-1"],
+        institution_jurisdictions={"bank_a": "eu-central-1", "bank_c": "us-east-1"},
+        allow_cross_border=True,
+        approving_bank_id="bank_a",
+        revision=1,
+        auth_token=auth_tokens["bank_a"],
+    )
+    service.approve_pairwise_operational_grant(
+        consortium_id="cfi-tri-consortium",
+        grant_id="pairwise_ac_explicit",
+        approving_bank_id="bank_c",
+        auth_token=auth_tokens["bank_c"],
+    )
+
+    # Now A-C is authorized via explicit pairwise grant
+    is_auth_ac_2, reason_ac_2, grant_ac_2 = service.resolve_pairwise_authorization(
+        consortium_id="cfi-tri-consortium",
+        requesting_bank_id="bank_a",
+        counterpart_bank_id="bank_c",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+    )
+    assert is_auth_ac_2
+    assert grant_ac_2 is not None
+    assert grant_ac_2["grant_id"] == "pairwise_ac_explicit"
+
+    consortium_updated = service.get_consortium("cfi-tri-consortium")
+    assert consortium_updated is not None
+    is_valid_ac_2, reasons_ac_2, _ = policy_engine.validate_intelligence_sharing(
+        consortium=consortium_updated,
+        requesting_bank="bank_a",
+        target_banks=["bank_c"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        is_operational=True,
+    )
+    assert is_valid_ac_2, f"Expected valid A-C sharing, got: {reasons_ac_2}"
+
+    # B-C remains unauthorized
+    is_auth_bc_2, _, _ = service.resolve_pairwise_authorization(
+        consortium_id="cfi-tri-consortium",
+        requesting_bank_id="bank_b",
+        counterpart_bank_id="bank_c",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+    )
+    assert not is_auth_bc_2
+
+
+def test_explicit_pairwise_grant_prioritized_over_legacy_and_cannot_be_bypassed(
+    auth_tokens: dict[str, str],
+) -> None:
+    """An explicit pairwise grant takes priority and cannot be bypassed via legacy fallback when incomplete or revoked."""
+    service = ConsortiumGovernanceService()
+    _setup_three_bank_consortium(service, auth_tokens)
+
+    # 1. Setup a valid 2-bank legacy grant between Bank A and Bank B
+    service.register_operational_data_sharing_grant(
+        consortium_id="cfi-tri-consortium",
+        grant_id="legacy_2bank_valid",
+        authority="EBA_AML_DIRECTIVE",
+        participating_banks=["bank_a", "bank_b"],
+        allowed_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+        allowed_jurisdictions=["eu-central-1"],
+        institution_jurisdictions={"bank_a": "eu-central-1", "bank_b": "eu-central-1"},
+        allow_cross_border=False,
+        allow_institution_identity_sharing=False,
+        approving_bank_id="bank_a",
+        revision=1,
+        auth_token=auth_tokens["bank_a"],
+    )
+    service.approve_operational_data_sharing_grant(
+        consortium_id="cfi-tri-consortium",
+        grant_id="legacy_2bank_valid",
+        approving_bank_id="bank_b",
+        auth_token=auth_tokens["bank_b"],
+    )
+
+    # Baseline: 2-bank legacy grant authorizes A-B
+    is_auth_base, _, _ = service.resolve_pairwise_authorization(
+        consortium_id="cfi-tri-consortium",
+        requesting_bank_id="bank_a",
+        counterpart_bank_id="bank_b",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+    )
+    assert is_auth_base
+
+    # 2. Bank A registers an explicit pairwise grant with Bank B, but Bank B has NOT approved it
+    service.register_pairwise_operational_grant(
+        consortium_id="cfi-tri-consortium",
+        grant_id="pairwise_ab_incomplete",
+        institution_a="bank_a",
+        institution_b="bank_b",
+        authority="EBA_AML_DIRECTIVE",
+        allowed_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+        allowed_jurisdictions=["eu-central-1"],
+        institution_jurisdictions={"bank_a": "eu-central-1", "bank_b": "eu-central-1"},
+        allow_cross_border=False,
+        approving_bank_id="bank_a",
+        revision=1,
+        auth_token=auth_tokens["bank_a"],
+    )
+
+    # Must fail closed because Bank B has not approved. MUST NOT fall back to legacy_2bank_valid!
+    is_auth_inc, reason_inc, grant_inc = service.resolve_pairwise_authorization(
+        consortium_id="cfi-tri-consortium",
+        requesting_bank_id="bank_a",
+        counterpart_bank_id="bank_b",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+    )
+    assert not is_auth_inc
+    assert grant_inc is not None
+    assert grant_inc["grant_id"] == "pairwise_ab_incomplete"
+    assert "has not approved operational grant" in reason_inc
+
+    policy_engine = ConsortiumPolicyEngine()
+    c_inc = service.get_consortium("cfi-tri-consortium")
+    assert c_inc is not None
+    is_valid_inc, reasons_inc, _ = policy_engine.validate_intelligence_sharing(
+        consortium=c_inc,
+        requesting_bank="bank_a",
+        target_banks=["bank_b"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        is_operational=True,
+    )
+    assert not is_valid_inc
+    assert any("has not approved operational data-sharing grant 'pairwise_ab_incomplete'" in r for r in reasons_inc)
+
+    # 3. Bank B approves the explicit pairwise grant
+    service.approve_pairwise_operational_grant(
+        consortium_id="cfi-tri-consortium",
+        grant_id="pairwise_ab_incomplete",
+        approving_bank_id="bank_b",
+        auth_token=auth_tokens["bank_b"],
+    )
+
+    # Now explicit grant is fully approved
+    is_auth_appr, _, grant_appr = service.resolve_pairwise_authorization(
+        consortium_id="cfi-tri-consortium",
+        requesting_bank_id="bank_a",
+        counterpart_bank_id="bank_b",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+    )
+    assert is_auth_appr
+    assert grant_appr is not None
+    assert grant_appr["grant_id"] == "pairwise_ab_incomplete"
+
+    # 4. Bank A revokes the explicit pairwise grant
+    service.revoke_pairwise_operational_grant(
+        consortium_id="cfi-tri-consortium",
+        grant_id="pairwise_ab_incomplete",
+        revoking_bank_id="bank_a",
+        reason="bilateral_dispute",
+        auth_token=auth_tokens["bank_a"],
+    )
+
+    # Must fail closed: revoked explicit grant must NOT be bypassed by falling back to legacy grant!
+    is_auth_rev, reason_rev, grant_rev = service.resolve_pairwise_authorization(
+        consortium_id="cfi-tri-consortium",
+        requesting_bank_id="bank_a",
+        counterpart_bank_id="bank_b",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+    )
+    assert not is_auth_rev
+    assert grant_rev is not None
+    assert grant_rev["grant_id"] == "pairwise_ab_incomplete"
+    assert "inactive or revoked" in reason_rev or "revoked by requesting institution" in reason_rev
+
+    c_rev = service.get_consortium("cfi-tri-consortium")
+    assert c_rev is not None
+    is_valid_rev, reasons_rev, _ = policy_engine.validate_intelligence_sharing(
+        consortium=c_rev,
+        requesting_bank="bank_a",
+        target_banks=["bank_b"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        is_operational=True,
+    )
+    assert not is_valid_rev
+    assert any("is inactive or revoked" in r or "revoked by requesting institution" in r for r in reasons_rev)
+

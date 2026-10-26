@@ -1223,14 +1223,16 @@ class ConsortiumGovernanceService:
         grant = c.find_pairwise_operational_grant(clean_req, clean_counterpart)
         if not grant:
             legacy = (c.metadata or {}).get("operational_data_sharing_grant")
-            if (
-                legacy
-                and isinstance(legacy, dict)
-                and clean_req in legacy.get("participating_banks", [])
-                and clean_counterpart in legacy.get("participating_banks", [])
-            ):
-                grant = legacy
-            else:
+            if legacy and isinstance(legacy, dict):
+                legacy_parts = {
+                    b.lower().strip()
+                    for b in legacy.get("participating_banks", [])
+                    if str(b).strip()
+                }
+                if len(legacy_parts) == 2 and legacy_parts == {clean_req, clean_counterpart}:
+                    grant = legacy
+
+            if not grant:
                 return (
                     False,
                     f"No authorized operational data-sharing grant exists between institutions '{clean_req}' and '{clean_counterpart}' in consortium '{clean_c_id}'.",

@@ -232,15 +232,23 @@ class Consortium:
         clean_a = bank_a.lower().strip()
         clean_b = bank_b.lower().strip()
         target_pair = {clean_a, clean_b}
+        found_grant: dict[str, Any] | None = None
         for grant in self.pairwise_operational_grants.values():
             if not isinstance(grant, dict):
                 continue
             inst_a = str(grant.get("institution_a", "")).lower().strip()
             inst_b = str(grant.get("institution_b", "")).lower().strip()
-            part = set(grant.get("participating_banks", [])) or {inst_a, inst_b}
+            part = {
+                b.lower().strip()
+                for b in grant.get("participating_banks", [])
+                if str(b).strip()
+            } or ({inst_a, inst_b} - {""})
             if part == target_pair:
-                return grant
-        return None
+                if grant.get("is_active", True) and not grant.get("revoked_by_institutions"):
+                    return grant
+                if found_grant is None:
+                    found_grant = grant
+        return found_grant
 
 
 @dataclass
