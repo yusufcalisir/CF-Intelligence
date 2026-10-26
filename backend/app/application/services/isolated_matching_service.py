@@ -476,7 +476,7 @@ class IsolatedBankWorkerNode:
                 )
             ],
             "expires_at": expires_at,
-            "allow_institution_identity_sharing": bool(allow_institution_identity_sharing),
+            "allow_institution_identity_sharing": allow_institution_identity_sharing,
             "is_active": True,
             "authorized_at": datetime.datetime.now(UTC).isoformat(),
         }
@@ -1287,7 +1287,7 @@ class IsolatedBankWorkerNode:
         resp_hash = hashlib.sha256(resp_bytes).hexdigest()
         ticket_digest = query.ticket.canonical_digest() if query.ticket else ""
         grant_id = query.ticket.grant_id if query.ticket else ""
-        grant_revision = int(query.ticket.grant_revision) if query.ticket else 1
+        grant_revision = query.ticket.grant_revision if query.ticket else 1
         grant_scope_digest = query.ticket.grant_scope_digest if query.ticket else ""
 
         canonical_evidence = canonical_counterpart_evidence_bytes(
@@ -1452,6 +1452,7 @@ class IsolatedBankWorkerNode:
                             gov_grant.get("allow_institution_identity_sharing", False)
                         )
 
+        contributing_institutions: tuple[str, ...]
         if match_confirmed and allow_identities:
             disclosure_mode = "ATTRIBUTED_INSTITUTIONS"
             contributing_institutions = (response.target_bank_id,)
