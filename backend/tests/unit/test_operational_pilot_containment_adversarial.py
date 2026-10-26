@@ -22,7 +22,8 @@ Milestone 5 Operational Acceptance Verification:
 
 import threading
 import uuid
-from datetime import UTC, datetime
+from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -69,7 +70,7 @@ SHARED_CONSORTIUM_STORE_SECRET = "consortium_store_hmac_adversarial_98712398471"
 
 
 @pytest.fixture
-def containment_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+def containment_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[dict[str, Any], None, None]:
     consortium_store_file = tmp_path / "containment_consortium_store.json"
     account_store_file = tmp_path / "containment_account_store.json"
     pilot_db_file = tmp_path / "containment_pilot_operations.db"
@@ -227,7 +228,7 @@ def _create_and_activate_pilot(
 ) -> PilotEntity:
     svc: PilotOperationsService = env["pilot_svc"]
     if not expires_at:
-        expires_at = (datetime.datetime.now(UTC) + datetime.timedelta(hours=24)).isoformat()
+        expires_at = (datetime.now(UTC) + timedelta(hours=24)).isoformat()
 
     pilot = svc.provision_pilot(
         pilot_id=pilot_id,
@@ -367,7 +368,7 @@ def test_omission_bypass_rejected_in_terminal_states(
 def test_omission_bypass_rejected_when_pilot_expired(containment_env: dict[str, Any]) -> None:
     """When governing pilot has expired, omitting pilot_id must fail closed with PilotExpiredError."""
     svc: PilotOperationsService = containment_env["pilot_svc"]
-    past_iso = (datetime.datetime.now(UTC) - datetime.timedelta(hours=1)).isoformat()
+    past_iso = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
     _create_and_activate_pilot(containment_env, pilot_id="pilot_expired_bypass", expires_at=past_iso)
 
     with pytest.raises(PilotExpiredError) as exc:
@@ -456,7 +457,7 @@ def test_admission_race_midflight_pause_fails_closed(containment_env: dict[str, 
         "admission_status": "PENDING_COMMIT",
         "is_authoritative": False,
         "is_attachable": False,
-        "expires_at": (datetime.datetime.now(UTC) + datetime.timedelta(minutes=30)).isoformat(),
+        "expires_at": (datetime.now(UTC) + timedelta(minutes=30)).isoformat(),
     }
     intel_svc._signal_store.set(sig_id, provisional_record)
 
@@ -558,7 +559,7 @@ def test_attachment_verifies_durable_reservation_and_signal_binding(containment_
         "admission_status": "COMMITTED",
         "is_authoritative": True,
         "is_attachable": True,
-        "expires_at": (datetime.datetime.now(UTC) + datetime.timedelta(minutes=30)).isoformat(),
+        "expires_at": (datetime.now(UTC) + timedelta(minutes=30)).isoformat(),
     }
     intel_svc._signal_store.set(tampered_sig_id, tampered_record)
 
@@ -586,7 +587,7 @@ def test_preflight_requires_mandatory_topology(containment_env: dict[str, Any]) 
         approved_datasets={"data": "h1"},
         query_quota_total=5,
         query_quota_per_institution=3,
-        expires_at=(datetime.datetime.now(UTC) + datetime.timedelta(hours=10)).isoformat(),
+        expires_at=(datetime.now(UTC) + timedelta(hours=10)).isoformat(),
         created_by="op_user",
         principal=containment_env["principal_op"],
         worker_endpoints={"bank_a": "http://127.0.0.1:8001"},  # bank_b missing!
@@ -610,7 +611,7 @@ def test_preflight_rejects_ssrf_and_cloud_metadata(containment_env: dict[str, An
         approved_datasets={"data": "h1"},
         query_quota_total=5,
         query_quota_per_institution=3,
-        expires_at=(datetime.datetime.now(UTC) + datetime.timedelta(hours=10)).isoformat(),
+        expires_at=(datetime.now(UTC) + timedelta(hours=10)).isoformat(),
         created_by="op_user",
         principal=containment_env["principal_op"],
         worker_endpoints={

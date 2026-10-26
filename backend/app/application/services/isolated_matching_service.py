@@ -1813,16 +1813,17 @@ class InstitutionalWorkerDaemon:
                         "timestamp": now_iso,
                         "nonce": nonce,
                     }
-                    if getattr(node, "_signing_identity", None) is not None:
+                    signing_id = getattr(node, "_signing_identity", None)
+                    if signing_id is not None:
                         canonical_stmt = canonical_worker_readiness_bytes(
                             bank_id=node.bank_id,
                             nonce=nonce,
                             timestamp=now_iso,
                             protocol=protocol,
                         )
-                        sig_hex = node._signing_identity.sign(canonical_stmt)
+                        sig_hex = signing_id.sign(canonical_stmt)
                         resp_data["signature"] = sig_hex
-                        resp_data["public_key_hex"] = node._signing_identity.public_key_hex
+                        resp_data["public_key_hex"] = signing_id.public_key_hex
                         resp_data["key_version"] = 1
 
                     self.send_response(200)
