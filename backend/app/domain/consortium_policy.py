@@ -314,7 +314,7 @@ class ConsortiumPolicyEngine:
                 )
                 return False, reasons, {}
 
-            if grant_scope_digest and req_approval.get("scope_digest") and req_approval.get("scope_digest") != grant_scope_digest:
+            if grant_scope_digest and isinstance(req_approval, dict) and req_approval.get("scope_digest") and req_approval.get("scope_digest") != grant_scope_digest:
                 reasons.append(
                     f"Approval by requesting institution '{clean_requesting}' is stale for operational grant '{operational_grant.get('grant_id')}' "
                     f"(approved digest: '{req_approval.get('scope_digest')}', current: '{grant_scope_digest}'). "
@@ -336,7 +336,7 @@ class ConsortiumPolicyEngine:
                         f"Unilateral approval by '{clean_requesting}' does not constitute bilateral institutional consent."
                     )
                     return False, reasons, {}
-                if grant_scope_digest and tb_approval.get("scope_digest") and tb_approval.get("scope_digest") != grant_scope_digest:
+                if grant_scope_digest and isinstance(tb_approval, dict) and tb_approval.get("scope_digest") and tb_approval.get("scope_digest") != grant_scope_digest:
                     reasons.append(
                         f"Approval by target institution '{clean_tb}' is stale for operational grant '{operational_grant.get('grant_id')}' "
                         f"(approved revision {tb_approval.get('grant_revision')} with digest '{tb_approval.get('scope_digest')}', "

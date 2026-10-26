@@ -333,12 +333,13 @@ class InstitutionalVerificationRegistry:
                 "in the public verification registry."
             )
 
-        if clean_bank_id in self._enrolled_keys and not allow_overwrite:
+        if clean_bank_id in self._enrolled_keys:
             current_v = self._enrolled_keys[clean_bank_id].version
             raise ConsortiumSecurityError(
                 f"Institution '{clean_bank_id}' is already enrolled with public verification key version {current_v}. "
                 "Unauthorized key replacement via ordinary registration is prohibited. "
-                "Key updates require authorized rotation via rotate_public_key()."
+                "Ordinary registration must never overwrite an existing institutional key. "
+                "Key updates require cryptographically authorized rotation via rotate_public_key()."
             )
 
         pub_obj: ed25519.Ed25519PublicKey

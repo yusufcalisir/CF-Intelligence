@@ -21,7 +21,7 @@ import hashlib
 import hmac
 import uuid
 from copy import deepcopy
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC
 from pathlib import Path
 from typing import Any
@@ -39,6 +39,8 @@ from app.application.services.consortium_service import (
 )
 from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
 from app.application.services.isolated_matching_service import (
+    EstablishedPSIQueryMessage,
+    IsolatedBankWorkerNode,
     OperationAuthorizationTicket,
     VerifiedMatchReceipt,
 )
@@ -397,6 +399,7 @@ def _create_mock_consortium_service(consortium_id: str = "c_alpha") -> Consortiu
         metadata={
             "operational_data_sharing_grant": {
                 "grant_id": grant_id,
+                "authority": "BILATERAL_INSTITUTIONAL_CONSENT",
                 "revision": 1,
                 "scope_digest": digest,
                 "is_active": True,
@@ -407,7 +410,10 @@ def _create_mock_consortium_service(consortium_id: str = "c_alpha") -> Consortiu
                 "allowed_jurisdictions": ["EU", "US"],
                 "allow_cross_border": False,
                 "allow_institution_identity_sharing": True,
-                "approvals": {"bank_a": "sig_a", "bank_b": "sig_b"},
+                "approvals": {
+                    "bank_a": {"signature": "sig_a", "scope_digest": digest, "revision": 1},
+                    "bank_b": {"signature": "sig_b", "scope_digest": digest, "revision": 1},
+                },
             }
         },
     )
@@ -956,3 +962,327 @@ def test_missing_signing_key_fails_closed_in_worker_node(tmp_path: Path) -> None
 
     with pytest.raises(ConsortiumSecurityError, match="Worker node 'bank_unprovisioned' has no provisioned signing key"):
         _ = worker.public_key_hex
+
+
+def _setup_adversarial_test_fixture(
+    tmp_path: Path,
+) -> tuple[
+    IsolatedBankWorkerNode,
+    IsolatedBankWorkerNode,
+    InstitutionalSigningIdentity,
+    InstitutionalSigningIdentity,
+    OperationAuthorizationTicket,
+    EstablishedPSIQueryMessage,
+]:
+    ident_a = InstitutionalSigningIdentity.generate("bank_a")
+    ident_b = InstitutionalSigningIdentity.generate("bank_b")
+
+    worker_a = IsolatedBankWorkerNode(
+        bank_id="bank_a",
+        storage_root=str(tmp_path),
+        signing_key=ident_a,
+        trusted_peer_keys={"bank_b": ident_b.public_key_hex},
+    )
+    worker_b = IsolatedBankWorkerNode(
+        bank_id="bank_b",
+        storage_root=str(tmp_path),
+        signing_key=ident_b,
+        trusted_peer_keys={"bank_a": ident_a.public_key_hex},
+    )
+
+    grant_id = f"grant_{uuid.uuid4().hex[:8]}"
+    scope_digest = "b" * 64
+    worker_a.register_authorized_grant(
+        consortium_id="consortium_test",
+        grant_id=grant_id,
+        revision=1,
+        scope_digest=scope_digest,
+        permitted_counterparts=["bank_b"],
+        permitted_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+    )
+    worker_b.register_authorized_grant(
+        consortium_id="consortium_test",
+        grant_id=grant_id,
+        revision=1,
+        scope_digest=scope_digest,
+        permitted_counterparts=["bank_a"],
+        permitted_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+    )
+
+    now = datetime.datetime.now(UTC)
+    expires = (now + datetime.timedelta(seconds=300)).isoformat()
+    raw_ticket = OperationAuthorizationTicket(
+        ticket_id=f"tkt_{uuid.uuid4().hex[:12]}",
+        consortium_id="consortium_test",
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        operation="ESTABLISHED_PSI",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        query_scope="entity:ent_test",
+        grant_id=grant_id,
+        grant_revision=1,
+        grant_scope_digest=scope_digest,
+        job_id=f"job_{uuid.uuid4().hex[:8]}",
+        issued_at=now.isoformat(),
+        expires_at=expires,
+        bank_approvals={},
+    )
+    sig_a = worker_a.sign_operation_authorization_ticket(raw_ticket)
+    sig_b = worker_b.sign_operation_authorization_ticket(raw_ticket)
+    ticket = replace(raw_ticket, bank_approvals={"bank_a": sig_a, "bank_b": sig_b})
+
+    canonical_query = (
+        f"{ticket.job_id}:{ticket.consortium_id}:bank_a:bank_b:"
+        f"dummy_b64:nonce_123:{now.isoformat()}:{ticket.purpose}:{ticket.canonical_digest()}".encode()
+    )
+    query_sig = ident_a.sign(canonical_query)
+    query = EstablishedPSIQueryMessage(
+        job_id=ticket.job_id,
+        consortium_id=ticket.consortium_id,
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        psi_request_b64="dummy_b64",
+        nonce="nonce_123",
+        timestamp=now.isoformat(),
+        purpose=ticket.purpose,
+        signature=query_sig,
+        ticket=ticket,
+    )
+
+    return worker_a, worker_b, ident_a, ident_b, ticket, query
+
+
+def test_adversarial_hmac_with_public_key_rejected_in_psi_query(tmp_path: Path) -> None:
+    """1. Mandatory negative control: Forged Bank A PSI query signed using HMAC with Bank A's public key."""
+    _, worker_b, ident_a, _, _, query = _setup_adversarial_test_fixture(tmp_path)
+
+    canonical_query = (
+        f"{query.job_id}:{query.consortium_id}:{query.requesting_bank_id}:"
+        f"{query.target_bank_id}:{query.psi_request_b64}:{query.nonce}:"
+        f"{query.timestamp}:{query.purpose}:{query.ticket.canonical_digest()}".encode()
+    )
+    # Attacker knows Bank A's public key and computes HMAC with it
+    forged_hmac_sig = hmac.new(
+        ident_a.public_key_hex.encode("utf-8"), canonical_query, hashlib.sha256
+    ).hexdigest()
+    attacker_query = replace(query, signature=forged_hmac_sig)
+
+    # Bank B must reject before private matching
+    with pytest.raises(
+        ConsortiumSecurityError,
+        match="Peer authentication failed: Invalid signature from requesting bank 'bank_a'",
+    ):
+        worker_b.process_established_psi_counterpart(attacker_query)
+
+
+def test_adversarial_hmac_with_public_key_rejected_in_ticket_approval(tmp_path: Path) -> None:
+    """2. Mandatory negative control: Forged Bank A operation-ticket approval signed with HMAC using Bank A's public key."""
+    _, worker_b, ident_a, _, ticket, query = _setup_adversarial_test_fixture(tmp_path)
+
+    req_canonical = f"{ticket.canonical_digest()}:bank_a".encode()
+    forged_ticket_hmac = hmac.new(
+        ident_a.public_key_hex.encode("utf-8"), req_canonical, hashlib.sha256
+    ).hexdigest()
+    forged_ticket = replace(
+        ticket,
+        bank_approvals={"bank_a": forged_ticket_hmac, "bank_b": ticket.bank_approvals["bank_b"]},
+    )
+    attacker_query = replace(query, ticket=forged_ticket)
+
+    with pytest.raises(
+        ConsortiumSecurityError,
+        match="Requesting institution 'bank_a' authorization verification failed",
+    ):
+        worker_b.process_established_psi_counterpart(attacker_query)
+
+
+def test_adversarial_completely_missing_requesting_bank_ticket_signature(tmp_path: Path) -> None:
+    """3. Mandatory negative control: Completely missing requesting-bank ticket signature."""
+    _, worker_b, _, _, ticket, query = _setup_adversarial_test_fixture(tmp_path)
+
+    ticket_missing_a = replace(
+        ticket,
+        bank_approvals={"bank_b": ticket.bank_approvals["bank_b"]},
+        requesting_bank_signature="",
+    )
+    attacker_query = replace(query, ticket=ticket_missing_a)
+
+    with pytest.raises(
+        ConsortiumSecurityError, match="missing approval signature in ticket"
+    ):
+        worker_b.process_established_psi_counterpart(attacker_query)
+
+
+def test_adversarial_invalid_ed25519_signature_with_valid_consortium_grant(tmp_path: Path) -> None:
+    """4. Mandatory negative control: Invalid Ed25519 signature with otherwise valid consortium grant."""
+    _, worker_b, _, _, ticket, query = _setup_adversarial_test_fixture(tmp_path)
+
+    corrupt_sig = "ee" * 64
+    ticket_corrupt_sig = replace(
+        ticket,
+        bank_approvals={"bank_a": corrupt_sig, "bank_b": ticket.bank_approvals["bank_b"]},
+    )
+    attacker_query = replace(query, ticket=ticket_corrupt_sig)
+
+    with pytest.raises(
+        ConsortiumSecurityError,
+        match="Requesting institution 'bank_a' authorization verification failed",
+    ):
+        worker_b.process_established_psi_counterpart(attacker_query)
+
+
+def test_adversarial_coordinator_cannot_impersonate_institutions_with_matching_tokens(tmp_path: Path) -> None:
+    """5. Mandatory negative control: Coordinator possessing matching tokens but no bank signing keys."""
+    from app.application.services.isolated_matching_service import (
+        CrossBankMatchingCoordinator,
+    )
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    gov = _create_mock_consortium_service("c_alpha")
+    coord = CrossBankMatchingCoordinator(
+        consortium_service=gov,
+        storage_root=str(tmp_path),
+    )
+
+    class FakeWorkerWithoutSigningIdentity:
+        def __init__(self, bank_id: str):
+            self.bank_id = bank_id
+            self._auth_secret = "matching_token_coord"
+            self._post = True
+
+    coord.register_worker("bank_a", FakeWorkerWithoutSigningIdentity("bank_a"), matching_token="coord_tok_a")
+    coord.register_worker("bank_b", FakeWorkerWithoutSigningIdentity("bank_b"), matching_token="coord_tok_b")
+
+    auth_svc = AuthenticationService.get_instance()
+    user = auth_svc.register_user(
+        f"analyst_{uuid.uuid4().hex[:6]}", "Password123!", "bank_a", roles=["analyst"]
+    )
+    auth_token = auth_svc.create_token_bundle(user).access_token
+
+    req = CrossBankIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        consortium_id="c_alpha",
+        query_entity_id="e_test",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        use_established_psi=True,
+    )
+    with pytest.raises(
+        ConsortiumSecurityError,
+        match="Coordinator cannot obtain authorization signature from requesting bank 'bank_a'",
+    ):
+        coord.execute_two_bank_private_matching(req=req, auth_token=auth_token)
+
+
+def test_adversarial_peer_key_replacement_via_allow_rotation_bypassed_rejected(tmp_path: Path) -> None:
+    """6. Mandatory negative control: Attempted peer public-key replacement using allow_rotation=True without valid rotation signature."""
+    _, worker_b, ident_a, _, _, _ = _setup_adversarial_test_fixture(tmp_path)
+
+    evil_ident = InstitutionalSigningIdentity.generate("bank_a")
+    with pytest.raises(
+        ConsortiumSecurityError,
+        match="Ordinary registration must never overwrite an existing institutional key",
+    ):
+        worker_b.enroll_trusted_peer("bank_a", evil_ident.public_key_hex, allow_rotation=True)
+
+    # Confirm original key was not modified
+    assert worker_b.get_trusted_peer_key("bank_a") == ident_a.public_key_hex
+
+
+def test_authorized_key_rotation_signed_by_old_active_key(tmp_path: Path) -> None:
+    """7. Mandatory positive control: Authorized rotation signed by the old active institutional key."""
+    _, worker_b, ident_a, _, _, _ = _setup_adversarial_test_fixture(tmp_path)
+
+    ident_a_v2 = InstitutionalSigningIdentity.generate("bank_a")
+    challenge = f"ROTATE:bank_a:{ident_a_v2.public_key_hex}:2".encode()
+    rotation_sig = ident_a.sign(challenge)
+
+    worker_b.rotate_trusted_peer("bank_a", ident_a_v2.public_key_hex, rotation_sig)
+    assert worker_b.get_trusted_peer_key("bank_a") == ident_a_v2.public_key_hex
+
+
+def test_adversarial_stale_key_verification_fails_after_rotation(tmp_path: Path) -> None:
+    """8. Mandatory negative control: Stale-key verification after rotation."""
+    _, worker_b, ident_a, _, ticket, _ = _setup_adversarial_test_fixture(tmp_path)
+
+    ident_a_v2 = InstitutionalSigningIdentity.generate("bank_a")
+    challenge = f"ROTATE:bank_a:{ident_a_v2.public_key_hex}:2".encode()
+    rotation_sig = ident_a.sign(challenge)
+    worker_b.rotate_trusted_peer("bank_a", ident_a_v2.public_key_hex, rotation_sig)
+
+    # 1. Attacker attempts to use old key ident_a after rotation
+    now = datetime.datetime.now(UTC)
+    stale_canonical = (
+        f"{ticket.job_id}:{ticket.consortium_id}:bank_a:bank_b:"
+        f"dummy_b64:nonce_stale:{now.isoformat()}:{ticket.purpose}:{ticket.canonical_digest()}".encode()
+    )
+    stale_query_sig = ident_a.sign(stale_canonical)
+    stale_query = EstablishedPSIQueryMessage(
+        job_id=ticket.job_id,
+        consortium_id=ticket.consortium_id,
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        psi_request_b64="dummy_b64",
+        nonce="nonce_stale",
+        timestamp=now.isoformat(),
+        purpose=ticket.purpose,
+        signature=stale_query_sig,
+        ticket=ticket,
+    )
+    with pytest.raises(
+        ConsortiumSecurityError,
+        match="Peer authentication failed: Invalid signature from requesting bank 'bank_a'",
+    ):
+        worker_b.process_established_psi_counterpart(stale_query)
+
+    # 2. Genuine new key ident_a_v2 signs successfully
+    fresh_ticket_sig_a = ident_a_v2.sign(f"{ticket.canonical_digest()}:bank_a".encode())
+    fresh_ticket = replace(
+        ticket,
+        bank_approvals={"bank_a": fresh_ticket_sig_a, "bank_b": ticket.bank_approvals["bank_b"]},
+    )
+    fresh_canonical = (
+        f"{ticket.job_id}:{ticket.consortium_id}:bank_a:bank_b:"
+        f"dummy_b64:nonce_fresh:{now.isoformat()}:{ticket.purpose}:{fresh_ticket.canonical_digest()}".encode()
+    )
+    fresh_query_sig = ident_a_v2.sign(fresh_canonical)
+    fresh_query = EstablishedPSIQueryMessage(
+        job_id=ticket.job_id,
+        consortium_id=ticket.consortium_id,
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        psi_request_b64="dummy_b64",
+        nonce="nonce_fresh",
+        timestamp=now.isoformat(),
+        purpose=ticket.purpose,
+        signature=fresh_query_sig,
+        ticket=fresh_ticket,
+    )
+    # Verification of query and ticket succeeds against rotated key
+    worker_b.verify_operation_authorization(
+        fresh_query.ticket,
+        expected_job_id=fresh_query.job_id,
+        expected_requesting_bank=fresh_query.requesting_bank_id,
+        expected_purpose=fresh_query.purpose,
+    )
+
+
+def test_adversarial_replayed_authorization_ticket_fails_before_matching(tmp_path: Path) -> None:
+    """9. Mandatory negative control: Replayed authorization ticket."""
+    _, worker_b, _, _, ticket, query = _setup_adversarial_test_fixture(tmp_path)
+
+    # Consume ticket in worker_b
+    worker_b._persist_consumed_nonce(f"ticket:{ticket.ticket_id}")
+
+    # Replayed query with same ticket but fresh nonce
+    replayed_query = replace(query, nonce=f"nonce_replay_{uuid.uuid4().hex[:8]}")
+    with pytest.raises(
+        ConsortiumSecurityError,
+        match="Replay attack detected: Operation authorization ticket .* has already been processed",
+    ):
+        worker_b.verify_operation_authorization(
+            replayed_query.ticket,
+            expected_job_id=replayed_query.job_id,
+            expected_requesting_bank=replayed_query.requesting_bank_id,
+            expected_purpose=replayed_query.purpose,
+        )

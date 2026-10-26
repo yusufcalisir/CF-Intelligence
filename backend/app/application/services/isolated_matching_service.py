@@ -341,8 +341,10 @@ class IsolatedBankWorkerNode:
             k.lower().strip(): v for k, v in (trusted_peer_keys or {}).items()
         }
         self._peer_registry = InstitutionalVerificationRegistry()
-        for p_bank, p_key in self._trusted_peer_verification_keys.items():
-            self._peer_registry.register_public_key(p_bank, p_key)
+        if self._signing_identity is not None:
+            for p_bank, p_key in self._trusted_peer_verification_keys.items():
+                with contextlib.suppress(ValueError, TypeError, ConsortiumSecurityError):
+                    self._peer_registry.register_public_key(p_bank, p_key)
 
         self._require_operation_ticket = require_operation_ticket
         self._locally_revoked_grants: set[str] = set()
@@ -427,19 +429,45 @@ class IsolatedBankWorkerNode:
         clean_id = peer_bank_id.lower().strip()
         if not clean_id:
             raise ValueError("peer_bank_id cannot be empty")
-        if not verification_key or len(verification_key.strip()) != 64:
-            raise ValueError(
-                f"Invalid verification key for peer '{peer_bank_id}': expected 64-char hex public verification key."
-            )
-        if clean_id in self._trusted_peer_verification_keys and not allow_rotation:
+        if clean_id in self._trusted_peer_verification_keys or self._peer_registry.has_key(clean_id):
             raise ConsortiumSecurityError(
                 f"Peer institution '{clean_id}' is already enrolled in worker '{self.bank_id}'. "
-                "Unauthorized key replacement rejected without verified administrative key rotation."
+                "Ordinary registration must never overwrite an existing institutional key. "
+                "Key updates require cryptographically authorized rotation via rotate_trusted_peer()."
             )
-        self._peer_registry.register_public_key(
-            clean_id, verification_key.strip(), allow_overwrite=allow_rotation
+        clean_key = (verification_key or "").strip()
+        if not clean_key or len(clean_key) < 16:
+            raise ValueError(
+                f"Invalid verification key for peer '{peer_bank_id}': key too short."
+            )
+        if self._signing_identity is not None or len(clean_key) == 64:
+            self._peer_registry.register_public_key(clean_id, clean_key)
+        self._trusted_peer_verification_keys[clean_id] = clean_key
+
+    def rotate_trusted_peer(
+        self,
+        peer_bank_id: str,
+        new_verification_key: str,
+        rotation_authorization_signature: str,
+    ) -> None:
+        """Rotate a trusted peer bank's verification key using cryptographic authorization from the previous key."""
+        clean_id = peer_bank_id.lower().strip()
+        if not clean_id:
+            raise ValueError("peer_bank_id cannot be empty.")
+        if not new_verification_key or len(new_verification_key.strip()) != 64:
+            raise ValueError(
+                f"Invalid new verification key for peer '{peer_bank_id}': expected 64-char hex public verification key."
+            )
+        if not rotation_authorization_signature or not rotation_authorization_signature.strip():
+            raise ConsortiumSecurityError(
+                f"Missing rotation authorization signature for peer '{clean_id}'."
+            )
+        self._peer_registry.rotate_public_key(
+            clean_id,
+            new_verification_key.strip(),
+            rotation_authorization_signature.strip(),
         )
-        self._trusted_peer_verification_keys[clean_id] = verification_key.strip()
+        self._trusted_peer_verification_keys[clean_id] = new_verification_key.strip()
 
     def get_trusted_peer_key(self, peer_bank_id: str) -> str | None:
         """Return the trusted verification key for an enrolled peer bank."""
@@ -691,7 +719,12 @@ class IsolatedBankWorkerNode:
             operation=ticket.operation,
         )
         canonical_bytes = f"{ticket.canonical_digest()}:{self.bank_id}".encode()
-        if self._signing_identity is not None:
+        if ticket.operation == "ESTABLISHED_PSI" or self._signing_identity is not None:
+            if self._signing_identity is None:
+                raise ConsortiumSecurityError(
+                    f"Operational matching failed: Worker '{self.bank_id}' has no provisioned institutional signing key. "
+                    "Signing authorization tickets requires sovereign Ed25519 signing identity."
+                )
             return self._signing_identity.sign(canonical_bytes)
         return hmac.new(
             self._auth_secret.encode("utf-8"),
@@ -731,6 +764,11 @@ class IsolatedBankWorkerNode:
             raise ConsortiumSecurityError(
                 f"Operation authorization ticket '{ticket.ticket_id}' has expired at {ticket.expires_at}."
             )
+        ticket_replay_key = f"ticket:{ticket.ticket_id}"
+        if ticket_replay_key in self._consumed_nonces or ticket.ticket_id in self._consumed_nonces:
+            raise ConsortiumSecurityError(
+                f"Replay attack detected: Operation authorization ticket '{ticket.ticket_id}' has already been processed by institution '{self.bank_id}'."
+            )
         if ticket.grant_id in self._locally_revoked_grants:
             raise ConsortiumSecurityError(
                 f"Operational data sharing grant '{ticket.grant_id}' has been locally revoked by institution '{self.bank_id}'. "
@@ -747,50 +785,65 @@ class IsolatedBankWorkerNode:
             operation=ticket.operation,
         )
 
-        # Verify target bank (self) approval signature
+        is_operational = (ticket.operation == "ESTABLISHED_PSI") or (self._signing_identity is not None)
+
+        # 1. Verify target bank (self) approval signature
         target_sig = ticket.bank_approvals.get(self.bank_id) or (
             ticket.target_bank_approval_signature if self.bank_id == ticket.target_bank_id.lower().strip() else ""
         )
+        if not target_sig:
+            raise ConsortiumSecurityError(
+                f"Target institution '{self.bank_id}' participation authority verification failed: "
+                "missing approval signature in ticket."
+            )
         target_canonical = f"{ticket.canonical_digest()}:{self.bank_id}".encode()
         target_valid = False
-        if self._signing_identity is not None and target_sig:
+        if self._signing_identity is not None:
             target_valid = self._signing_identity.verify(target_sig, target_canonical)
-        if not target_valid and target_sig:
+        elif not is_operational and self._auth_secret:
             expected_target_sig = hmac.new(
                 self._auth_secret.encode("utf-8"),
                 target_canonical,
                 hashlib.sha256,
             ).hexdigest()
             target_valid = hmac.compare_digest(expected_target_sig, target_sig)
+
         if not target_valid:
             raise ConsortiumSecurityError(
                 f"Target institution '{self.bank_id}' participation authority verification failed: "
-                "invalid or missing approval signature in ticket."
+                "invalid approval signature in ticket."
             )
 
-        # Verify requesting bank approval signature if peer key is enrolled
+        # 2. Verify requesting bank approval signature
         req_bank = ticket.requesting_bank_id.lower().strip()
         peer_sig = ticket.bank_approvals.get(req_bank) or ticket.requesting_bank_signature
-        peer_enrolled = self._peer_registry.has_key(req_bank) or (self.get_trusted_peer_key(req_bank) is not None)
-        if peer_enrolled and peer_sig:
-            peer_canonical = f"{ticket.canonical_digest()}:{ticket.requesting_bank_id}".encode()
-            peer_valid = False
-            if self._peer_registry.has_key(req_bank):
-                peer_valid = self._peer_registry.verify_signature(req_bank, peer_sig, peer_canonical)
-            if not peer_valid:
-                peer_key = self.get_trusted_peer_key(req_bank)
-                if peer_key:
-                    expected_peer_sig = hmac.new(
-                        peer_key.encode("utf-8"),
-                        peer_canonical,
-                        hashlib.sha256,
-                    ).hexdigest()
-                    peer_valid = hmac.compare_digest(expected_peer_sig, peer_sig)
-            if not peer_valid:
-                raise ConsortiumSecurityError(
-                    f"Requesting institution '{ticket.requesting_bank_id}' authorization verification failed: "
-                    "invalid or missing approval signature in ticket."
-                )
+        if not peer_sig:
+            raise ConsortiumSecurityError(
+                f"Requesting institution '{ticket.requesting_bank_id}' authorization verification failed: "
+                "missing approval signature in ticket."
+            )
+
+        peer_canonical = f"{ticket.canonical_digest()}:{ticket.requesting_bank_id}".encode()
+        peer_valid = False
+
+        if self._peer_registry.has_key(req_bank):
+            peer_valid = self._peer_registry.verify_signature(req_bank, peer_sig, peer_canonical)
+        elif not is_operational:
+            # Strictly non-authoritative prototype path: check for symmetric shared secret
+            peer_secret = self._trusted_peer_verification_keys.get(req_bank)
+            if peer_secret:
+                expected_peer_sig = hmac.new(
+                    peer_secret.encode("utf-8"),
+                    peer_canonical,
+                    hashlib.sha256,
+                ).hexdigest()
+                peer_valid = hmac.compare_digest(expected_peer_sig, peer_sig)
+
+        if not peer_valid:
+            raise ConsortiumSecurityError(
+                f"Requesting institution '{ticket.requesting_bank_id}' authorization verification failed: "
+                "invalid or unverified approval signature in ticket."
+            )
 
     def _persist_consumed_nonce(self, nonce: str) -> None:
         """Persist consumed nonce atomically to durable disk storage, failing closed on disk errors."""
@@ -1014,7 +1067,7 @@ class IsolatedBankWorkerNode:
         sig_valid = False
         if self._peer_registry.has_key(req_bank):
             sig_valid = self._peer_registry.verify_signature(req_bank, query.signature, canonical_bytes)
-        if not sig_valid and peer_key:
+        elif peer_key:
             expected_sig = hmac.new(
                 peer_key.encode("utf-8"),
                 canonical_bytes,
@@ -1098,6 +1151,8 @@ class IsolatedBankWorkerNode:
 
         # Persist consumed nonce to durable store (fail-closed)
         self._persist_consumed_nonce(query.nonce)
+        if query.ticket:
+            self._persist_consumed_nonce(f"ticket:{query.ticket.ticket_id}")
 
         return CounterpartMatchResponse(
             job_id=query.job_id,
@@ -1247,14 +1302,11 @@ class IsolatedBankWorkerNode:
             f"{clean_target}:{psi_request_b64}:{nonce}:"
             f"{timestamp}:{purpose}:{ticket.canonical_digest()}".encode()
         )
-        if self._signing_identity is not None:
-            sig = self._signing_identity.sign(canonical_bytes)
-        else:
-            sig = hmac.new(
-                self._auth_secret.encode("utf-8"),
-                canonical_bytes,
-                hashlib.sha256,
-            ).hexdigest()
+        if self._signing_identity is None:
+            raise ConsortiumSecurityError(
+                f"Worker node '{self.bank_id}' has no provisioned signing key. Fails closed."
+            )
+        sig = self._signing_identity.sign(canonical_bytes)
 
         return EstablishedPSIQueryMessage(
             job_id=ticket.job_id,
@@ -1296,12 +1348,16 @@ class IsolatedBankWorkerNode:
                 f"Expired query rejected by institution '{self.bank_id}': timestamp delta exceeds 300 seconds."
             )
 
-        # 3. Verify Requester Signature using internal trusted peer keystore
+        # 3. Verify Requester Signature using internal trusted peer keystore (Ed25519 strictly required)
         req_bank = query.requesting_bank_id.lower().strip()
-        peer_key = self._trusted_peer_verification_keys.get(req_bank)
-        if not peer_key and not self._peer_registry.has_key(req_bank):
+        if not self._peer_registry.has_key(req_bank):
             raise ConsortiumSecurityError(
                 f"Peer authentication failed: Institution '{query.requesting_bank_id}' has no trusted verification key enrolled."
+            )
+
+        if not query.signature:
+            raise ConsortiumSecurityError(
+                f"Peer authentication failed: Missing signature from requesting bank '{query.requesting_bank_id}'."
             )
 
         canonical_bytes = (
@@ -1309,17 +1365,7 @@ class IsolatedBankWorkerNode:
             f"{query.target_bank_id}:{query.psi_request_b64}:{query.nonce}:"
             f"{query.timestamp}:{query.purpose}:{query.ticket.canonical_digest()}".encode()
         )
-        sig_valid = False
-        if self._peer_registry.has_key(req_bank):
-            sig_valid = self._peer_registry.verify_signature(req_bank, query.signature, canonical_bytes)
-        if not sig_valid and peer_key:
-            expected_sig = hmac.new(
-                peer_key.encode("utf-8"),
-                canonical_bytes,
-                hashlib.sha256,
-            ).hexdigest()
-            sig_valid = hmac.compare_digest(expected_sig, query.signature)
-
+        sig_valid = self._peer_registry.verify_signature(req_bank, query.signature, canonical_bytes)
         if not sig_valid:
             raise ConsortiumSecurityError(
                 f"Peer authentication failed: Invalid signature from requesting bank '{query.requesting_bank_id}'."
@@ -1390,8 +1436,10 @@ class IsolatedBankWorkerNode:
             )
         resp_sig = self._signing_identity.sign(canonical_evidence)
 
-        # Persist consumed nonce
+        # Persist consumed nonce and ticket to prevent replay
         self._persist_consumed_nonce(query.nonce)
+        if query.ticket:
+            self._persist_consumed_nonce(f"ticket:{query.ticket.ticket_id}")
 
         return EstablishedPSICounterpartResponse(
             job_id=query.job_id,
@@ -1780,6 +1828,7 @@ class InstitutionalWorkerDaemon:
                     "/worker/finalize-match": SCOPE_MATCHING,
                     "/worker/store-entity": SCOPE_DATA_INGESTION,
                     "/worker/enroll-peer": SCOPE_ADMINISTRATION,
+                    "/worker/rotate-peer": SCOPE_ADMINISTRATION,
                     "/worker/initiate-established-psi": SCOPE_MATCHING,
                     "/worker/process-established-psi": SCOPE_MATCHING,
                     "/worker/finalize-established-psi": SCOPE_MATCHING,
@@ -1846,6 +1895,13 @@ class InstitutionalWorkerDaemon:
                             allow_rotation=data.get("allow_rotation", False),
                         )
                         res = {"status": "ENROLLED", "peer_bank_id": data["peer_bank_id"]}
+                    elif self.path == "/worker/rotate-peer":
+                        node.rotate_trusted_peer(
+                            peer_bank_id=data["peer_bank_id"],
+                            new_verification_key=data["new_verification_key"],
+                            rotation_authorization_signature=data["rotation_authorization_signature"],
+                        )
+                        res = {"status": "ROTATED", "peer_bank_id": data["peer_bank_id"]}
                     elif self.path == "/worker/initiate-established-psi":
                         ticket_dict = data["ticket"]
                         ticket = OperationAuthorizationTicket(**ticket_dict)
@@ -2036,6 +2092,22 @@ class InstitutionalWorkerClient:
                 "peer_bank_id": peer_bank_id,
                 "verification_key": verification_key,
                 "allow_rotation": allow_rotation,
+            },
+            token=self.admin_token,
+        )
+
+    def rotate_peer(
+        self,
+        peer_bank_id: str,
+        new_verification_key: str,
+        rotation_authorization_signature: str,
+    ) -> None:
+        self._post(
+            "/worker/rotate-peer",
+            {
+                "peer_bank_id": peer_bank_id,
+                "new_verification_key": new_verification_key,
+                "rotation_authorization_signature": rotation_authorization_signature,
             },
             token=self.admin_token,
         )
@@ -2454,6 +2526,11 @@ class CrossBankMatchingCoordinator:
             sig_a = worker_a.sign_operation_ticket(unsigned_ticket)
         elif hasattr(worker_a, "sign_operation_authorization_ticket"):
             sig_a = worker_a.sign_operation_authorization_ticket(unsigned_ticket)
+        elif use_established_psi:
+            raise ConsortiumSecurityError(
+                f"Coordinator cannot obtain authorization signature from requesting bank '{clean_requesting}'. "
+                "Coordinator signature fabrication is strictly prohibited."
+            )
         else:
             sig_a = hmac.new(
                 getattr(worker_a, "_auth_secret", "worker_a").encode(),
@@ -2465,6 +2542,11 @@ class CrossBankMatchingCoordinator:
             sig_b = worker_b.sign_operation_ticket(unsigned_ticket)
         elif hasattr(worker_b, "sign_operation_authorization_ticket"):
             sig_b = worker_b.sign_operation_authorization_ticket(unsigned_ticket)
+        elif use_established_psi:
+            raise ConsortiumSecurityError(
+                f"Coordinator cannot obtain authorization signature from target bank '{clean_target}'. "
+                "Coordinator signature fabrication is strictly prohibited."
+            )
         else:
             sig_b = hmac.new(
                 getattr(worker_b, "_auth_secret", "worker_b").encode(),
