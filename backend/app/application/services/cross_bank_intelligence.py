@@ -410,7 +410,7 @@ class CrossBankIntelligenceService:
                         pilot_svc.record_query_outcome(
                             pilot_id=req.pilot_id,
                             success=True,
-                            is_match=bool(signal.match_found),
+                            is_match=bool(signal.match_confirmed),
                             latency_ms=duration_ms,
                         )
                     return signal

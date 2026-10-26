@@ -227,7 +227,7 @@ async def approve_pilot(
             signature=payload.signature,
         )
         return _entity_to_response(entity)
-    except (InvalidPilotTransitionError, PilotAuthorizationError, PilotGovernanceError) as exc:
+    except (InvalidPilotTransitionError, PilotAuthorizationError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
@@ -255,7 +255,7 @@ async def activate_pilot(
     try:
         entity = service.activate_pilot(pilot_id=pilot_id, principal=principal)
         return _entity_to_response(entity)
-    except (InvalidPilotTransitionError, PilotAuthorizationError, PilotGovernanceError) as exc:
+    except (InvalidPilotTransitionError, PilotAuthorizationError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
@@ -310,7 +310,7 @@ async def resume_pilot(
     try:
         entity = service.resume_pilot(pilot_id=pilot_id, principal=principal)
         return _entity_to_response(entity)
-    except (InvalidPilotTransitionError, PilotAuthorizationError, PilotExpiredError, PilotQuotaExceededError, PilotGovernanceError) as exc:
+    except (InvalidPilotTransitionError, PilotAuthorizationError, PilotExpiredError, PilotQuotaExceededError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

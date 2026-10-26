@@ -26,6 +26,7 @@ class PilotProvisionRequest(BaseModel):
     query_quota_per_institution: int = Field(default=25, ge=1)
     max_queries_total: int | None = None
     max_queries_per_institution: int | None = None
+    duration_days: int = Field(default=14, ge=1)
 
     @model_validator(mode="before")
     @classmethod

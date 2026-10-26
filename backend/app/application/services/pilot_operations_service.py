@@ -38,6 +38,9 @@ from app.domain.pilot_operations import (
     PilotStatus,
     PreflightCheckResult,
 )
+from app.domain.pilot_operations import (
+    PilotGovernanceError as PilotGovernanceError,
+)
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 from app.infrastructure.storage.durable_pilot_store import DurablePilotStore
@@ -490,7 +493,7 @@ class PilotOperationsService:
             actual_actor = (
                 principal.principal_id
                 if isinstance(principal, AuthenticatedPrincipal)
-                else (str(principal) if principal else "operator")
+                else (principal if principal else "operator")
             )
 
         entity.transition_to(PilotStatus.PAUSED, f"Paused by operator: {actual_reason}")
@@ -554,7 +557,7 @@ class PilotOperationsService:
 
         entity.transition_to(PilotStatus.ACTIVE, "Resumed after health and authorization revalidation.")
 
-        actor_id = principal.principal_id if isinstance(principal, AuthenticatedPrincipal) else (str(principal) if principal else "operator")
+        actor_id = principal.principal_id if isinstance(principal, AuthenticatedPrincipal) else (principal if principal else "operator")
         evt = self._audit_chain.append_event(
             event_type="PILOT_RESUMED",
             actor_id=actor_id,
@@ -579,7 +582,7 @@ class PilotOperationsService:
         entity = self._get_required_pilot(pilot_id)
         entity.transition_to(PilotStatus.ABORTED, f"Aborted by operator: {reason}")
 
-        actor_id = principal.principal_id if isinstance(principal, AuthenticatedPrincipal) else (str(principal) if principal else "operator")
+        actor_id = principal.principal_id if isinstance(principal, AuthenticatedPrincipal) else (principal if principal else "operator")
         evt = self._audit_chain.append_event(
             event_type="PILOT_ABORTED",
             actor_id=actor_id,
@@ -608,7 +611,7 @@ class PilotOperationsService:
             completion_msg,
         )
 
-        actor_id = principal.principal_id if isinstance(principal, AuthenticatedPrincipal) else (str(principal) if principal else "operator")
+        actor_id = principal.principal_id if isinstance(principal, AuthenticatedPrincipal) else (principal if principal else "operator")
         evt = self._audit_chain.append_event(
             event_type="PILOT_COMPLETED",
             actor_id=actor_id,

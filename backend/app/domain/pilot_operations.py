@@ -114,7 +114,7 @@ class PilotOperationalConfig:
     participating_institutions: list[str] = field(default_factory=lambda: ["bank_a", "bank_b"])
     allowed_purposes: list[str] = field(default_factory=lambda: ["AML_COLLABORATIVE_INVESTIGATION"])
     allowed_jurisdictions: list[str] = field(default_factory=lambda: ["eu-central-1"])
-    approved_datasets: dict[str, Any] = field(default_factory=dict)
+    approved_datasets: dict[str, Any] | list[str] = field(default_factory=dict)
     authorized_operators: list[str] = field(default_factory=list)
     operational_grant_id: str = ""
     grant_revision: int = 1
@@ -391,7 +391,7 @@ class PilotEntity:
             else 0.0
         )
         p95_latency = (
-            sorted(self.latencies_ms)[int(math.ceil(0.95 * len(self.latencies_ms))) - 1]
+            sorted(self.latencies_ms)[math.ceil(0.95 * len(self.latencies_ms)) - 1]
             if self.latencies_ms
             else 0.0
         )
