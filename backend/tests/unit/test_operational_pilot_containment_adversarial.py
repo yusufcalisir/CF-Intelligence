@@ -20,7 +20,11 @@ Milestone 5 Operational Acceptance Verification:
    - Rejection when grant is revoked during execution.
 """
 
+import hashlib
+import hmac
+import json
 import threading
+import urllib.parse
 import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
@@ -53,6 +57,7 @@ from app.domain.consortium_governance import (
 )
 from app.domain.institutional_identity import (
     InstitutionalSigningIdentity,
+    canonical_coordinator_readiness_bytes,
 )
 from app.domain.pilot_operations import (
     PilotEntity,
@@ -67,6 +72,7 @@ from app.infrastructure.storage.durable_pilot_store import DurablePilotStore
 
 SHARED_JWT_SECRET = "jwt_secret_adversarial_containment_91823749812734"
 SHARED_CONSORTIUM_STORE_SECRET = "consortium_store_hmac_adversarial_98712398471"
+SHARED_COORDINATOR_SECRET = "coordinator_secret_adversarial_containment_99887766"
 
 
 @pytest.fixture
@@ -79,6 +85,7 @@ def containment_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generato
     monkeypatch.setenv("CFI_ACCOUNT_STORE_PATH", str(account_store_file))
     monkeypatch.setenv("CFI_PILOT_DB_PATH", str(pilot_db_file))
     monkeypatch.setenv("CFI_CONSORTIUM_STORE_SECRET", SHARED_CONSORTIUM_STORE_SECRET)
+    monkeypatch.setenv("CFI_COORDINATOR_SECRET", SHARED_COORDINATOR_SECRET)
     monkeypatch.setenv("JWT_SECRET", SHARED_JWT_SECRET)
     monkeypatch.setenv("CFI_JWT_SECRET", SHARED_JWT_SECRET)
     monkeypatch.setenv("CFI_JWT_SIGNING_SECRET", SHARED_JWT_SECRET)
@@ -189,7 +196,9 @@ def containment_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generato
     url_a = daemon_a.start()
     url_b = daemon_b.start()
     coord_obj = CrossBankMatchingCoordinator()
-    coord_daemon = InstitutionalCoordinatorDaemon(coord_obj, host="127.0.0.1", port=0)
+    coord_daemon = InstitutionalCoordinatorDaemon(
+        coord_obj, host="127.0.0.1", port=0, coordinator_secret=SHARED_COORDINATOR_SECRET
+    )
     url_coord = coord_daemon.start()
 
     test_topology = {
@@ -833,3 +842,254 @@ def test_mandatory_attack_fake_worker_rejected_by_preflight_and_resumption(conta
     finally:
         rogue_server.shutdown()
         rogue_server.server_close()
+
+
+def test_coordinator_authentication_mandatory_negative_controls(
+    containment_env: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Mandatory negative controls for Coordinator Authentication (P0):
+    1. CFI_COORDINATOR_SECRET completely unset -> preflight and resume fail closed.
+    2. CFI_COORDINATOR_SECRET set to empty string -> preflight and resume fail closed.
+    3. Fabricated healthy coordinator endpoint with no valid signature -> preflight and resume fail closed.
+    4. Wrong coordinator HMAC -> preflight and resume fail closed.
+    5. Replayed readiness response (stale timestamp >300s) -> preflight and resume fail closed.
+    6. Mismatched nonce -> preflight and resume fail closed.
+    7. Substituted role / wrong identity -> preflight and resume fail closed.
+    8. Successful independently authenticated coordinator -> preflight and resume succeed.
+    """
+    svc: PilotOperationsService = containment_env["pilot_svc"]
+
+    adversarial_state = {
+        "mode": "unsigned",
+    }
+
+    class DynamicAdversarialCoordinatorHandler(BaseHTTPRequestHandler):
+        def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+            pass
+
+        def do_GET(self) -> None:
+            parsed = urllib.parse.urlparse(self.path)
+            query = urllib.parse.parse_qs(parsed.query)
+            probe_nonce = query.get("nonce", [""])[0]
+            now_iso = datetime.now(UTC).isoformat()
+            mode = adversarial_state["mode"]
+
+            if mode == "unsigned":
+                body = {
+                    "status": "HEALTHY",
+                    "role": "coordinator",
+                    "coordinator_id": "coordinator_default",
+                    "protocol": "OPENMINED-PSI-2.0.6-ECDH",
+                    "nonce": probe_nonce,
+                    "timestamp": now_iso,
+                }
+            elif mode == "wrong_hmac":
+                can_bytes = canonical_coordinator_readiness_bytes(
+                    role="coordinator",
+                    coordinator_id="coordinator_default",
+                    nonce=probe_nonce,
+                    timestamp=now_iso,
+                    protocol="OPENMINED-PSI-2.0.6-ECDH",
+                )
+                wrong_sig = hmac.new(b"wrong_secret_adversarial_123", can_bytes, hashlib.sha256).hexdigest()
+                body = {
+                    "status": "HEALTHY",
+                    "role": "coordinator",
+                    "coordinator_id": "coordinator_default",
+                    "protocol": "OPENMINED-PSI-2.0.6-ECDH",
+                    "nonce": probe_nonce,
+                    "timestamp": now_iso,
+                    "coordinator_signature": wrong_sig,
+                }
+            elif mode == "stale_timestamp":
+                stale_ts = (datetime.now(UTC) - timedelta(seconds=600)).isoformat()
+                can_bytes = canonical_coordinator_readiness_bytes(
+                    role="coordinator",
+                    coordinator_id="coordinator_default",
+                    nonce=probe_nonce,
+                    timestamp=stale_ts,
+                    protocol="OPENMINED-PSI-2.0.6-ECDH",
+                )
+                sig = hmac.new(SHARED_COORDINATOR_SECRET.encode("utf-8"), can_bytes, hashlib.sha256).hexdigest()
+                body = {
+                    "status": "HEALTHY",
+                    "role": "coordinator",
+                    "coordinator_id": "coordinator_default",
+                    "protocol": "OPENMINED-PSI-2.0.6-ECDH",
+                    "nonce": probe_nonce,
+                    "timestamp": stale_ts,
+                    "coordinator_signature": sig,
+                }
+            elif mode == "mismatched_nonce":
+                bad_nonce = "adversarial_nonce_mismatch_888"
+                can_bytes = canonical_coordinator_readiness_bytes(
+                    role="coordinator",
+                    coordinator_id="coordinator_default",
+                    nonce=bad_nonce,
+                    timestamp=now_iso,
+                    protocol="OPENMINED-PSI-2.0.6-ECDH",
+                )
+                sig = hmac.new(SHARED_COORDINATOR_SECRET.encode("utf-8"), can_bytes, hashlib.sha256).hexdigest()
+                body = {
+                    "status": "HEALTHY",
+                    "role": "coordinator",
+                    "coordinator_id": "coordinator_default",
+                    "protocol": "OPENMINED-PSI-2.0.6-ECDH",
+                    "nonce": bad_nonce,
+                    "timestamp": now_iso,
+                    "coordinator_signature": sig,
+                }
+            elif mode == "substituted_role":
+                can_bytes = canonical_coordinator_readiness_bytes(
+                    role="worker",
+                    coordinator_id="coordinator_default",
+                    nonce=probe_nonce,
+                    timestamp=now_iso,
+                    protocol="OPENMINED-PSI-2.0.6-ECDH",
+                )
+                sig = hmac.new(SHARED_COORDINATOR_SECRET.encode("utf-8"), can_bytes, hashlib.sha256).hexdigest()
+                body = {
+                    "status": "HEALTHY",
+                    "role": "worker",
+                    "coordinator_id": "coordinator_default",
+                    "protocol": "OPENMINED-PSI-2.0.6-ECDH",
+                    "nonce": probe_nonce,
+                    "timestamp": now_iso,
+                    "coordinator_signature": sig,
+                }
+            else:
+                body = {"status": "UNKNOWN"}
+
+            resp_bytes = json.dumps(body).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(resp_bytes)))
+            self.end_headers()
+            self.wfile.write(resp_bytes)
+
+    adv_server = ThreadingHTTPServer(("127.0.0.1", 0), DynamicAdversarialCoordinatorHandler)
+    adv_port = adv_server.server_address[1]
+    adv_thread = threading.Thread(target=adv_server.serve_forever, daemon=True)
+    adv_thread.start()
+
+    try:
+        adv_url = f"http://127.0.0.1:{adv_port}"
+        legit_coord_url = containment_env["test_topology"]["coordinator_url"]
+
+        def assert_preflight_rejected(pilot_id: str, coord_endpoint: str) -> None:
+            _ = svc.provision_pilot(
+                pilot_id=pilot_id,
+                consortium_id="c_containment",
+                participating_institutions=["bank_a", "bank_b"],
+                allowed_purposes=["AML_INVESTIGATION"],
+                allowed_jurisdictions=["EU"],
+                approved_datasets={"data": "h1"},
+                principal=containment_env["principal_op"],
+                worker_endpoints={
+                    "bank_a": containment_env["test_topology"]["bank_a_worker_url"],
+                    "bank_b": containment_env["test_topology"]["bank_b_worker_url"],
+                },
+                coordinator_endpoint=coord_endpoint,
+            )
+            with pytest.raises(PilotGovernanceError) as exc_info:
+                svc.run_preflight(pilot_id, principal=containment_env["principal_op"])
+            err_msg = str(exc_info.value).lower()
+            assert (
+                "authentication_failed" in err_msg
+                or "preflight verification failed" in err_msg
+                or "coordinator_reachable" in err_msg
+            )
+            p = svc.get_pilot(pilot_id)
+            assert p is not None and p.status == PilotStatus.FAILED
+
+        def assert_resume_rejected(active_pilot_id: str, coord_endpoint: str) -> None:
+            p = svc.get_pilot(active_pilot_id)
+            assert p is not None
+            p.config.coordinator_endpoint = coord_endpoint
+            p.config.topology["coordinator_url"] = coord_endpoint
+            svc.store.save_pilot(p)
+            with pytest.raises(PilotGovernanceError) as exc_info:
+                svc.resume_pilot(active_pilot_id, principal=containment_env["principal_op"])
+            err_msg = str(exc_info.value).lower()
+            assert (
+                "authentication_failed" in err_msg
+                or "preflight probe failed" in err_msg
+                or "coordinator_reachable" in err_msg
+            )
+            p_after = svc.get_pilot(active_pilot_id)
+            assert p_after is not None and p_after.status == PilotStatus.PAUSED
+
+        # 1. Negative Scenario: CFI_COORDINATOR_SECRET completely unset
+        monkeypatch.delenv("CFI_COORDINATOR_SECRET", raising=False)
+        monkeypatch.delenv("COORDINATOR_SECRET", raising=False)
+        monkeypatch.delenv("COORDINATOR_AUTH_SECRET", raising=False)
+        assert_preflight_rejected("pilot_neg_coord_unset", legit_coord_url)
+
+        monkeypatch.setenv("CFI_COORDINATOR_SECRET", SHARED_COORDINATOR_SECRET)
+        _create_and_activate_pilot(containment_env, pilot_id="pilot_resume_unset")
+        svc.pause_pilot("pilot_resume_unset", principal=containment_env["principal_op"])
+        monkeypatch.delenv("CFI_COORDINATOR_SECRET", raising=False)
+        monkeypatch.delenv("COORDINATOR_SECRET", raising=False)
+        monkeypatch.delenv("COORDINATOR_AUTH_SECRET", raising=False)
+        assert_resume_rejected("pilot_resume_unset", legit_coord_url)
+
+        # 2. Negative Scenario: CFI_COORDINATOR_SECRET set to empty string
+        monkeypatch.setenv("CFI_COORDINATOR_SECRET", "   ")
+        assert_preflight_rejected("pilot_neg_coord_empty", legit_coord_url)
+
+        monkeypatch.setenv("CFI_COORDINATOR_SECRET", SHARED_COORDINATOR_SECRET)
+        _create_and_activate_pilot(containment_env, pilot_id="pilot_resume_empty")
+        svc.pause_pilot("pilot_resume_empty", principal=containment_env["principal_op"])
+        monkeypatch.setenv("CFI_COORDINATOR_SECRET", "   ")
+        assert_resume_rejected("pilot_resume_empty", legit_coord_url)
+
+        # Restore valid secret for server-side adversary tests
+        monkeypatch.setenv("CFI_COORDINATOR_SECRET", SHARED_COORDINATOR_SECRET)
+
+        # 3. Negative Scenario: Fabricated healthy coordinator endpoint with no valid signature
+        adversarial_state["mode"] = "unsigned"
+        assert_preflight_rejected("pilot_neg_coord_unsigned", adv_url)
+        _create_and_activate_pilot(containment_env, pilot_id="pilot_resume_unsigned")
+        svc.pause_pilot("pilot_resume_unsigned", principal=containment_env["principal_op"])
+        assert_resume_rejected("pilot_resume_unsigned", adv_url)
+
+        # 4. Negative Scenario: Wrong coordinator HMAC signature
+        adversarial_state["mode"] = "wrong_hmac"
+        assert_preflight_rejected("pilot_neg_coord_wrong_hmac", adv_url)
+        _create_and_activate_pilot(containment_env, pilot_id="pilot_resume_wrong_hmac")
+        svc.pause_pilot("pilot_resume_wrong_hmac", principal=containment_env["principal_op"])
+        assert_resume_rejected("pilot_resume_wrong_hmac", adv_url)
+
+        # 5. Negative Scenario: Replayed readiness response (stale timestamp >300s)
+        adversarial_state["mode"] = "stale_timestamp"
+        assert_preflight_rejected("pilot_neg_coord_stale_ts", adv_url)
+        _create_and_activate_pilot(containment_env, pilot_id="pilot_resume_stale_ts")
+        svc.pause_pilot("pilot_resume_stale_ts", principal=containment_env["principal_op"])
+        assert_resume_rejected("pilot_resume_stale_ts", adv_url)
+
+        # 6. Negative Scenario: Mismatched nonce
+        adversarial_state["mode"] = "mismatched_nonce"
+        assert_preflight_rejected("pilot_neg_coord_bad_nonce", adv_url)
+        _create_and_activate_pilot(containment_env, pilot_id="pilot_resume_bad_nonce")
+        svc.pause_pilot("pilot_resume_bad_nonce", principal=containment_env["principal_op"])
+        assert_resume_rejected("pilot_resume_bad_nonce", adv_url)
+
+        # 7. Negative Scenario: Substituted role / wrong identity
+        adversarial_state["mode"] = "substituted_role"
+        assert_preflight_rejected("pilot_neg_coord_sub_role", adv_url)
+        _create_and_activate_pilot(containment_env, pilot_id="pilot_resume_sub_role")
+        svc.pause_pilot("pilot_resume_sub_role", principal=containment_env["principal_op"])
+        assert_resume_rejected("pilot_resume_sub_role", adv_url)
+
+        # 8. Positive Scenario: Successful independently authenticated coordinator with valid configured identity
+        p_valid = _create_and_activate_pilot(containment_env, pilot_id="pilot_coord_valid_auth")
+        assert p_valid.status == PilotStatus.ACTIVE
+        svc.pause_pilot("pilot_coord_valid_auth", principal=containment_env["principal_op"])
+        p_paused = svc.get_pilot("pilot_coord_valid_auth")
+        assert p_paused is not None and p_paused.status == PilotStatus.PAUSED
+        svc.resume_pilot("pilot_coord_valid_auth", principal=containment_env["principal_op"])
+        p_resumed = svc.get_pilot("pilot_coord_valid_auth")
+        assert p_resumed is not None and p_resumed.status == PilotStatus.ACTIVE
+    finally:
+        adv_server.shutdown()
+        adv_server.server_close()

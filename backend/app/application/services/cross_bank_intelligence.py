@@ -15,6 +15,7 @@ import os
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from datetime import UTC
 from typing import Any, cast
 
@@ -111,6 +112,7 @@ class CrossBankIntelligenceService:
         self._research_case_evidence_store = RedisStore("research_case_evidence")
         self._admitted_receipts_store = RedisStore("admitted_operational_psi_receipts")
         self._admitted_receipt_ids: set[str] = set()
+        self._before_result_admission_hook: Callable[[str], None] | None = None
         self._lock = threading.RLock()
 
     def _authenticate_principal(
@@ -395,6 +397,9 @@ class CrossBankIntelligenceService:
                 )
 
                 # Kill-switch revalidation immediately before authoritative result admission
+                if self._before_result_admission_hook is not None and active_pilot_id:
+                    self._before_result_admission_hook(active_pilot_id)
+
                 if active_pilot_id and pilot_svc:
                     pilot_svc.revalidate_pilot_active(
                         pilot_id=active_pilot_id,
@@ -467,6 +472,9 @@ class CrossBankIntelligenceService:
                     )
 
                     # Kill-switch revalidation immediately before authoritative result admission
+                    if self._before_result_admission_hook is not None and active_pilot_id:
+                        self._before_result_admission_hook(active_pilot_id)
+
                     if active_pilot_id and pilot_svc:
                         pilot_svc.revalidate_pilot_active(
                             pilot_id=active_pilot_id,

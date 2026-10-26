@@ -22,6 +22,7 @@ from app.application.services.case_service import CaseNotFoundError, TerminalCas
 from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
 from app.dependencies import PrincipalDep, enforce_tenant_isolation
 from app.domain.consortium_governance import ConsortiumSecurityError
+from app.domain.pilot_operations import PilotGovernanceError
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ api_router = APIRouter(prefix="/v1/intelligence/cross-bank", tags=["cross-bank-i
 
 def get_cross_bank_intelligence_service() -> CrossBankIntelligenceService:
     """Dependency provider for CrossBankIntelligenceService."""
-    return CrossBankIntelligenceService()
+    return CrossBankIntelligenceService.get_instance()
 
 
 @router.post(
@@ -44,7 +45,7 @@ def get_cross_bank_intelligence_service() -> CrossBankIntelligenceService:
     response_model=CrossBankIntelligenceSignal,
     status_code=status.HTTP_200_OK,
 )
-async def query_cross_bank_intelligence(
+def query_cross_bank_intelligence(
     req: CrossBankIntelligenceQueryRequest,
     principal: PrincipalDep,
     service: CrossBankIntelligenceService = Depends(get_cross_bank_intelligence_service),
@@ -69,6 +70,11 @@ async def query_cross_bank_intelligence(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Consortium governance authorization rejected: {err}",
+        ) from err
+    except PilotGovernanceError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Pilot governance rejected: {err}",
         ) from err
     except PermissionError as err:
         raise HTTPException(

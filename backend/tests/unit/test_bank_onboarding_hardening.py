@@ -410,3 +410,100 @@ def test_router_bundle_and_lifecycle_endpoints(
         assert activate_resp.json()["status"] == "active"
     finally:
         app.dependency_overrides.clear()
+
+
+def _generate_custom_csr(common_name: str, san_names: list[str] | None = None) -> str:
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    builder = (
+        x509.CertificateSigningRequestBuilder()
+        .subject_name(
+            x509.Name(
+                [
+                    x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+                    x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Institutional Bank Test"),
+                ]
+            )
+        )
+    )
+    if san_names is not None:
+        builder = builder.add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(san) for san in san_names]),
+            critical=False,
+        )
+    csr = builder.sign(key, hashes.SHA256())
+    return csr.public_bytes(serialization.Encoding.PEM).decode("utf-8")
+
+
+@pytest.mark.asyncio
+async def test_csr_subject_binding_strict_enforcement(db_session: AsyncSession) -> None:
+    """Verifies strict institutional CSR Common Name and Subject Alternative Name binding.
+
+    Mandatory attack & edge-case controls:
+    1. Valid canonical Bank A CSR succeeds.
+    2. bank_a.attacker.example is rejected (preventing first-label bypass).
+    3. bank_a.client.cf-intelligence.io.attacker.example is rejected.
+    4. Valid CN with unauthorized SAN is rejected.
+    5. Bank B identity in Bank A enrollment is rejected.
+    6. Router and service levels enforce the identical fail-closed policy.
+    """
+    service = BankOnboardingService(db_session)
+    await service.register_bank(
+        bank_id="bank_a",
+        legal_name="Bank Alpha Corp",
+        jurisdiction="DE",
+        contact_email="security@banka.de",
+        data_residency_region="eu-central-1",
+    )
+
+    # 1. Valid canonical Bank A CSRs succeed
+    for valid_cn in ("bank_a", "bank_a.client.cf-intelligence.io", "bank_a.worker.cf-intelligence.io"):
+        valid_csr = _generate_custom_csr(valid_cn, [valid_cn, "localhost"])
+        cert_pem, fp, exp = await service.sign_csr("bank_a", valid_csr)
+        assert cert_pem.startswith("-----BEGIN CERTIFICATE-----")
+        assert fp.startswith("SHA256:")
+
+    # 2. bank_a.attacker.example is rejected (first-label bypass attempt)
+    attacker_csr_1 = _generate_custom_csr("bank_a.attacker.example", ["bank_a.attacker.example"])
+    with pytest.raises(InvalidCSRError) as exc1:
+        await service.sign_csr("bank_a", attacker_csr_1)
+    assert "does not match authorized canonical identity" in str(exc1.value)
+
+    # 3. bank_a.client.cf-intelligence.io.attacker.example is rejected (suffix injection)
+    attacker_csr_2 = _generate_custom_csr(
+        "bank_a.client.cf-intelligence.io.attacker.example",
+        ["bank_a.client.cf-intelligence.io.attacker.example"],
+    )
+    with pytest.raises(InvalidCSRError) as exc2:
+        await service.sign_csr("bank_a", attacker_csr_2)
+    assert "does not match authorized canonical identity" in str(exc2.value)
+
+    # 4. Valid CN with unauthorized SAN is rejected
+    unauthorized_san_csr = _generate_custom_csr(
+        "bank_a.client.cf-intelligence.io",
+        ["bank_a.client.cf-intelligence.io", "attacker.example"],
+    )
+    with pytest.raises(InvalidCSRError) as exc3:
+        await service.sign_csr("bank_a", unauthorized_san_csr)
+    assert "Subject Alternative Name 'attacker.example' does not match" in str(exc3.value)
+
+    # 5. Bank B identity in Bank A enrollment is rejected
+    bank_b_csr = _generate_custom_csr("bank_b.client.cf-intelligence.io", ["bank_b.client.cf-intelligence.io"])
+    with pytest.raises(InvalidCSRError) as exc4:
+        await service.sign_csr("bank_a", bank_b_csr)
+    assert "does not match authorized canonical identity" in str(exc4.value)
+
+    # 6. Verify same rejection occurs through presentation router
+    app.dependency_overrides[get_async_session] = lambda: db_session
+    client = TestClient(app)
+    headers = _get_admin_auth_headers("bank_a")
+    try:
+        router_resp = client.post(
+            "/api/v1/onboarding/banks/bank_a/sign-csr",
+            json={"csr_pem": attacker_csr_1, "days_valid": 90},
+            headers=headers,
+        )
+        assert router_resp.status_code == 400
+        assert "does not match authorized canonical identity" in router_resp.text
+    finally:
+        app.dependency_overrides.clear()
+

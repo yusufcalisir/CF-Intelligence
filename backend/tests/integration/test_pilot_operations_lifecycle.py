@@ -44,6 +44,7 @@ from app.infrastructure.storage.durable_pilot_store import DurablePilotStore
 from app.main import app
 
 # Import Docker topology fixtures from test_institutional_docker_psi_vertical_slice
+from tests.integration.conftest import SECRET_COORD
 from tests.integration.test_institutional_docker_psi_vertical_slice import (
     SHARED_CONSORTIUM_STORE_SECRET,
     SHARED_JWT_SECRET,
@@ -66,6 +67,7 @@ def pilot_test_env(
     monkeypatch.setenv("CFI_ACCOUNT_STORE_PATH", str(account_store_file))
     monkeypatch.setenv("CFI_PILOT_DB_PATH", str(pilot_db_file))
     monkeypatch.setenv("CFI_CONSORTIUM_STORE_SECRET", SHARED_CONSORTIUM_STORE_SECRET)
+    monkeypatch.setenv("CFI_COORDINATOR_SECRET", SECRET_COORD)
     monkeypatch.setenv("JWT_SECRET", SHARED_JWT_SECRET)
     monkeypatch.setenv("CFI_JWT_SECRET", SHARED_JWT_SECRET)
     monkeypatch.setenv("CFI_JWT_SIGNING_SECRET", SHARED_JWT_SECRET)
@@ -203,7 +205,9 @@ def pilot_test_env(
     url_a = daemon_a.start()
     url_b = daemon_b.start()
     coord_obj = CrossBankMatchingCoordinator()
-    coord_daemon = InstitutionalCoordinatorDaemon(coord_obj, host="127.0.0.1", port=0)
+    coord_daemon = InstitutionalCoordinatorDaemon(
+        coord_obj, host="127.0.0.1", port=0, coordinator_secret=SECRET_COORD
+    )
     url_coord = coord_daemon.start()
 
     test_topology = {
@@ -905,6 +909,8 @@ def test_gate_e_operational_resilience_and_incident_containment(
 
     from app.presentation.routers import cross_bank_intelligence as cbi_router_mod
 
+    CrossBankIntelligenceService._instance = cbi_svc
+    app.dependency_overrides[cbi_router_mod.get_cross_bank_intelligence_service] = lambda: cbi_svc
     monkeypatch.setattr(cbi_router_mod, "get_cross_bank_intelligence_service", lambda: cbi_svc)
 
     with TestClient(app) as test_client:
@@ -954,6 +960,247 @@ def test_gate_e_operational_resilience_and_incident_containment(
         assert persisted_pilot.status == PilotStatus.PAUSED
         # State machine prevents silent re-authorization or auto-activation
         assert persisted_pilot.is_active is False
+
+        # Restore singleton binding for subsequent live FastAPI operations
+        PilotOperationsService._instance = pilot_svc
+        pilot_store = pilot_svc.store
+
+        # ==============================================================================
+        # Step 6: Full 13-Step Deterministic Real Execution Mid-Flight PAUSE Race
+        # Exercising live Docker mesh and FastAPI TestClient without synthetic records
+        # ==============================================================================
+        # 1. Start actual isolated Bank A, Bank B, and coordinator services (running in Docker mesh).
+        _wait_for_health(f"http://127.0.0.1:{docker_topology['port_a']}/worker/health", timeout_sec=20.0)
+        _wait_for_health(f"http://127.0.0.1:{docker_topology['port_b']}/worker/health", timeout_sec=20.0)
+        _wait_for_health(f"http://127.0.0.1:{port_coord}/coordinator/health", timeout_sec=20.0)
+
+        # Ingest sovereign private entities into Docker worker vaults
+        shared_race_iban = "DE88112233445566778899"
+        ent_race_a_id = "ent_race_subj_a"
+        ent_race_b_id = "ent_race_subj_b"
+        client_a.store_private_entity({
+            "id": ent_race_a_id,
+            "bank_id": "bank_a",
+            "entity_type": "account",
+            "raw_identifier": shared_race_iban,
+            "risk_level": "HIGH",
+            "typologies": ["CROSS_BORDER_FRAUD"],
+        })
+        client_b.store_private_entity({
+            "id": ent_race_b_id,
+            "bank_id": "bank_b",
+            "entity_type": "account",
+            "raw_identifier": shared_race_iban,
+            "risk_level": "CRITICAL",
+            "typologies": ["CROSS_BORDER_FRAUD"],
+        })
+
+        # Register local entity in CBI service
+        ent_race_obj = Entity(
+            id=ent_race_a_id,
+            entity_type=EntityType.CUSTOMER,
+            privacy_id=hashlib.sha256(shared_race_iban.encode()).hexdigest(),
+            bank_id="bank_a",
+            display_label="Race Pilot Subject",
+            risk_level=RiskLevel.HIGH,
+            attributes={"raw_identifier": shared_race_iban},
+        )
+        cbi_svc.entity_service._entities.set(ent_race_a_id, _entity_to_dict(ent_race_obj))
+
+        # 2. Authenticate and authorize a controlled pilot
+        race_pilot_id = "pilot_resilience_race_01"
+        pilot_svc.institutional_registry.register_public_key("bank_a", id_a.public_key, allow_overwrite=True)
+        pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key, allow_overwrite=True)
+        race_pilot_ent = pilot_svc.provision_pilot(
+            pilot_id=race_pilot_id,
+            consortium_id="consortium_pilot_m5",
+            participating_institutions=["bank_a", "bank_b"],
+            allowed_purposes=["AML_INVESTIGATION"],
+            allowed_jurisdictions=["EU"],
+            approved_synthetic_datasets=["syn_a_v1", "syn_b_v1"],
+            max_queries_total=10,
+            max_queries_per_institution=5,
+            duration_days=7,
+            principal=pilot_test_env["principal_op"],
+            topology={
+                "bank_a_worker_url": f"http://127.0.0.1:{docker_topology['port_a']}",
+                "bank_b_worker_url": f"http://127.0.0.1:{docker_topology['port_b']}",
+                "coordinator_url": coord_url,
+            },
+        )
+        pilot_svc.run_preflight(race_pilot_id, principal=pilot_test_env["principal_op"])
+        sig_race_a = id_a.sign(canonical_pilot_approval_bytes(
+            pilot_id=race_pilot_id,
+            scope_digest=race_pilot_ent.scope_digest,
+            config_revision=race_pilot_ent.config.revision,
+            approving_bank_id="bank_a",
+            approving_principal_id="admin_bank_a",
+        ))
+        sig_race_b = id_b.sign(canonical_pilot_approval_bytes(
+            pilot_id=race_pilot_id,
+            scope_digest=race_pilot_ent.scope_digest,
+            config_revision=race_pilot_ent.config.revision,
+            approving_bank_id="bank_b",
+            approving_principal_id="admin_bank_b",
+        ))
+        pilot_svc.approve_pilot(race_pilot_id, "bank_a", principal=pilot_test_env["principal_a"], signature=sig_race_a)
+        pilot_svc.approve_pilot(race_pilot_id, "bank_b", principal=pilot_test_env["principal_b"], signature=sig_race_b)
+        pilot_svc.approve_pilot(race_pilot_id, "consortium", principal=pilot_test_env["principal_op"])
+        pilot_svc.activate_pilot(race_pilot_id, principal=pilot_test_env["principal_op"])
+        p_active_check = pilot_svc.get_pilot(race_pilot_id)
+        assert p_active_check is not None and p_active_check.status == PilotStatus.ACTIVE
+
+        # Create investigation case owned by Bank A
+        case_race_resp = test_client.post(
+            "/api/v1/cases",
+            json={
+                "title": "Milestone 5 Operational Race Investigation Case",
+                "priority": "p1_critical",
+                "bank_id": "bank_a",
+            },
+            headers=auth_headers,
+        )
+        assert case_race_resp.status_code == 200, f"Case creation failed: {case_race_resp.text}"
+        case_race_id = case_race_resp.json()["id"]
+
+        op_headers = {"Authorization": f"Bearer {pilot_test_env['token_op']}"}
+
+        # 3. & 4. & 5. Hold actual execution immediately before result finalization using deterministic hook
+        hook_called_for_pilot = []
+
+        def _deterministic_pause_hook(effective_pilot_id: str) -> None:
+            if effective_pilot_id == race_pilot_id:
+                hook_called_for_pilot.append(effective_pilot_id)
+                # 5. PAUSE the pilot through its authorized HTTP endpoint
+                pause_http_resp = test_client.post(
+                    f"/api/v1/pilots/{race_pilot_id}/pause",
+                    json={"reason": "Adversarial mid-flight pause race containment verification"},
+                    headers=op_headers,
+                )
+                assert pause_http_resp.status_code == 200
+                assert pause_http_resp.json()["status"] == "PAUSED"
+
+        cbi_svc._before_result_admission_hook = _deterministic_pause_hook
+
+        race_query_payload = {
+            "consortium_id": "consortium_pilot_m5",
+            "requesting_bank_id": "bank_a",
+            "target_bank_id": "bank_b",
+            "query_entity_id": ent_race_a_id,
+            "case_id": case_race_id,
+            "purpose": "AML_INVESTIGATION",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "use_established_psi": True,
+            "require_established_psi": True,
+            "protocol": "OPENMINED-PSI-2.0.6-ECDH",
+            "pilot_id": race_pilot_id,
+        }
+
+        # 6. Allow genuine PSI execution to complete through HTTP app
+        race_query_resp = test_client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=race_query_payload,
+            headers=auth_headers,
+        )
+
+        # 7. Assert query cannot issue an authoritative successful result
+        assert len(hook_called_for_pilot) == 1, "Synchronization hook was not invoked before admission"
+        assert race_query_resp.status_code in (400, 403, 409), f"Query should have failed closed: {race_query_resp.text}"
+        assert "paused" in race_query_resp.text.lower() or "governance" in race_query_resp.text.lower()
+
+        # 8. Verify that the durable reservation was NOT committed (released/aborted)
+        with pilot_store._lock, pilot_store._get_connection() as conn:
+            cur = conn.execute(
+                "SELECT status, finalized_at FROM pilot_query_reservations WHERE pilot_id = ? ORDER BY reserved_at DESC LIMIT 1;",
+                (race_pilot_id,),
+            )
+            res_row = cur.fetchone()
+            assert res_row is not None, "Durable reservation record should exist"
+            assert res_row["status"] != "COMMITTED", "Reservation must NOT be committed on paused pilot"
+            assert res_row["status"] in ("RELEASED", "ABORTED", "FAILED")
+
+        # 9. Verify that no attachable authoritative signal became visible
+        fallback = getattr(cbi_svc._signal_store, "_fallback_store", {})
+        for sig_id, sig_rec in fallback.items():
+            if isinstance(sig_rec, dict) and sig_rec.get("pilot_id") == race_pilot_id:
+                assert sig_rec.get("admission_status") != "COMMITTED"
+                assert sig_rec.get("is_attachable") is not True
+
+        # 10. Verify that the actual case evidence endpoint rejects the result
+        attach_race_denied = test_client.post(
+            f"/api/v1/cases/{case_race_id}/evidence/cross-bank-intelligence",
+            json={
+                "signal_id": f"uncommitted_sig_{race_pilot_id}",
+                "notes": "Attempting to attach uncommitted mid-flight signal",
+            },
+            headers=auth_headers,
+        )
+        assert attach_race_denied.status_code in (400, 404), f"Case attachment should have been rejected: {attach_race_denied.text}"
+
+        # 11. RESUME only after valid authenticated readiness checks
+        resume_http_resp = test_client.post(
+            f"/api/v1/pilots/{race_pilot_id}/resume",
+            json={"reason": "Operational incident containment cleared by operator"},
+            headers=op_headers,
+        )
+        assert resume_http_resp.status_code == 200, f"Pilot resume failed: {resume_http_resp.text}"
+        assert resume_http_resp.json()["status"] == "ACTIVE"
+        p_resumed_check = pilot_svc.get_pilot(race_pilot_id)
+        assert p_resumed_check is not None and p_resumed_check.status == PilotStatus.ACTIVE
+
+        # 12. Verify that a fresh authorized PSI query can succeed and attach legitimately
+        cbi_svc._before_result_admission_hook = None  # Remove pause hook for normal run
+        fresh_query_resp = test_client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=race_query_payload,
+            headers=auth_headers,
+        )
+        assert fresh_query_resp.status_code == 200, f"Fresh query post-resume failed: {fresh_query_resp.text}"
+        fresh_signal = fresh_query_resp.json()
+        assert fresh_signal["match_confirmed"] is True
+        fresh_sig_id = fresh_signal["signal_id"]
+
+        # Verify durable reservation is now COMMITTED
+        with pilot_store._lock, pilot_store._get_connection() as conn:
+            cur = conn.execute(
+                "SELECT status, signal_id FROM pilot_query_reservations WHERE pilot_id = ? AND status = 'COMMITTED';",
+                (race_pilot_id,),
+            )
+            committed_row = cur.fetchone()
+            assert committed_row is not None, "Reservation must be COMMITTED for fresh successful query"
+            assert committed_row["signal_id"] == fresh_sig_id
+
+        # Attach to case evidence legitimately
+        attach_fresh_resp = test_client.post(
+            f"/api/v1/cases/{case_race_id}/evidence/cross-bank-intelligence",
+            json={
+                "signal_id": fresh_sig_id,
+                "notes": "Milestone 5 legitimate verified post-resumption evidence",
+            },
+            headers=auth_headers,
+        )
+        assert attach_fresh_resp.status_code == 200, f"Fresh evidence attachment failed: {attach_fresh_resp.text}"
+
+        # 13. Verify that a query omitting pilot_id cannot bypass a paused governing pilot
+        # Pause governing pilot again via HTTP endpoint
+        pause_again_resp = test_client.post(
+            f"/api/v1/pilots/{race_pilot_id}/pause",
+            json={"reason": "Paused for omission bypass verification"},
+            headers=op_headers,
+        )
+        assert pause_again_resp.status_code == 200
+        assert pause_again_resp.json()["status"] == "PAUSED"
+
+        query_payload_omitted = dict(race_query_payload)
+        del query_payload_omitted["pilot_id"]
+
+        omission_resp = test_client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=query_payload_omitted,
+            headers=auth_headers,
+        )
+        assert omission_resp.status_code in (400, 403), f"Omission query should have failed: {omission_resp.text}"
+        assert "paused" in omission_resp.text.lower() or "governance" in omission_resp.text.lower()
 
 
 # ==============================================================================

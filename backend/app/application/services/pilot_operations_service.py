@@ -186,7 +186,7 @@ class PilotOperationsService:
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
         try:
             addr_info = socket.getaddrinfo(hostname, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
-            resolved_ips = [ai[4][0] for ai in addr_info]
+            resolved_ips: list[str] = [str(ai[4][0]) for ai in addr_info]
         except Exception as dns_exc:
             return False, f"DNS_RESOLUTION_FAILED: Cannot resolve host '{hostname}': {dns_exc}"
 
@@ -201,11 +201,10 @@ class PilotOperationsService:
                 return False, f"SSRF_PROHIBITED: Loopback address '{ip_str}' rejected outside verified test environment."
 
         probe_nonce = secrets.token_hex(16)
-        probe_path = (
-            f"{clean_url}/worker/health?nonce={probe_nonce}"
-            if expected_type == "worker"
-            else f"{clean_url}/health?nonce={probe_nonce}"
-        )
+        target_ip: str = resolved_ips[0]
+        ip_formatted = f"[{target_ip}]" if ":" in target_ip else target_ip
+        sub_path = "/worker/health" if expected_type == "worker" else "/health"
+        probe_path = f"{parsed.scheme}://{ip_formatted}:{port}{sub_path}?nonce={probe_nonce}"
 
         class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
             def http_error_302(self, req, fp, code, msg, headers):
@@ -215,6 +214,7 @@ class PilotOperationsService:
         try:
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirectHandler())
             req = urllib.request.Request(probe_path, method="GET")
+            req.add_header("Host", parsed.netloc)
             req.add_header("User-Agent", "CFI-Pilot-Preflight/1.0")
             with opener.open(req, timeout=2.0) as resp:
                 if resp.status != 200:
@@ -229,26 +229,27 @@ class PilotOperationsService:
                 if status_val not in ("ONLINE", "HEALTHY"):
                     return False, f"UNHEALTHY_STATUS: Node reported status '{data.get('status')}'."
 
-                # Verify challenge nonce
+                # Verify challenge nonce strictly (must exist and match probe_nonce)
                 resp_nonce = str(data.get("nonce", "")).strip()
-                if resp_nonce and resp_nonce != probe_nonce:
+                if not resp_nonce or resp_nonce != probe_nonce:
                     return False, (
-                        f"AUTHENTICATION_FAILED: Challenge nonce mismatch "
+                        f"AUTHENTICATION_FAILED: Challenge nonce mismatch or missing "
                         f"(received '{resp_nonce}', expected '{probe_nonce}')."
                     )
 
-                # Verify timestamp freshness
+                # Verify timestamp freshness strictly (< 300 seconds)
                 resp_ts_str = str(data.get("timestamp", "")).strip()
-                if resp_ts_str:
-                    try:
-                        resp_ts = datetime.datetime.fromisoformat(resp_ts_str)
-                        if resp_ts.tzinfo is None:
-                            resp_ts = resp_ts.replace(tzinfo=UTC)
-                        now_utc = datetime.datetime.now(UTC)
-                        if abs((now_utc - resp_ts).total_seconds()) > 300:
-                            return False, f"AUTHENTICATION_FAILED: Stale readiness timestamp '{resp_ts_str}'."
-                    except Exception:
-                        return False, f"AUTHENTICATION_FAILED: Invalid readiness timestamp format '{resp_ts_str}'."
+                if not resp_ts_str:
+                    return False, "AUTHENTICATION_FAILED: Missing readiness timestamp in node health response."
+                try:
+                    resp_ts = datetime.datetime.fromisoformat(resp_ts_str)
+                    if resp_ts.tzinfo is None:
+                        resp_ts = resp_ts.replace(tzinfo=UTC)
+                    now_utc = datetime.datetime.now(UTC)
+                    if abs((now_utc - resp_ts).total_seconds()) > 300:
+                        return False, f"AUTHENTICATION_FAILED: Stale readiness timestamp '{resp_ts_str}'."
+                except Exception:
+                    return False, f"AUTHENTICATION_FAILED: Invalid readiness timestamp format '{resp_ts_str}'."
 
                 if expected_type == "worker":
                     clean_expected = (expected_bank_id or "").lower().strip()
@@ -277,7 +278,7 @@ class PilotOperationsService:
 
                     canonical_stmt = canonical_worker_readiness_bytes(
                         bank_id=clean_expected,
-                        nonce=resp_nonce or probe_nonce,
+                        nonce=resp_nonce,
                         timestamp=resp_ts_str,
                         protocol=protocol or "OPENMINED-PSI-2.0.6-ECDH",
                     )
@@ -293,17 +294,42 @@ class PilotOperationsService:
                     if resp_role != "coordinator":
                         return False, f"IDENTITY_MISMATCH: Coordinator endpoint at '{clean_url}' returned role '{resp_role}', expected 'coordinator'."
 
-                    coord_secret = os.environ.get("CFI_COORDINATOR_SECRET", "")
-                    if coord_secret:
-                        canonical_coord = canonical_coordinator_readiness_bytes(
-                            nonce=resp_nonce or probe_nonce,
-                            timestamp=resp_ts_str,
-                            role="coordinator",
+                    coord_secret = (
+                        os.environ.get("CFI_COORDINATOR_SECRET", "")
+                        or os.environ.get("COORDINATOR_SECRET", "")
+                        or os.environ.get("COORDINATOR_AUTH_SECRET", "")
+                    )
+                    if not coord_secret or not coord_secret.strip():
+                        return False, (
+                            "AUTHENTICATION_FAILED: Coordinator workload authentication secret is missing or unconfigured. "
+                            "Every operational pilot must configure an independently trusted coordinator credential."
                         )
-                        expected_sig = hmac.new(coord_secret.encode("utf-8"), canonical_coord, hashlib.sha256).hexdigest()
-                        actual_sig = str(data.get("coordinator_signature", "")).strip()
-                        if not actual_sig or not hmac.compare_digest(actual_sig, expected_sig):
-                            return False, "AUTHENTICATION_FAILED: Coordinator HMAC readiness signature verification failed."
+
+                    coord_id = str(data.get("coordinator_id", "coordinator")).strip()
+                    if not coord_id:
+                        return False, "IDENTITY_MISMATCH: Coordinator endpoint returned empty coordinator_id."
+
+                    coord_proto = str(data.get("protocol", "OPENMINED-PSI-2.0.6-ECDH")).strip()
+                    if coord_proto != "OPENMINED-PSI-2.0.6-ECDH":
+                        return False, f"PROTOCOL_UNSUPPORTED: Coordinator reported protocol '{coord_proto}', expected 'OPENMINED-PSI-2.0.6-ECDH'."
+
+                    actual_sig = str(data.get("coordinator_signature", "")).strip()
+                    if not actual_sig:
+                        return False, (
+                            f"AUTHENTICATION_FAILED: Coordinator endpoint at '{clean_url}' returned unsigned health response "
+                            "without cryptographic coordinator workload signature."
+                        )
+
+                    canonical_coord = canonical_coordinator_readiness_bytes(
+                        nonce=resp_nonce,
+                        timestamp=resp_ts_str,
+                        role="coordinator",
+                        coordinator_id=coord_id,
+                        protocol=coord_proto,
+                    )
+                    expected_sig = hmac.new(coord_secret.encode("utf-8"), canonical_coord, hashlib.sha256).hexdigest()
+                    if not hmac.compare_digest(actual_sig, expected_sig):
+                        return False, "AUTHENTICATION_FAILED: Coordinator HMAC readiness signature verification failed."
 
                 return True, f"ONLINE (type={expected_type}, bank={expected_bank_id or 'coord'}, protocol=OPENMINED-PSI-2.0.6-ECDH, authenticated=True)"
         except Exception as exc:

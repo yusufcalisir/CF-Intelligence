@@ -7,7 +7,6 @@ provisioning tenant schemas, downloading root CA trust bundles, and retrieving o
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
@@ -150,53 +149,15 @@ def _validate_institutional_csr_identity(csr: Any, expected_bank_id: str) -> Non
 
     Prevents lookalike institution IDs, ambiguous naming, and substring injection.
     """
-    from cryptography import x509
-    from cryptography.x509.oid import NameOID
+    from app.domain.institutional_identity import validate_institutional_csr_identity
 
-    clean_bank = expected_bank_id.lower().strip()
-    if not re.match(r"^[a-zA-Z0-9_-]{3,36}$", clean_bank):
+    try:
+        validate_institutional_csr_identity(csr, expected_bank_id)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid institutional bank_id format: '{expected_bank_id}'.",
-        )
-
-    # 1. Subject Common Name verification
-    cns = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-    if not cns:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"CSR Subject must include Common Name for bank_id '{expected_bank_id}'.",
-        )
-    cn_val = str(cns[0].value).lower().strip()
-
-    canonical_fqdn = f"{clean_bank}.client.cf-intelligence.io"
-    canonical_worker_fqdn = f"{clean_bank}.worker.cf-intelligence.io"
-    cn_prefix = cn_val.split(".")[0].strip()
-
-    if cn_val not in (clean_bank, canonical_fqdn, canonical_worker_fqdn) and cn_prefix != clean_bank:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"CSR Subject Common Name '{cn_val}' does not match authorized canonical identity "
-                f"for bank_id '{expected_bank_id}'. Substring, lookalike, or unapproved identities are rejected."
-            ),
-        )
-
-    # 2. Subject Alternative Name verification (if present)
-    for ext in csr.extensions:
-        if isinstance(ext.value, x509.SubjectAlternativeName):
-            san_names = ext.value.get_values_for_type(x509.DNSName)
-            for san in san_names:
-                san_clean = san.lower().strip()
-                san_prefix = san_clean.split(".")[0].strip()
-                if san_clean not in (clean_bank, canonical_fqdn, canonical_worker_fqdn, "localhost") and san_prefix != clean_bank:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=(
-                            f"CSR Subject Alternative Name '{san}' does not match authorized institutional identity "
-                            f"for bank_id '{expected_bank_id}'."
-                        ),
-                    )
+            detail=str(exc),
+        ) from exc
 
 
 def _require_admin_auth(request: Request) -> AuthenticatedPrincipal:

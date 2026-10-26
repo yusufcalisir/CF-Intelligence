@@ -175,7 +175,6 @@ class BankOnboardingService:
             raise BankNotFoundError(f"Bank with ID {bank_id!r} not found.")
 
         from cryptography import x509
-        from cryptography.x509.oid import NameOID
 
         from app.infrastructure.security.cert_generator import sign_csr_pem
 
@@ -187,18 +186,12 @@ class BankOnboardingService:
         if not parsed_csr.is_signature_valid:
             raise InvalidCSRError("CSR signature verification failed: invalid cryptographic proof-of-possession.")
 
-        cns = parsed_csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-        if not cns:
-            raise InvalidCSRError(f"CSR Subject must include Common Name for bank_id '{bank_id}'.")
-        cn_val = str(cns[0].value).lower().strip()
-        clean_bank = bank_id.lower().strip()
-        canonical_fqdn = f"{clean_bank}.client.cf-intelligence.io"
-        canonical_worker_fqdn = f"{clean_bank}.worker.cf-intelligence.io"
-        cn_prefix = cn_val.split(".")[0].strip()
-        if cn_val not in (clean_bank, canonical_fqdn, canonical_worker_fqdn) and cn_prefix != clean_bank:
-            raise InvalidCSRError(
-                f"CSR Subject Common Name '{cn_val}' does not match authorized canonical identity for '{bank_id}'."
-            )
+        from app.domain.institutional_identity import validate_institutional_csr_identity
+
+        try:
+            validate_institutional_csr_identity(parsed_csr, bank_id)
+        except ValueError as exc:
+            raise InvalidCSRError(str(exc)) from exc
 
         try:
             cert_pem, fingerprint, expires_at = sign_csr_pem(csr_pem, days_valid=days_valid)

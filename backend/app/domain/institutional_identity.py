@@ -15,10 +15,14 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import re
+from typing import Any
 
+from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.x509.oid import NameOID
 
 from app.domain.consortium_governance import ConsortiumSecurityError
 
@@ -41,10 +45,79 @@ def canonical_coordinator_readiness_bytes(
     nonce: str,
     timestamp: str,
     role: str = "coordinator",
+    coordinator_id: str = "coordinator",
+    protocol: str = "OPENMINED-PSI-2.0.6-ECDH",
 ) -> bytes:
     """Construct canonical byte representation for coordinator readiness authentication."""
-    canonical = f"COORDINATOR_READINESS:{role.strip()}:{nonce.strip()}:{timestamp.strip()}"
+    canonical = (
+        f"COORDINATOR_READINESS:{role.strip()}:{coordinator_id.strip()}:"
+        f"{nonce.strip()}:{timestamp.strip()}:{protocol.strip()}"
+    )
     return canonical.encode("utf-8")
+
+
+def validate_institutional_csr_identity(csr: Any, expected_bank_id: str) -> None:
+    """Strictly validates that an institutional CSR binds to authorized canonical identities.
+
+    Enforces:
+    - Exact canonical Common Name matching: {bank_id}, {bank_id}.client.cf-intelligence.io, or {bank_id}.worker.cf-intelligence.io
+    - Rejection of lookalike institution IDs, substring injections, and unapproved domain suffixes
+    - Rejection of wildcard CN and wildcard SAN entries
+    - Independent verification of all Subject Alternative Names (SANs); every entry must be authorized
+    - Rejection of cross-institution identity substitution (e.g. Bank B identity in Bank A enrollment)
+
+    Raises:
+        ValueError: If the CSR identity, Common Name, or SAN fails validation.
+    """
+    clean_bank = expected_bank_id.lower().strip()
+    if not re.match(r"^[a-zA-Z0-9_-]{3,36}$", clean_bank):
+        raise ValueError(f"Invalid institutional bank_id format: '{expected_bank_id}'.")
+
+    approved_identities = {
+        clean_bank,
+        f"{clean_bank}.client.cf-intelligence.io",
+        f"{clean_bank}.worker.cf-intelligence.io",
+    }
+    allowed_san_identities = approved_identities | {"localhost", "127.0.0.1"}
+
+    # 1. Subject Common Name verification
+    cns = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+    if not cns:
+        raise ValueError(f"CSR Subject must include Common Name for bank_id '{expected_bank_id}'.")
+    cn_val = str(cns[0].value).lower().strip()
+
+    if "*" in cn_val:
+        raise ValueError(f"Wildcard Common Name '{cn_val}' is strictly forbidden.")
+
+    # Exact match only: reject any lookalikes, prefix substrings, or unauthorized domain suffixes
+    if cn_val not in approved_identities:
+        raise ValueError(
+            f"CSR Subject Common Name '{cn_val}' does not match authorized canonical identity "
+            f"for bank_id '{expected_bank_id}'. Expected one of {sorted(approved_identities)}. "
+            "Substring, lookalike, and unapproved suffix identities are rejected."
+        )
+
+    # 2. Subject Alternative Name verification (if present)
+    for ext in csr.extensions:
+        if isinstance(ext.value, x509.SubjectAlternativeName):
+            san_names = ext.value.get_values_for_type(x509.DNSName)
+            for san in san_names:
+                san_clean = san.lower().strip()
+                if "*" in san_clean:
+                    raise ValueError(f"Wildcard Subject Alternative Name '{san}' is strictly forbidden.")
+                if san_clean not in allowed_san_identities:
+                    raise ValueError(
+                        f"CSR Subject Alternative Name '{san}' does not match authorized institutional identity "
+                        f"for bank_id '{expected_bank_id}'. Every SAN entry must be approved."
+                    )
+            san_ips = ext.value.get_values_for_type(x509.IPAddress)
+            for ip in san_ips:
+                ip_str = str(ip).strip()
+                if ip_str not in ("127.0.0.1", "::1"):
+                    raise ValueError(
+                        f"CSR IP SAN '{ip_str}' is not an authorized IP address for bank_id '{expected_bank_id}'."
+                    )
+
 
 
 def canonical_counterpart_evidence_bytes(

@@ -2840,9 +2840,13 @@ class InstitutionalCoordinatorDaemon:
 
                 if parsed_url.path in ("/health", "/coordinator/health"):
                     now_iso = datetime.datetime.now(UTC).isoformat()
+                    coord_id = str(getattr(coord, "coordinator_id", "coordinator")).strip()
+                    proto = "OPENMINED-PSI-2.0.6-ECDH"
                     resp_data: dict[str, Any] = {
                         "status": "ONLINE",
                         "role": "coordinator",
+                        "coordinator_id": coord_id,
+                        "protocol": proto,
                         "registered_workers": list(coord._workers.keys()),
                         "pid": os.getpid(),
                         "timestamp": now_iso,
@@ -2858,6 +2862,8 @@ class InstitutionalCoordinatorDaemon:
                             nonce=nonce,
                             timestamp=now_iso,
                             role="coordinator",
+                            coordinator_id=coord_id,
+                            protocol=proto,
                         )
                         resp_data["coordinator_signature"] = hmac.new(
                             coord_sec.encode("utf-8"), canonical_stmt, hashlib.sha256
