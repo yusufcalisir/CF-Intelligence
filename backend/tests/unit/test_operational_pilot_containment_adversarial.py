@@ -1107,3 +1107,231 @@ def test_coordinator_authentication_mandatory_negative_controls(
     finally:
         adv_server.shutdown()
         adv_server.server_close()
+
+
+# ==============================================================================
+# P0 — Final Durable Publication Linearization & Crash Consistency Closure
+# ==============================================================================
+
+
+def test_process_crash_after_preparation_before_redis_completion(containment_env: dict[str, Any]) -> None:
+    """Process failure after publication preparation leaves reservation in PUBLICATION_PREPARED.
+
+    Evidence attachment must fail closed because signal is not published in Redis
+    and reservation is not PUBLISHED in SQLite.
+    """
+    svc: PilotOperationsService = containment_env["pilot_svc"]
+    pilot = _create_and_activate_pilot(containment_env, pilot_id="pilot_crash_prep_01")
+    p_id = pilot.config.pilot_id
+
+    # Reserve and commit query reservation
+    res_id = "res_crash_01"
+    svc.reserve_query_slot(p_id, "bank_a", "bank_b", "AML_INVESTIGATION", res_id)
+    sig_id = f"sig_{uuid.uuid4().hex}"
+    rcp_id = f"rcp_{uuid.uuid4().hex}"
+    svc.commit_query_reservation(res_id, p_id, rcp_id, latency_ms=10.0, match_confirmed=True, signal_id=sig_id, case_id="case_01")
+
+    # Step 1: Prepare publication (sets PUBLICATION_PREPARED with fence)
+    fence = svc.prepare_query_publication(res_id, p_id, sig_id, rcp_id)
+    assert fence.startswith("fence_")
+
+    # Verify SQLite state is PUBLICATION_PREPARED
+    res_row = svc.store.get_query_reservation(res_id)
+    assert res_row is not None
+    assert res_row["status"] == "PUBLICATION_PREPARED"
+    assert res_row["publication_fence"] == fence
+    assert res_row["signal_id"] == sig_id
+    assert res_row["receipt_id"] == rcp_id
+
+    # Step 2: Simulate process crash before publication finalization and Redis write
+    cbi_svc = CrossBankIntelligenceService(consortium_service=containment_env["gov_svc"])
+    # Case evidence attachment must fail closed because signal is not in Redis
+    with pytest.raises(ValueError, match="Authoritative signal .* not found"):
+        cbi_svc.attach_signal_to_case_evidence(case_id="case_01", signal_id=sig_id, case_bank="bank_a")
+
+    # Even if an unfinalized record exists in Redis with publication_status=PUBLICATION_PREPARED
+    cbi_svc._signal_store.set(sig_id, {
+        "signal_id": sig_id,
+        "pilot_id": p_id,
+        "reservation_id": res_id,
+        "receipt_id": rcp_id,
+        "requesting_bank_id": "bank_a",
+        "target_bank_id": "bank_b",
+        "purpose": "AML_INVESTIGATION",
+        "admission_status": "COMMITTED",
+        "publication_status": "PUBLICATION_PREPARED",
+        "is_authoritative": False,
+        "is_attachable": False,
+        "consortium_id": "c_containment",
+        "query_entity_id": "ent_01",
+        "issued_to_principal": "analyst",
+        "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+    })
+    with pytest.raises(ConsortiumSecurityError, match="is marked non-authoritative or unattachable"):
+        cbi_svc.attach_signal_to_case_evidence(case_id="case_01", signal_id=sig_id, case_bank="bank_a")
+
+    # If attacker attempts to claim authoritative in Redis, SQLite durable check fails closed
+    cbi_svc._signal_store.set(sig_id, {
+        "signal_id": sig_id,
+        "pilot_id": p_id,
+        "reservation_id": res_id,
+        "receipt_id": rcp_id,
+        "requesting_bank_id": "bank_a",
+        "target_bank_id": "bank_b",
+        "purpose": "AML_INVESTIGATION",
+        "admission_status": "COMMITTED",
+        "publication_status": "PUBLISHED",
+        "is_authoritative": True,
+        "is_attachable": True,
+        "consortium_id": "c_containment",
+        "query_entity_id": "ent_01",
+        "issued_to_principal": "analyst",
+        "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+    })
+    with pytest.raises(ConsortiumSecurityError, match="publication status is 'PUBLICATION_PREPARED', not PUBLISHED"):
+        cbi_svc.attach_signal_to_case_evidence(case_id="case_01", signal_id=sig_id, case_bank="bank_a")
+
+
+def test_redis_publication_failure_records_failed(containment_env: dict[str, Any]) -> None:
+    """Simulated physical publication failure records PUBLICATION_FAILED and prevents phantom published state."""
+    svc: PilotOperationsService = containment_env["pilot_svc"]
+    pilot = _create_and_activate_pilot(containment_env, pilot_id="pilot_redis_fail_01")
+    p_id = pilot.config.pilot_id
+
+    res_id = "res_redis_fail_01"
+    svc.reserve_query_slot(p_id, "bank_a", "bank_b", "AML_INVESTIGATION", res_id)
+    sig_id = f"sig_{uuid.uuid4().hex}"
+    rcp_id = f"rcp_{uuid.uuid4().hex}"
+    svc.commit_query_reservation(res_id, p_id, rcp_id, latency_ms=10.0, match_confirmed=True, signal_id=sig_id, case_id="case_01")
+
+    # Prepare and finalize publication
+    fence = svc.prepare_query_publication(res_id, p_id, sig_id, rcp_id)
+    svc.finalize_query_publication(res_id, p_id, sig_id, rcp_id, publication_fence=fence)
+
+    # Physical Redis write fails: record_publication_failure transitions reservation to PUBLICATION_FAILED
+    svc.record_publication_failure(res_id, p_id, "Connection to Redis refused (ECONNREFUSED)")
+
+    res_row = svc.store.get_query_reservation(res_id)
+    assert res_row is not None
+    assert res_row["status"] == "PUBLICATION_FAILED"
+    assert "Physical publication failure" in str(res_row["rejection_reason"])
+
+    # Evidence attachment fails closed
+    cbi_svc = CrossBankIntelligenceService(consortium_service=containment_env["gov_svc"])
+    with pytest.raises(ValueError):
+        cbi_svc.attach_signal_to_case_evidence(case_id="case_01", signal_id=sig_id, case_bank="bank_a")
+
+
+def test_two_concurrent_application_processes_attempting_same_publication(containment_env: dict[str, Any]) -> None:
+    """Two concurrent processes attempting identical publication succeed idempotently."""
+    svc: PilotOperationsService = containment_env["pilot_svc"]
+    pilot = _create_and_activate_pilot(containment_env, pilot_id="pilot_concurrent_pub_01")
+    p_id = pilot.config.pilot_id
+
+    res_id = "res_concurrent_01"
+    svc.reserve_query_slot(p_id, "bank_a", "bank_b", "AML_INVESTIGATION", res_id)
+    sig_id = f"sig_{uuid.uuid4().hex}"
+    rcp_id = f"rcp_{uuid.uuid4().hex}"
+    svc.commit_query_reservation(res_id, p_id, rcp_id, latency_ms=10.0, match_confirmed=True, signal_id=sig_id, case_id="case_01")
+
+    fence = svc.prepare_query_publication(res_id, p_id, sig_id, rcp_id)
+
+    # Process A finalizes
+    svc.finalize_query_publication(res_id, p_id, sig_id, rcp_id, publication_fence=fence)
+
+    # Process B attempts to finalize identical publication: succeeds idempotently
+    svc.finalize_query_publication(res_id, p_id, sig_id, rcp_id, publication_fence=fence)
+
+    res_row = svc.store.get_query_reservation(res_id)
+    assert res_row is not None
+    assert res_row["status"] == "PUBLISHED"
+
+
+def test_rebinding_published_reservation_to_different_signal_or_receipt(containment_env: dict[str, Any]) -> None:
+    """Rebinding an already finalized PUBLISHED reservation to a different signal or receipt must fail closed."""
+    svc: PilotOperationsService = containment_env["pilot_svc"]
+    pilot = _create_and_activate_pilot(containment_env, pilot_id="pilot_rebind_01")
+    p_id = pilot.config.pilot_id
+
+    res_id = "res_rebind_01"
+    svc.reserve_query_slot(p_id, "bank_a", "bank_b", "AML_INVESTIGATION", res_id)
+    sig_id = f"sig_{uuid.uuid4().hex}"
+    rcp_id = f"rcp_{uuid.uuid4().hex}"
+    svc.commit_query_reservation(res_id, p_id, rcp_id, latency_ms=10.0, match_confirmed=True, signal_id=sig_id, case_id="case_01")
+
+    fence = svc.prepare_query_publication(res_id, p_id, sig_id, rcp_id)
+    svc.finalize_query_publication(res_id, p_id, sig_id, rcp_id, publication_fence=fence)
+
+    # Attempt to rebind already PUBLISHED reservation to different signal
+    diff_sig = f"sig_fraudulent_{uuid.uuid4().hex}"
+    with pytest.raises(PilotGovernanceError, match="Immutable binding violation"):
+        svc.finalize_query_publication(res_id, p_id, diff_sig, rcp_id)
+
+    # Attempt to rebind already PUBLISHED reservation to different receipt
+    diff_rcp = f"rcp_forged_{uuid.uuid4().hex}"
+    with pytest.raises(PilotGovernanceError, match="Immutable binding violation"):
+        svc.finalize_query_publication(res_id, p_id, sig_id, diff_rcp)
+
+    # Attempt to prepare already PUBLISHED reservation with different signal
+    with pytest.raises(PilotGovernanceError, match="Immutable binding violation: Reservation '.*' already PUBLISHED"):
+        svc.prepare_query_publication(res_id, p_id, diff_sig, rcp_id)
+
+    # Attempt to mutate status via record_publication_status bypass
+    with pytest.raises(PilotGovernanceError, match="Cannot mutate finalized reservation status 'PUBLISHED'"):
+        svc.record_publication_status(res_id, p_id, "COMMITTED")
+
+
+def test_repeated_identical_publication_attempts_idempotent(containment_env: dict[str, Any]) -> None:
+    """Repeated identical publication attempts are idempotent and do not corrupt state."""
+    svc: PilotOperationsService = containment_env["pilot_svc"]
+    pilot = _create_and_activate_pilot(containment_env, pilot_id="pilot_idempotent_01")
+    p_id = pilot.config.pilot_id
+
+    res_id = "res_idem_01"
+    svc.reserve_query_slot(p_id, "bank_a", "bank_b", "AML_INVESTIGATION", res_id)
+    sig_id = f"sig_{uuid.uuid4().hex}"
+    rcp_id = f"rcp_{uuid.uuid4().hex}"
+    svc.commit_query_reservation(res_id, p_id, rcp_id, latency_ms=10.0, match_confirmed=True, signal_id=sig_id, case_id="case_01")
+
+    fence = svc.prepare_query_publication(res_id, p_id, sig_id, rcp_id)
+    fence2 = svc.prepare_query_publication(res_id, p_id, sig_id, rcp_id)
+    assert fence == fence2
+
+    # Finalize publication
+    svc.finalize_query_publication(res_id, p_id, sig_id, rcp_id, publication_fence=fence)
+
+    # Repeated identical finalization calls succeed idempotently
+    svc.finalize_query_publication(res_id, p_id, sig_id, rcp_id, publication_fence=fence)
+    svc.authorize_and_record_signal_publication(res_id, p_id, sig_id, rcp_id)
+
+    res_row = svc.store.get_query_reservation(res_id)
+    assert res_row is not None
+    assert res_row["status"] == "PUBLISHED"
+
+
+def test_pause_and_publication_competing_at_same_durable_boundary(containment_env: dict[str, Any]) -> None:
+    """PAUSE and publication completion competing at the same durable boundary serialize correctly."""
+    svc: PilotOperationsService = containment_env["pilot_svc"]
+    pilot = _create_and_activate_pilot(containment_env, pilot_id="pilot_compete_01")
+    p_id = pilot.config.pilot_id
+
+    res_id = "res_compete_01"
+    svc.reserve_query_slot(p_id, "bank_a", "bank_b", "AML_INVESTIGATION", res_id)
+    sig_id = f"sig_{uuid.uuid4().hex}"
+    rcp_id = f"rcp_{uuid.uuid4().hex}"
+    svc.commit_query_reservation(res_id, p_id, rcp_id, latency_ms=10.0, match_confirmed=True, signal_id=sig_id, case_id="case_01")
+
+    fence = svc.prepare_query_publication(res_id, p_id, sig_id, rcp_id)
+
+    # Pause pilot while reservation is in PUBLICATION_PREPARED
+    svc.pause_pilot(p_id, principal=containment_env["principal_op"], reason="Compete boundary test")
+
+    # In-flight reservation must have been transitioned to PUBLICATION_REJECTED by pause transaction
+    res_row = svc.store.get_query_reservation(res_id)
+    assert res_row is not None
+    assert res_row["status"] == "PUBLICATION_REJECTED"
+
+    # Any subsequent attempt to finalize publication must fail closed
+    with pytest.raises(PilotGovernanceError, match="Publication rejected: Reservation '.*' was rejected"):
+        svc.finalize_query_publication(res_id, p_id, sig_id, rcp_id, publication_fence=fence)
+

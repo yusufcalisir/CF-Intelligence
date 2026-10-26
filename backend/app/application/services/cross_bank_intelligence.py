@@ -113,6 +113,7 @@ class CrossBankIntelligenceService:
         self._admitted_receipt_ids: set[str] = set()
         self._before_result_admission_hook: Any = None
         self._before_signal_publication_hook: Any = None
+        self._after_publication_preparation_hook: Any = None
         self._lock = threading.RLock()
 
     def _authenticate_principal(
@@ -463,7 +464,7 @@ class CrossBankIntelligenceService:
                     reservation_id = None  # prevent release_query_reservation from treating it as uncommitted in-flight
 
                     # Post-commit publication boundary:
-                    # Test-only synchronization hook after reservation commit and before publication
+                    # Test-only synchronization hook after reservation commit and before publication authorization
                     if self._before_signal_publication_hook is not None:
                         try:
                             self._before_signal_publication_hook(active_pilot_id, signal.signal_id, resolved_receipt_id)
@@ -471,11 +472,28 @@ class CrossBankIntelligenceService:
                             self._before_signal_publication_hook(active_pilot_id)
 
                     try:
-                        pilot_svc.authorize_and_record_signal_publication(
+                        # 1. Prepare publication under store lock (verifies pilot ACTIVE, binds signal/receipt, generates fence)
+                        pub_fence = pilot_svc.prepare_query_publication(
                             reservation_id=committed_res_id,
                             pilot_id=active_pilot_id,
                             signal_id=signal.signal_id,
                             receipt_id=resolved_receipt_id,
+                        )
+
+                        # Test-only synchronization hook after SQLite publication preparation/authorization but before publication finalization
+                        if self._after_publication_preparation_hook is not None:
+                            try:
+                                self._after_publication_preparation_hook(active_pilot_id, signal.signal_id, resolved_receipt_id, committed_res_id)
+                            except TypeError:
+                                self._after_publication_preparation_hook(active_pilot_id, signal.signal_id, resolved_receipt_id)
+
+                        # 2. Definitively finalize publication linearization point under store lock
+                        pilot_svc.finalize_query_publication(
+                            reservation_id=committed_res_id,
+                            pilot_id=active_pilot_id,
+                            signal_id=signal.signal_id,
+                            receipt_id=resolved_receipt_id,
+                            publication_fence=pub_fence,
                         )
                     except Exception as pub_exc:
                         record["admission_status"] = "REJECTED"
@@ -486,13 +504,23 @@ class CrossBankIntelligenceService:
                         self._signal_store.set(signal.signal_id, record)
                         raise
 
+                # 3. Publish authoritative record to Redis only after publication finalization
                 record["admission_status"] = "COMMITTED"
                 record["publication_status"] = "PUBLISHED"
                 record["is_authoritative"] = True
                 record["is_attachable"] = True
                 record["committed_at"] = datetime.datetime.now(UTC).isoformat()
                 record["published_at"] = datetime.datetime.now(UTC).isoformat()
-                self._signal_store.set(signal.signal_id, record)
+                try:
+                    self._signal_store.set(signal.signal_id, record)
+                except Exception as write_exc:
+                    if active_pilot_id and committed_res_id:
+                        pilot_svc.record_publication_failure(
+                            reservation_id=committed_res_id,
+                            pilot_id=active_pilot_id,
+                            error_msg=str(write_exc),
+                        )
+                    raise
                 return signal
 
             if self.matching_coordinator is not None:
@@ -571,7 +599,7 @@ class CrossBankIntelligenceService:
                         reservation_id = None  # prevent release_query_reservation from treating it as uncommitted in-flight
 
                         # Post-commit publication boundary:
-                        # Test-only synchronization hook after reservation commit and before publication
+                        # Test-only synchronization hook after reservation commit and before publication authorization
                         if self._before_signal_publication_hook is not None:
                             try:
                                 self._before_signal_publication_hook(active_pilot_id, signal.signal_id, resolved_receipt_id)
@@ -579,11 +607,28 @@ class CrossBankIntelligenceService:
                                 self._before_signal_publication_hook(active_pilot_id)
 
                         try:
-                            pilot_svc.authorize_and_record_signal_publication(
+                            # 1. Prepare publication under store lock (verifies pilot ACTIVE, binds signal/receipt, generates fence)
+                            pub_fence = pilot_svc.prepare_query_publication(
                                 reservation_id=committed_res_id,
                                 pilot_id=active_pilot_id,
                                 signal_id=signal.signal_id,
                                 receipt_id=resolved_receipt_id,
+                            )
+
+                            # Test-only synchronization hook after SQLite publication preparation/authorization but before publication finalization
+                            if self._after_publication_preparation_hook is not None:
+                                try:
+                                    self._after_publication_preparation_hook(active_pilot_id, signal.signal_id, resolved_receipt_id, committed_res_id)
+                                except TypeError:
+                                    self._after_publication_preparation_hook(active_pilot_id, signal.signal_id, resolved_receipt_id)
+
+                            # 2. Definitively finalize publication linearization point under store lock
+                            pilot_svc.finalize_query_publication(
+                                reservation_id=committed_res_id,
+                                pilot_id=active_pilot_id,
+                                signal_id=signal.signal_id,
+                                receipt_id=resolved_receipt_id,
+                                publication_fence=pub_fence,
                             )
                         except Exception as pub_exc:
                             record["admission_status"] = "REJECTED"
@@ -594,13 +639,23 @@ class CrossBankIntelligenceService:
                             self._signal_store.set(signal.signal_id, record)
                             raise
 
+                    # 3. Publish authoritative record to Redis only after publication finalization
                     record["admission_status"] = "COMMITTED"
                     record["publication_status"] = "PUBLISHED"
                     record["is_authoritative"] = True
                     record["is_attachable"] = True
                     record["committed_at"] = datetime.datetime.now(UTC).isoformat()
                     record["published_at"] = datetime.datetime.now(UTC).isoformat()
-                    self._signal_store.set(signal.signal_id, record)
+                    try:
+                        self._signal_store.set(signal.signal_id, record)
+                    except Exception as write_exc:
+                        if active_pilot_id and committed_res_id:
+                            pilot_svc.record_publication_failure(
+                                reservation_id=committed_res_id,
+                                pilot_id=active_pilot_id,
+                                error_msg=str(write_exc),
+                            )
+                        raise
                     return signal
                 except ConsortiumSecurityError:
                     raise
@@ -1613,6 +1668,11 @@ class CrossBankIntelligenceService:
                 raise ConsortiumSecurityError(
                     f"Execution reservation '{res_id}' is bound to pilot '{durable_res.get('pilot_id')}', does not match '{pilot_id}'."
                 )
+            record_rcp = record.get("receipt_id")
+            if record_rcp and durable_res.get("receipt_id") and durable_res.get("receipt_id") != record_rcp:
+                raise ConsortiumSecurityError(
+                    f"Execution reservation '{res_id}' receipt '{durable_res.get('receipt_id')}' does not match record receipt '{record_rcp}'."
+                )
 
         # Enforce admission state transition: unfinalized or rejected signals cannot enter case evidence
         adm_status = record.get("admission_status")
@@ -1620,6 +1680,12 @@ class CrossBankIntelligenceService:
             raise ConsortiumSecurityError(
                 f"Authoritative signal '{resolved_signal_id}' admission status is '{adm_status}', "
                 f"not COMMITTED. Unfinalized or rejected signals cannot enter case evidence."
+            )
+        pub_status = record.get("publication_status")
+        if pub_status and pub_status != "PUBLISHED":
+            raise ConsortiumSecurityError(
+                f"Authoritative signal '{resolved_signal_id}' publication status is '{pub_status}', "
+                f"not PUBLISHED. Evidence admission requires genuinely finalized authoritative publication."
             )
         if record.get("is_attachable") is False or record.get("is_authoritative") is False:
             raise ConsortiumSecurityError(

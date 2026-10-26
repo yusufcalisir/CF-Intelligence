@@ -17,6 +17,7 @@ import logging
 import os
 import sqlite3
 import threading
+import uuid
 from datetime import UTC
 from typing import Any
 
@@ -109,6 +110,10 @@ class DurablePilotStore:
                 conn.execute("ALTER TABLE pilot_query_reservations ADD COLUMN published_at TEXT;")
             if "rejection_reason" not in res_cols:
                 conn.execute("ALTER TABLE pilot_query_reservations ADD COLUMN rejection_reason TEXT;")
+            if "prepared_at" not in res_cols:
+                conn.execute("ALTER TABLE pilot_query_reservations ADD COLUMN prepared_at TEXT;")
+            if "publication_fence" not in res_cols:
+                conn.execute("ALTER TABLE pilot_query_reservations ADD COLUMN publication_fence TEXT;")
 
             conn.execute("CREATE INDEX IF NOT EXISTS idx_pilot_status ON pilot_operations(status);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_pilot_consortium ON pilot_operations(consortium_id);")
@@ -170,6 +175,24 @@ class DurablePilotStore:
                     raise PilotGovernanceError(
                         f"Optimistic concurrency violation: Pilot '{entity.config.pilot_id}' state was concurrently modified."
                     )
+                if entity.status == PilotStatus.PAUSED:
+                    now_iso_pause = datetime.datetime.now(UTC).isoformat()
+                    conn.execute("""
+                        UPDATE pilot_query_reservations SET
+                            status = 'PUBLICATION_REJECTED',
+                            finalized_at = ?,
+                            rejection_reason = 'Pilot transitioned to PAUSED while publication was pending'
+                        WHERE pilot_id = ? AND status = 'PUBLICATION_PREPARED';
+                    """, (now_iso_pause, entity.config.pilot_id))
+                elif entity.status in (PilotStatus.ABORTED, PilotStatus.COMPLETED, PilotStatus.FAILED):
+                    now_iso_term = datetime.datetime.now(UTC).isoformat()
+                    conn.execute("""
+                        UPDATE pilot_query_reservations SET
+                            status = 'PUBLICATION_REJECTED',
+                            finalized_at = ?,
+                            rejection_reason = 'Pilot transitioned to terminal status while publication was pending'
+                        WHERE pilot_id = ? AND status = 'PUBLICATION_PREPARED';
+                    """, (now_iso_term, entity.config.pilot_id))
             else:
                 entity.state_version = 1
                 data_json = json.dumps(entity.to_dict(), separators=(",", ":"))
@@ -359,44 +382,223 @@ class DurablePilotStore:
             conn.commit()
             return entity, receipt
 
-    def authorize_and_record_publication(
+    def prepare_query_publication(
         self,
         reservation_id: str,
         pilot_id: str,
         signal_id: str,
         receipt_id: str,
-    ) -> None:
-        """Atomically authorize and record authoritative signal publication under exclusive store lock.
+    ) -> str:
+        """Atomically authorize and prepare publication for a COMMITTED reservation.
 
-        Enforces post-commit publication boundary:
-        - Re-checks pilot state is ACTIVE.
-        - If pilot has transitioned to PAUSED/ABORTED/TERMINATED, publication is rejected,
-          reservation status transitions to 'PUBLICATION_REJECTED', and PilotGovernanceError is raised.
-        - If pilot is ACTIVE, reservation status transitions to 'PUBLISHED' with exact
-          bindings to signal_id and receipt_id.
+        Transitions reservation from 'COMMITTED' to 'PUBLICATION_PREPARED' under exclusive lock.
+        Generates and binds a durable publication_fence to serialize publication completion.
+
+        Enforces:
+        - Pilot must currently be ACTIVE.
+        - Reservation must exist and belong to pilot_id.
+        - If pilot is non-active, transitions reservation to 'PUBLICATION_REJECTED' and fails closed.
+        - Idempotent: if already PUBLICATION_PREPARED with identical signal_id and receipt_id,
+          revalidates pilot ACTIVE and returns existing fence.
+        - Immutable binding: if reservation was already PUBLISHED or PREPARED with a DIFFERENT
+          signal_id or receipt_id, raises PilotGovernanceError.
         """
         clean_pilot_id = pilot_id.strip()
         with self._lock, self._get_connection() as conn:
             conn.execute("BEGIN IMMEDIATE;")
             cur_res = conn.execute(
-                "SELECT status, signal_id, receipt_id FROM pilot_query_reservations WHERE reservation_id = ?;",
+                "SELECT status, signal_id, receipt_id, publication_fence, pilot_id FROM pilot_query_reservations WHERE reservation_id = ?;",
                 (reservation_id,),
             )
             res_row = cur_res.fetchone()
             if not res_row:
                 conn.rollback()
-                raise PilotGovernanceError(f"Reservation '{reservation_id}' not found for publication.")
+                raise PilotGovernanceError(f"Reservation '{reservation_id}' not found for publication preparation.")
+
+            if res_row["pilot_id"] != clean_pilot_id:
+                conn.rollback()
+                raise PilotGovernanceError(
+                    f"Reservation '{reservation_id}' belongs to pilot '{res_row['pilot_id']}', not '{clean_pilot_id}'."
+                )
 
             res_status = res_row["status"]
             if res_status == "PUBLICATION_REJECTED":
                 conn.rollback()
                 raise PilotGovernanceError(
-                    f"Publication rejected: Reservation '{reservation_id}' was previously rejected."
+                    f"Publication preparation rejected: Reservation '{reservation_id}' was permanently rejected. "
+                    "Rejected publications cannot be revived."
                 )
-            if res_status not in ("COMMITTED", "PUBLISHED"):
+
+            if res_status == "PUBLISHED":
+                # Idempotent re-check
+                if res_row["signal_id"] == signal_id and res_row["receipt_id"] == receipt_id:
+                    conn.commit()
+                    return str(res_row["publication_fence"] or "ALREADY_PUBLISHED")
                 conn.rollback()
                 raise PilotGovernanceError(
-                    f"Cannot publish reservation '{reservation_id}' in status '{res_status}'. Must be 'COMMITTED'."
+                    f"Immutable binding violation: Reservation '{reservation_id}' already PUBLISHED with signal "
+                    f"'{res_row['signal_id']}'. Cannot reassign to signal '{signal_id}'."
+                )
+
+            if res_status == "PUBLICATION_PREPARED":
+                # Idempotent re-check
+                if res_row["signal_id"] != signal_id or res_row["receipt_id"] != receipt_id:
+                    conn.rollback()
+                    raise PilotGovernanceError(
+                        f"Immutable binding violation: Reservation '{reservation_id}' already PREPARED with different bindings. "
+                        f"(existing: signal={res_row['signal_id']}, receipt={res_row['receipt_id']}; "
+                        f"attempted: signal={signal_id}, receipt={receipt_id})."
+                    )
+                # Re-check pilot governance state
+                cur_p = conn.execute(
+                    "SELECT status FROM pilot_operations WHERE pilot_id = ?;",
+                    (clean_pilot_id,),
+                )
+                p_row = cur_p.fetchone()
+                if not p_row or p_row["status"] != PilotStatus.ACTIVE.value:
+                    now_iso = datetime.datetime.now(UTC).isoformat()
+                    rej_msg = (
+                        f"Pilot '{clean_pilot_id}' transitioned to non-active status '{p_row['status'] if p_row else 'NOT_FOUND'}' "
+                        "prior to publication completion. Publication rejected."
+                    )
+                    conn.execute(
+                        """UPDATE pilot_query_reservations SET
+                            status = 'PUBLICATION_REJECTED',
+                            finalized_at = ?,
+                            rejection_reason = ?
+                        WHERE reservation_id = ?;""",
+                        (now_iso, rej_msg, reservation_id),
+                    )
+                    conn.commit()
+                    raise PilotGovernanceError(rej_msg)
+                conn.commit()
+                return str(res_row["publication_fence"])
+
+            if res_status != "COMMITTED":
+                conn.rollback()
+                raise PilotGovernanceError(
+                    f"Cannot prepare publication for reservation '{reservation_id}' in status '{res_status}'. "
+                    "Must be in COMMITTED state."
+                )
+
+            # Check pilot governance state
+            cur_p = conn.execute(
+                "SELECT status FROM pilot_operations WHERE pilot_id = ?;",
+                (clean_pilot_id,),
+            )
+            p_row = cur_p.fetchone()
+            if not p_row:
+                conn.rollback()
+                raise ValueError(f"Pilot '{clean_pilot_id}' not found.")
+
+            curr_status = p_row["status"]
+            now_iso = datetime.datetime.now(UTC).isoformat()
+            if curr_status != PilotStatus.ACTIVE.value:
+                rej_msg = (
+                    f"Pilot '{clean_pilot_id}' transitioned to non-active status '{curr_status}' "
+                    "prior to authoritative signal publication. Publication rejected."
+                )
+                conn.execute(
+                    """UPDATE pilot_query_reservations SET
+                        status = 'PUBLICATION_REJECTED',
+                        finalized_at = ?,
+                        rejection_reason = ?
+                    WHERE reservation_id = ?;""",
+                    (now_iso, rej_msg, reservation_id),
+                )
+                conn.commit()
+                raise PilotGovernanceError(rej_msg)
+
+            fence = f"fence_{uuid.uuid4().hex[:12]}"
+            conn.execute(
+                """UPDATE pilot_query_reservations SET
+                    status = 'PUBLICATION_PREPARED',
+                    prepared_at = ?,
+                    signal_id = ?,
+                    receipt_id = ?,
+                    publication_fence = ?
+                WHERE reservation_id = ?;""",
+                (now_iso, signal_id, receipt_id, fence, reservation_id),
+            )
+            conn.commit()
+            return fence
+
+    def finalize_query_publication(
+        self,
+        reservation_id: str,
+        pilot_id: str,
+        signal_id: str,
+        receipt_id: str,
+        publication_fence: str | None = None,
+    ) -> None:
+        """Atomically finalize publication completion in SQLite under exclusive store lock.
+
+        This is the definitive, authoritative publication linearization point.
+
+        Enforces:
+        - Reservation must be in 'PUBLICATION_PREPARED' (or idempotent retry on 'PUBLISHED').
+        - Exact immutable binding: signal_id, receipt_id, and publication_fence.
+        - Re-checks pilot governance state: if pilot transitioned to PAUSED/ABORTED,
+          marks reservation as 'PUBLICATION_REJECTED' and raises PilotGovernanceError.
+        - If pilot is ACTIVE, marks reservation as 'PUBLISHED', published_at = now.
+        """
+        clean_pilot_id = pilot_id.strip()
+        with self._lock, self._get_connection() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
+            cur_res = conn.execute(
+                "SELECT status, signal_id, receipt_id, publication_fence, pilot_id FROM pilot_query_reservations WHERE reservation_id = ?;",
+                (reservation_id,),
+            )
+            res_row = cur_res.fetchone()
+            if not res_row:
+                conn.rollback()
+                raise PilotGovernanceError(f"Reservation '{reservation_id}' not found for publication finalization.")
+
+            if res_row["pilot_id"] != clean_pilot_id:
+                conn.rollback()
+                raise PilotGovernanceError(
+                    f"Reservation '{reservation_id}' belongs to pilot '{res_row['pilot_id']}', not '{clean_pilot_id}'."
+                )
+
+            res_status = res_row["status"]
+            if res_status == "PUBLICATION_REJECTED":
+                conn.rollback()
+                raise PilotGovernanceError(
+                    f"Publication rejected: Reservation '{reservation_id}' was rejected. Cannot finalize."
+                )
+
+            if res_status == "PUBLISHED":
+                # Idempotent retry:
+                if res_row["signal_id"] == signal_id and res_row["receipt_id"] == receipt_id:
+                    conn.commit()
+                    return
+                conn.rollback()
+                raise PilotGovernanceError(
+                    f"Immutable binding violation: Reservation '{reservation_id}' already PUBLISHED with signal "
+                    f"'{res_row['signal_id']}'. Cannot rebind to signal '{signal_id}'."
+                )
+
+            if res_status != "PUBLICATION_PREPARED":
+                conn.rollback()
+                raise PilotGovernanceError(
+                    f"Cannot finalize publication for reservation '{reservation_id}' in status '{res_status}'. "
+                    "Must be in PUBLICATION_PREPARED state."
+                )
+
+            # Validate immutable bindings
+            if res_row["signal_id"] != signal_id or res_row["receipt_id"] != receipt_id:
+                conn.rollback()
+                raise PilotGovernanceError(
+                    f"Immutable binding violation during publication finalization: Reservation '{reservation_id}' "
+                    f"prepared for (signal={res_row['signal_id']}, receipt={res_row['receipt_id']}), "
+                    f"attempted finalization with (signal={signal_id}, receipt={receipt_id})."
+                )
+
+            if publication_fence and res_row["publication_fence"] and publication_fence != res_row["publication_fence"]:
+                conn.rollback()
+                raise PilotGovernanceError(
+                    f"Publication fence mismatch for reservation '{reservation_id}': "
+                    f"Expected '{res_row['publication_fence']}', got '{publication_fence}'."
                 )
 
             # Re-check pilot governance state
@@ -412,10 +614,10 @@ class DurablePilotStore:
             curr_status = p_row["status"]
             now_iso = datetime.datetime.now(UTC).isoformat()
             if curr_status != PilotStatus.ACTIVE.value:
-                # Pilot transitioned away from ACTIVE before publication authorization!
+                # Pilot transitioned away from ACTIVE before publication completion!
                 rejection_msg = (
                     f"Pilot '{clean_pilot_id}' transitioned to non-active status '{curr_status}' "
-                    f"prior to authoritative signal publication. Publication rejected."
+                    "prior to publication completion. Publication rejected."
                 )
                 conn.execute(
                     """UPDATE pilot_query_reservations SET
@@ -428,17 +630,61 @@ class DurablePilotStore:
                 conn.commit()
                 raise PilotGovernanceError(rejection_msg)
 
-            # Pilot is ACTIVE: finalize publication
+            # Pilot is ACTIVE: finalize publication!
             conn.execute(
                 """UPDATE pilot_query_reservations SET
                     status = 'PUBLISHED',
-                    published_at = ?,
-                    signal_id = ?,
-                    receipt_id = ?
+                    published_at = ?
                 WHERE reservation_id = ?;""",
-                (now_iso, signal_id, receipt_id, reservation_id),
+                (now_iso, reservation_id),
             )
             conn.commit()
+
+    def record_publication_failure(
+        self,
+        reservation_id: str,
+        pilot_id: str,
+        error_msg: str,
+    ) -> None:
+        """Record physical storage publication failure (e.g. Redis storage write failed).
+
+        Transitions reservation from 'PUBLICATION_PREPARED' or 'PUBLISHED' to 'PUBLICATION_FAILED',
+        preventing inconsistent phantom published states.
+        """
+        now_iso = datetime.datetime.now(UTC).isoformat()
+        with self._lock, self._get_connection() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
+            conn.execute(
+                """UPDATE pilot_query_reservations SET
+                    status = 'PUBLICATION_FAILED',
+                    finalized_at = ?,
+                    rejection_reason = ?
+                WHERE reservation_id = ? AND pilot_id = ?;""",
+                (now_iso, f"Physical publication failure: {error_msg}", reservation_id, pilot_id.strip()),
+            )
+            conn.commit()
+
+    def authorize_and_record_publication(
+        self,
+        reservation_id: str,
+        pilot_id: str,
+        signal_id: str,
+        receipt_id: str,
+    ) -> None:
+        """Atomically authorize, prepare, and finalize publication under store lock."""
+        fence = self.prepare_query_publication(
+            reservation_id=reservation_id,
+            pilot_id=pilot_id,
+            signal_id=signal_id,
+            receipt_id=receipt_id,
+        )
+        self.finalize_query_publication(
+            reservation_id=reservation_id,
+            pilot_id=pilot_id,
+            signal_id=signal_id,
+            receipt_id=receipt_id,
+            publication_fence=fence,
+        )
 
     def record_publication_status(
         self,
@@ -447,16 +693,29 @@ class DurablePilotStore:
         status: str,
         rejection_reason: str | None = None,
     ) -> None:
-        """Explicitly set publication status on reservation."""
-        now_iso = datetime.datetime.now(UTC).isoformat()
+        """Constrained publication status recorder that prevents state machine bypass."""
+        clean_pilot_id = pilot_id.strip()
         with self._lock, self._get_connection() as conn:
             conn.execute("BEGIN IMMEDIATE;")
-            if status == "PUBLISHED":
-                conn.execute(
-                    "UPDATE pilot_query_reservations SET status = 'PUBLISHED', published_at = ? WHERE reservation_id = ?;",
-                    (now_iso, reservation_id),
+            cur = conn.execute(
+                "SELECT status, signal_id, receipt_id, pilot_id FROM pilot_query_reservations WHERE reservation_id = ?;",
+                (reservation_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                conn.rollback()
+                raise PilotGovernanceError(f"Reservation '{reservation_id}' not found.")
+            if row["pilot_id"] != clean_pilot_id:
+                conn.rollback()
+                raise PilotGovernanceError(f"Reservation belongs to pilot '{row['pilot_id']}', not '{clean_pilot_id}'.")
+            curr = row["status"]
+            if curr in ("PUBLISHED", "PUBLICATION_REJECTED") and status != curr:
+                conn.rollback()
+                raise PilotGovernanceError(
+                    f"Cannot mutate finalized reservation status '{curr}' to '{status}'. State is immutable."
                 )
-            elif status == "PUBLICATION_REJECTED":
+            now_iso = datetime.datetime.now(UTC).isoformat()
+            if status == "PUBLICATION_REJECTED":
                 conn.execute(
                     """UPDATE pilot_query_reservations SET
                         status = 'PUBLICATION_REJECTED',
@@ -464,6 +723,16 @@ class DurablePilotStore:
                         rejection_reason = ?
                     WHERE reservation_id = ?;""",
                     (now_iso, rejection_reason or "Publication rejected", reservation_id),
+                )
+            elif status == "PUBLISHED":
+                cur_p = conn.execute("SELECT status FROM pilot_operations WHERE pilot_id = ?;", (clean_pilot_id,))
+                p_row = cur_p.fetchone()
+                if not p_row or p_row["status"] != PilotStatus.ACTIVE.value:
+                    conn.rollback()
+                    raise PilotGovernanceError(f"Cannot mark reservation PUBLISHED when pilot is '{p_row['status'] if p_row else 'NOT_FOUND'}'.")
+                conn.execute(
+                    "UPDATE pilot_query_reservations SET status = 'PUBLISHED', published_at = ? WHERE reservation_id = ?;",
+                    (now_iso, reservation_id),
                 )
             else:
                 conn.execute(

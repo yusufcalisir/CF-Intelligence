@@ -1453,6 +1453,251 @@ def test_gate_e_operational_resilience_and_incident_containment(
         )
         assert attach_pc_ok.status_code == 200, f"Fresh evidence attachment failed: {attach_pc_ok.text}"
 
+        # ==============================================================================
+        # Step 8: Deterministic Real Execution Post-Authorization / Pre-Publication Race Verification
+        # Exercises the exact race boundary: pilot transitions to PAUSED after SQLite publication
+        # preparation/authorization (PUBLICATION_PREPARED) but before authoritative publication finalization and Redis write.
+        # ==============================================================================
+        post_auth_pilot_id = "pilot_resilience_post_auth_01"
+        post_auth_pilot_ent = pilot_svc.provision_pilot(
+            pilot_id=post_auth_pilot_id,
+            consortium_id="consortium_pilot_m5",
+            participating_institutions=["bank_a", "bank_b"],
+            allowed_purposes=["AML_INVESTIGATION"],
+            allowed_jurisdictions=["EU"],
+            approved_synthetic_datasets=["syn_a_v1", "syn_b_v1"],
+            max_queries_total=10,
+            max_queries_per_institution=5,
+            duration_days=7,
+            principal=pilot_test_env["principal_op"],
+            topology={
+                "bank_a_worker_url": f"http://127.0.0.1:{docker_topology['port_a']}",
+                "bank_b_worker_url": f"http://127.0.0.1:{docker_topology['port_b']}",
+                "coordinator_url": coord_url,
+            },
+        )
+        pilot_svc.run_preflight(post_auth_pilot_id, principal=pilot_test_env["principal_op"])
+        sig_pa_a = id_a.sign(canonical_pilot_approval_bytes(
+            pilot_id=post_auth_pilot_id,
+            scope_digest=post_auth_pilot_ent.scope_digest,
+            config_revision=post_auth_pilot_ent.config.revision,
+            approving_bank_id="bank_a",
+            approving_principal_id="admin_bank_a",
+        ))
+        sig_pa_b = id_b.sign(canonical_pilot_approval_bytes(
+            pilot_id=post_auth_pilot_id,
+            scope_digest=post_auth_pilot_ent.scope_digest,
+            config_revision=post_auth_pilot_ent.config.revision,
+            approving_bank_id="bank_b",
+            approving_principal_id="admin_bank_b",
+        ))
+        pilot_svc.approve_pilot(post_auth_pilot_id, "bank_a", principal=pilot_test_env["principal_a"], signature=sig_pa_a)
+        pilot_svc.approve_pilot(post_auth_pilot_id, "bank_b", principal=pilot_test_env["principal_b"], signature=sig_pa_b)
+        pilot_svc.approve_pilot(post_auth_pilot_id, "consortium", principal=pilot_test_env["principal_op"])
+        pilot_svc.activate_pilot(post_auth_pilot_id, principal=pilot_test_env["principal_op"])
+        p_pa_active = pilot_svc.get_pilot(post_auth_pilot_id)
+        assert p_pa_active is not None and p_pa_active.status == PilotStatus.ACTIVE
+
+        # Ingest sovereign private entity for post-auth race into Docker worker vaults
+        shared_pa_iban = "DE77665544332211009988"
+        ent_pa_a_id = "ent_post_auth_subj_a"
+        ent_pa_b_id = "ent_post_auth_subj_b"
+        client_a.store_private_entity({
+            "id": ent_pa_a_id,
+            "bank_id": "bank_a",
+            "entity_type": "account",
+            "raw_identifier": shared_pa_iban,
+            "risk_level": "HIGH",
+            "typologies": ["TERRORIST_FINANCING"],
+        })
+        client_b.store_private_entity({
+            "id": ent_pa_b_id,
+            "bank_id": "bank_b",
+            "entity_type": "account",
+            "raw_identifier": shared_pa_iban,
+            "risk_level": "CRITICAL",
+            "typologies": ["TERRORIST_FINANCING"],
+        })
+        ent_pa_obj = Entity(
+            id=ent_pa_a_id,
+            entity_type=EntityType.CUSTOMER,
+            privacy_id=hashlib.sha256(shared_pa_iban.encode()).hexdigest(),
+            bank_id="bank_a",
+            display_label="Post Auth Race Subject",
+            risk_level=RiskLevel.HIGH,
+            attributes={"raw_identifier": shared_pa_iban},
+        )
+        cbi_svc.entity_service._entities.set(ent_pa_a_id, _entity_to_dict(ent_pa_obj))
+
+        case_pa_resp = test_client.post(
+            "/api/v1/cases",
+            json={
+                "title": "Post Authorization Publication Race Case",
+                "priority": "p1_critical",
+                "bank_id": "bank_a",
+            },
+            headers=auth_headers,
+        )
+        assert case_pa_resp.status_code == 200, f"Case creation failed: {case_pa_resp.text}"
+        case_pa_id = case_pa_resp.json()["id"]
+
+        # Register deterministic post-authorization pre-publication synchronization hook
+        pa_hook_called = []
+        captured_pa_sig_id = []
+        captured_pa_rcp_id = []
+        captured_pa_res_id = []
+
+        def _deterministic_post_auth_pause_hook(effective_pilot_id: str, sig_id: str, rcp_id: str, res_id: str) -> None:
+            if effective_pilot_id == post_auth_pilot_id:
+                pa_hook_called.append(effective_pilot_id)
+                captured_pa_sig_id.append(sig_id)
+                captured_pa_rcp_id.append(rcp_id)
+                captured_pa_res_id.append(res_id)
+
+                # Verify reservation is in PUBLICATION_PREPARED in SQLite right now!
+                with pilot_store._lock, pilot_store._get_connection() as conn:
+                    cur = conn.execute(
+                        "SELECT status, publication_fence FROM pilot_query_reservations WHERE reservation_id = ?;",
+                        (res_id,),
+                    )
+                    r_row = cur.fetchone()
+                    assert r_row is not None
+                    assert r_row["status"] == "PUBLICATION_PREPARED"
+                    assert r_row["publication_fence"] is not None
+
+                # PAUSE the pilot through authenticated HTTP endpoint specifically after publication preparation!
+                pause_http_resp = test_client.post(
+                    f"/api/v1/pilots/{post_auth_pilot_id}/pause",
+                    json={"reason": "Adversarial post-authorization pause race verification"},
+                    headers=op_headers,
+                )
+                assert pause_http_resp.status_code == 200
+                assert pause_http_resp.json()["status"] == "PAUSED"
+
+        cbi_svc._after_publication_preparation_hook = _deterministic_post_auth_pause_hook
+
+        pa_query_payload = {
+            "consortium_id": "consortium_pilot_m5",
+            "requesting_bank_id": "bank_a",
+            "target_bank_id": "bank_b",
+            "query_entity_id": ent_pa_a_id,
+            "case_id": case_pa_id,
+            "purpose": "AML_INVESTIGATION",
+            "execution_mode": "VERIFIED_OPERATIONAL",
+            "use_established_psi": True,
+            "require_established_psi": True,
+            "protocol": "OPENMINED-PSI-2.0.6-ECDH",
+            "pilot_id": post_auth_pilot_id,
+        }
+
+        # Dispatch real PSI query: execution completes, commits, prepares publication, pause intercepts before finalization
+        pa_query_resp = test_client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=pa_query_payload,
+            headers=auth_headers,
+        )
+
+        # Assert query fails closed
+        assert len(pa_hook_called) == 1, "Post-authorization hook was not invoked"
+        assert len(captured_pa_sig_id) == 1, "Failed to capture genuine would-be signal ID"
+        assert len(captured_pa_rcp_id) == 1, "Failed to capture genuine receipt ID"
+        assert len(captured_pa_res_id) == 1, "Failed to capture genuine reservation ID"
+        rej_post_auth_sig_id = captured_pa_sig_id[0]
+        rej_post_auth_rcp_id = captured_pa_rcp_id[0]
+        rej_post_auth_res_id = captured_pa_res_id[0]
+        assert len(rej_post_auth_rcp_id) > 0
+        assert pa_query_resp.status_code in (400, 403), f"Query should have failed closed: {pa_query_resp.text}"
+        assert "paused" in pa_query_resp.text.lower() or "governance" in pa_query_resp.text.lower() or "rejected" in pa_query_resp.text.lower()
+
+        # Verify durable reservation is in PUBLICATION_REJECTED status in SQLite
+        with pilot_store._lock, pilot_store._get_connection() as conn:
+            cur = conn.execute(
+                "SELECT status, rejection_reason, signal_id, receipt_id FROM pilot_query_reservations WHERE reservation_id = ?;",
+                (rej_post_auth_res_id,),
+            )
+            pa_res_row = cur.fetchone()
+            assert pa_res_row is not None, "Durable reservation record must exist"
+            assert pa_res_row["status"] == "PUBLICATION_REJECTED", "Reservation must be PUBLICATION_REJECTED when paused prior to publication finalization"
+
+        # Verify no attachable authoritative signal is visible in Redis store
+        stored_pa_sig = cbi_svc._signal_store.get(rej_post_auth_sig_id)
+        if stored_pa_sig is not None:
+            assert stored_pa_sig.get("is_authoritative") is not True
+            assert stored_pa_sig.get("is_attachable") is not True
+            assert stored_pa_sig.get("admission_status") != "COMMITTED"
+            assert stored_pa_sig.get("publication_status") == "PUBLICATION_REJECTED"
+
+        # Verify case evidence attachment is REJECTED using the EXACT genuine captured signal ID
+        attach_pa_denied = test_client.post(
+            f"/api/v1/cases/{case_pa_id}/evidence/cross-bank-intelligence",
+            json={
+                "signal_id": rej_post_auth_sig_id,
+                "notes": "Attempting to attach post-auth rejected signal",
+            },
+            headers=auth_headers,
+        )
+        assert attach_pa_denied.status_code in (400, 403), f"Case attachment must be rejected: {attach_pa_denied.text}"
+
+        # RESUME the pilot via authenticated HTTP endpoint with readiness verification
+        resume_pa_resp = test_client.post(
+            f"/api/v1/pilots/{post_auth_pilot_id}/resume",
+            json={"reason": "Cleared post-auth pause race containment"},
+            headers=op_headers,
+        )
+        assert resume_pa_resp.status_code == 200
+        assert resume_pa_resp.json()["status"] == "ACTIVE"
+
+        # Verify the rejected publication CANNOT reappear or become attachable after RESUME
+        attach_pa_revive_denied = test_client.post(
+            f"/api/v1/cases/{case_pa_id}/evidence/cross-bank-intelligence",
+            json={
+                "signal_id": rej_post_auth_sig_id,
+                "notes": "Attempting to revive post-auth rejected signal after pilot resumed",
+            },
+            headers=auth_headers,
+        )
+        assert attach_pa_revive_denied.status_code in (400, 403), f"Rejected signal must NOT revive: {attach_pa_revive_denied.text}"
+
+        # Execute fresh authorized query and verify normal publication and evidence attachment
+        cbi_svc._after_publication_preparation_hook = None
+        fresh_pa_query_resp = test_client.post(
+            "/api/v1/intelligence/cross-bank/query",
+            json=pa_query_payload,
+            headers=auth_headers,
+        )
+        assert fresh_pa_query_resp.status_code == 200, f"Fresh query post-resume failed: {fresh_pa_query_resp.text}"
+        fresh_pa_signal = fresh_pa_query_resp.json()
+        assert fresh_pa_signal["match_confirmed"] is True
+        fresh_pa_sig_id = fresh_pa_signal["signal_id"]
+
+        # Verify durable reservation is now PUBLISHED in SQLite
+        with pilot_store._lock, pilot_store._get_connection() as conn:
+            cur = conn.execute(
+                "SELECT status, signal_id, receipt_id FROM pilot_query_reservations WHERE pilot_id = ? AND status = 'PUBLISHED' ORDER BY reserved_at DESC LIMIT 1;",
+                (post_auth_pilot_id,),
+            )
+            pub_pa_row = cur.fetchone()
+            assert pub_pa_row is not None, "Reservation must be PUBLISHED for fresh successful query"
+            assert pub_pa_row["signal_id"] == fresh_pa_sig_id
+
+        # Verify signal in Redis is authoritative and attachable
+        pub_pa_sig = cbi_svc._signal_store.get(fresh_pa_sig_id)
+        assert pub_pa_sig is not None
+        assert pub_pa_sig.get("is_authoritative") is True
+        assert pub_pa_sig.get("is_attachable") is True
+        assert pub_pa_sig.get("publication_status") == "PUBLISHED"
+
+        # Legitimate case evidence attachment succeeds
+        attach_pa_ok = test_client.post(
+            f"/api/v1/cases/{case_pa_id}/evidence/cross-bank-intelligence",
+            json={
+                "signal_id": fresh_pa_sig_id,
+                "notes": "Legitimate post-auth post-resume evidence attachment",
+            },
+            headers=auth_headers,
+        )
+        assert attach_pa_ok.status_code == 200, f"Fresh evidence attachment failed: {attach_pa_ok.text}"
+
 
 # ==============================================================================
 # Gate F — Pilot Evidence & Durable Audit Dossier Export

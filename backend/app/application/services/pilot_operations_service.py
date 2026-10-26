@@ -1329,6 +1329,51 @@ class PilotOperationsService:
             case_id=case_id,
         )
 
+    def prepare_query_publication(
+        self,
+        reservation_id: str,
+        pilot_id: str,
+        signal_id: str,
+        receipt_id: str,
+    ) -> str:
+        """Prepare query publication under exclusive store lock, returning publication fence."""
+        return self.store.prepare_query_publication(
+            reservation_id=reservation_id,
+            pilot_id=pilot_id,
+            signal_id=signal_id,
+            receipt_id=receipt_id,
+        )
+
+    def finalize_query_publication(
+        self,
+        reservation_id: str,
+        pilot_id: str,
+        signal_id: str,
+        receipt_id: str,
+        publication_fence: str | None = None,
+    ) -> None:
+        """Atomically finalize query publication under exclusive store lock (linearization point)."""
+        self.store.finalize_query_publication(
+            reservation_id=reservation_id,
+            pilot_id=pilot_id,
+            signal_id=signal_id,
+            receipt_id=receipt_id,
+            publication_fence=publication_fence,
+        )
+
+    def record_publication_failure(
+        self,
+        reservation_id: str,
+        pilot_id: str,
+        error_msg: str,
+    ) -> None:
+        """Record physical publication failure to prevent phantom published states."""
+        self.store.record_publication_failure(
+            reservation_id=reservation_id,
+            pilot_id=pilot_id,
+            error_msg=error_msg,
+        )
+
     def authorize_and_record_signal_publication(
         self,
         reservation_id: str,
