@@ -1600,13 +1600,14 @@ class CrossBankIntelligenceService:
             raise ConsortiumSecurityError(
                 f"Consortium '{consortium_id}' is in non-active status '{consortium.status.value}'."
             )
-        if case_bank in consortium.removed_members:
+        active_case_bank = (case_bank or eff_case_bank or caller_bank or "").lower().strip()
+        if active_case_bank in consortium.removed_members:
             raise ConsortiumSecurityError(
-                f"Institution '{case_bank}' has been revoked/evicted from consortium '{consortium_id}'."
+                f"Institution '{active_case_bank}' has been revoked/evicted from consortium '{consortium_id}'."
             )
-        if case_bank not in consortium.members:
+        if active_case_bank not in consortium.members:
             raise ConsortiumSecurityError(
-                f"Institution '{case_bank}' is not an active member of consortium '{consortium_id}'."
+                f"Institution '{active_case_bank}' is not an active member of consortium '{consortium_id}'."
             )
 
         # 4b. Revalidate Operational Data-Sharing Grant & Bilateral Consent
@@ -1619,7 +1620,7 @@ class CrossBankIntelligenceService:
             if (
                 grant.get("grant_id") != grant_id
                 or not is_grant_active
-                or (case_bank in revoked_institutions)
+                or (active_case_bank in revoked_institutions)
                 or (target_bank and target_bank in revoked_institutions)
             ):
                 raise ConsortiumSecurityError(
@@ -1633,9 +1634,9 @@ class CrossBankIntelligenceService:
                     "Prior consent no longer authorizes evidence attachment without reapproval."
                 )
             approvals = grant.get("approvals") or {}
-            if case_bank not in approvals:
+            if active_case_bank not in approvals:
                 raise ConsortiumSecurityError(
-                    f"Institution '{case_bank}' has not approved current grant revision for grant '{grant_id}'. "
+                    f"Institution '{active_case_bank}' has not approved current grant revision for grant '{grant_id}'. "
                     "Evidence attachment denied."
                 )
             target_bank = record.get("target_bank_id") or signal_data.get("provenance", {}).get("target_bank_id")

@@ -7,6 +7,7 @@ provisioning tenant schemas, downloading root CA trust bundles, and retrieving o
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
@@ -104,16 +105,6 @@ def _enforce_onboarding_access(
     response_model=BankCABundleResponse,
     summary="Download Consortium Root CA bundle for mTLS trust store",
 )
-@router.get(
-    "/consortium-ca",
-    response_model=BankCABundleResponse,
-    summary="Download Consortium Root CA certificate and fingerprint",
-)
-@api_router.get(
-    "/consortium-ca",
-    response_model=BankCABundleResponse,
-    summary="Download Consortium Root CA certificate and fingerprint",
-)
 async def get_ca_bundle() -> BankCABundleResponse:
     """Returns the persistent Consortium Root Certificate Authority certificate PEM and fingerprint."""
     from cryptography import x509
@@ -138,17 +129,94 @@ async def get_ca_bundle() -> BankCABundleResponse:
     )
 
 
+@router.get(
+    "/consortium-ca",
+    response_model=BankCABundleResponse,
+    summary="Download Consortium Root CA certificate and fingerprint (authenticated)",
+)
+@api_router.get(
+    "/consortium-ca",
+    response_model=BankCABundleResponse,
+    summary="Download Consortium Root CA certificate and fingerprint (authenticated)",
+)
+async def get_consortium_ca(request: Request) -> BankCABundleResponse:
+    """Authenticated endpoint returning the persistent Consortium Root CA certificate and fingerprint."""
+    _enforce_onboarding_access(request)
+    return await get_ca_bundle()
+
+
+def _validate_institutional_csr_identity(csr: Any, expected_bank_id: str) -> None:
+    """Strictly validates that an institutional CSR binds to the canonical institution identity.
+
+    Prevents lookalike institution IDs, ambiguous naming, and substring injection.
+    """
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+
+    clean_bank = expected_bank_id.lower().strip()
+    if not re.match(r"^[a-zA-Z0-9_-]{3,36}$", clean_bank):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid institutional bank_id format: '{expected_bank_id}'.",
+        )
+
+    # 1. Subject Common Name verification
+    cns = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+    if not cns:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"CSR Subject must include Common Name for bank_id '{expected_bank_id}'.",
+        )
+    cn_val = str(cns[0].value).lower().strip()
+
+    canonical_fqdn = f"{clean_bank}.client.cf-intelligence.io"
+    canonical_worker_fqdn = f"{clean_bank}.worker.cf-intelligence.io"
+    cn_prefix = cn_val.split(".")[0].strip()
+
+    if cn_val not in (clean_bank, canonical_fqdn, canonical_worker_fqdn) and cn_prefix != clean_bank:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"CSR Subject Common Name '{cn_val}' does not match authorized canonical identity "
+                f"for bank_id '{expected_bank_id}'. Substring, lookalike, or unapproved identities are rejected."
+            ),
+        )
+
+    # 2. Subject Alternative Name verification (if present)
+    for ext in csr.extensions:
+        if isinstance(ext.value, x509.SubjectAlternativeName):
+            san_names = ext.value.get_values_for_type(x509.DNSName)
+            for san in san_names:
+                san_clean = san.lower().strip()
+                san_prefix = san_clean.split(".")[0].strip()
+                if san_clean not in (clean_bank, canonical_fqdn, canonical_worker_fqdn, "localhost") and san_prefix != clean_bank:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=(
+                            f"CSR Subject Alternative Name '{san}' does not match authorized institutional identity "
+                            f"for bank_id '{expected_bank_id}'."
+                        ),
+                    )
+
+
+def _require_admin_auth(request: Request) -> AuthenticatedPrincipal:
+    """Dependency enforcing institutional admin/operator authentication prior to body validation."""
+    return _enforce_onboarding_access(request, required_role="admin")
+
+
 @router.post(
     "/register",
     response_model=BankOnboardingBundleResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register a new bank node and receive the onboarding bundle",
+    dependencies=[Depends(_require_admin_auth)],
 )
 @api_router.post(
     "/register",
     response_model=BankOnboardingBundleResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register a new bank node and receive the onboarding bundle",
+    dependencies=[Depends(_require_admin_auth)],
 )
 async def register_bank(
     payload: BankRegisterRequest,
@@ -183,7 +251,6 @@ async def register_bank(
         if payload.csr_pem:
             # Step 2: Validate sovereign CSR proof-of-possession and subject binding
             from cryptography import x509
-            from cryptography.x509.oid import NameOID
 
             try:
                 csr = x509.load_pem_x509_csr(payload.csr_pem.encode("utf-8"))
@@ -199,14 +266,7 @@ async def register_bank(
                     detail="CSR signature proof-of-possession failed.",
                 )
 
-            cns = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-            cn_val = str(cns[0].value) if cns else ""
-            clean_bank = payload.bank_id.lower().replace("-", "_")
-            if clean_bank not in cn_val.lower().replace("-", "_"):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"CSR Subject Common Name '{cn_val}' does not match registered bank_id '{payload.bank_id}'.",
-                )
+            _validate_institutional_csr_identity(csr, payload.bank_id)
 
             # Step 3: Sign CSR with Consortium Root CA
             cert_pem, fingerprint, _ = await service.sign_csr(payload.bank_id, payload.csr_pem)
@@ -413,7 +473,6 @@ async def sign_bank_csr(
         )
     try:
         from cryptography import x509
-        from cryptography.x509.oid import NameOID
 
         try:
             csr = x509.load_pem_x509_csr(payload.csr_pem.encode("utf-8"))
@@ -429,14 +488,7 @@ async def sign_bank_csr(
                 detail="CSR signature proof-of-possession failed.",
             )
 
-        cns = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-        cn_val = str(cns[0].value) if cns else ""
-        clean_bank = bank_id.lower().replace("-", "_")
-        if clean_bank not in cn_val.lower().replace("-", "_"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"CSR Subject Common Name '{cn_val}' does not match bank_id '{bank_id}'.",
-            )
+        _validate_institutional_csr_identity(csr, bank_id)
 
         cert_pem, fingerprint, expires_at = await service.sign_csr(
             bank_id=bank_id,

@@ -23,6 +23,30 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from app.domain.consortium_governance import ConsortiumSecurityError
 
 
+def canonical_worker_readiness_bytes(
+    bank_id: str,
+    nonce: str,
+    timestamp: str,
+    protocol: str = "OPENMINED-PSI-2.0.6-ECDH",
+) -> bytes:
+    """Construct canonical byte representation for institutional worker readiness authentication."""
+    canonical = (
+        f"WORKER_READINESS:{bank_id.lower().strip()}:{nonce.strip()}:"
+        f"{timestamp.strip()}:{protocol.strip()}"
+    )
+    return canonical.encode("utf-8")
+
+
+def canonical_coordinator_readiness_bytes(
+    nonce: str,
+    timestamp: str,
+    role: str = "coordinator",
+) -> bytes:
+    """Construct canonical byte representation for coordinator readiness authentication."""
+    canonical = f"COORDINATOR_READINESS:{role.strip()}:{nonce.strip()}:{timestamp.strip()}"
+    return canonical.encode("utf-8")
+
+
 def canonical_counterpart_evidence_bytes(
     version: str,
     consortium_id: str,

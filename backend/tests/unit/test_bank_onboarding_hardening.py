@@ -260,6 +260,24 @@ async def test_bank_id_sanitization_and_validation(db_session: AsyncSession) -> 
             )
 
 
+def _get_admin_auth_headers(bank_id: str = "consortium") -> dict[str, str]:
+    """Helper to generate authoritative admin Bearer authorization headers for test requests."""
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    auth_svc = AuthenticationService.get_instance()
+    user = auth_svc.get_user("admin_test_user")
+    if not user:
+        user = auth_svc.register_user(
+            username="admin_test_user",
+            plain_password="AdminSecure2026!",
+            bank_id=bank_id,
+            roles=["admin", "super_admin", "compliance", "compliance_officer"],
+            clearance_level=3,
+        )
+    bundle = auth_svc.create_token_bundle(user)
+    return {"Authorization": f"Bearer {bundle.access_token}"}
+
+
 # ── Presentation Router Hardening & Zero-Mock Tests ───────────────────────────
 
 
@@ -267,20 +285,21 @@ def test_router_zero_mock_empty_list_and_404(db_session: AsyncSession) -> None:
     """Verifies presentation router returns true empty list and 404 NOT FOUND (zero mock fallbacks)."""
     app.dependency_overrides[get_async_session] = lambda: db_session
     client = TestClient(app)
+    headers = _get_admin_auth_headers()
 
     try:
         # GET /banks when empty must return [] (NOT fake JPMorgan/HSBC)
-        list_resp = client.get("/api/v1/onboarding/banks")
+        list_resp = client.get("/api/v1/onboarding/banks", headers=headers)
         assert list_resp.status_code == 200
         assert list_resp.json() == []
 
         # GET /banks/unknown/status must return 404 NOT FOUND (NOT fake demo status)
-        status_resp = client.get("/api/v1/onboarding/banks/unknown_node/status")
+        status_resp = client.get("/api/v1/onboarding/banks/unknown_node/status", headers=headers)
         assert status_resp.status_code == 404
         assert "not found" in status_resp.json()["detail"].lower()
 
         # GET /bundle/unknown must return 404 NOT FOUND
-        bundle_resp = client.get("/api/v1/onboarding/bundle/unknown_node")
+        bundle_resp = client.get("/api/v1/onboarding/bundle/unknown_node", headers=headers)
         assert bundle_resp.status_code == 404
     finally:
         app.dependency_overrides.clear()
@@ -295,6 +314,7 @@ def test_router_pki_wizard_csr_signing_endpoint(
     """Verifies POST /api/v1/onboarding/banks/{bank_id}/sign-csr endpoint."""
     app.dependency_overrides[get_async_session] = lambda: db_session
     client = TestClient(app)
+    headers = _get_admin_auth_headers()
 
     try:
         # 1. Register bank
@@ -307,6 +327,7 @@ def test_router_pki_wizard_csr_signing_endpoint(
                 "contact_email": "pki@wizardbank.ch",
                 "data_residency_region": "eu-central-2",
             },
+            headers=headers,
         )
         assert reg_resp.status_code == 201
 
@@ -315,6 +336,7 @@ def test_router_pki_wizard_csr_signing_endpoint(
         sign_resp = client.post(
             "/api/v1/onboarding/banks/bank_wizard/sign-csr",
             json={"csr_pem": csr_pem, "days_valid": 90},
+            headers=headers,
         )
         assert sign_resp.status_code == 200, sign_resp.text
         data = sign_resp.json()
@@ -326,6 +348,7 @@ def test_router_pki_wizard_csr_signing_endpoint(
         bad_csr_resp = client.post(
             "/api/v1/onboarding/banks/bank_wizard/sign-csr",
             json={"csr_pem": "not-a-csr", "days_valid": 90},
+            headers=headers,
         )
         assert bad_csr_resp.status_code == 400
 
@@ -333,6 +356,7 @@ def test_router_pki_wizard_csr_signing_endpoint(
         unknown_resp = client.post(
             "/api/v1/onboarding/banks/unknown_bank/sign-csr",
             json={"csr_pem": csr_pem, "days_valid": 90},
+            headers=headers,
         )
         assert unknown_resp.status_code == 404
     finally:
@@ -348,6 +372,7 @@ def test_router_bundle_and_lifecycle_endpoints(
     """Verifies GET /bundle/{bank_id}, POST /verify, POST /suspend, POST /activate endpoints."""
     app.dependency_overrides[get_async_session] = lambda: db_session
     client = TestClient(app)
+    headers = _get_admin_auth_headers()
 
     try:
         # Register bank
@@ -360,26 +385,27 @@ def test_router_bundle_and_lifecycle_endpoints(
                 "contact_email": "ops@flowbank.sg",
                 "data_residency_region": "ap-southeast-1",
             },
+            headers=headers,
         )
 
         # GET /bundle/{bank_id}
-        bundle_resp = client.get("/api/v1/onboarding/bundle/bank_flow")
+        bundle_resp = client.get("/api/v1/onboarding/bundle/bank_flow", headers=headers)
         assert bundle_resp.status_code == 200
         bundle = bundle_resp.json()
         assert bundle["bank_id"] == "bank_flow"
         assert 'bank_id: "bank_flow"' in bundle["connector_config_yaml"]
 
         # POST /verify
-        verify_resp = client.post("/api/v1/onboarding/banks/bank_flow/verify")
+        verify_resp = client.post("/api/v1/onboarding/banks/bank_flow/verify", headers=headers)
         assert verify_resp.status_code == 200
 
         # POST /suspend
-        suspend_resp = client.post("/api/v1/onboarding/banks/bank_flow/suspend")
+        suspend_resp = client.post("/api/v1/onboarding/banks/bank_flow/suspend", headers=headers)
         assert suspend_resp.status_code == 200
         assert suspend_resp.json()["status"] == "suspended"
 
         # POST /activate
-        activate_resp = client.post("/api/v1/onboarding/banks/bank_flow/activate")
+        activate_resp = client.post("/api/v1/onboarding/banks/bank_flow/activate", headers=headers)
         assert activate_resp.status_code == 200
         assert activate_resp.json()["status"] == "active"
     finally:

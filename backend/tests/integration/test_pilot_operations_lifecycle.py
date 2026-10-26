@@ -23,7 +23,11 @@ from fastapi.testclient import TestClient
 from app.application.services.consortium_service import ConsortiumGovernanceService
 from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
 from app.application.services.isolated_matching_service import (
+    CrossBankMatchingCoordinator,
+    InstitutionalCoordinatorDaemon,
     InstitutionalWorkerClient,
+    InstitutionalWorkerDaemon,
+    IsolatedBankWorkerNode,
 )
 from app.application.services.pilot_operations_service import (
     PilotGovernanceError,
@@ -191,24 +195,47 @@ def pilot_test_env(
     pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key)
     PilotOperationsService._instance = pilot_svc
 
-    yield {
-        "consortium_id": consortium_id,
-        "grant_id": grant_id,
-        "consortium_store_file": consortium_store_file,
-        "account_store_file": account_store_file,
-        "pilot_db_file": pilot_db_file,
-        "gov_svc": gov_svc,
-        "pilot_svc": pilot_svc,
-        "token_op": token_op,
-        "token_admin_a": token_admin_a,
-        "token_analyst_a": token_analyst_a,
-        "token_admin_b": token_admin_b,
-        "id_a": id_a,
-        "id_b": id_b,
-        "principal_op": principal_op,
-        "principal_a": principal_a,
-        "principal_b": principal_b,
+    # Spin up ephemeral authenticated daemons for Gate B preflight/resumption validation
+    node_a = IsolatedBankWorkerNode("bank_a", storage_root=str(tmp_path / "bank_a_vault"), signing_key=id_a)
+    node_b = IsolatedBankWorkerNode("bank_b", storage_root=str(tmp_path / "bank_b_vault"), signing_key=id_b)
+    daemon_a = InstitutionalWorkerDaemon(node_a, host="127.0.0.1", port=0, run_as_process=False)
+    daemon_b = InstitutionalWorkerDaemon(node_b, host="127.0.0.1", port=0, run_as_process=False)
+    url_a = daemon_a.start()
+    url_b = daemon_b.start()
+    coord_obj = CrossBankMatchingCoordinator()
+    coord_daemon = InstitutionalCoordinatorDaemon(coord_obj, host="127.0.0.1", port=0)
+    url_coord = coord_daemon.start()
+
+    test_topology = {
+        "bank_a_worker_url": url_a,
+        "bank_b_worker_url": url_b,
+        "coordinator_url": url_coord,
     }
+
+    try:
+        yield {
+            "consortium_id": consortium_id,
+            "grant_id": grant_id,
+            "consortium_store_file": consortium_store_file,
+            "account_store_file": account_store_file,
+            "pilot_db_file": pilot_db_file,
+            "gov_svc": gov_svc,
+            "pilot_svc": pilot_svc,
+            "token_op": token_op,
+            "token_admin_a": token_admin_a,
+            "token_analyst_a": token_analyst_a,
+            "token_admin_b": token_admin_b,
+            "id_a": id_a,
+            "id_b": id_b,
+            "principal_op": principal_op,
+            "principal_a": principal_a,
+            "principal_b": principal_b,
+            "test_topology": test_topology,
+        }
+    finally:
+        daemon_a.stop()
+        daemon_b.stop()
+        coord_daemon.stop()
 
 
 # ==============================================================================
@@ -341,6 +368,7 @@ def test_gate_b_pilot_state_machine_and_kill_switch(
             "max_queries_total": 5,
             "max_queries_per_institution": 3,
             "duration_days": 14,
+            "topology": dict(pilot_test_env["test_topology"]),
         }
         prov_resp = client.post(
             "/api/v1/pilots",
@@ -584,6 +612,11 @@ def test_gate_c_and_d_real_docker_investigation_workflow(
     )
 
     # 1. Provision & Authorize Live Pilot
+    id_a = docker_topology.get("ident_a") or pilot_test_env["id_a"]
+    id_b = docker_topology.get("ident_b") or pilot_test_env["id_b"]
+    pilot_svc.institutional_registry.register_public_key("bank_a", id_a.public_key, allow_overwrite=True)
+    pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key, allow_overwrite=True)
+
     pilot_id = "pilot_docker_live_01"
     pilot_ent = pilot_svc.provision_pilot(
         pilot_id=pilot_id,
@@ -596,13 +629,13 @@ def test_gate_c_and_d_real_docker_investigation_workflow(
         max_queries_per_institution=5,
         duration_days=7,
         principal=pilot_test_env["principal_op"],
+        topology={
+            "bank_a_worker_url": f"http://127.0.0.1:{docker_topology['port_a']}",
+            "bank_b_worker_url": f"http://127.0.0.1:{docker_topology['port_b']}",
+            "coordinator_url": coord_url,
+        },
     )
     pilot_svc.run_preflight(pilot_id, principal=pilot_test_env["principal_op"])
-
-    id_a = docker_topology.get("ident_a") or pilot_test_env["id_a"]
-    id_b = docker_topology.get("ident_b") or pilot_test_env["id_b"]
-    pilot_svc.institutional_registry.register_public_key("bank_a", id_a.public_key, allow_overwrite=True)
-    pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key, allow_overwrite=True)
     sig_a = id_a.sign(canonical_pilot_approval_bytes(
         pilot_id=pilot_id,
         scope_digest=pilot_ent.scope_digest,
@@ -811,7 +844,11 @@ def test_gate_e_operational_resilience_and_incident_containment(
         permitted_purposes=["AML_INVESTIGATION"],
     )
 
-    # 1. Provision & Activate Resilience Pilot
+    id_a = docker_topology.get("ident_a") or pilot_test_env["id_a"]
+    id_b = docker_topology.get("ident_b") or pilot_test_env["id_b"]
+    pilot_svc.institutional_registry.register_public_key("bank_a", id_a.public_key, allow_overwrite=True)
+    pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key, allow_overwrite=True)
+
     pilot_id = "pilot_resilience_01"
     pilot_ent = pilot_svc.provision_pilot(
         pilot_id=pilot_id,
@@ -824,13 +861,13 @@ def test_gate_e_operational_resilience_and_incident_containment(
         max_queries_per_institution=5,
         duration_days=7,
         principal=pilot_test_env["principal_op"],
+        topology={
+            "bank_a_worker_url": f"http://127.0.0.1:{docker_topology['port_a']}",
+            "bank_b_worker_url": f"http://127.0.0.1:{docker_topology['port_b']}",
+            "coordinator_url": coord_url,
+        },
     )
     pilot_svc.run_preflight(pilot_id, principal=pilot_test_env["principal_op"])
-
-    id_a = docker_topology.get("ident_a") or pilot_test_env["id_a"]
-    id_b = docker_topology.get("ident_b") or pilot_test_env["id_b"]
-    pilot_svc.institutional_registry.register_public_key("bank_a", id_a.public_key, allow_overwrite=True)
-    pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key, allow_overwrite=True)
     sig_a = id_a.sign(canonical_pilot_approval_bytes(
         pilot_id=pilot_id,
         scope_digest=pilot_ent.scope_digest,
@@ -975,6 +1012,11 @@ def test_gate_f_audit_dossier_and_evidence_export(
     )
 
     # 1. Provision Pilot
+    id_a = docker_topology.get("ident_a") or pilot_test_env["id_a"]
+    id_b = docker_topology.get("ident_b") or pilot_test_env["id_b"]
+    pilot_svc.institutional_registry.register_public_key("bank_a", id_a.public_key, allow_overwrite=True)
+    pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key, allow_overwrite=True)
+
     pilot_id = "pilot_dossier_01"
     pilot_ent = pilot_svc.provision_pilot(
         pilot_id=pilot_id,
@@ -987,14 +1029,15 @@ def test_gate_f_audit_dossier_and_evidence_export(
         max_queries_per_institution=5,
         duration_days=7,
         principal=pilot_test_env["principal_op"],
+        topology={
+            "bank_a_worker_url": f"http://127.0.0.1:{docker_topology['port_a']}",
+            "bank_b_worker_url": f"http://127.0.0.1:{docker_topology['port_b']}",
+            "coordinator_url": coord_url,
+        },
     )
     pilot_svc.run_preflight(pilot_id, principal=pilot_test_env["principal_op"])
 
     # 2. Independent Bilateral Approvals with genuine Ed25519 signatures
-    id_a = docker_topology.get("ident_a") or pilot_test_env["id_a"]
-    id_b = docker_topology.get("ident_b") or pilot_test_env["id_b"]
-    pilot_svc.institutional_registry.register_public_key("bank_a", id_a.public_key, allow_overwrite=True)
-    pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key, allow_overwrite=True)
     sig_a = id_a.sign(canonical_pilot_approval_bytes(
         pilot_id=pilot_id,
         scope_digest=pilot_ent.scope_digest,

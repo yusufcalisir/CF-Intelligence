@@ -166,6 +166,8 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
     ident_a = InstitutionalSigningIdentity.generate("bank_a")
     ident_b = InstitutionalSigningIdentity.generate("bank_b")
 
+    backend_dir = Path(__file__).resolve().parents[2]
+
     # 3. Start Bank A Worker container
     peers_a_json = json.dumps({"bank_b": ident_b.public_key_hex})
     cmd_worker_a = [
@@ -173,6 +175,7 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "--name", CONTAINER_WORKER_A,
         "--network", NETWORK_NAME,
         "-v", f"{VOLUME_BANK_A}:/vault",
+        "-v", f"{backend_dir.as_posix()}:/app/backend:ro",
         "-p", f"{PORT_WORKER_A}:8100",
         "-e", "APP_ENV=production",
         "-e", f"JWT_SECRET={SHARED_JWT_SECRET}",
@@ -210,6 +213,7 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "--name", CONTAINER_WORKER_B,
         "--network", NETWORK_NAME,
         "-v", f"{VOLUME_BANK_B}:/vault",
+        "-v", f"{backend_dir.as_posix()}:/app/backend:ro",
         "-p", f"{PORT_WORKER_B}:8100",
         "-e", "APP_ENV=production",
         "-e", f"JWT_SECRET={SHARED_JWT_SECRET}",
@@ -245,6 +249,7 @@ def docker_topology() -> Generator[dict[str, Any], None, None]:
         "docker", "run", "-d",
         "--name", CONTAINER_COORDINATOR,
         "--network", NETWORK_NAME,
+        "-v", f"{backend_dir.as_posix()}:/app/backend:ro",
         "-p", f"{PORT_COORDINATOR}:8200",
         "-e", "APP_ENV=production",
         "-e", f"JWT_SECRET={SHARED_JWT_SECRET}",

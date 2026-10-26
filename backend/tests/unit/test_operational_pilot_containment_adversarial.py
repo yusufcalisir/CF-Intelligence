@@ -20,11 +20,10 @@ Milestone 5 Operational Acceptance Verification:
    - Rejection when grant is revoked during execution.
 """
 
-from __future__ import annotations
-
-import datetime
+import threading
 import uuid
-from datetime import UTC
+from datetime import UTC, datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +34,12 @@ from app.application.services.consortium_service import (
 )
 from app.application.services.cross_bank_intelligence import (
     CrossBankIntelligenceService,
+)
+from app.application.services.isolated_matching_service import (
+    CrossBankMatchingCoordinator,
+    InstitutionalCoordinatorDaemon,
+    InstitutionalWorkerDaemon,
+    IsolatedBankWorkerNode,
 )
 from app.application.services.pilot_operations_service import (
     PilotExpiredError,
@@ -175,19 +180,42 @@ def containment_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str
     pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key)
     PilotOperationsService._instance = pilot_svc
 
-    return {
-        "pilot_svc": pilot_svc,
-        "gov_svc": gov_svc,
-        "pilot_db_file": pilot_db_file,
-        "id_a": id_a,
-        "id_b": id_b,
-        "principal_op": principal_op,
-        "principal_a": principal_a,
-        "principal_b": principal_b,
-        "token_op": token_op,
-        "token_a": token_a,
-        "token_b": token_b,
+    # Start live test daemons on ephemeral ports for authentic preflight verification
+    node_a = IsolatedBankWorkerNode("bank_a", storage_root=str(tmp_path / "bank_a_vault"), signing_key=id_a)
+    node_b = IsolatedBankWorkerNode("bank_b", storage_root=str(tmp_path / "bank_b_vault"), signing_key=id_b)
+    daemon_a = InstitutionalWorkerDaemon(node_a, host="127.0.0.1", port=0, run_as_process=False)
+    daemon_b = InstitutionalWorkerDaemon(node_b, host="127.0.0.1", port=0, run_as_process=False)
+    url_a = daemon_a.start()
+    url_b = daemon_b.start()
+    coord_obj = CrossBankMatchingCoordinator()
+    coord_daemon = InstitutionalCoordinatorDaemon(coord_obj, host="127.0.0.1", port=0)
+    url_coord = coord_daemon.start()
+
+    test_topology = {
+        "bank_a_worker_url": url_a,
+        "bank_b_worker_url": url_b,
+        "coordinator_url": url_coord,
     }
+
+    try:
+        yield {
+            "pilot_svc": pilot_svc,
+            "gov_svc": gov_svc,
+            "pilot_db_file": pilot_db_file,
+            "id_a": id_a,
+            "id_b": id_b,
+            "principal_op": principal_op,
+            "principal_a": principal_a,
+            "principal_b": principal_b,
+            "token_op": token_op,
+            "token_a": token_a,
+            "token_b": token_b,
+            "test_topology": test_topology,
+        }
+    finally:
+        daemon_a.stop()
+        daemon_b.stop()
+        coord_daemon.stop()
 
 
 def _create_and_activate_pilot(
@@ -213,6 +241,7 @@ def _create_and_activate_pilot(
         expires_at=expires_at,
         created_by="op_user",
         principal=env["principal_op"],
+        topology=dict(env.get("test_topology") or {}),
     )
 
     # Run preflight
@@ -690,3 +719,116 @@ def test_grant_revocation_during_execution_fails_closed(containment_env: dict[st
             consortium_id="c_containment",
         )
     assert "inactive or revoked" in str(exc.value).lower() or "revoked" in str(exc.value).lower()
+
+
+def test_mandatory_negative_activation_prevented_without_topology(containment_env: dict[str, Any]) -> None:
+    """Mandatory negative test: Provision pilot without worker/coordinator endpoints.
+    Collect valid institutional approvals and attempt activation.
+    The pilot must NOT become ACTIVE.
+    """
+    svc: PilotOperationsService = containment_env["pilot_svc"]
+    pilot = svc.provision_pilot(
+        pilot_id="pilot_no_topo_neg_test",
+        consortium_id="c_containment",
+        participating_institutions=["bank_a", "bank_b"],
+        allowed_purposes=["AML_INVESTIGATION"],
+        allowed_jurisdictions=["EU"],
+        approved_datasets={"fraud": "sha256_hash"},
+        created_by="op_user",
+        principal=containment_env["principal_op"],
+        topology={},  # NO TOPOLOGY!
+    )
+    sig_a = containment_env["id_a"].sign(canonical_pilot_approval_bytes(
+        pilot_id="pilot_no_topo_neg_test",
+        revision=pilot.config.revision,
+        scope_digest=pilot.scope_digest,
+        approver_institution="bank_a",
+        approver_id="bank_a_user",
+    ))
+    sig_b = containment_env["id_b"].sign(canonical_pilot_approval_bytes(
+        pilot_id="pilot_no_topo_neg_test",
+        revision=pilot.config.revision,
+        scope_digest=pilot.scope_digest,
+        approver_institution="bank_b",
+        approver_id="bank_b_user",
+    ))
+    svc.approve_pilot("pilot_no_topo_neg_test", "bank_a", principal=containment_env["principal_a"], signature=sig_a)
+    svc.approve_pilot("pilot_no_topo_neg_test", "bank_b", principal=containment_env["principal_b"], signature=sig_b)
+    svc.approve_pilot("pilot_no_topo_neg_test", "operator", principal=containment_env["principal_op"])
+
+    # Attempt activation without topology
+    with pytest.raises(PilotGovernanceError) as exc_act:
+        svc.activate_pilot("pilot_no_topo_neg_test", principal=containment_env["principal_op"])
+    assert "mandatory topology" in str(exc_act.value).lower() or "not been verified" in str(exc_act.value).lower()
+
+    # The pilot must NOT become ACTIVE
+    p_final = svc.get_pilot("pilot_no_topo_neg_test")
+    assert p_final is not None
+    assert p_final.status != PilotStatus.ACTIVE
+
+
+def test_mandatory_attack_fake_worker_rejected_by_preflight_and_resumption(containment_env: dict[str, Any]) -> None:
+    """Mandatory attack test: Replace Bank B's expected endpoint with a fake server
+    returning {"status":"HEALTHY","bank_id":"bank_b"} without valid institutional signature.
+    Preflight and resumption must reject it.
+    """
+    svc: PilotOperationsService = containment_env["pilot_svc"]
+
+    class RogueHandler(BaseHTTPRequestHandler):
+        def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+            pass
+
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"status":"HEALTHY","bank_id":"bank_b","role":"worker"}')
+
+    rogue_server = ThreadingHTTPServer(("127.0.0.1", 0), RogueHandler)
+    rogue_port = rogue_server.server_port
+    rogue_thread = threading.Thread(target=rogue_server.serve_forever, daemon=True)
+    rogue_thread.start()
+
+    try:
+        rogue_url = f"http://127.0.0.1:{rogue_port}"
+        # 1. Preflight must reject fake Bank B worker
+        _ = svc.provision_pilot(
+            pilot_id="pilot_fake_worker_attack",
+            consortium_id="c_containment",
+            participating_institutions=["bank_a", "bank_b"],
+            allowed_purposes=["AML_INVESTIGATION"],
+            allowed_jurisdictions=["EU"],
+            approved_datasets={"data": "h1"},
+            principal=containment_env["principal_op"],
+            worker_endpoints={
+                "bank_a": containment_env["test_topology"]["bank_a_worker_url"],
+                "bank_b": rogue_url,  # ATTACK: fake server!
+            },
+            coordinator_endpoint=containment_env["test_topology"]["coordinator_url"],
+        )
+
+        with pytest.raises(PilotGovernanceError) as exc_pref:
+            svc.run_preflight("pilot_fake_worker_attack", principal=containment_env["principal_op"])
+        assert "authentication_failed" in str(exc_pref.value).lower() or "preflight verification failed" in str(exc_pref.value).lower()
+
+        p_check = svc.get_pilot("pilot_fake_worker_attack")
+        assert p_check is not None
+        assert p_check.status == PilotStatus.FAILED
+
+        # 2. Resumption must also reject fake Bank B worker
+        _ = _create_and_activate_pilot(containment_env, pilot_id="pilot_resume_fake_test")
+        svc.pause_pilot("pilot_resume_fake_test", principal=containment_env["principal_op"])
+
+        # Tamper topology to point Bank B to rogue server
+        active_p_obj = svc.get_pilot("pilot_resume_fake_test")
+        assert active_p_obj is not None
+        active_p_obj.config.worker_endpoints["bank_b"] = rogue_url
+        active_p_obj.config.topology["bank_b_worker_url"] = rogue_url
+        svc.store.save_pilot(active_p_obj)
+
+        with pytest.raises(PilotGovernanceError) as exc_res:
+            svc.resume_pilot("pilot_resume_fake_test", principal=containment_env["principal_op"])
+        assert "authentication_failed" in str(exc_res.value).lower() or "preflight probe failed" in str(exc_res.value).lower()
+    finally:
+        rogue_server.shutdown()
+        rogue_server.server_close()

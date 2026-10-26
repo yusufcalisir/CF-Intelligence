@@ -128,9 +128,12 @@ def _make_engine_kwargs(tenant: str | None) -> dict[str, Any]:
     """Build engine keyword arguments with production connection pooling."""
     current_settings = get_settings()
     if current_settings.database_type == "sqlite":
+        from sqlalchemy.pool import NullPool
+
         return {
             "echo": current_settings.app_debug,
             "connect_args": {"timeout": 30.0, "check_same_thread": False},
+            "poolclass": NullPool,
         }
 
     kwargs: dict[str, Any] = {

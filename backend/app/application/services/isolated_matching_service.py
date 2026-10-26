@@ -30,6 +30,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import asdict, dataclass, field, replace
@@ -56,8 +57,10 @@ from app.domain.consortium_policy import ConsortiumPolicyEngine
 from app.domain.institutional_identity import (
     InstitutionalSigningIdentity,
     InstitutionalVerificationRegistry,
+    canonical_coordinator_readiness_bytes,
     canonical_counterpart_evidence_bytes,
     canonical_evaluated_result_bytes,
+    canonical_worker_readiness_bytes,
 )
 from app.domain.investigation_entities import Entity
 from app.domain.psi_service import (
@@ -1794,15 +1797,38 @@ class InstitutionalWorkerDaemon:
                 return True
 
             def do_GET(self) -> None:
-                if self.path in ("/health", "/worker/health"):
+                parsed_url = urllib.parse.urlparse(self.path)
+                query_params = urllib.parse.parse_qs(parsed_url.query)
+                nonce = query_params.get("nonce", [""])[0]
+
+                if parsed_url.path in ("/health", "/worker/health"):
+                    now_iso = datetime.datetime.now(UTC).isoformat()
+                    protocol = "OPENMINED-PSI-2.0.6-ECDH"
+                    resp_data: dict[str, Any] = {
+                        "status": "ONLINE",
+                        "bank_id": node.bank_id,
+                        "role": "worker",
+                        "protocol": protocol,
+                        "pid": os.getpid(),
+                        "timestamp": now_iso,
+                        "nonce": nonce,
+                    }
+                    if getattr(node, "_signing_identity", None) is not None:
+                        canonical_stmt = canonical_worker_readiness_bytes(
+                            bank_id=node.bank_id,
+                            nonce=nonce,
+                            timestamp=now_iso,
+                            protocol=protocol,
+                        )
+                        sig_hex = node._signing_identity.sign(canonical_stmt)
+                        resp_data["signature"] = sig_hex
+                        resp_data["public_key_hex"] = node._signing_identity.public_key_hex
+                        resp_data["key_version"] = 1
+
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
-                    self.wfile.write(
-                        json.dumps(
-                            {"status": "ONLINE", "bank_id": node.bank_id, "pid": os.getpid()}
-                        ).encode()
-                    )
+                    self.wfile.write(json.dumps(resp_data).encode())
                 elif self.path in ("/worker/public-key", "/public-key"):
                     try:
                         pub_hex = node.public_key_hex
@@ -2783,34 +2809,63 @@ class InstitutionalCoordinatorDaemon:
         coordinator: CrossBankMatchingCoordinator,
         host: str = "0.0.0.0",  # nosec B104
         port: int = 8200,
+        coordinator_secret: str | None = None,
     ) -> None:
         self.coordinator = coordinator
         self.host = host
         self.port = port
+        self.coordinator_secret = (
+            coordinator_secret
+            or os.environ.get("CFI_COORDINATOR_SECRET")
+            or os.environ.get("COORDINATOR_SECRET")
+            or ""
+        )
         self.server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self.pid: int = os.getpid()
 
     def start(self) -> str:
         coord = self.coordinator
+        self_daemon = self
 
         class CoordinatorHandler(BaseHTTPRequestHandler):
             def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
                 pass
 
             def do_GET(self) -> None:
-                if self.path in ("/health", "/coordinator/health"):
+                parsed_url = urllib.parse.urlparse(self.path)
+                query_params = urllib.parse.parse_qs(parsed_url.query)
+                nonce = query_params.get("nonce", [""])[0]
+
+                if parsed_url.path in ("/health", "/coordinator/health"):
+                    now_iso = datetime.datetime.now(UTC).isoformat()
+                    resp_data: dict[str, Any] = {
+                        "status": "ONLINE",
+                        "role": "coordinator",
+                        "registered_workers": list(coord._workers.keys()),
+                        "pid": os.getpid(),
+                        "timestamp": now_iso,
+                        "nonce": nonce,
+                    }
+                    coord_sec = (
+                        getattr(coord, "_coordinator_secret", "")
+                        or self_daemon.coordinator_secret
+                        or os.environ.get("CFI_COORDINATOR_SECRET", "")
+                    )
+                    if coord_sec:
+                        canonical_stmt = canonical_coordinator_readiness_bytes(
+                            nonce=nonce,
+                            timestamp=now_iso,
+                            role="coordinator",
+                        )
+                        resp_data["coordinator_signature"] = hmac.new(
+                            coord_sec.encode("utf-8"), canonical_stmt, hashlib.sha256
+                        ).hexdigest()
+
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
-                    self.wfile.write(
-                        json.dumps({
-                            "status": "ONLINE",
-                            "role": "coordinator",
-                            "registered_workers": list(coord._workers.keys()),
-                            "pid": os.getpid(),
-                        }).encode()
-                    )
+                    self.wfile.write(json.dumps(resp_data).encode())
                 else:
                     self.send_response(404)
                     self.end_headers()
