@@ -22,13 +22,8 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
-import os
-import socket
-import subprocess
-import time
 import urllib.error
 import urllib.request
-import uuid
 from collections.abc import Generator
 from dataclasses import asdict, replace
 from datetime import UTC
@@ -51,41 +46,16 @@ from app.application.services.isolated_matching_service import (
 )
 from app.domain.consortium_governance import ConsortiumSecurityError, MemberRole
 from app.domain.enums import CasePriority
-from app.domain.institutional_identity import InstitutionalSigningIdentity
 from app.domain.investigation_entities import Entity, EntityType, RiskLevel
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
-
-import tests.integration.conftest as integration_conftest
 from tests.integration.conftest import (
-    IMAGE_NAME,
-    SECRET_A,
-    SECRET_B,
-    TOKEN_MATCH_A,
-    TOKEN_MATCH_B,
-    TOKEN_INGEST_A,
-    TOKEN_INGEST_B,
-    TOKEN_ADMIN_A,
-    TOKEN_ADMIN_B,
-    SECRET_COORD,
     SHARED_CONSORTIUM_STORE_SECRET,
     SHARED_JWT_SECRET,
-    _get_free_port,
+    TOKEN_MATCH_A,
     _run_cmd,
-    is_docker_running,
-    is_docker_image_available,
-    ensure_docker_image,
     _wait_for_health,
-    _teardown_disposable_resources,
-    docker_topology,
 )
-
-
-def __getattr__(name: str) -> Any:
-    if hasattr(integration_conftest, name):
-        return getattr(integration_conftest, name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
 
 
 @pytest.fixture
@@ -162,7 +132,10 @@ def isolated_governance_env(
     )
 
     # Synchronize consortium store file and account store file into container filesystems
-    for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
+    c_a = docker_topology["container_worker_a"]
+    c_b = docker_topology["container_worker_b"]
+    c_coord = docker_topology["container_coordinator"]
+    for c in [c_a, c_b, c_coord]:
         _run_cmd(["docker", "cp", str(store_file), f"{c}:/tmp/consortium_store.json"], check=False)
         _run_cmd(["docker", "exec", "-u", "0", c, "chmod", "666", "/tmp/consortium_store.json"], check=False)
         _run_cmd(["docker", "cp", str(account_file), f"{c}:/tmp/account_store.json"], check=False)
@@ -203,25 +176,29 @@ def isolated_governance_env(
 
 def test_probe_1_non_root_and_volume_isolation(docker_topology: dict[str, Any]) -> None:
     """Probe 1: Verify non-root UID 10001 process identity and strict volume isolation across 3 containers."""
+    c_a = docker_topology["container_worker_a"]
+    c_b = docker_topology["container_worker_b"]
+    c_coord = docker_topology["container_coordinator"]
+
     # Process identity verification: all containers must execute as UID 10001 (non-root)
-    res_a = _run_cmd(["docker", "exec", CONTAINER_WORKER_A, "id", "-u"])
+    res_a = _run_cmd(["docker", "exec", c_a, "id", "-u"])
     assert res_a.stdout.strip() == "10001", "Bank A worker container must run as non-root UID 10001"
 
-    res_b = _run_cmd(["docker", "exec", CONTAINER_WORKER_B, "id", "-u"])
+    res_b = _run_cmd(["docker", "exec", c_b, "id", "-u"])
     assert res_b.stdout.strip() == "10001", "Bank B worker container must run as non-root UID 10001"
 
-    res_coord = _run_cmd(["docker", "exec", CONTAINER_COORDINATOR, "id", "-u"])
+    res_coord = _run_cmd(["docker", "exec", c_coord, "id", "-u"])
     assert res_coord.stdout.strip() == "10001", "Coordinator container must run as non-root UID 10001"
 
     # Negative Control: Bank A cannot see Bank B vault
     _run_cmd([
-        "docker", "exec", CONTAINER_WORKER_B,
+        "docker", "exec", c_b,
         "python", "-c",
         "import os; os.makedirs('/vault/bank_b/canary', exist_ok=True); open('/vault/bank_b/canary/secret_b.txt', 'w').write('SECRET_DATA_B')",
     ])
 
     check_a = _run_cmd([
-        "docker", "exec", CONTAINER_WORKER_A,
+        "docker", "exec", c_a,
         "python", "-c",
         "import os; print(os.path.exists('/vault/bank_b/canary/secret_b.txt'))",
     ])
@@ -229,7 +206,7 @@ def test_probe_1_non_root_and_volume_isolation(docker_topology: dict[str, Any]) 
 
     # Negative Control: Coordinator possesses ZERO vault mounts and no private datasets
     check_coord = _run_cmd([
-        "docker", "exec", CONTAINER_COORDINATOR,
+        "docker", "exec", c_coord,
         "python", "-c",
         "import os; print(os.path.exists('/vault/bank_b/canary/secret_b.txt'))",
     ])
@@ -527,8 +504,9 @@ def test_probe_6_entity_deletion_updates_matching(
     assert sig1.match_confirmed is True
 
     # Real entity deletion: remove file from Bank B vault inside container
+    c_b = docker_topology["container_worker_b"]
     del_res = _run_cmd([
-        "docker", "exec", CONTAINER_WORKER_B,
+        "docker", "exec", c_b,
         "rm", "-f", "/vault/bank_b/private_entities/ent_to_delete_b.json",
     ])
     assert del_res.returncode == 0
@@ -705,7 +683,10 @@ def test_probe_8_complete_end_to_end_product_workflow(
 
     # Sync updated governance store to coordinator and worker containers
     store_file = Path(gov_svc._store._store_path)
-    for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
+    c_a = docker_topology["container_worker_a"]
+    c_b = docker_topology["container_worker_b"]
+    c_coord = docker_topology["container_coordinator"]
+    for c in [c_a, c_b, c_coord]:
         _run_cmd(["docker", "cp", str(store_file), f"{c}:/tmp/consortium_store.json"], check=False)
 
     # Step 10: Subsequent query MUST be denied
@@ -782,7 +763,9 @@ def test_probe_9_negative_controls_and_outage_containment(
     assert "target_bank_id" in str(exc_no_counterpart.value).lower() or "counterpart" in str(exc_no_counterpart.value).lower()
 
     # 2. Worker Outage: Stop Bank B container and verify system fails closed without prototype fallback
-    _run_cmd(["docker", "stop", CONTAINER_WORKER_B], check=True)
+    c_b = docker_topology["container_worker_b"]
+    port_b = docker_topology["port_b"]
+    _run_cmd(["docker", "stop", c_b], check=True)
     try:
         req_outage = CrossBankIntelligenceQueryRequest(
             consortium_id="c_docker_psi",
@@ -803,8 +786,8 @@ def test_probe_9_negative_controls_and_outage_containment(
             or "failed" in err_outage
         ), f"System did not fail closed during worker outage: {exc_outage.value}"
     finally:
-        _run_cmd(["docker", "start", CONTAINER_WORKER_B], check=True)
-        _wait_for_health(f"http://127.0.0.1:{PORT_WORKER_B}/worker/health", timeout_sec=20.0)
+        _run_cmd(["docker", "start", c_b], check=True)
+        _wait_for_health(f"http://127.0.0.1:{port_b}/worker/health", timeout_sec=20.0)
 
 
 def test_probe_10_actual_user_facing_http_product_workflow(
@@ -982,7 +965,10 @@ def test_probe_10_actual_user_facing_http_product_workflow(
 
         # Sync revocation to Docker containers
         store_file = Path(gov_svc._store._store_path)
-        for c in [CONTAINER_WORKER_A, CONTAINER_WORKER_B, CONTAINER_COORDINATOR]:
+        c_a = docker_topology["container_worker_a"]
+        c_b = docker_topology["container_worker_b"]
+        c_coord = docker_topology["container_coordinator"]
+        for c in [c_a, c_b, c_coord]:
             _run_cmd(["docker", "cp", str(store_file), f"{c}:/tmp/consortium_store.json"], check=False)
 
         # Step 13: Subsequent query fails closed with HTTP 403

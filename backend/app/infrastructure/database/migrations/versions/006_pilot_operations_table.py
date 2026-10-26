@@ -8,6 +8,7 @@ Create Date: 2026-10-26
 from __future__ import annotations
 
 import sqlalchemy as sa
+
 from alembic import op  # type: ignore[attr-defined]
 
 # Alembic revision identifiers

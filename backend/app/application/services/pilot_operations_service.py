@@ -13,6 +13,7 @@ Adheres strictly to .agents/AGENTS.md:
 from __future__ import annotations
 
 import datetime
+import json
 import logging
 import os
 import threading
@@ -139,7 +140,7 @@ class PilotOperationsService:
                     if resp_role != "coordinator":
                         return False, f"IDENTITY_MISMATCH: Coordinator endpoint at '{clean_url}' returned role '{resp_role}', expected 'coordinator'."
 
-                return True, f"ONLINE (status=200, identity_verified=True)"
+                return True, "ONLINE (status=200, identity_verified=True)"
         except Exception as exc:
             return False, f"OFFLINE ({exc})"
 
@@ -163,7 +164,7 @@ class PilotOperationsService:
         if req is None:
             if not pilot_id or not consortium_id:
                 raise ValueError("Both pilot_id and consortium_id are mandatory to provision a pilot.")
-            
+
             topo = dict(kwargs.get("topology") or {})
             worker_eps = dict(kwargs.get("worker_endpoints") or {})
             for k, v in worker_eps.items():
@@ -811,11 +812,10 @@ class PilotOperationsService:
         )
 
         has_explicit_topo = bool(topo or worker_eps or coord_ep)
-        if has_explicit_topo:
-            if not bank_a_url or not bank_b_url or not coord_url:
-                raise PilotGovernanceError(
-                    f"Cannot resume pilot '{pilot_id}': Preflight verification failed. Incomplete mandatory topology."
-                )
+        if has_explicit_topo and (not bank_a_url or not bank_b_url or not coord_url):
+            raise PilotGovernanceError(
+                f"Cannot resume pilot '{pilot_id}': Preflight verification failed. Incomplete mandatory topology."
+            )
 
         if bank_a_url:
             ok, det = self._probe_node_health(bank_a_url, "worker", expected_bank_id=bank_a)

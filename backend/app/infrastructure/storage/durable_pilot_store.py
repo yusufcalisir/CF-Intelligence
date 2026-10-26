@@ -18,6 +18,7 @@ import os
 import sqlite3
 import threading
 from datetime import UTC
+from typing import Any
 
 from app.domain.pilot_operations import (
     InvalidPilotTransitionError,

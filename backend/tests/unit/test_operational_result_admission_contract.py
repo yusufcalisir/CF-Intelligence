@@ -32,6 +32,9 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from app.application.schemas.cross_bank_intelligence import (
     CrossBankIntelligenceQueryRequest,
     CrossBankIntelligenceSignal,
+    DisclosureMode,
+    MatchCategory,
+    SanitizedRiskLevel,
 )
 from app.application.services.consortium_service import (
     ConsortiumGovernanceService,
@@ -85,10 +88,10 @@ def _build_authentic_test_signal(
     target_bank_id: str = "bank_b",
     query_entity_id: str = "ent_target_123",
     match_confirmed: bool = True,
-    match_category: str = "PROBABILISTIC_FUZZY",
+    match_category: MatchCategory = "PROBABILISTIC_FUZZY",
     match_confidence: float = 0.999999999,
-    disclosure_mode: str = "ATTRIBUTED_INSTITUTIONS",
-    sanitized_risk_level: str | None = None,
+    disclosure_mode: DisclosureMode = "ATTRIBUTED_INSTITUTIONS",
+    sanitized_risk_level: SanitizedRiskLevel | None = None,
     sanitized_typologies: tuple[str, ...] | None = None,
     sign_a: InstitutionalSigningIdentity | None = None,
     sign_b: InstitutionalSigningIdentity | None = None,
@@ -222,7 +225,7 @@ def _build_authentic_test_signal(
     }
 
     # 2. Bank A signs Evaluated Outcome
-    risk = sanitized_risk_level or ("UNAVAILABLE" if match_confirmed else "UNOBSERVED")
+    risk: SanitizedRiskLevel = sanitized_risk_level or ("UNAVAILABLE" if match_confirmed else "UNOBSERVED")
     typs = (
         sanitized_typologies
         if sanitized_typologies is not None

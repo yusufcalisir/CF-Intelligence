@@ -23,23 +23,20 @@ Milestone 5 Operational Acceptance Verification:
 from __future__ import annotations
 
 import datetime
+import uuid
 from datetime import UTC
-import json
 from pathlib import Path
 from typing import Any
-import uuid
 
 import pytest
 
 from app.application.services.consortium_service import (
     ConsortiumGovernanceService,
-    compute_operational_grant_scope_digest,
 )
 from app.application.services.cross_bank_intelligence import (
     CrossBankIntelligenceService,
 )
 from app.application.services.pilot_operations_service import (
-    PilotAuthorizationError,
     PilotExpiredError,
     PilotOperationsService,
     PilotQuotaExceededError,
@@ -50,13 +47,10 @@ from app.domain.consortium_governance import (
 )
 from app.domain.institutional_identity import (
     InstitutionalSigningIdentity,
-    InstitutionalVerificationRegistry,
 )
 from app.domain.pilot_operations import (
-    PilotApprovalRecord,
     PilotEntity,
     PilotGovernanceError,
-    PilotOperationalConfig,
     PilotStatus,
     canonical_pilot_approval_bytes,
 )
@@ -407,7 +401,7 @@ def test_admission_race_midflight_pause_fails_closed(containment_env: dict[str, 
     - A fresh query after resume succeeds.
     """
     svc: PilotOperationsService = containment_env["pilot_svc"]
-    pilot = _create_and_activate_pilot(containment_env, pilot_id="pilot_race_test")
+    _create_and_activate_pilot(containment_env, pilot_id="pilot_race_test")
     intel_svc = CrossBankIntelligenceService.get_instance()
 
     # 1. Start execution: reserve execution slot

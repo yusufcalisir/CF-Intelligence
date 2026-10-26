@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import socket
 import subprocess
 import time
-from typing import TYPE_CHECKING, Any
 import urllib.request
 import uuid
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pytest
 

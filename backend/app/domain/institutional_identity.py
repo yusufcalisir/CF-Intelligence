@@ -13,6 +13,7 @@ Adheres strictly to .agents/AGENTS.md:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 
 from cryptography.exceptions import InvalidSignature
@@ -495,15 +496,13 @@ class InstitutionalVerificationRegistry:
             )
             if env_key and len(env_key.strip()) == 64:
                 clean_env = env_key.strip()
-                try:
+                with contextlib.suppress(Exception):
                     self.register_public_key(
                         clean_bank_id,
                         clean_env,
                         trust_source="ENVIRONMENT_BOOTSTRAP",
                         allow_overwrite=True,
                     )
-                except Exception:
-                    pass
 
         enrolled = self._enrolled_keys.get(clean_bank_id)
         if enrolled is not None:
