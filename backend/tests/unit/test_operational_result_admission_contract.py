@@ -1087,7 +1087,12 @@ def test_adversarial_hmac_with_public_key_rejected_in_ticket_approval(tmp_path: 
         ticket,
         bank_approvals={"bank_a": forged_ticket_hmac, "bank_b": ticket.bank_approvals["bank_b"]},
     )
-    attacker_query = replace(query, ticket=forged_ticket)
+    canonical_env = (
+        f"{query.job_id}:{query.consortium_id}:{query.requesting_bank_id}:"
+        f"{query.target_bank_id}:{query.psi_request_b64}:{query.nonce}:"
+        f"{query.timestamp}:{query.purpose}:{forged_ticket.canonical_digest()}".encode()
+    )
+    attacker_query = replace(query, ticket=forged_ticket, signature=ident_a.sign(canonical_env))
 
     with pytest.raises(
         ConsortiumSecurityError,
@@ -1098,14 +1103,19 @@ def test_adversarial_hmac_with_public_key_rejected_in_ticket_approval(tmp_path: 
 
 def test_adversarial_completely_missing_requesting_bank_ticket_signature(tmp_path: Path) -> None:
     """3. Mandatory negative control: Completely missing requesting-bank ticket signature."""
-    _, worker_b, _, _, ticket, query = _setup_adversarial_test_fixture(tmp_path)
+    _, worker_b, ident_a, _, ticket, query = _setup_adversarial_test_fixture(tmp_path)
 
     ticket_missing_a = replace(
         ticket,
         bank_approvals={"bank_b": ticket.bank_approvals["bank_b"]},
         requesting_bank_signature="",
     )
-    attacker_query = replace(query, ticket=ticket_missing_a)
+    canonical_env = (
+        f"{query.job_id}:{query.consortium_id}:{query.requesting_bank_id}:"
+        f"{query.target_bank_id}:{query.psi_request_b64}:{query.nonce}:"
+        f"{query.timestamp}:{query.purpose}:{ticket_missing_a.canonical_digest()}".encode()
+    )
+    attacker_query = replace(query, ticket=ticket_missing_a, signature=ident_a.sign(canonical_env))
 
     with pytest.raises(
         ConsortiumSecurityError, match="missing approval signature in ticket"
@@ -1115,14 +1125,19 @@ def test_adversarial_completely_missing_requesting_bank_ticket_signature(tmp_pat
 
 def test_adversarial_invalid_ed25519_signature_with_valid_consortium_grant(tmp_path: Path) -> None:
     """4. Mandatory negative control: Invalid Ed25519 signature with otherwise valid consortium grant."""
-    _, worker_b, _, _, ticket, query = _setup_adversarial_test_fixture(tmp_path)
+    _, worker_b, ident_a, _, ticket, query = _setup_adversarial_test_fixture(tmp_path)
 
     corrupt_sig = "ee" * 64
     ticket_corrupt_sig = replace(
         ticket,
         bank_approvals={"bank_a": corrupt_sig, "bank_b": ticket.bank_approvals["bank_b"]},
     )
-    attacker_query = replace(query, ticket=ticket_corrupt_sig)
+    canonical_env = (
+        f"{query.job_id}:{query.consortium_id}:{query.requesting_bank_id}:"
+        f"{query.target_bank_id}:{query.psi_request_b64}:{query.nonce}:"
+        f"{query.timestamp}:{query.purpose}:{ticket_corrupt_sig.canonical_digest()}".encode()
+    )
+    attacker_query = replace(query, ticket=ticket_corrupt_sig, signature=ident_a.sign(canonical_env))
 
     with pytest.raises(
         ConsortiumSecurityError,

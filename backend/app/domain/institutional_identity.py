@@ -487,15 +487,14 @@ class InstitutionalVerificationRegistry:
         clean_bank_id = bank_id.lower().strip()
         import os
 
-        env_key = (
-            os.getenv(f"CFI_INSTITUTION_PUBLIC_KEY_{clean_bank_id.upper()}")
-            or os.getenv(f"CFI_PEER_PUBLIC_KEY_{clean_bank_id.upper()}")
-            or os.getenv(f"CFI_PEER_KEY_{clean_bank_id.upper()}")
-        )
-        if env_key and len(env_key.strip()) == 64:
-            clean_env = env_key.strip()
-            enrolled = self._enrolled_keys.get(clean_bank_id)
-            if enrolled is None or enrolled.public_key_hex != clean_env:
+        if clean_bank_id not in self._enrolled_keys:
+            env_key = (
+                os.getenv(f"CFI_INSTITUTION_PUBLIC_KEY_{clean_bank_id.upper()}")
+                or os.getenv(f"CFI_PEER_PUBLIC_KEY_{clean_bank_id.upper()}")
+                or os.getenv(f"CFI_PEER_KEY_{clean_bank_id.upper()}")
+            )
+            if env_key and len(env_key.strip()) == 64:
+                clean_env = env_key.strip()
                 try:
                     self.register_public_key(
                         clean_bank_id,
@@ -503,7 +502,6 @@ class InstitutionalVerificationRegistry:
                         trust_source="ENVIRONMENT_BOOTSTRAP",
                         allow_overwrite=True,
                     )
-                    return self._enrolled_keys[clean_bank_id].public_key
                 except Exception:
                     pass
 

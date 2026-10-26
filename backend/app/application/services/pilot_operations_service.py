@@ -75,19 +75,71 @@ class PilotOperationsService:
         self._audit_chain = ImmutableAuditChain.get_instance()
         self._lock = threading.RLock()
 
-    def _probe_node_health(self, url: str | None, expected_type: str = "worker") -> tuple[bool, str]:
-        """Probe actual HTTP readiness of a topology worker or coordinator."""
-        if not url:
-            return True, "NOT_CONFIGURED"
-        clean_url = url.rstrip("/")
+    def _probe_node_health(
+        self,
+        url: str | None,
+        expected_type: str = "worker",
+        expected_bank_id: str | None = None,
+    ) -> tuple[bool, str]:
+        """Probe actual HTTP readiness and authenticated identity of a topology worker or coordinator."""
+        if not url or not url.strip():
+            return False, "NOT_CONFIGURED: Topology endpoint URL is missing."
+
+        clean_url = url.strip().rstrip("/")
+        parsed = urllib.parse.urlparse(clean_url)
+        if parsed.scheme not in ("http", "https"):
+            return False, f"FORBIDDEN_SCHEME: Scheme '{parsed.scheme}' rejected. Only http and https permitted."
+
+        hostname = (parsed.hostname or "").lower()
+        forbidden_hosts = {
+            "169.254.169.254",
+            "metadata.google.internal",
+            "metadata.google",
+            "100.100.100.200",
+            "fd00:ec2::254",
+        }
+        if hostname in forbidden_hosts:
+            return False, f"SSRF_PROHIBITED: Endpoint '{hostname}' points to forbidden cloud metadata."
+
         probe_path = f"{clean_url}/worker/health" if expected_type == "worker" else f"{clean_url}/health"
+
+        class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+            def http_error_302(self, req, fp, code, msg, headers):
+                raise urllib.error.HTTPError(req.full_url, code, "Redirect forbidden for security probe", headers, fp)
+            http_error_301 = http_error_303 = http_error_307 = http_error_308 = http_error_302
+
         try:
-            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirectHandler())
             req = urllib.request.Request(probe_path, method="GET")
-            with opener.open(req, timeout=0.8) as resp:
-                if resp.status == 200:
-                    return True, f"ONLINE (status={resp.status})"
-                return False, f"UNHEALTHY (status={resp.status})"
+            req.add_header("User-Agent", "CFI-Pilot-Preflight/1.0")
+            with opener.open(req, timeout=1.5) as resp:
+                if resp.status != 200:
+                    return False, f"UNHEALTHY (status={resp.status})"
+                body_bytes = resp.read()
+                try:
+                    data = json.loads(body_bytes.decode("utf-8"))
+                except Exception:
+                    return False, "INVALID_RESPONSE: Non-JSON body returned by node health probe."
+
+                status_val = str(data.get("status", "")).upper()
+                if status_val not in ("ONLINE", "HEALTHY"):
+                    return False, f"UNHEALTHY_STATUS: Node reported status '{data.get('status')}'."
+
+                if expected_type == "worker":
+                    resp_bank = str(data.get("bank_id", "")).lower().strip()
+                    if expected_bank_id:
+                        clean_expected = expected_bank_id.lower().strip()
+                        if resp_bank != clean_expected:
+                            return False, (
+                                f"IDENTITY_MISMATCH: Worker endpoint at '{clean_url}' returned bank_id '{resp_bank}', "
+                                f"expected '{clean_expected}'."
+                            )
+                elif expected_type == "coordinator":
+                    resp_role = str(data.get("role", "")).lower().strip()
+                    if resp_role != "coordinator":
+                        return False, f"IDENTITY_MISMATCH: Coordinator endpoint at '{clean_url}' returned role '{resp_role}', expected 'coordinator'."
+
+                return True, f"ONLINE (status=200, identity_verified=True)"
         except Exception as exc:
             return False, f"OFFLINE ({exc})"
 
@@ -111,16 +163,33 @@ class PilotOperationsService:
         if req is None:
             if not pilot_id or not consortium_id:
                 raise ValueError("Both pilot_id and consortium_id are mandatory to provision a pilot.")
+            
+            topo = dict(kwargs.get("topology") or {})
+            worker_eps = dict(kwargs.get("worker_endpoints") or {})
+            for k, v in worker_eps.items():
+                topo[f"{k.lower()}_worker_url"] = v
+            coord_ep = kwargs.get("coordinator_endpoint") or kwargs.get("coordinator_url")
+            if coord_ep:
+                topo["coordinator_url"] = coord_ep
+
+            total_q = kwargs.get("query_quota_total") or kwargs.get("max_queries_total") or max_queries_total
+            per_inst_q = kwargs.get("query_quota_per_institution") or kwargs.get("max_queries_per_institution") or max_queries_per_institution
+            d_sets = kwargs.get("approved_datasets") or kwargs.get("approved_synthetic_datasets") or approved_synthetic_datasets or {}
+
             req = PilotProvisionRequest(
                 pilot_id=pilot_id,
                 consortium_id=consortium_id,
                 participating_institutions=participating_institutions or ["bank_a", "bank_b"],
                 allowed_purposes=allowed_purposes or ["AML_INVESTIGATION"],
                 allowed_jurisdictions=allowed_jurisdictions or ["EU"],
-                approved_synthetic_datasets=approved_synthetic_datasets or [],
-                max_queries_total=max_queries_total,
-                max_queries_per_institution=max_queries_per_institution,
+                approved_datasets=d_sets,
+                query_quota_total=total_q,
+                query_quota_per_institution=per_inst_q,
                 duration_days=duration_days,
+                starts_at=str(kwargs.get("starts_at") or ""),
+                expires_at=str(kwargs.get("expires_at") or ""),
+                operational_grant_id=str(kwargs.get("operational_grant_id") or ""),
+                topology=topo,
             )
         clean_pilot_id = req.pilot_id.strip()
         clean_consortium_id = req.consortium_id.lower().strip()
@@ -168,11 +237,13 @@ class PilotOperationsService:
             allowed_purposes=req.allowed_purposes,
             allowed_jurisdictions=req.allowed_jurisdictions,
             approved_datasets=req.approved_datasets,
-            authorized_operators=req.authorized_operators or [principal.principal_id] if principal else ["operator_admin"],
+            authorized_operators=req.authorized_operators or ([principal.principal_id] if principal else ["operator_admin"]),
             operational_grant_id=grant_id,
             grant_revision=grant_revision,
             grant_scope_digest=grant_scope_digest,
             topology=req.topology,
+            worker_endpoints=dict(kwargs.get("worker_endpoints") or {}),
+            coordinator_endpoint=str(kwargs.get("coordinator_endpoint") or kwargs.get("coordinator_url") or ""),
             starts_at=starts_at,
             expires_at=expires_at,
             query_quota_total=req.query_quota_total,
@@ -300,19 +371,62 @@ class PilotOperationsService:
 
         # 7. Live Infrastructure Readiness & Topology Reachability Probes
         topo = entity.config.topology or {}
-        bank_a_url = topo.get("bank_a_worker_url") or topo.get("bank_a_url") or os.getenv("CFI_WORKER_A_URL") or os.getenv("CFI_BANK_A_URL")
-        bank_b_url = topo.get("bank_b_worker_url") or topo.get("bank_b_url") or os.getenv("CFI_WORKER_B_URL") or os.getenv("CFI_BANK_B_URL")
-        coord_url = topo.get("coordinator_url") or os.getenv("CFI_COORDINATOR_URL")
+        worker_eps = getattr(entity.config, "worker_endpoints", {}) or {}
+        coord_ep = getattr(entity.config, "coordinator_endpoint", "") or ""
+
+        bank_a = entity.config.participating_institutions[0] if len(entity.config.participating_institutions) > 0 else "bank_a"
+        bank_b = entity.config.participating_institutions[1] if len(entity.config.participating_institutions) > 1 else "bank_b"
+
+        bank_a_url = (
+            topo.get(f"{bank_a}_worker_url")
+            or topo.get(f"{bank_a}_url")
+            or topo.get("bank_a_worker_url")
+            or topo.get("bank_a_url")
+            or worker_eps.get(bank_a)
+            or os.getenv("CFI_WORKER_A_URL")
+            or os.getenv("CFI_BANK_A_URL")
+        )
+        bank_b_url = (
+            topo.get(f"{bank_b}_worker_url")
+            or topo.get(f"{bank_b}_url")
+            or topo.get("bank_b_worker_url")
+            or topo.get("bank_b_url")
+            or worker_eps.get(bank_b)
+            or os.getenv("CFI_WORKER_B_URL")
+            or os.getenv("CFI_BANK_B_URL")
+        )
+        coord_url = (
+            topo.get("coordinator_url")
+            or topo.get("coord_url")
+            or coord_ep
+            or os.getenv("CFI_COORDINATOR_URL")
+        )
+
+        has_explicit_topo = bool(topo or worker_eps or coord_ep)
+        if has_explicit_topo:
+            missing_nodes = []
+            if not bank_a_url:
+                missing_nodes.append(bank_a)
+            if not bank_b_url:
+                missing_nodes.append(bank_b)
+            if not coord_url:
+                missing_nodes.append("coordinator")
+
+            checks.append(PreflightCheckResult(
+                check_name="MANDATORY_TOPOLOGY_CONFIGURED",
+                passed=len(missing_nodes) == 0,
+                details=f"Missing mandatory topology endpoints: {', '.join(missing_nodes)}" if missing_nodes else "All topology nodes configured.",
+            ))
 
         if bank_a_url:
-            a_ok, a_det = self._probe_node_health(bank_a_url, "worker")
+            a_ok, a_det = self._probe_node_health(bank_a_url, "worker", expected_bank_id=bank_a)
             checks.append(PreflightCheckResult(
                 check_name="BANK_A_WORKER_REACHABLE",
                 passed=a_ok,
                 details=f"Worker A ({bank_a_url}): {a_det}",
             ))
         if bank_b_url:
-            b_ok, b_det = self._probe_node_health(bank_b_url, "worker")
+            b_ok, b_det = self._probe_node_health(bank_b_url, "worker", expected_bank_id=bank_b)
             checks.append(PreflightCheckResult(
                 check_name="BANK_B_WORKER_REACHABLE",
                 passed=b_ok,
@@ -356,6 +470,13 @@ class PilotOperationsService:
         entity.audit_event_ids.append(evt.event_id)
 
         self.store.save_pilot(entity)
+
+        if not all_passed:
+            failed_names = [c.check_name for c in checks if not c.passed]
+            raise PilotGovernanceError(
+                f"Preflight verification failed for pilot '{pilot_id}': {', '.join(failed_names)}."
+            )
+
         return entity
 
     def approve_pilot(
@@ -614,8 +735,28 @@ class PilotOperationsService:
 
         c_meta = getattr(consortium, "metadata", {}) or {}
         op_grant = c_meta.get("operational_data_sharing_grant") or {}
-        if not op_grant or not op_grant.get("is_active", True):
+        if not op_grant or not op_grant.get("is_active", True) or op_grant.get("status") == "REVOKED":
             raise PilotAuthorizationError("Underlying operational grant is no longer active.")
+
+        # Re-check exact grant revision and scope digest binding
+        current_rev = int(op_grant.get("revision", 0))
+        if current_rev != entity.config.grant_revision:
+            raise PilotAuthorizationError(
+                f"Cannot resume pilot '{pilot_id}': Operational grant revision mismatch "
+                f"(approved revision {entity.config.grant_revision}, current active revision {current_rev}). "
+                "Fresh pilot approvals are required after grant modification."
+            )
+        current_digest = str(op_grant.get("scope_digest", ""))
+        if current_digest and entity.config.grant_scope_digest and current_digest != entity.config.grant_scope_digest:
+            raise PilotAuthorizationError(
+                f"Cannot resume pilot '{pilot_id}': Operational grant scope digest has mutated. "
+                "Fresh bilateral institutional approvals are required before resumption."
+            )
+        grant_banks = {b.lower().strip() for b in op_grant.get("participating_banks", [])}
+        if grant_banks and not set([b.lower().strip() for b in entity.config.participating_institutions]).issubset(grant_banks):
+            raise PilotAuthorizationError(
+                f"Cannot resume pilot '{pilot_id}': Participating institutions removed from operational grant."
+            )
 
         revoked = set(op_grant.get("revoked_by_institutions", []))
         if revoked & set(entity.config.participating_institutions):
@@ -638,22 +779,56 @@ class PilotOperationsService:
 
         # Live infrastructure readiness verification before resumption
         topo = entity.config.topology or {}
-        bank_a_url = topo.get("bank_a_worker_url") or topo.get("bank_a_url") or os.getenv("CFI_WORKER_A_URL") or os.getenv("CFI_BANK_A_URL")
-        bank_b_url = topo.get("bank_b_worker_url") or topo.get("bank_b_url") or os.getenv("CFI_WORKER_B_URL") or os.getenv("CFI_BANK_B_URL")
-        coord_url = topo.get("coordinator_url") or os.getenv("CFI_COORDINATOR_URL")
+        worker_eps = getattr(entity.config, "worker_endpoints", {}) or {}
+        coord_ep = getattr(entity.config, "coordinator_endpoint", "") or ""
+
+        bank_a = entity.config.participating_institutions[0] if len(entity.config.participating_institutions) > 0 else "bank_a"
+        bank_b = entity.config.participating_institutions[1] if len(entity.config.participating_institutions) > 1 else "bank_b"
+
+        bank_a_url = (
+            topo.get(f"{bank_a}_worker_url")
+            or topo.get(f"{bank_a}_url")
+            or topo.get("bank_a_worker_url")
+            or topo.get("bank_a_url")
+            or worker_eps.get(bank_a)
+            or os.getenv("CFI_WORKER_A_URL")
+            or os.getenv("CFI_BANK_A_URL")
+        )
+        bank_b_url = (
+            topo.get(f"{bank_b}_worker_url")
+            or topo.get(f"{bank_b}_url")
+            or topo.get("bank_b_worker_url")
+            or topo.get("bank_b_url")
+            or worker_eps.get(bank_b)
+            or os.getenv("CFI_WORKER_B_URL")
+            or os.getenv("CFI_BANK_B_URL")
+        )
+        coord_url = (
+            topo.get("coordinator_url")
+            or topo.get("coord_url")
+            or coord_ep
+            or os.getenv("CFI_COORDINATOR_URL")
+        )
+
+        has_explicit_topo = bool(topo or worker_eps or coord_ep)
+        if has_explicit_topo:
+            if not bank_a_url or not bank_b_url or not coord_url:
+                raise PilotGovernanceError(
+                    f"Cannot resume pilot '{pilot_id}': Preflight verification failed. Incomplete mandatory topology."
+                )
 
         if bank_a_url:
-            ok, det = self._probe_node_health(bank_a_url, "worker")
+            ok, det = self._probe_node_health(bank_a_url, "worker", expected_bank_id=bank_a)
             if not ok:
-                raise PilotGovernanceError(f"Cannot resume pilot '{pilot_id}': Bank A worker at '{bank_a_url}' is unreachable ({det}).")
+                raise PilotGovernanceError(f"Cannot resume pilot '{pilot_id}': Preflight probe failed for Bank A worker at '{bank_a_url}': {det}")
         if bank_b_url:
-            ok, det = self._probe_node_health(bank_b_url, "worker")
+            ok, det = self._probe_node_health(bank_b_url, "worker", expected_bank_id=bank_b)
             if not ok:
-                raise PilotGovernanceError(f"Cannot resume pilot '{pilot_id}': Bank B worker at '{bank_b_url}' is unreachable ({det}).")
+                raise PilotGovernanceError(f"Cannot resume pilot '{pilot_id}': Preflight probe failed for Bank B worker at '{bank_b_url}': {det}")
         if coord_url:
             ok, det = self._probe_node_health(coord_url, "coordinator")
             if not ok:
-                raise PilotGovernanceError(f"Cannot resume pilot '{pilot_id}': Coordinator at '{coord_url}' is unreachable ({det}).")
+                raise PilotGovernanceError(f"Cannot resume pilot '{pilot_id}': Preflight probe failed for Coordinator at '{coord_url}': {det}")
 
         entity.transition_to(PilotStatus.ACTIVE, "Resumed after health and authorization revalidation.")
 
@@ -731,25 +906,37 @@ class PilotOperationsService:
 
     def validate_pilot_query(
         self,
-        pilot_id: str,
+        pilot_id: str | None = None,
         requesting_bank_id: str | None = None,
         target_bank_id: str | None = None,
         purpose: str = "",
         requesting_bank: str | None = None,
         target_bank: str | None = None,
+        consortium_id: str | None = None,
         **kwargs: Any,
     ) -> PilotEntity:
         """Authoritatively validates execution gating for a matching query under this pilot."""
-        requesting_bank_id = requesting_bank_id or requesting_bank or ""
-        target_bank_id = target_bank_id or target_bank or ""
+        clean_req = (requesting_bank_id or requesting_bank or "").lower().strip()
+        clean_target = (target_bank_id or target_bank or "").lower().strip()
+        if not pilot_id:
+            scoped = self.find_active_or_scoped_pilot(
+                requesting_bank=clean_req,
+                target_bank=clean_target,
+                purpose=purpose,
+                consortium_id=consortium_id,
+            )
+            if scoped:
+                pilot_id = scoped.config.pilot_id
+            else:
+                raise ValueError("pilot_id is required or must match an existing governed pilot scope.")
         entity = self._get_required_pilot(pilot_id)
         entity.validate_executable(
-            requesting_bank_id=requesting_bank_id,
-            target_bank_id=target_bank_id,
+            requesting_bank_id=clean_req,
+            target_bank_id=clean_target,
             purpose=purpose,
         )
 
-        # Verify underlying consortium operational grant is still active
+        # Verify underlying consortium operational grant is still active and unchanged
         consortium = self.consortium_service.get_consortium(entity.config.consortium_id)
         if not consortium or consortium.status != ConsortiumStatus.ACTIVE:
             raise PilotAuthorizationError(
@@ -757,14 +944,53 @@ class PilotOperationsService:
             )
         c_meta = getattr(consortium, "metadata", {}) or {}
         op_grant = c_meta.get("operational_data_sharing_grant") or {}
-        if not op_grant or not op_grant.get("is_active", True):
+        if not op_grant or not op_grant.get("is_active", True) or op_grant.get("status") == "REVOKED":
             raise PilotAuthorizationError("Underlying operational data sharing grant is inactive or revoked.")
 
+        # Exact Approved Grant Revision & Scope Binding
+        grant_id = op_grant.get("grant_id")
+        if grant_id and entity.config.operational_grant_id and grant_id != entity.config.operational_grant_id:
+            raise PilotAuthorizationError(
+                f"Operational grant ID mismatch: pilot was approved under grant '{entity.config.operational_grant_id}', "
+                f"current active grant is '{grant_id}'."
+            )
+        current_rev = int(op_grant.get("revision", 0))
+        if current_rev != entity.config.grant_revision:
+            raise PilotAuthorizationError(
+                f"Operational grant revision mismatch: pilot was approved under revision {entity.config.grant_revision}, "
+                f"current active grant revision is {current_rev}. Fresh pilot approval required."
+            )
+        current_digest = str(op_grant.get("scope_digest", ""))
+        if current_digest and entity.config.grant_scope_digest and current_digest != entity.config.grant_scope_digest:
+            raise PilotAuthorizationError(
+                "Operational grant scope digest mismatch: grant terms, scope, or disclosure policy have mutated. "
+                "Prior pilot approval is invalid without fresh bilateral authorization."
+            )
+
+        grant_banks = {b.lower().strip() for b in op_grant.get("participating_banks", [])}
+        if grant_banks:
+            if clean_req not in grant_banks:
+                raise PilotAuthorizationError(f"Requesting bank '{clean_req}' is no longer in operational grant participating institutions.")
+            if clean_target not in grant_banks:
+                raise PilotAuthorizationError(f"Target bank '{clean_target}' is no longer in operational grant participating institutions.")
+
+        grant_purposes = set(op_grant.get("allowed_purposes", []))
+        if grant_purposes and not set(entity.config.allowed_purposes).issubset(grant_purposes):
+            raise PilotAuthorizationError(
+                f"Pilot purposes {entity.config.allowed_purposes} are no longer permitted under active grant."
+            )
+
+        grant_jurisdictions = set(op_grant.get("allowed_jurisdictions", []))
+        if grant_jurisdictions and not set(entity.config.allowed_jurisdictions).issubset(grant_jurisdictions):
+            raise PilotAuthorizationError(
+                f"Pilot jurisdictions {entity.config.allowed_jurisdictions} are no longer permitted under active grant."
+            )
+
         revoked = set(op_grant.get("revoked_by_institutions", []))
-        if requesting_bank_id.lower().strip() in revoked:
-            raise PilotAuthorizationError(f"Requesting bank '{requesting_bank_id}' revoked operational consent.")
-        if target_bank_id.lower().strip() in revoked:
-            raise PilotAuthorizationError(f"Counterpart bank '{target_bank_id}' revoked operational consent.")
+        if clean_req in revoked:
+            raise PilotAuthorizationError(f"Requesting bank '{clean_req}' revoked operational consent.")
+        if clean_target in revoked:
+            raise PilotAuthorizationError(f"Counterpart bank '{clean_target}' revoked operational consent.")
 
         return entity
 
@@ -774,27 +1000,63 @@ class PilotOperationsService:
         target_bank: str,
         purpose: str,
         pilot_id: str | None = None,
+        consortium_id: str | None = None,
     ) -> PilotEntity | None:
         """Find governing pilot for the institutional pair and purpose.
 
-        If pilot_id is supplied, retrieves that exact pilot.
-        Otherwise, inspects active pilots for institutional match.
+        If pilot_id is supplied, retrieves that exact pilot and verifies scope binding.
+        Otherwise, discovers any governing pilot (active or non-active) for this scope.
+        Non-active pilots (PAUSED, ABORTED, COMPLETED, EXPIRED, FAILED) remain authoritatively
+        bound so that client omission of pilot_id cannot bypass pilot containment.
+        If no pilot was provisioned for this scope, returns None to allow separately authorized M4 usage.
         """
         clean_req = requesting_bank.lower().strip()
         clean_target = target_bank.lower().strip()
+        clean_cid = consortium_id.lower().strip() if consortium_id else None
 
         if pilot_id:
             entity = self.store.get_pilot(pilot_id.strip())
             if not entity:
                 raise PilotGovernanceError(f"Governing pilot '{pilot_id}' not found.")
+            p_insts = {b.lower().strip() for b in entity.config.participating_institutions}
+            if clean_req not in p_insts or clean_target not in p_insts:
+                raise PilotAuthorizationError(
+                    f"Supplied pilot '{pilot_id}' participating institutions {entity.config.participating_institutions} "
+                    f"do not match query institutions ('{clean_req}', '{clean_target}')."
+                )
+            if clean_cid and entity.config.consortium_id.lower().strip() != clean_cid:
+                raise PilotAuthorizationError(
+                    f"Supplied pilot '{pilot_id}' consortium '{entity.config.consortium_id}' "
+                    f"does not match query consortium '{clean_cid}'."
+                )
             return entity
 
-        active_pilots = self.store.get_active_pilots()
-        for p in active_pilots:
+        all_pilots = self.store.list_pilots()
+        matching_pilots: list[PilotEntity] = []
+        for p in all_pilots:
+            if clean_cid and p.config.consortium_id.lower().strip() != clean_cid:
+                continue
             p_insts = {b.lower().strip() for b in p.config.participating_institutions}
-            if clean_req in p_insts and clean_target in p_insts and purpose in p.config.allowed_purposes:
+            if clean_req in p_insts and clean_target in p_insts:
+                matching_pilots.append(p)
+
+        if not matching_pilots:
+            return None
+
+        # Prefer an active pilot matching purpose
+        for p in matching_pilots:
+            if p.status == PilotStatus.ACTIVE and (not purpose or purpose in p.config.allowed_purposes):
                 return p
-        return None
+
+        # If any active pilot exists for this pair
+        for p in matching_pilots:
+            if p.status == PilotStatus.ACTIVE:
+                return p
+
+        # If no active pilot, return the governing non-active pilot (most recently updated)
+        # so downstream validation authoritatively enforces kill switch / failure containment
+        # and rejects the query rather than silently escaping to uncontained M4 execution!
+        return matching_pilots[0]
 
     def revalidate_pilot_active(
         self,
@@ -804,6 +1066,8 @@ class PilotOperationsService:
         purpose: str,
     ) -> PilotEntity:
         """Revalidate effective pilot authorization immediately before authoritative signal admission."""
+        clean_req = requesting_bank.lower().strip()
+        clean_target = target_bank.lower().strip()
         entity = self._get_required_pilot(pilot_id)
         if entity.status != PilotStatus.ACTIVE:
             raise PilotGovernanceError(
@@ -814,7 +1078,7 @@ class PilotOperationsService:
             raise PilotExpiredError(
                 f"Kill switch activated: Pilot '{pilot_id}' expired. Authoritative signal admission rejected."
             )
-        entity.validate_executable(requesting_bank, target_bank, purpose)
+        entity.validate_executable(clean_req, clean_target, purpose)
 
         consortium = self.consortium_service.get_consortium(entity.config.consortium_id)
         if not consortium or consortium.status != ConsortiumStatus.ACTIVE:
@@ -823,14 +1087,34 @@ class PilotOperationsService:
             )
         c_meta = getattr(consortium, "metadata", {}) or {}
         op_grant = c_meta.get("operational_data_sharing_grant") or {}
-        if not op_grant or not op_grant.get("is_active", True):
+        if not op_grant or not op_grant.get("is_active", True) or op_grant.get("status") == "REVOKED":
             raise PilotAuthorizationError("Underlying operational data sharing grant is inactive or revoked.")
 
+        # Re-check exact grant revision & scope digest binding
+        current_rev = int(op_grant.get("revision", 0))
+        if current_rev != entity.config.grant_revision:
+            raise PilotAuthorizationError(
+                f"Operational grant revision mismatch: pilot was approved under revision {entity.config.grant_revision}, "
+                f"current active grant revision is {current_rev}. Admission rejected."
+            )
+        current_digest = str(op_grant.get("scope_digest", ""))
+        if current_digest and entity.config.grant_scope_digest and current_digest != entity.config.grant_scope_digest:
+            raise PilotAuthorizationError(
+                "Operational grant scope digest mismatch: grant terms have mutated. Admission rejected."
+            )
+
+        grant_banks = {b.lower().strip() for b in op_grant.get("participating_banks", [])}
+        if grant_banks:
+            if clean_req not in grant_banks:
+                raise PilotAuthorizationError(f"Requesting bank '{clean_req}' is no longer in operational grant.")
+            if clean_target not in grant_banks:
+                raise PilotAuthorizationError(f"Target bank '{clean_target}' is no longer in operational grant.")
+
         revoked = set(op_grant.get("revoked_by_institutions", []))
-        if requesting_bank.lower().strip() in revoked:
-            raise PilotAuthorizationError(f"Requesting bank '{requesting_bank}' revoked operational consent.")
-        if target_bank.lower().strip() in revoked:
-            raise PilotAuthorizationError(f"Counterpart bank '{target_bank}' revoked operational consent.")
+        if clean_req in revoked:
+            raise PilotAuthorizationError(f"Requesting bank '{clean_req}' revoked operational consent.")
+        if clean_target in revoked:
+            raise PilotAuthorizationError(f"Counterpart bank '{clean_target}' revoked operational consent.")
 
         return entity
 

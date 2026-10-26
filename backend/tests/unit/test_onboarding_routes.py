@@ -62,6 +62,24 @@ def _generate_valid_csr(common_name: str) -> str:
     return csr.public_bytes(serialization.Encoding.PEM).decode("utf-8")
 
 
+def _get_admin_auth_headers(bank_id: str = "consortium") -> dict[str, str]:
+    """Helper to generate authoritative admin Bearer authorization headers for test requests."""
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    auth_svc = AuthenticationService.get_instance()
+    user = auth_svc.get_user("admin_test_user")
+    if not user:
+        user = auth_svc.register_user(
+            username="admin_test_user",
+            plain_password="AdminSecure2026!",
+            bank_id=bank_id,
+            roles=["admin", "super_admin", "compliance", "compliance_officer"],
+            clearance_level=3,
+        )
+    bundle = auth_svc.create_token_bundle(user)
+    return {"Authorization": f"Bearer {bundle.access_token}"}
+
+
 # ── Bank Onboarding Routes ───────────────────────────────────────────────────
 
 
@@ -81,27 +99,64 @@ def test_get_ca_bundle_success(client: TestClient, prefix: str) -> None:
 
 @pytest.mark.parametrize("prefix", ["/api/v1/onboarding", "/v1/onboarding"])
 def test_register_bank_success(client: TestClient, prefix: str) -> None:
-    """Verify POST /register creates a new bank node and returns full bundle."""
+    """Verify POST /register creates a new bank node with sovereign CSR and returns bundle without private key exposure."""
+    csr_pem = _generate_valid_csr("bank_test_alpha.client.cf-intelligence.io")
     payload = {
         "bank_id": "bank_test_alpha",
         "legal_name": "Alpha Bank Global AG",
         "jurisdiction": "DE",
         "contact_email": "security@alphabank.de",
         "data_residency_region": "eu-central-1",
+        "csr_pem": csr_pem,
     }
-    response = client.post(f"{prefix}/register", json=payload)
+    headers = _get_admin_auth_headers()
+    response = client.post(f"{prefix}/register", json=payload, headers=headers)
     assert response.status_code == 201
     data = response.json()
     assert data["bank_id"] == "bank_test_alpha"
     assert data["status"].lower() == "active"
     assert data["cert_fingerprint"].startswith("SHA256:")
     assert data["mtls_cert_pem"].startswith("-----BEGIN CERTIFICATE-----")
-    assert data["mtls_key_pem"].startswith("-----BEGIN RSA PRIVATE KEY-----")
+    assert data["mtls_key_pem"] == ""  # Sovereign private key custody: NEVER returned centrally
+    assert data["private_key_pem"] == ""
     assert "bank_test_alpha" in data["connector_config_yaml"]
+
+
+def test_register_bank_unauthenticated_rejected(client: TestClient) -> None:
+    """Verify unauthenticated registration request fails with 401 Unauthorized."""
+    payload = {
+        "bank_id": "bank_unauth",
+        "legal_name": "Unauth Bank",
+        "jurisdiction": "US",
+        "contact_email": "sec@unauth.com",
+        "data_residency_region": "us-east-1",
+    }
+    response = client.post("/api/v1/onboarding/register", json=payload)
+    assert response.status_code == 401
+
+
+def test_register_bank_without_csr_stays_pending(client: TestClient) -> None:
+    """Verify registration without CSR remains truthfully PENDING_VERIFICATION."""
+    payload = {
+        "bank_id": "bank_pending_test",
+        "legal_name": "Pending Bank",
+        "jurisdiction": "FR",
+        "contact_email": "sec@pending.fr",
+        "data_residency_region": "eu-west-1",
+    }
+    headers = _get_admin_auth_headers()
+    response = client.post("/api/v1/onboarding/register", json=payload, headers=headers)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["bank_id"] == "bank_pending_test"
+    assert data["status"].lower() == "pending_verification"
+    assert data["mtls_cert_pem"] == ""
+    assert data["mtls_key_pem"] == ""
 
 
 def test_register_bank_validation_errors(client: TestClient) -> None:
     """Verify input validation rejects invalid jurisdiction, email, and extra fields."""
+    headers = _get_admin_auth_headers()
     # Invalid jurisdiction code (must be 2 uppercase characters)
     bad_jur = {
         "bank_id": "bank_valid",
@@ -110,7 +165,7 @@ def test_register_bank_validation_errors(client: TestClient) -> None:
         "contact_email": "sec@bank.com",
         "data_residency_region": "us-east-1",
     }
-    res1 = client.post("/api/v1/onboarding/register", json=bad_jur)
+    res1 = client.post("/api/v1/onboarding/register", json=bad_jur, headers=headers)
     assert res1.status_code == 422
 
     # Invalid email format
@@ -121,7 +176,7 @@ def test_register_bank_validation_errors(client: TestClient) -> None:
         "contact_email": "not-an-email",
         "data_residency_region": "us-east-1",
     }
-    res2 = client.post("/api/v1/onboarding/register", json=bad_email)
+    res2 = client.post("/api/v1/onboarding/register", json=bad_email, headers=headers)
     assert res2.status_code == 422
 
     # Extra forbidden field
@@ -133,12 +188,13 @@ def test_register_bank_validation_errors(client: TestClient) -> None:
         "data_residency_region": "us-east-1",
         "unauthorized_field": "exploit",
     }
-    res3 = client.post("/api/v1/onboarding/register", json=extra_field)
+    res3 = client.post("/api/v1/onboarding/register", json=extra_field, headers=headers)
     assert res3.status_code == 422
 
 
 def test_register_duplicate_bank_id_returns_409(client: TestClient) -> None:
     """Verify duplicate bank_id registration raises 409 Conflict."""
+    headers = _get_admin_auth_headers()
     payload = {
         "bank_id": "bank_duplicate",
         "legal_name": "Duplicate Bank Ltd",
@@ -146,18 +202,19 @@ def test_register_duplicate_bank_id_returns_409(client: TestClient) -> None:
         "contact_email": "admin@duplicate.co.uk",
         "data_residency_region": "eu-west-1",
     }
-    res1 = client.post("/api/v1/onboarding/register", json=payload)
+    res1 = client.post("/api/v1/onboarding/register", json=payload, headers=headers)
     assert res1.status_code == 201
 
-    res2 = client.post("/api/v1/onboarding/register", json=payload)
+    res2 = client.post("/api/v1/onboarding/register", json=payload, headers=headers)
     assert res2.status_code == 409
     assert "already registered" in res2.json()["detail"].lower()
 
 
 def test_get_onboarding_bundle_lifecycle(client: TestClient) -> None:
     """Verify GET /bundle/{bank_id} returns existing configuration or 404."""
+    headers = _get_admin_auth_headers()
     # Unknown bank returns 404
-    missing_res = client.get("/api/v1/onboarding/bundle/nonexistent_bank")
+    missing_res = client.get("/api/v1/onboarding/bundle/nonexistent_bank", headers=headers)
     assert missing_res.status_code == 404
 
     # Register bank
@@ -168,11 +225,11 @@ def test_get_onboarding_bundle_lifecycle(client: TestClient) -> None:
         "contact_email": "bundle@bank.fr",
         "data_residency_region": "eu-west-3",
     }
-    reg_res = client.post("/api/v1/onboarding/register", json=payload)
+    reg_res = client.post("/api/v1/onboarding/register", json=payload, headers=headers)
     assert reg_res.status_code == 201
 
     # Retrieve bundle
-    bundle_res = client.get("/api/v1/onboarding/bundle/bank_bundle_test")
+    bundle_res = client.get("/api/v1/onboarding/bundle/bank_bundle_test", headers=headers)
     assert bundle_res.status_code == 200
     bundle_data = bundle_res.json()
     assert bundle_data["bank_id"] == "bank_bundle_test"
@@ -181,6 +238,7 @@ def test_get_onboarding_bundle_lifecycle(client: TestClient) -> None:
 
 def test_list_and_get_bank_status(client: TestClient) -> None:
     """Verify GET /banks and GET /banks/{bank_id}/status."""
+    headers = _get_admin_auth_headers()
     payload = {
         "bank_id": "bank_status_check",
         "legal_name": "Status Check Bank",
@@ -188,27 +246,28 @@ def test_list_and_get_bank_status(client: TestClient) -> None:
         "contact_email": "ops@swissbank.ch",
         "data_residency_region": "eu-central-1",
     }
-    client.post("/api/v1/onboarding/register", json=payload)
+    client.post("/api/v1/onboarding/register", json=payload, headers=headers)
 
     # List banks
-    list_res = client.get("/api/v1/onboarding/banks")
+    list_res = client.get("/api/v1/onboarding/banks", headers=headers)
     assert list_res.status_code == 200
     banks = list_res.json()
     assert len(banks) >= 1
     assert any(b["bank_id"] == "bank_status_check" for b in banks)
 
     # Get single status
-    status_res = client.get("/api/v1/onboarding/banks/bank_status_check/status")
+    status_res = client.get("/api/v1/onboarding/banks/bank_status_check/status", headers=headers)
     assert status_res.status_code == 200
     assert status_res.json()["bank_id"] == "bank_status_check"
 
     # Nonexistent status returns 404
-    not_found = client.get("/api/v1/onboarding/banks/missing_bank_xyz/status")
+    not_found = client.get("/api/v1/onboarding/banks/missing_bank_xyz/status", headers=headers)
     assert not_found.status_code == 404
 
 
 def test_sign_csr_flow(client: TestClient) -> None:
     """Verify POST /banks/{bank_id}/sign-csr workflow."""
+    headers = _get_admin_auth_headers()
     # Register bank first
     payload = {
         "bank_id": "bank_csr_target",
@@ -217,12 +276,13 @@ def test_sign_csr_flow(client: TestClient) -> None:
         "contact_email": "csr@bank.sg",
         "data_residency_region": "ap-southeast-1",
     }
-    client.post("/api/v1/onboarding/register", json=payload)
+    client.post("/api/v1/onboarding/register", json=payload, headers=headers)
 
     csr_pem = _generate_valid_csr("bank_csr_target.client.cf-intelligence.io")
     sign_res = client.post(
         "/api/v1/onboarding/banks/bank_csr_target/sign-csr",
         json={"csr_pem": csr_pem, "days_valid": 180},
+        headers=headers,
     )
     assert sign_res.status_code == 200
     sign_data = sign_res.json()
@@ -233,6 +293,7 @@ def test_sign_csr_flow(client: TestClient) -> None:
     bad_csr = client.post(
         "/api/v1/onboarding/banks/bank_csr_target/sign-csr",
         json={"csr_pem": "MALFORMED_GARBAGE_STRING", "days_valid": 180},
+        headers=headers,
     )
     assert bad_csr.status_code == 400
 
@@ -240,12 +301,14 @@ def test_sign_csr_flow(client: TestClient) -> None:
     missing_bank = client.post(
         "/api/v1/onboarding/banks/nonexistent_bank_csr/sign-csr",
         json={"csr_pem": csr_pem, "days_valid": 180},
+        headers=headers,
     )
     assert missing_bank.status_code == 404
 
 
 def test_bank_lifecycle_transitions(client: TestClient) -> None:
     """Verify suspend and rotate-cert lifecycle state transitions."""
+    headers = _get_admin_auth_headers()
     payload = {
         "bank_id": "bank_lifecycle",
         "legal_name": "Lifecycle Bank Corp",
@@ -253,15 +316,15 @@ def test_bank_lifecycle_transitions(client: TestClient) -> None:
         "contact_email": "sec@lifecycle.com",
         "data_residency_region": "us-east-1",
     }
-    client.post("/api/v1/onboarding/register", json=payload)
+    client.post("/api/v1/onboarding/register", json=payload, headers=headers)
 
     # Suspend
-    suspend_res = client.post("/api/v1/onboarding/banks/bank_lifecycle/suspend")
+    suspend_res = client.post("/api/v1/onboarding/banks/bank_lifecycle/suspend", headers=headers)
     assert suspend_res.status_code == 200
     assert suspend_res.json()["status"].lower() == "suspended"
 
     # Rotate cert
-    rotate_res = client.post("/api/v1/onboarding/banks/bank_lifecycle/rotate-cert")
+    rotate_res = client.post("/api/v1/onboarding/banks/bank_lifecycle/rotate-cert", headers=headers)
     assert rotate_res.status_code == 200
     assert rotate_res.json()["mtls_cert_pem"].startswith("-----BEGIN CERTIFICATE-----")
     assert rotate_res.json()["cert_fingerprint"].startswith("SHA256:")
@@ -269,8 +332,9 @@ def test_bank_lifecycle_transitions(client: TestClient) -> None:
 
 def test_path_regex_bounds_validation(client: TestClient) -> None:
     """Verify that path parameters with invalid characters or out-of-bound lengths are rejected."""
+    headers = _get_admin_auth_headers()
     # Special characters like spaces or colons in bank_id should trigger 422
-    res = client.get("/api/v1/onboarding/bundle/invalid%20bank%20id!")
+    res = client.get("/api/v1/onboarding/bundle/invalid%20bank%20id!", headers=headers)
     assert res.status_code == 422
 
 

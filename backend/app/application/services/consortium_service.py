@@ -64,6 +64,11 @@ class ConsortiumGovernanceService:
         self._lock = threading.RLock()
 
     @property
+    def store(self) -> DurableConsortiumStore:
+        """Authoritative durable storage accessor."""
+        return self._store
+
+    @property
     def _consortia(self) -> dict[str, Consortium]:
         """Backward-compatible read access to authoritative consortia dictionary."""
         self._store.reload()

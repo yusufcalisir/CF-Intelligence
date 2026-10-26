@@ -60,7 +60,7 @@ def test_alembic_heads_is_single_linear_branch() -> None:
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
     assert len(heads) == 1, f"Expected exactly 1 migration head, found {len(heads)}: {heads}"
-    assert heads[0] == "005_case_institutional_ownership"
+    assert heads[0] == "006_pilot_operations_table"
 
 
 def test_alembic_migrations_upgrade_head_and_downgrade_base_cleanly(temp_alembic_db: str) -> None:
@@ -649,7 +649,7 @@ def test_migration_manager_handles_legacy_unversioned_db_missing_bank_id(temp_al
     cur.execute("SELECT version_num FROM alembic_version;")
     version_row = cur.fetchone()
     assert version_row is not None
-    assert version_row[0] == "005_case_institutional_ownership"
+    assert version_row[0] == "006_pilot_operations_table"
 
     cur.execute("PRAGMA table_info(cases);")
     assert "bank_id" in {row[1] for row in cur.fetchall()}

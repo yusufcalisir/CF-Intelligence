@@ -653,15 +653,34 @@ def test_onboarding_private_key_redacted_and_unauthenticated_blocked(unit_pilot_
         )
         assert resp_unauth.status_code == 401
 
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+
+        priv_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        csr_pem = (
+            x509.CertificateSigningRequestBuilder()
+            .subject_name(
+                x509.Name([
+                    x509.NameAttribute(NameOID.COMMON_NAME, f"{test_bank_id}.client.cf-intelligence.io"),
+                ])
+            )
+            .sign(priv_key, hashes.SHA256())
+            .public_bytes(serialization.Encoding.PEM)
+            .decode("utf-8")
+        )
+
         # Authenticated registration returns certificates but NEVER private keys
         resp_auth = client.post(
             "/v1/onboarding/register",
             json={
                 "bank_id": test_bank_id,
                 "legal_name": "Test Bank Redact",
-                "jurisdiction": "EU",
+                "jurisdiction": "DE",
                 "data_residency_region": "eu-central-1",
                 "contact_email": "ops@testbank.com",
+                "csr_pem": csr_pem,
             },
             headers={"Authorization": f"Bearer {token_op}"},
         )

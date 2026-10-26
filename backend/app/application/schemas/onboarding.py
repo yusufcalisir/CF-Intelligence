@@ -44,6 +44,10 @@ class BankRegisterRequest(BaseModel):
         pattern=r"^[a-z0-9\-]+$",
         description="Regulatory cloud region (e.g. eu-west-1)",
     )
+    csr_pem: str | None = Field(
+        None,
+        description="Optional PEM-encoded X.509 Certificate Signing Request for sovereign bank-side key custody",
+    )
 
 
 class BankOnboardingBundleResponse(BaseModel):

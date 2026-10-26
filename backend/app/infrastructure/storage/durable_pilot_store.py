@@ -96,13 +96,20 @@ class DurablePilotStore:
                     reserved_at TEXT NOT NULL,
                     finalized_at TEXT,
                     receipt_id TEXT,
+                    signal_id TEXT,
                     FOREIGN KEY(pilot_id) REFERENCES pilot_operations(pilot_id)
                 );
             """)
+            cur_res = conn.execute("PRAGMA table_info(pilot_query_reservations);")
+            res_cols = {row["name"] for row in cur_res.fetchall()}
+            if "signal_id" not in res_cols:
+                conn.execute("ALTER TABLE pilot_query_reservations ADD COLUMN signal_id TEXT;")
+
             conn.execute("CREATE INDEX IF NOT EXISTS idx_pilot_status ON pilot_operations(status);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_pilot_consortium ON pilot_operations(consortium_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_res_pilot ON pilot_query_reservations(pilot_id, status);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_res_bank ON pilot_query_reservations(pilot_id, requesting_bank_id, status);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_res_signal ON pilot_query_reservations(signal_id);")
             conn.commit()
 
     def save_pilot(self, entity: PilotEntity) -> PilotEntity:
@@ -339,9 +346,10 @@ class DurablePilotStore:
                 UPDATE pilot_query_reservations SET
                     status = 'COMMITTED',
                     finalized_at = ?,
-                    receipt_id = ?
+                    receipt_id = ?,
+                    signal_id = ?
                 WHERE reservation_id = ?;
-            """, (now_iso, receipt_id, reservation_id))
+            """, (now_iso, receipt_id, signal_id, reservation_id))
             conn.commit()
             return entity, receipt
 
@@ -430,3 +438,15 @@ class DurablePilotStore:
             cur = conn.execute("DELETE FROM pilot_operations WHERE pilot_id = ?;", (clean_id,))
             conn.commit()
             return cur.rowcount > 0
+
+    def get_query_reservation(self, reservation_id: str) -> dict[str, Any] | None:
+        """Fetch reservation record by ID."""
+        with self._lock, self._get_connection() as conn:
+            cur = conn.execute(
+                "SELECT * FROM pilot_query_reservations WHERE reservation_id = ?;",
+                (reservation_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return dict(row)

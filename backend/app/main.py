@@ -1123,6 +1123,7 @@ class TenantAccessControlMiddleware:
         "/metrics",
         "/ws/",
         "/api/v1/onboarding",
+        "/v1/onboarding",
         "/api/v1/auth/login",
         "/api/v1/auth/refresh",
         "/api/v1/auth/lockout-status",

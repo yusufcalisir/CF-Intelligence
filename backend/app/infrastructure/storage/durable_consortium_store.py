@@ -566,6 +566,15 @@ class DurableConsortiumStore:
             self._save_unlocked()
             return result
 
+    def save_consortium(self, consortium: Consortium) -> None:
+        """Atomically persist or update a consortium in durable storage."""
+        cid = consortium.consortium_id.lower().strip()
+
+        def _mutate(consortia: dict[str, Consortium], proposals: dict[str, MembershipProposal]) -> None:
+            consortia[cid] = consortium
+
+        self.atomic_mutate(_mutate)
+
     def get_consortium(self, consortium_id: str) -> Consortium | None:
         """Retrieve a consortium by ID after validating freshness."""
         with self._lock, self._file_lock_context():

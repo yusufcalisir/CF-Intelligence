@@ -48,7 +48,13 @@ VALID_PILOT_TRANSITIONS: dict[PilotStatus, set[PilotStatus]] = {
 }
 
 
-class InvalidPilotTransitionError(ValueError):
+class PilotGovernanceError(Exception):
+    """Base exception for all pilot governance, authorization, and execution gating violations."""
+
+    pass
+
+
+class InvalidPilotTransitionError(PilotGovernanceError, ValueError):
     """Raised when an invalid pilot lifecycle transition is attempted."""
 
     def __init__(self, message: str) -> None:
@@ -57,25 +63,19 @@ class InvalidPilotTransitionError(ValueError):
         super().__init__(message)
 
 
-class PilotAuthorizationError(PermissionError):
+class PilotAuthorizationError(PilotGovernanceError, PermissionError):
     """Raised when pilot authorization or execution preconditions fail."""
 
     pass
 
 
-class PilotGovernanceError(PilotAuthorizationError):
-    """Raised when pilot governance policy or state preconditions fail."""
-
-    pass
-
-
-class PilotQuotaExceededError(Exception):
+class PilotQuotaExceededError(PilotGovernanceError):
     """Raised when query quotas are exhausted for the pilot or institution."""
 
     pass
 
 
-class PilotExpiredError(Exception):
+class PilotExpiredError(PilotGovernanceError):
     """Raised when a query is attempted on an expired pilot."""
 
     pass
@@ -142,6 +142,8 @@ class PilotOperationalConfig:
     grant_revision: int = 1
     grant_scope_digest: str = ""
     topology: dict[str, Any] = field(default_factory=dict)
+    worker_endpoints: dict[str, Any] = field(default_factory=dict)
+    coordinator_endpoint: str = ""
     starts_at: str = ""
     expires_at: str = ""
     query_quota_total: int = 50
@@ -243,6 +245,11 @@ class PilotEntity:
     def config_revision(self) -> int:
         """Returns configuration revision number."""
         return self.config.revision
+
+    @property
+    def grant_revision(self) -> int:
+        """Returns the bound operational grant revision."""
+        return self.config.grant_revision
 
     def has_expired(self, current_time: datetime.datetime | None = None) -> bool:
         """Check if the pilot configuration expires_at boundary has passed."""

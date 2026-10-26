@@ -167,7 +167,7 @@ async def register_bank(
     _enforce_onboarding_access(request, target_bank_id=payload.bank_id, required_role="admin")
     service = BankOnboardingService(session)
     try:
-        # Step 1: Register
+        # Step 1: Register bank node (starts in PENDING_VERIFICATION)
         await service.register_bank(
             bank_id=payload.bank_id,
             legal_name=payload.legal_name,
@@ -176,26 +176,55 @@ async def register_bank(
             data_residency_region=payload.data_residency_region,
         )
 
-        # Step 2: Issue Cert
-        cert_pem, key_pem = await service.issue_mtls_certificate(payload.bank_id)
+        cert_pem = ""
+        fingerprint = ""
+        activated_status = "pending_verification"
 
-        # Step 3: Provision Schema
-        await service.provision_tenant_schema(payload.bank_id)
+        if payload.csr_pem:
+            # Step 2: Validate sovereign CSR proof-of-possession and subject binding
+            from cryptography import x509
+            from cryptography.x509.oid import NameOID
 
-        # Step 4: Provision KMS
-        await service.provision_kms_key(payload.bank_id)
+            try:
+                csr = x509.load_pem_x509_csr(payload.csr_pem.encode("utf-8"))
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid institutional CSR PEM: {exc}",
+                ) from exc
 
-        # Step 5: Config
+            if not csr.is_signature_valid:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="CSR signature proof-of-possession failed.",
+                )
+
+            cns = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+            cn_val = str(cns[0].value) if cns else ""
+            clean_bank = payload.bank_id.lower().replace("-", "_")
+            if clean_bank not in cn_val.lower().replace("-", "_"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"CSR Subject Common Name '{cn_val}' does not match registered bank_id '{payload.bank_id}'.",
+                )
+
+            # Step 3: Sign CSR with Consortium Root CA
+            cert_pem, fingerprint, _ = await service.sign_csr(payload.bank_id, payload.csr_pem)
+
+            # Step 4: Provision Schema & KMS Key
+            await service.provision_tenant_schema(payload.bank_id)
+            await service.provision_kms_key(payload.bank_id)
+
+            # Step 5: Truthfully activate bank now that cert and schemas are established
+            activated = await service.activate_bank(payload.bank_id)
+            activated_status = (
+                activated.status.value
+                if hasattr(activated.status, "value")
+                else str(activated.status)
+            )
+
+        # Step 6: Generate Connector Configuration
         config_yaml = service.generate_connector_config(payload.bank_id)
-
-        # Step 6: Activate
-        activated = await service.activate_bank(payload.bank_id)
-
-        activated_status = (
-            activated.status.value
-            if hasattr(activated.status, "value")
-            else str(activated.status)
-        )
 
         return BankOnboardingBundleResponse(
             bank_id=payload.bank_id,
@@ -204,12 +233,12 @@ async def register_bank(
             jurisdiction=payload.jurisdiction,
             contact_email=payload.contact_email,
             data_residency_region=payload.data_residency_region,
-            cert_fingerprint=activated.cert_fingerprint or "",
+            cert_fingerprint=fingerprint,
             mtls_cert_pem=cert_pem,
             mtls_key_pem="",
             connector_config_yaml=config_yaml,
             coordinator_endpoint="https://coordinator.cf-intelligence.io:50051",
-            certificate_pem=cert_pem,
+            certificate_pem=cert_pem if cert_pem else None,
             private_key_pem="",
         )
 
@@ -376,12 +405,55 @@ async def sign_bank_csr(
     """Signs an institutional X.509 Certificate Signing Request (CSR) for an onboarded bank node."""
     _enforce_onboarding_access(request, target_bank_id=bank_id)
     service = BankOnboardingService(session)
+    b = await service.get_bank(bank_id)
+    if not b:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Bank node {bank_id!r} not found.",
+        )
     try:
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+
+        try:
+            csr = x509.load_pem_x509_csr(payload.csr_pem.encode("utf-8"))
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid institutional CSR PEM: {exc}",
+            ) from exc
+
+        if not csr.is_signature_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CSR signature proof-of-possession failed.",
+            )
+
+        cns = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        cn_val = str(cns[0].value) if cns else ""
+        clean_bank = bank_id.lower().replace("-", "_")
+        if clean_bank not in cn_val.lower().replace("-", "_"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"CSR Subject Common Name '{cn_val}' does not match bank_id '{bank_id}'.",
+            )
+
         cert_pem, fingerprint, expires_at = await service.sign_csr(
             bank_id=bank_id,
             csr_pem=payload.csr_pem,
             days_valid=payload.days_valid,
         )
+
+        from app.domain.enums import BankStatus
+
+        b = await service.get_bank(bank_id)
+        if b and (b.status == BankStatus.PENDING_VERIFICATION or str(b.status).lower() == "pending_verification"):
+            if not b.schema_provisioned:
+                await service.provision_tenant_schema(bank_id)
+            if not b.vault_key_path:
+                await service.provision_kms_key(bank_id)
+            await service.activate_bank(bank_id)
+
         return BankCSRSignResponse(
             bank_id=bank_id,
             signed_cert_pem=cert_pem,
