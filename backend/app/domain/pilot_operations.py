@@ -131,7 +131,7 @@ class PilotOperationalConfig:
         if isinstance(self.approved_datasets, dict):
             datasets_norm: Any = {k.lower().strip(): v for k, v in sorted(self.approved_datasets.items())}
         elif isinstance(self.approved_datasets, list):
-            datasets_norm = sorted([str(d).lower().strip() for d in self.approved_datasets])
+            datasets_norm = sorted([d.lower().strip() for d in self.approved_datasets])
         else:
             datasets_norm = str(self.approved_datasets)
 
