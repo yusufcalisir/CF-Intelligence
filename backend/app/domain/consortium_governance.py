@@ -202,3 +202,202 @@ class Consortium:
             if m.role == MemberRole.FOUNDER:
                 return b_id
         return None
+
+    @property
+    def pairwise_operational_grants(self) -> dict[str, dict[str, Any]]:
+        """Access all bilateral operational grants registered in consortium metadata."""
+        return (self.metadata or {}).get("pairwise_operational_grants", {})
+
+    @property
+    def operational_data_sharing_grants(self) -> dict[str, dict[str, Any]]:
+        """Unified dictionary of all operational grants (both pairwise and legacy) for backward compatibility."""
+        grants: dict[str, dict[str, Any]] = dict((self.metadata or {}).get("pairwise_operational_grants", {}))
+        legacy = (self.metadata or {}).get("operational_data_sharing_grant")
+        if legacy and isinstance(legacy, dict) and "grant_id" in legacy:
+            grants[legacy["grant_id"]] = legacy
+        return grants
+
+    def get_pairwise_operational_grant(self, grant_id: str) -> dict[str, Any] | None:
+        """Retrieve a specific pairwise operational grant by stable ID."""
+        clean = grant_id.strip()
+        pairwise = self.pairwise_operational_grants
+        if clean in pairwise:
+            return pairwise[clean]
+        return None
+
+    def find_pairwise_operational_grant(
+        self, bank_a: str, bank_b: str
+    ) -> dict[str, Any] | None:
+        """Find the pairwise operational grant governing data sharing between two institutions."""
+        clean_a = bank_a.lower().strip()
+        clean_b = bank_b.lower().strip()
+        target_pair = {clean_a, clean_b}
+        for grant in self.pairwise_operational_grants.values():
+            if not isinstance(grant, dict):
+                continue
+            inst_a = str(grant.get("institution_a", "")).lower().strip()
+            inst_b = str(grant.get("institution_b", "")).lower().strip()
+            part = set(grant.get("participating_banks", [])) or {inst_a, inst_b}
+            if part == target_pair:
+                return grant
+        return None
+
+
+@dataclass
+class PairwiseOperationalGrant:
+    """Domain model representing an authoritative bilateral operational data-sharing grant between two institutions."""
+
+    grant_id: str
+    consortium_id: str
+    institution_a: str
+    institution_b: str
+    authority: str
+    revision: int = 1
+    scope_digest: str = ""
+    is_active: bool = True
+    participating_banks: list[str] = field(default_factory=list)
+    allowed_purposes: list[str] = field(
+        default_factory=lambda: ["AML_COLLABORATIVE_INVESTIGATION", "FRAUD_INVESTIGATION"]
+    )
+    institution_jurisdictions: dict[str, str] = field(default_factory=dict)
+    allowed_jurisdictions: list[str] = field(
+        default_factory=lambda: ["eu-central-1", "us-east-1", "apac-singapore-1"]
+    )
+    allow_cross_border: bool = False
+    allow_institution_identity_sharing: bool = False
+    approvals: dict[str, dict[str, Any]] = field(default_factory=dict)
+    revoked_by_institutions: list[str] = field(default_factory=list)
+    revocation_history: list[dict[str, Any]] = field(default_factory=list)
+    registered_at: str = field(default_factory=lambda: datetime.datetime.now(UTC).isoformat())
+    history: list[dict[str, Any]] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.grant_id = self.grant_id.strip()
+        self.consortium_id = self.consortium_id.lower().strip()
+        self.institution_a = self.institution_a.lower().strip()
+        self.institution_b = self.institution_b.lower().strip()
+        self.authority = self.authority.strip()
+
+        if not self.grant_id:
+            raise ValueError("PairwiseOperationalGrant grant_id cannot be empty.")
+        if not self.consortium_id:
+            raise ValueError("PairwiseOperationalGrant consortium_id cannot be empty.")
+        if not self.institution_a:
+            raise ValueError("PairwiseOperationalGrant institution_a cannot be empty.")
+        if not self.institution_b:
+            raise ValueError("PairwiseOperationalGrant institution_b cannot be empty.")
+        if self.institution_a == self.institution_b:
+            raise ValueError(
+                f"Bilateral operational grant requires two distinct member institutions, got same '{self.institution_a}'."
+            )
+        if not self.authority:
+            raise ValueError("PairwiseOperationalGrant authority cannot be empty.")
+        if self.revision < 1:
+            raise ValueError(f"PairwiseOperationalGrant revision must be >= 1, got {self.revision}")
+
+        self.participating_banks = sorted([self.institution_a, self.institution_b])
+        self.allowed_purposes = sorted(list(set(p.strip() for p in self.allowed_purposes)))
+        self.institution_jurisdictions = {
+            k.lower().strip(): v.strip()
+            for k, v in sorted(self.institution_jurisdictions.items())
+        }
+        self.allowed_jurisdictions = sorted(list(set(j.strip() for j in self.allowed_jurisdictions)))
+        self.revoked_by_institutions = sorted(
+            list(set(b.lower().strip() for b in self.revoked_by_institutions))
+        )
+
+    def involves(self, bank_id: str) -> bool:
+        """Returns True if the given institution is one of the two bilateral participants."""
+        clean = bank_id.lower().strip()
+        return clean in (self.institution_a, self.institution_b)
+
+    def counterpart_of(self, bank_id: str) -> str:
+        """Returns the counterpart institution for the given participant."""
+        clean = bank_id.lower().strip()
+        if clean == self.institution_a:
+            return self.institution_b
+        if clean == self.institution_b:
+            return self.institution_a
+        raise ValueError(
+            f"Institution '{bank_id}' is not a participant of pairwise grant '{self.grant_id}'."
+        )
+
+    @property
+    def is_fully_approved(self) -> bool:
+        """True only if both institutions have approved the exact current revision and scope digest."""
+        if not self.is_active or bool(self.revoked_by_institutions):
+            return False
+        for bank_id in (self.institution_a, self.institution_b):
+            rec = self.approvals.get(bank_id)
+            if not rec or not isinstance(rec, dict):
+                return False
+            if rec.get("grant_revision") != self.revision:
+                return False
+            if self.scope_digest and rec.get("scope_digest") != self.scope_digest:
+                return False
+        return True
+
+    @property
+    def is_revoked(self) -> bool:
+        """True if the grant is marked inactive or has been revoked by either institution."""
+        return not self.is_active or bool(self.revoked_by_institutions)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert domain model to canonical dictionary representation."""
+        return {
+            "grant_id": self.grant_id,
+            "consortium_id": self.consortium_id,
+            "institution_a": self.institution_a,
+            "institution_b": self.institution_b,
+            "authority": self.authority,
+            "revision": self.revision,
+            "scope_digest": self.scope_digest,
+            "is_active": self.is_active,
+            "participating_banks": self.participating_banks,
+            "allowed_purposes": self.allowed_purposes,
+            "institution_jurisdictions": self.institution_jurisdictions,
+            "allowed_jurisdictions": self.allowed_jurisdictions,
+            "allow_cross_border": self.allow_cross_border,
+            "allow_institution_identity_sharing": self.allow_institution_identity_sharing,
+            "approvals": self.approvals,
+            "revoked_by_institutions": self.revoked_by_institutions,
+            "revocation_history": self.revocation_history,
+            "registered_at": self.registered_at,
+            "history": self.history,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> PairwiseOperationalGrant:
+        """Construct domain model from dictionary representation."""
+        part_banks = d.get("participating_banks", [])
+        inst_a = d.get("institution_a") or (part_banks[0] if len(part_banks) > 0 else "")
+        inst_b = d.get("institution_b") or (part_banks[1] if len(part_banks) > 1 else "")
+        return cls(
+            grant_id=d["grant_id"],
+            consortium_id=d["consortium_id"],
+            institution_a=inst_a,
+            institution_b=inst_b,
+            authority=d.get("authority", "authoritative_consortium_governance"),
+            revision=int(d.get("revision", 1)),
+            scope_digest=d.get("scope_digest", ""),
+            is_active=bool(d.get("is_active", True)),
+            participating_banks=part_banks,
+            allowed_purposes=d.get(
+                "allowed_purposes",
+                ["AML_COLLABORATIVE_INVESTIGATION", "FRAUD_INVESTIGATION"],
+            ),
+            institution_jurisdictions=d.get("institution_jurisdictions", {}),
+            allowed_jurisdictions=d.get(
+                "allowed_jurisdictions",
+                ["eu-central-1", "us-east-1", "apac-singapore-1"],
+            ),
+            allow_cross_border=bool(d.get("allow_cross_border", False)),
+            allow_institution_identity_sharing=bool(
+                d.get("allow_institution_identity_sharing", False)
+            ),
+            approvals=d.get("approvals", {}),
+            revoked_by_institutions=d.get("revoked_by_institutions", []),
+            revocation_history=d.get("revocation_history", []),
+            registered_at=d.get("registered_at", datetime.datetime.now(UTC).isoformat()),
+            history=d.get("history", []),
+        )

@@ -268,7 +268,21 @@ class ConsortiumPolicyEngine:
         c_meta = getattr(consortium, "metadata", {}) or {}
 
         # 1. Operational Sharing Grant Enforcement (Fail-closed: No fallback to permissive defaults)
-        operational_grant = c_meta.get("operational_data_sharing_grant")
+        operational_grant: dict[str, Any] | None = None
+        if len(target_banks) == 1:
+            clean_tb = target_banks[0].lower().strip()
+            if hasattr(consortium, "find_pairwise_operational_grant"):
+                operational_grant = consortium.find_pairwise_operational_grant(clean_requesting, clean_tb)
+            if not operational_grant:
+                pairwise_dict = c_meta.get("pairwise_operational_grants", {})
+                for g in pairwise_dict.values():
+                    if isinstance(g, dict) and set(g.get("participating_banks", [])) == {clean_requesting, clean_tb}:
+                        operational_grant = g
+                        break
+
+        if not operational_grant:
+            operational_grant = c_meta.get("operational_data_sharing_grant")
+
         if is_operational:
             if not operational_grant or not isinstance(operational_grant, dict):
                 reasons.append(
@@ -466,11 +480,12 @@ class ConsortiumPolicyEngine:
             if "allow_fuzzy_matching" in sharing_policy
             else self.intelligence_config.allow_fuzzy_matching
         )
-        min_fuzzy_thresh = float(
+        raw_fuzzy = (
             sharing_policy.get("min_fuzzy_confidence_threshold")
             if "min_fuzzy_confidence_threshold" in sharing_policy
             else self.intelligence_config.min_fuzzy_confidence_threshold
         )
+        min_fuzzy_thresh = float(raw_fuzzy if raw_fuzzy is not None else 0.60)
 
         disclosure_scope: dict[str, Any] = {
             "allow_institution_identity": allow_identities,

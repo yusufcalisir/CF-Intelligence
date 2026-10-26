@@ -56,6 +56,27 @@ def canonical_coordinator_readiness_bytes(
     return canonical.encode("utf-8")
 
 
+def canonical_pairwise_grant_approval_bytes(
+    consortium_id: str,
+    grant_id: str,
+    revision: int,
+    scope_digest: str,
+    approving_bank_id: str,
+    approver_id: str = "",
+) -> bytes:
+    """Construct canonical byte representation for institutional pairwise grant approval.
+
+    Binds the approving bank's Ed25519 signature to the exact consortium, grant ID,
+    revision, canonical scope digest, and approver identity.
+    """
+    canonical = (
+        f"PAIRWISE_GRANT_APPROVAL:{consortium_id.lower().strip()}:"
+        f"{grant_id.strip()}:{revision}:{scope_digest.strip()}:"
+        f"{approving_bank_id.lower().strip()}:{approver_id.strip()}"
+    )
+    return canonical.encode("utf-8")
+
+
 def validate_institutional_csr_identity(csr: Any, expected_bank_id: str) -> None:
     """Strictly validates that an institutional CSR binds to authorized canonical identities.
 

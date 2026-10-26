@@ -56,17 +56,65 @@ def compute_operational_grant_scope_digest(
     return hashlib.sha256(canonical_bytes).hexdigest()
 
 
+def compute_pairwise_grant_scope_digest(
+    grant_id: str,
+    consortium_id: str,
+    institution_a: str,
+    institution_b: str,
+    revision: int,
+    allowed_purposes: list[str],
+    institution_jurisdictions: dict[str, str],
+    allowed_jurisdictions: list[str],
+    allow_cross_border: bool,
+    allow_institution_identity_sharing: bool,
+) -> str:
+    """Computes deterministic, canonical SHA-256 digest of a pairwise operational grant scope."""
+    part_banks = sorted([institution_a.lower().strip(), institution_b.lower().strip()])
+    canonical = {
+        "grant_id": grant_id.strip(),
+        "consortium_id": consortium_id.lower().strip(),
+        "institution_a": part_banks[0],
+        "institution_b": part_banks[1],
+        "revision": revision,
+        "participating_banks": part_banks,
+        "allowed_purposes": sorted(list(set(p.strip() for p in allowed_purposes))),
+        "institution_jurisdictions": {
+            k.lower().strip(): v.strip()
+            for k, v in sorted(institution_jurisdictions.items())
+        },
+        "allowed_jurisdictions": sorted(list(set(j.strip() for j in allowed_jurisdictions))),
+        "allow_cross_border": bool(allow_cross_border),
+        "allow_institution_identity_sharing": bool(allow_institution_identity_sharing),
+    }
+    canonical_bytes = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(canonical_bytes).hexdigest()
+
+
 class ConsortiumGovernanceService:
     """Manages consortium creation, weighted voting proposals, dynamic state machine, and member lifecycle."""
 
-    def __init__(self, store: DurableConsortiumStore | None = None) -> None:
+    def __init__(
+        self,
+        store: DurableConsortiumStore | None = None,
+        institutional_registry: Any | None = None,
+    ) -> None:
         self._store = store or DurableConsortiumStore.get_instance()
         self._lock = threading.RLock()
+        self._institutional_registry = institutional_registry
 
     @property
     def store(self) -> DurableConsortiumStore:
         """Authoritative durable storage accessor."""
         return self._store
+
+    @property
+    def institutional_registry(self) -> Any | None:
+        """Accessor for institutional verification key registry."""
+        return self._institutional_registry
+
+    @institutional_registry.setter
+    def institutional_registry(self, registry: Any | None) -> None:
+        self._institutional_registry = registry
 
     @property
     def _consortia(self) -> dict[str, Consortium]:
@@ -585,6 +633,755 @@ class ConsortiumGovernanceService:
             return existing
 
         return self._store.atomic_mutate(_mutate)
+
+    def register_pairwise_operational_grant(
+        self,
+        consortium_id: str,
+        grant_id: str,
+        institution_a: str,
+        institution_b: str,
+        authority: str,
+        allowed_purposes: list[str] | None = None,
+        institution_jurisdictions: dict[str, str] | None = None,
+        allowed_jurisdictions: list[str] | None = None,
+        allow_cross_border: bool = False,
+        allow_institution_identity_sharing: bool = False,
+        revision: int = 1,
+        approving_bank_id: str | None = None,
+        auth_token: str | None = None,
+        actor: str | None = None,
+        trusted_context: Any | None = None,
+        approval_signature: str | None = None,
+    ) -> dict[str, Any]:
+        """Registers or updates an authoritative pairwise operational data-sharing grant between two institutions.
+
+        Enforces:
+        - Authenticated caller authority bound to one of the two participating institutions.
+        - Strict rejection of third-party, operator, or other bank approvals on their behalf.
+        - Exactly two distinct active member institutions.
+        - Scope immutability per revision.
+        - Incremented revision resets bilateral approvals (stale approvals do not carry forward).
+        - Optional Ed25519 signature verification via InstitutionalVerificationRegistry.
+        """
+        clean_c_id = consortium_id.lower().strip()
+        clean_grant_id = grant_id.strip()
+        clean_a = institution_a.lower().strip()
+        clean_b = institution_b.lower().strip()
+        clean_auth = authority.strip()
+
+        if not clean_c_id:
+            raise ValueError("consortium_id cannot be empty.")
+        if not clean_grant_id:
+            raise ValueError("grant_id cannot be empty.")
+        if not clean_a or not clean_b:
+            raise ValueError("Both institution_a and institution_b must be non-empty.")
+        if clean_a == clean_b:
+            raise ValueError(
+                f"Bilateral operational grant requires two distinct member institutions, got same '{clean_a}'."
+            )
+        if not clean_auth:
+            raise ValueError("Grant authority cannot be empty.")
+        if revision < 1:
+            raise ValueError(f"Grant revision must be >= 1, got {revision}.")
+
+        if not auth_token and trusted_context is None:
+            raise PermissionError(
+                "Authentication required: Direct service operation 'register_pairwise_operational_grant' "
+                "requires a valid Bearer auth_token or trusted internal context."
+            )
+
+        if auth_token and not approving_bank_id:
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            auth_svc = AuthenticationService.get_instance()
+            is_valid, claims, err = auth_svc.verify_access_token(auth_token)
+            if not is_valid or not claims:
+                raise PermissionError(f"Direct service authentication failed: {err}")
+            approving_bank_id = str(claims.get("bank_id", "")).lower().strip()
+
+        clean_approver = (approving_bank_id or "").lower().strip()
+        if not clean_approver:
+            raise PermissionError("Approving institution identity could not be established.")
+
+        if clean_approver not in (clean_a, clean_b):
+            raise PermissionError(
+                f"Cross-bank authorization rejected: Approving bank '{clean_approver}' is not a participant "
+                f"of pairwise grant between '{clean_a}' and '{clean_b}'. Third-party institutions cannot approve on their behalf."
+            )
+
+        attr = self._verify_service_actor_bank(
+            expected_bank=clean_approver,
+            consortium_id=clean_c_id,
+            auth_token=auth_token,
+            actor=actor,
+            trusted_context=trusted_context,
+            action_name="register_pairwise_operational_grant",
+        )
+
+        purposes = sorted(
+            list(
+                set(
+                    p.strip()
+                    for p in (
+                        allowed_purposes
+                        or ["AML_COLLABORATIVE_INVESTIGATION", "FRAUD_INVESTIGATION"]
+                    )
+                )
+            )
+        )
+        jurisdictions = institution_jurisdictions or {}
+        default_allowed = list(
+            dict.fromkeys(
+                list(jurisdictions.values())
+                + ["eu-central-1", "us-east-1", "apac-singapore-1"]
+            )
+        )
+        clean_jurisdictions = {
+            k.lower().strip(): v.strip() for k, v in sorted(jurisdictions.items())
+        }
+        clean_allowed_jur = sorted(
+            list(set(j.strip() for j in (allowed_jurisdictions or default_allowed)))
+        )
+
+        scope_digest = compute_pairwise_grant_scope_digest(
+            grant_id=clean_grant_id,
+            consortium_id=clean_c_id,
+            institution_a=clean_a,
+            institution_b=clean_b,
+            revision=revision,
+            allowed_purposes=purposes,
+            institution_jurisdictions=clean_jurisdictions,
+            allowed_jurisdictions=clean_allowed_jur,
+            allow_cross_border=allow_cross_border,
+            allow_institution_identity_sharing=allow_institution_identity_sharing,
+        )
+
+        if approval_signature:
+            from app.domain.institutional_identity import (
+                InstitutionalVerificationRegistry,
+                canonical_pairwise_grant_approval_bytes,
+            )
+
+            reg = self._institutional_registry or InstitutionalVerificationRegistry()
+            challenge = canonical_pairwise_grant_approval_bytes(
+                consortium_id=clean_c_id,
+                grant_id=clean_grant_id,
+                revision=revision,
+                scope_digest=scope_digest,
+                approving_bank_id=clean_approver,
+                approver_id=attr["actor_id"],
+            )
+            if not reg.verify_signature(clean_approver, approval_signature, challenge):
+                raise ConsortiumSecurityError(
+                    f"Cryptographic signature verification failed for pairwise grant registration by institution '{clean_approver}'."
+                )
+
+        approval_record = {
+            "actor_id": attr["actor_id"],
+            "actor_institution": clean_approver,
+            "approved_at": datetime.datetime.now(UTC).isoformat(),
+            "roles": attr["effective_role"],
+            "scope_digest": scope_digest,
+            "grant_revision": revision,
+            "signature": approval_signature,
+        }
+
+        part_banks = sorted([clean_a, clean_b])
+        grant_dict: dict[str, Any] = {
+            "grant_id": clean_grant_id,
+            "consortium_id": clean_c_id,
+            "institution_a": part_banks[0],
+            "institution_b": part_banks[1],
+            "authority": clean_auth,
+            "revision": revision,
+            "scope_digest": scope_digest,
+            "is_active": True,
+            "participating_banks": part_banks,
+            "allowed_purposes": purposes,
+            "institution_jurisdictions": clean_jurisdictions,
+            "allowed_jurisdictions": clean_allowed_jur,
+            "allow_cross_border": allow_cross_border,
+            "allow_institution_identity_sharing": allow_institution_identity_sharing,
+            "approvals": {clean_approver: approval_record},
+            "revoked_by_institutions": [],
+            "revocation_history": [],
+            "registered_at": datetime.datetime.now(UTC).isoformat(),
+            "history": [],
+        }
+
+        def _mutate(consortia: dict[str, Consortium], proposals: dict[str, Any]) -> dict[str, Any]:
+            if clean_c_id not in consortia:
+                raise ValueError(f"Consortium '{clean_c_id}' does not exist.")
+            c = consortia[clean_c_id]
+            if c.status != ConsortiumStatus.ACTIVE:
+                raise ConsortiumSecurityError(
+                    f"Consortium '{clean_c_id}' is not in ACTIVE status ({c.status.value})."
+                )
+            if clean_a not in c.members or clean_b not in c.members:
+                missing = [b for b in (clean_a, clean_b) if b not in c.members]
+                raise PermissionError(
+                    f"Cannot register pairwise grant: institution(s) {missing} are not active members of consortium '{clean_c_id}'."
+                )
+            if clean_a in c.removed_members or clean_b in c.removed_members:
+                evicted = [b for b in (clean_a, clean_b) if b in c.removed_members]
+                raise PermissionError(
+                    f"Cannot register pairwise grant: institution(s) {evicted} have been evicted from consortium '{clean_c_id}'."
+                )
+
+            if not hasattr(c, "metadata") or c.metadata is None:
+                c.metadata = {}
+
+            pairwise_grants = c.metadata.setdefault("pairwise_operational_grants", {})
+            existing = pairwise_grants.get(clean_grant_id)
+
+            if existing and isinstance(existing, dict):
+                existing_parts = set(existing.get("participating_banks", []))
+                if existing_parts != set(part_banks):
+                    raise ValueError(
+                        f"Pairwise grant '{clean_grant_id}' is bound to participants {sorted(existing_parts)}. "
+                        f"Re-registering under different institutions {part_banks} is prohibited."
+                    )
+
+                prev_rev = int(existing.get("revision", 1))
+                prev_scope_digest = existing.get("scope_digest")
+                if not prev_scope_digest:
+                    prev_scope_digest = compute_pairwise_grant_scope_digest(
+                        grant_id=existing.get("grant_id", clean_grant_id),
+                        consortium_id=clean_c_id,
+                        institution_a=existing.get("institution_a", clean_a),
+                        institution_b=existing.get("institution_b", clean_b),
+                        revision=prev_rev,
+                        allowed_purposes=existing.get("allowed_purposes", []),
+                        institution_jurisdictions=existing.get("institution_jurisdictions", {}),
+                        allowed_jurisdictions=existing.get("allowed_jurisdictions", []),
+                        allow_cross_border=existing.get("allow_cross_border", False),
+                        allow_institution_identity_sharing=existing.get(
+                            "allow_institution_identity_sharing", False
+                        ),
+                    )
+                    existing["scope_digest"] = prev_scope_digest
+
+                if revision == prev_rev:
+                    if scope_digest != prev_scope_digest:
+                        raise ValueError(
+                            f"Pairwise operational grant scope is immutable per revision. "
+                            f"Modifications to participants, purposes, jurisdictions, or cross-border settings "
+                            f"require an incremented revision. Current active revision is {prev_rev}."
+                        )
+                    approvals = dict(existing.get("approvals", {}))
+                    approvals[clean_approver] = approval_record
+                    existing["approvals"] = approvals
+                    revoked = list(existing.get("revoked_by_institutions", []))
+                    if clean_approver in revoked:
+                        revoked.remove(clean_approver)
+                    existing["revoked_by_institutions"] = revoked
+                    existing["is_active"] = len(existing["revoked_by_institutions"]) == 0
+                    pairwise_grants[clean_grant_id] = existing
+                    return existing
+
+                if revision <= prev_rev:
+                    raise ValueError(
+                        f"Pairwise grant revision must be strictly monotonically increasing. "
+                        f"Current revision is {prev_rev}, attempted revision is {revision}."
+                    )
+
+                history = list(existing.get("history", []))
+                prior_snapshot = {k: v for k, v in existing.items() if k != "history"}
+                history.append(prior_snapshot)
+                grant_dict["history"] = history
+                grant_dict["approvals"] = {clean_approver: approval_record}
+                pairwise_grants[clean_grant_id] = grant_dict
+                return grant_dict
+
+            grant_dict["history"] = []
+            pairwise_grants[clean_grant_id] = grant_dict
+            return grant_dict
+
+        return self._store.atomic_mutate(_mutate)
+
+    def approve_pairwise_operational_grant(
+        self,
+        consortium_id: str,
+        grant_id: str,
+        approving_bank_id: str,
+        auth_token: str | None = None,
+        actor: str | None = None,
+        trusted_context: Any | None = None,
+        approval_signature: str | None = None,
+    ) -> dict[str, Any]:
+        """Records authenticated bilateral approval from a participating institution for a pairwise grant."""
+        clean_c_id = consortium_id.lower().strip()
+        clean_grant_id = grant_id.strip()
+        clean_bank = approving_bank_id.lower().strip()
+
+        if not auth_token and trusted_context is None:
+            raise PermissionError(
+                "Authentication required: Direct service operation 'approve_pairwise_operational_grant' "
+                "requires a valid Bearer auth_token or trusted internal context."
+            )
+
+        attr = self._verify_service_actor_bank(
+            expected_bank=clean_bank,
+            consortium_id=clean_c_id,
+            auth_token=auth_token,
+            actor=actor,
+            trusted_context=trusted_context,
+            action_name="approve_pairwise_operational_grant",
+        )
+
+        def _mutate(consortia: dict[str, Consortium], proposals: dict[str, Any]) -> dict[str, Any]:
+            if clean_c_id not in consortia:
+                raise ValueError(f"Consortium '{clean_c_id}' does not exist.")
+            c = consortia[clean_c_id]
+            if c.status != ConsortiumStatus.ACTIVE:
+                raise ConsortiumSecurityError(
+                    f"Consortium '{clean_c_id}' is not in ACTIVE status ({c.status.value})."
+                )
+            if clean_bank not in c.members:
+                raise PermissionError(
+                    f"Approving bank '{clean_bank}' is not an active member of consortium '{clean_c_id}'."
+                )
+            if clean_bank in c.removed_members:
+                raise PermissionError(
+                    f"Approving bank '{clean_bank}' has been evicted from consortium '{clean_c_id}'."
+                )
+
+            pairwise_grants = (c.metadata or {}).get("pairwise_operational_grants", {})
+            existing = pairwise_grants.get(clean_grant_id)
+            if not existing or not isinstance(existing, dict):
+                raise ValueError(
+                    f"Pairwise operational grant '{clean_grant_id}' does not exist in consortium '{clean_c_id}'."
+                )
+
+            part_banks = existing.get("participating_banks", [])
+            if clean_bank not in part_banks:
+                raise PermissionError(
+                    f"Institution '{clean_bank}' is not a bilateral participant of pairwise grant '{clean_grant_id}' "
+                    f"({part_banks}). Third-party approval is strictly prohibited."
+                )
+
+            counterpart = next((b for b in part_banks if b != clean_bank), None)
+            if counterpart and (
+                counterpart not in c.members or counterpart in c.removed_members
+            ):
+                raise PermissionError(
+                    f"Counterpart institution '{counterpart}' is not an active member of consortium '{clean_c_id}'."
+                )
+
+            rev = int(existing.get("revision", 1))
+            current_scope_digest = existing.get("scope_digest")
+            if not current_scope_digest:
+                current_scope_digest = compute_pairwise_grant_scope_digest(
+                    grant_id=existing.get("grant_id", clean_grant_id),
+                    consortium_id=clean_c_id,
+                    institution_a=existing.get("institution_a", part_banks[0]),
+                    institution_b=existing.get(
+                        "institution_b",
+                        part_banks[1] if len(part_banks) > 1 else part_banks[0],
+                    ),
+                    revision=rev,
+                    allowed_purposes=existing.get("allowed_purposes", []),
+                    institution_jurisdictions=existing.get("institution_jurisdictions", {}),
+                    allowed_jurisdictions=existing.get("allowed_jurisdictions", []),
+                    allow_cross_border=existing.get("allow_cross_border", False),
+                    allow_institution_identity_sharing=existing.get(
+                        "allow_institution_identity_sharing", False
+                    ),
+                )
+                existing["scope_digest"] = current_scope_digest
+
+            if approval_signature:
+                from app.domain.institutional_identity import (
+                    InstitutionalVerificationRegistry,
+                    canonical_pairwise_grant_approval_bytes,
+                )
+
+                reg = self._institutional_registry or InstitutionalVerificationRegistry()
+                challenge = canonical_pairwise_grant_approval_bytes(
+                    consortium_id=clean_c_id,
+                    grant_id=clean_grant_id,
+                    revision=rev,
+                    scope_digest=current_scope_digest,
+                    approving_bank_id=clean_bank,
+                    approver_id=attr["actor_id"],
+                )
+                if not reg.verify_signature(clean_bank, approval_signature, challenge):
+                    raise ConsortiumSecurityError(
+                        f"Cryptographic signature verification failed for pairwise grant approval by institution '{clean_bank}'."
+                    )
+
+            approval_record = {
+                "actor_id": attr["actor_id"],
+                "actor_institution": clean_bank,
+                "approved_at": datetime.datetime.now(UTC).isoformat(),
+                "roles": attr["effective_role"],
+                "scope_digest": current_scope_digest,
+                "grant_revision": rev,
+                "signature": approval_signature,
+            }
+
+            approvals = dict(existing.get("approvals", {}))
+            approvals[clean_bank] = approval_record
+            existing["approvals"] = approvals
+
+            revoked = list(existing.get("revoked_by_institutions", []))
+            if clean_bank in revoked:
+                revoked.remove(clean_bank)
+            existing["revoked_by_institutions"] = revoked
+            existing["is_active"] = len(existing["revoked_by_institutions"]) == 0
+            pairwise_grants[clean_grant_id] = existing
+            return existing
+
+        return self._store.atomic_mutate(_mutate)
+
+    def revoke_pairwise_operational_grant(
+        self,
+        consortium_id: str,
+        grant_id: str,
+        revoking_bank_id: str | None = None,
+        reason: str = "pairwise_governance_revocation",
+        auth_token: str | None = None,
+        actor: str | None = None,
+        trusted_context: Any | None = None,
+    ) -> dict[str, Any]:
+        """Revokes an existing pairwise operational data-sharing grant under authenticated governance authority."""
+        clean_c_id = consortium_id.lower().strip()
+        clean_grant_id = grant_id.strip()
+
+        if not auth_token and trusted_context is None:
+            raise PermissionError(
+                "Authentication required: Direct service operation 'revoke_pairwise_operational_grant' "
+                "requires a valid Bearer auth_token or trusted internal context."
+            )
+
+        if auth_token and not revoking_bank_id:
+            from app.infrastructure.security.auth_service import AuthenticationService
+
+            auth_svc = AuthenticationService.get_instance()
+            is_valid, claims, err = auth_svc.verify_access_token(auth_token)
+            if not is_valid or not claims:
+                raise PermissionError(f"Direct service authentication failed: {err}")
+            revoking_bank_id = str(claims.get("bank_id", "")).lower().strip()
+
+        clean_revoker = (revoking_bank_id or "").lower().strip()
+        attr = self._verify_service_actor_bank(
+            expected_bank=clean_revoker,
+            consortium_id=clean_c_id,
+            auth_token=auth_token,
+            actor=actor,
+            trusted_context=trusted_context,
+            action_name="revoke_pairwise_operational_grant",
+        )
+
+        def _mutate(consortia: dict[str, Consortium], proposals: dict[str, Any]) -> dict[str, Any]:
+            if clean_c_id not in consortia:
+                raise ValueError(f"Consortium '{clean_c_id}' does not exist.")
+            c = consortia[clean_c_id]
+            pairwise_grants = (c.metadata or {}).get("pairwise_operational_grants", {})
+            existing = pairwise_grants.get(clean_grant_id)
+            if not existing or not isinstance(existing, dict):
+                raise ValueError(
+                    f"Pairwise grant '{clean_grant_id}' does not exist in consortium '{clean_c_id}'."
+                )
+
+            part_banks = existing.get("participating_banks", [])
+            if clean_revoker not in part_banks and clean_revoker != c.founder_bank_id:
+                raise PermissionError(
+                    f"Revoking bank '{clean_revoker}' is not a participant of pairwise grant '{clean_grant_id}'."
+                )
+
+            history = list(existing.get("history", []))
+            prior_snapshot = {k: v for k, v in existing.items() if k != "history"}
+            history.append(prior_snapshot)
+
+            revoked_list = list(existing.get("revoked_by_institutions", []))
+            if clean_revoker not in revoked_list:
+                revoked_list.append(clean_revoker)
+            existing["revoked_by_institutions"] = sorted(revoked_list)
+
+            revocations = list(existing.get("revocation_history", []))
+            revocations.append({
+                "revoked_by_actor": attr["actor_id"],
+                "revoked_by_institution": clean_revoker,
+                "reason": reason.strip(),
+                "revoked_at": datetime.datetime.now(UTC).isoformat(),
+            })
+            existing["revocation_history"] = revocations
+            existing["is_active"] = False
+            existing["revoked_at"] = datetime.datetime.now(UTC).isoformat()
+            existing["revocation_reason"] = reason.strip()
+            existing["revoked_by"] = attr["actor_id"]
+            existing["history"] = history
+
+            pairwise_grants[clean_grant_id] = existing
+            return existing
+
+        return self._store.atomic_mutate(_mutate)
+
+    def get_pairwise_operational_grant(
+        self, consortium_id: str, grant_id: str
+    ) -> dict[str, Any] | None:
+        """Retrieves a specific pairwise operational grant by ID."""
+        clean_c_id = consortium_id.lower().strip()
+        clean_grant_id = grant_id.strip()
+        c = self._store.get_consortium(clean_c_id)
+        if not c:
+            return None
+        return c.get_pairwise_operational_grant(clean_grant_id)
+
+    def list_pairwise_operational_grants(
+        self, consortium_id: str, bank_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Lists pairwise operational grants in a consortium, optionally filtered by participating institution."""
+        clean_c_id = consortium_id.lower().strip()
+        c = self._store.get_consortium(clean_c_id)
+        if not c:
+            return []
+        grants = list(c.pairwise_operational_grants.values())
+        if bank_id:
+            clean_bank = bank_id.lower().strip()
+            return [
+                g
+                for g in grants
+                if isinstance(g, dict) and clean_bank in g.get("participating_banks", [])
+            ]
+        return grants
+
+    def resolve_pairwise_authorization(
+        self,
+        consortium_id: str,
+        requesting_bank_id: str,
+        counterpart_bank_id: str,
+        purpose: str,
+        requesting_jurisdiction: str | None = None,
+        counterpart_jurisdiction: str | None = None,
+        expected_revision: int | None = None,
+    ) -> tuple[bool, str, dict[str, Any] | None]:
+        """Evaluates whether data sharing between two institutions is authorized.
+
+        Enforces:
+        - Active consortium status and active membership of both institutions.
+        - Fails closed if either institution has been evicted/removed.
+        - Exactly two distinct institutions.
+        - Authoritative pairwise grant resolution (or legacy grant fallback).
+        - Mandatory bilateral approvals bound to current revision and scope digest.
+        - Fails closed for revoked grants or grants revoked by either institution.
+        - Permitted purpose validation.
+        - Jurisdiction compliance and cross-border sovereignty treaties.
+        """
+        clean_c_id = consortium_id.lower().strip()
+        clean_req = requesting_bank_id.lower().strip()
+        clean_counterpart = counterpart_bank_id.lower().strip()
+        clean_purpose = purpose.strip()
+
+        if not clean_req or not clean_counterpart:
+            return False, "Requesting and counterpart institution IDs must be non-empty.", None
+        if clean_req == clean_counterpart:
+            return (
+                False,
+                f"Pairwise authorization requires two distinct institutions, got '{clean_req}'.",
+                None,
+            )
+
+        c = self._store.get_consortium(clean_c_id)
+        if not c:
+            return False, f"Consortium '{clean_c_id}' does not exist.", None
+        if c.status != ConsortiumStatus.ACTIVE:
+            return (
+                False,
+                f"Consortium '{clean_c_id}' is in non-active status '{c.status.value}'. Operational queries are prohibited.",
+                None,
+            )
+
+        # Check membership and evictions
+        if clean_req in c.removed_members:
+            return (
+                False,
+                f"Requesting institution '{clean_req}' has been evicted from consortium '{clean_c_id}'.",
+                None,
+            )
+        if clean_counterpart in c.removed_members:
+            return (
+                False,
+                f"Counterpart institution '{clean_counterpart}' has been evicted from consortium '{clean_c_id}'.",
+                None,
+            )
+        if clean_req not in c.members:
+            return (
+                False,
+                f"Requesting institution '{clean_req}' is not an active member of consortium '{clean_c_id}'.",
+                None,
+            )
+        if clean_counterpart not in c.members:
+            return (
+                False,
+                f"Counterpart institution '{clean_counterpart}' is not an active member of consortium '{clean_c_id}'.",
+                None,
+            )
+
+        # Find matching pairwise grant
+        grant = c.find_pairwise_operational_grant(clean_req, clean_counterpart)
+        if not grant:
+            legacy = (c.metadata or {}).get("operational_data_sharing_grant")
+            if (
+                legacy
+                and isinstance(legacy, dict)
+                and clean_req in legacy.get("participating_banks", [])
+                and clean_counterpart in legacy.get("participating_banks", [])
+            ):
+                grant = legacy
+            else:
+                return (
+                    False,
+                    f"No authorized operational data-sharing grant exists between institutions '{clean_req}' and '{clean_counterpart}' in consortium '{clean_c_id}'.",
+                    None,
+                )
+
+        grant_id = grant.get("grant_id", "unknown")
+        if not grant.get("is_active", True):
+            return False, f"Operational grant '{grant_id}' is inactive or revoked.", grant
+
+        revoked_institutions = set(grant.get("revoked_by_institutions", []))
+        if clean_req in revoked_institutions:
+            return (
+                False,
+                f"Operational consent under grant '{grant_id}' was revoked by requesting institution '{clean_req}'.",
+                grant,
+            )
+        if clean_counterpart in revoked_institutions:
+            return (
+                False,
+                f"Operational consent under grant '{grant_id}' was revoked by counterpart institution '{clean_counterpart}'.",
+                grant,
+            )
+
+        current_rev = int(grant.get("revision", 1))
+        if expected_revision is not None and expected_revision != current_rev:
+            return (
+                False,
+                f"Grant revision mismatch for '{grant_id}': expected revision {expected_revision}, active is {current_rev}.",
+                grant,
+            )
+
+        current_scope_digest = grant.get("scope_digest")
+        approvals = grant.get("approvals", {})
+
+        req_approval = approvals.get(clean_req)
+        if not req_approval or not isinstance(req_approval, dict):
+            return (
+                False,
+                f"Requesting institution '{clean_req}' has not approved operational grant '{grant_id}'.",
+                grant,
+            )
+        if req_approval.get("grant_revision") != current_rev:
+            return (
+                False,
+                f"Approval by requesting institution '{clean_req}' is stale for operational grant '{grant_id}' (approved revision {req_approval.get('grant_revision')}, current is {current_rev}).",
+                grant,
+            )
+        if current_scope_digest and req_approval.get("scope_digest") != current_scope_digest:
+            return (
+                False,
+                f"Approval by requesting institution '{clean_req}' is stale for operational grant '{grant_id}' (approved digest '{req_approval.get('scope_digest')}', current is '{current_scope_digest}').",
+                grant,
+            )
+
+        counterpart_approval = approvals.get(clean_counterpart)
+        if not counterpart_approval or not isinstance(counterpart_approval, dict):
+            return (
+                False,
+                f"Counterpart institution '{clean_counterpart}' has not approved operational grant '{grant_id}'. Unilateral approval does not constitute bilateral consent.",
+                grant,
+            )
+        if counterpart_approval.get("grant_revision") != current_rev:
+            return (
+                False,
+                f"Approval by counterpart institution '{clean_counterpart}' is stale for operational grant '{grant_id}' (approved revision {counterpart_approval.get('grant_revision')}, current is {current_rev}).",
+                grant,
+            )
+        if current_scope_digest and counterpart_approval.get("scope_digest") != current_scope_digest:
+            return (
+                False,
+                f"Approval by counterpart institution '{clean_counterpart}' is stale for operational grant '{grant_id}' (approved digest '{counterpart_approval.get('scope_digest')}', current is '{current_scope_digest}').",
+                grant,
+            )
+
+        # Purpose check
+        allowed_purposes = grant.get("allowed_purposes", [])
+        if clean_purpose not in allowed_purposes:
+            return (
+                False,
+                f"Purpose '{clean_purpose}' is not authorized under operational grant '{grant_id}'. Permitted: {allowed_purposes}.",
+                grant,
+            )
+
+        # Jurisdiction & Sovereignty
+        inst_jurisdictions = grant.get("institution_jurisdictions", {})
+        allowed_jurisdictions = grant.get("allowed_jurisdictions", [])
+        allow_cross_border = bool(grant.get("allow_cross_border", False))
+
+        req_jur = requesting_jurisdiction or inst_jurisdictions.get(clean_req)
+        counterpart_jur = counterpart_jurisdiction or inst_jurisdictions.get(clean_counterpart)
+
+        if not req_jur:
+            return (
+                False,
+                f"Authoritative jurisdiction for requesting institution '{clean_req}' is not registered and was not supplied. Denied by default.",
+                grant,
+            )
+        if req_jur not in allowed_jurisdictions:
+            return (
+                False,
+                f"Requesting institution operates in unapproved jurisdiction '{req_jur}' (Allowed: {allowed_jurisdictions}).",
+                grant,
+            )
+
+        if not counterpart_jur:
+            return (
+                False,
+                f"Authoritative jurisdiction for counterpart institution '{clean_counterpart}' is not registered and was not supplied. Denied by default.",
+                grant,
+            )
+        if counterpart_jur not in allowed_jurisdictions:
+            return (
+                False,
+                f"Counterpart institution operates in unapproved jurisdiction '{counterpart_jur}' (Allowed: {allowed_jurisdictions}).",
+                grant,
+            )
+
+        if req_jur != counterpart_jur and not allow_cross_border:
+            return (
+                False,
+                f"Cross-border intelligence disclosure between '{req_jur}' and '{counterpart_jur}' is prohibited without explicit bilateral cross-border consent.",
+                grant,
+            )
+
+        return True, "Pairwise authorization verified.", grant
+
+    def check_pairwise_authorization(
+        self,
+        consortium_id: str,
+        requesting_bank_id: str,
+        counterpart_bank_id: str,
+        purpose: str,
+        requesting_jurisdiction: str | None = None,
+        counterpart_jurisdiction: str | None = None,
+        expected_revision: int | None = None,
+    ) -> dict[str, Any]:
+        """Fails closed with ConsortiumSecurityError if pairwise authorization is not verified."""
+        is_auth, reason, grant = self.resolve_pairwise_authorization(
+            consortium_id=consortium_id,
+            requesting_bank_id=requesting_bank_id,
+            counterpart_bank_id=counterpart_bank_id,
+            purpose=purpose,
+            requesting_jurisdiction=requesting_jurisdiction,
+            counterpart_jurisdiction=counterpart_jurisdiction,
+            expected_revision=expected_revision,
+        )
+        if not is_auth:
+            raise ConsortiumSecurityError(reason)
+        assert grant is not None
+        return grant
 
     def propose_membership_change(
         self,
