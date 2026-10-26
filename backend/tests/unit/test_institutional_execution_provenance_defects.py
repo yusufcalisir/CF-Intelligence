@@ -303,12 +303,6 @@ def test_defect_demonstration_symmetric_secret_requirement(monkeypatch: pytest.M
         InstitutionalVerificationRegistry,
     )
     from tests.unit.test_operational_result_admission_contract import (
-        SECRET_A as CONTRACT_SECRET_A,
-    )
-    from tests.unit.test_operational_result_admission_contract import (
-        SECRET_B as CONTRACT_SECRET_B,
-    )
-    from tests.unit.test_operational_result_admission_contract import (
         SECRET_COORD as CONTRACT_SECRET_COORD,
     )
     from tests.unit.test_operational_result_admission_contract import (

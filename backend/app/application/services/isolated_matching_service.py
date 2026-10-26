@@ -650,7 +650,7 @@ class IsolatedBankWorkerNode:
         self, consortium_id: str, grant_id: str, revision: int, scope_digest: str
     ) -> str:
         """Produce bank worker signature approving an immutable grant revision and scope digest."""
-        canonical_bytes = f"{consortium_id}:{grant_id}:{revision}:{scope_digest}:{self.bank_id}".encode("utf-8")
+        canonical_bytes = f"{consortium_id}:{grant_id}:{revision}:{scope_digest}:{self.bank_id}".encode()
         if self._signing_identity is not None:
             return self._signing_identity.sign(canonical_bytes)
         return hmac.new(
@@ -690,7 +690,7 @@ class IsolatedBankWorkerNode:
             purpose=ticket.purpose,
             operation=ticket.operation,
         )
-        canonical_bytes = f"{ticket.canonical_digest()}:{self.bank_id}".encode("utf-8")
+        canonical_bytes = f"{ticket.canonical_digest()}:{self.bank_id}".encode()
         if self._signing_identity is not None:
             return self._signing_identity.sign(canonical_bytes)
         return hmac.new(
@@ -751,7 +751,7 @@ class IsolatedBankWorkerNode:
         target_sig = ticket.bank_approvals.get(self.bank_id) or (
             ticket.target_bank_approval_signature if self.bank_id == ticket.target_bank_id.lower().strip() else ""
         )
-        target_canonical = f"{ticket.canonical_digest()}:{self.bank_id}".encode("utf-8")
+        target_canonical = f"{ticket.canonical_digest()}:{self.bank_id}".encode()
         target_valid = False
         if self._signing_identity is not None and target_sig:
             target_valid = self._signing_identity.verify(target_sig, target_canonical)
@@ -773,7 +773,7 @@ class IsolatedBankWorkerNode:
         peer_sig = ticket.bank_approvals.get(req_bank) or ticket.requesting_bank_signature
         peer_enrolled = self._peer_registry.has_key(req_bank) or (self.get_trusted_peer_key(req_bank) is not None)
         if peer_enrolled and peer_sig:
-            peer_canonical = f"{ticket.canonical_digest()}:{ticket.requesting_bank_id}".encode("utf-8")
+            peer_canonical = f"{ticket.canonical_digest()}:{ticket.requesting_bank_id}".encode()
             peer_valid = False
             if self._peer_registry.has_key(req_bank):
                 peer_valid = self._peer_registry.verify_signature(req_bank, peer_sig, peer_canonical)
@@ -944,7 +944,7 @@ class IsolatedBankWorkerNode:
         canonical_bytes = (
             f"{job_id}:{consortium_id}:{self.bank_id}:"
             f"{clean_target}:{blinded_hex}:{nonce}:"
-            f"{timestamp}:{purpose}".encode("utf-8")
+            f"{timestamp}:{purpose}".encode()
         )
         if self._signing_identity is not None:
             signature = self._signing_identity.sign(canonical_bytes)
@@ -1009,7 +1009,7 @@ class IsolatedBankWorkerNode:
         canonical_bytes = (
             f"{query.job_id}:{query.consortium_id}:{query.requesting_bank_id}:"
             f"{query.target_bank_id}:{query.blinded_element_hex}:{query.nonce}:"
-            f"{query.timestamp}:{query.purpose}".encode("utf-8")
+            f"{query.timestamp}:{query.purpose}".encode()
         )
         sig_valid = False
         if self._peer_registry.has_key(req_bank):
@@ -1245,7 +1245,7 @@ class IsolatedBankWorkerNode:
         canonical_bytes = (
             f"{ticket.job_id}:{consortium_id}:{self.bank_id}:"
             f"{clean_target}:{psi_request_b64}:{nonce}:"
-            f"{timestamp}:{purpose}:{ticket.canonical_digest()}".encode("utf-8")
+            f"{timestamp}:{purpose}:{ticket.canonical_digest()}".encode()
         )
         if self._signing_identity is not None:
             sig = self._signing_identity.sign(canonical_bytes)
@@ -1307,7 +1307,7 @@ class IsolatedBankWorkerNode:
         canonical_bytes = (
             f"{query.job_id}:{query.consortium_id}:{query.requesting_bank_id}:"
             f"{query.target_bank_id}:{query.psi_request_b64}:{query.nonce}:"
-            f"{query.timestamp}:{query.purpose}:{query.ticket.canonical_digest()}".encode("utf-8")
+            f"{query.timestamp}:{query.purpose}:{query.ticket.canonical_digest()}".encode()
         )
         sig_valid = False
         if self._peer_registry.has_key(req_bank):
