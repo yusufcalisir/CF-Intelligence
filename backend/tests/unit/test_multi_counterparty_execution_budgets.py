@@ -564,6 +564,11 @@ def test_pilot_quota_enforcement_remains_active_and_cannot_be_bypassed(
 
     assert "pilot total query quota exhausted" in str(exc_info.value).lower()
 
+    # Pre-dispatch pilot quota failure must NOT consume the pairwise execution budget
+    b_status = budget_store.get_budget(c_id, "bank_a", "bank_b")
+    assert b_status is not None and b_status["consumed_executions"] == 0
+    assert b_status["remaining_executions"] == 10
+
 
 def test_known_pre_dispatch_failure_releases_reservations(
     tri_consortium: tuple[ConsortiumGovernanceService, str],
@@ -879,3 +884,233 @@ def test_sanitized_audit_records_do_not_persist_sensitive_data(
         assert "secret_salt_hash_xyz_12345" not in dump
         assert "private_key" not in dump
         assert "matching_token" not in dump
+
+
+def test_total_budget_not_replenished_by_audit_cleanup(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """A total budget without execution window cannot be replenished merely through audit cleanup."""
+    gov_svc, c_id = tri_consortium
+    service = CrossBankIntelligenceService.get_instance()
+    service.consortium_service = gov_svc
+    budget_store = service.budget_store
+
+    # Exactly 1 total execution budget for Bank A -> Bank B (window_seconds=None)
+    budget_store.set_budget(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        counterpart_bank_id="bank_b",
+        max_executions=1,
+        window_seconds=None,
+    )
+
+    test_ent = Entity(
+        id="cust_budget_audit_1",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_budget_audit_1",
+        bank_id="bank_a",
+        display_label="Budget Audit Entity",
+        risk_level=RiskLevel.HIGH,
+    )
+    service.entity_service._entities.set("cust_budget_audit_1", _entity_to_dict(test_ent))
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b"],
+        query_entity_id="cust_budget_audit_1",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", return_value=sig_b):
+        resp = service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+    assert resp.overall_outcome == "COMPLETED"
+
+    # Verify budget is exhausted
+    b_status = budget_store.get_budget(c_id, "bank_a", "bank_b")
+    assert b_status is not None and b_status["consumed_executions"] == 1
+    assert b_status["remaining_executions"] == 0
+
+    # Simulate 8 days passing and trigger retention cleanup (prunes all reservations older than 7 days)
+    now_future = datetime.datetime.now(UTC) + datetime.timedelta(days=8)
+    with budget_store._lock, budget_store._get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE;")
+        budget_store._execute_cleanup_in_conn(conn, now_future, now_future.isoformat())
+        conn.commit()
+
+    # Verify the reservation row was pruned from the audit reservations table
+    with budget_store._get_connection() as conn:
+        res_count = conn.execute("SELECT COUNT(*) as c FROM cross_bank_budget_reservations;").fetchone()["c"]
+        assert res_count == 0
+
+    # Invariant: Despite audit rows being pruned, authoritative durable consumption is preserved!
+    b_status_after = budget_store.get_budget(c_id, "bank_a", "bank_b")
+    assert b_status_after is not None and b_status_after["consumed_executions"] == 1
+    assert b_status_after["remaining_executions"] == 0
+
+    # A subsequent request MUST still be rejected due to quota exhaustion (silent replenishment prevented)
+    with pytest.raises(CrossBankExecutionQuotaExceededError) as exc_info:
+        service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+    assert "Cross-bank execution quota exceeded" in str(exc_info.value)
+
+
+def test_expired_unresolved_reservations_cannot_create_temporary_oversubscription(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+) -> None:
+    """Expired unresolved reservations are atomically reconciled as FAILED_CLOSED before granting new reservations."""
+    gov_svc, c_id = tri_consortium
+    service = CrossBankIntelligenceService.get_instance()
+    service.consortium_service = gov_svc
+    budget_store = service.budget_store
+
+    # Exactly 1 total slot for Bank A -> Bank B
+    budget_store.set_budget(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        counterpart_bank_id="bank_b",
+        max_executions=1,
+    )
+
+    # Reserve the 1 slot with a very short TTL of 0.05 seconds
+    ok, bid, exhausted = budget_store.reserve_batch(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b"],
+        ttl_seconds=0.05,
+    )
+    assert ok is True
+
+    # Wait for the reservation to expire
+    time.sleep(0.1)
+
+    # Verify that without running periodic cleanup, attempting a new reservation immediately reconciles
+    # the expired reservation to FAILED_CLOSED and rejects oversubscription
+    ok2, bid2, exhausted2 = budget_store.reserve_batch(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b"],
+    )
+    assert ok2 is False
+    assert exhausted2 == ["bank_b"]
+
+    # Verify the expired reservation is now FAILED_CLOSED in database
+    status_b = budget_store.get_budget(c_id, "bank_a", "bank_b")
+    assert status_b is not None and status_b["consumed_executions"] == 1
+    assert status_b["remaining_executions"] == 0
+
+
+def test_persisted_failure_reasons_never_contain_sentinel_secret(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """Failure resolution reasons strictly persist bounded categories and never leak raw exception secrets."""
+    gov_svc, c_id = tri_consortium
+    service = CrossBankIntelligenceService.get_instance()
+    service.consortium_service = gov_svc
+    budget_store = service.budget_store
+
+    budget_store.set_budget(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        counterpart_bank_id="bank_b",
+        max_executions=5,
+    )
+
+    test_ent = Entity(
+        id="cust_budget_secret_1",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_budget_secret_1",
+        bank_id="bank_a",
+        display_label="Secret Entity",
+        risk_level=RiskLevel.HIGH,
+    )
+    service.entity_service._entities.set("cust_budget_secret_1", _entity_to_dict(test_ent))
+
+    sentinel_secret = "SENTINEL_SECRET_TOKEN_99999_VAULT_KEY_DO_NOT_LEAK"
+
+    def fail_with_sentinel_secret(*args, **kwargs):
+        raise RuntimeError(f"Indeterminate crash containing secret: {sentinel_secret}")
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b"],
+        query_entity_id="cust_budget_secret_1",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=fail_with_sentinel_secret):
+        with pytest.raises(RuntimeError):
+            service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+
+    # Inspect all rows and columns across the entire budget database
+    with budget_store._get_connection() as conn:
+        for table_name in ("cross_bank_budget_reservations", "cross_bank_budget_consumption", "cross_bank_execution_budgets"):
+            rows = conn.execute(f"SELECT * FROM {table_name};").fetchall()
+            for r in rows:
+                dump = str(dict(r))
+                assert sentinel_secret not in dump, f"Sentinel secret leaked in table {table_name}: {dump}"
+                if table_name == "cross_bank_budget_reservations":
+                    assert r["reason"] == "EXECUTION_INDETERMINATE"
+
+
+def test_predispatch_pilot_quota_exceeded_multi_target_accounting(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """Pre-dispatch pilot quota failure releases undispatched target pairwise budget while charging completed target."""
+    gov_svc, c_id = tri_consortium
+    service = CrossBankIntelligenceService.get_instance()
+    service.consortium_service = gov_svc
+    budget_store = service.budget_store
+
+    # Pairwise budgets of 1 for Bank B and Bank C
+    budget_store.set_budget(consortium_id=c_id, requesting_bank_id="bank_a", counterpart_bank_id="bank_b", max_executions=1)
+    budget_store.set_budget(consortium_id=c_id, requesting_bank_id="bank_a", counterpart_bank_id="bank_c", max_executions=1)
+
+    test_ent = Entity(
+        id="cust_budget_multi_pilot",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_budget_multi_pilot",
+        bank_id="bank_a",
+        display_label="Multi Pilot Entity",
+        risk_level=RiskLevel.HIGH,
+    )
+    service.entity_service._entities.set("cust_budget_multi_pilot", _entity_to_dict(test_ent))
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=False)
+
+    def execute_with_selective_pilot_failure(req, *args, **kwargs):
+        if req.target_bank_id == "bank_b":
+            return sig_b
+        # Bank C fails pre-dispatch pilot quota
+        raise PilotQuotaExceededError("Pilot total query quota exhausted for counterpart bank_c")
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b", "bank_c"],
+        query_entity_id="cust_budget_multi_pilot",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=execute_with_selective_pilot_failure):
+        with pytest.raises(PilotQuotaExceededError):
+            service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+
+    # Bank B completed execution -> pairwise budget IS committed and charged
+    b_status = budget_store.get_budget(c_id, "bank_a", "bank_b")
+    assert b_status is not None and b_status["consumed_executions"] == 1
+    assert b_status["remaining_executions"] == 0
+
+    # Bank C encountered pre-dispatch pilot quota failure -> pairwise budget IS RELEASED and uncharged
+    c_status = budget_store.get_budget(c_id, "bank_a", "bank_c")
+    assert c_status is not None and c_status["consumed_executions"] == 0
+    assert c_status["remaining_executions"] == 1
+

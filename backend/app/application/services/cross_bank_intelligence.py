@@ -61,6 +61,7 @@ from app.domain.institutional_identity import (
     canonical_counterpart_evidence_bytes,
     canonical_evaluated_result_bytes,
 )
+from app.domain.pilot_operations import PilotQuotaExceededError
 from app.domain.value_objects_investigation import (
     calculate_jaccard_similarity,
 )
@@ -68,6 +69,10 @@ from app.infrastructure.redis_store import RedisStore
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 from app.infrastructure.storage.durable_execution_budget_store import (
+    REASON_BATCH_ABORTED_BEFORE_DISPATCH,
+    REASON_EXECUTION_COMPLETED,
+    REASON_EXECUTION_INDETERMINATE,
+    REASON_PILOT_PREFLIGHT_REJECTED,
     DurableCrossBankExecutionBudgetStore,
 )
 from app.infrastructure.storage.durable_idempotency_store import (
@@ -2104,6 +2109,28 @@ class CrossBankIntelligenceService:
                     )
                     completed_targets.append(clean_target)
                 except Exception as exc:
+                    # Handle demonstrably pre-dispatch pilot quota rejections without consuming pairwise budget
+                    if isinstance(exc, PilotQuotaExceededError):
+                        logger.warning(
+                            "Counterpart '%s' rejected in pre-dispatch pilot quota check: %s. Releasing reservation.",
+                            clean_target,
+                            exc,
+                        )
+                        undispatched = [t for t in clean_targets if t not in completed_targets]
+                        if undispatched:
+                            self.budget_store.release_reservations(
+                                batch_id=budget_batch_id,
+                                targets=undispatched,
+                                reason=REASON_PILOT_PREFLIGHT_REJECTED,
+                            )
+                        if completed_targets:
+                            self.budget_store.commit_reservations(
+                                batch_id=budget_batch_id,
+                                completed_targets=completed_targets,
+                                reason=REASON_EXECUTION_COMPLETED,
+                            )
+                        raise
+
                     recoverable_failure = self._classify_recoverable_counterparty_failure(
                         target_bank_id=clean_target,
                         exc=exc,
@@ -2111,22 +2138,28 @@ class CrossBankIntelligenceService:
                     if recoverable_failure is None:
                         # Security boundary: governance, authorization, cryptographic verification,
                         # ticket/receipt integrity, and admission failures MUST fail closed and terminate the request.
+                        logger.error(
+                            "Counterpart '%s' failed with indeterminate or security boundary error: %s",
+                            clean_target,
+                            exc,
+                        )
                         undispatched = [t for t in clean_targets if t not in dispatched_targets]
                         if undispatched:
                             self.budget_store.release_reservations(
                                 batch_id=budget_batch_id,
                                 targets=undispatched,
-                                reason="Aborted prior to dispatch due to counterpart failure",
+                                reason=REASON_BATCH_ABORTED_BEFORE_DISPATCH,
                             )
                         self.budget_store.fail_closed_reservations(
                             batch_id=budget_batch_id,
                             targets=[clean_target],
-                            reason=f"Indeterminate execution failure: {exc}",
+                            reason=REASON_EXECUTION_INDETERMINATE,
                         )
                         if completed_targets:
                             self.budget_store.commit_reservations(
                                 batch_id=budget_batch_id,
                                 completed_targets=completed_targets,
+                                reason=REASON_EXECUTION_COMPLETED,
                             )
                         raise
 
@@ -2149,7 +2182,7 @@ class CrossBankIntelligenceService:
             self.budget_store.commit_reservations(
                 batch_id=budget_batch_id,
                 completed_targets=completed_targets,
-                reason="Execution completed",
+                reason=REASON_EXECUTION_COMPLETED,
             )
 
             # 8. Determine overall execution outcome across queried counterparts
@@ -2189,15 +2222,15 @@ class CrossBankIntelligenceService:
 
             return response_obj
         except Exception as exec_exc:
-            undispatched = [t for t in clean_targets if t not in dispatched_targets]
+            undispatched = [t for t in clean_targets if t not in dispatched_targets and t not in completed_targets]
             if undispatched:
                 self.budget_store.release_reservations(
                     batch_id=budget_batch_id,
                     targets=undispatched,
-                    reason=f"Pre-dispatch failure: {exec_exc}",
+                    reason=REASON_BATCH_ABORTED_BEFORE_DISPATCH,
                 )
             if effective_idem_key and idem_owner_id:
-                is_indeterminate = len(dispatched_targets) > 0
+                is_indeterminate = len(dispatched_targets) > 0 and not isinstance(exec_exc, PilotQuotaExceededError)
                 self.idempotency_store.fail_or_abort(
                     consortium_id=clean_consortium_id,
                     requesting_bank_id=clean_requesting,
