@@ -271,6 +271,53 @@ class CrossBankIntelligenceSignal(BaseModel):
     )
 
 
+OverallQueryOutcome = Literal["COMPLETED", "PARTIAL_FAILURE", "FAILED"]
+CounterpartyOutcomeStatus = Literal["SUCCESS", "FAILED"]
+
+
+class CounterpartyExecutionFailure(BaseModel):
+    """Sanitized failure details for an execution against an authorized counterpart."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    target_bank_id: str = Field(
+        ..., description="Target counterpart institution ID that experienced execution failure."
+    )
+    error_category: str = Field(
+        ...,
+        description="Sanitized failure category (e.g. WORKER_UNAVAILABLE, TRANSPORT_FAILURE, TIMEOUT, EXECUTION_ERROR).",
+    )
+    error_message: str = Field(
+        ...,
+        description="Sanitized, non-sensitive failure summary without internal credentials, IPs, or private data.",
+    )
+    failed_at: str = Field(..., description="ISO-8601 failure timestamp.")
+    retryable: bool = Field(
+        default=True,
+        description="Indicates whether this failure might be transient and potentially retryable.",
+    )
+
+
+class CounterpartyExecutionOutcome(BaseModel):
+    """Typed execution outcome for an individual counterpart institution."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    target_bank_id: str = Field(..., description="Counterpart institution ID.")
+    status: CounterpartyOutcomeStatus = Field(
+        ...,
+        description="Outcome status for this counterpart ('SUCCESS' or 'FAILED').",
+    )
+    signal: CrossBankIntelligenceSignal | None = Field(
+        default=None,
+        description="Verifiable cross-bank intelligence signal when status is SUCCESS; None on failure.",
+    )
+    failure: CounterpartyExecutionFailure | None = Field(
+        default=None,
+        description="Sanitized failure information when status is FAILED; None on success.",
+    )
+
+
 class MultiCounterpartyIntelligenceQueryResponse(BaseModel):
     """Response payload for multi-counterparty cross-bank intelligence query."""
 
@@ -283,9 +330,25 @@ class MultiCounterpartyIntelligenceQueryResponse(BaseModel):
     counterpart_count: int = Field(
         ..., ge=1, description="Number of distinct counterpart institutions queried."
     )
+    overall_outcome: OverallQueryOutcome = Field(
+        default="COMPLETED",
+        description="Overall execution outcome across all requested counterparts: COMPLETED, PARTIAL_FAILURE, or FAILED.",
+    )
+    outcome: OverallQueryOutcome = Field(
+        default="COMPLETED",
+        description="Direct alias for overall_outcome to support consumer conventions.",
+    )
     results: dict[str, CrossBankIntelligenceSignal] = Field(
-        ...,
-        description="Map of counterpart bank ID to separately verifiable, sanitized cross-bank intelligence signal.",
+        default_factory=dict,
+        description="Map of counterpart bank ID to separately verifiable, sanitized cross-bank intelligence signal for successful executions.",
+    )
+    failures: dict[str, CounterpartyExecutionFailure] = Field(
+        default_factory=dict,
+        description="Map of counterpart bank ID to sanitized execution failure details for failed executions.",
+    )
+    execution_outcomes: dict[str, CounterpartyExecutionOutcome] = Field(
+        default_factory=dict,
+        description="Typed per-counterparty execution outcomes mapping target_bank_id to outcome status and details.",
     )
     executed_at: str = Field(..., description="ISO-8601 execution timestamp.")
 

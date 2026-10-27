@@ -466,6 +466,9 @@ def test_multi_counterparty_fastapi_router_api(
     data = resp.json()
     assert data["requesting_bank_id"] == "bank_a"
     assert data["counterpart_count"] == 2
+    assert data["overall_outcome"] == "COMPLETED"
+    assert data["outcome"] == "COMPLETED"
+    assert len(data.get("failures", {})) == 0
     assert "bank_b" in data["results"]
     assert "bank_c" in data["results"]
     assert data["results"]["bank_b"]["match_confirmed"] is True
@@ -508,3 +511,93 @@ def test_multi_counterparty_fastapi_router_api(
         headers={"Authorization": f"Bearer {token_a}"},
     )
     assert resp_self.status_code in (400, 422)
+
+
+def test_multi_counterparty_docker_psi_controlled_worker_failure(
+    three_bank_docker_topology: dict[str, Any],
+    isolated_tri_governance_env: tuple[ConsortiumGovernanceService, str, str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that stopping Bank C's container causes a partial failure, retaining Bank B without fabricated signals."""
+    gov_svc, token_a, _, _ = isolated_tri_governance_env
+    client_a = three_bank_docker_topology["client_a"]
+    client_b = three_bank_docker_topology["client_b"]
+    port_coord: int = three_bank_docker_topology["port_coord"]
+    container_c = three_bank_docker_topology["container_worker_c"]
+
+    coord_url = f"http://127.0.0.1:{port_coord}"
+    monkeypatch.setenv("CFI_COORDINATOR_URL", coord_url)
+
+    shared_identifier = "TR330001112223334445556667"
+    client_a.store_private_entity({
+        "id": "ent_partial_a",
+        "bank_id": "bank_a",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["ORGANIZED_CRIME"],
+    })
+    client_b.store_private_entity({
+        "id": "ent_partial_b",
+        "bank_id": "bank_b",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["ORGANIZED_CRIME"],
+    })
+
+    cbi_service = CrossBankIntelligenceService(consortium_service=gov_svc)
+    ent_a = Entity(
+        id="ent_partial_a",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id=hashlib.sha256(shared_identifier.encode()).hexdigest(),
+        bank_id="bank_a",
+        display_label="Partial Test Target",
+        risk_level=RiskLevel.HIGH,
+        attributes={"raw_identifier": shared_identifier},
+    )
+    cbi_service.entity_service._entities.set("ent_partial_a", _entity_to_dict(ent_a))
+
+    # Temporarily stop Bank C's worker container to trigger genuine worker unavailability
+    _run_cmd(["docker", "stop", container_c], check=True)
+    try:
+        req = MultiCounterpartyIntelligenceQueryRequest(
+            consortium_id="c_tri_m63_docker",
+            requesting_bank_id="bank_a",
+            target_bank_ids=["bank_b", "bank_c"],
+            query_entity_id="ent_partial_a",
+            purpose="AML_COLLABORATIVE_INVESTIGATION",
+            execution_mode="VERIFIED_OPERATIONAL",
+            use_established_psi=True,
+            require_established_psi=True,
+        )
+
+        response: MultiCounterpartyIntelligenceQueryResponse = cbi_service.query_multi_counterparty_intelligence(
+            req=req,
+            auth_token=token_a,
+        )
+
+        assert response.overall_outcome == "PARTIAL_FAILURE"
+        assert response.outcome == "PARTIAL_FAILURE"
+        assert response.counterpart_count == 2
+
+        # 1. Bank B succeeded and returned genuine verified signal
+        assert "bank_b" in response.results
+        sig_b = response.results["bank_b"]
+        assert sig_b.match_confirmed is True
+        assert sig_b.match_category == "PROBABILISTIC_FUZZY"
+        assert response.execution_outcomes["bank_b"].status == "SUCCESS"
+        assert response.execution_outcomes["bank_b"].signal is not None
+        assert response.execution_outcomes["bank_b"].failure is None
+
+        # 2. Bank C failed: no signal fabricated, recorded in failures
+        assert "bank_c" not in response.results
+        assert "bank_c" in response.failures
+        fail_c = response.failures["bank_c"]
+        assert fail_c.target_bank_id == "bank_c"
+        assert fail_c.error_category in ("WORKER_UNAVAILABLE", "TRANSPORT_FAILURE", "TIMEOUT")
+        assert response.execution_outcomes["bank_c"].status == "FAILED"
+        assert response.execution_outcomes["bank_c"].signal is None
+        assert response.execution_outcomes["bank_c"].failure is not None
+    finally:
+        _run_cmd(["docker", "start", container_c], check=False)

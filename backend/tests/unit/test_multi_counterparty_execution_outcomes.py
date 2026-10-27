@@ -1,0 +1,501 @@
+"""Unit tests for Per-Counterparty Execution Outcomes and Partial Failure Management.
+
+Verifies:
+1. Fully successful multi-counterparty query retains all verified signals and reports COMPLETED.
+2. Controlled worker/transport failure on one counterpart retains verified results for completed
+   counterparts, reports PARTIAL_FAILURE, and contains no fabricated signal for the failed counterpart.
+3. Complete failure across all counterparts truthfully reports FAILED without representing any
+   failed execution as NO_MATCH.
+4. Sanitization of counterpart execution failures strips internal credentials, URLs, and private details.
+5. All-or-nothing authorization preflight remains fail-closed; missing grants or revoked consent
+   are never converted into partial success.
+6. FastAPI router endpoint exposes typed execution outcomes, overall outcome, and failure records.
+"""
+
+from __future__ import annotations
+
+import urllib.error
+from collections.abc import Generator
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.application.schemas.cross_bank_intelligence import (
+    CrossBankIntelligenceQueryRequest,
+    CrossBankIntelligenceSignal,
+    MultiCounterpartyIntelligenceQueryRequest,
+)
+from app.application.services.consortium_service import ConsortiumGovernanceService
+from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
+from app.application.services.entity_resolution import EntityResolutionService, _entity_to_dict
+from app.domain.consortium_governance import (
+    ConsortiumSecurityError,
+    MemberRole,
+)
+from app.domain.investigation_entities import Entity, EntityType, RiskLevel
+from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
+from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
+from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def isolate_test_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    store_file = tmp_path / "execution_outcomes_consortium_store.json"
+    account_file = tmp_path / "execution_outcomes_account_store.json"
+    monkeypatch.setenv("CFI_CONSORTIUM_STORE_PATH", str(store_file))
+    monkeypatch.setenv("CFI_ACCOUNT_STORE_PATH", str(account_file))
+    monkeypatch.setenv("JWT_SECRET", "test_jwt_secret_execution_outcomes_must_be_32bytes_min!")
+    monkeypatch.setenv("CFI_JWT_SECRET", "test_jwt_secret_execution_outcomes_must_be_32bytes_min!")
+    monkeypatch.setenv("CFI_CONSORTIUM_STORE_SECRET", "test_secret_execution_outcomes_32bytes_min!")
+    monkeypatch.setenv("CFI_ENABLE_CROSS_BANK_SIMULATION", "true")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    DurableConsortiumStore.set_instance(None)
+    AuthenticationService.reset_instance()
+    yield
+    get_settings.cache_clear()
+    DurableConsortiumStore.set_instance(None)
+    AuthenticationService.reset_instance()
+
+
+@pytest.fixture
+def auth_tokens() -> dict[str, str]:
+    auth_svc = AuthenticationService.get_instance()
+    u_a = auth_svc.get_user("user_a") or auth_svc.register_user(
+        "user_a", "Pass1234!", "bank_a", roles=["admin", "compliance", "ml_lead"]
+    )
+    u_b = auth_svc.get_user("user_b") or auth_svc.register_user(
+        "user_b", "Pass1234!", "bank_b", roles=["admin", "compliance", "ml_lead"]
+    )
+    u_c = auth_svc.get_user("user_c") or auth_svc.register_user(
+        "user_c", "Pass1234!", "bank_c", roles=["admin", "compliance", "ml_lead"]
+    )
+    return {
+        "bank_a": auth_svc.create_token_bundle(u_a).access_token,
+        "bank_b": auth_svc.create_token_bundle(u_b).access_token,
+        "bank_c": auth_svc.create_token_bundle(u_c).access_token,
+    }
+
+
+@pytest.fixture
+def tri_consortium(auth_tokens: dict[str, str]) -> tuple[ConsortiumGovernanceService, str]:
+    service = ConsortiumGovernanceService()
+    c_id = "consortium_tri_outcomes"
+
+    service.create_consortium(
+        consortium_id=c_id,
+        name="Tri-Bank Consortium Outcomes",
+        founder_bank_id="bank_a",
+        auth_token=auth_tokens["bank_a"],
+    )
+    service.add_member(
+        consortium_id=c_id,
+        bank_id="bank_b",
+        role=MemberRole.FULL_MEMBER,
+        auth_token=auth_tokens["bank_a"],
+    )
+    service.add_member(
+        consortium_id=c_id,
+        bank_id="bank_c",
+        role=MemberRole.FULL_MEMBER,
+        auth_token=auth_tokens["bank_a"],
+    )
+
+    # Pairwise Grant A <-> B
+    service.register_pairwise_operational_grant(
+        consortium_id=c_id,
+        grant_id="grant_a_b",
+        institution_a="bank_a",
+        institution_b="bank_b",
+        allowed_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+        allowed_jurisdictions=["EU"],
+        institution_jurisdictions={"bank_a": "EU", "bank_b": "EU"},
+        approving_bank_id="bank_a",
+        authority="ECB",
+        auth_token=auth_tokens["bank_a"],
+    )
+    service.approve_pairwise_operational_grant(
+        consortium_id=c_id,
+        grant_id="grant_a_b",
+        approving_bank_id="bank_b",
+        auth_token=auth_tokens["bank_b"],
+    )
+
+    # Pairwise Grant A <-> C
+    service.register_pairwise_operational_grant(
+        consortium_id=c_id,
+        grant_id="grant_a_c",
+        institution_a="bank_a",
+        institution_b="bank_c",
+        allowed_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+        allowed_jurisdictions=["EU"],
+        institution_jurisdictions={"bank_a": "EU", "bank_c": "EU"},
+        approving_bank_id="bank_a",
+        authority="ECB",
+        auth_token=auth_tokens["bank_a"],
+    )
+    service.approve_pairwise_operational_grant(
+        consortium_id=c_id,
+        grant_id="grant_a_c",
+        approving_bank_id="bank_c",
+        auth_token=auth_tokens["bank_c"],
+    )
+
+    return service, c_id
+
+
+def _create_verified_signal(bank_id: str, consortium_id: str, match: bool) -> CrossBankIntelligenceSignal:
+    return CrossBankIntelligenceSignal(
+        signal_id=f"sig_{bank_id}_valid",
+        consortium_id=consortium_id,
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        privacy_hash_truncated="priv_hash_truncated...",
+        match_confirmed=match,
+        match_category="EXACT_MATCH" if match else "NO_MATCH",
+        match_confidence=1.0 if match else 0.0,
+        contributing_institutions_count=1 if match else 0,
+        contributing_institutions=[bank_id] if match else [],
+        disclosure_mode="ATTRIBUTED_INSTITUTIONS" if match else "ANONYMIZED_SUMMARY",
+        sanitized_risk_level="HIGH" if match else "UNOBSERVED",
+        sanitized_typology_indicators=["RAPID_MOVEMENT"] if match else [],
+        execution_mode="VERIFIED_OPERATIONAL",
+        attestation_status="SOFTWARE_EMULATED",
+        assurance_level="REVIEWED_ESTABLISHED_PSI_VERIFIED",
+        provenance={"target_bank_id": bank_id},
+    )
+
+
+def test_multi_counterparty_full_success_reports_completed(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+
+    service = CrossBankIntelligenceService(consortium_service=gov_svc, entity_service=entity_svc)
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+    sig_c = _create_verified_signal("bank_c", c_id, match=False)
+
+    def mock_exec_operational(
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        if req.target_bank_id == "bank_b":
+            return sig_b
+        elif req.target_bank_id == "bank_c":
+            return sig_c
+        raise ValueError(f"Unexpected target {req.target_bank_id}")
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec_operational):
+        req = MultiCounterpartyIntelligenceQueryRequest(
+            requesting_bank_id="bank_a",
+            query_entity_id="cust_test_001",
+            consortium_id=c_id,
+            target_bank_ids=["bank_b", "bank_c"],
+            purpose="AML_COLLABORATIVE_INVESTIGATION",
+            execution_mode="VERIFIED_OPERATIONAL",
+        )
+        res = service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+
+    assert res.overall_outcome == "COMPLETED"
+    assert res.outcome == "COMPLETED"
+    assert res.counterpart_count == 2
+    assert len(res.results) == 2
+    assert res.results["bank_b"].match_confirmed is True
+    assert res.results["bank_c"].match_confirmed is False
+    assert len(res.failures) == 0
+
+    assert res.execution_outcomes["bank_b"].status == "SUCCESS"
+    assert res.execution_outcomes["bank_b"].signal is not None
+    assert res.execution_outcomes["bank_b"].failure is None
+
+    assert res.execution_outcomes["bank_c"].status == "SUCCESS"
+    assert res.execution_outcomes["bank_c"].signal is not None
+    assert res.execution_outcomes["bank_c"].failure is None
+
+
+def test_multi_counterparty_partial_failure_worker_unavailable(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+
+    service = CrossBankIntelligenceService(consortium_service=gov_svc, entity_service=entity_svc)
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+
+    def mock_exec_operational(
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        if req.target_bank_id == "bank_b":
+            return sig_b
+        elif req.target_bank_id == "bank_c":
+            raise urllib.error.URLError("Connection refused by counterpart worker daemon on port 8000")
+        raise ValueError(f"Unexpected target {req.target_bank_id}")
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec_operational):
+        req = MultiCounterpartyIntelligenceQueryRequest(
+            requesting_bank_id="bank_a",
+            query_entity_id="cust_test_001",
+            consortium_id=c_id,
+            target_bank_ids=["bank_b", "bank_c"],
+            purpose="AML_COLLABORATIVE_INVESTIGATION",
+            execution_mode="VERIFIED_OPERATIONAL",
+        )
+        res = service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+
+    assert res.overall_outcome == "PARTIAL_FAILURE"
+    assert res.outcome == "PARTIAL_FAILURE"
+    assert res.counterpart_count == 2
+
+    # Bank B succeeded and is preserved
+    assert "bank_b" in res.results
+    assert res.results["bank_b"].match_confirmed is True
+    assert res.execution_outcomes["bank_b"].status == "SUCCESS"
+    assert res.execution_outcomes["bank_b"].signal is not None
+
+    # Bank C failed: NO fabricated signal anywhere in results
+    assert "bank_c" not in res.results
+    assert "bank_c" in res.failures
+    failure_c = res.failures["bank_c"]
+    assert failure_c.target_bank_id == "bank_c"
+    assert failure_c.error_category == "WORKER_UNAVAILABLE"
+    assert "unreachable or offline" in failure_c.error_message
+    assert failure_c.retryable is True
+
+    assert res.execution_outcomes["bank_c"].status == "FAILED"
+    assert res.execution_outcomes["bank_c"].signal is None
+    assert res.execution_outcomes["bank_c"].failure is not None
+
+
+def test_multi_counterparty_all_counterparties_fail(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+
+    service = CrossBankIntelligenceService(consortium_service=gov_svc, entity_service=entity_svc)
+
+    def mock_exec_operational(
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        if req.target_bank_id == "bank_b":
+            raise TimeoutError("Timed out waiting for worker response")
+        elif req.target_bank_id == "bank_c":
+            raise ConnectionRefusedError("Failed to establish transport connection")
+        raise ValueError(f"Unexpected target {req.target_bank_id}")
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec_operational):
+        req = MultiCounterpartyIntelligenceQueryRequest(
+            requesting_bank_id="bank_a",
+            query_entity_id="cust_test_001",
+            consortium_id=c_id,
+            target_bank_ids=["bank_b", "bank_c"],
+            purpose="AML_COLLABORATIVE_INVESTIGATION",
+            execution_mode="VERIFIED_OPERATIONAL",
+        )
+        res = service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+
+    assert res.overall_outcome == "FAILED"
+    assert res.outcome == "FAILED"
+    assert res.counterpart_count == 2
+
+    # Crucial: No fabricated signals, results is empty dictionary
+    assert len(res.results) == 0
+    assert len(res.failures) == 2
+
+    assert res.failures["bank_b"].error_category == "TIMEOUT"
+    assert res.execution_outcomes["bank_b"].status == "FAILED"
+    assert res.execution_outcomes["bank_b"].signal is None
+
+    assert res.failures["bank_c"].error_category == "WORKER_UNAVAILABLE"
+    assert res.execution_outcomes["bank_c"].status == "FAILED"
+    assert res.execution_outcomes["bank_c"].signal is None
+
+
+def test_multi_counterparty_sanitization_strips_sensitive_data(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+
+    service = CrossBankIntelligenceService(consortium_service=gov_svc, entity_service=entity_svc)
+
+    sensitive_exception = RuntimeError(
+        "Connection failed to http://cfi_vault_worker_internal:9090/vault/private_keys?token=secret_internal_jwt_token_9999"
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=sensitive_exception):
+        req = MultiCounterpartyIntelligenceQueryRequest(
+            requesting_bank_id="bank_a",
+            query_entity_id="cust_test_001",
+            consortium_id=c_id,
+            target_bank_ids=["bank_b"],
+            purpose="AML_COLLABORATIVE_INVESTIGATION",
+            execution_mode="VERIFIED_OPERATIONAL",
+        )
+        res = service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+
+    assert res.overall_outcome == "FAILED"
+    failure = res.failures["bank_b"]
+    # Verify no private tokens, port numbers, or internal URLs leaked
+    assert "secret_internal_jwt_token_9999" not in failure.error_message
+    assert "9090" not in failure.error_message
+    assert "cfi_vault_worker_internal" not in failure.error_message
+    assert failure.error_category in ("WORKER_UNAVAILABLE", "EXECUTION_ERROR")
+
+
+def test_multi_counterparty_preflight_authorization_remains_fail_closed(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+
+    # Bank C revokes pairwise grant
+    gov_svc.revoke_pairwise_operational_grant(
+        consortium_id=c_id,
+        grant_id="grant_a_c",
+        revoking_bank_id="bank_c",
+        reason="Revoked by institution bank_c",
+        auth_token=auth_tokens["bank_c"],
+    )
+
+    service = CrossBankIntelligenceService(consortium_service=gov_svc, entity_service=entity_svc)
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        consortium_id=c_id,
+        target_bank_ids=["bank_b", "bank_c"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    # Must raise ConsortiumSecurityError before any execution occurs; never convert to partial success
+    with pytest.raises(ConsortiumSecurityError, match="Pairwise operational authorization rejected"):
+        service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+
+
+def test_multi_counterparty_fastapi_router_outcomes(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    gov_svc, c_id = tri_consortium
+    cbi_instance = CrossBankIntelligenceService.get_instance()
+    cbi_instance.consortium_service = gov_svc
+
+    test_ent = Entity(
+        id="cust_router_ent",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_router_ent",
+        bank_id="bank_a",
+        display_label="Router Entity",
+        risk_level=RiskLevel.HIGH,
+    )
+    cbi_instance.entity_service._entities.set("cust_router_ent", _entity_to_dict(test_ent))
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+
+    def mock_exec_operational(
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        if req.target_bank_id == "bank_b":
+            return sig_b
+        elif req.target_bank_id == "bank_c":
+            raise ConnectionRefusedError("Connection refused by worker container")
+        raise ValueError(f"Unexpected target: {req.target_bank_id}")
+
+    client = TestClient(app)
+    payload = {
+        "consortium_id": c_id,
+        "requesting_bank_id": "bank_a",
+        "target_bank_ids": ["bank_b", "bank_c"],
+        "query_entity_id": "cust_router_ent",
+        "purpose": "AML_COLLABORATIVE_INVESTIGATION",
+        "execution_mode": "VERIFIED_OPERATIONAL",
+    }
+
+    with patch.object(cbi_instance, "_execute_verified_operational_psi", side_effect=mock_exec_operational):
+        resp = client.post(
+            "/api/v1/intelligence/cross-bank/query-multi",
+            json=payload,
+            headers={"Authorization": f"Bearer {auth_tokens['bank_a']}"},
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["overall_outcome"] == "PARTIAL_FAILURE"
+    assert data["outcome"] == "PARTIAL_FAILURE"
+    assert data["counterpart_count"] == 2
+    assert "bank_b" in data["results"]
+    assert "bank_c" not in data["results"]
+    assert "bank_c" in data["failures"]
+    assert data["failures"]["bank_c"]["error_category"] == "WORKER_UNAVAILABLE"
+    assert data["execution_outcomes"]["bank_b"]["status"] == "SUCCESS"
+    assert data["execution_outcomes"]["bank_c"]["status"] == "FAILED"

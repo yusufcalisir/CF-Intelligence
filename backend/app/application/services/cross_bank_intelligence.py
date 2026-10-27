@@ -12,13 +12,17 @@ import hmac
 import json
 import logging
 import os
+import socket
 import threading
 import time
+import urllib.error
 import uuid
 from datetime import UTC
 from typing import Any, cast
 
 from app.application.schemas.cross_bank_intelligence import (
+    CounterpartyExecutionFailure,
+    CounterpartyExecutionOutcome,
     CrossBankEvidenceAttachResponse,
     CrossBankIntelligenceQueryRequest,
     CrossBankIntelligenceSignal,
@@ -26,6 +30,7 @@ from app.application.schemas.cross_bank_intelligence import (
     MatchCategory,
     MultiCounterpartyIntelligenceQueryRequest,
     MultiCounterpartyIntelligenceQueryResponse,
+    OverallQueryOutcome,
     SanitizedRiskLevel,
 )
 from app.application.services.case_service import (
@@ -1464,6 +1469,74 @@ class CrossBankIntelligenceService:
         )
         return signal
 
+    @staticmethod
+    def _is_governance_authorization_failure(exc: Exception) -> bool:
+        """Determine whether an error represents a fail-closed governance/authorization rejection.
+
+        Governance rejections (unauthorized counterparties, revoked consent, tenant isolation
+        violations, evicted members, missing bilateral treaties, etc.) MUST fail closed
+        and abort the entire multi-counterparty query before or during execution.
+        """
+        if isinstance(exc, PermissionError):
+            return True
+        msg = str(exc).lower()
+        gov_markers = (
+            "revoked",
+            "evicted",
+            "not an active member",
+            "non-active status",
+            "pairwise operational authorization rejected",
+            "policy rejected",
+            "participation authority denied",
+            "grant revision mismatch",
+            "scope digest mismatch",
+            "impersonation",
+            "cross-tenant",
+            "pilot governance",
+            "not found in institution",
+            "terminal state",
+            "hardware attestation unavailable",
+            "simulation mode is strictly prohibited",
+            "arbitrary privacy-hash",
+        )
+        return any(marker in msg for marker in gov_markers)
+
+    @staticmethod
+    def _sanitize_counterparty_failure(
+        target_bank_id: str,
+        exc: Exception,
+    ) -> CounterpartyExecutionFailure:
+        """Construct a sanitized, non-leaking execution failure record for an authorized counterpart."""
+        msg = str(exc).lower()
+        now_iso = datetime.datetime.now(UTC).isoformat()
+
+        if isinstance(exc, (TimeoutError, socket.timeout)) or "timed out" in msg or "timeout" in msg:
+            category = "TIMEOUT"
+            clean_msg = f"Execution timed out communicating with counterpart worker for '{target_bank_id}'."
+        elif (
+            isinstance(exc, (ConnectionRefusedError, ConnectionError, urllib.error.URLError))
+            or "connection refused" in msg
+            or "unreachable" in msg
+            or "failed to establish a new connection" in msg
+            or "is offline" in msg
+        ):
+            category = "WORKER_UNAVAILABLE"
+            clean_msg = f"Counterpart worker node for institution '{target_bank_id}' is unreachable or offline."
+        elif "503" in msg or "502" in msg or "service unavailable" in msg or "bad gateway" in msg:
+            category = "TRANSPORT_FAILURE"
+            clean_msg = f"Transport service for counterpart institution '{target_bank_id}' is temporarily unavailable."
+        else:
+            category = "EXECUTION_ERROR"
+            clean_msg = f"Private set intersection execution failed at counterpart institution '{target_bank_id}'."
+
+        return CounterpartyExecutionFailure(
+            target_bank_id=target_bank_id,
+            error_category=category,
+            error_message=clean_msg,
+            failed_at=now_iso,
+            retryable=True,
+        )
+
     def query_multi_counterparty_intelligence(
         self,
         req: MultiCounterpartyIntelligenceQueryRequest,
@@ -1485,6 +1558,10 @@ class CrossBankIntelligenceService:
         - Independent operational OpenMined PSI execution per target bank.
         - Per-signal cryptographic verification, admission, and linearized publication.
         - Separately identifiable, sanitized results returned per counterpart.
+        - Explicit, typed per-counterparty execution outcomes (SUCCESS / FAILED).
+        - Preservation of independent results when one counterpart experiences transport / worker failure.
+        - Overall query execution outcome (COMPLETED, PARTIAL_FAILURE, or FAILED).
+        - Absolute prohibition of fabricated signals or match statuses for failed counterpart executions.
         """
         clean_requesting = req.requesting_bank_id.lower().strip()
         clean_consortium_id = req.consortium_id.lower().strip()
@@ -1653,6 +1730,9 @@ class CrossBankIntelligenceService:
 
         # 7. Execute Verified Operational Matching / Established PSI Per Counterpart
         results: dict[str, CrossBankIntelligenceSignal] = {}
+        failures: dict[str, CounterpartyExecutionFailure] = {}
+        execution_outcomes: dict[str, CounterpartyExecutionOutcome] = {}
+
         for clean_target in clean_targets:
             single_req = CrossBankIntelligenceQueryRequest(
                 requesting_bank_id=clean_requesting,
@@ -1669,21 +1749,59 @@ class CrossBankIntelligenceService:
                 protocol=req.protocol,
                 pilot_id=req.pilot_id,
             )
-            if req.execution_mode == "VERIFIED_OPERATIONAL":
-                signal = self._execute_verified_operational_psi(
-                    req=single_req,
-                    auth_token=auth_token,
-                    auth_principal=auth_principal,
-                    audited_actor=audited_actor,
+            try:
+                if req.execution_mode == "VERIFIED_OPERATIONAL":
+                    signal = self._execute_verified_operational_psi(
+                        req=single_req,
+                        auth_token=auth_token,
+                        auth_principal=auth_principal,
+                        audited_actor=audited_actor,
+                    )
+                else:
+                    signal = self.query_cross_bank_intelligence(
+                        req=single_req,
+                        auth_token=auth_token,
+                        principal=auth_principal,
+                        actor=audited_actor,
+                    )
+                results[clean_target] = signal
+                execution_outcomes[clean_target] = CounterpartyExecutionOutcome(
+                    target_bank_id=clean_target,
+                    status="SUCCESS",
+                    signal=signal,
+                    failure=None,
                 )
-            else:
-                signal = self.query_cross_bank_intelligence(
-                    req=single_req,
-                    auth_token=auth_token,
-                    principal=auth_principal,
-                    actor=audited_actor,
+            except Exception as exc:
+                if self._is_governance_authorization_failure(exc):
+                    raise
+
+                sanitized_failure = self._sanitize_counterparty_failure(
+                    target_bank_id=clean_target,
+                    exc=exc,
                 )
-            results[clean_target] = signal
+                failures[clean_target] = sanitized_failure
+                execution_outcomes[clean_target] = CounterpartyExecutionOutcome(
+                    target_bank_id=clean_target,
+                    status="FAILED",
+                    signal=None,
+                    failure=sanitized_failure,
+                )
+                logger.warning(
+                    "Counterpart '%s' execution failed: [%s] %s",
+                    clean_target,
+                    sanitized_failure.error_category,
+                    sanitized_failure.error_message,
+                )
+
+        # 8. Determine overall execution outcome across queried counterparts
+        total_targets = len(clean_targets)
+        success_count = len(results)
+        if success_count == total_targets:
+            overall_outcome: OverallQueryOutcome = "COMPLETED"
+        elif success_count > 0:
+            overall_outcome = "PARTIAL_FAILURE"
+        else:
+            overall_outcome = "FAILED"
 
         now_iso = datetime.datetime.now(UTC).isoformat()
         return MultiCounterpartyIntelligenceQueryResponse(
@@ -1692,7 +1810,11 @@ class CrossBankIntelligenceService:
             requesting_bank_id=clean_requesting,
             query_entity_id=req.query_entity_id,
             counterpart_count=len(clean_targets),
+            overall_outcome=overall_outcome,
+            outcome=overall_outcome,
             results=results,
+            failures=failures,
+            execution_outcomes=execution_outcomes,
             executed_at=now_iso,
         )
 
