@@ -69,6 +69,22 @@ class CrossBankIdempotencyConflictError(ConsortiumSecurityError):
     """Raised when an idempotency key is reused with a conflicting payload, principal, or indeterminate state."""
 
 
+class CrossBankExecutionQuotaExceededError(ConsortiumSecurityError):
+    """Raised when pairwise cross-bank execution budget/quota is exhausted."""
+
+    def __init__(
+        self,
+        message: str,
+        consortium_id: str | None = None,
+        requesting_bank_id: str | None = None,
+        exhausted_targets: list[str] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.consortium_id = consortium_id
+        self.requesting_bank_id = requesting_bank_id
+        self.exhausted_targets = exhausted_targets or []
+
+
 @dataclass
 class ConsortiumMember:
     """Represents a member institution participating in a consortium."""

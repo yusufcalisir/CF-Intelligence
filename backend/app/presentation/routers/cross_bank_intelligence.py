@@ -25,6 +25,7 @@ from app.application.services.cross_bank_intelligence import CrossBankIntelligen
 from app.dependencies import PrincipalDep, enforce_tenant_isolation
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
+    CrossBankExecutionQuotaExceededError,
     CrossBankIdempotencyConflictError,
 )
 from app.domain.pilot_operations import PilotGovernanceError
@@ -154,6 +155,11 @@ def query_multi_counterparty_intelligence(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(err),
+        ) from err
+    except CrossBankExecutionQuotaExceededError as err:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Execution budget quota exceeded: {err}",
         ) from err
     except ConsortiumSecurityError as err:
         raise HTTPException(

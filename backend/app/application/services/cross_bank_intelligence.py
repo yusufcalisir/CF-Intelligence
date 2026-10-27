@@ -6,6 +6,7 @@ and institution-scoped risk context for AML investigations under strict consorti
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 import hashlib
 import hmac
@@ -51,6 +52,7 @@ from app.domain.consortium_governance import (
     CounterpartyTimeoutError,
     CounterpartyTransportError,
     CounterpartyWorkerUnavailableError,
+    CrossBankExecutionQuotaExceededError,
     CrossBankIdempotencyConflictError,
 )
 from app.domain.consortium_policy import ConsortiumPolicyEngine
@@ -65,6 +67,9 @@ from app.domain.value_objects_investigation import (
 from app.infrastructure.redis_store import RedisStore
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
+from app.infrastructure.storage.durable_execution_budget_store import (
+    DurableCrossBankExecutionBudgetStore,
+)
 from app.infrastructure.storage.durable_idempotency_store import (
     DurableCrossBankIdempotencyStore,
 )
@@ -128,6 +133,12 @@ class CrossBankIntelligenceService:
                     cls._instance = cls()
         return cls._instance
 
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Resets the singleton instance (for testing isolation)."""
+        with cls._singleton_lock:
+            cls._instance = None
+
     def __init__(
         self,
         consortium_service: ConsortiumGovernanceService | None = None,
@@ -138,6 +149,7 @@ class CrossBankIntelligenceService:
         matching_coordinator: CrossBankMatchingCoordinator | None = None,
         institutional_registry: InstitutionalVerificationRegistry | None = None,
         idempotency_store: DurableCrossBankIdempotencyStore | None = None,
+        budget_store: DurableCrossBankExecutionBudgetStore | None = None,
     ) -> None:
         self.consortium_service = consortium_service or ConsortiumGovernanceService()
         self.entity_service = entity_service or EntityResolutionService()
@@ -152,6 +164,7 @@ class CrossBankIntelligenceService:
         )
         self.institutional_registry = institutional_registry or InstitutionalVerificationRegistry()
         self.idempotency_store = idempotency_store or DurableCrossBankIdempotencyStore.get_instance()
+        self.budget_store = budget_store or DurableCrossBankExecutionBudgetStore.get_instance()
         self._signal_store = RedisStore("authoritative_signals")
         self._synthetic_entity_store = RedisStore("synthetic_entities")
         self._research_case_evidence_store = RedisStore("research_case_evidence")
@@ -1858,6 +1871,7 @@ class CrossBankIntelligenceService:
         clean_targets: list[str] = []
         seen_targets: set[str] = set()
         governance_snapshot: dict[str, Any] = {}
+        grant_budgets: dict[str, int] = {}
 
         for t in req.target_bank_ids:
             clean_t = t.lower().strip()
@@ -1897,6 +1911,16 @@ class CrossBankIntelligenceService:
                 "revision": resolved_grant.get("revision", 1),
                 "scope_digest": resolved_grant.get("scope_digest", ""),
             }
+
+            # Extract bilateral grant execution budget if explicitly declared
+            grant_budget_val = (
+                resolved_grant.get("execution_budget")
+                or resolved_grant.get("max_executions")
+                or resolved_grant.get("query_quota")
+            )
+            if grant_budget_val is not None:
+                with contextlib.suppress(ValueError, TypeError):
+                    grant_budgets[clean_t] = int(grant_budget_val)
 
             seen_targets.add(clean_t)
             clean_targets.append(clean_t)
@@ -2004,13 +2028,43 @@ class CrossBankIntelligenceService:
                 replayed_resp._idempotency_replayed = True
                 return replayed_resp
 
+        # 6.6. Durable Per-Counterparty Execution Budgets & Atomic Batch Reservation
+        budget_batch_id = str(uuid.uuid4())
+        has_budget, assigned_bid, exhausted_targets = self.budget_store.reserve_batch(
+            consortium_id=clean_consortium_id,
+            requesting_bank_id=clean_requesting,
+            target_bank_ids=clean_targets,
+            batch_id=budget_batch_id,
+            grant_budgets=grant_budgets if grant_budgets else None,
+        )
+        if not has_budget:
+            if effective_idem_key and idem_owner_id:
+                self.idempotency_store.fail_or_abort(
+                    consortium_id=clean_consortium_id,
+                    requesting_bank_id=clean_requesting,
+                    idempotency_key=effective_idem_key,
+                    owner_id=idem_owner_id,
+                    error_message=f"Execution budget quota exceeded for targets: {', '.join(sorted(exhausted_targets))}",
+                    indeterminate=False,
+                )
+            raise CrossBankExecutionQuotaExceededError(
+                f"Cross-bank execution quota exceeded for counterpart(s): {', '.join(sorted(exhausted_targets))} "
+                f"in consortium '{clean_consortium_id}'. Batch rejected before dispatch.",
+                consortium_id=clean_consortium_id,
+                requesting_bank_id=clean_requesting,
+                exhausted_targets=exhausted_targets,
+            )
+
         # 7. Execute Verified Operational Matching / Established PSI Per Counterpart
+        dispatched_targets: list[str] = []
+        completed_targets: list[str] = []
         try:
             results: dict[str, CrossBankIntelligenceSignal] = {}
             failures: dict[str, CounterpartyExecutionFailure] = {}
             execution_outcomes: dict[str, CounterpartyExecutionOutcome] = {}
 
             for clean_target in clean_targets:
+                dispatched_targets.append(clean_target)
                 single_req = CrossBankIntelligenceQueryRequest(
                     requesting_bank_id=clean_requesting,
                     query_entity_id=req.query_entity_id,
@@ -2048,6 +2102,7 @@ class CrossBankIntelligenceService:
                         signal=signal,
                         failure=None,
                     )
+                    completed_targets.append(clean_target)
                 except Exception as exc:
                     recoverable_failure = self._classify_recoverable_counterparty_failure(
                         target_bank_id=clean_target,
@@ -2056,6 +2111,23 @@ class CrossBankIntelligenceService:
                     if recoverable_failure is None:
                         # Security boundary: governance, authorization, cryptographic verification,
                         # ticket/receipt integrity, and admission failures MUST fail closed and terminate the request.
+                        undispatched = [t for t in clean_targets if t not in dispatched_targets]
+                        if undispatched:
+                            self.budget_store.release_reservations(
+                                batch_id=budget_batch_id,
+                                targets=undispatched,
+                                reason="Aborted prior to dispatch due to counterpart failure",
+                            )
+                        self.budget_store.fail_closed_reservations(
+                            batch_id=budget_batch_id,
+                            targets=[clean_target],
+                            reason=f"Indeterminate execution failure: {exc}",
+                        )
+                        if completed_targets:
+                            self.budget_store.commit_reservations(
+                                batch_id=budget_batch_id,
+                                completed_targets=completed_targets,
+                            )
                         raise
 
                     failures[clean_target] = recoverable_failure
@@ -2065,12 +2137,20 @@ class CrossBankIntelligenceService:
                         signal=None,
                         failure=recoverable_failure,
                     )
+                    completed_targets.append(clean_target)
                     logger.warning(
                         "Counterpart '%s' execution failed with recoverable transport error: [%s] %s",
                         clean_target,
                         recoverable_failure.error_category,
                         recoverable_failure.error_message,
                     )
+
+            # All targets processed: commit all completed reservations
+            self.budget_store.commit_reservations(
+                batch_id=budget_batch_id,
+                completed_targets=completed_targets,
+                reason="Execution completed",
+            )
 
             # 8. Determine overall execution outcome across queried counterparts
             total_targets = len(clean_targets)
@@ -2109,14 +2189,22 @@ class CrossBankIntelligenceService:
 
             return response_obj
         except Exception as exec_exc:
+            undispatched = [t for t in clean_targets if t not in dispatched_targets]
+            if undispatched:
+                self.budget_store.release_reservations(
+                    batch_id=budget_batch_id,
+                    targets=undispatched,
+                    reason=f"Pre-dispatch failure: {exec_exc}",
+                )
             if effective_idem_key and idem_owner_id:
+                is_indeterminate = len(dispatched_targets) > 0
                 self.idempotency_store.fail_or_abort(
                     consortium_id=clean_consortium_id,
                     requesting_bank_id=clean_requesting,
                     idempotency_key=effective_idem_key,
                     owner_id=idem_owner_id,
                     error_message=str(exec_exc),
-                    indeterminate=True,
+                    indeterminate=is_indeterminate,
                 )
             raise
 
