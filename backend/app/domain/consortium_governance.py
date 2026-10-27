@@ -53,6 +53,18 @@ class ConsortiumSecurityError(Exception):
     """Raised when consortium governance integrity or authorization boundary fails."""
 
 
+class CounterpartyWorkerUnavailableError(ConsortiumSecurityError):
+    """Raised when an institutional counterpart worker node is unreachable, offline, or refuses connection."""
+
+
+class CounterpartyTimeoutError(ConsortiumSecurityError, TimeoutError):
+    """Raised when communication with counterpart worker daemon times out."""
+
+
+class CounterpartyTransportError(ConsortiumSecurityError):
+    """Raised when network transport service or intermediate gateway is unavailable or broken."""
+
+
 @dataclass
 class ConsortiumMember:
     """Represents a member institution participating in a consortium."""

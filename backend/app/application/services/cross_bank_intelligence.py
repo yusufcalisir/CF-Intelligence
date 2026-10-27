@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 import hmac
+import http.client
 import json
 import logging
 import os
@@ -47,6 +48,9 @@ from app.application.services.isolated_matching_service import (
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
     ConsortiumStatus,
+    CounterpartyTimeoutError,
+    CounterpartyTransportError,
+    CounterpartyWorkerUnavailableError,
 )
 from app.domain.consortium_policy import ConsortiumPolicyEngine
 from app.domain.institutional_identity import (
@@ -1470,13 +1474,165 @@ class CrossBankIntelligenceService:
         )
         return signal
 
+    @classmethod
+    def _classify_recoverable_counterparty_failure(
+        cls,
+        target_bank_id: str,
+        exc: Exception,
+    ) -> CounterpartyExecutionFailure | None:
+        """Classify genuine, recoverable transport/availability failures into sanitized failure records.
+
+        Fail-Closed Security Boundary:
+        Returns CounterpartyExecutionFailure ONLY for recognized transport, timeout, or worker
+        availability errors. Returns None for ANY governance, authorization, cryptographic verification,
+        ticket/receipt integrity, publication-admission, or unexpected generic errors so that the
+        caller can immediately propagate the failure and terminate the batch request.
+        """
+        # 1. Never recover from governance, permission, or admission errors
+        if isinstance(exc, PermissionError):
+            return None
+
+        # 2. Extract underlying root causes from exception chain (__cause__ or __context__)
+        underlying_causes: list[BaseException] = []
+        curr: BaseException | None = exc
+        while curr is not None and len(underlying_causes) < 5:
+            underlying_causes.append(curr)
+            curr = curr.__cause__ or curr.__context__
+
+        # 3. Check for explicit timeout errors
+        is_timeout = False
+        for cause in underlying_causes:
+            if isinstance(cause, (CounterpartyTimeoutError, TimeoutError, socket.timeout)):
+                is_timeout = True
+                break
+            if isinstance(cause, urllib.error.URLError) and isinstance(
+                getattr(cause, "reason", None), (TimeoutError, socket.timeout)
+            ):
+                is_timeout = True
+                break
+
+        # 4. Check for explicit worker unavailable / connection refused errors
+        is_worker_unavailable = False
+        for cause in underlying_causes:
+            if isinstance(
+                cause,
+                (
+                    CounterpartyWorkerUnavailableError,
+                    ConnectionRefusedError,
+                    ConnectionResetError,
+                    ConnectionAbortedError,
+                    BrokenPipeError,
+                    ConnectionError,
+                    http.client.RemoteDisconnected,
+                    socket.gaierror,
+                    socket.herror,
+                ),
+            ):
+                is_worker_unavailable = True
+                break
+            if isinstance(cause, urllib.error.URLError):
+                reason = getattr(cause, "reason", None)
+                if isinstance(
+                    reason,
+                    (
+                        ConnectionRefusedError,
+                        ConnectionResetError,
+                        ConnectionAbortedError,
+                        BrokenPipeError,
+                        ConnectionError,
+                        http.client.RemoteDisconnected,
+                        socket.gaierror,
+                        socket.herror,
+                    ),
+                ):
+                    is_worker_unavailable = True
+                    break
+                if not isinstance(cause, urllib.error.HTTPError):
+                    is_worker_unavailable = True
+                    break
+
+        # 5. Check for explicit HTTP gateway / service unavailable (502, 503, 504)
+        is_transport_failure = False
+        for cause in underlying_causes:
+            if isinstance(cause, CounterpartyTransportError):
+                is_transport_failure = True
+                break
+            if isinstance(cause, urllib.error.HTTPError) and cause.code in (502, 503, 504):
+                is_transport_failure = True
+                break
+
+        # 6. Check for coordinator wrapped message for worker unavailability
+        # When coordinator executes in Docker, it wraps worker unreachable errors as:
+        # "Institutional bank worker for '{target_bank_id}' is unreachable or timed out:"
+        if not is_worker_unavailable and not is_timeout and not is_transport_failure:
+            exc_str = str(exc)
+            worker_prefix = (
+                f"institutional bank worker for '{target_bank_id.lower()}' is unreachable or timed out:"
+            )
+            if worker_prefix in exc_str.lower():
+                if "timed out" in exc_str.lower() or "timeout" in exc_str.lower():
+                    is_timeout = True
+                else:
+                    is_worker_unavailable = True
+
+        if is_timeout:
+            return CounterpartyExecutionFailure(
+                target_bank_id=target_bank_id,
+                error_category="TIMEOUT",
+                error_message=f"Execution timed out communicating with counterpart worker for '{target_bank_id}'.",
+                failed_at=datetime.datetime.now(UTC).isoformat(),
+                retryable=True,
+            )
+
+        if is_worker_unavailable:
+            return CounterpartyExecutionFailure(
+                target_bank_id=target_bank_id,
+                error_category="WORKER_UNAVAILABLE",
+                error_message=f"Counterpart worker node for institution '{target_bank_id}' is unreachable or offline.",
+                failed_at=datetime.datetime.now(UTC).isoformat(),
+                retryable=True,
+            )
+
+        if is_transport_failure:
+            return CounterpartyExecutionFailure(
+                target_bank_id=target_bank_id,
+                error_category="TRANSPORT_FAILURE",
+                error_message=f"Transport service for counterpart institution '{target_bank_id}' is temporarily unavailable.",
+                failed_at=datetime.datetime.now(UTC).isoformat(),
+                retryable=True,
+            )
+
+        # Non-recoverable: Governance rejections, cryptographic evidence mismatches,
+        # ticket/receipt mismatches, admission failures, or unexpected errors return None.
+        return None
+
+    @classmethod
+    def _sanitize_counterparty_failure(
+        cls,
+        target_bank_id: str,
+        exc: Exception,
+    ) -> CounterpartyExecutionFailure:
+        """Construct a sanitized, non-leaking execution failure record for an authorized counterpart.
+
+        Only recognized transport, timeout, or worker availability failures may be sanitized.
+        Unexpected or security-critical exceptions fail closed immediately.
+        """
+        classified = cls._classify_recoverable_counterparty_failure(
+            target_bank_id=target_bank_id,
+            exc=exc,
+        )
+        if classified is not None:
+            return classified
+
+        # Fail-closed: If invoked directly on non-recoverable exception, do NOT invent EXECUTION_ERROR
+        raise exc
+
     @staticmethod
     def _is_governance_authorization_failure(exc: Exception) -> bool:
         """Determine whether an error represents a fail-closed governance/authorization rejection.
 
-        Governance rejections (unauthorized counterparties, revoked consent, tenant isolation
-        violations, evicted members, missing bilateral treaties, etc.) MUST fail closed
-        and abort the entire multi-counterparty query before or during execution.
+        Preserved for backward-compatibility; in the revised architecture, any failure that is
+        not explicitly a recognized recoverable transport error is treated as fail-closed.
         """
         if isinstance(exc, PermissionError):
             return True
@@ -1499,44 +1655,13 @@ class CrossBankIntelligenceService:
             "hardware attestation unavailable",
             "simulation mode is strictly prohibited",
             "arbitrary privacy-hash",
+            "adoption rejection",
+            "publication rejected",
+            "reservation commit failure",
+            "cryptographic",
+            "signature",
         )
         return any(marker in msg for marker in gov_markers)
-
-    @staticmethod
-    def _sanitize_counterparty_failure(
-        target_bank_id: str,
-        exc: Exception,
-    ) -> CounterpartyExecutionFailure:
-        """Construct a sanitized, non-leaking execution failure record for an authorized counterpart."""
-        msg = str(exc).lower()
-        now_iso = datetime.datetime.now(UTC).isoformat()
-
-        if isinstance(exc, (TimeoutError, socket.timeout)) or "timed out" in msg or "timeout" in msg:
-            category = "TIMEOUT"
-            clean_msg = f"Execution timed out communicating with counterpart worker for '{target_bank_id}'."
-        elif (
-            isinstance(exc, (ConnectionRefusedError, ConnectionError, urllib.error.URLError))
-            or "connection refused" in msg
-            or "unreachable" in msg
-            or "failed to establish a new connection" in msg
-            or "is offline" in msg
-        ):
-            category = "WORKER_UNAVAILABLE"
-            clean_msg = f"Counterpart worker node for institution '{target_bank_id}' is unreachable or offline."
-        elif "503" in msg or "502" in msg or "service unavailable" in msg or "bad gateway" in msg:
-            category = "TRANSPORT_FAILURE"
-            clean_msg = f"Transport service for counterpart institution '{target_bank_id}' is temporarily unavailable."
-        else:
-            category = "EXECUTION_ERROR"
-            clean_msg = f"Private set intersection execution failed at counterpart institution '{target_bank_id}'."
-
-        return CounterpartyExecutionFailure(
-            target_bank_id=target_bank_id,
-            error_category=category,
-            error_message=clean_msg,
-            failed_at=now_iso,
-            retryable=True,
-        )
 
     def query_multi_counterparty_intelligence(
         self,
@@ -1773,25 +1898,27 @@ class CrossBankIntelligenceService:
                     failure=None,
                 )
             except Exception as exc:
-                if self._is_governance_authorization_failure(exc):
-                    raise
-
-                sanitized_failure = self._sanitize_counterparty_failure(
+                recoverable_failure = self._classify_recoverable_counterparty_failure(
                     target_bank_id=clean_target,
                     exc=exc,
                 )
-                failures[clean_target] = sanitized_failure
+                if recoverable_failure is None:
+                    # Security boundary: governance, authorization, cryptographic verification,
+                    # ticket/receipt integrity, and admission failures MUST fail closed and terminate the request.
+                    raise
+
+                failures[clean_target] = recoverable_failure
                 execution_outcomes[clean_target] = CounterpartyExecutionOutcome(
                     target_bank_id=clean_target,
                     status="FAILED",
                     signal=None,
-                    failure=sanitized_failure,
+                    failure=recoverable_failure,
                 )
                 logger.warning(
-                    "Counterpart '%s' execution failed: [%s] %s",
+                    "Counterpart '%s' execution failed with recoverable transport error: [%s] %s",
                     clean_target,
-                    sanitized_failure.error_category,
-                    sanitized_failure.error_message,
+                    recoverable_failure.error_category,
+                    recoverable_failure.error_message,
                 )
 
         # 8. Determine overall execution outcome across queried counterparts

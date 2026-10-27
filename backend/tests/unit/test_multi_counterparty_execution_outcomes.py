@@ -374,7 +374,7 @@ def test_multi_counterparty_sanitization_strips_sensitive_data(
 
     service = CrossBankIntelligenceService(consortium_service=gov_svc, entity_service=entity_svc)
 
-    sensitive_exception = RuntimeError(
+    sensitive_exception = ConnectionRefusedError(
         "Connection failed to http://cfi_vault_worker_internal:9090/vault/private_keys?token=secret_internal_jwt_token_9999"
     )
 
@@ -395,7 +395,7 @@ def test_multi_counterparty_sanitization_strips_sensitive_data(
     assert "secret_internal_jwt_token_9999" not in failure.error_message
     assert "9090" not in failure.error_message
     assert "cfi_vault_worker_internal" not in failure.error_message
-    assert failure.error_category in ("WORKER_UNAVAILABLE", "EXECUTION_ERROR")
+    assert failure.error_category in ("WORKER_UNAVAILABLE", "TRANSPORT_FAILURE")
 
 
 def test_multi_counterparty_preflight_authorization_remains_fail_closed(
@@ -499,3 +499,245 @@ def test_multi_counterparty_fastapi_router_outcomes(
     assert data["failures"]["bank_c"]["error_category"] == "WORKER_UNAVAILABLE"
     assert data["execution_outcomes"]["bank_b"]["status"] == "SUCCESS"
     assert data["execution_outcomes"]["bank_c"]["status"] == "FAILED"
+
+
+def test_multi_counterparty_ticket_integrity_mismatch_fails_closed(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """Security boundary: A Bank C ticket-integrity mismatch causes fail-closed request termination.
+
+    Must NEVER be converted into PARTIAL_FAILURE or EXECUTION_ERROR.
+    """
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+    service = CrossBankIntelligenceService(consortium_service=gov_svc, entity_service=entity_svc)
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+
+    def mock_exec_operational(
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        if req.target_bank_id == "bank_b":
+            return sig_b
+        elif req.target_bank_id == "bank_c":
+            raise ConsortiumSecurityError("Adoption rejection: Ticket ID mismatch between ticket and provenance.")
+        raise ValueError(f"Unexpected target: {req.target_bank_id}")
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        consortium_id=c_id,
+        target_bank_ids=["bank_b", "bank_c"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec_operational):
+        with pytest.raises(ConsortiumSecurityError, match="Ticket ID mismatch between ticket and provenance"):
+            service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+
+
+def test_multi_counterparty_invalid_signature_fails_closed(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """Security boundary: Invalid cryptographic signatures cause immediate fail-closed termination."""
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+    service = CrossBankIntelligenceService(consortium_service=gov_svc, entity_service=entity_svc)
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+
+    def mock_exec_operational(
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        if req.target_bank_id == "bank_b":
+            return sig_b
+        elif req.target_bank_id == "bank_c":
+            raise ConsortiumSecurityError("Adoption rejection: Worker B authorization signature invalid under enrolled key.")
+        raise ValueError(f"Unexpected target: {req.target_bank_id}")
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        consortium_id=c_id,
+        target_bank_ids=["bank_b", "bank_c"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec_operational):
+        with pytest.raises(ConsortiumSecurityError, match="authorization signature invalid"):
+            service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+
+
+def test_multi_counterparty_publication_admission_rejection_fails_closed(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """Security boundary: Linearized publication / reservation admission rejections fail closed."""
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+    service = CrossBankIntelligenceService(consortium_service=gov_svc, entity_service=entity_svc)
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+
+    def mock_exec_operational(
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        if req.target_bank_id == "bank_b":
+            return sig_b
+        elif req.target_bank_id == "bank_c":
+            raise ConsortiumSecurityError("Publication rejected: Pilot reservation expired during linearization.")
+        raise ValueError(f"Unexpected target: {req.target_bank_id}")
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        consortium_id=c_id,
+        target_bank_ids=["bank_b", "bank_c"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec_operational):
+        with pytest.raises(ConsortiumSecurityError, match="Publication rejected"):
+            service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+
+
+def test_multi_counterparty_unexpected_runtime_error_fails_closed(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """Security boundary: Unexpected generic exceptions must propagate and terminate the request."""
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+    service = CrossBankIntelligenceService(consortium_service=gov_svc, entity_service=entity_svc)
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+
+    def mock_exec_operational(
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        if req.target_bank_id == "bank_b":
+            return sig_b
+        elif req.target_bank_id == "bank_c":
+            raise RuntimeError("Unexpected memory corruption during PSI execution")
+        raise ValueError(f"Unexpected target: {req.target_bank_id}")
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        consortium_id=c_id,
+        target_bank_ids=["bank_b", "bank_c"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec_operational):
+        with pytest.raises(RuntimeError, match="Unexpected memory corruption"):
+            service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+
+
+def test_multi_counterparty_router_fails_closed_on_integrity_violation(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """FastAPI router endpoint returns HTTP 403 when counterpart integrity is violated."""
+    gov_svc, c_id = tri_consortium
+    cbi_instance = CrossBankIntelligenceService.get_instance()
+    cbi_instance.consortium_service = gov_svc
+
+    test_ent = Entity(
+        id="cust_router_ent_integrity",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_router_cust_integrity",
+        bank_id="bank_a",
+        display_label="Router Test Entity",
+        risk_level=RiskLevel.HIGH,
+    )
+    cbi_instance.entity_service._entities.set("cust_router_ent_integrity", _entity_to_dict(test_ent))
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+
+    def mock_exec_operational(
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        if req.target_bank_id == "bank_b":
+            return sig_b
+        elif req.target_bank_id == "bank_c":
+            raise ConsortiumSecurityError("Adoption rejection: Ticket ID mismatch between ticket and provenance.")
+        raise ValueError(f"Unexpected target: {req.target_bank_id}")
+
+    client = TestClient(app)
+    payload = {
+        "consortium_id": c_id,
+        "requesting_bank_id": "bank_a",
+        "target_bank_ids": ["bank_b", "bank_c"],
+        "query_entity_id": "cust_router_ent_integrity",
+        "purpose": "AML_COLLABORATIVE_INVESTIGATION",
+        "execution_mode": "VERIFIED_OPERATIONAL",
+    }
+
+    with patch.object(cbi_instance, "_execute_verified_operational_psi", side_effect=mock_exec_operational):
+        resp = client.post(
+            "/api/v1/intelligence/cross-bank/query-multi",
+            json=payload,
+            headers={"Authorization": f"Bearer {auth_tokens['bank_a']}"},
+        )
+
+    # Must be HTTP 403 Forbidden fail-closed; NEVER HTTP 200 PARTIAL_FAILURE
+    assert resp.status_code == 403
+    assert "Ticket ID mismatch between ticket and provenance" in resp.json()["detail"]

@@ -20,11 +20,13 @@ import contextlib
 import datetime
 import hashlib
 import hmac
+import http.client
 import json
 import logging
 import os
 import re
 import secrets
+import socket
 import subprocess
 import sys
 import threading
@@ -52,6 +54,9 @@ from app.application.services.openmined_psi_adapter import OpenMinedPSIAdapter
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
     ConsortiumStatus,
+    CounterpartyTimeoutError,
+    CounterpartyTransportError,
+    CounterpartyWorkerUnavailableError,
 )
 from app.domain.consortium_policy import ConsortiumPolicyEngine
 from app.domain.institutional_identity import (
@@ -2066,7 +2071,7 @@ class InstitutionalWorkerClient:
                 body = resp.read()
                 return cast("dict[str, Any]", json.loads(body.decode("utf-8")))
         except Exception as exc:
-            raise ConsortiumSecurityError(
+            raise CounterpartyWorkerUnavailableError(
                 f"Worker unreachable on health probe for '{self.bank_id}': {exc}"
             ) from exc
 
@@ -2081,7 +2086,7 @@ class InstitutionalWorkerClient:
                 data = json.loads(resp.read().decode("utf-8"))
                 return str(data["public_key_hex"])
         except Exception as exc:
-            raise ConsortiumSecurityError(
+            raise CounterpartyWorkerUnavailableError(
                 f"Worker unreachable on public-key probe for '{self.bank_id}': {exc}"
             ) from exc
 
@@ -2109,19 +2114,52 @@ class InstitutionalWorkerClient:
                 err_body = json.loads(http_err.read().decode())
                 err_msg = err_body.get("error", str(http_err))
                 err_type = err_body.get("error_type", "")
+                if "CounterpartyTimeoutError" in err_type:
+                    raise CounterpartyTimeoutError(err_msg) from http_err
+                if "CounterpartyWorkerUnavailableError" in err_type:
+                    raise CounterpartyWorkerUnavailableError(err_msg) from http_err
+                if "CounterpartyTransportError" in err_type:
+                    raise CounterpartyTransportError(err_msg) from http_err
                 if "ConsortiumSecurityError" in err_type:
                     raise ConsortiumSecurityError(err_msg) from http_err
                 if "PermissionError" in err_type or http_err.code in (401, 403):
                     raise PermissionError(err_msg) from http_err
+                if http_err.code in (502, 503, 504):
+                    raise CounterpartyTransportError(f"HTTP {http_err.code} from worker '{self.bank_id}'") from http_err
                 raise ValueError(err_msg) from http_err
             except (ConsortiumSecurityError, PermissionError, ValueError):
                 raise
             except Exception:
+                if http_err.code in (502, 503, 504):
+                    raise CounterpartyTransportError(
+                        f"HTTP transport service unavailable ({http_err.code}) from {self.bank_id} worker"
+                    ) from http_err
                 raise ValueError(
                     f"HTTP transport error from {self.bank_id} worker: {http_err}"
                 ) from http_err
+        except TimeoutError as exc:
+            raise CounterpartyTimeoutError(
+                f"Institutional bank worker for '{self.bank_id}' timed out: {exc}"
+            ) from exc
+        except (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected) as exc:
+            raise CounterpartyWorkerUnavailableError(
+                f"Institutional bank worker for '{self.bank_id}' is unreachable or offline: {exc}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            reason = getattr(exc, "reason", None)
+            if isinstance(reason, (TimeoutError, socket.timeout)):
+                raise CounterpartyTimeoutError(
+                    f"Institutional bank worker for '{self.bank_id}' timed out: {exc}"
+                ) from exc
+            if isinstance(reason, (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected)):
+                raise CounterpartyWorkerUnavailableError(
+                    f"Institutional bank worker for '{self.bank_id}' is unreachable or offline: {exc}"
+                ) from exc
+            raise CounterpartyWorkerUnavailableError(
+                f"Institutional bank worker for '{self.bank_id}' is unreachable or timed out: {exc}"
+            ) from exc
         except Exception as exc:
-            raise ConsortiumSecurityError(
+            raise CounterpartyWorkerUnavailableError(
                 f"Institutional bank worker for '{self.bank_id}' is unreachable or timed out: {exc}"
             ) from exc
 
@@ -3033,17 +3071,57 @@ class InstitutionalCoordinatorClient:
                 err_body = json.loads(http_err.read().decode())
                 err_msg = err_body.get("error", str(http_err))
                 err_type = err_body.get("error_type", "")
+                if "CounterpartyTimeoutError" in err_type:
+                    raise CounterpartyTimeoutError(err_msg) from http_err
+                if "CounterpartyWorkerUnavailableError" in err_type:
+                    raise CounterpartyWorkerUnavailableError(err_msg) from http_err
+                if "CounterpartyTransportError" in err_type:
+                    raise CounterpartyTransportError(err_msg) from http_err
                 if "ConsortiumSecurityError" in err_type:
                     raise ConsortiumSecurityError(err_msg) from http_err
                 if "PermissionError" in err_type or http_err.code in (401, 403):
                     raise PermissionError(err_msg) from http_err
+                if http_err.code in (502, 503, 504):
+                    raise CounterpartyTransportError(f"HTTP {http_err.code} from coordinator") from http_err
                 raise ValueError(err_msg) from http_err
-            except (ConsortiumSecurityError, PermissionError, ValueError):
+            except (
+                CounterpartyTimeoutError,
+                CounterpartyWorkerUnavailableError,
+                CounterpartyTransportError,
+                ConsortiumSecurityError,
+                PermissionError,
+                ValueError,
+            ):
                 raise
             except Exception:
+                if http_err.code in (502, 503, 504):
+                    raise CounterpartyTransportError(
+                        f"HTTP transport service unavailable ({http_err.code}) from coordinator"
+                    ) from http_err
                 raise ValueError(f"HTTP transport error from coordinator: {http_err}") from http_err
+        except TimeoutError as exc:
+            raise CounterpartyTimeoutError(
+                f"Coordinator matching invocation timed out on '{self.base_url}': {exc}"
+            ) from exc
+        except (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected) as exc:
+            raise CounterpartyWorkerUnavailableError(
+                f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            reason = getattr(exc, "reason", None)
+            if isinstance(reason, (TimeoutError, socket.timeout)):
+                raise CounterpartyTimeoutError(
+                    f"Coordinator matching invocation timed out on '{self.base_url}': {exc}"
+                ) from exc
+            if isinstance(reason, (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected)):
+                raise CounterpartyWorkerUnavailableError(
+                    f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
+                ) from exc
+            raise CounterpartyTransportError(
+                f"Coordinator matching invocation failed on '{self.base_url}': {exc}"
+            ) from exc
         except Exception as exc:
-            raise ConsortiumSecurityError(
+            raise CounterpartyTransportError(
                 f"Coordinator matching invocation failed on '{self.base_url}': {exc}"
             ) from exc
 
