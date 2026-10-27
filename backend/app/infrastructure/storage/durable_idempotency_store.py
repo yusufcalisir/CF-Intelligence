@@ -18,6 +18,7 @@ import logging
 import os
 import sqlite3
 import threading
+import time
 from datetime import UTC
 from typing import Any
 
@@ -39,6 +40,7 @@ class DurableCrossBankIdempotencyStore:
         self,
         db_path: str | None = None,
         retention_seconds: int = DEFAULT_IDEMPOTENCY_RETENTION_SECONDS,
+        cleanup_interval_seconds: float = 0.0,
     ) -> None:
         if db_path is None:
             env_path = os.environ.get("CFI_IDEMPOTENCY_DB_PATH")
@@ -49,6 +51,8 @@ class DurableCrossBankIdempotencyStore:
                 db_path = os.path.join(storage_dir, "cfi_cross_bank_idempotency.sqlite")
         self.db_path = db_path
         self.retention_seconds = retention_seconds
+        self.cleanup_interval_seconds = cleanup_interval_seconds
+        self._last_cleanup_monotonic: float = 0.0
         self._lock = threading.RLock()
         self._init_db()
 
@@ -108,6 +112,48 @@ class DurableCrossBankIdempotencyStore:
         """Builds an institutional and consortium scoped primary key."""
         return f"{consortium_id.lower().strip()}:{requesting_bank_id.lower().strip()}:{idempotency_key.strip()}"
 
+    def _execute_cleanup_in_conn(
+        self,
+        conn: sqlite3.Connection,
+        now_dt: datetime.datetime,
+        now_iso: str,
+        in_progress_grace_seconds: float = 300.0,
+    ) -> int:
+        """Atomically deletes expired records while strictly preserving active IN_PROGRESS reservations.
+
+        Guarantees:
+        - Only records with expires_at < now_iso are eligible for deletion.
+        - Active IN_PROGRESS reservations (updated_at within grace period) are never purged.
+        - Preserves fail-closed behavior for indeterminate executions (FAILED_AMBIGUOUS) within retention.
+        """
+        stale_in_progress_dt = now_dt - datetime.timedelta(seconds=in_progress_grace_seconds)
+        stale_in_progress_iso = stale_in_progress_dt.isoformat()
+        cur = conn.execute(
+            """
+            DELETE FROM cross_bank_idempotency_records
+            WHERE expires_at < ?
+              AND (status != 'IN_PROGRESS' OR updated_at < ?);
+            """,
+            (now_iso, stale_in_progress_iso),
+        )
+        return cur.rowcount
+
+    def _maybe_cleanup_expired(
+        self,
+        conn: sqlite3.Connection,
+        now_dt: datetime.datetime,
+        now_iso: str,
+    ) -> int:
+        """Opportunistic rate-limited cleanup executed during normal store transactions."""
+        now_mono = time.monotonic()
+        if (
+            self.cleanup_interval_seconds > 0.0
+            and (now_mono - self._last_cleanup_monotonic) < self.cleanup_interval_seconds
+        ):
+            return 0
+        self._last_cleanup_monotonic = now_mono
+        return self._execute_cleanup_in_conn(conn, now_dt, now_iso)
+
     def acquire(
         self,
         consortium_id: str,
@@ -143,6 +189,9 @@ class DurableCrossBankIdempotencyStore:
 
         with self._lock, self._get_connection() as conn:
             conn.execute("BEGIN IMMEDIATE;")
+            # Opportunistic rate-limited operational cleanup of expired records
+            self._maybe_cleanup_expired(conn, now_dt, now_iso)
+
             cur = conn.execute(
                 "SELECT * FROM cross_bank_idempotency_records WHERE lookup_key = ?;",
                 (lookup_key,),
@@ -327,6 +376,8 @@ class DurableCrossBankIdempotencyStore:
 
         with self._lock, self._get_connection() as conn:
             conn.execute("BEGIN IMMEDIATE;")
+            # Opportunistic operational cleanup on query completion
+            self._maybe_cleanup_expired(conn, datetime.datetime.now(UTC), now_iso)
             cur = conn.execute(
                 """
                 UPDATE cross_bank_idempotency_records
@@ -379,17 +430,15 @@ class DurableCrossBankIdempotencyStore:
             conn.commit()
             return cur.rowcount > 0
 
-    def cleanup_expired(self) -> int:
+    def cleanup_expired(self, in_progress_grace_seconds: float = 300.0) -> int:
         """Deletes expired idempotency records to ensure bounded storage retention."""
-        now_iso = datetime.datetime.now(UTC).isoformat()
+        now_dt = datetime.datetime.now(UTC)
+        now_iso = now_dt.isoformat()
         with self._lock, self._get_connection() as conn:
             conn.execute("BEGIN IMMEDIATE;")
-            cur = conn.execute(
-                "DELETE FROM cross_bank_idempotency_records WHERE expires_at < ?;",
-                (now_iso,),
-            )
+            deleted = self._execute_cleanup_in_conn(conn, now_dt, now_iso, in_progress_grace_seconds)
             conn.commit()
-            return cur.rowcount
+            return deleted
 
     def clear(self) -> None:
         """Clears all records (for test isolation only)."""

@@ -91,9 +91,11 @@ def compute_multi_counterparty_request_fingerprint(
 ) -> str:
     """Computes a deterministic canonical SHA-256 fingerprint of the query request and its governance scope."""
     canonical_payload: dict[str, Any] = {
+        "case_id": (req.case_id or "").strip(),
         "consortium_id": req.consortium_id.lower().strip(),
         "execution_mode": req.execution_mode.strip(),
         "pilot_id": (req.pilot_id or "").strip(),
+        "privacy_id": (req.privacy_id or "").strip(),
         "protocol": (req.protocol or "").strip(),
         "purpose": req.purpose.strip(),
         "query_entity_id": req.query_entity_id.strip(),

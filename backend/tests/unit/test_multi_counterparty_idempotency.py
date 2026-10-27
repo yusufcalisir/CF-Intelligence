@@ -14,9 +14,11 @@ Adheres strictly to .agents/AGENTS.md, runtime truth, and M6.4 Task 2 requiremen
 
 from __future__ import annotations
 
+import datetime
 import threading
 import time
 from collections.abc import Generator
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -30,7 +32,10 @@ from app.application.schemas.cross_bank_intelligence import (
     MultiCounterpartyIntelligenceQueryRequest,
 )
 from app.application.services.consortium_service import ConsortiumGovernanceService
-from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
+from app.application.services.cross_bank_intelligence import (
+    CrossBankIntelligenceService,
+    compute_multi_counterparty_request_fingerprint,
+)
 from app.application.services.entity_resolution import EntityResolutionService, _entity_to_dict
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
@@ -917,3 +922,221 @@ def test_bounded_retention_and_cleanup_expired(tmp_path: Path) -> None:
         remaining = [row["idempotency_key"] for row in cur.fetchall()]
         assert "k1" not in remaining
         assert "k2" in remaining
+
+
+def test_same_key_with_different_privacy_id_rejected_as_conflict(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+    tmp_path: Path,
+) -> None:
+    """Changing privacy_id under the same key yields an idempotency conflict without executing PSI."""
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+
+    idem_store = DurableCrossBankIdempotencyStore(db_path=str(tmp_path / "idem_privacy_id.sqlite"))
+    service = CrossBankIntelligenceService(
+        consortium_service=gov_svc, entity_service=entity_svc, idempotency_store=idem_store
+    )
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+    exec_call_count = 0
+
+    def mock_exec(*args, **kwargs):
+        nonlocal exec_call_count
+        exec_call_count += 1
+        return sig_b
+
+    # Request 1: privacy_id is absent (None)
+    req1 = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        privacy_id=None,
+        consortium_id=c_id,
+        target_bank_ids=["bank_b"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+        idempotency_key="privacy-id-conflict-key-01",
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec):
+        resp1 = service.query_multi_counterparty_intelligence(req=req1, auth_token=auth_tokens["bank_a"])
+
+    assert exec_call_count == 1
+    assert resp1.overall_outcome == "COMPLETED"
+
+    # Request 2: same key, but changing privacy_id to an explicit valid value
+    req2 = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        privacy_id="hash_test_cust_001",
+        consortium_id=c_id,
+        target_bank_ids=["bank_b"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+        idempotency_key="privacy-id-conflict-key-01",
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec):
+        with pytest.raises(CrossBankIdempotencyConflictError, match="Idempotency key conflict"):
+            service.query_multi_counterparty_intelligence(req=req2, auth_token=auth_tokens["bank_a"])
+
+    # Crucial acceptance check: NO additional PSI executions occurred
+    assert exec_call_count == 1
+
+
+def test_operational_cleanup_reclaims_expired_during_normal_operations(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+    tmp_path: Path,
+) -> None:
+    """Expired records are reclaimed during normal store operations without manual cleanup_expired calls."""
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+
+    db_file = tmp_path / "auto_cleanup_test.sqlite"
+    # Ensure immediate cleanup evaluation on store operations
+    idem_store = DurableCrossBankIdempotencyStore(
+        db_path=str(db_file), retention_seconds=86400, cleanup_interval_seconds=0.0
+    )
+    service = CrossBankIntelligenceService(
+        consortium_service=gov_svc, entity_service=entity_svc, idempotency_store=idem_store
+    )
+
+    now_dt = datetime.datetime.now(UTC)
+    expired_iso = (now_dt - datetime.timedelta(hours=25)).isoformat()
+    future_iso = (now_dt + datetime.timedelta(hours=23)).isoformat()
+    now_iso = now_dt.isoformat()
+
+    req_amb = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        consortium_id=c_id,
+        target_bank_ids=["bank_b"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+        idempotency_key="key_ambiguous",
+    )
+    fp_amb = compute_multi_counterparty_request_fingerprint(req_amb)
+
+    # Seed store directly with:
+    # 1. Expired completed record (key_expired)
+    # 2. Valid completed record (key_valid)
+    # 3. Active in-progress reservation (key_active_in_progress)
+    # 4. Indeterminate failure within 24h retention (key_ambiguous)
+    with idem_store._get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE;")
+        conn.execute(
+            """
+            INSERT INTO cross_bank_idempotency_records (
+                lookup_key, idempotency_key, requesting_bank_id, principal_id,
+                consortium_id, request_fingerprint, status, execution_owner_id,
+                response_json, governance_snapshot_json, created_at, updated_at, expires_at
+            ) VALUES
+            (?, 'key_expired', 'bank_a', 'user_a', ?, 'fp_exp', 'COMPLETED', 'own_exp', '{}', '{}', ?, ?, ?),
+            (?, 'key_valid', 'bank_a', 'user_a', ?, 'fp_val', 'COMPLETED', 'own_val', '{}', '{}', ?, ?, ?),
+            (?, 'key_active_in_progress', 'bank_a', 'user_a', ?, 'fp_prog', 'IN_PROGRESS', 'own_prog', NULL, '{}', ?, ?, ?),
+            (?, 'key_ambiguous', 'bank_a', 'user_a', ?, ?, 'FAILED_AMBIGUOUS', 'own_amb', NULL, '{}', ?, ?, ?);
+            """,
+            (
+                idem_store._build_lookup_key(c_id, "bank_a", "key_expired"),
+                c_id,
+                expired_iso,
+                expired_iso,
+                expired_iso,
+                idem_store._build_lookup_key(c_id, "bank_a", "key_valid"),
+                c_id,
+                now_iso,
+                now_iso,
+                future_iso,
+                idem_store._build_lookup_key(c_id, "bank_a", "key_active_in_progress"),
+                c_id,
+                now_iso,
+                now_iso,
+                future_iso,
+                idem_store._build_lookup_key(c_id, "bank_a", "key_ambiguous"),
+                c_id,
+                fp_amb,
+                now_iso,
+                now_iso,
+                future_iso,
+            ),
+        )
+        conn.commit()
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+
+    def mock_exec(*args, **kwargs):
+        return sig_b
+
+    # Normal operation: perform a query with a brand new key (key_fresh)
+    # Notice: We NEVER call idem_store.cleanup_expired() manually here!
+    req_fresh = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        consortium_id=c_id,
+        target_bank_ids=["bank_b"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+        idempotency_key="key_fresh",
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec):
+        resp_fresh = service.query_multi_counterparty_intelligence(req=req_fresh, auth_token=auth_tokens["bank_a"])
+
+    assert resp_fresh.overall_outcome == "COMPLETED"
+
+    # Verify database state after normal operation:
+    with idem_store._get_connection() as conn:
+        cur = conn.execute("SELECT idempotency_key, status FROM cross_bank_idempotency_records;")
+        rows = {row["idempotency_key"]: row["status"] for row in cur.fetchall()}
+
+    # 1. Expired record was reclaimed automatically
+    assert "key_expired" not in rows
+
+    # 2. Valid record remains intact
+    assert "key_valid" in rows
+    assert rows["key_valid"] == "COMPLETED"
+
+    # 3. Active in-progress reservation was strictly protected from cleanup
+    assert "key_active_in_progress" in rows
+    assert rows["key_active_in_progress"] == "IN_PROGRESS"
+
+    # 4. Indeterminate execution within retention remains protected and fails closed
+    assert "key_ambiguous" in rows
+    assert rows["key_ambiguous"] == "FAILED_AMBIGUOUS"
+
+    # 5. Fresh key was inserted and completed
+    assert "key_fresh" in rows
+    assert rows["key_fresh"] == "COMPLETED"
+
+    # Confirm ambiguous execution fails closed when called
+    req_amb = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        consortium_id=c_id,
+        target_bank_ids=["bank_b"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+        idempotency_key="key_ambiguous",
+    )
+    with pytest.raises(CrossBankIdempotencyConflictError, match="indeterminate state"):
+        service.query_multi_counterparty_intelligence(req=req_amb, auth_token=auth_tokens["bank_a"])
+
