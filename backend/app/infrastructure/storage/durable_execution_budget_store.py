@@ -456,9 +456,9 @@ class DurableCrossBankExecutionBudgetStore:
 
         with self._lock, self._get_connection() as conn:
             conn.execute("BEGIN IMMEDIATE;")
+            count = 0
             if completed_targets is not None:
                 clean_targets = [t.lower().strip() for t in completed_targets]
-                count = 0
                 for target in clean_targets:
                     cur = conn.execute(
                         """
@@ -478,7 +478,7 @@ class DurableCrossBankExecutionBudgetStore:
                     """,
                     (now_iso, reason, clean_bid),
                 )
-            count = cur.rowcount
+                count = cur.rowcount
             conn.commit()
             return count
 
@@ -494,9 +494,9 @@ class DurableCrossBankExecutionBudgetStore:
 
         with self._lock, self._get_connection() as conn:
             conn.execute("BEGIN IMMEDIATE;")
+            count = 0
             if targets is not None:
                 clean_targets = [t.lower().strip() for t in targets]
-                count = 0
                 for target in clean_targets:
                     cur = conn.execute(
                         """
@@ -516,7 +516,7 @@ class DurableCrossBankExecutionBudgetStore:
                     """,
                     (now_iso, reason, clean_bid),
                 )
-            count = cur.rowcount
+                count = cur.rowcount
             conn.commit()
             return count
 
@@ -536,9 +536,9 @@ class DurableCrossBankExecutionBudgetStore:
 
         with self._lock, self._get_connection() as conn:
             conn.execute("BEGIN IMMEDIATE;")
+            count = 0
             if targets is not None:
                 clean_targets = [t.lower().strip() for t in targets]
-                count = 0
                 for target in clean_targets:
                     cur = conn.execute(
                         """
@@ -558,6 +558,6 @@ class DurableCrossBankExecutionBudgetStore:
                     """,
                     (now_iso, reason, clean_bid),
                 )
-            count = cur.rowcount
+                count = cur.rowcount
             conn.commit()
             return count
