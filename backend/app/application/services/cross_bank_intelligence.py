@@ -120,9 +120,9 @@ def compute_multi_counterparty_request_fingerprint(
         "target_bank_ids": sorted({t.lower().strip() for t in req.target_bank_ids}),
         "use_established_psi": req.use_established_psi,
     }
-    if getattr(req, "per_counterparty_timeout_seconds", None) is not None:
+    if req.per_counterparty_timeout_seconds is not None:
         canonical_payload["per_counterparty_timeout_seconds"] = float(req.per_counterparty_timeout_seconds)
-    if getattr(req, "total_batch_timeout_seconds", None) is not None:
+    if req.total_batch_timeout_seconds is not None:
         canonical_payload["total_batch_timeout_seconds"] = float(req.total_batch_timeout_seconds)
     if governance_scope:
         canonical_payload["governance_scope"] = governance_scope
@@ -1757,7 +1757,7 @@ class CrossBankIntelligenceService:
         raise exc
 
     @staticmethod
-    def _is_governance_authorization_failure(exc: Exception) -> bool:
+    def _is_governance_authorization_failure(exc: BaseException) -> bool:
         """Determine whether an error represents a fail-closed governance/authorization rejection.
 
         Preserved for backward-compatibility; in the revised architecture, any failure that is
