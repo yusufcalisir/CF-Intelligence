@@ -18,6 +18,7 @@ import datetime
 import sqlite3
 import time
 from datetime import UTC
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -56,7 +57,7 @@ from app.main import app
 
 
 @pytest.fixture(autouse=True)
-def isolated_budget_env(tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch):
+def isolated_budget_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Isolate SQLite database files and cryptographic keys for each test."""
     store_file = tmp_path / "consortium_test.json"
     account_file = tmp_path / "account_test.json"

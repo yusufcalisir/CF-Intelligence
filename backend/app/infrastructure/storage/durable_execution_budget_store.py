@@ -388,7 +388,7 @@ class DurableCrossBankExecutionBudgetStore:
                     max_exec = int(row["max_executions"])
                     win_sec = int(row["window_seconds"]) if row["window_seconds"] is not None else None
                 elif grant_budgets and t in grant_budgets:
-                    max_exec = int(grant_budgets[t])
+                    max_exec = grant_budgets[t]
 
                 if max_exec is not None:
                     if win_sec and win_sec > 0:
@@ -458,15 +458,17 @@ class DurableCrossBankExecutionBudgetStore:
             conn.execute("BEGIN IMMEDIATE;")
             if completed_targets is not None:
                 clean_targets = [t.lower().strip() for t in completed_targets]
-                placeholders = ",".join("?" for _ in clean_targets)
-                cur = conn.execute(
-                    f"""
-                    UPDATE cross_bank_budget_reservations
-                    SET status = 'COMMITTED', resolved_at = ?, reason = ?
-                    WHERE batch_id = ? AND counterpart_bank_id IN ({placeholders}) AND status = 'RESERVED';
-                    """,
-                    [now_iso, reason, clean_bid, *clean_targets],
-                )
+                count = 0
+                for target in clean_targets:
+                    cur = conn.execute(
+                        """
+                        UPDATE cross_bank_budget_reservations
+                        SET status = 'COMMITTED', resolved_at = ?, reason = ?
+                        WHERE batch_id = ? AND counterpart_bank_id = ? AND status = 'RESERVED';
+                        """,
+                        (now_iso, reason, clean_bid, target),
+                    )
+                    count += cur.rowcount
             else:
                 cur = conn.execute(
                     """
@@ -494,15 +496,17 @@ class DurableCrossBankExecutionBudgetStore:
             conn.execute("BEGIN IMMEDIATE;")
             if targets is not None:
                 clean_targets = [t.lower().strip() for t in targets]
-                placeholders = ",".join("?" for _ in clean_targets)
-                cur = conn.execute(
-                    f"""
-                    UPDATE cross_bank_budget_reservations
-                    SET status = 'RELEASED', resolved_at = ?, reason = ?
-                    WHERE batch_id = ? AND counterpart_bank_id IN ({placeholders}) AND status = 'RESERVED';
-                    """,
-                    [now_iso, reason, clean_bid, *clean_targets],
-                )
+                count = 0
+                for target in clean_targets:
+                    cur = conn.execute(
+                        """
+                        UPDATE cross_bank_budget_reservations
+                        SET status = 'RELEASED', resolved_at = ?, reason = ?
+                        WHERE batch_id = ? AND counterpart_bank_id = ? AND status = 'RESERVED';
+                        """,
+                        (now_iso, reason, clean_bid, target),
+                    )
+                    count += cur.rowcount
             else:
                 cur = conn.execute(
                     """
@@ -534,15 +538,17 @@ class DurableCrossBankExecutionBudgetStore:
             conn.execute("BEGIN IMMEDIATE;")
             if targets is not None:
                 clean_targets = [t.lower().strip() for t in targets]
-                placeholders = ",".join("?" for _ in clean_targets)
-                cur = conn.execute(
-                    f"""
-                    UPDATE cross_bank_budget_reservations
-                    SET status = 'FAILED_CLOSED', resolved_at = ?, reason = ?
-                    WHERE batch_id = ? AND counterpart_bank_id IN ({placeholders}) AND status = 'RESERVED';
-                    """,
-                    [now_iso, reason, clean_bid, *clean_targets],
-                )
+                count = 0
+                for target in clean_targets:
+                    cur = conn.execute(
+                        """
+                        UPDATE cross_bank_budget_reservations
+                        SET status = 'FAILED_CLOSED', resolved_at = ?, reason = ?
+                        WHERE batch_id = ? AND counterpart_bank_id = ? AND status = 'RESERVED';
+                        """,
+                        (now_iso, reason, clean_bid, target),
+                    )
+                    count += cur.rowcount
             else:
                 cur = conn.execute(
                     """
