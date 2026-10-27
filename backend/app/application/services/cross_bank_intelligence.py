@@ -98,10 +98,10 @@ def compute_multi_counterparty_request_fingerprint(
         "purpose": req.purpose.strip(),
         "query_entity_id": req.query_entity_id.strip(),
         "requesting_bank_id": req.requesting_bank_id.lower().strip(),
-        "require_established_psi": bool(req.require_established_psi),
-        "require_hardware_attestation": bool(req.require_hardware_attestation),
-        "target_bank_ids": sorted(list(set(t.lower().strip() for t in req.target_bank_ids))),
-        "use_established_psi": bool(req.use_established_psi),
+        "require_established_psi": req.require_established_psi,
+        "require_hardware_attestation": req.require_hardware_attestation,
+        "target_bank_ids": sorted({t.lower().strip() for t in req.target_bank_ids}),
+        "use_established_psi": req.use_established_psi,
     }
     if governance_scope:
         canonical_payload["governance_scope"] = governance_scope
