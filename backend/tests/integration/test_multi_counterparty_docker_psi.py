@@ -1,0 +1,510 @@
+"""Integration tests for Multi-Counterparty PSI Query Orchestration over Genuine Three-Bank Docker Topology (Module M6.3).
+
+Verifies:
+1. Authenticated Bank A analyst executes an authorized multi-counterparty OpenMined PSI query
+   against both Bank B and Bank C within a single API / service request.
+2. Independent pairwise executions over isolated Docker containers with real OpenMined PSI:
+   - Bank B (holding matching target record) yields verified match_confirmed=True.
+   - Bank C (holding distinct clean record) yields verified match_confirmed=False.
+   - No fabricated joint intersection; distinct separately identifiable signals per counterpart.
+3. Each execution ticket binds the authentic bilateral operational grant (grant_m63_ab and grant_m63_ac),
+   never a broader legacy grant or manufactured identifier.
+4. Pre-flight pairwise governance validation fails closed: if any target's bilateral grant is revoked,
+   the entire query request is rejected before any dispatch to workers occurs.
+5. FastAPI HTTP API router endpoint (/intelligence/query-multi) enforces authentication,
+   tenant isolation, schema constraints, and error mapping.
+"""
+
+from __future__ import annotations
+
+import hashlib
+from collections.abc import Generator
+from pathlib import Path
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.application.schemas.cross_bank_intelligence import (
+    MultiCounterpartyIntelligenceQueryRequest,
+    MultiCounterpartyIntelligenceQueryResponse,
+)
+from app.application.services.consortium_service import (
+    ConsortiumGovernanceService,
+)
+from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
+from app.application.services.entity_resolution import _entity_to_dict
+from app.domain.consortium_governance import ConsortiumSecurityError, MemberRole
+from app.domain.investigation_entities import Entity, EntityType, RiskLevel
+from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
+from app.main import app
+from tests.integration.conftest import (
+    SHARED_CONSORTIUM_STORE_SECRET,
+    SHARED_JWT_SECRET,
+    _run_cmd,
+)
+
+
+@pytest.fixture
+def isolated_tri_governance_env(
+    three_bank_docker_topology: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Generator[tuple[ConsortiumGovernanceService, str, str, str], None, None]:
+    """Isolated consortium governance environment synchronized with four-container topology."""
+    store_file = tmp_path / "docker_tri_m63_consortium_store.json"
+    account_file = tmp_path / "docker_tri_m63_account_store.json"
+    monkeypatch.setenv("CFI_CONSORTIUM_STORE_PATH", str(store_file))
+    monkeypatch.setenv("CFI_ACCOUNT_STORE_PATH", str(account_file))
+    monkeypatch.setenv("CFI_CONSORTIUM_STORE_SECRET", SHARED_CONSORTIUM_STORE_SECRET)
+    monkeypatch.setenv("JWT_SECRET", SHARED_JWT_SECRET)
+    monkeypatch.setenv("CFI_JWT_SECRET", SHARED_JWT_SECRET)
+    monkeypatch.setenv("CFI_JWT_SIGNING_SECRET", SHARED_JWT_SECRET)
+    monkeypatch.setenv("CFI_OIDC_JWT_SIGNING_SECRET", SHARED_JWT_SECRET)
+    monkeypatch.setenv("CFI_IDENTITY_STORE_SECRET", SHARED_JWT_SECRET)
+    monkeypatch.setenv("CFI_AUDIT_LEDGER_SECRET", SHARED_JWT_SECRET)
+    DurableConsortiumStore.set_instance(None)
+    AuthenticationService.reset_instance()
+
+    gov_svc = ConsortiumGovernanceService()
+    auth_svc = AuthenticationService.get_instance()
+
+    u_a = auth_svc.get_user("tri_analyst_a")
+    if not u_a:
+        u_a = auth_svc.register_user("tri_analyst_a", "Pass123!", "bank_a", roles=["admin", "compliance", "ml_lead"])
+    else:
+        u_a.roles = ["admin", "compliance", "ml_lead"]
+        auth_svc.identity_store.save_user(u_a)
+
+    u_b = auth_svc.get_user("tri_analyst_b")
+    if not u_b:
+        u_b = auth_svc.register_user("tri_analyst_b", "Pass123!", "bank_b", roles=["admin", "compliance", "ml_lead"])
+    else:
+        u_b.roles = ["admin", "compliance", "ml_lead"]
+        auth_svc.identity_store.save_user(u_b)
+
+    u_c = auth_svc.get_user("tri_analyst_c")
+    if not u_c:
+        u_c = auth_svc.register_user("tri_analyst_c", "Pass123!", "bank_c", roles=["admin", "compliance", "ml_lead"])
+    else:
+        u_c.roles = ["admin", "compliance", "ml_lead"]
+        auth_svc.identity_store.save_user(u_c)
+
+    token_a = auth_svc.create_token_bundle(u_a).access_token
+    token_b = auth_svc.create_token_bundle(u_b).access_token
+    token_c = auth_svc.create_token_bundle(u_c).access_token
+
+    c_id = "c_tri_m63_docker"
+    gov_svc.create_consortium(
+        consortium_id=c_id,
+        name="Tri-Bank M6.3 Docker Consortium",
+        founder_bank_id="bank_a",
+        auth_token=token_a,
+    )
+    gov_svc.add_member(
+        consortium_id=c_id,
+        bank_id="bank_b",
+        role=MemberRole.FULL_MEMBER,
+        auth_token=token_a,
+    )
+    gov_svc.add_member(
+        consortium_id=c_id,
+        bank_id="bank_c",
+        role=MemberRole.FULL_MEMBER,
+        auth_token=token_a,
+    )
+
+    # Pairwise Grant A <-> B
+    gov_svc.register_pairwise_operational_grant(
+        consortium_id=c_id,
+        grant_id="grant_m63_ab",
+        institution_a="bank_a",
+        institution_b="bank_b",
+        authority="BILATERAL_AML_TREATY",
+        allowed_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+        allowed_jurisdictions=["EU", "US"],
+        institution_jurisdictions={"bank_a": "EU", "bank_b": "EU"},
+        allow_cross_border=False,
+        allow_institution_identity_sharing=True,
+        revision=1,
+        auth_token=token_a,
+    )
+    gov_svc.approve_pairwise_operational_grant(
+        consortium_id=c_id,
+        grant_id="grant_m63_ab",
+        approving_bank_id="bank_b",
+        auth_token=token_b,
+    )
+
+    # Pairwise Grant A <-> C
+    gov_svc.register_pairwise_operational_grant(
+        consortium_id=c_id,
+        grant_id="grant_m63_ac",
+        institution_a="bank_a",
+        institution_b="bank_c",
+        authority="BILATERAL_AML_TREATY",
+        allowed_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+        allowed_jurisdictions=["EU", "US"],
+        institution_jurisdictions={"bank_a": "EU", "bank_c": "EU"},
+        allow_cross_border=False,
+        allow_institution_identity_sharing=True,
+        revision=1,
+        auth_token=token_a,
+    )
+    gov_svc.approve_pairwise_operational_grant(
+        consortium_id=c_id,
+        grant_id="grant_m63_ac",
+        approving_bank_id="bank_c",
+        auth_token=token_c,
+    )
+
+    # Synchronize consortium store file and account store file into all 4 container filesystems
+    c_a = three_bank_docker_topology["container_worker_a"]
+    c_b = three_bank_docker_topology["container_worker_b"]
+    c_c = three_bank_docker_topology["container_worker_c"]
+    c_coord = three_bank_docker_topology["container_coordinator"]
+    for c in [c_a, c_b, c_c, c_coord]:
+        _run_cmd(["docker", "cp", str(store_file), f"{c}:/tmp/consortium_store.json"], check=False)
+        _run_cmd(["docker", "exec", "-u", "0", c, "chmod", "666", "/tmp/consortium_store.json"], check=False)
+        _run_cmd(["docker", "cp", str(account_file), f"{c}:/tmp/account_store.json"], check=False)
+        _run_cmd(["docker", "exec", "-u", "0", c, "chmod", "666", "/tmp/account_store.json"], check=False)
+
+    # Register authorized grants on worker containers
+    grant_ab = gov_svc.get_pairwise_operational_grant(c_id, "grant_m63_ab")
+    grant_ac = gov_svc.get_pairwise_operational_grant(c_id, "grant_m63_ac")
+    assert grant_ab is not None and grant_ac is not None
+    digest_ab = grant_ab.get("scope_digest", "")
+    digest_ac = grant_ac.get("scope_digest", "")
+
+    client_a = three_bank_docker_topology["client_a"]
+    client_b = three_bank_docker_topology["client_b"]
+    client_c = three_bank_docker_topology["client_c"]
+
+    client_a.register_authorized_grant(
+        consortium_id=c_id,
+        grant_id="grant_m63_ab",
+        revision=1,
+        scope_digest=digest_ab,
+        permitted_counterparts=["bank_b"],
+        permitted_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+        allow_institution_identity_sharing=True,
+    )
+    client_a.register_authorized_grant(
+        consortium_id=c_id,
+        grant_id="grant_m63_ac",
+        revision=1,
+        scope_digest=digest_ac,
+        permitted_counterparts=["bank_c"],
+        permitted_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+        allow_institution_identity_sharing=True,
+    )
+    client_b.register_authorized_grant(
+        consortium_id=c_id,
+        grant_id="grant_m63_ab",
+        revision=1,
+        scope_digest=digest_ab,
+        permitted_counterparts=["bank_a"],
+        permitted_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+        allow_institution_identity_sharing=True,
+    )
+    client_c.register_authorized_grant(
+        consortium_id=c_id,
+        grant_id="grant_m63_ac",
+        revision=1,
+        scope_digest=digest_ac,
+        permitted_counterparts=["bank_a"],
+        permitted_purposes=["AML_COLLABORATIVE_INVESTIGATION"],
+        allow_institution_identity_sharing=True,
+    )
+
+    yield gov_svc, token_a, token_b, token_c
+
+    DurableConsortiumStore.set_instance(None)
+    AuthenticationService.reset_instance()
+
+
+def test_multi_counterparty_docker_psi_execution(
+    three_bank_docker_topology: dict[str, Any],
+    isolated_tri_governance_env: tuple[ConsortiumGovernanceService, str, str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies Bank A executes multi-counterparty PSI query against Bank B and Bank C over genuine Docker topology."""
+    gov_svc, token_a, _, _ = isolated_tri_governance_env
+    client_a = three_bank_docker_topology["client_a"]
+    client_b = three_bank_docker_topology["client_b"]
+    client_c = three_bank_docker_topology["client_c"]
+    port_coord: int = three_bank_docker_topology["port_coord"]
+
+    coord_url = f"http://127.0.0.1:{port_coord}"
+    monkeypatch.setenv("CFI_COORDINATOR_URL", coord_url)
+
+    # Seed private entities into institutional vaults:
+    # Target in Bank A: IBAN_M63_SYNDICATE_MATCH_001
+    # Bank B: IBAN_M63_SYNDICATE_MATCH_001 (EXACT MATCH!)
+    # Bank C: IBAN_M63_CLEAN_BENIGN_8888 (NO MATCH!)
+    shared_identifier = "TR990001112223334445556667"
+    clean_identifier = "TR112233445566778899001122"
+
+    client_a.store_private_entity({
+        "id": "ent_target_a",
+        "bank_id": "bank_a",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["ORGANIZED_CRIME"],
+    })
+    client_b.store_private_entity({
+        "id": "ent_target_b",
+        "bank_id": "bank_b",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["ORGANIZED_CRIME"],
+    })
+    client_c.store_private_entity({
+        "id": "ent_target_c",
+        "bank_id": "bank_c",
+        "entity_type": "account",
+        "raw_identifier": clean_identifier,
+        "risk_level": "low",
+        "typologies": [],
+    })
+
+    cbi_service = CrossBankIntelligenceService(consortium_service=gov_svc)
+    ent_a = Entity(
+        id="ent_target_a",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id=hashlib.sha256(shared_identifier.encode()).hexdigest(),
+        bank_id="bank_a",
+        display_label="Syndicate Target A",
+        risk_level=RiskLevel.HIGH,
+        attributes={"raw_identifier": shared_identifier},
+    )
+    cbi_service.entity_service._entities.set("ent_target_a", _entity_to_dict(ent_a))
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        consortium_id="c_tri_m63_docker",
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b", "bank_c"],
+        query_entity_id="ent_target_a",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+        use_established_psi=True,
+        require_established_psi=True,
+    )
+
+    response: MultiCounterpartyIntelligenceQueryResponse = cbi_service.query_multi_counterparty_intelligence(
+        req=req,
+        auth_token=token_a,
+    )
+
+    assert response.consortium_id == "c_tri_m63_docker"
+    assert response.requesting_bank_id == "bank_a"
+    assert response.query_entity_id == "ent_target_a"
+    assert response.counterpart_count == 2
+    assert set(response.results.keys()) == {"bank_b", "bank_c"}
+
+    # 1. Bank B outcome verification (Confirmed match over Docker OpenMined PSI)
+    sig_b = response.results["bank_b"]
+    assert sig_b.match_confirmed is True
+    assert sig_b.match_category == "PROBABILISTIC_FUZZY"
+    assert sig_b.match_confidence == 0.999999999
+    assert sig_b.contributing_institutions == ["bank_b"]
+    assert sig_b.contributing_institutions_count == 1
+    assert sig_b.execution_mode == "VERIFIED_OPERATIONAL"
+    assert sig_b.assurance_level == "REVIEWED_ESTABLISHED_PSI_VERIFIED"
+    assert sig_b.provenance["target_bank_id"] == "bank_b"
+    assert sig_b.provenance["grant_id"] == "grant_m63_ab"
+
+    # 2. Bank C outcome verification (Disjoint non-match over Docker OpenMined PSI)
+    sig_c = response.results["bank_c"]
+    assert sig_c.match_confirmed is False
+    assert sig_c.match_category == "NO_MATCH"
+    assert sig_c.match_confidence == 0.0
+    assert sig_c.contributing_institutions == []
+    assert sig_c.contributing_institutions_count == 0
+    assert sig_c.execution_mode == "VERIFIED_OPERATIONAL"
+    assert sig_c.assurance_level == "REVIEWED_ESTABLISHED_PSI_VERIFIED"
+    assert sig_c.provenance["target_bank_id"] == "bank_c"
+    assert sig_c.provenance["grant_id"] == "grant_m63_ac"
+
+
+def test_multi_counterparty_preflight_revocation_denial(
+    three_bank_docker_topology: dict[str, Any],
+    isolated_tri_governance_env: tuple[ConsortiumGovernanceService, str, str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that revoking Bank C's pairwise grant causes the entire multi-counterparty query to fail closed."""
+    gov_svc, token_a, _, token_c = isolated_tri_governance_env
+    port_coord: int = three_bank_docker_topology["port_coord"]
+    monkeypatch.setenv("CFI_COORDINATOR_URL", f"http://127.0.0.1:{port_coord}")
+
+    shared_identifier = "TR880001112223334445556667"
+    cbi_service = CrossBankIntelligenceService(consortium_service=gov_svc)
+    ent_a = Entity(
+        id="ent_target_rev",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id=hashlib.sha256(shared_identifier.encode()).hexdigest(),
+        bank_id="bank_a",
+        display_label="Revocation Test Target",
+        risk_level=RiskLevel.HIGH,
+        attributes={"raw_identifier": shared_identifier},
+    )
+    cbi_service.entity_service._entities.set("ent_target_rev", _entity_to_dict(ent_a))
+
+    # Bank C revokes bilateral grant grant_m63_ac
+    gov_svc.revoke_pairwise_operational_grant(
+        consortium_id="c_tri_m63_docker",
+        grant_id="grant_m63_ac",
+        revoking_bank_id="bank_c",
+        reason="bilateral treaty terminated by Bank C",
+        auth_token=token_c,
+    )
+
+    # Sync revoked store into containers
+    store_file = Path(gov_svc._store._store_path)
+    for c in [
+        three_bank_docker_topology["container_worker_a"],
+        three_bank_docker_topology["container_worker_b"],
+        three_bank_docker_topology["container_worker_c"],
+        three_bank_docker_topology["container_coordinator"],
+    ]:
+        _run_cmd(["docker", "cp", str(store_file), f"{c}:/tmp/consortium_store.json"], check=False)
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        consortium_id="c_tri_m63_docker",
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b", "bank_c"],
+        query_entity_id="ent_target_rev",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+        use_established_psi=True,
+    )
+
+    # Must fail closed before dispatching any queries!
+    with pytest.raises(ConsortiumSecurityError) as exc_info:
+        cbi_service.query_multi_counterparty_intelligence(req=req, auth_token=token_a)
+
+    err_msg = str(exc_info.value)
+    assert "Pairwise operational authorization rejected for bank_a <-> bank_c" in err_msg
+
+
+def test_multi_counterparty_fastapi_router_api(
+    three_bank_docker_topology: dict[str, Any],
+    isolated_tri_governance_env: tuple[ConsortiumGovernanceService, str, str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies FastAPI HTTP API router endpoint (/intelligence/query-multi)."""
+    gov_svc, token_a, token_b, _ = isolated_tri_governance_env
+    port_coord: int = three_bank_docker_topology["port_coord"]
+    monkeypatch.setenv("CFI_COORDINATOR_URL", f"http://127.0.0.1:{port_coord}")
+
+    shared_identifier = "TR770001112223334445556667"
+    client_a = three_bank_docker_topology["client_a"]
+    client_b = three_bank_docker_topology["client_b"]
+    client_c = three_bank_docker_topology["client_c"]
+
+    client_a.store_private_entity({
+        "id": "ent_api_test",
+        "bank_id": "bank_a",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["MONEY_LAUNDERING"],
+    })
+    client_b.store_private_entity({
+        "id": "ent_api_b",
+        "bank_id": "bank_b",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["MONEY_LAUNDERING"],
+    })
+    client_c.store_private_entity({
+        "id": "ent_api_c",
+        "bank_id": "bank_c",
+        "entity_type": "account",
+        "raw_identifier": "TR_CLEAN_NON_MATCHING",
+        "risk_level": "low",
+        "typologies": [],
+    })
+
+    # Register entity in router service's store
+    ent_a = Entity(
+        id="ent_api_test",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id=hashlib.sha256(shared_identifier.encode()).hexdigest(),
+        bank_id="bank_a",
+        display_label="API Test Entity",
+        risk_level=RiskLevel.HIGH,
+        attributes={"raw_identifier": shared_identifier},
+    )
+    cbi_instance = CrossBankIntelligenceService.get_instance()
+    cbi_instance.consortium_service = gov_svc
+    cbi_instance.entity_service._entities.set("ent_api_test", _entity_to_dict(ent_a))
+
+    http_client = TestClient(app)
+
+    # 1. Successful query by Bank A analyst
+    payload = {
+        "consortium_id": "c_tri_m63_docker",
+        "requesting_bank_id": "bank_a",
+        "target_bank_ids": ["bank_b", "bank_c"],
+        "query_entity_id": "ent_api_test",
+        "purpose": "AML_COLLABORATIVE_INVESTIGATION",
+        "execution_mode": "VERIFIED_OPERATIONAL",
+        "use_established_psi": True,
+        "require_established_psi": True,
+    }
+    resp = http_client.post(
+        "/api/v1/intelligence/cross-bank/query-multi",
+        json=payload,
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert resp.status_code == 200, f"Router returned {resp.status_code}: {resp.text}"
+    data = resp.json()
+    assert data["requesting_bank_id"] == "bank_a"
+    assert data["counterpart_count"] == 2
+    assert "bank_b" in data["results"]
+    assert "bank_c" in data["results"]
+    assert data["results"]["bank_b"]["match_confirmed"] is True
+    assert data["results"]["bank_c"]["match_confirmed"] is False
+
+    # Also verify dual routing prefix /v1/intelligence/cross-bank/query-multi
+    resp_v1 = http_client.post(
+        "/v1/intelligence/cross-bank/query-multi",
+        json=payload,
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert resp_v1.status_code == 200
+
+    # 2. Cross-tenant impersonation attempt (Bank B token claiming requesting_bank_id = 'bank_a')
+    resp_impersonation = http_client.post(
+        "/api/v1/intelligence/cross-bank/query-multi",
+        json=payload,
+        headers={"Authorization": f"Bearer {token_b}"},
+    )
+    assert resp_impersonation.status_code == 403, (
+        f"Impersonation was not rejected: {resp_impersonation.status_code}"
+    )
+
+    # 3. Validation rejection for duplicate targets
+    invalid_dup = dict(payload)
+    invalid_dup["target_bank_ids"] = ["bank_b", "bank_b"]
+    resp_dup = http_client.post(
+        "/api/v1/intelligence/cross-bank/query-multi",
+        json=invalid_dup,
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert resp_dup.status_code in (400, 422)
+
+    # 4. Validation rejection for self-targeting
+    invalid_self = dict(payload)
+    invalid_self["target_bank_ids"] = ["bank_a", "bank_b"]
+    resp_self = http_client.post(
+        "/api/v1/intelligence/cross-bank/query-multi",
+        json=invalid_self,
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert resp_self.status_code in (400, 422)

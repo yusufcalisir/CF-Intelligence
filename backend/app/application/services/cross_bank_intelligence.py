@@ -24,6 +24,8 @@ from app.application.schemas.cross_bank_intelligence import (
     CrossBankIntelligenceSignal,
     DisclosureMode,
     MatchCategory,
+    MultiCounterpartyIntelligenceQueryRequest,
+    MultiCounterpartyIntelligenceQueryResponse,
     SanitizedRiskLevel,
 )
 from app.application.services.case_service import (
@@ -750,10 +752,22 @@ class CrossBankIntelligenceService:
                 "Adoption rejection: Participating banks are not active members of the consortium."
             )
 
-        operational_grant = consortium.metadata.get("operational_data_sharing_grant") or {}
-        grant_id = operational_grant.get("grant_id", f"grant_{clean_consortium_id}")
-        grant_revision = int(operational_grant.get("revision", 1))
-        grant_scope_digest = operational_grant.get("scope_digest", "")
+        is_auth, auth_reason, resolved_grant = (
+            self.consortium_service.resolve_pairwise_authorization(
+                consortium_id=clean_consortium_id,
+                requesting_bank_id=clean_requesting,
+                counterpart_bank_id=clean_target,
+                purpose=expected_req.purpose,
+            )
+        )
+        if not is_auth or not resolved_grant:
+            raise ConsortiumSecurityError(
+                f"Adoption rejection: Pairwise operational authorization failed for {clean_requesting} <-> {clean_target}: {auth_reason}"
+            )
+
+        grant_id = str(resolved_grant.get("grant_id", "")).strip()
+        grant_revision = int(resolved_grant.get("revision", 1))
+        grant_scope_digest = str(resolved_grant.get("scope_digest", "")).strip()
         if not grant_scope_digest:
             from app.application.services.consortium_service import (
                 compute_operational_grant_scope_digest,
@@ -761,12 +775,12 @@ class CrossBankIntelligenceService:
             grant_scope_digest = compute_operational_grant_scope_digest(
                 grant_id=grant_id,
                 revision=grant_revision,
-                participating_banks=list(operational_grant.get("participating_banks", [clean_requesting, clean_target])),
-                allowed_purposes=list(operational_grant.get("allowed_purposes", [expected_req.purpose])),
-                institution_jurisdictions=dict(operational_grant.get("institution_jurisdictions", {clean_requesting: "EU", clean_target: "EU"})),
-                allowed_jurisdictions=list(operational_grant.get("allowed_jurisdictions", ["EU", "US"])),
-                allow_cross_border=bool(operational_grant.get("allow_cross_border", False)),
-                allow_institution_identity_sharing=bool(operational_grant.get("allow_institution_identity_sharing", False)),
+                participating_banks=list(resolved_grant.get("participating_banks", [clean_requesting, clean_target])),
+                allowed_purposes=list(resolved_grant.get("allowed_purposes", [expected_req.purpose])),
+                institution_jurisdictions=dict(resolved_grant.get("institution_jurisdictions", {clean_requesting: "EU", clean_target: "EU"})),
+                allowed_jurisdictions=list(resolved_grant.get("allowed_jurisdictions", ["EU", "US"])),
+                allow_cross_border=bool(resolved_grant.get("allow_cross_border", False)),
+                allow_institution_identity_sharing=bool(resolved_grant.get("allow_institution_identity_sharing", False)),
             )
 
         if ticket.get("grant_id") != grant_id:
@@ -782,12 +796,6 @@ class CrossBankIntelligenceService:
                 "Adoption rejection: Ticket grant scope digest mismatch with active consortium grant."
             )
 
-        is_grant_active = bool(operational_grant.get("is_active", False) and operational_grant.get("status") != "REVOKED")
-        revoked_institutions = set(operational_grant.get("revoked_by_institutions") or [])
-        if not is_grant_active or clean_requesting in revoked_institutions or clean_target in revoked_institutions:
-            raise ConsortiumSecurityError(
-                f"Adoption rejection: Bilateral operational consent for grant '{grant_id}' has been revoked."
-            )
 
         # 4. Identity & Session Consistency Binding
         prov_job_id = provenance.get("job_id")
@@ -1455,6 +1463,239 @@ class CrossBankIntelligenceService:
             signal.disclosure_mode,
         )
         return signal
+
+    def query_multi_counterparty_intelligence(
+        self,
+        req: MultiCounterpartyIntelligenceQueryRequest,
+        auth_token: str | None = None,
+        principal: AuthenticatedPrincipal | None = None,
+        actor: str | None = None,
+    ) -> MultiCounterpartyIntelligenceQueryResponse:
+        """Execute authorized multi-counterparty cross-bank intelligence queries.
+
+        Enforces:
+        - Authenticated institutional principal bound to requesting bank.
+        - Permitted intelligence query analyst roles.
+        - Actor integrity.
+        - Requesting bank entity ownership in local registry.
+        - Active consortium membership and absence of eviction.
+        - Explicit, non-empty, distinct target_bank_ids without self-targeting.
+        - Independent pre-flight pairwise governance authorization for EVERY target.
+          Fails closed immediately if any target lacks bilateral authorization; never silently omits.
+        - Independent operational OpenMined PSI execution per target bank.
+        - Per-signal cryptographic verification, admission, and linearized publication.
+        - Separately identifiable, sanitized results returned per counterpart.
+        """
+        clean_requesting = req.requesting_bank_id.lower().strip()
+        clean_consortium_id = req.consortium_id.lower().strip()
+        clean_purpose = req.purpose.strip()
+
+        # 1. Authoritative Institutional Principal & Role Verification
+        auth_principal = self._authenticate_principal(principal=principal, auth_token=auth_token)
+        caller_bank = (auth_principal.tenant_id or "").lower().strip()
+
+        if not auth_principal.is_privileged and caller_bank != clean_requesting:
+            raise PermissionError(
+                f"Institutional impersonation rejected: Authenticated principal belongs to '{caller_bank}', "
+                f"cannot execute multi-counterparty queries on behalf of institution '{req.requesting_bank_id}'."
+            )
+
+        if not any(r in PERMITTED_INTELLIGENCE_ROLES for r in auth_principal.roles):
+            raise PermissionError(
+                f"Principal '{auth_principal.principal_id}' lacks permitted intelligence query role. "
+                f"Permitted roles: {sorted(PERMITTED_INTELLIGENCE_ROLES)}."
+            )
+
+        audited_actor = auth_principal.principal_id
+        if actor and actor.lower().strip() != audited_actor.lower().strip():
+            raise PermissionError(
+                f"Caller-supplied actor identity ('{actor}') does not match authenticated principal ('{audited_actor}')."
+            )
+
+        # 2. Hardware Enclave & Operational Mode Attestation (Fail-Closed)
+        if req.require_hardware_attestation:
+            raise RuntimeError(
+                "Hardware attestation unavailable: Physical hardware enclave is absent in this runtime. "
+                "Production hardware attestation requirement failed closed."
+            )
+
+        if req.execution_mode == "SIMULATED_RESEARCH":
+            from app.config import get_settings
+
+            settings = get_settings()
+            if settings.is_production or settings.app_env.lower() in ("production", "prod"):
+                raise ConsortiumSecurityError(
+                    "Research simulation mode is strictly prohibited in production environments. "
+                    "Production operations require verified operational matching with cryptographic attestation."
+                )
+            if not settings.is_cross_bank_simulation_allowed():
+                raise ConsortiumSecurityError(
+                    "Research simulation mode is disabled in this environment. Explicit configuration opt-in "
+                    "(enable_cross_bank_simulation) in an approved research/development environment is required."
+                )
+
+        # 3. Authoritative Consortium Governance & Active Membership
+        consortium = self.consortium_service.get_consortium(clean_consortium_id)
+        if not consortium:
+            raise ConsortiumSecurityError(
+                f"Consortium '{clean_consortium_id}' does not exist or has not been established."
+            )
+        if consortium.status != ConsortiumStatus.ACTIVE:
+            raise ConsortiumSecurityError(
+                f"Consortium '{clean_consortium_id}' is in non-active status '{consortium.status.value}'. "
+                "Cross-bank intelligence queries are prohibited."
+            )
+
+        if clean_requesting in consortium.removed_members:
+            raise ConsortiumSecurityError(
+                f"Institution '{clean_requesting}' has been revoked or evicted from consortium '{clean_consortium_id}'."
+            )
+        if clean_requesting not in consortium.members:
+            raise ConsortiumSecurityError(
+                f"Institution '{clean_requesting}' is not an active member of consortium '{clean_consortium_id}'."
+            )
+
+        # 4. Local Entity Verification & Anti-Enumeration Protection
+        if not req.query_entity_id or not req.query_entity_id.strip():
+            raise ValueError(
+                "Mandatory query_entity_id missing: Cross-bank queries must reference a verified local entity belonging to the requesting institution."
+            )
+
+        val = self.entity_service._entities.get(req.query_entity_id)
+        if not val:
+            raise ValueError(
+                f"Local entity '{req.query_entity_id}' not found in institution '{clean_requesting}' database. "
+                "Arbitrary privacy-hash or unverified entity probing is prohibited."
+            )
+
+        from app.application.services.entity_resolution import _dict_to_entity
+
+        source_entity = _dict_to_entity(val)
+        if source_entity.bank_id.lower().strip() != clean_requesting:
+            raise PermissionError(
+                f"Cross-tenant access violation: Entity '{req.query_entity_id}' belongs to "
+                f"'{source_entity.bank_id}', not requesting institution '{clean_requesting}'."
+            )
+
+        query_privacy_id = source_entity.privacy_id
+        if req.privacy_id and req.privacy_id.strip() != query_privacy_id:
+            raise ValueError(
+                f"Supplied privacy_id does not match the authoritative hash for local entity '{req.query_entity_id}'."
+            )
+
+        if req.execution_mode == "SIMULATED_RESEARCH" and bool(
+            (source_entity.attributes or {}).get("is_production_operational", False)
+        ):
+            raise ConsortiumSecurityError(
+                "Operational data leak prevention: Local entity is tagged as operational production data. "
+                "Querying operational data via SIMULATED_RESEARCH mode is strictly prohibited."
+            )
+
+        # 5. Case Verification if case_id specified
+        req_case_id = getattr(req, "case_id", None)
+        if req_case_id:
+            case = self.case_service.get_case(req_case_id)
+            if not case:
+                raise ValueError(f"Investigation case '{req_case_id}' not found.")
+            case_bank = getattr(case, "bank_id", None)
+            if case_bank and str(case_bank).lower().strip() != clean_requesting:
+                raise PermissionError(
+                    f"Cross-tenant access violation: Case '{req_case_id}' belongs to '{case_bank}', not '{clean_requesting}'."
+                )
+            if not case.is_open:
+                raise TerminalCaseImmutableError(
+                    f"Invalid query: Case '{req_case_id}' is finalized in terminal state."
+                )
+
+        # 6. Target Institutions Validation & Pre-flight Pairwise Governance Verification
+        if not req.target_bank_ids:
+            raise ValueError("target_bank_ids must contain at least one counterpart institution.")
+        if len(req.target_bank_ids) > 10:
+            raise ValueError("target_bank_ids exceeds maximum permitted counterpart institutions (10).")
+
+        clean_targets: list[str] = []
+        seen_targets: set[str] = set()
+        for t in req.target_bank_ids:
+            clean_t = t.lower().strip()
+            if not clean_t:
+                raise ValueError("Target bank ID must be non-empty.")
+            if clean_t in seen_targets:
+                raise ValueError(f"Duplicate target bank ID '{clean_t}' detected in query request.")
+            if clean_t == clean_requesting:
+                raise ValueError(
+                    f"Self-targeting is prohibited: requesting institution '{clean_requesting}' cannot be a target."
+                )
+            if clean_t in consortium.removed_members:
+                raise ConsortiumSecurityError(
+                    f"Target institution '{clean_t}' has been revoked or evicted from consortium '{clean_consortium_id}'."
+                )
+            if clean_t not in consortium.members:
+                raise ConsortiumSecurityError(
+                    f"Target institution '{clean_t}' is not an active member of consortium '{clean_consortium_id}'."
+                )
+
+            # Independent Pairwise Governance Authorization Pre-flight check
+            is_auth, auth_reason, resolved_grant = (
+                self.consortium_service.resolve_pairwise_authorization(
+                    consortium_id=clean_consortium_id,
+                    requesting_bank_id=clean_requesting,
+                    counterpart_bank_id=clean_t,
+                    purpose=clean_purpose,
+                )
+            )
+            if not is_auth or not resolved_grant:
+                raise ConsortiumSecurityError(
+                    f"Pairwise operational authorization rejected for {clean_requesting} <-> {clean_t}: {auth_reason}"
+                )
+
+            seen_targets.add(clean_t)
+            clean_targets.append(clean_t)
+
+        # 7. Execute Verified Operational Matching / Established PSI Per Counterpart
+        results: dict[str, CrossBankIntelligenceSignal] = {}
+        for clean_target in clean_targets:
+            single_req = CrossBankIntelligenceQueryRequest(
+                requesting_bank_id=clean_requesting,
+                query_entity_id=req.query_entity_id,
+                privacy_id=req.privacy_id,
+                consortium_id=clean_consortium_id,
+                target_bank_id=clean_target,
+                case_id=req.case_id,
+                purpose=req.purpose,
+                execution_mode=req.execution_mode,
+                require_hardware_attestation=req.require_hardware_attestation,
+                use_established_psi=req.use_established_psi,
+                require_established_psi=req.require_established_psi,
+                protocol=req.protocol,
+                pilot_id=req.pilot_id,
+            )
+            if req.execution_mode == "VERIFIED_OPERATIONAL":
+                signal = self._execute_verified_operational_psi(
+                    req=single_req,
+                    auth_token=auth_token,
+                    auth_principal=auth_principal,
+                    audited_actor=audited_actor,
+                )
+            else:
+                signal = self.query_cross_bank_intelligence(
+                    req=single_req,
+                    auth_token=auth_token,
+                    principal=auth_principal,
+                    actor=audited_actor,
+                )
+            results[clean_target] = signal
+
+        now_iso = datetime.datetime.now(UTC).isoformat()
+        return MultiCounterpartyIntelligenceQueryResponse(
+            query_id=str(uuid.uuid4()),
+            consortium_id=clean_consortium_id,
+            requesting_bank_id=clean_requesting,
+            query_entity_id=req.query_entity_id,
+            counterpart_count=len(clean_targets),
+            results=results,
+            executed_at=now_iso,
+        )
+
 
     def attach_signal_to_case_evidence(
         self,

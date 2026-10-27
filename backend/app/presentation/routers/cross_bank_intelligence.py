@@ -17,6 +17,8 @@ from app.application.schemas.cross_bank_intelligence import (
     CrossBankEvidenceAttachResponse,
     CrossBankIntelligenceQueryRequest,
     CrossBankIntelligenceSignal,
+    MultiCounterpartyIntelligenceQueryRequest,
+    MultiCounterpartyIntelligenceQueryResponse,
 )
 from app.application.services.case_service import CaseNotFoundError, TerminalCaseImmutableError
 from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
@@ -63,6 +65,75 @@ def query_cross_bank_intelligence(
 
     try:
         return service.query_cross_bank_intelligence(
+            req=req,
+            principal=principal,
+        )
+    except ConsortiumSecurityError as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Consortium governance authorization rejected: {err}",
+        ) from err
+    except PilotGovernanceError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Pilot governance rejected: {err}",
+        ) from err
+    except PermissionError as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(err),
+        ) from err
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
+    except RuntimeError as err:
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail=str(err),
+        ) from err
+
+
+@router.post(
+    "/query-multi",
+    response_model=MultiCounterpartyIntelligenceQueryResponse,
+    status_code=status.HTTP_200_OK,
+)
+@api_router.post(
+    "/query-multi",
+    response_model=MultiCounterpartyIntelligenceQueryResponse,
+    status_code=status.HTTP_200_OK,
+)
+@router.post(
+    "/multi-query",
+    response_model=MultiCounterpartyIntelligenceQueryResponse,
+    status_code=status.HTTP_200_OK,
+)
+@api_router.post(
+    "/multi-query",
+    response_model=MultiCounterpartyIntelligenceQueryResponse,
+    status_code=status.HTTP_200_OK,
+)
+def query_multi_counterparty_intelligence(
+    req: MultiCounterpartyIntelligenceQueryRequest,
+    principal: PrincipalDep,
+    service: CrossBankIntelligenceService = Depends(get_cross_bank_intelligence_service),
+) -> MultiCounterpartyIntelligenceQueryResponse:
+    """Execute authorized, multi-counterparty cross-bank intelligence query.
+
+    Mandates:
+    - Authenticated institutional principal bound to requesting bank.
+    - Verified intelligence analyst or investigator role.
+    - Verified local institution-owned query entity.
+    - Pre-flight pairwise governance authorization for every target institution.
+    """
+    caller_tenant = principal.tenant_id
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, req.requesting_bank_id, roles=principal.roles)
+
+    try:
+        return service.query_multi_counterparty_intelligence(
             req=req,
             principal=principal,
         )

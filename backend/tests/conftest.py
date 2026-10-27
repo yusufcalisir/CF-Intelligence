@@ -155,6 +155,22 @@ def _isolate_nonce_store_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_pilot_store_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Ensure every test has a clean, isolated DurablePilotStore SQLite file."""
+    from app.application.services.pilot_operations_service import PilotOperationsService
+    from app.infrastructure.storage.durable_pilot_store import DurablePilotStore
+
+    if "CFI_PILOT_DB_PATH" not in os.environ:
+        test_pilot_db = tmp_path / "test_pilot_operations.sqlite"
+        monkeypatch.setenv("CFI_PILOT_DB_PATH", str(test_pilot_db))
+    DurablePilotStore._instance = None
+    PilotOperationsService._instance = None
+    yield
+    DurablePilotStore._instance = None
+    PilotOperationsService._instance = None
+
+
+@pytest.fixture(autouse=True)
 def _reset_ddos_state():
     """Reset DDoSProtectionMiddleware's class-level shared request counter before each test."""
     try:

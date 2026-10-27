@@ -43,8 +43,12 @@ class DurablePilotStore:
 
     def __init__(self, db_path: str | None = None) -> None:
         if db_path is None:
-            storage_dir = get_storage_dir()
-            db_path = os.path.join(storage_dir, "cfi_pilot_operations.sqlite")
+            env_path = os.environ.get("CFI_PILOT_DB_PATH")
+            if env_path:
+                db_path = env_path
+            else:
+                storage_dir = get_storage_dir()
+                db_path = os.path.join(storage_dir, "cfi_pilot_operations.sqlite")
         self.db_path = db_path
         self._lock = threading.RLock()
         self._init_db()

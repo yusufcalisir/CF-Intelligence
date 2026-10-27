@@ -1576,8 +1576,11 @@ class IsolatedBankWorkerNode:
                 if consortium:
                     grants = getattr(consortium, "operational_data_sharing_grants", {}) or {}
                     meta_grant = consortium.metadata.get("operational_data_sharing_grant") or {}
-                    gov_grant = grants.get(clean_grant) or (
-                        meta_grant if meta_grant.get("grant_id") == clean_grant else None
+                    pairwise_grants = (consortium.metadata or {}).get("pairwise_operational_grants", {}) or {}
+                    gov_grant = (
+                        grants.get(clean_grant)
+                        or pairwise_grants.get(clean_grant)
+                        or (meta_grant if meta_grant.get("grant_id") == clean_grant else None)
                     )
                     if gov_grant:
                         allow_identities = bool(
@@ -2482,10 +2485,22 @@ class CrossBankMatchingCoordinator:
             raise ConsortiumSecurityError("Institutional worker matching credentials are not configured.")
 
         # 3b. Determine Bilateral Operational Grant and Construct Operation Authorization Ticket
-        operational_grant = consortium.metadata.get("operational_data_sharing_grant") or {}
-        grant_id = operational_grant.get("grant_id", f"grant_{clean_consortium_id}")
-        grant_revision = int(operational_grant.get("revision", 1))
-        grant_scope_digest = operational_grant.get("scope_digest", "")
+        is_auth, auth_reason, resolved_grant = (
+            self.consortium_service.resolve_pairwise_authorization(
+                consortium_id=clean_consortium_id,
+                requesting_bank_id=clean_requesting,
+                counterpart_bank_id=clean_target,
+                purpose=req.purpose,
+            )
+        )
+        if not is_auth or not resolved_grant:
+            raise ConsortiumSecurityError(
+                f"Pairwise operational authorization rejected for {clean_requesting} <-> {clean_target}: {auth_reason}"
+            )
+
+        grant_id = str(resolved_grant.get("grant_id", "")).strip()
+        grant_revision = int(resolved_grant.get("revision", 1))
+        grant_scope_digest = str(resolved_grant.get("scope_digest", "")).strip()
         if not grant_scope_digest:
             from app.application.services.consortium_service import (
                 compute_operational_grant_scope_digest,
@@ -2495,24 +2510,29 @@ class CrossBankMatchingCoordinator:
                 grant_id=grant_id,
                 revision=grant_revision,
                 participating_banks=list(
-                    operational_grant.get("participating_banks", [clean_requesting, clean_target])
+                    resolved_grant.get("participating_banks", [clean_requesting, clean_target])
                 ),
                 allowed_purposes=list(
-                    operational_grant.get("allowed_purposes", [req.purpose])
+                    resolved_grant.get("allowed_purposes", [req.purpose])
                 ),
                 institution_jurisdictions=dict(
-                    operational_grant.get(
+                    resolved_grant.get(
                         "institution_jurisdictions",
                         {clean_requesting: "EU", clean_target: "EU"},
                     )
                 ),
                 allowed_jurisdictions=list(
-                    operational_grant.get("allowed_jurisdictions", ["EU", "US"])
+                    resolved_grant.get("allowed_jurisdictions", ["EU", "US"])
                 ),
-                allow_cross_border=bool(operational_grant.get("allow_cross_border", False)),
+                allow_cross_border=bool(resolved_grant.get("allow_cross_border", False)),
                 allow_institution_identity_sharing=bool(
-                    operational_grant.get("allow_institution_identity_sharing", False)
+                    resolved_grant.get("allow_institution_identity_sharing", False)
                 ),
+            )
+
+        if not grant_id or not grant_scope_digest:
+            raise ConsortiumSecurityError(
+                f"Pairwise operational grant for {clean_requesting} <-> {clean_target} lacks authentic grant_id or scope_digest."
             )
 
         session_ticket_id = str(uuid.uuid4())
@@ -2667,7 +2687,9 @@ class CrossBankMatchingCoordinator:
             [clean_target] if (receipt.match_confirmed and allow_identities) else []
         )
         disclosure_mode_literal: DisclosureMode = (
-            "ATTRIBUTED_INSTITUTIONS" if allow_identities else "ANONYMIZED_SUMMARY"
+            "ATTRIBUTED_INSTITUTIONS"
+            if (receipt.match_confirmed and allow_identities)
+            else "ANONYMIZED_SUMMARY"
         )
 
         max_risk = receipt.matched_risk_level if receipt.match_confirmed else "UNOBSERVED"

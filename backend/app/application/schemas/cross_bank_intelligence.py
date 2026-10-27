@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 _SAFE_TEXT_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
@@ -98,11 +98,111 @@ class CrossBankIntelligenceQueryRequest(BaseModel):
     )
 
 
+class MultiCounterpartyIntelligenceQueryRequest(BaseModel):
+    """Request payload for authorized multi-counterparty cross-bank intelligence query."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    requesting_bank_id: str = Field(
+        ...,
+        min_length=2,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Authoritative requesting institution ID.",
+    )
+    query_entity_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        description="Authoritative requesting bank internal entity ID. Must belong to requesting bank.",
+    )
+    privacy_id: str | None = Field(
+        default=None,
+        max_length=256,
+        description="Optional expected privacy hash to verify against local entity.",
+    )
+    consortium_id: str = Field(
+        default="consortium_alpha",
+        min_length=2,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Consortium ID governing cross-bank intelligence sharing.",
+    )
+    target_bank_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=10,
+        description="Explicit, non-empty list of distinct counterpart institution IDs (max 10).",
+    )
+    case_id: str | None = Field(
+        default=None,
+        max_length=128,
+        description="Optional active case ID to bind and verify against the query.",
+    )
+    purpose: str = Field(
+        default="AML_COLLABORATIVE_INVESTIGATION",
+        max_length=128,
+        description="Permitted intelligence query purpose under consortium sharing treaty.",
+    )
+    execution_mode: Literal["VERIFIED_OPERATIONAL", "SIMULATED_RESEARCH"] = Field(
+        default="SIMULATED_RESEARCH",
+        description="Execution mode: VERIFIED_OPERATIONAL requires hardware enclave and multi-party PSI; SIMULATED_RESEARCH is software emulation.",
+    )
+    require_hardware_attestation: bool = Field(
+        default=False,
+        description="If True, strictly requires physical hardware enclave attestation; fails closed if unavailable.",
+    )
+    use_established_psi: bool = Field(
+        default=False,
+        description="Whether to execute reviewed established PSI protocol (OpenMined PSI ECDH) instead of protocol prototype.",
+    )
+    require_established_psi: bool = Field(
+        default=False,
+        description="If True, strictly fails closed if reviewed established PSI is unavailable.",
+    )
+    protocol: str = Field(
+        default="",
+        max_length=64,
+        description="Optional explicit protocol selection (e.g. OPENMINED_PSI, DH-PSI-2048-MODP).",
+    )
+    pilot_id: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Optional active controlled two-bank pilot ID governing this execution.",
+    )
+
+    @model_validator(mode="after")
+    def validate_multi_targets(self) -> MultiCounterpartyIntelligenceQueryRequest:
+        if not self.target_bank_ids:
+            raise ValueError("target_bank_ids must contain at least one counterpart institution.")
+        if len(self.target_bank_ids) > 10:
+            raise ValueError("target_bank_ids exceeds maximum permitted counterpart institutions (10).")
+
+        seen: set[str] = set()
+        cleaned_targets: list[str] = []
+        clean_req = self.requesting_bank_id.lower().strip()
+        for t in self.target_bank_ids:
+            clean_t = t.lower().strip()
+            if not clean_t:
+                raise ValueError("Target bank ID must be non-empty.")
+            if clean_t in seen:
+                raise ValueError(f"Duplicate target bank ID '{clean_t}' detected in query request.")
+            if clean_t == clean_req:
+                raise ValueError(
+                    f"Self-targeting is prohibited: requesting institution '{clean_req}' cannot be in target_bank_ids."
+                )
+            seen.add(clean_t)
+            cleaned_targets.append(clean_t)
+
+        self.target_bank_ids = cleaned_targets
+        return self
+
 
 class CrossBankIntelligenceSignal(BaseModel):
     """Sanitized, institution-scoped cross-bank intelligence signal."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
+
 
     signal_id: str = Field(..., description="Unique immutable signal ID.")
     consortium_id: str = Field(..., description="Authoritative consortium ID.")
@@ -169,6 +269,25 @@ class CrossBankIntelligenceSignal(BaseModel):
         ),
         description="Mandatory regulatory disclaimer.",
     )
+
+
+class MultiCounterpartyIntelligenceQueryResponse(BaseModel):
+    """Response payload for multi-counterparty cross-bank intelligence query."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    query_id: str = Field(..., description="Unique query execution batch identifier.")
+    consortium_id: str = Field(..., description="Authoritative consortium ID.")
+    requesting_bank_id: str = Field(..., description="Authoritative requesting institution ID.")
+    query_entity_id: str = Field(..., description="Requesting bank's entity ID.")
+    counterpart_count: int = Field(
+        ..., ge=1, description="Number of distinct counterpart institutions queried."
+    )
+    results: dict[str, CrossBankIntelligenceSignal] = Field(
+        ...,
+        description="Map of counterpart bank ID to separately verifiable, sanitized cross-bank intelligence signal.",
+    )
+    executed_at: str = Field(..., description="ISO-8601 execution timestamp.")
 
 
 class CrossBankEvidenceAttachRequest(BaseModel):
