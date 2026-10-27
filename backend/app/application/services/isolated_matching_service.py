@@ -2069,11 +2069,52 @@ class InstitutionalWorkerClient:
         try:
             with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
                 body = resp.read()
-                return cast("dict[str, Any]", json.loads(body.decode("utf-8")))
-        except Exception as exc:
+        except TimeoutError as exc:
+            raise CounterpartyTimeoutError(
+                f"Worker probe timed out for '{self.bank_id}': {exc}"
+            ) from exc
+        except (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected) as exc:
             raise CounterpartyWorkerUnavailableError(
                 f"Worker unreachable on health probe for '{self.bank_id}': {exc}"
             ) from exc
+        except urllib.error.URLError as exc:
+            reason = getattr(exc, "reason", None)
+            if isinstance(reason, (TimeoutError, socket.timeout)):
+                raise CounterpartyTimeoutError(
+                    f"Worker probe timed out for '{self.bank_id}': {exc}"
+                ) from exc
+            if isinstance(reason, (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected)):
+                raise CounterpartyWorkerUnavailableError(
+                    f"Worker unreachable on health probe for '{self.bank_id}': {exc}"
+                ) from exc
+            if isinstance(reason, (socket.gaierror, socket.herror)):
+                raise CounterpartyWorkerUnavailableError(
+                    f"Worker unreachable on health probe for '{self.bank_id}' (DNS resolution failed): {exc}"
+                ) from exc
+            raise CounterpartyTransportError(
+                f"Worker probe transport error for '{self.bank_id}': {exc}"
+            ) from exc
+        except (http.client.HTTPException, OSError) as exc:
+            raise CounterpartyTransportError(
+                f"Worker probe transport error for '{self.bank_id}': {exc}"
+            ) from exc
+
+        try:
+            body_text = body.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Worker for '{self.bank_id}' returned non-UTF8 response: {exc}") from exc
+
+        try:
+            data = json.loads(body_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Worker for '{self.bank_id}' returned malformed JSON response: {exc}") from exc
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"Worker for '{self.bank_id}' returned unexpected payload type: expected dict, got {type(data).__name__}"
+            )
+
+        return data
 
     def get_public_key(self) -> str:
         """Fetch worker institutional sovereign Ed25519 public key."""
@@ -2083,12 +2124,51 @@ class InstitutionalWorkerClient:
         req = urllib.request.Request(url, method="GET")
         try:
             with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
-                data = json.loads(resp.read().decode("utf-8"))
-                return str(data["public_key_hex"])
-        except Exception as exc:
+                body = resp.read()
+        except TimeoutError as exc:
+            raise CounterpartyTimeoutError(
+                f"Worker probe timed out for '{self.bank_id}': {exc}"
+            ) from exc
+        except (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected) as exc:
             raise CounterpartyWorkerUnavailableError(
                 f"Worker unreachable on public-key probe for '{self.bank_id}': {exc}"
             ) from exc
+        except urllib.error.URLError as exc:
+            reason = getattr(exc, "reason", None)
+            if isinstance(reason, (TimeoutError, socket.timeout)):
+                raise CounterpartyTimeoutError(
+                    f"Worker probe timed out for '{self.bank_id}': {exc}"
+                ) from exc
+            if isinstance(reason, (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected)):
+                raise CounterpartyWorkerUnavailableError(
+                    f"Worker unreachable on public-key probe for '{self.bank_id}': {exc}"
+                ) from exc
+            if isinstance(reason, (socket.gaierror, socket.herror)):
+                raise CounterpartyWorkerUnavailableError(
+                    f"Worker unreachable on public-key probe for '{self.bank_id}' (DNS resolution failed): {exc}"
+                ) from exc
+            raise CounterpartyTransportError(
+                f"Worker probe transport error for '{self.bank_id}': {exc}"
+            ) from exc
+        except (http.client.HTTPException, OSError) as exc:
+            raise CounterpartyTransportError(
+                f"Worker probe transport error for '{self.bank_id}': {exc}"
+            ) from exc
+
+        try:
+            body_text = body.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Worker for '{self.bank_id}' returned non-UTF8 response: {exc}") from exc
+
+        try:
+            data = json.loads(body_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Worker for '{self.bank_id}' returned malformed JSON response: {exc}") from exc
+
+        if not isinstance(data, dict) or "public_key_hex" not in data:
+            raise ValueError(f"Worker for '{self.bank_id}' returned invalid public-key response payload")
+
+        return str(data["public_key_hex"])
 
     def _post(self, path: str, payload: dict[str, Any], token: str | None = None) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
@@ -2108,7 +2188,6 @@ class InstitutionalWorkerClient:
         try:
             with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
                 body = resp.read()
-                return cast("dict[str, Any]", json.loads(body.decode("utf-8")))
         except urllib.error.HTTPError as http_err:
             try:
                 err_body = json.loads(http_err.read().decode())
@@ -2127,7 +2206,14 @@ class InstitutionalWorkerClient:
                 if http_err.code in (502, 503, 504):
                     raise CounterpartyTransportError(f"HTTP {http_err.code} from worker '{self.bank_id}'") from http_err
                 raise ValueError(err_msg) from http_err
-            except (ConsortiumSecurityError, PermissionError, ValueError):
+            except (
+                CounterpartyTimeoutError,
+                CounterpartyWorkerUnavailableError,
+                CounterpartyTransportError,
+                ConsortiumSecurityError,
+                PermissionError,
+                ValueError,
+            ):
                 raise
             except Exception:
                 if http_err.code in (502, 503, 504):
@@ -2155,13 +2241,36 @@ class InstitutionalWorkerClient:
                 raise CounterpartyWorkerUnavailableError(
                     f"Institutional bank worker for '{self.bank_id}' is unreachable or offline: {exc}"
                 ) from exc
-            raise CounterpartyWorkerUnavailableError(
-                f"Institutional bank worker for '{self.bank_id}' is unreachable or timed out: {exc}"
+            if isinstance(reason, (socket.gaierror, socket.herror)):
+                raise CounterpartyWorkerUnavailableError(
+                    f"Institutional bank worker for '{self.bank_id}' is unreachable (DNS resolution failed): {exc}"
+                ) from exc
+            raise CounterpartyTransportError(
+                f"Institutional bank worker for '{self.bank_id}' network transport error: {exc}"
             ) from exc
-        except Exception as exc:
-            raise CounterpartyWorkerUnavailableError(
-                f"Institutional bank worker for '{self.bank_id}' is unreachable or timed out: {exc}"
+        except (http.client.HTTPException, OSError) as exc:
+            raise CounterpartyTransportError(
+                f"Institutional bank worker for '{self.bank_id}' network transport error: {exc}"
             ) from exc
+
+        # Response parsing and schema validation must execute OUTSIDE the network exception handlers.
+        # Malformed JSON or unexpected payload types MUST fail closed with safe, explicit nonrecoverable exceptions.
+        try:
+            body_text = body.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Worker for '{self.bank_id}' returned non-UTF8 response: {exc}") from exc
+
+        try:
+            data = json.loads(body_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Worker for '{self.bank_id}' returned malformed JSON response: {exc}") from exc
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"Worker for '{self.bank_id}' returned unexpected payload type: expected dict, got {type(data).__name__}"
+            )
+
+        return data
 
     def store_private_entity(self, entity: Entity | dict[str, Any]) -> str:
         ent_dict = entity.to_dict() if isinstance(entity, Entity) else dict(entity)
@@ -3023,11 +3132,48 @@ class InstitutionalCoordinatorClient:
         try:
             with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
                 body = resp.read()
-                return cast("dict[str, Any]", json.loads(body.decode("utf-8")))
+        except TimeoutError as exc:
+            raise CounterpartyTimeoutError(
+                f"Coordinator probe timed out on '{self.base_url}': {exc}"
+            ) from exc
+        except (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected) as exc:
+            raise CounterpartyWorkerUnavailableError(
+                f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            reason = getattr(exc, "reason", None)
+            if isinstance(reason, (TimeoutError, socket.timeout)):
+                raise CounterpartyTimeoutError(
+                    f"Coordinator probe timed out on '{self.base_url}': {exc}"
+                ) from exc
+            if isinstance(reason, (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected)):
+                raise CounterpartyWorkerUnavailableError(
+                    f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
+                ) from exc
+            raise ConsortiumSecurityError(
+                f"Coordinator daemon at '{self.base_url}' is unreachable: {exc}"
+            ) from exc
         except Exception as exc:
             raise ConsortiumSecurityError(
                 f"Coordinator daemon at '{self.base_url}' is unreachable: {exc}"
             ) from exc
+
+        try:
+            body_text = body.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Coordinator daemon at '{self.base_url}' returned non-UTF8 response: {exc}") from exc
+
+        try:
+            data = json.loads(body_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Coordinator daemon at '{self.base_url}' returned malformed JSON response: {exc}") from exc
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"Coordinator daemon at '{self.base_url}' returned unexpected payload type: expected dict, got {type(data).__name__}"
+            )
+
+        return data
 
     def get_topology(self) -> dict[str, Any]:
         """Fetch registered worker topology metadata from coordinator daemon."""
@@ -3036,11 +3182,48 @@ class InstitutionalCoordinatorClient:
         try:
             with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
                 body = resp.read()
-                return cast("dict[str, Any]", json.loads(body.decode("utf-8")))
+        except TimeoutError as exc:
+            raise CounterpartyTimeoutError(
+                f"Coordinator topology probe timed out on '{self.base_url}': {exc}"
+            ) from exc
+        except (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected) as exc:
+            raise CounterpartyWorkerUnavailableError(
+                f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            reason = getattr(exc, "reason", None)
+            if isinstance(reason, (TimeoutError, socket.timeout)):
+                raise CounterpartyTimeoutError(
+                    f"Coordinator topology probe timed out on '{self.base_url}': {exc}"
+                ) from exc
+            if isinstance(reason, (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected)):
+                raise CounterpartyWorkerUnavailableError(
+                    f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
+                ) from exc
+            raise ConsortiumSecurityError(
+                f"Coordinator daemon at '{self.base_url}' is unreachable: {exc}"
+            ) from exc
         except Exception as exc:
             raise ConsortiumSecurityError(
                 f"Coordinator daemon at '{self.base_url}' is unreachable: {exc}"
             ) from exc
+
+        try:
+            body_text = body.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Coordinator daemon at '{self.base_url}' returned non-UTF8 response: {exc}") from exc
+
+        try:
+            data = json.loads(body_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Coordinator daemon at '{self.base_url}' returned malformed JSON response: {exc}") from exc
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"Coordinator daemon at '{self.base_url}' returned unexpected payload type: expected dict, got {type(data).__name__}"
+            )
+
+        return data
 
     def execute_match(
         self,
@@ -3064,8 +3247,7 @@ class InstitutionalCoordinatorClient:
         )
         try:
             with urllib.request.urlopen(request, timeout=20.0) as resp:  # nosec B310
-                data = json.loads(resp.read().decode("utf-8"))
-                return CrossBankIntelligenceSignal(**data)
+                resp_bytes = resp.read()
         except urllib.error.HTTPError as http_err:
             try:
                 err_body = json.loads(http_err.read().decode())
@@ -3117,13 +3299,40 @@ class InstitutionalCoordinatorClient:
                 raise CounterpartyWorkerUnavailableError(
                     f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
                 ) from exc
+            if isinstance(reason, (socket.gaierror, socket.herror)):
+                raise CounterpartyWorkerUnavailableError(
+                    f"Coordinator daemon at '{self.base_url}' is unreachable (DNS resolution failed): {exc}"
+                ) from exc
             raise CounterpartyTransportError(
                 f"Coordinator matching invocation failed on '{self.base_url}': {exc}"
             ) from exc
+        except (http.client.HTTPException, OSError) as exc:
+            raise CounterpartyTransportError(
+                f"Coordinator matching invocation failed on '{self.base_url}': {exc}"
+            ) from exc
+
+        # Response parsing and schema validation must execute OUTSIDE the network exception handlers.
+        # Malformed JSON, unexpected payload types, and invalid CrossBankIntelligenceSignal responses
+        # must fail closed with a safe, explicit nonrecoverable exception.
+        try:
+            raw_text = resp_bytes.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Coordinator returned non-UTF8 response: {exc}") from exc
+
+        try:
+            data = json.loads(raw_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Coordinator returned malformed JSON response: {exc}") from exc
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"Coordinator returned unexpected payload type: expected dict, got {type(data).__name__}"
+            )
+
+        try:
+            return CrossBankIntelligenceSignal(**data)
         except Exception as exc:
-            raise CounterpartyTransportError(
-                f"Coordinator matching invocation failed on '{self.base_url}': {exc}"
-            ) from exc
+            raise ValueError(f"Coordinator returned invalid signal schema: {exc}") from exc
 
 
 if __name__ == "__main__":

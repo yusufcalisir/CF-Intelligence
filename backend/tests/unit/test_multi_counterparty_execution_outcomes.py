@@ -17,7 +17,7 @@ from __future__ import annotations
 import urllib.error
 from collections.abc import Generator
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -30,8 +30,14 @@ from app.application.schemas.cross_bank_intelligence import (
 from app.application.services.consortium_service import ConsortiumGovernanceService
 from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
 from app.application.services.entity_resolution import EntityResolutionService, _entity_to_dict
+from app.application.services.isolated_matching_service import (
+    InstitutionalCoordinatorClient,
+    InstitutionalWorkerClient,
+)
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
+    CounterpartyTimeoutError,
+    CounterpartyWorkerUnavailableError,
     MemberRole,
 )
 from app.domain.investigation_entities import Entity, EntityType, RiskLevel
@@ -741,3 +747,204 @@ def test_multi_counterparty_router_fails_closed_on_integrity_violation(
     # Must be HTTP 403 Forbidden fail-closed; NEVER HTTP 200 PARTIAL_FAILURE
     assert resp.status_code == 403
     assert "Ticket ID mismatch between ticket and provenance" in resp.json()["detail"]
+
+
+def _make_mock_response(body_bytes: bytes, status: int = 200) -> MagicMock:
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = body_bytes
+    mock_resp.status = status
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = None
+    return mock_resp
+
+
+def test_coordinator_client_malformed_http200_fails_closed(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """A malformed HTTP 200 coordinator response fails closed with ValueError, not transport failure."""
+    client = InstitutionalCoordinatorClient(base_url="http://127.0.0.1:8999")
+    req = CrossBankIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        query_entity_id="cust_test_001",
+        consortium_id="consortium_tri_outcomes",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    malformed_http200 = _make_mock_response(b"<html><body>502 Bad Gateway masked as 200 OK</body></html>")
+
+    # 1. Direct client parsing raises ValueError, NOT CounterpartyTransportError
+    with patch("urllib.request.urlopen", return_value=malformed_http200):
+        with pytest.raises(ValueError, match="Coordinator returned malformed JSON response"):
+            client.execute_match(req=req, auth_token=auth_tokens["bank_a"])
+
+    # 2. Multi-counterparty query fails closed rather than yielding PARTIAL_FAILURE
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+    service = CrossBankIntelligenceService(consortium_service=gov_svc, entity_service=entity_svc)
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+
+    def mock_exec_operational(
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        if req.target_bank_id == "bank_b":
+            return sig_b
+        elif req.target_bank_id == "bank_c":
+            # Simulate coordinator client encountering malformed HTTP 200
+            with patch("urllib.request.urlopen", return_value=malformed_http200):
+                return client.execute_match(req=req, auth_token=auth_tokens["bank_a"])
+        raise ValueError(f"Unexpected target: {req.target_bank_id}")
+
+    multi_req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        consortium_id=c_id,
+        target_bank_ids=["bank_b", "bank_c"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec_operational):
+        with pytest.raises(ValueError, match="Coordinator returned malformed JSON response"):
+            service.query_multi_counterparty_intelligence(req=multi_req, auth_token=auth_tokens["bank_a"])
+
+
+def test_coordinator_client_invalid_signal_schema_http200_fails_closed(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """A well-formed HTTP 200 coordinator response with invalid schema fails closed."""
+    client = InstitutionalCoordinatorClient(base_url="http://127.0.0.1:8999")
+    req = CrossBankIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        query_entity_id="cust_test_001",
+        consortium_id="consortium_tri_outcomes",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    invalid_schema_http200 = _make_mock_response(b'{"status": "ok", "unexpected_field": "corrupted"}')
+
+    # Direct client parsing raises ValueError for schema validation
+    with patch("urllib.request.urlopen", return_value=invalid_schema_http200):
+        with pytest.raises(ValueError, match="Coordinator returned invalid signal schema"):
+            client.execute_match(req=req, auth_token=auth_tokens["bank_a"])
+
+    # Multi-counterparty query fails closed
+    gov_svc, c_id = tri_consortium
+    entity_svc = EntityResolutionService()
+    test_ent = Entity(
+        id="cust_test_001",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_test_cust_001",
+        bank_id="bank_a",
+        display_label="Test Customer",
+        risk_level=RiskLevel.HIGH,
+    )
+    entity_svc._entities.set("cust_test_001", _entity_to_dict(test_ent))
+    service = CrossBankIntelligenceService(consortium_service=gov_svc, entity_service=entity_svc)
+
+    def mock_exec_operational(
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        with patch("urllib.request.urlopen", return_value=invalid_schema_http200):
+            return client.execute_match(req=req, auth_token=auth_tokens["bank_a"])
+
+    multi_req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="cust_test_001",
+        consortium_id=c_id,
+        target_bank_ids=["bank_b"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec_operational):
+        with pytest.raises(ValueError, match="Coordinator returned invalid signal schema"):
+            service.query_multi_counterparty_intelligence(req=multi_req, auth_token=auth_tokens["bank_a"])
+
+
+def test_coordinator_client_payload_type_mismatch_fails_closed(
+    auth_tokens: dict[str, str],
+) -> None:
+    """Coordinator returning a JSON list or non-dict raises ValueError."""
+    client = InstitutionalCoordinatorClient(base_url="http://127.0.0.1:8999")
+    req = CrossBankIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        query_entity_id="cust_test_001",
+        consortium_id="consortium_tri_outcomes",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    list_payload = _make_mock_response(b'[{"signal_id": "123"}]')
+    with patch("urllib.request.urlopen", return_value=list_payload):
+        with pytest.raises(ValueError, match="Coordinator returned unexpected payload type: expected dict, got list"):
+            client.execute_match(req=req, auth_token=auth_tokens["bank_a"])
+
+
+def test_worker_client_malformed_http200_cannot_masquerade_as_worker_unavailable() -> None:
+    """A malformed HTTP 200 worker response raises ValueError and cannot masquerade as WORKER_UNAVAILABLE."""
+    worker = InstitutionalWorkerClient(bank_id="bank_c", base_url="http://127.0.0.1:8998")
+
+    malformed_http200 = _make_mock_response(b"<html>500 Internal Error as 200</html>")
+
+    # 1. _post raises ValueError on malformed JSON, NOT CounterpartyWorkerUnavailableError
+    with patch("urllib.request.urlopen", return_value=malformed_http200):
+        with pytest.raises(ValueError, match="Worker for 'bank_c' returned malformed JSON response"):
+            worker._post("/worker/store-entity", {"entity": {}})
+
+    # 2. _post raises ValueError on non-dict payload
+    non_dict_http200 = _make_mock_response(b'["not", "a", "dict"]')
+    with patch("urllib.request.urlopen", return_value=non_dict_http200):
+        with pytest.raises(ValueError, match="Worker for 'bank_c' returned unexpected payload type: expected dict, got list"):
+            worker._post("/worker/store-entity", {"entity": {}})
+
+    # 3. health_check raises ValueError on malformed JSON
+    with patch("urllib.request.urlopen", return_value=malformed_http200):
+        with pytest.raises(ValueError, match="Worker for 'bank_c' returned malformed JSON response"):
+            worker.health_check()
+
+    # 4. get_public_key raises ValueError on malformed JSON or missing key
+    with patch("urllib.request.urlopen", return_value=malformed_http200):
+        with pytest.raises(ValueError, match="Worker for 'bank_c' returned malformed JSON response"):
+            worker.get_public_key()
+
+    missing_key_http200 = _make_mock_response(b'{"wrong_key": "123"}')
+    with patch("urllib.request.urlopen", return_value=missing_key_http200):
+        with pytest.raises(ValueError, match="Worker for 'bank_c' returned invalid public-key response payload"):
+            worker.get_public_key()
+
+
+def test_worker_client_disconnection_raises_typed_worker_unavailable() -> None:
+    """Genuine connection refusal or disconnection raises typed CounterpartyWorkerUnavailableError."""
+    worker = InstitutionalWorkerClient(bank_id="bank_c", base_url="http://127.0.0.1:8998")
+
+    with patch("urllib.request.urlopen", side_effect=urllib.error.URLError(reason=ConnectionRefusedError("Connection refused"))):
+        with pytest.raises(CounterpartyWorkerUnavailableError, match="unreachable or offline"):
+            worker._post("/worker/store-entity", {"entity": {}})
+
+    with patch("urllib.request.urlopen", side_effect=TimeoutError("Request timed out")):
+        with pytest.raises(CounterpartyTimeoutError, match="timed out"):
+            worker._post("/worker/store-entity", {"entity": {}})
+
