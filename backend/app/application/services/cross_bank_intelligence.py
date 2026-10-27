@@ -344,6 +344,7 @@ class CrossBankIntelligenceService:
 
         active_pilot_id: str | None = None
         reservation_id: str | None = None
+        committed_res_id: str | None = None
         if governing_pilot is not None:
             active_pilot_id = governing_pilot.config.pilot_id
             pilot_svc.validate_pilot_query(
