@@ -51,6 +51,7 @@ from app.domain.consortium_governance import (
     CounterpartyTimeoutError,
     CounterpartyTransportError,
     CounterpartyWorkerUnavailableError,
+    CrossBankIdempotencyConflictError,
 )
 from app.domain.consortium_policy import ConsortiumPolicyEngine
 from app.domain.institutional_identity import (
@@ -64,6 +65,9 @@ from app.domain.value_objects_investigation import (
 from app.infrastructure.redis_store import RedisStore
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
+from app.infrastructure.storage.durable_idempotency_store import (
+    DurableCrossBankIdempotencyStore,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +83,33 @@ PERMITTED_INTELLIGENCE_ROLES: frozenset[str] = frozenset(
         "super_admin",
     }
 )
+
+
+def compute_multi_counterparty_request_fingerprint(
+    req: MultiCounterpartyIntelligenceQueryRequest,
+    governance_scope: dict[str, Any] | None = None,
+) -> str:
+    """Computes a deterministic canonical SHA-256 fingerprint of the query request and its governance scope."""
+    canonical_payload: dict[str, Any] = {
+        "consortium_id": req.consortium_id.lower().strip(),
+        "execution_mode": req.execution_mode.strip(),
+        "pilot_id": (req.pilot_id or "").strip(),
+        "protocol": (req.protocol or "").strip(),
+        "purpose": req.purpose.strip(),
+        "query_entity_id": req.query_entity_id.strip(),
+        "requesting_bank_id": req.requesting_bank_id.lower().strip(),
+        "require_established_psi": bool(req.require_established_psi),
+        "require_hardware_attestation": bool(req.require_hardware_attestation),
+        "target_bank_ids": sorted(list(set(t.lower().strip() for t in req.target_bank_ids))),
+        "use_established_psi": bool(req.use_established_psi),
+    }
+    if governance_scope:
+        canonical_payload["governance_scope"] = governance_scope
+
+    canonical_bytes = json.dumps(
+        canonical_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    return hashlib.sha256(canonical_bytes).hexdigest()
 
 
 class CrossBankIntelligenceService:
@@ -104,6 +135,7 @@ class CrossBankIntelligenceService:
         policy_engine: ConsortiumPolicyEngine | None = None,
         matching_coordinator: CrossBankMatchingCoordinator | None = None,
         institutional_registry: InstitutionalVerificationRegistry | None = None,
+        idempotency_store: DurableCrossBankIdempotencyStore | None = None,
     ) -> None:
         self.consortium_service = consortium_service or ConsortiumGovernanceService()
         self.entity_service = entity_service or EntityResolutionService()
@@ -117,6 +149,7 @@ class CrossBankIntelligenceService:
             policy_engine=self.policy_engine,
         )
         self.institutional_registry = institutional_registry or InstitutionalVerificationRegistry()
+        self.idempotency_store = idempotency_store or DurableCrossBankIdempotencyStore.get_instance()
         self._signal_store = RedisStore("authoritative_signals")
         self._synthetic_entity_store = RedisStore("synthetic_entities")
         self._research_case_evidence_store = RedisStore("research_case_evidence")
@@ -1669,6 +1702,7 @@ class CrossBankIntelligenceService:
         auth_token: str | None = None,
         principal: AuthenticatedPrincipal | None = None,
         actor: str | None = None,
+        idempotency_key: str | None = None,
     ) -> MultiCounterpartyIntelligenceQueryResponse:
         """Execute authorized multi-counterparty cross-bank intelligence queries.
 
@@ -1681,6 +1715,9 @@ class CrossBankIntelligenceService:
         - Explicit, non-empty, distinct target_bank_ids without self-targeting.
         - Independent pre-flight pairwise governance authorization for EVERY target.
           Fails closed immediately if any target lacks bilateral authorization; never silently omits.
+        - Optional explicit idempotency key with atomic concurrency-safe reservation acquisition.
+        - Automatic rejection of conflicting payloads or principals under the same key.
+        - Revalidation of active consortium membership, bilateral grants, and revisions on cached replay.
         - Independent operational OpenMined PSI execution per target bank.
         - Per-signal cryptographic verification, admission, and linearized publication.
         - Separately identifiable, sanitized results returned per counterpart.
@@ -1818,6 +1855,8 @@ class CrossBankIntelligenceService:
 
         clean_targets: list[str] = []
         seen_targets: set[str] = set()
+        governance_snapshot: dict[str, Any] = {}
+
         for t in req.target_bank_ids:
             clean_t = t.lower().strip()
             if not clean_t:
@@ -1851,100 +1890,233 @@ class CrossBankIntelligenceService:
                     f"Pairwise operational authorization rejected for {clean_requesting} <-> {clean_t}: {auth_reason}"
                 )
 
+            governance_snapshot[clean_t] = {
+                "grant_id": resolved_grant.get("grant_id"),
+                "revision": resolved_grant.get("revision", 1),
+                "scope_digest": resolved_grant.get("scope_digest", ""),
+            }
+
             seen_targets.add(clean_t)
             clean_targets.append(clean_t)
 
-        # 7. Execute Verified Operational Matching / Established PSI Per Counterpart
-        results: dict[str, CrossBankIntelligenceSignal] = {}
-        failures: dict[str, CounterpartyExecutionFailure] = {}
-        execution_outcomes: dict[str, CounterpartyExecutionOutcome] = {}
+        # 6.5. Durable Request Idempotency & Duplicate Execution Prevention
+        effective_idem_key = (idempotency_key or req.idempotency_key or "").strip() or None
+        idem_owner_id: str | None = None
 
-        for clean_target in clean_targets:
-            single_req = CrossBankIntelligenceQueryRequest(
-                requesting_bank_id=clean_requesting,
-                query_entity_id=req.query_entity_id,
-                privacy_id=req.privacy_id,
+        if effective_idem_key:
+            req_fingerprint = compute_multi_counterparty_request_fingerprint(req=req)
+            idem_owner_id = str(uuid.uuid4())
+            acquire_status, cached_resp_data, cached_gov_snapshot = self.idempotency_store.acquire(
                 consortium_id=clean_consortium_id,
-                target_bank_id=clean_target,
-                case_id=req.case_id,
-                purpose=req.purpose,
-                execution_mode=req.execution_mode,
-                require_hardware_attestation=req.require_hardware_attestation,
-                use_established_psi=req.use_established_psi,
-                require_established_psi=req.require_established_psi,
-                protocol=req.protocol,
-                pilot_id=req.pilot_id,
+                requesting_bank_id=clean_requesting,
+                principal_id=audited_actor,
+                idempotency_key=effective_idem_key,
+                request_fingerprint=req_fingerprint,
+                governance_snapshot=governance_snapshot,
+                owner_id=idem_owner_id,
             )
-            try:
-                if req.execution_mode == "VERIFIED_OPERATIONAL":
-                    signal = self._execute_verified_operational_psi(
-                        req=single_req,
-                        auth_token=auth_token,
-                        auth_principal=auth_principal,
-                        audited_actor=audited_actor,
+
+            if acquire_status in (
+                "INSTITUTION_MISMATCH",
+                "CONSORTIUM_MISMATCH",
+                "PRINCIPAL_MISMATCH",
+                "FINGERPRINT_MISMATCH",
+            ):
+                raise CrossBankIdempotencyConflictError(
+                    f"Idempotency key conflict: key '{effective_idem_key}' was previously used "
+                    "with a different request payload, principal, or institution."
+                )
+
+            if acquire_status == "AMBIGUOUS_EXECUTION":
+                raise CrossBankIdempotencyConflictError(
+                    f"Previous execution under idempotency key '{effective_idem_key}' terminated "
+                    "in an indeterminate state. Replay rejected."
+                )
+
+            if acquire_status == "IN_PROGRESS":
+                # Wait briefly for in-progress concurrent request to resolve
+                await_status, cached_resp_data, cached_gov_snapshot = self.idempotency_store.await_completion(
+                    consortium_id=clean_consortium_id,
+                    requesting_bank_id=clean_requesting,
+                    principal_id=audited_actor,
+                    idempotency_key=effective_idem_key,
+                    request_fingerprint=req_fingerprint,
+                    timeout=5.0,
+                )
+                if await_status == "COMPLETED":
+                    acquire_status = "COMPLETED"
+                elif await_status in ("FINGERPRINT_MISMATCH", "PRINCIPAL_MISMATCH"):
+                    raise CrossBankIdempotencyConflictError(
+                        f"Idempotency key conflict: key '{effective_idem_key}' was previously used "
+                        "with a different request payload, principal, or institution."
+                    )
+                elif await_status == "AMBIGUOUS_EXECUTION":
+                    raise CrossBankIdempotencyConflictError(
+                        f"Concurrent execution under idempotency key '{effective_idem_key}' failed "
+                        "in an indeterminate state. Replay rejected."
                     )
                 else:
-                    signal = self.query_cross_bank_intelligence(
-                        req=single_req,
-                        auth_token=auth_token,
-                        principal=auth_principal,
-                        actor=audited_actor,
+                    raise CrossBankIdempotencyConflictError(
+                        f"A query with idempotency key '{effective_idem_key}' is currently in progress. "
+                        "Concurrent duplicate execution prevented."
                     )
-                results[clean_target] = signal
-                execution_outcomes[clean_target] = CounterpartyExecutionOutcome(
-                    target_bank_id=clean_target,
-                    status="SUCCESS",
-                    signal=signal,
-                    failure=None,
-                )
-            except Exception as exc:
-                recoverable_failure = self._classify_recoverable_counterparty_failure(
-                    target_bank_id=clean_target,
-                    exc=exc,
-                )
-                if recoverable_failure is None:
-                    # Security boundary: governance, authorization, cryptographic verification,
-                    # ticket/receipt integrity, and admission failures MUST fail closed and terminate the request.
-                    raise
 
-                failures[clean_target] = recoverable_failure
-                execution_outcomes[clean_target] = CounterpartyExecutionOutcome(
+            if acquire_status == "COMPLETED" and cached_resp_data:
+                # Revalidate current consortium membership, bilateral grants, revocation state, and revisions
+                for clean_t in clean_targets:
+                    if clean_t in consortium.removed_members or clean_t not in consortium.members:
+                        raise ConsortiumSecurityError(
+                            f"Counterpart '{clean_t}' is no longer an active member of consortium '{clean_consortium_id}'. "
+                            "Cached idempotency replay rejected."
+                        )
+                    is_auth, auth_reason, current_grant = (
+                        self.consortium_service.resolve_pairwise_authorization(
+                            consortium_id=clean_consortium_id,
+                            requesting_bank_id=clean_requesting,
+                            counterpart_bank_id=clean_t,
+                            purpose=clean_purpose,
+                        )
+                    )
+                    if not is_auth or not current_grant:
+                        raise ConsortiumSecurityError(
+                            f"Pairwise operational authorization for {clean_requesting} <-> {clean_t} is no longer valid: {auth_reason}. "
+                            "Cached idempotency replay rejected."
+                        )
+                    recorded_gov = (cached_gov_snapshot or {}).get(clean_t, {})
+                    recorded_rev = recorded_gov.get("revision")
+                    recorded_digest = recorded_gov.get("scope_digest")
+                    current_rev = current_grant.get("revision", 1)
+                    current_digest = current_grant.get("scope_digest", "")
+                    if recorded_rev is not None and current_rev != recorded_rev:
+                        raise ConsortiumSecurityError(
+                            f"Operational grant for counterpart '{clean_t}' was modified since execution "
+                            f"(revision {recorded_rev} -> {current_rev}). Stale result replay rejected."
+                        )
+                    if recorded_digest and current_digest != recorded_digest:
+                        raise ConsortiumSecurityError(
+                            f"Operational grant scope digest for counterpart '{clean_t}' was modified. "
+                            "Stale result replay rejected."
+                        )
+
+                replayed_resp = MultiCounterpartyIntelligenceQueryResponse(**cached_resp_data)
+                replayed_resp._idempotency_replayed = True
+                return replayed_resp
+
+        # 7. Execute Verified Operational Matching / Established PSI Per Counterpart
+        try:
+            results: dict[str, CrossBankIntelligenceSignal] = {}
+            failures: dict[str, CounterpartyExecutionFailure] = {}
+            execution_outcomes: dict[str, CounterpartyExecutionOutcome] = {}
+
+            for clean_target in clean_targets:
+                single_req = CrossBankIntelligenceQueryRequest(
+                    requesting_bank_id=clean_requesting,
+                    query_entity_id=req.query_entity_id,
+                    privacy_id=req.privacy_id,
+                    consortium_id=clean_consortium_id,
                     target_bank_id=clean_target,
-                    status="FAILED",
-                    signal=None,
-                    failure=recoverable_failure,
+                    case_id=req.case_id,
+                    purpose=req.purpose,
+                    execution_mode=req.execution_mode,
+                    require_hardware_attestation=req.require_hardware_attestation,
+                    use_established_psi=req.use_established_psi,
+                    require_established_psi=req.require_established_psi,
+                    protocol=req.protocol,
+                    pilot_id=req.pilot_id,
                 )
-                logger.warning(
-                    "Counterpart '%s' execution failed with recoverable transport error: [%s] %s",
-                    clean_target,
-                    recoverable_failure.error_category,
-                    recoverable_failure.error_message,
+                try:
+                    if req.execution_mode == "VERIFIED_OPERATIONAL":
+                        signal = self._execute_verified_operational_psi(
+                            req=single_req,
+                            auth_token=auth_token,
+                            auth_principal=auth_principal,
+                            audited_actor=audited_actor,
+                        )
+                    else:
+                        signal = self.query_cross_bank_intelligence(
+                            req=single_req,
+                            auth_token=auth_token,
+                            principal=auth_principal,
+                            actor=audited_actor,
+                        )
+                    results[clean_target] = signal
+                    execution_outcomes[clean_target] = CounterpartyExecutionOutcome(
+                        target_bank_id=clean_target,
+                        status="SUCCESS",
+                        signal=signal,
+                        failure=None,
+                    )
+                except Exception as exc:
+                    recoverable_failure = self._classify_recoverable_counterparty_failure(
+                        target_bank_id=clean_target,
+                        exc=exc,
+                    )
+                    if recoverable_failure is None:
+                        # Security boundary: governance, authorization, cryptographic verification,
+                        # ticket/receipt integrity, and admission failures MUST fail closed and terminate the request.
+                        raise
+
+                    failures[clean_target] = recoverable_failure
+                    execution_outcomes[clean_target] = CounterpartyExecutionOutcome(
+                        target_bank_id=clean_target,
+                        status="FAILED",
+                        signal=None,
+                        failure=recoverable_failure,
+                    )
+                    logger.warning(
+                        "Counterpart '%s' execution failed with recoverable transport error: [%s] %s",
+                        clean_target,
+                        recoverable_failure.error_category,
+                        recoverable_failure.error_message,
+                    )
+
+            # 8. Determine overall execution outcome across queried counterparts
+            total_targets = len(clean_targets)
+            success_count = len(results)
+            if success_count == total_targets:
+                overall_outcome: OverallQueryOutcome = "COMPLETED"
+            elif success_count > 0:
+                overall_outcome = "PARTIAL_FAILURE"
+            else:
+                overall_outcome = "FAILED"
+
+            now_iso = datetime.datetime.now(UTC).isoformat()
+            response_obj = MultiCounterpartyIntelligenceQueryResponse(
+                query_id=str(uuid.uuid4()),
+                consortium_id=clean_consortium_id,
+                requesting_bank_id=clean_requesting,
+                query_entity_id=req.query_entity_id,
+                counterpart_count=len(clean_targets),
+                overall_outcome=overall_outcome,
+                outcome=overall_outcome,
+                results=results,
+                failures=failures,
+                execution_outcomes=execution_outcomes,
+                executed_at=now_iso,
+            )
+
+            if effective_idem_key and idem_owner_id:
+                self.idempotency_store.complete(
+                    consortium_id=clean_consortium_id,
+                    requesting_bank_id=clean_requesting,
+                    idempotency_key=effective_idem_key,
+                    owner_id=idem_owner_id,
+                    response_data=response_obj.model_dump(mode="json"),
+                    governance_snapshot=governance_snapshot,
                 )
 
-        # 8. Determine overall execution outcome across queried counterparts
-        total_targets = len(clean_targets)
-        success_count = len(results)
-        if success_count == total_targets:
-            overall_outcome: OverallQueryOutcome = "COMPLETED"
-        elif success_count > 0:
-            overall_outcome = "PARTIAL_FAILURE"
-        else:
-            overall_outcome = "FAILED"
-
-        now_iso = datetime.datetime.now(UTC).isoformat()
-        return MultiCounterpartyIntelligenceQueryResponse(
-            query_id=str(uuid.uuid4()),
-            consortium_id=clean_consortium_id,
-            requesting_bank_id=clean_requesting,
-            query_entity_id=req.query_entity_id,
-            counterpart_count=len(clean_targets),
-            overall_outcome=overall_outcome,
-            outcome=overall_outcome,
-            results=results,
-            failures=failures,
-            execution_outcomes=execution_outcomes,
-            executed_at=now_iso,
-        )
+            return response_obj
+        except Exception as exec_exc:
+            if effective_idem_key and idem_owner_id:
+                self.idempotency_store.fail_or_abort(
+                    consortium_id=clean_consortium_id,
+                    requesting_bank_id=clean_requesting,
+                    idempotency_key=effective_idem_key,
+                    owner_id=idem_owner_id,
+                    error_message=str(exec_exc),
+                    indeterminate=True,
+                )
+            raise
 
 
     def attach_signal_to_case_evidence(

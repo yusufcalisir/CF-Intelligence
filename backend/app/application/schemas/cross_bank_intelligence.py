@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 _SAFE_TEXT_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
@@ -169,6 +169,11 @@ class MultiCounterpartyIntelligenceQueryRequest(BaseModel):
         default=None,
         max_length=64,
         description="Optional active controlled two-bank pilot ID governing this execution.",
+    )
+    idempotency_key: str | None = Field(
+        default=None,
+        max_length=256,
+        description="Optional client-specified idempotency key to prevent duplicate execution.",
     )
 
     @model_validator(mode="after")
@@ -351,6 +356,7 @@ class MultiCounterpartyIntelligenceQueryResponse(BaseModel):
         description="Typed per-counterparty execution outcomes mapping target_bank_id to outcome status and details.",
     )
     executed_at: str = Field(..., description="ISO-8601 execution timestamp.")
+    _idempotency_replayed: bool = PrivateAttr(default=False)
 
 
 class CrossBankEvidenceAttachRequest(BaseModel):

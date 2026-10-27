@@ -65,6 +65,10 @@ class CounterpartyTransportError(ConsortiumSecurityError):
     """Raised when network transport service or intermediate gateway is unavailable or broken."""
 
 
+class CrossBankIdempotencyConflictError(ConsortiumSecurityError):
+    """Raised when an idempotency key is reused with a conflicting payload, principal, or indeterminate state."""
+
+
 @dataclass
 class ConsortiumMember:
     """Represents a member institution participating in a consortium."""

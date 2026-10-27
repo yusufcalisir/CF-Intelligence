@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 
 from app.application.schemas.cross_bank_intelligence import (
     CrossBankEvidenceAttachRequest,
@@ -23,7 +23,10 @@ from app.application.schemas.cross_bank_intelligence import (
 from app.application.services.case_service import CaseNotFoundError, TerminalCaseImmutableError
 from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
 from app.dependencies import PrincipalDep, enforce_tenant_isolation
-from app.domain.consortium_governance import ConsortiumSecurityError
+from app.domain.consortium_governance import (
+    ConsortiumSecurityError,
+    CrossBankIdempotencyConflictError,
+)
 from app.domain.pilot_operations import PilotGovernanceError
 
 logger = logging.getLogger(__name__)
@@ -118,6 +121,9 @@ def query_cross_bank_intelligence(
 def query_multi_counterparty_intelligence(
     req: MultiCounterpartyIntelligenceQueryRequest,
     principal: PrincipalDep,
+    response: Response,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    x_idempotency_key: str | None = Header(None, alias="X-Idempotency-Key"),
     service: CrossBankIntelligenceService = Depends(get_cross_bank_intelligence_service),
 ) -> MultiCounterpartyIntelligenceQueryResponse:
     """Execute authorized, multi-counterparty cross-bank intelligence query.
@@ -127,16 +133,28 @@ def query_multi_counterparty_intelligence(
     - Verified intelligence analyst or investigator role.
     - Verified local institution-owned query entity.
     - Pre-flight pairwise governance authorization for every target institution.
+    - Optional explicit idempotency key to prevent duplicate execution across retries.
     """
     caller_tenant = principal.tenant_id
     if caller_tenant:
         enforce_tenant_isolation(caller_tenant, req.requesting_bank_id, roles=principal.roles)
 
+    effective_idem_key = idempotency_key or x_idempotency_key or req.idempotency_key
+
     try:
-        return service.query_multi_counterparty_intelligence(
+        res = service.query_multi_counterparty_intelligence(
             req=req,
             principal=principal,
+            idempotency_key=effective_idem_key,
         )
+        if getattr(res, "_idempotency_replayed", False):
+            response.headers["Idempotency-Replayed"] = "true"
+        return res
+    except CrossBankIdempotencyConflictError as err:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(err),
+        ) from err
     except ConsortiumSecurityError as err:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
