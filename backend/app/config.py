@@ -58,6 +58,28 @@ class Settings(BaseSettings):
         ),
         description="Base URL for the established PSI matching coordinator daemon.",
     )
+    cross_bank_per_counterparty_timeout_seconds: float = Field(
+        default=15.0,
+        ge=1.0,
+        le=60.0,
+        validation_alias=AliasChoices(
+            "cross_bank_per_counterparty_timeout_seconds",
+            "cfi_counterparty_timeout_seconds",
+            "cfi_counterparty_execution_timeout_seconds",
+        ),
+        description="Default bounded execution timeout in seconds allocated per counterpart institution in cross-bank queries.",
+    )
+    cross_bank_total_batch_timeout_seconds: float = Field(
+        default=60.0,
+        ge=1.0,
+        le=300.0,
+        validation_alias=AliasChoices(
+            "cross_bank_total_batch_timeout_seconds",
+            "cfi_total_batch_timeout_seconds",
+            "cfi_batch_execution_timeout_seconds",
+        ),
+        description="Default bounded total execution timeout in seconds for an entire multi-counterparty query batch.",
+    )
 
     # ── FastAPI & CORS ────────────────────────
     api_host: str = "0.0.0.0"  # nosec B104

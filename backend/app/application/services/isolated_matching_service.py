@@ -2046,6 +2046,7 @@ class InstitutionalWorkerClient:
         matching_token: str | None = None,
         ingestion_token: str | None = None,
         admin_token: str | None = None,
+        default_timeout: float = 5.0,
     ) -> None:
         self.bank_id = bank_id.lower().strip()
         self.base_url = base_url.rstrip("/")
@@ -2054,6 +2055,7 @@ class InstitutionalWorkerClient:
         self.ingestion_token = ingestion_token or auth_secret or ""
         self.admin_token = admin_token or auth_secret or ""
         self.auth_secret = self.matching_token
+        self.default_timeout = default_timeout
         self._is_network_transport = True
 
     def health_check(self) -> dict[str, Any]:
@@ -2170,7 +2172,13 @@ class InstitutionalWorkerClient:
 
         return str(data["public_key_hex"])
 
-    def _post(self, path: str, payload: dict[str, Any], token: str | None = None) -> dict[str, Any]:
+    def _post(
+        self,
+        path: str,
+        payload: dict[str, Any],
+        token: str | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
         if not (url.startswith("http://") or url.startswith("https://")):
             raise ValueError(f"Unsupported URL scheme for worker client: {url}")
@@ -2185,8 +2193,9 @@ class InstitutionalWorkerClient:
             },
             method="POST",
         )
+        effective_timeout = self.default_timeout if timeout is None else max(0.001, float(timeout))
         try:
-            with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
+            with urllib.request.urlopen(req, timeout=effective_timeout) as resp:  # nosec B310
                 body = resp.read()
         except urllib.error.HTTPError as http_err:
             try:
@@ -2534,6 +2543,7 @@ class CrossBankMatchingCoordinator:
         req: CrossBankIntelligenceQueryRequest,
         auth_token: str | None = None,
         actor: str | None = None,
+        timeout: float | None = None,
     ) -> CrossBankIntelligenceSignal:
         """Executes authentic, isolated two-bank private matching under consortium governance."""
         clean_requesting = req.requesting_bank_id.lower().strip()
@@ -3086,6 +3096,7 @@ class InstitutionalCoordinatorDaemon:
                         req=req,
                         auth_token=auth_token,
                         actor=actor,
+                        timeout=req.timeout_seconds,
                     )
                     res = signal.model_dump()
                     self.send_response(200)
@@ -3230,8 +3241,12 @@ class InstitutionalCoordinatorClient:
         req: CrossBankIntelligenceQueryRequest,
         auth_token: str,
         actor: str | None = None,
+        timeout: float | None = None,
     ) -> CrossBankIntelligenceSignal:
         url = f"{self.base_url}/coordinator/execute-match"
+        effective_timeout = 20.0 if timeout is None else max(0.001, float(timeout))
+        if timeout is not None and getattr(req, "timeout_seconds", None) is None:
+            req = req.model_copy(update={"timeout_seconds": effective_timeout})
         body = req.model_dump()
         if actor:
             body["_actor"] = actor
@@ -3246,7 +3261,7 @@ class InstitutionalCoordinatorClient:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=20.0) as resp:  # nosec B310
+            with urllib.request.urlopen(request, timeout=effective_timeout) as resp:  # nosec B310
                 resp_bytes = resp.read()
         except urllib.error.HTTPError as http_err:
             try:

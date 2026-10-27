@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, Literal
 
@@ -96,6 +97,12 @@ class CrossBankIntelligenceQueryRequest(BaseModel):
         max_length=64,
         description="Optional active controlled two-bank pilot ID governing this execution.",
     )
+    timeout_seconds: float | None = Field(
+        default=None,
+        ge=1.0,
+        le=60.0,
+        description="Optional caller-specified execution timeout in seconds allocated for this counterparty query (bounded [1.0, 60.0]).",
+    )
 
 
 class MultiCounterpartyIntelligenceQueryRequest(BaseModel):
@@ -175,6 +182,18 @@ class MultiCounterpartyIntelligenceQueryRequest(BaseModel):
         max_length=256,
         description="Optional client-specified idempotency key to prevent duplicate execution.",
     )
+    per_counterparty_timeout_seconds: float | None = Field(
+        default=None,
+        ge=1.0,
+        le=60.0,
+        description="Optional explicit execution timeout in seconds allocated per counterpart institution (bounded [1.0, 60.0]).",
+    )
+    total_batch_timeout_seconds: float | None = Field(
+        default=None,
+        ge=1.0,
+        le=300.0,
+        description="Optional total wall-clock execution deadline in seconds for the complete query batch (bounded [1.0, 300.0]).",
+    )
 
     @model_validator(mode="after")
     def validate_multi_targets(self) -> MultiCounterpartyIntelligenceQueryRequest:
@@ -200,6 +219,25 @@ class MultiCounterpartyIntelligenceQueryRequest(BaseModel):
             cleaned_targets.append(clean_t)
 
         self.target_bank_ids = cleaned_targets
+
+        if self.per_counterparty_timeout_seconds is not None and (
+            not math.isfinite(self.per_counterparty_timeout_seconds)
+            or self.per_counterparty_timeout_seconds < 1.0
+            or self.per_counterparty_timeout_seconds > 60.0
+        ):
+            raise ValueError(
+                "per_counterparty_timeout_seconds must be a finite float between 1.0 and 60.0 seconds."
+            )
+
+        if self.total_batch_timeout_seconds is not None and (
+            not math.isfinite(self.total_batch_timeout_seconds)
+            or self.total_batch_timeout_seconds < 1.0
+            or self.total_batch_timeout_seconds > 300.0
+        ):
+            raise ValueError(
+                "total_batch_timeout_seconds must be a finite float between 1.0 and 300.0 seconds."
+            )
+
         return self
 
 

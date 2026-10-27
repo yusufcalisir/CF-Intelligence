@@ -49,6 +49,7 @@ from app.application.services.isolated_matching_service import (
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
     ConsortiumStatus,
+    CounterpartyDeadlineExceededError,
     CounterpartyTimeoutError,
     CounterpartyTransportError,
     CounterpartyWorkerUnavailableError,
@@ -56,6 +57,9 @@ from app.domain.consortium_governance import (
     CrossBankIdempotencyConflictError,
 )
 from app.domain.consortium_policy import ConsortiumPolicyEngine
+from app.domain.execution_deadline_policy import (
+    CounterpartyExecutionDeadlinePolicy,
+)
 from app.domain.institutional_identity import (
     InstitutionalVerificationRegistry,
     canonical_counterpart_evidence_bytes,
@@ -73,6 +77,7 @@ from app.infrastructure.storage.durable_execution_budget_store import (
     REASON_EXECUTION_COMPLETED,
     REASON_EXECUTION_INDETERMINATE,
     REASON_PILOT_PREFLIGHT_REJECTED,
+    REASON_PRE_DISPATCH_DEADLINE_EXCEEDED,
     DurableCrossBankExecutionBudgetStore,
 )
 from app.infrastructure.storage.durable_idempotency_store import (
@@ -115,6 +120,10 @@ def compute_multi_counterparty_request_fingerprint(
         "target_bank_ids": sorted({t.lower().strip() for t in req.target_bank_ids}),
         "use_established_psi": req.use_established_psi,
     }
+    if getattr(req, "per_counterparty_timeout_seconds", None) is not None:
+        canonical_payload["per_counterparty_timeout_seconds"] = float(req.per_counterparty_timeout_seconds)
+    if getattr(req, "total_batch_timeout_seconds", None) is not None:
+        canonical_payload["total_batch_timeout_seconds"] = float(req.total_batch_timeout_seconds)
     if governance_scope:
         canonical_payload["governance_scope"] = governance_scope
 
@@ -229,12 +238,52 @@ class CrossBankIntelligenceService:
             token_claims=claims,
         )
 
+    def _resolve_execution_deadline_policy(
+        self, req: MultiCounterpartyIntelligenceQueryRequest
+    ) -> CounterpartyExecutionDeadlinePolicy:
+        """Resolve authoritative execution deadline policy from request overrides and system settings."""
+        from app.config import get_settings
+        from app.domain.execution_deadline_policy import (
+            DEFAULT_PER_COUNTERPARTY_TIMEOUT_SECONDS,
+            DEFAULT_TOTAL_BATCH_TIMEOUT_SECONDS,
+            CounterpartyExecutionDeadlinePolicy,
+        )
+
+        settings = get_settings()
+        default_per_counterpart = getattr(
+            settings,
+            "cross_bank_per_counterparty_timeout_seconds",
+            DEFAULT_PER_COUNTERPARTY_TIMEOUT_SECONDS,
+        )
+        default_total_batch = getattr(
+            settings,
+            "cross_bank_total_batch_timeout_seconds",
+            DEFAULT_TOTAL_BATCH_TIMEOUT_SECONDS,
+        )
+
+        effective_per_counterpart = (
+            float(req.per_counterparty_timeout_seconds)
+            if req.per_counterparty_timeout_seconds is not None
+            else float(default_per_counterpart)
+        )
+        effective_total_batch = (
+            float(req.total_batch_timeout_seconds)
+            if req.total_batch_timeout_seconds is not None
+            else float(default_total_batch)
+        )
+
+        return CounterpartyExecutionDeadlinePolicy(
+            per_counterparty_timeout_seconds=effective_per_counterpart,
+            total_batch_timeout_seconds=effective_total_batch,
+        )
+
     def execute_two_bank_private_matching(
         self,
         req: CrossBankIntelligenceQueryRequest,
         auth_token: str | None = None,
         principal: AuthenticatedPrincipal | None = None,
         actor: str | None = None,
+        timeout: float | None = None,
     ) -> CrossBankIntelligenceSignal:
         """Execute authentic two-bank private matching across isolated institutional bank nodes.
 
@@ -280,6 +329,7 @@ class CrossBankIntelligenceService:
             req=req,
             auth_token=auth_token,
             actor=audited_actor,
+            timeout=timeout,
         )
 
     def _execute_verified_operational_psi(
@@ -288,6 +338,7 @@ class CrossBankIntelligenceService:
         auth_token: str | None,
         auth_principal: AuthenticatedPrincipal,
         audited_actor: str,
+        timeout: float | None = None,
     ) -> CrossBankIntelligenceSignal:
         """Route authorized intelligence query to established PSI operational worker topology."""
         clean_requesting = req.requesting_bank_id.lower().strip()
@@ -424,12 +475,14 @@ class CrossBankIntelligenceService:
             "CFI_COORDINATOR_URL"
         )
 
+        effective_timeout = timeout if timeout is not None else getattr(req, "timeout_seconds", None)
         est_req = req.model_copy(
             update={
                 "target_bank_id": clean_target,
                 "target_bank_ids": [clean_target],
                 "execution_mode": "VERIFIED_OPERATIONAL",
                 "use_established_psi": True,
+                "timeout_seconds": effective_timeout,
             }
         )
 
@@ -460,6 +513,7 @@ class CrossBankIntelligenceService:
                     req=est_req,
                     auth_token=resolved_auth_token,
                     actor=audited_actor,
+                    timeout=effective_timeout,
                 )
 
                 resolved_receipt_id = (
@@ -596,6 +650,7 @@ class CrossBankIntelligenceService:
                         req=est_req,
                         auth_token=resolved_auth_token,
                         actor=audited_actor,
+                        timeout=timeout,
                     )
 
                     resolved_receipt_id = (
@@ -1178,6 +1233,7 @@ class CrossBankIntelligenceService:
         auth_token: str | None = None,
         principal: AuthenticatedPrincipal | None = None,
         actor: str | None = None,
+        timeout: float | None = None,
     ) -> CrossBankIntelligenceSignal:
         """Execute authorized cross-bank intelligence query under consortium policy."""
         clean_requesting = req.requesting_bank_id.lower().strip()
@@ -1542,7 +1598,7 @@ class CrossBankIntelligenceService:
         caller can immediately propagate the failure and terminate the batch request.
         """
         # 1. Never recover from governance, permission, or admission errors
-        if isinstance(exc, PermissionError):
+        if isinstance(exc, PermissionError) or cls._is_governance_authorization_failure(exc):
             return None
 
         # 2. Extract underlying root causes from exception chain (__cause__ or __context__)
@@ -1552,10 +1608,22 @@ class CrossBankIntelligenceService:
             underlying_causes.append(curr)
             curr = curr.__cause__ or curr.__context__
 
+        for cause in underlying_causes:
+            if isinstance(cause, PermissionError) or cls._is_governance_authorization_failure(cause):
+                return None
+
         # 3. Check for explicit timeout errors
         is_timeout = False
         for cause in underlying_causes:
-            if isinstance(cause, (CounterpartyTimeoutError, TimeoutError, socket.timeout)):
+            if isinstance(
+                cause,
+                (
+                    CounterpartyDeadlineExceededError,
+                    CounterpartyTimeoutError,
+                    TimeoutError,
+                    socket.timeout,
+                ),
+            ):
                 is_timeout = True
                 break
             if isinstance(cause, urllib.error.URLError) and isinstance(
@@ -1629,10 +1697,18 @@ class CrossBankIntelligenceService:
                     is_worker_unavailable = True
 
         if is_timeout:
+            is_pre_dispatch = any(
+                getattr(c, "is_pre_dispatch", False) for c in underlying_causes
+            )
+            msg = (
+                f"Execution deadline exceeded before counterpart dispatch for '{target_bank_id}'."
+                if is_pre_dispatch
+                else f"Execution timed out communicating with counterpart worker for '{target_bank_id}'."
+            )
             return CounterpartyExecutionFailure(
                 target_bank_id=target_bank_id,
                 error_category="TIMEOUT",
-                error_message=f"Execution timed out communicating with counterpart worker for '{target_bank_id}'.",
+                error_message=msg,
                 failed_at=datetime.datetime.now(UTC).isoformat(),
                 retryable=True,
             )
@@ -2060,6 +2136,11 @@ class CrossBankIntelligenceService:
                 exhausted_targets=exhausted_targets,
             )
 
+        # 6.7. Authoritative Execution Deadline Policy & Monotonic Time Horizon
+        deadline_policy = self._resolve_execution_deadline_policy(req)
+        batch_start_mono = time.monotonic()
+        batch_deadline_mono = batch_start_mono + deadline_policy.total_batch_timeout_seconds
+
         # 7. Execute Verified Operational Matching / Established PSI Per Counterpart
         dispatched_targets: list[str] = []
         completed_targets: list[str] = []
@@ -2069,6 +2150,40 @@ class CrossBankIntelligenceService:
             execution_outcomes: dict[str, CounterpartyExecutionOutcome] = {}
 
             for clean_target in clean_targets:
+                # Pre-dispatch execution deadline check using monotonic time
+                now_mono = time.monotonic()
+                remaining_batch_time = batch_deadline_mono - now_mono
+                if remaining_batch_time <= 0:
+                    # Total batch deadline exhausted before this counterpart could be dispatched
+                    self.budget_store.release_reservations(
+                        batch_id=budget_batch_id,
+                        targets=[clean_target],
+                        reason=REASON_PRE_DISPATCH_DEADLINE_EXCEEDED,
+                    )
+                    pre_dispatch_failure = CounterpartyExecutionFailure(
+                        target_bank_id=clean_target,
+                        error_category="TIMEOUT",
+                        error_message=f"Execution deadline exceeded before counterpart dispatch for '{clean_target}'.",
+                        failed_at=datetime.datetime.now(UTC).isoformat(),
+                        retryable=True,
+                    )
+                    failures[clean_target] = pre_dispatch_failure
+                    execution_outcomes[clean_target] = CounterpartyExecutionOutcome(
+                        target_bank_id=clean_target,
+                        status="FAILED",
+                        signal=None,
+                        failure=pre_dispatch_failure,
+                    )
+                    logger.warning(
+                        "Counterpart '%s' skipped: total batch execution deadline exhausted prior to dispatch.",
+                        clean_target,
+                    )
+                    continue
+
+                effective_target_timeout = min(
+                    deadline_policy.per_counterparty_timeout_seconds,
+                    remaining_batch_time,
+                )
                 dispatched_targets.append(clean_target)
                 single_req = CrossBankIntelligenceQueryRequest(
                     requesting_bank_id=clean_requesting,
@@ -2084,6 +2199,7 @@ class CrossBankIntelligenceService:
                     require_established_psi=req.require_established_psi,
                     protocol=req.protocol,
                     pilot_id=req.pilot_id,
+                    timeout_seconds=effective_target_timeout,
                 )
                 try:
                     if req.execution_mode == "VERIFIED_OPERATIONAL":
@@ -2180,12 +2296,13 @@ class CrossBankIntelligenceService:
                         recoverable_failure.error_message,
                     )
 
-            # All targets processed: commit all completed reservations
-            self.budget_store.commit_reservations(
-                batch_id=budget_batch_id,
-                completed_targets=completed_targets,
-                reason=REASON_EXECUTION_COMPLETED,
-            )
+            # All targets processed: commit all completed reservations for dispatched targets
+            if completed_targets:
+                self.budget_store.commit_reservations(
+                    batch_id=budget_batch_id,
+                    completed_targets=completed_targets,
+                    reason=REASON_EXECUTION_COMPLETED,
+                )
 
             # 8. Determine overall execution outcome across queried counterparts
             total_targets = len(clean_targets)

@@ -61,6 +61,20 @@ class CounterpartyTimeoutError(ConsortiumSecurityError, TimeoutError):
     """Raised when communication with counterpart worker daemon times out."""
 
 
+class CounterpartyDeadlineExceededError(CounterpartyTimeoutError):
+    """Raised when execution deadline is exceeded prior to or during counterparty dispatch."""
+
+    def __init__(
+        self,
+        message: str,
+        target_bank_id: str | None = None,
+        is_pre_dispatch: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.target_bank_id = target_bank_id
+        self.is_pre_dispatch = is_pre_dispatch
+
+
 class CounterpartyTransportError(ConsortiumSecurityError):
     """Raised when network transport service or intermediate gateway is unavailable or broken."""
 
