@@ -14,6 +14,7 @@ Verifies:
 
 from __future__ import annotations
 
+import json
 import urllib.error
 from collections.abc import Generator
 from pathlib import Path
@@ -947,4 +948,176 @@ def test_worker_client_disconnection_raises_typed_worker_unavailable() -> None:
     with patch("urllib.request.urlopen", side_effect=TimeoutError("Request timed out")):
         with pytest.raises(CounterpartyTimeoutError, match="timed out"):
             worker._post("/worker/store-entity", {"entity": {}})
+
+
+def test_schema_validation_error_does_not_leak_sentinel_secret(
+    auth_tokens: dict[str, str],
+) -> None:
+    """Schema validation failure raises a nonrecoverable exception without disclosing sentinel secret."""
+    client = InstitutionalCoordinatorClient(base_url="http://127.0.0.1:8999")
+    req = CrossBankIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        query_entity_id="cust_test_001",
+        consortium_id="consortium_tri_outcomes",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    sentinel_secret = "TOP_SECRET_CREDENTIAL_SENTINEL_VAL_12345"
+    payload = {
+        "signal_id": "sig-001",
+        "consortium_id": "consortium_tri_outcomes",
+        "requesting_bank_id": "bank_a",
+        "privacy_hash_truncated": "abc1234",
+        "match_confirmed": True,
+        "match_category": "EXACT_MATCH",
+        "match_confidence": 0.99,
+        "contributing_institutions_count": 1,
+        "sanitized_risk_level": sentinel_secret,  # invalid enum value containing sensitive sentinel
+        "execution_mode": "VERIFIED_OPERATIONAL",
+        "attestation_status": "HARDWARE_ENCLAVE_VERIFIED",
+    }
+
+    mock_resp = _make_mock_response(json.dumps(payload).encode("utf-8"))
+
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        with pytest.raises(ValueError) as exc_info:
+            client.execute_match(req=req, auth_token=auth_tokens["bank_a"])
+
+    err_str = str(exc_info.value)
+    # 1. Public error message is bounded and fixed
+    assert err_str == "Coordinator returned invalid signal schema"
+    # 2. Public error message NEVER leaks the sentinel secret
+    assert sentinel_secret not in err_str
+    # 3. Root cause is preserved in __cause__ for server-side diagnosis
+    assert exc_info.value.__cause__ is not None
+    # 4. Confirm Pydantic raw error did contain the secret, proving our bounded message guarded it
+    assert sentinel_secret in str(exc_info.value.__cause__)
+
+
+def test_malformed_json_and_non_utf8_do_not_disclose_raw_response_content(
+    auth_tokens: dict[str, str],
+) -> None:
+    """Malformed JSON and non-UTF8 response failures do not disclose raw response body content."""
+    coord_client = InstitutionalCoordinatorClient(base_url="http://127.0.0.1:8999")
+    worker_client = InstitutionalWorkerClient(bank_id="bank_c", base_url="http://127.0.0.1:8998")
+
+    req = CrossBankIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        query_entity_id="cust_test_001",
+        consortium_id="consortium_tri_outcomes",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    coord_raw_secret = "SENTINEL_RAW_SECRET_DATA_XYZ_987"
+    worker_raw_secret = "WORKER_SENTINEL_RAW_SECRET_ABC_654"
+
+    # 1. Coordinator malformed JSON
+    coord_malformed = _make_mock_response(f"{coord_raw_secret}{{invalid_json".encode())
+    with patch("urllib.request.urlopen", return_value=coord_malformed):
+        with pytest.raises(ValueError) as exc_info:
+            coord_client.execute_match(req=req, auth_token=auth_tokens["bank_a"])
+    assert str(exc_info.value) == "Coordinator returned malformed JSON response"
+    assert coord_raw_secret not in str(exc_info.value)
+
+    # 2. Coordinator non-UTF8 bytes
+    coord_non_utf8 = _make_mock_response(b"SECRET_COORD_BYTES_\xff\xfe")
+    with patch("urllib.request.urlopen", return_value=coord_non_utf8):
+        with pytest.raises(ValueError) as exc_info:
+            coord_client.execute_match(req=req, auth_token=auth_tokens["bank_a"])
+    assert str(exc_info.value) == "Coordinator returned non-UTF8 response"
+    assert "SECRET_COORD_BYTES" not in str(exc_info.value)
+
+    # 3. Worker malformed JSON
+    worker_malformed = _make_mock_response(f"{worker_raw_secret}{{broken".encode())
+    with patch("urllib.request.urlopen", return_value=worker_malformed):
+        with pytest.raises(ValueError) as exc_info:
+            worker_client._post("/worker/store-entity", {"entity": {}})
+    assert str(exc_info.value) == "Worker for 'bank_c' returned malformed JSON response"
+    assert worker_raw_secret not in str(exc_info.value)
+
+    # 4. Worker non-UTF8 bytes
+    worker_non_utf8 = _make_mock_response(b"SECRET_WORKER_BYTES_\xff\xfe")
+    with patch("urllib.request.urlopen", return_value=worker_non_utf8):
+        with pytest.raises(ValueError) as exc_info:
+            worker_client._post("/worker/store-entity", {"entity": {}})
+    assert str(exc_info.value) == "Worker for 'bank_c' returned non-UTF8 response"
+    assert "SECRET_WORKER_BYTES" not in str(exc_info.value)
+
+
+def test_multi_counterparty_api_does_not_leak_sentinel_secret_on_schema_validation_error(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """FastAPI router endpoint returns HTTP 400 without leaking sentinel secret from invalid signal."""
+    gov_svc, c_id = tri_consortium
+    cbi_instance = CrossBankIntelligenceService.get_instance()
+    cbi_instance.consortium_service = gov_svc
+
+    test_ent = Entity(
+        id="cust_router_ent_secret_leak_guard",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_router_cust_secret_leak_guard",
+        bank_id="bank_a",
+        display_label="Router Leak Guard Test Entity",
+        risk_level=RiskLevel.HIGH,
+    )
+    cbi_instance.entity_service._entities.set("cust_router_ent_secret_leak_guard", _entity_to_dict(test_ent))
+
+    sentinel_secret = "E2E_API_SENTINEL_SECRET_TOKEN_DO_NOT_LEAK_999"
+    coord_client = InstitutionalCoordinatorClient(base_url="http://127.0.0.1:8999")
+
+    # Deliberately invalid schema payload containing the sentinel secret
+    invalid_payload = {
+        "signal_id": "sig-001",
+        "consortium_id": c_id,
+        "requesting_bank_id": "bank_a",
+        "privacy_hash_truncated": "abc1234",
+        "match_confirmed": True,
+        "match_category": "EXACT_MATCH",
+        "match_confidence": 0.99,
+        "contributing_institutions_count": 1,
+        "sanitized_risk_level": sentinel_secret,  # schema-invalid field value
+        "execution_mode": "VERIFIED_OPERATIONAL",
+        "attestation_status": "HARDWARE_ENCLAVE_VERIFIED",
+    }
+    mock_resp = _make_mock_response(json.dumps(invalid_payload).encode("utf-8"))
+
+    def mock_exec_operational(
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+    ) -> CrossBankIntelligenceSignal:
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            return coord_client.execute_match(req=req, auth_token=auth_tokens["bank_a"])
+
+    client = TestClient(app)
+    req_body = {
+        "consortium_id": c_id,
+        "requesting_bank_id": "bank_a",
+        "target_bank_ids": ["bank_b"],
+        "query_entity_id": "cust_router_ent_secret_leak_guard",
+        "purpose": "AML_COLLABORATIVE_INVESTIGATION",
+        "execution_mode": "VERIFIED_OPERATIONAL",
+    }
+
+    with patch.object(cbi_instance, "_execute_verified_operational_psi", side_effect=mock_exec_operational):
+        resp = client.post(
+            "/api/v1/intelligence/cross-bank/query-multi",
+            json=req_body,
+            headers={"Authorization": f"Bearer {auth_tokens['bank_a']}"},
+        )
+
+    # 1. Nonrecoverable failure: HTTP 400 Bad Request
+    assert resp.status_code == 400
+    # 2. Public detail contains fixed bounded message
+    assert resp.json()["detail"] == "Coordinator returned invalid signal schema"
+    # 3. Sentinel secret NEVER appears in the HTTP response body
+    assert sentinel_secret not in resp.text
+    assert sentinel_secret not in str(resp.content)
+
 

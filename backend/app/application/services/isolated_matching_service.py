@@ -2102,12 +2102,12 @@ class InstitutionalWorkerClient:
         try:
             body_text = body.decode("utf-8")
         except UnicodeDecodeError as exc:
-            raise ValueError(f"Worker for '{self.bank_id}' returned non-UTF8 response: {exc}") from exc
+            raise ValueError(f"Worker for '{self.bank_id}' returned non-UTF8 response") from exc
 
         try:
             data = json.loads(body_text)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Worker for '{self.bank_id}' returned malformed JSON response: {exc}") from exc
+            raise ValueError(f"Worker for '{self.bank_id}' returned malformed JSON response") from exc
 
         if not isinstance(data, dict):
             raise ValueError(
@@ -2158,12 +2158,12 @@ class InstitutionalWorkerClient:
         try:
             body_text = body.decode("utf-8")
         except UnicodeDecodeError as exc:
-            raise ValueError(f"Worker for '{self.bank_id}' returned non-UTF8 response: {exc}") from exc
+            raise ValueError(f"Worker for '{self.bank_id}' returned non-UTF8 response") from exc
 
         try:
             data = json.loads(body_text)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Worker for '{self.bank_id}' returned malformed JSON response: {exc}") from exc
+            raise ValueError(f"Worker for '{self.bank_id}' returned malformed JSON response") from exc
 
         if not isinstance(data, dict) or "public_key_hex" not in data:
             raise ValueError(f"Worker for '{self.bank_id}' returned invalid public-key response payload")
@@ -2258,12 +2258,12 @@ class InstitutionalWorkerClient:
         try:
             body_text = body.decode("utf-8")
         except UnicodeDecodeError as exc:
-            raise ValueError(f"Worker for '{self.bank_id}' returned non-UTF8 response: {exc}") from exc
+            raise ValueError(f"Worker for '{self.bank_id}' returned non-UTF8 response") from exc
 
         try:
             data = json.loads(body_text)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Worker for '{self.bank_id}' returned malformed JSON response: {exc}") from exc
+            raise ValueError(f"Worker for '{self.bank_id}' returned malformed JSON response") from exc
 
         if not isinstance(data, dict):
             raise ValueError(
@@ -3161,12 +3161,12 @@ class InstitutionalCoordinatorClient:
         try:
             body_text = body.decode("utf-8")
         except UnicodeDecodeError as exc:
-            raise ValueError(f"Coordinator daemon at '{self.base_url}' returned non-UTF8 response: {exc}") from exc
+            raise ValueError("Coordinator daemon returned non-UTF8 response") from exc
 
         try:
             data = json.loads(body_text)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Coordinator daemon at '{self.base_url}' returned malformed JSON response: {exc}") from exc
+            raise ValueError("Coordinator daemon returned malformed JSON response") from exc
 
         if not isinstance(data, dict):
             raise ValueError(
@@ -3211,12 +3211,12 @@ class InstitutionalCoordinatorClient:
         try:
             body_text = body.decode("utf-8")
         except UnicodeDecodeError as exc:
-            raise ValueError(f"Coordinator daemon at '{self.base_url}' returned non-UTF8 response: {exc}") from exc
+            raise ValueError("Coordinator daemon returned non-UTF8 response") from exc
 
         try:
             data = json.loads(body_text)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Coordinator daemon at '{self.base_url}' returned malformed JSON response: {exc}") from exc
+            raise ValueError("Coordinator daemon returned malformed JSON response") from exc
 
         if not isinstance(data, dict):
             raise ValueError(
@@ -3317,12 +3317,12 @@ class InstitutionalCoordinatorClient:
         try:
             raw_text = resp_bytes.decode("utf-8")
         except UnicodeDecodeError as exc:
-            raise ValueError(f"Coordinator returned non-UTF8 response: {exc}") from exc
+            raise ValueError("Coordinator returned non-UTF8 response") from exc
 
         try:
             data = json.loads(raw_text)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Coordinator returned malformed JSON response: {exc}") from exc
+            raise ValueError("Coordinator returned malformed JSON response") from exc
 
         if not isinstance(data, dict):
             raise ValueError(
@@ -3332,7 +3332,8 @@ class InstitutionalCoordinatorClient:
         try:
             return CrossBankIntelligenceSignal(**data)
         except Exception as exc:
-            raise ValueError(f"Coordinator returned invalid signal schema: {exc}") from exc
+            logger.warning("Coordinator returned invalid signal schema: %s", exc)
+            raise ValueError("Coordinator returned invalid signal schema") from exc
 
 
 if __name__ == "__main__":
