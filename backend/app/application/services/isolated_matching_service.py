@@ -2073,7 +2073,7 @@ class InstitutionalWorkerClient:
             raise CounterpartyTimeoutError(
                 f"Worker probe timed out for '{self.bank_id}': {exc}"
             ) from exc
-        except (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected) as exc:
+        except ConnectionError as exc:
             raise CounterpartyWorkerUnavailableError(
                 f"Worker unreachable on health probe for '{self.bank_id}': {exc}"
             ) from exc
@@ -2083,7 +2083,7 @@ class InstitutionalWorkerClient:
                 raise CounterpartyTimeoutError(
                     f"Worker probe timed out for '{self.bank_id}': {exc}"
                 ) from exc
-            if isinstance(reason, (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected)):
+            if isinstance(reason, ConnectionError):
                 raise CounterpartyWorkerUnavailableError(
                     f"Worker unreachable on health probe for '{self.bank_id}': {exc}"
                 ) from exc
@@ -2129,7 +2129,7 @@ class InstitutionalWorkerClient:
             raise CounterpartyTimeoutError(
                 f"Worker probe timed out for '{self.bank_id}': {exc}"
             ) from exc
-        except (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected) as exc:
+        except ConnectionError as exc:
             raise CounterpartyWorkerUnavailableError(
                 f"Worker unreachable on public-key probe for '{self.bank_id}': {exc}"
             ) from exc
@@ -2139,7 +2139,7 @@ class InstitutionalWorkerClient:
                 raise CounterpartyTimeoutError(
                     f"Worker probe timed out for '{self.bank_id}': {exc}"
                 ) from exc
-            if isinstance(reason, (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected)):
+            if isinstance(reason, ConnectionError):
                 raise CounterpartyWorkerUnavailableError(
                     f"Worker unreachable on public-key probe for '{self.bank_id}': {exc}"
                 ) from exc
@@ -2227,7 +2227,7 @@ class InstitutionalWorkerClient:
             raise CounterpartyTimeoutError(
                 f"Institutional bank worker for '{self.bank_id}' timed out: {exc}"
             ) from exc
-        except (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected) as exc:
+        except ConnectionError as exc:
             raise CounterpartyWorkerUnavailableError(
                 f"Institutional bank worker for '{self.bank_id}' is unreachable or offline: {exc}"
             ) from exc
@@ -2237,7 +2237,7 @@ class InstitutionalWorkerClient:
                 raise CounterpartyTimeoutError(
                     f"Institutional bank worker for '{self.bank_id}' timed out: {exc}"
                 ) from exc
-            if isinstance(reason, (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected)):
+            if isinstance(reason, ConnectionError):
                 raise CounterpartyWorkerUnavailableError(
                     f"Institutional bank worker for '{self.bank_id}' is unreachable or offline: {exc}"
                 ) from exc
@@ -3136,7 +3136,7 @@ class InstitutionalCoordinatorClient:
             raise CounterpartyTimeoutError(
                 f"Coordinator probe timed out on '{self.base_url}': {exc}"
             ) from exc
-        except (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected) as exc:
+        except ConnectionError as exc:
             raise CounterpartyWorkerUnavailableError(
                 f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
             ) from exc
@@ -3146,7 +3146,7 @@ class InstitutionalCoordinatorClient:
                 raise CounterpartyTimeoutError(
                     f"Coordinator probe timed out on '{self.base_url}': {exc}"
                 ) from exc
-            if isinstance(reason, (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected)):
+            if isinstance(reason, ConnectionError):
                 raise CounterpartyWorkerUnavailableError(
                     f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
                 ) from exc
@@ -3186,7 +3186,7 @@ class InstitutionalCoordinatorClient:
             raise CounterpartyTimeoutError(
                 f"Coordinator topology probe timed out on '{self.base_url}': {exc}"
             ) from exc
-        except (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected) as exc:
+        except ConnectionError as exc:
             raise CounterpartyWorkerUnavailableError(
                 f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
             ) from exc
@@ -3196,7 +3196,7 @@ class InstitutionalCoordinatorClient:
                 raise CounterpartyTimeoutError(
                     f"Coordinator topology probe timed out on '{self.base_url}': {exc}"
                 ) from exc
-            if isinstance(reason, (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected)):
+            if isinstance(reason, ConnectionError):
                 raise CounterpartyWorkerUnavailableError(
                     f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
                 ) from exc
@@ -3285,7 +3285,7 @@ class InstitutionalCoordinatorClient:
             raise CounterpartyTimeoutError(
                 f"Coordinator matching invocation timed out on '{self.base_url}': {exc}"
             ) from exc
-        except (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected) as exc:
+        except ConnectionError as exc:
             raise CounterpartyWorkerUnavailableError(
                 f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
             ) from exc
@@ -3295,7 +3295,7 @@ class InstitutionalCoordinatorClient:
                 raise CounterpartyTimeoutError(
                     f"Coordinator matching invocation timed out on '{self.base_url}': {exc}"
                 ) from exc
-            if isinstance(reason, (ConnectionRefusedError, ConnectionError, ConnectionResetError, http.client.RemoteDisconnected)):
+            if isinstance(reason, ConnectionError):
                 raise CounterpartyWorkerUnavailableError(
                     f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
                 ) from exc
