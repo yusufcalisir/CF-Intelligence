@@ -2111,6 +2111,8 @@ class CrossBankIntelligenceService:
                 except Exception as exc:
                     # Handle demonstrably pre-dispatch pilot quota rejections without consuming pairwise budget
                     if isinstance(exc, PilotQuotaExceededError):
+                        if clean_target in dispatched_targets:
+                            dispatched_targets.remove(clean_target)
                         logger.warning(
                             "Counterpart '%s' rejected in pre-dispatch pilot quota check: %s. Releasing reservation.",
                             clean_target,
@@ -2230,14 +2232,14 @@ class CrossBankIntelligenceService:
                     reason=REASON_BATCH_ABORTED_BEFORE_DISPATCH,
                 )
             if effective_idem_key and idem_owner_id:
-                is_indeterminate = len(dispatched_targets) > 0 and not isinstance(exec_exc, PilotQuotaExceededError)
+                has_executed_side_effects = len(completed_targets) > 0 or len(dispatched_targets) > 0
                 self.idempotency_store.fail_or_abort(
                     consortium_id=clean_consortium_id,
                     requesting_bank_id=clean_requesting,
                     idempotency_key=effective_idem_key,
                     owner_id=idem_owner_id,
                     error_message=str(exec_exc),
-                    indeterminate=is_indeterminate,
+                    indeterminate=has_executed_side_effects,
                 )
             raise
 

@@ -1050,7 +1050,12 @@ def test_persisted_failure_reasons_never_contain_sentinel_secret(
 
     # Inspect all rows and columns across the entire budget database
     with budget_store._get_connection() as conn:
-        for table_name in ("cross_bank_budget_reservations", "cross_bank_budget_consumption", "cross_bank_execution_budgets"):
+        for table_name in (
+            "cross_bank_budget_reservations",
+            "cross_bank_budget_consumption",
+            "cross_bank_budget_window_executions",
+            "cross_bank_execution_budgets",
+        ):
             rows = conn.execute(f"SELECT * FROM {table_name};").fetchall()
             for r in rows:
                 dump = str(dict(r))
@@ -1113,4 +1118,212 @@ def test_predispatch_pilot_quota_exceeded_multi_target_accounting(
     c_status = budget_store.get_budget(c_id, "bank_a", "bank_c")
     assert c_status is not None and c_status["consumed_executions"] == 0
     assert c_status["remaining_executions"] == 1
+
+
+def test_idempotency_fail_closed_after_partial_execution_and_clean_release_when_undispatched(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """Reusing identical key after partial execution is rejected; pre-dispatch abort permits clean retry."""
+    from app.domain.consortium_governance import CrossBankIdempotencyConflictError
+
+    gov_svc, c_id = tri_consortium
+    service = CrossBankIntelligenceService.get_instance()
+    service.consortium_service = gov_svc
+    budget_store = service.budget_store
+
+    budget_store.set_budget(consortium_id=c_id, requesting_bank_id="bank_a", counterpart_bank_id="bank_b", max_executions=5)
+    budget_store.set_budget(consortium_id=c_id, requesting_bank_id="bank_a", counterpart_bank_id="bank_c", max_executions=5)
+
+    test_ent = Entity(
+        id="cust_budget_idem_partial",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id="hash_budget_idem_partial",
+        bank_id="bank_a",
+        display_label="Idem Partial Entity",
+        risk_level=RiskLevel.HIGH,
+    )
+    service.entity_service._entities.set("cust_budget_idem_partial", _entity_to_dict(test_ent))
+
+    sig_b = _create_verified_signal("bank_b", c_id, match=True)
+
+    def execute_b_success_c_pilot_fail(req, *args, **kwargs):
+        if req.target_bank_id == "bank_b":
+            return sig_b
+        raise PilotQuotaExceededError("Pilot quota exhausted for target bank_c")
+
+    partial_req = MultiCounterpartyIntelligenceQueryRequest(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b", "bank_c"],
+        query_entity_id="cust_budget_idem_partial",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    idem_key_partial = "idem_key_b_success_c_pilot_fail_1"
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=execute_b_success_c_pilot_fail) as mock_psi:
+        # 1. Initial attempt: Bank B completes, Bank C pilot quota fails
+        with pytest.raises(PilotQuotaExceededError):
+            service.query_multi_counterparty_intelligence(
+                req=partial_req,
+                auth_token=auth_tokens["bank_a"],
+                idempotency_key=idem_key_partial,
+            )
+
+        assert mock_psi.call_count == 2  # Bank B and then Bank C attempted
+
+        # Bank B consumed 1, Bank C consumed 0
+        b_status_1 = budget_store.get_budget(c_id, "bank_a", "bank_b")
+        c_status_1 = budget_store.get_budget(c_id, "bank_a", "bank_c")
+        assert b_status_1 is not None and b_status_1["consumed_executions"] == 1
+        assert c_status_1 is not None and c_status_1["consumed_executions"] == 0
+
+        # 2. Invariant: Reusing identical key MUST be rejected in fail-closed ambiguous state
+        with pytest.raises(CrossBankIdempotencyConflictError) as conf_exc:
+            service.query_multi_counterparty_intelligence(
+                req=partial_req,
+                auth_token=auth_tokens["bank_a"],
+                idempotency_key=idem_key_partial,
+            )
+        assert "indeterminate state" in str(conf_exc.value)
+
+        # 3. Assert zero additional PSI executions occurred
+        assert mock_psi.call_count == 2
+
+        # 4. Assert zero additional budget consumed
+        b_status_2 = budget_store.get_budget(c_id, "bank_a", "bank_b")
+        c_status_2 = budget_store.get_budget(c_id, "bank_a", "bank_c")
+        assert b_status_2 is not None and b_status_2["consumed_executions"] == 1
+        assert c_status_2 is not None and c_status_2["consumed_executions"] == 0
+
+    # 5. Clean abort scenario: pilot rejection BEFORE all dispatches permits safe clean release
+    clean_req = MultiCounterpartyIntelligenceQueryRequest(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b"],
+        query_entity_id="cust_budget_idem_partial",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    idem_key_clean = "idem_key_clean_abort_test_1"
+
+    def fail_first_target_pilot(*args, **kwargs):
+        raise PilotQuotaExceededError("Target bank_b pilot quota exhausted pre-dispatch")
+
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=fail_first_target_pilot):
+        with pytest.raises(PilotQuotaExceededError):
+            service.query_multi_counterparty_intelligence(
+                req=clean_req,
+                auth_token=auth_tokens["bank_a"],
+                idempotency_key=idem_key_clean,
+            )
+
+    # Bank B was not charged for the pre-dispatch pilot failure
+    b_status_pre = budget_store.get_budget(c_id, "bank_a", "bank_b")
+    assert b_status_pre is not None and b_status_pre["consumed_executions"] == 1  # 1 from previous partial test
+
+    # Invariant: Because no counterpart was dispatched and no side effects occurred, the key was cleanly released!
+    # A subsequent retry with the identical key can execute normally
+    with patch.object(service, "_execute_verified_operational_psi", return_value=sig_b):
+        resp_clean = service.query_multi_counterparty_intelligence(
+            req=clean_req,
+            auth_token=auth_tokens["bank_a"],
+            idempotency_key=idem_key_clean,
+        )
+        assert resp_clean.overall_outcome == "COMPLETED"
+        assert getattr(resp_clean, "_idempotency_replayed", False) is False
+
+    b_status_final = budget_store.get_budget(c_id, "bank_a", "bank_b")
+    assert b_status_final is not None and b_status_final["consumed_executions"] == 2
+
+
+def test_rolling_window_consumption_preserved_through_seven_day_audit_retention(
+    tri_consortium: tuple[ConsortiumGovernanceService, str],
+) -> None:
+    """A 30-day window does not replenish after 7-day audit cleanup, but replenishes after 30-day expiration."""
+    gov_svc, c_id = tri_consortium
+    service = CrossBankIntelligenceService.get_instance()
+    service.consortium_service = gov_svc
+    budget_store = service.budget_store
+
+    # 30-day rolling window budget with max 1 execution
+    thirty_days_sec = 30 * 86400
+    budget_store.set_budget(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        counterpart_bank_id="bank_b",
+        max_executions=1,
+        window_seconds=thirty_days_sec,
+    )
+
+    now_0 = datetime.datetime.now(UTC)
+
+    # 1. Execute and commit 1 reservation at now_0
+    ok, bid, exhausted = budget_store.reserve_batch(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b"],
+        now_dt=now_0,
+    )
+    assert ok is True
+    budget_store.commit_reservations(bid, ["bank_b"])
+
+    status_0 = budget_store.get_budget(c_id, "bank_a", "bank_b", now_dt=now_0)
+    assert status_0 is not None
+    assert status_0["consumed_executions"] == 1
+    assert status_0["remaining_executions"] == 0
+
+    # 2. Simulate 8 days passing (exceeding 7-day retention cleanup)
+    now_8d = now_0 + datetime.timedelta(days=8)
+    with budget_store._lock, budget_store._get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE;")
+        budget_store._execute_cleanup_in_conn(conn, now_8d, now_8d.isoformat())
+        conn.commit()
+
+    # Verify that the disposable audit reservation row was pruned from cross_bank_budget_reservations
+    with budget_store._get_connection() as conn:
+        res_count = conn.execute("SELECT COUNT(*) as c FROM cross_bank_budget_reservations;").fetchone()["c"]
+        assert res_count == 0
+
+    # Invariant: Despite 7-day audit rows being pruned, rolling-window consumption is preserved for the full 30 days!
+    status_8d = budget_store.get_budget(c_id, "bank_a", "bank_b", now_dt=now_8d)
+    assert status_8d is not None
+    assert status_8d["consumed_executions"] == 1
+    assert status_8d["remaining_executions"] == 0
+
+    # Attempting to reserve at day 8 must still be rejected (silent replenishment prevented)
+    ok_8d, _, exhausted_8d = budget_store.reserve_batch(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b"],
+        now_dt=now_8d,
+    )
+    assert ok_8d is False
+    assert exhausted_8d == ["bank_b"]
+
+    # 3. Simulate 31 days passing (exceeding the actual 30-day window)
+    now_31d = now_0 + datetime.timedelta(days=31)
+    with budget_store._lock, budget_store._get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE;")
+        budget_store._execute_cleanup_in_conn(conn, now_31d, now_31d.isoformat())
+        conn.commit()
+
+    # Invariant: The 30-day window has now genuinely expired -> budget replenishes!
+    status_31d = budget_store.get_budget(c_id, "bank_a", "bank_b", now_dt=now_31d)
+    assert status_31d is not None
+    assert status_31d["consumed_executions"] == 0
+    assert status_31d["remaining_executions"] == 1
+
+    # Reservation at day 31 now succeeds cleanly
+    ok_31d, bid_31d, exhausted_31d = budget_store.reserve_batch(
+        consortium_id=c_id,
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b"],
+        now_dt=now_31d,
+    )
+    assert ok_31d is True
+    assert exhausted_31d == []
 

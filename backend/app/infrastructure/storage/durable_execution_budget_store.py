@@ -176,6 +176,24 @@ class DurableCrossBankExecutionBudgetStore:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_budget_res_expires ON cross_bank_budget_reservations (expires_at);"
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS cross_bank_budget_window_executions (
+                    execution_id TEXT PRIMARY KEY,
+                    consortium_id TEXT NOT NULL,
+                    requesting_bank_id TEXT NOT NULL,
+                    counterpart_bank_id TEXT NOT NULL,
+                    executed_at TEXT NOT NULL
+                );
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_budget_window_pair_time ON cross_bank_budget_window_executions (
+                    consortium_id, requesting_bank_id, counterpart_bank_id, executed_at
+                );
+                """
+            )
             # Backfill consumption ledger from existing historical reservations if upgrading
             conn.execute(
                 """
@@ -186,6 +204,17 @@ class DurableCrossBankExecutionBudgetStore:
                 FROM cross_bank_budget_reservations
                 WHERE status IN ('COMMITTED', 'FAILED_CLOSED')
                 GROUP BY consortium_id, requesting_bank_id, counterpart_bank_id;
+                """
+            )
+            # Backfill window execution history from existing historical reservations if upgrading
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO cross_bank_budget_window_executions (
+                    execution_id, consortium_id, requesting_bank_id, counterpart_bank_id, executed_at
+                )
+                SELECT reservation_id, consortium_id, requesting_bank_id, counterpart_bank_id, COALESCE(resolved_at, reserved_at)
+                FROM cross_bank_budget_reservations
+                WHERE status IN ('COMMITTED', 'FAILED_CLOSED');
                 """
             )
             conn.commit()
@@ -210,6 +239,25 @@ class DurableCrossBankExecutionBudgetStore:
                 total_consumed = total_consumed + excluded.total_consumed;
             """,
             (consortium_id, requesting_bank_id, counterpart_bank_id, count),
+        )
+
+    def _record_window_execution(
+        self,
+        conn: sqlite3.Connection,
+        reservation_id: str,
+        consortium_id: str,
+        requesting_bank_id: str,
+        counterpart_bank_id: str,
+        executed_at: str,
+    ) -> None:
+        """Records an authoritative execution event into the durable window execution history."""
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO cross_bank_budget_window_executions (
+                execution_id, consortium_id, requesting_bank_id, counterpart_bank_id, executed_at
+            ) VALUES (?, ?, ?, ?, ?);
+            """,
+            (reservation_id, consortium_id, requesting_bank_id, counterpart_bank_id, executed_at),
         )
 
     def _reconcile_expired_reservations(self, conn: sqlite3.Connection, now_iso: str) -> int:
@@ -246,6 +294,14 @@ class DurableCrossBankExecutionBudgetStore:
                 r["counterpart_bank_id"],
                 1,
             )
+            self._record_window_execution(
+                conn,
+                r["reservation_id"],
+                r["consortium_id"],
+                r["requesting_bank_id"],
+                r["counterpart_bank_id"],
+                now_iso,
+            )
         return len(expired_rows)
 
     def _execute_cleanup_in_conn(
@@ -265,6 +321,38 @@ class DurableCrossBankExecutionBudgetStore:
             """
             DELETE FROM cross_bank_budget_reservations
             WHERE status IN ('COMMITTED', 'RELEASED', 'FAILED_CLOSED') AND resolved_at < ?;
+            """,
+            (cutoff_iso,),
+        )
+
+        # 3. Prune window executions older than each configured budget's window
+        cur_w = conn.execute(
+            """
+            SELECT consortium_id, requesting_bank_id, counterpart_bank_id, window_seconds
+            FROM cross_bank_execution_budgets
+            WHERE window_seconds IS NOT NULL AND window_seconds > 0;
+            """
+        )
+        for w in cur_w.fetchall():
+            w_cutoff = (now_dt - datetime.timedelta(seconds=int(w["window_seconds"]))).isoformat()
+            conn.execute(
+                """
+                DELETE FROM cross_bank_budget_window_executions
+                WHERE consortium_id = ? AND requesting_bank_id = ? AND counterpart_bank_id = ? AND executed_at < ?;
+                """,
+                (w["consortium_id"], w["requesting_bank_id"], w["counterpart_bank_id"], w_cutoff),
+            )
+        # Prune window executions for pairs that have no active window budget older than default retention
+        conn.execute(
+            """
+            DELETE FROM cross_bank_budget_window_executions
+            WHERE executed_at < ? AND NOT EXISTS (
+                SELECT 1 FROM cross_bank_execution_budgets b
+                WHERE b.consortium_id = cross_bank_budget_window_executions.consortium_id
+                  AND b.requesting_bank_id = cross_bank_budget_window_executions.requesting_bank_id
+                  AND b.counterpart_bank_id = cross_bank_budget_window_executions.counterpart_bank_id
+                  AND b.window_seconds IS NOT NULL AND b.window_seconds > 0
+            );
             """,
             (cutoff_iso,),
         )
@@ -318,13 +406,14 @@ class DurableCrossBankExecutionBudgetStore:
         consortium_id: str,
         requesting_bank_id: str,
         counterpart_bank_id: str,
+        now_dt: datetime.datetime | None = None,
     ) -> dict[str, Any] | None:
         """Returns budget configuration and current consumption statistics for a directional pair."""
         clean_c = consortium_id.lower().strip()
         clean_req = requesting_bank_id.lower().strip()
         clean_target = counterpart_bank_id.lower().strip()
-        now_dt = datetime.datetime.now(UTC)
-        now_iso = now_dt.isoformat()
+        now_resolved = now_dt or datetime.datetime.now(UTC)
+        now_iso = now_resolved.isoformat()
 
         with self._lock, self._get_connection() as conn:
             # Reconcile expired reservations to get accurate current count
@@ -346,7 +435,7 @@ class DurableCrossBankExecutionBudgetStore:
             win_sec = int(row["window_seconds"]) if row["window_seconds"] is not None else None
 
             if win_sec and win_sec > 0:
-                cutoff_dt = now_dt - datetime.timedelta(seconds=win_sec)
+                cutoff_dt = now_resolved - datetime.timedelta(seconds=win_sec)
                 cutoff_iso = cutoff_dt.isoformat()
                 cur_inf = conn.execute(
                     """
@@ -358,11 +447,11 @@ class DurableCrossBankExecutionBudgetStore:
                 )
                 cur_comm = conn.execute(
                     """
-                    SELECT COUNT(*) as c FROM cross_bank_budget_reservations
+                    SELECT COUNT(*) as c FROM cross_bank_budget_window_executions
                     WHERE consortium_id = ? AND requesting_bank_id = ? AND counterpart_bank_id = ?
-                    AND status IN ('COMMITTED', 'FAILED_CLOSED') AND (resolved_at >= ? OR reserved_at >= ?);
+                    AND executed_at >= ?;
                     """,
-                    (clean_c, clean_req, clean_target, cutoff_iso, cutoff_iso),
+                    (clean_c, clean_req, clean_target, cutoff_iso),
                 )
                 in_flight = cur_inf.fetchone()["c"]
                 consumed = cur_comm.fetchone()["c"]
@@ -422,6 +511,13 @@ class DurableCrossBankExecutionBudgetStore:
                 """,
                 (clean_c, clean_req, clean_target),
             )
+            conn.execute(
+                """
+                DELETE FROM cross_bank_budget_window_executions
+                WHERE consortium_id = ? AND requesting_bank_id = ? AND counterpart_bank_id = ?;
+                """,
+                (clean_c, clean_req, clean_target),
+            )
             cur = conn.execute(
                 """
                 DELETE FROM cross_bank_execution_budgets
@@ -464,6 +560,13 @@ class DurableCrossBankExecutionBudgetStore:
             )
             conn.execute(
                 """
+                DELETE FROM cross_bank_budget_window_executions
+                WHERE consortium_id = ? AND requesting_bank_id = ? AND counterpart_bank_id = ?;
+                """,
+                (clean_c, clean_req, clean_target),
+            )
+            conn.execute(
+                """
                 UPDATE cross_bank_execution_budgets
                 SET window_start = ?, updated_at = ?
                 WHERE consortium_id = ? AND requesting_bank_id = ? AND counterpart_bank_id = ?;
@@ -480,6 +583,7 @@ class DurableCrossBankExecutionBudgetStore:
         batch_id: str | None = None,
         ttl_seconds: float = DEFAULT_RESERVATION_TTL_SECONDS,
         grant_budgets: dict[str, int] | None = None,
+        now_dt: datetime.datetime | None = None,
     ) -> tuple[bool, str, list[str]]:
         """Atomically checks and reserves budget slots for all targets in a multi-counterparty batch.
 
@@ -496,16 +600,16 @@ class DurableCrossBankExecutionBudgetStore:
         clean_req = requesting_bank_id.lower().strip()
         clean_targets = [t.lower().strip() for t in target_bank_ids]
         bid = batch_id or str(uuid.uuid4())
-        now_dt = datetime.datetime.now(UTC)
-        now_iso = now_dt.isoformat()
-        expires_dt = now_dt + datetime.timedelta(seconds=ttl_seconds)
+        now_resolved = now_dt or datetime.datetime.now(UTC)
+        now_iso = now_resolved.isoformat()
+        expires_dt = now_resolved + datetime.timedelta(seconds=ttl_seconds)
         expires_iso = expires_dt.isoformat()
 
         with self._lock, self._get_connection() as conn:
             conn.execute("BEGIN IMMEDIATE;")
             # Atomically reconcile any expired reservations before quota checks
             self._reconcile_expired_reservations(conn, now_iso)
-            self._maybe_cleanup(conn, now_dt, now_iso)
+            self._maybe_cleanup(conn, now_resolved, now_iso)
 
             exhausted_targets: list[str] = []
 
@@ -530,21 +634,27 @@ class DurableCrossBankExecutionBudgetStore:
 
                 if max_exec is not None:
                     if win_sec and win_sec > 0:
-                        cutoff_dt = now_dt - datetime.timedelta(seconds=win_sec)
+                        cutoff_dt = now_resolved - datetime.timedelta(seconds=win_sec)
                         cutoff_iso = cutoff_dt.isoformat()
-                        cur_count = conn.execute(
+                        cur_inflight = conn.execute(
                             """
                             SELECT COUNT(*) as c FROM cross_bank_budget_reservations
                             WHERE consortium_id = ? AND requesting_bank_id = ? AND counterpart_bank_id = ?
-                            AND (
-                                (status = 'RESERVED' AND expires_at > ? AND reserved_at >= ?)
-                                OR
-                                (status IN ('COMMITTED', 'FAILED_CLOSED') AND (resolved_at >= ? OR reserved_at >= ?))
-                            );
+                            AND status = 'RESERVED' AND expires_at > ? AND reserved_at >= ?;
                             """,
-                            (clean_c, clean_req, t, now_iso, cutoff_iso, cutoff_iso, cutoff_iso),
+                            (clean_c, clean_req, t, now_iso, cutoff_iso),
                         )
-                        current_consumed = cur_count.fetchone()["c"]
+                        in_flight = cur_inflight.fetchone()["c"]
+                        cur_win = conn.execute(
+                            """
+                            SELECT COUNT(*) as c FROM cross_bank_budget_window_executions
+                            WHERE consortium_id = ? AND requesting_bank_id = ? AND counterpart_bank_id = ?
+                            AND executed_at >= ?;
+                            """,
+                            (clean_c, clean_req, t, cutoff_iso),
+                        )
+                        win_consumed = cur_win.fetchone()["c"]
+                        current_consumed = in_flight + win_consumed
                     else:
                         cur_inflight = conn.execute(
                             """
@@ -608,7 +718,7 @@ class DurableCrossBankExecutionBudgetStore:
                 for target in clean_targets:
                     cur_info = conn.execute(
                         """
-                        SELECT consortium_id, requesting_bank_id
+                        SELECT reservation_id, consortium_id, requesting_bank_id
                         FROM cross_bank_budget_reservations
                         WHERE batch_id = ? AND counterpart_bank_id = ? AND status = 'RESERVED';
                         """,
@@ -632,10 +742,18 @@ class DurableCrossBankExecutionBudgetStore:
                                 target,
                                 1,
                             )
+                            self._record_window_execution(
+                                conn,
+                                r["reservation_id"],
+                                r["consortium_id"],
+                                r["requesting_bank_id"],
+                                target,
+                                now_iso,
+                            )
             else:
                 cur_info = conn.execute(
                     """
-                    SELECT consortium_id, requesting_bank_id, counterpart_bank_id
+                    SELECT reservation_id, consortium_id, requesting_bank_id, counterpart_bank_id
                     FROM cross_bank_budget_reservations
                     WHERE batch_id = ? AND status = 'RESERVED';
                     """,
@@ -658,6 +776,14 @@ class DurableCrossBankExecutionBudgetStore:
                             r["requesting_bank_id"],
                             r["counterpart_bank_id"],
                             1,
+                        )
+                        self._record_window_execution(
+                            conn,
+                            r["reservation_id"],
+                            r["consortium_id"],
+                            r["requesting_bank_id"],
+                            r["counterpart_bank_id"],
+                            now_iso,
                         )
             conn.commit()
             return count
@@ -724,7 +850,7 @@ class DurableCrossBankExecutionBudgetStore:
                 for target in clean_targets:
                     cur_info = conn.execute(
                         """
-                        SELECT consortium_id, requesting_bank_id
+                        SELECT reservation_id, consortium_id, requesting_bank_id
                         FROM cross_bank_budget_reservations
                         WHERE batch_id = ? AND counterpart_bank_id = ? AND status = 'RESERVED';
                         """,
@@ -748,10 +874,18 @@ class DurableCrossBankExecutionBudgetStore:
                                 target,
                                 1,
                             )
+                            self._record_window_execution(
+                                conn,
+                                r["reservation_id"],
+                                r["consortium_id"],
+                                r["requesting_bank_id"],
+                                target,
+                                now_iso,
+                            )
             else:
                 cur_info = conn.execute(
                     """
-                    SELECT consortium_id, requesting_bank_id, counterpart_bank_id
+                    SELECT reservation_id, consortium_id, requesting_bank_id, counterpart_bank_id
                     FROM cross_bank_budget_reservations
                     WHERE batch_id = ? AND status = 'RESERVED';
                     """,
@@ -774,6 +908,14 @@ class DurableCrossBankExecutionBudgetStore:
                             r["requesting_bank_id"],
                             r["counterpart_bank_id"],
                             1,
+                        )
+                        self._record_window_execution(
+                            conn,
+                            r["reservation_id"],
+                            r["consortium_id"],
+                            r["requesting_bank_id"],
+                            r["counterpart_bank_id"],
+                            now_iso,
                         )
             conn.commit()
             return count
