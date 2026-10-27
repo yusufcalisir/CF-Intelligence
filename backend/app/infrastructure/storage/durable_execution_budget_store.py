@@ -278,31 +278,34 @@ class DurableCrossBankExecutionBudgetStore:
         if not expired_rows:
             return 0
 
-        conn.execute(
-            """
-            UPDATE cross_bank_budget_reservations
-            SET status = 'FAILED_CLOSED', resolved_at = ?, reason = ?
-            WHERE status = 'RESERVED' AND expires_at <= ?;
-            """,
-            (now_iso, REASON_EXPIRED_RESERVATION_FAILED_CLOSED, now_iso),
-        )
+        transitioned_count = 0
         for r in expired_rows:
-            self._increment_consumption(
-                conn,
-                r["consortium_id"],
-                r["requesting_bank_id"],
-                r["counterpart_bank_id"],
-                1,
+            cur_up = conn.execute(
+                """
+                UPDATE cross_bank_budget_reservations
+                SET status = 'FAILED_CLOSED', resolved_at = ?, reason = ?
+                WHERE reservation_id = ? AND status = 'RESERVED' AND expires_at <= ?;
+                """,
+                (now_iso, REASON_EXPIRED_RESERVATION_FAILED_CLOSED, r["reservation_id"], now_iso),
             )
-            self._record_window_execution(
-                conn,
-                r["reservation_id"],
-                r["consortium_id"],
-                r["requesting_bank_id"],
-                r["counterpart_bank_id"],
-                now_iso,
-            )
-        return len(expired_rows)
+            if cur_up.rowcount > 0:
+                transitioned_count += cur_up.rowcount
+                self._increment_consumption(
+                    conn,
+                    r["consortium_id"],
+                    r["requesting_bank_id"],
+                    r["counterpart_bank_id"],
+                    1,
+                )
+                self._record_window_execution(
+                    conn,
+                    r["reservation_id"],
+                    r["consortium_id"],
+                    r["requesting_bank_id"],
+                    r["counterpart_bank_id"],
+                    now_iso,
+                )
+        return transitioned_count
 
     def _execute_cleanup_in_conn(
         self,
@@ -416,6 +419,7 @@ class DurableCrossBankExecutionBudgetStore:
         now_iso = now_resolved.isoformat()
 
         with self._lock, self._get_connection() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
             # Reconcile expired reservations to get accurate current count
             self._reconcile_expired_reservations(conn, now_iso)
 
@@ -429,6 +433,7 @@ class DurableCrossBankExecutionBudgetStore:
             )
             row = cur.fetchone()
             if not row:
+                conn.commit()
                 return None
 
             max_exec = int(row["max_executions"])
@@ -476,6 +481,7 @@ class DurableCrossBankExecutionBudgetStore:
                 consumed = r_cons["total_consumed"] if r_cons else 0
 
             remaining = max(0, max_exec - (in_flight + consumed))
+            conn.commit()
 
             return {
                 "consortium_id": clean_c,
@@ -724,17 +730,17 @@ class DurableCrossBankExecutionBudgetStore:
                         """,
                         (clean_bid, target),
                     ).fetchall()
-                    if cur_info:
+                    for r in cur_info:
                         cur = conn.execute(
                             """
                             UPDATE cross_bank_budget_reservations
                             SET status = 'COMMITTED', resolved_at = ?, reason = ?
-                            WHERE batch_id = ? AND counterpart_bank_id = ? AND status = 'RESERVED';
+                            WHERE reservation_id = ? AND status = 'RESERVED';
                             """,
-                            (now_iso, safe_reason, clean_bid, target),
+                            (now_iso, safe_reason, r["reservation_id"]),
                         )
-                        count += cur.rowcount
-                        for r in cur_info:
+                        if cur.rowcount > 0:
+                            count += cur.rowcount
                             self._increment_consumption(
                                 conn,
                                 r["consortium_id"],
@@ -759,17 +765,17 @@ class DurableCrossBankExecutionBudgetStore:
                     """,
                     (clean_bid,),
                 ).fetchall()
-                if cur_info:
+                for r in cur_info:
                     cur = conn.execute(
                         """
                         UPDATE cross_bank_budget_reservations
                         SET status = 'COMMITTED', resolved_at = ?, reason = ?
-                        WHERE batch_id = ? AND status = 'RESERVED';
+                        WHERE reservation_id = ? AND status = 'RESERVED';
                         """,
-                        (now_iso, safe_reason, clean_bid),
+                        (now_iso, safe_reason, r["reservation_id"]),
                     )
-                    count = cur.rowcount
-                    for r in cur_info:
+                    if cur.rowcount > 0:
+                        count += cur.rowcount
                         self._increment_consumption(
                             conn,
                             r["consortium_id"],
@@ -856,17 +862,17 @@ class DurableCrossBankExecutionBudgetStore:
                         """,
                         (clean_bid, target),
                     ).fetchall()
-                    if cur_info:
+                    for r in cur_info:
                         cur = conn.execute(
                             """
                             UPDATE cross_bank_budget_reservations
                             SET status = 'FAILED_CLOSED', resolved_at = ?, reason = ?
-                            WHERE batch_id = ? AND counterpart_bank_id = ? AND status = 'RESERVED';
+                            WHERE reservation_id = ? AND status = 'RESERVED';
                             """,
-                            (now_iso, safe_reason, clean_bid, target),
+                            (now_iso, safe_reason, r["reservation_id"]),
                         )
-                        count += cur.rowcount
-                        for r in cur_info:
+                        if cur.rowcount > 0:
+                            count += cur.rowcount
                             self._increment_consumption(
                                 conn,
                                 r["consortium_id"],
@@ -891,17 +897,17 @@ class DurableCrossBankExecutionBudgetStore:
                     """,
                     (clean_bid,),
                 ).fetchall()
-                if cur_info:
+                for r in cur_info:
                     cur = conn.execute(
                         """
                         UPDATE cross_bank_budget_reservations
                         SET status = 'FAILED_CLOSED', resolved_at = ?, reason = ?
-                        WHERE batch_id = ? AND status = 'RESERVED';
+                        WHERE reservation_id = ? AND status = 'RESERVED';
                         """,
-                        (now_iso, safe_reason, clean_bid),
+                        (now_iso, safe_reason, r["reservation_id"]),
                     )
-                    count = cur.rowcount
-                    for r in cur_info:
+                    if cur.rowcount > 0:
+                        count += cur.rowcount
                         self._increment_consumption(
                             conn,
                             r["consortium_id"],

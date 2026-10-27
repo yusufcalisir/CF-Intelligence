@@ -1327,3 +1327,145 @@ def test_rolling_window_consumption_preserved_through_seven_day_audit_retention(
     assert ok_31d is True
     assert exhausted_31d == []
 
+
+def test_concurrent_reconciliation_two_store_instances_idempotent(tmp_path: Path) -> None:
+    """Two independent budget store instances pointing to the same SQLite file reconcile concurrently.
+
+    Asserts:
+    - Exactly one reservation transitions to FAILED_CLOSED.
+    - The permanent consumption ledger increments exactly once.
+    - The window-history table contains exactly one execution event.
+    - Repeated reconciliation does not increment consumption again.
+    - Available budget never exceeds its configured limit.
+    """
+    db_file = tmp_path / "concurrent_reconcile_budget.sqlite"
+    store1 = DurableCrossBankExecutionBudgetStore(db_path=str(db_file))
+    store2 = DurableCrossBankExecutionBudgetStore(db_path=str(db_file))
+
+    c_id = "test_consortium_concurrency"
+    req_bank = "bank_a"
+    counterpart = "bank_b"
+    max_executions = 2
+
+    # Configure budget on store1 (shared SQLite file)
+    store1.set_budget(
+        consortium_id=c_id,
+        requesting_bank_id=req_bank,
+        counterpart_bank_id=counterpart,
+        max_executions=max_executions,
+    )
+
+    # Seed exactly one expired RESERVED reservation directly into cross_bank_budget_reservations
+    now = datetime.datetime.now(UTC)
+    past_iso = (now - datetime.timedelta(seconds=60)).isoformat()
+    expired_iso = (now - datetime.timedelta(seconds=10)).isoformat()
+    res_id = "expired-res-concurrency-1"
+    batch_id = "expired-batch-concurrency-1"
+
+    with sqlite3.connect(str(db_file)) as conn:
+        conn.execute(
+            """
+            INSERT INTO cross_bank_budget_reservations (
+                reservation_id, batch_id, consortium_id, requesting_bank_id,
+                counterpart_bank_id, status, reserved_at, expires_at
+            ) VALUES (?, ?, ?, ?, ?, 'RESERVED', ?, ?);
+            """,
+            (res_id, batch_id, c_id, req_bank, counterpart, past_iso, expired_iso),
+        )
+        conn.commit()
+
+    # Concurrently call get_budget() from both store instances
+    def call_store1():
+        return store1.get_budget(c_id, req_bank, counterpart, now_dt=now)
+
+    def call_store2():
+        return store2.get_budget(c_id, req_bank, counterpart, now_dt=now)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        f1 = executor.submit(call_store1)
+        f2 = executor.submit(call_store2)
+        r1 = f1.result()
+        r2 = f2.result()
+
+    # Assert: Exactly one reservation transitions to FAILED_CLOSED
+    with sqlite3.connect(str(db_file)) as conn:
+        conn.row_factory = sqlite3.Row
+        res = conn.execute(
+            "SELECT status, reason FROM cross_bank_budget_reservations WHERE reservation_id = ?;",
+            (res_id,),
+        ).fetchone()
+        assert res is not None
+        assert res["status"] == "FAILED_CLOSED"
+
+        failed_count = conn.execute(
+            "SELECT COUNT(*) as c FROM cross_bank_budget_reservations WHERE status = 'FAILED_CLOSED';"
+        ).fetchone()["c"]
+        assert failed_count == 1
+
+        # Assert: The permanent consumption ledger increments exactly once
+        cons_row = conn.execute(
+            """
+            SELECT total_consumed FROM cross_bank_budget_consumption
+            WHERE consortium_id = ? AND requesting_bank_id = ? AND counterpart_bank_id = ?;
+            """,
+            (c_id, req_bank, counterpart),
+        ).fetchone()
+        assert cons_row is not None
+        assert cons_row["total_consumed"] == 1
+
+        # Assert: The window-history table contains exactly one execution event
+        win_rows = conn.execute(
+            """
+            SELECT COUNT(*) as c FROM cross_bank_budget_window_executions
+            WHERE consortium_id = ? AND requesting_bank_id = ? AND counterpart_bank_id = ?;
+            """,
+            (c_id, req_bank, counterpart),
+        ).fetchone()["c"]
+        assert win_rows == 1
+
+    # Assert: Both concurrent callers observe consistent budget state
+    assert r1 is not None and r2 is not None
+    assert r1["max_executions"] == max_executions
+    assert r2["max_executions"] == max_executions
+    assert r1["consumed_executions"] == 1
+    assert r2["consumed_executions"] == 1
+    assert r1["remaining_executions"] == 1
+    assert r2["remaining_executions"] == 1
+
+    # Assert: Available budget never exceeds its configured limit
+    assert r1["remaining_executions"] <= max_executions
+    assert r1["remaining_executions"] + r1["consumed_executions"] <= max_executions
+    assert r2["remaining_executions"] <= max_executions
+    assert r2["remaining_executions"] + r2["consumed_executions"] <= max_executions
+
+    # Assert: Repeated reconciliation does not increment consumption again
+    r1_repeat = store1.get_budget(c_id, req_bank, counterpart, now_dt=now)
+    r2_repeat = store2.get_budget(c_id, req_bank, counterpart, now_dt=now)
+
+    assert r1_repeat is not None and r2_repeat is not None
+    assert r1_repeat["consumed_executions"] == 1
+    assert r2_repeat["consumed_executions"] == 1
+    assert r1_repeat["remaining_executions"] == 1
+    assert r2_repeat["remaining_executions"] == 1
+
+    with sqlite3.connect(str(db_file)) as conn:
+        conn.row_factory = sqlite3.Row
+        cons_row_repeat = conn.execute(
+            """
+            SELECT total_consumed FROM cross_bank_budget_consumption
+            WHERE consortium_id = ? AND requesting_bank_id = ? AND counterpart_bank_id = ?;
+            """,
+            (c_id, req_bank, counterpart),
+        ).fetchone()
+        assert cons_row_repeat is not None
+        assert cons_row_repeat["total_consumed"] == 1
+
+        win_rows_repeat = conn.execute(
+            """
+            SELECT COUNT(*) as c FROM cross_bank_budget_window_executions
+            WHERE consortium_id = ? AND requesting_bank_id = ? AND counterpart_bank_id = ?;
+            """,
+            (c_id, req_bank, counterpart),
+        ).fetchone()["c"]
+        assert win_rows_repeat == 1
+
