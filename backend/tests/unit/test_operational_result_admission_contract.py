@@ -414,8 +414,8 @@ def _create_mock_consortium_service(consortium_id: str = "c_alpha") -> Consortiu
                 "allow_cross_border": False,
                 "allow_institution_identity_sharing": True,
                 "approvals": {
-                    "bank_a": {"signature": "sig_a", "scope_digest": digest, "revision": 1},
-                    "bank_b": {"signature": "sig_b", "scope_digest": digest, "revision": 1},
+                    "bank_a": {"signature": "sig_a", "scope_digest": digest, "revision": 1, "grant_revision": 1},
+                    "bank_b": {"signature": "sig_b", "scope_digest": digest, "revision": 1, "grant_revision": 1},
                 },
             }
         },
@@ -748,7 +748,7 @@ def test_revoked_consent_rejects_admission() -> None:
     cbi = CrossBankIntelligenceService(consortium_service=gov, institutional_registry=reg)
     signal, req, _, _, _ = _build_authentic_test_signal("c_alpha")
 
-    with pytest.raises(ConsortiumSecurityError, match="Bilateral operational consent for grant .* has been revoked"):
+    with pytest.raises(ConsortiumSecurityError, match="Bilateral operational consent for grant .* has been revoked|Operational consent under grant .* was revoked"):
         cbi._admit_and_verify_operational_signal(
             signal=signal,
             expected_req=req,

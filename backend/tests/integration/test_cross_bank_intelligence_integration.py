@@ -12,6 +12,7 @@ Verifies:
 
 from __future__ import annotations
 
+import datetime
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -292,6 +293,45 @@ class TestCrossBankIntelligenceIntegration:
         assert q_resp.status_code == 200
         signal_id = q_resp.json()["signal_id"]
 
+        # Mark signal authoritative and admitted for authoritative HTTP evidence attachment test
+        import hashlib
+        import json
+
+        from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
+        intel_svc = CrossBankIntelligenceService.get_instance()
+        record = intel_svc._signal_store.get(signal_id)
+        assert record is not None
+        rcp_id = f"rcp_{signal_id}"
+        sig_data = dict(record["signal_data"])
+        sig_data["execution_mode"] = "VERIFIED_OPERATIONAL"
+        sig_data["is_authoritative"] = True
+        sig_data["is_synthetic"] = False
+        record["signal_data"] = sig_data
+        record["content_hash"] = hashlib.sha256(json.dumps(sig_data, sort_keys=True).encode("utf-8")).hexdigest()
+        record["is_authoritative"] = True
+        record["is_synthetic"] = False
+        record["execution_mode"] = "VERIFIED_OPERATIONAL"
+        record["operational_status"] = "OPERATIONAL"
+        record["admission_status"] = "COMMITTED"
+        record["publication_status"] = "PUBLISHED"
+        record["is_attachable"] = True
+        record["target_bank_id"] = "bank_b"
+        record["receipt_id"] = rcp_id
+        intel_svc._signal_store.set(signal_id, record)
+        intel_svc._admitted_receipts_store.set(
+            rcp_id,
+            {
+                "admitted_at": datetime.datetime.now(datetime.UTC).isoformat(),
+                "signal_id": signal_id,
+                "receipt_id": rcp_id,
+                "content_hash": record["content_hash"],
+                "requesting_bank_id": "bank_a",
+                "target_bank_id": "bank_b",
+                "consortium_id": "integ_alliance",
+                "execution_mode": "VERIFIED_OPERATIONAL",
+            },
+        )
+
         # 2. Create case
         case_svc = CaseManagementService()
         case = case_svc.create_case(
@@ -312,7 +352,7 @@ class TestCrossBankIntelligenceIntegration:
             json=attach_req,
             headers={"Authorization": f"Bearer {auth_tokens['bank_a']}"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["case_id"] == case.id
         assert data["signal_id"] == signal_id
@@ -369,7 +409,7 @@ class TestCrossBankIntelligenceIntegration:
                 f"{prefix}/consortiums/integ_alliance/policy",
                 headers={"Authorization": f"Bearer {auth_tokens['bank_a']}"},
             )
-            assert resp.status_code == 200
+            assert resp.status_code == 200, resp.text
             data = resp.json()
             assert data["consortium_id"] == "integ_alliance"
             assert data["active_member_count"] == 2

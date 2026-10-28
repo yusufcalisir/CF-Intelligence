@@ -223,9 +223,20 @@ def test_defect_demonstration_risk_and_typology_tampering_vulnerability() -> Non
             "operational_data_sharing_grant": {
                 "grant_id": grant_meta["grant_id"],
                 "revision": grant_meta["revision"],
+                "grant_revision": grant_meta["revision"],
                 "scope_digest": grant_meta["scope_digest"],
                 "is_active": True,
-                "status": "ACTIVE",
+                "status": "APPROVED",
+                "participating_banks": ["bank_a", "bank_b"],
+                "allowed_purposes": ["AML_COLLABORATIVE_INVESTIGATION"],
+                "institution_jurisdictions": {"bank_a": "EU", "bank_b": "EU"},
+                "allowed_jurisdictions": ["EU", "US"],
+                "allow_cross_border": False,
+                "allow_institution_identity_sharing": True,
+                "approvals": {
+                    "bank_a": {"signature": "sig_a", "scope_digest": grant_meta["scope_digest"], "revision": 1, "grant_revision": 1},
+                    "bank_b": {"signature": "sig_b", "scope_digest": grant_meta["scope_digest"], "revision": 1, "grant_revision": 1},
+                },
             }
         },
     )
@@ -266,9 +277,20 @@ def test_defect_demonstration_unverified_counterpart_response() -> None:
             "operational_data_sharing_grant": {
                 "grant_id": grant_meta["grant_id"],
                 "revision": grant_meta["revision"],
+                "grant_revision": grant_meta["revision"],
                 "scope_digest": grant_meta["scope_digest"],
                 "is_active": True,
-                "status": "ACTIVE",
+                "status": "APPROVED",
+                "participating_banks": ["bank_a", "bank_b"],
+                "allowed_purposes": ["AML_COLLABORATIVE_INVESTIGATION"],
+                "institution_jurisdictions": {"bank_a": "EU", "bank_b": "EU"},
+                "allowed_jurisdictions": ["EU", "US"],
+                "allow_cross_border": False,
+                "allow_institution_identity_sharing": True,
+                "approvals": {
+                    "bank_a": {"signature": "sig_a", "scope_digest": grant_meta["scope_digest"], "revision": 1, "grant_revision": 1},
+                    "bank_b": {"signature": "sig_b", "scope_digest": grant_meta["scope_digest"], "revision": 1, "grant_revision": 1},
+                },
             }
         },
     )
@@ -350,7 +372,10 @@ def test_defect_demonstration_symmetric_secret_requirement(monkeypatch: pytest.M
                 "allowed_jurisdictions": ["EU", "US"],
                 "allow_cross_border": False,
                 "allow_institution_identity_sharing": True,
-                "approvals": {"bank_a": "sig_a", "bank_b": "sig_b"},
+                "approvals": {
+                    "bank_a": {"signature": "sig_a", "scope_digest": signal.provenance["grant_scope_digest"], "revision": 1, "grant_revision": 1},
+                    "bank_b": {"signature": "sig_b", "scope_digest": signal.provenance["grant_scope_digest"], "revision": 1, "grant_revision": 1},
+                },
             }
         },
     )

@@ -326,19 +326,19 @@ def test_concurrent_identical_requests_cannot_execute_twice(
 
     def worker_thread() -> None:
         try:
-            with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec_operational_slow):
-                res = service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
-                responses.append(res)
+            res = service.query_multi_counterparty_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+            responses.append(res)
         except Exception as e:
             errors.append(e)
 
     t1 = threading.Thread(target=worker_thread)
     t2 = threading.Thread(target=worker_thread)
 
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
+    with patch.object(service, "_execute_verified_operational_psi", side_effect=mock_exec_operational_slow):
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
 
     # Across both threads, PSI execution ran exactly once per counterpart (total 2 calls, not 4)
     assert exec_call_count == 2

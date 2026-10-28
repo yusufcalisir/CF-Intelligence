@@ -273,7 +273,7 @@ def test_migration_manager_configuration_and_head() -> None:
 
     heads = get_current_head_revision()
     assert len(heads) == 1
-    assert heads[0] == "005_case_institutional_ownership"
+    assert heads[0] == "006_pilot_operations_table"
 
 
 # ── 5. Distributed Locking in CacheService ─────────────────────────────────────

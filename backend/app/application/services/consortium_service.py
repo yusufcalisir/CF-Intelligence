@@ -1275,10 +1275,11 @@ class ConsortiumGovernanceService:
                 f"Requesting institution '{clean_req}' has not approved operational grant '{grant_id}'.",
                 grant,
             )
-        if req_approval.get("grant_revision") != current_rev:
+        req_rev = req_approval.get("grant_revision") if req_approval.get("grant_revision") is not None else req_approval.get("revision")
+        if req_rev != current_rev:
             return (
                 False,
-                f"Approval by requesting institution '{clean_req}' is stale for operational grant '{grant_id}' (approved revision {req_approval.get('grant_revision')}, current is {current_rev}).",
+                f"Approval by requesting institution '{clean_req}' is stale for operational grant '{grant_id}' (approved revision {req_rev}, current is {current_rev}).",
                 grant,
             )
         if current_scope_digest and req_approval.get("scope_digest") != current_scope_digest:
@@ -1295,10 +1296,11 @@ class ConsortiumGovernanceService:
                 f"Counterpart institution '{clean_counterpart}' has not approved operational grant '{grant_id}'. Unilateral approval does not constitute bilateral consent.",
                 grant,
             )
-        if counterpart_approval.get("grant_revision") != current_rev:
+        counterpart_rev = counterpart_approval.get("grant_revision") if counterpart_approval.get("grant_revision") is not None else counterpart_approval.get("revision")
+        if counterpart_rev != current_rev:
             return (
                 False,
-                f"Approval by counterpart institution '{clean_counterpart}' is stale for operational grant '{grant_id}' (approved revision {counterpart_approval.get('grant_revision')}, current is {current_rev}).",
+                f"Approval by counterpart institution '{clean_counterpart}' is stale for operational grant '{grant_id}' (approved revision {counterpart_rev}, current is {current_rev}).",
                 grant,
             )
         if current_scope_digest and counterpart_approval.get("scope_digest") != current_scope_digest:

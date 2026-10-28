@@ -28,6 +28,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.application.services.consortium_service import ConsortiumGovernanceService
+from app.application.services.isolated_matching_service import (
+    CrossBankMatchingCoordinator,
+    InstitutionalCoordinatorDaemon,
+    InstitutionalWorkerDaemon,
+    IsolatedBankWorkerNode,
+)
 from app.application.services.pilot_operations_service import (
     PilotAuthorizationError,
     PilotExpiredError,
@@ -52,6 +58,7 @@ from app.main import app
 
 SHARED_JWT_SECRET = "jwt_secret_unit_test_pilot_operations_091823749812734"
 SHARED_CONSORTIUM_STORE_SECRET = "consortium_store_hmac_unit_test_98712398471"
+SHARED_COORDINATOR_SECRET = "coordinator_secret_unit_test_8392173491827"
 
 
 @pytest.fixture
@@ -70,6 +77,7 @@ def unit_pilot_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str,
     monkeypatch.setenv("CFI_OIDC_JWT_SIGNING_SECRET", SHARED_JWT_SECRET)
     monkeypatch.setenv("CFI_IDENTITY_STORE_SECRET", SHARED_JWT_SECRET)
     monkeypatch.setenv("CFI_AUDIT_LEDGER_SECRET", SHARED_JWT_SECRET)
+    monkeypatch.setenv("CFI_COORDINATOR_SECRET", SHARED_COORDINATOR_SECRET)
 
     DurableConsortiumStore.set_instance(None)
     AuthenticationService.reset_instance()
@@ -158,21 +166,55 @@ def unit_pilot_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str,
     pilot_svc.institutional_registry.register_public_key("bank_b", id_b.public_key)
     PilotOperationsService._instance = pilot_svc
 
-    return {
-        "pilot_svc": pilot_svc,
-        "gov_svc": gov_svc,
-        "pilot_db_file": pilot_db_file,
-        "id_a": id_a,
-        "id_b": id_b,
-        "principal_op": principal_op,
-        "principal_a": principal_a,
-        "principal_b": principal_b,
-        "principal_hacker": principal_hacker,
-        "token_op": token_op,
-        "token_a": token_a,
-        "token_b": token_b,
-        "token_hacker": token_hacker,
+    # Start live test daemons on ephemeral ports for authentic preflight verification
+    node_a = IsolatedBankWorkerNode("bank_a", storage_root=str(tmp_path / "bank_a_vault"), signing_key=id_a)
+    node_b = IsolatedBankWorkerNode("bank_b", storage_root=str(tmp_path / "bank_b_vault"), signing_key=id_b)
+    daemon_a = InstitutionalWorkerDaemon(node_a, host="127.0.0.1", port=0, run_as_process=False)
+    daemon_b = InstitutionalWorkerDaemon(node_b, host="127.0.0.1", port=0, run_as_process=False)
+    url_a = daemon_a.start()
+    url_b = daemon_b.start()
+    coord_obj = CrossBankMatchingCoordinator()
+    coord_daemon = InstitutionalCoordinatorDaemon(
+        coord_obj, host="127.0.0.1", port=0, coordinator_secret=SHARED_COORDINATOR_SECRET
+    )
+    url_coord = coord_daemon.start()
+
+    test_topology = {
+        "bank_a_worker_url": url_a,
+        "bank_b_worker_url": url_b,
+        "coordinator_url": url_coord,
     }
+
+    orig_provision = pilot_svc.provision_pilot
+
+    def _provision_with_topo(*args: Any, **kwargs: Any) -> PilotEntity:
+        if "topology" not in kwargs:
+            kwargs["topology"] = dict(test_topology)
+        return orig_provision(*args, **kwargs)
+
+    pilot_svc.provision_pilot = _provision_with_topo  # type: ignore[method-assign]
+
+    try:
+        yield {
+            "pilot_svc": pilot_svc,
+            "gov_svc": gov_svc,
+            "pilot_db_file": pilot_db_file,
+            "id_a": id_a,
+            "id_b": id_b,
+            "principal_op": principal_op,
+            "principal_a": principal_a,
+            "principal_b": principal_b,
+            "principal_hacker": principal_hacker,
+            "token_op": token_op,
+            "token_a": token_a,
+            "token_b": token_b,
+            "token_hacker": token_hacker,
+            "test_topology": test_topology,
+        }
+    finally:
+        daemon_a.stop()
+        daemon_b.stop()
+        coord_daemon.stop()
 
 
 def _sign(pilot: PilotEntity, inst: str, identity: InstitutionalSigningIdentity, approver_id: str) -> str:

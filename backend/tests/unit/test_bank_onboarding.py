@@ -301,8 +301,37 @@ def test_onboarding_endpoint_returns_bundle(
     mock_init_tables: AsyncMock, db_session: AsyncSession
 ) -> None:
     """POST /api/v1/onboarding/register must return complete onboarding bundle."""
+    from app.infrastructure.security.auth_service import AuthenticationService
+
+    auth_svc = AuthenticationService.get_instance()
+    admin_user = auth_svc.get_user("onboarding_admin")
+    if not admin_user:
+        admin_user = auth_svc.register_user(
+            "onboarding_admin", "AdminPass123!", "system", roles=["super_admin", "admin"]
+        )
+    token = auth_svc.create_token_bundle(admin_user).access_token
+    headers = {"Authorization": f"Bearer {token}"}
+
     app.dependency_overrides[get_async_session] = lambda: db_session
     client = TestClient(app)
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+
+    priv_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    csr_pem = (
+        x509.CertificateSigningRequestBuilder()
+        .subject_name(
+            x509.Name([
+                x509.NameAttribute(NameOID.COMMON_NAME, "bank_delta.client.cf-intelligence.io"),
+            ])
+        )
+        .sign(priv_key, hashes.SHA256())
+        .public_bytes(serialization.Encoding.PEM)
+        .decode("utf-8")
+    )
 
     try:
         response = client.post(
@@ -313,7 +342,9 @@ def test_onboarding_endpoint_returns_bundle(
                 "jurisdiction": "US",
                 "contact_email": "compliance@deltasavings.com",
                 "data_residency_region": "us-east-1",
+                "csr_pem": csr_pem,
             },
+            headers=headers,
         )
         assert response.status_code == 201, response.text
         data = response.json()
@@ -334,17 +365,19 @@ def test_onboarding_endpoint_returns_bundle(
                 "jurisdiction": "US",
                 "contact_email": "compliance@deltasavings.com",
                 "data_residency_region": "us-east-1",
+                "csr_pem": csr_pem,
             },
+            headers=headers,
         )
         assert dup_resp.status_code == 409
 
         # Test list -> 200
-        list_resp = client.get("/api/v1/onboarding/banks")
+        list_resp = client.get("/api/v1/onboarding/banks", headers=headers)
         assert list_resp.status_code == 200
         assert len(list_resp.json()) == 1
 
         # Test single status -> 200
-        status_resp = client.get("/api/v1/onboarding/banks/bank_delta/status")
+        status_resp = client.get("/api/v1/onboarding/banks/bank_delta/status", headers=headers)
         assert status_resp.status_code == 200
         assert status_resp.json()["bank_id"] == "bank_delta"
 

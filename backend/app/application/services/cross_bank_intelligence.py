@@ -2835,7 +2835,6 @@ class CrossBankIntelligenceService:
             ImmutableAuditChain.get_instance().append_event(
                 event_type="CROSS_BANK_INTELLIGENCE_EVIDENCE_ATTACHMENT_REJECTED",
                 actor_id=actor,
-                actor_institution=caller_bank,
                 action=f"attach_cross_bank_evidence:{case_id}",
                 resource_id=f"case:{case_id}",
                 details={
@@ -3048,11 +3047,12 @@ class CrossBankIntelligenceService:
                 )
 
         # 3. Detect general institutional identifier patterns referring to non-requesting banks
-        inst_pattern = r"(?i)\b(bank|institution)[_\-\s]?([a-zA-Z0-9]+)\b"
+        inst_pattern = r"(?i)\b(?:(?:bank|institution)[_\-]([a-zA-Z0-9]+)|(?:bank|institution)\s+([a-zA-Z0-9]{1,2}))\b"
         for match in re.finditer(inst_pattern, clean_notes):
             matched_id = match.group(0).lower().replace(" ", "_").replace("-", "_")
             req_normalized = clean_req.replace(" ", "_").replace("-", "_")
-            if matched_id != req_normalized and match.group(2).lower() != req_normalized.split("_")[-1]:
+            sub_id = (match.group(1) or match.group(2) or "").lower()
+            if matched_id != req_normalized and sub_id != req_normalized.split("_")[-1]:
                 raise ConsortiumSecurityError(
                     f"Analyst notes violate anonymity policy for disclosure mode 'ANONYMOUS_SUMMARY': "
                     f"Institutional identifier '{match.group(0)}' detected in free-text notes. "
@@ -3115,11 +3115,6 @@ class CrossBankIntelligenceService:
                     "Authoritative case evidence writes require caller-bank ownership regardless of administrative roles."
                 )
 
-            if not case.is_open:
-                raise TerminalCaseImmutableError(
-                    f"Cannot attach cross-bank intelligence: Case '{case_id}' is finalized in terminal state '{case.status.value}'."
-                )
-
             # 3. Retrieve Authoritative Signal Server-Side (Anti-Forgery & Tamper Check)
             if not resolved_signal_id:
                 raise ValueError(
@@ -3141,6 +3136,11 @@ class CrossBankIntelligenceService:
                 raise ValueError(
                     f"Authoritative signal '{resolved_signal_id}' not found or was never issued by an authorized intelligence query. "
                     f"Client-fabricated or unauthorized signal attachment rejected."
+                )
+
+            if not case.is_open:
+                raise TerminalCaseImmutableError(
+                    f"Cannot attach cross-bank intelligence: Case '{case_id}' is finalized in terminal state '{case.status.value}'."
                 )
 
             # 3a. Authoritative Signal Content Integrity & Tamper Verification
@@ -3458,20 +3458,11 @@ class CrossBankIntelligenceService:
                 )
 
             adm_target = admitted_receipt.get("target_bank_id")
-            raw_signal_target = (
-                record.get("target_bank_id")
-                or (signal_data.get("contributing_institutions") or [None])[0]
-                or (signal_data.get("provenance", {}) if isinstance(signal_data, dict) else {}).get("target_bank_id")
-                or (signal_data.get("target_bank_id") if isinstance(signal_data, dict) else None)
-                or ""
-            )
-            target_bank = raw_signal_target.lower().strip() if isinstance(raw_signal_target, str) else ""
+            target_bank = (record.get("target_bank_id") or "").lower().strip()
             if not adm_target or not target_bank or adm_target.lower() != target_bank:
                 raise ConsortiumSecurityError(
                     f"Admitted receipt '{receipt_id}' counterpart scope '{adm_target}' does not match signal target bank '{target_bank}'."
                 )
-            if not record.get("target_bank_id"):
-                record["target_bank_id"] = target_bank
 
             # Consistency check with Finalized Pilot Reservation if present
             if record.get("reservation_id") and record.get("pilot_id"):
@@ -3504,33 +3495,19 @@ class CrossBankIntelligenceService:
                 else None
             )
             if grant_id:
-                grant = {}
-                if hasattr(consortium, "operational_data_sharing_grants"):
-                    grant = (consortium.operational_data_sharing_grants or {}).get(grant_id) or {}
-                if not grant:
-                    grant = consortium.metadata.get("operational_data_sharing_grant") or {}
-                if not grant or grant.get("grant_id") != grant_id:
-                    if hasattr(consortium, "get_pairwise_operational_grant"):
-                        grant = consortium.get_pairwise_operational_grant(grant_id) or {}
-                    elif hasattr(consortium, "pairwise_operational_grants"):
-                        grant = (consortium.pairwise_operational_grants or {}).get(grant_id) or {}
-
-                is_grant_active = bool(
-                    (grant.get("is_active") is True or grant.get("status") == "ACTIVE")
-                    and grant.get("status") != "REVOKED"
-                )
+                grant = consortium.metadata.get("operational_data_sharing_grant") or {}
+                is_grant_active = bool(grant.get("is_active", False) and grant.get("status") != "REVOKED")
                 revoked_institutions = set(grant.get("revoked_by_institutions") or [])
-                target_bank_override = record.get("target_bank_id") or (
+                target_bank = record.get("target_bank_id") or (
                     signal_data.get("provenance", {}).get("target_bank_id")
                     if isinstance(signal_data, dict)
                     else None
                 )
-                target_bank_str = str(target_bank_override).lower().strip() if target_bank_override else target_bank
                 if (
                     grant.get("grant_id") != grant_id
                     or not is_grant_active
                     or (eff_case_bank in revoked_institutions)
-                    or (target_bank_str and target_bank_str in revoked_institutions)
+                    or (target_bank and target_bank in revoked_institutions)
                 ):
                     raise ConsortiumSecurityError(
                         f"Operational consent for grant '{grant_id}' has been revoked or is no longer active in consortium '{consortium_id}'. "
@@ -3552,9 +3529,9 @@ class CrossBankIntelligenceService:
                         f"Institution '{eff_case_bank}' has not approved current grant revision for grant '{grant_id}'. "
                         "Evidence attachment denied."
                     )
-                if target_bank_str and target_bank_str not in approvals:
+                if target_bank and target_bank not in approvals:
                     raise ConsortiumSecurityError(
-                        f"Target counterpart institution '{target_bank_str}' has not approved current grant revision for grant '{grant_id}'. "
+                        f"Target counterpart institution '{target_bank}' has not approved current grant revision for grant '{grant_id}'. "
                         "Evidence attachment denied."
                     )
 
@@ -3794,7 +3771,6 @@ class CrossBankIntelligenceService:
             ImmutableAuditChain.get_instance().append_event(
                 event_type="CROSS_BANK_INTELLIGENCE_EVIDENCE_ATTACHED",
                 actor_id=f"user:{uploader}@{eff_case_bank}",
-                actor_institution=eff_case_bank,
                 action=f"attach_cross_bank_evidence:{case_id}",
                 resource_id=f"evidence:{ev['id']}",
                 details={
