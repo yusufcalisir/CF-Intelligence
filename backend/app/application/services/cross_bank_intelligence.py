@@ -292,7 +292,15 @@ class CrossBankIntelligenceService:
     def _resolve_circuit_breaker_policy(
         self, req: MultiCounterpartyIntelligenceQueryRequest | CrossBankIntelligenceQueryRequest
     ) -> CounterpartyCircuitBreakerPolicy:
-        """Resolve authoritative circuit breaker policy from request overrides and system settings."""
+        """Resolve authoritative circuit breaker policy from request overrides and system settings.
+
+        Enforces server-authoritative controls (Correction A):
+        - A client cannot disable or weaken an enabled server-side circuit breaker.
+        - When cfi_circuit_breaker_enabled is True on the server, circuit_breaker_enabled=False
+          in the request is ignored and breaker remains enabled.
+        - Client overrides cannot weaken failure thresholds (higher count) or cooldowns (shorter time).
+        - When server enforcement is disabled (default), authorized client opt-in is respected.
+        """
         from app.config import get_settings
         from app.domain.circuit_breaker_policy import (
             DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS,
@@ -302,27 +310,38 @@ class CrossBankIntelligenceService:
         )
 
         settings = get_settings()
-        req_enabled = getattr(req, "circuit_breaker_enabled", None)
-        enabled = (
-            bool(req_enabled)
-            if req_enabled is not None
-            else bool(getattr(settings, "cfi_circuit_breaker_enabled", False))
+        server_enabled = bool(getattr(settings, "cfi_circuit_breaker_enabled", False))
+        server_threshold = int(
+            getattr(settings, "cfi_circuit_breaker_failure_threshold", DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD)
         )
-        req_threshold = getattr(req, "circuit_breaker_failure_threshold", None)
-        failure_threshold = (
-            int(req_threshold)
-            if req_threshold is not None
-            else int(getattr(settings, "cfi_circuit_breaker_failure_threshold", DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD))
-        )
-        req_cooldown = getattr(req, "circuit_breaker_cooldown_seconds", None)
-        cooldown_seconds = (
-            float(req_cooldown)
-            if req_cooldown is not None
-            else float(getattr(settings, "cfi_circuit_breaker_cooldown_seconds", DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS))
+        server_cooldown = float(
+            getattr(settings, "cfi_circuit_breaker_cooldown_seconds", DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS)
         )
         half_open_timeout = float(
             getattr(settings, "cfi_circuit_breaker_half_open_probe_timeout_seconds", DEFAULT_HALF_OPEN_PROBE_TIMEOUT_SECONDS)
         )
+
+        req_enabled = getattr(req, "circuit_breaker_enabled", None)
+        req_threshold = getattr(req, "circuit_breaker_failure_threshold", None)
+        req_cooldown = getattr(req, "circuit_breaker_cooldown_seconds", None)
+
+        if server_enabled:
+            # Server control is authoritative: client cannot disable or weaken
+            enabled = True
+            if req_threshold is not None:
+                failure_threshold = min(int(req_threshold), server_threshold)
+            else:
+                failure_threshold = server_threshold
+
+            if req_cooldown is not None:
+                cooldown_seconds = max(float(req_cooldown), server_cooldown)
+            else:
+                cooldown_seconds = server_cooldown
+        else:
+            # Server default is disabled: allow explicit client opt-in
+            enabled = bool(req_enabled) if req_enabled is not None else False
+            failure_threshold = int(req_threshold) if req_threshold is not None else server_threshold
+            cooldown_seconds = float(req_cooldown) if req_cooldown is not None else server_cooldown
 
         return CounterpartyCircuitBreakerPolicy(
             enabled=enabled,
@@ -330,6 +349,20 @@ class CrossBankIntelligenceService:
             cooldown_seconds=cooldown_seconds,
             half_open_probe_timeout_seconds=half_open_timeout,
         )
+
+    def _is_verified_operational_signal(self, signal: Any) -> bool:
+        """Verify that signal satisfies the authentic operational result-admission contract.
+
+        Ensures simulated research requests or unverified responses cannot poison or reset
+        authoritative operational worker availability state (Correction B).
+        """
+        if not isinstance(signal, CrossBankIntelligenceSignal):
+            return False
+        if signal.execution_mode != "VERIFIED_OPERATIONAL":
+            return False
+        if not signal.is_authoritative:
+            return False
+        return not getattr(signal, "is_synthetic", False)
 
 
     def execute_two_bank_private_matching(
@@ -1342,6 +1375,7 @@ class CrossBankIntelligenceService:
         principal: AuthenticatedPrincipal | None = None,
         actor: str | None = None,
         timeout: float | None = None,
+        _circuit_breaker_managed: bool = False,
     ) -> CrossBankIntelligenceSignal:
         """Execute authorized cross-bank intelligence query under consortium policy."""
         clean_requesting = req.requesting_bank_id.lower().strip()
@@ -1372,40 +1406,108 @@ class CrossBankIntelligenceService:
                 "Production hardware attestation requirement failed closed."
             )
 
+        cb_probe_id: str | None = None
+        cb_policy_single: CounterpartyCircuitBreakerPolicy | None = None
+        clean_target_single: str | None = None
+
         if req.target_bank_id:
             clean_target_single = req.target_bank_id.lower().strip()
-            cb_policy_single = self._resolve_circuit_breaker_policy(req)
-            if cb_policy_single.enabled:
-                can_dispatch, cb_state, cb_probe_or_reason = (
-                    self.circuit_breaker_store.evaluate_and_acquire_dispatch(
+            if not _circuit_breaker_managed:
+                cb_policy_single = self._resolve_circuit_breaker_policy(req)
+                if cb_policy_single.enabled:
+                    can_dispatch, cb_state, cb_probe_or_reason = (
+                        self.circuit_breaker_store.evaluate_and_acquire_dispatch(
+                            consortium_id=clean_consortium_id,
+                            requesting_bank_id=clean_requesting,
+                            target_bank_id=clean_target_single,
+                            policy=cb_policy_single,
+                            allow_probe=(req.execution_mode == "VERIFIED_OPERATIONAL"),
+                        )
+                    )
+                    if not can_dispatch:
+                        raise CounterpartyCircuitBreakerOpenError(
+                            message=f"Circuit breaker is OPEN for counterpart '{clean_target_single}' ({cb_probe_or_reason}). Dispatch rejected.",
+                            target_bank_id=clean_target_single,
+                            consortium_id=clean_consortium_id,
+                            requesting_bank_id=clean_requesting,
+                        )
+                    if cb_state == CircuitState.HALF_OPEN.value and cb_probe_or_reason:
+                        cb_probe_id = cb_probe_or_reason
+
+        try:
+            if req.execution_mode == "VERIFIED_OPERATIONAL":
+                if not req.target_bank_id:
+                    raise RuntimeError(
+                        "Operational privacy attestation unavailable: Target counterpart institution (target_bank_id) missing, "
+                        "and hardware enclaves (Intel SGX) or distributed multi-party cryptographic PSI across independent "
+                        "physical bank nodes are not available in this software runtime. Operation fails closed to prevent fabricated operational claims."
+                    )
+                signal = self._execute_verified_operational_psi(
+                    req=req,
+                    auth_token=auth_token,
+                    auth_principal=auth_principal,
+                    audited_actor=audited_actor,
+                )
+            else:
+                signal = self._execute_simulated_research_query(
+                    req=req,
+                    auth_token=auth_token,
+                    auth_principal=auth_principal,
+                    audited_actor=audited_actor,
+                    clean_requesting=clean_requesting,
+                    clean_consortium_id=clean_consortium_id,
+                )
+
+            if not _circuit_breaker_managed and cb_policy_single and cb_policy_single.enabled and clean_target_single:
+                if self._is_verified_operational_signal(signal):
+                    self.circuit_breaker_store.record_success(
                         consortium_id=clean_consortium_id,
                         requesting_bank_id=clean_requesting,
                         target_bank_id=clean_target_single,
+                        probe_id=cb_probe_id,
+                    )
+                elif cb_probe_id:
+                    self.circuit_breaker_store.record_probe_aborted(
+                        consortium_id=clean_consortium_id,
+                        requesting_bank_id=clean_requesting,
+                        target_bank_id=clean_target_single,
+                        probe_id=cb_probe_id,
+                        reason="SECURITY_REJECTED",
                         policy=cb_policy_single,
                     )
-                )
-                if not can_dispatch:
-                    raise CounterpartyCircuitBreakerOpenError(
-                        message=f"Circuit breaker is OPEN for counterpart '{clean_target_single}' ({cb_probe_or_reason}). Dispatch rejected.",
-                        target_bank_id=clean_target_single,
+            return signal
+        except Exception as exc:
+            if not _circuit_breaker_managed and cb_policy_single and cb_policy_single.enabled and clean_target_single:
+                recoverable = self._classify_recoverable_counterparty_failure(clean_target_single, exc)
+                if recoverable is not None:
+                    self.circuit_breaker_store.record_failure(
                         consortium_id=clean_consortium_id,
                         requesting_bank_id=clean_requesting,
+                        target_bank_id=clean_target_single,
+                        error_category=recoverable.error_category,
+                        probe_id=cb_probe_id,
+                        policy=cb_policy_single,
                     )
+                elif cb_probe_id:
+                    self.circuit_breaker_store.record_probe_aborted(
+                        consortium_id=clean_consortium_id,
+                        requesting_bank_id=clean_requesting,
+                        target_bank_id=clean_target_single,
+                        probe_id=cb_probe_id,
+                        reason="SECURITY_REJECTED",
+                        policy=cb_policy_single,
+                    )
+            raise
 
-
-        if req.execution_mode == "VERIFIED_OPERATIONAL":
-            if not req.target_bank_id:
-                raise RuntimeError(
-                    "Operational privacy attestation unavailable: Target counterpart institution (target_bank_id) missing, "
-                    "and hardware enclaves (Intel SGX) or distributed multi-party cryptographic PSI across independent "
-                    "physical bank nodes are not available in this software runtime. Operation fails closed to prevent fabricated operational claims."
-                )
-            return self._execute_verified_operational_psi(
-                req=req,
-                auth_token=auth_token,
-                auth_principal=auth_principal,
-                audited_actor=audited_actor,
-            )
+    def _execute_simulated_research_query(
+        self,
+        req: CrossBankIntelligenceQueryRequest,
+        auth_token: str | None,
+        auth_principal: AuthenticatedPrincipal,
+        audited_actor: str,
+        clean_requesting: str,
+        clean_consortium_id: str,
+    ) -> CrossBankIntelligenceSignal:
 
         # Enforce Research Simulation Boundary (Fail-Closed in Production)
         from app.config import get_settings
@@ -2354,6 +2456,7 @@ class CrossBankIntelligenceService:
                             requesting_bank_id=clean_requesting,
                             target_bank_id=clean_target,
                             policy=cb_policy,
+                            allow_probe=(req.execution_mode == "VERIFIED_OPERATIONAL"),
                         )
                     )
                     if not can_dispatch:
@@ -2405,6 +2508,9 @@ class CrossBankIntelligenceService:
                     protocol=req.protocol,
                     pilot_id=req.pilot_id,
                     timeout_seconds=effective_target_timeout,
+                    circuit_breaker_enabled=req.circuit_breaker_enabled,
+                    circuit_breaker_failure_threshold=req.circuit_breaker_failure_threshold,
+                    circuit_breaker_cooldown_seconds=req.circuit_breaker_cooldown_seconds,
                 )
                 try:
                     dispatched_targets.append(clean_target)
@@ -2421,6 +2527,7 @@ class CrossBankIntelligenceService:
                             auth_token=auth_token,
                             principal=auth_principal,
                             actor=audited_actor,
+                            _circuit_breaker_managed=True,
                         )
                     results[clean_target] = signal
                     execution_outcomes[clean_target] = CounterpartyExecutionOutcome(
@@ -2431,12 +2538,22 @@ class CrossBankIntelligenceService:
                     )
                     completed_targets.append(clean_target)
                     if cb_policy.enabled:
-                        self.circuit_breaker_store.record_success(
-                            consortium_id=clean_consortium_id,
-                            requesting_bank_id=clean_requesting,
-                            target_bank_id=clean_target,
-                            probe_id=cb_probe_id,
-                        )
+                        if self._is_verified_operational_signal(signal):
+                            self.circuit_breaker_store.record_success(
+                                consortium_id=clean_consortium_id,
+                                requesting_bank_id=clean_requesting,
+                                target_bank_id=clean_target,
+                                probe_id=cb_probe_id,
+                            )
+                        elif cb_probe_id:
+                            self.circuit_breaker_store.record_probe_aborted(
+                                consortium_id=clean_consortium_id,
+                                requesting_bank_id=clean_requesting,
+                                target_bank_id=clean_target,
+                                probe_id=cb_probe_id,
+                                reason="SECURITY_REJECTED",
+                                policy=cb_policy,
+                            )
                 except Exception as exc:
                     # Security-First Classification Rule (M6.4 Task 4 Correction A):
                     # 1. Explicit security, integrity, authorization, and governance failures take absolute

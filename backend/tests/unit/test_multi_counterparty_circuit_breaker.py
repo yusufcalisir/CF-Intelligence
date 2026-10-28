@@ -37,6 +37,7 @@ from app.application.services.entity_resolution import (
     EntityResolutionService,
     _entity_to_dict,
 )
+from app.config import get_settings
 from app.domain.circuit_breaker_policy import (
     CounterpartyCircuitBreakerOpenError,
     CounterpartyCircuitBreakerPolicy,
@@ -452,7 +453,7 @@ def test_concurrent_service_instances_enforce_single_recovery_probe_gate(
     policy = CounterpartyCircuitBreakerPolicy(
         enabled=True,
         failure_threshold=1,
-        cooldown_seconds=0.01,  # short cooldown to expire immediately
+        cooldown_seconds=0.05,  # 50ms cooldown gives ample time to verify OPEN state before expiry
         half_open_probe_timeout_seconds=30.0,
     )
 
@@ -462,7 +463,7 @@ def test_concurrent_service_instances_enforce_single_recovery_probe_gate(
     assert st["state"] == "OPEN"
 
     # Sleep slightly so cooldown expires
-    time.sleep(0.02)
+    time.sleep(0.06)
 
     # Store 1 attempts to dispatch -> cooldown expired -> admitted as single recovery probe
     allowed1, state1, probe1 = store1.evaluate_and_acquire_dispatch(
@@ -486,7 +487,7 @@ def test_successful_verified_recovery_closes_circuit(
     test_setup: tuple[CrossBankIntelligenceService, Entity, str],
     auth_tokens: dict[str, str],
 ) -> None:
-    """Requirement: A valid verified recovery closes the circuit; subsequent requests execute normally."""
+    """Requirement: A valid verified operational recovery closes the circuit; subsequent requests execute normally."""
     svc, ent, c_id = test_setup
     principal = AuthenticatedPrincipal(
         principal_id="user_a",
@@ -498,7 +499,7 @@ def test_successful_verified_recovery_closes_circuit(
     policy = CounterpartyCircuitBreakerPolicy(
         enabled=True,
         failure_threshold=1,
-        cooldown_seconds=0.2,
+        cooldown_seconds=0.05,
     )
 
     # 1. Open circuit
@@ -506,20 +507,20 @@ def test_successful_verified_recovery_closes_circuit(
     assert svc.circuit_breaker_store.get_circuit_state(c_id, "bank_a", "bank_c")["state"] == "OPEN"
 
     # 2. Wait for cooldown expiry
-    time.sleep(0.25)
+    time.sleep(0.06)
 
-    # 3. Execute query: Bank C is admitted as probe and succeeds
+    # 3. Execute query: Bank C is admitted as probe in VERIFIED_OPERATIONAL mode and succeeds
     req = MultiCounterpartyIntelligenceQueryRequest(
         requesting_bank_id="bank_a",
         query_entity_id=ent.id,
         consortium_id=c_id,
         target_bank_ids=["bank_c"],
         circuit_breaker_enabled=True,
-        circuit_breaker_cooldown_seconds=0.2,
-        execution_mode="SIMULATED_RESEARCH",
+        circuit_breaker_cooldown_seconds=0.05,
+        execution_mode="VERIFIED_OPERATIONAL",
     )
 
-    with patch.object(svc, "query_cross_bank_intelligence", side_effect=_mock_signal) as mock_dispatch:
+    with patch.object(svc, "_execute_verified_operational_psi", side_effect=_mock_signal) as mock_dispatch:
         resp = svc.query_multi_counterparty_intelligence(req=req, principal=principal)
         assert resp.overall_outcome == "COMPLETED"
         assert resp.execution_outcomes["bank_c"].status == "SUCCESS"
@@ -532,10 +533,87 @@ def test_successful_verified_recovery_closes_circuit(
     assert st["half_open_probe_id"] is None
 
     # Next query executes cleanly without probe
-    with patch.object(svc, "query_cross_bank_intelligence", side_effect=_mock_signal) as mock_dispatch2:
+    with patch.object(svc, "_execute_verified_operational_psi", side_effect=_mock_signal) as mock_dispatch2:
         resp2 = svc.query_multi_counterparty_intelligence(req=req, principal=principal)
         assert resp2.overall_outcome == "COMPLETED"
         assert mock_dispatch2.call_count == 1
+
+
+def test_simulated_research_cannot_transition_half_open_to_closed(
+    test_setup: tuple[CrossBankIntelligenceService, Entity, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """Correction B: Simulated or unverified research results cannot transition HALF_OPEN circuit to CLOSED."""
+    svc, ent, c_id = test_setup
+    principal = AuthenticatedPrincipal(
+        principal_id="user_a",
+        tenant_id="bank_a",
+        roles=["analyst"],
+        is_authenticated=True,
+    )
+
+    policy = CounterpartyCircuitBreakerPolicy(
+        enabled=True,
+        failure_threshold=1,
+        cooldown_seconds=0.02,
+    )
+
+    # 1. Open circuit
+    svc.circuit_breaker_store.record_failure(c_id, "bank_a", "bank_c", "TIMEOUT", policy=policy)
+    time.sleep(0.03)
+
+    # 2. Attempt multi-counterparty query in SIMULATED_RESEARCH mode
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=ent.id,
+        consortium_id=c_id,
+        target_bank_ids=["bank_c"],
+        circuit_breaker_enabled=True,
+        circuit_breaker_cooldown_seconds=0.02,
+        execution_mode="SIMULATED_RESEARCH",
+    )
+
+    resp = svc.query_multi_counterparty_intelligence(req=req, principal=principal)
+    assert "bank_c" in resp.failures
+    assert resp.failures["bank_c"].error_category == "CIRCUIT_BREAKER_OPEN"
+    # Circuit MUST NOT be CLOSED by simulated research
+    st = svc.circuit_breaker_store.get_circuit_state(c_id, "bank_a", "bank_c")
+    assert st["state"] != "CLOSED"
+    assert st["state"] == "OPEN"
+
+    # 3. Even if a HALF_OPEN probe lease is active, an unverified/simulated signal MUST abort the probe rather than close it
+    admitted, state, probe_id = svc.circuit_breaker_store.evaluate_and_acquire_dispatch(
+        c_id, "bank_a", "bank_c", policy=policy, allow_probe=True
+    )
+    assert admitted is True
+    assert state == "HALF_OPEN"
+    assert probe_id is not None
+    st_half = svc.circuit_breaker_store.get_circuit_state(c_id, "bank_a", "bank_c")
+    assert st_half["state"] == "HALF_OPEN"
+
+    single_req = CrossBankIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=ent.id,
+        consortium_id=c_id,
+        target_bank_id="bank_c",
+        execution_mode="SIMULATED_RESEARCH",
+    )
+    sim_signal = _mock_signal(single_req)
+    sim_signal.execution_mode = "SIMULATED_RESEARCH"
+    sim_signal.is_synthetic = True
+    sim_signal.is_authoritative = False
+    assert svc._is_verified_operational_signal(sim_signal) is False
+
+    if svc._is_verified_operational_signal(sim_signal):
+        svc.circuit_breaker_store.record_success(c_id, "bank_a", "bank_c", probe_id=probe_id)
+    else:
+        svc.circuit_breaker_store.record_probe_aborted(
+            c_id, "bank_a", "bank_c", probe_id=probe_id, reason="SECURITY_REJECTED", policy=policy
+        )
+
+    st_after = svc.circuit_breaker_store.get_circuit_state(c_id, "bank_a", "bank_c")
+    assert st_after["state"] == "OPEN"
+    assert st_after["state"] != "CLOSED"
 
 
 def test_failed_recovery_probe_safely_reopens_circuit(
@@ -571,13 +649,13 @@ def test_failed_recovery_probe_safely_reopens_circuit(
         target_bank_ids=["bank_c"],
         circuit_breaker_enabled=True,
         circuit_breaker_cooldown_seconds=60.0,  # fresh 60s cooldown on failure
-        execution_mode="SIMULATED_RESEARCH",
+        execution_mode="VERIFIED_OPERATIONAL",
     )
 
-    # Probe fails with worker unavailable error
+    # Operational probe fails with worker unavailable error
     with patch.object(
         svc,
-        "query_cross_bank_intelligence",
+        "_execute_verified_operational_psi",
         side_effect=CounterpartyWorkerUnavailableError("Worker still dead."),
     ):
         resp = svc.query_multi_counterparty_intelligence(req=req, principal=principal)
@@ -700,7 +778,7 @@ def test_idempotency_replay_does_not_trigger_recovery_probe_or_consume_budget(
 def test_stale_recovery_probe_reclaimed_after_timeout(
     tmp_path: Path,
 ) -> None:
-    """Requirement: Stale probe lease is reclaimed after half_open_probe_timeout_seconds."""
+    """Correction D: An in-flight recovery probe preserves a blocked state and prevents overlapping probe admission."""
     db_file = str(tmp_path / "stale_probe_test.db")
     store = DurableCrossBankCircuitBreakerStore(db_path=db_file)
 
@@ -725,14 +803,18 @@ def test_stale_recovery_probe_reclaimed_after_timeout(
     assert allowed2 is False
     assert state2 == "HALF_OPEN"
 
-    # Wait for probe lease to expire
+    # Wait past probe lease timeout: Correction D ensures second probe is NOT automatically admitted
     time.sleep(0.05)
 
-    # Stale probe is reclaimed, caller 3 is admitted with a new probe
-    allowed3, state3, probe3 = store.evaluate_and_acquire_dispatch("c1", "bank_a", "bank_c", policy=policy)
-    assert allowed3 is True
+    # In-flight recovery probe preserves blocked state; caller 3 is NOT admitted
+    allowed3, state3, reason3 = store.evaluate_and_acquire_dispatch("c1", "bank_a", "bank_c", policy=policy)
+    assert allowed3 is False
     assert state3 == "HALF_OPEN"
-    assert probe3 != probe1
+    assert "currently in flight" in reason3
+
+    # Only explicit lifecycle resolution (e.g. failure or reset) resolves the lease
+    assert store.record_failure("c1", "bank_a", "bank_c", "TIMEOUT", probe_id=probe1, policy=policy) is True
+    assert store.get_circuit_state("c1", "bank_a", "bank_c")["state"] == "OPEN"
 
 
 def test_single_counterparty_query_respects_circuit_breaker(
@@ -796,3 +878,213 @@ def test_policy_bounds_validation() -> None:
 
     with pytest.raises(ValueError, match="half_open_probe_timeout_seconds must be a finite float"):
         CounterpartyCircuitBreakerPolicy(half_open_probe_timeout_seconds=0.0)
+
+
+def test_independent_store_in_flight_recovery_blocks_second_dispatch_after_deadline(
+    tmp_path: Path,
+) -> None:
+    """Correction D: An in-flight recovery probe across independent stores blocks second dispatch even after lease deadline."""
+    db_file = str(tmp_path / "shared_stale_probe.db")
+    store1 = DurableCrossBankCircuitBreakerStore(db_path=db_file)
+    store2 = DurableCrossBankCircuitBreakerStore(db_path=db_file)
+
+    policy = CounterpartyCircuitBreakerPolicy(
+        enabled=True,
+        failure_threshold=1,
+        cooldown_seconds=0.01,
+        half_open_probe_timeout_seconds=0.03,
+    )
+
+    store1.record_failure("c1", "bank_a", "bank_c", "TIMEOUT", policy=policy)
+    time.sleep(0.02)
+
+    # Store 1 acquires recovery probe
+    allowed1, state1, probe1 = store1.evaluate_and_acquire_dispatch("c1", "bank_a", "bank_c", policy=policy)
+    assert allowed1 is True
+    assert state1 == "HALF_OPEN"
+    assert probe1 is not None
+
+    # Wait past lease deadline (30ms)
+    time.sleep(0.05)
+
+    # Store 2 attempts dispatch: MUST NOT be admitted as a replacement probe
+    allowed2, state2, reason2 = store2.evaluate_and_acquire_dispatch("c1", "bank_a", "bank_c", policy=policy)
+    assert allowed2 is False
+    assert state2 == "HALF_OPEN"
+    assert "currently in flight" in reason2
+
+
+def test_server_authoritative_circuit_policy_cannot_be_disabled_or_weakened(
+    test_setup: tuple[CrossBankIntelligenceService, Entity, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Correction A: Server-authoritative circuit policy prevents client from disabling or weakening an enabled breaker."""
+    svc, ent, c_id = test_setup
+    principal = AuthenticatedPrincipal(
+        principal_id="user_a",
+        tenant_id="bank_a",
+        roles=["analyst"],
+        is_authenticated=True,
+    )
+
+    # Enforce server-side circuit breaker settings
+    monkeypatch.setenv("CFI_CIRCUIT_BREAKER_ENABLED", "true")
+    monkeypatch.setenv("CFI_CIRCUIT_BREAKER_FAILURE_THRESHOLD", "2")
+    monkeypatch.setenv("CFI_CIRCUIT_BREAKER_COOLDOWN_SECONDS", "30.0")
+    get_settings.cache_clear()
+
+    server_policy = CounterpartyCircuitBreakerPolicy(
+        enabled=True,
+        failure_threshold=2,
+        cooldown_seconds=30.0,
+    )
+    svc.circuit_breaker_store.record_failure(c_id, "bank_a", "bank_c", "TIMEOUT", policy=server_policy)
+    svc.circuit_breaker_store.record_failure(c_id, "bank_a", "bank_c", "TIMEOUT", policy=server_policy)
+    assert svc.circuit_breaker_store.get_circuit_state(c_id, "bank_a", "bank_c")["state"] == "OPEN"
+
+    # Client attempts to bypass by supplying circuit_breaker_enabled=False and weakening threshold/cooldown
+    multi_req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=ent.id,
+        consortium_id=c_id,
+        target_bank_ids=["bank_c"],
+        circuit_breaker_enabled=False,
+        circuit_breaker_failure_threshold=50,
+        circuit_breaker_cooldown_seconds=0.001,
+        execution_mode="SIMULATED_RESEARCH",
+    )
+    resolved_multi = svc._resolve_circuit_breaker_policy(multi_req)
+    assert resolved_multi.enabled is True
+    assert resolved_multi.failure_threshold == 2
+    assert resolved_multi.cooldown_seconds == 30.0
+
+    resp = svc.query_multi_counterparty_intelligence(req=multi_req, principal=principal)
+    assert resp.overall_outcome == "FAILED"
+    assert resp.execution_outcomes["bank_c"].status == "FAILED"
+    assert resp.execution_outcomes["bank_c"].failure.error_category == "CIRCUIT_BREAKER_OPEN"
+
+    # Single-counterparty request attempting client bypass
+    single_req = CrossBankIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=ent.id,
+        consortium_id=c_id,
+        target_bank_id="bank_c",
+        circuit_breaker_enabled=False,
+        circuit_breaker_failure_threshold=50,
+        circuit_breaker_cooldown_seconds=0.001,
+        execution_mode="SIMULATED_RESEARCH",
+    )
+    resolved_single = svc._resolve_circuit_breaker_policy(single_req)
+    assert resolved_single.enabled is True
+    assert resolved_single.failure_threshold == 2
+    assert resolved_single.cooldown_seconds == 30.0
+
+    with pytest.raises(CounterpartyCircuitBreakerOpenError):
+        svc.query_cross_bank_intelligence(req=single_req, principal=principal)
+    get_settings.cache_clear()
+
+
+def test_fenced_recovery_transitions_reject_superseded_or_mismatched_probes(
+    tmp_path: Path,
+) -> None:
+    """Correction C: Late, superseded, missing, or incorrect probe tokens cannot mutate state."""
+    db_file = str(tmp_path / "fencing_test.db")
+    store = DurableCrossBankCircuitBreakerStore(db_path=db_file)
+
+    policy = CounterpartyCircuitBreakerPolicy(
+        enabled=True,
+        failure_threshold=1,
+        cooldown_seconds=0.01,
+    )
+
+    # 1. Open circuit
+    store.record_failure("c1", "bank_a", "bank_c", "TIMEOUT", policy=policy)
+    time.sleep(0.02)
+
+    # 2. Admit active probe Gen-1
+    allowed, state, gen1_probe = store.evaluate_and_acquire_dispatch("c1", "bank_a", "bank_c", policy=policy)
+    assert allowed is True
+    assert gen1_probe is not None
+
+    # 3. Old or invalid probe attempts record_success() -> MUST FAIL and NOT close the circuit
+    assert store.record_success("c1", "bank_a", "bank_c", probe_id="stale-old-probe") is False
+    assert store.record_success("c1", "bank_a", "bank_c", probe_id=None) is False
+    assert store.get_circuit_state("c1", "bank_a", "bank_c")["state"] == "HALF_OPEN"
+
+    # 4. Old probe attempts record_probe_aborted() -> MUST FAIL and NOT clear Gen-1's lease
+    assert store.record_probe_aborted("c1", "bank_a", "bank_c", probe_id="stale-old-probe") is False
+    assert store.get_circuit_state("c1", "bank_a", "bank_c")["half_open_probe_id"] == gen1_probe
+
+    # 5. Old probe attempts record_failure() -> MUST FAIL and NOT clear Gen-1's lease
+    assert store.record_failure("c1", "bank_a", "bank_c", "TIMEOUT", probe_id="stale-old-probe") is False
+    assert store.get_circuit_state("c1", "bank_a", "bank_c")["half_open_probe_id"] == gen1_probe
+
+    # 6. Legitimate Gen-1 probe records failure -> Successfully transitions to OPEN
+    assert store.record_failure("c1", "bank_a", "bank_c", "TIMEOUT", probe_id=gen1_probe, policy=policy) is True
+    assert store.get_circuit_state("c1", "bank_a", "bank_c")["state"] == "OPEN"
+
+    # 7. Late Gen-1 success callback arriving while OPEN -> MUST FAIL and NOT close the circuit
+    assert store.record_success("c1", "bank_a", "bank_c", probe_id=gen1_probe) is False
+    assert store.get_circuit_state("c1", "bank_a", "bank_c")["state"] == "OPEN"
+
+
+def test_single_target_resolves_probe_lifecycle_and_nested_calls_do_not_double_acquire(
+    test_setup: tuple[CrossBankIntelligenceService, Entity, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """Correction E: Single-target requests resolve probe lifecycle, and nested calls do not double-acquire."""
+    svc, ent, c_id = test_setup
+    principal = AuthenticatedPrincipal(
+        principal_id="user_a",
+        tenant_id="bank_a",
+        roles=["analyst"],
+        is_authenticated=True,
+    )
+
+    policy = CounterpartyCircuitBreakerPolicy(
+        enabled=True,
+        failure_threshold=1,
+        cooldown_seconds=0.01,
+    )
+
+    # 1. Open circuit
+    svc.circuit_breaker_store.record_failure(c_id, "bank_a", "bank_c", "TIMEOUT", policy=policy)
+    time.sleep(0.02)
+
+    # 2. Single-target request executes in VERIFIED_OPERATIONAL mode with mocked operational PSI
+    single_req = CrossBankIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=ent.id,
+        consortium_id=c_id,
+        target_bank_id="bank_c",
+        circuit_breaker_enabled=True,
+        circuit_breaker_cooldown_seconds=0.01,
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    with patch.object(svc, "_execute_verified_operational_psi", side_effect=_mock_signal):
+        sig = svc.query_cross_bank_intelligence(req=single_req, principal=principal)
+        assert sig is not None
+
+    # Single-target query resolved its own probe: circuit is now CLOSED!
+    assert svc.circuit_breaker_store.get_circuit_state(c_id, "bank_a", "bank_c")["state"] == "CLOSED"
+
+    # 3. Open circuit again
+    svc.circuit_breaker_store.record_failure(c_id, "bank_a", "bank_c", "TIMEOUT", policy=policy)
+    time.sleep(0.02)
+
+    # 4. Multi-counterparty request calling nested query_cross_bank_intelligence in SIMULATED_RESEARCH
+    multi_req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=ent.id,
+        consortium_id=c_id,
+        target_bank_ids=["bank_c"],
+        circuit_breaker_enabled=True,
+        circuit_breaker_cooldown_seconds=0.01,
+        execution_mode="SIMULATED_RESEARCH",
+    )
+
+    # Verify that multi-counterparty does not crash with unexpected self-rejection from nested call
+    with patch.object(svc, "query_cross_bank_intelligence", wraps=svc.query_cross_bank_intelligence):
+        resp = svc.query_multi_counterparty_intelligence(req=multi_req, principal=principal)
+        assert resp is not None

@@ -28,7 +28,6 @@ from typing import Any
 from app.domain.circuit_breaker_policy import (
     DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS,
     DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
-    DEFAULT_HALF_OPEN_PROBE_TIMEOUT_SECONDS,
     CircuitState,
     CounterpartyCircuitBreakerPolicy,
 )
@@ -165,18 +164,29 @@ class DurableCrossBankCircuitBreakerStore:
         requesting_bank_id: str,
         target_bank_id: str,
         policy: CounterpartyCircuitBreakerPolicy | None = None,
+        allow_probe: bool = True,
     ) -> tuple[bool, str, str | None]:
         """Atomically evaluate circuit state and optionally admit a single recovery probe.
+
+        Adheres to M6.4 Task 5 Corrections C & D:
+        - Scoped strictly to (consortium_id, requesting_bank_id, target_bank_id).
+        - Single recovery probe admission gate across concurrent service instances.
+        - Fenced compare-and-transition semantics.
+        - Unsafe automatic overlapping recovery admission is strictly eliminated:
+          elapsed lease time alone is never used to admit a replacement probe.
+          If an earlier probe remains unresolved, the circuit preserves a blocked
+          state awaiting explicit lifecycle resolution rather than admitting an overlapping probe.
+        - If allow_probe is False (e.g. non-operational or simulated requests),
+          recovery probe admission in OPEN/HALF_OPEN is denied to prevent unverified probes.
 
         Returns:
             (allowed: bool, state: str, probe_id_or_rejection_reason: str | None)
             - If allowed is True and state is 'CLOSED': normal execution permitted.
             - If allowed is True and state is 'HALF_OPEN': this caller is granted the single recovery probe lease.
-            - If allowed is False and state is 'OPEN': dispatch is rejected due to active cooldown.
-            - If allowed is False and state is 'HALF_OPEN': dispatch is rejected because another recovery probe is in flight.
+            - If allowed is False and state is 'OPEN': dispatch is rejected due to active cooldown or unverified probe restriction.
+            - If allowed is False and state is 'HALF_OPEN': dispatch is rejected because another recovery probe is in flight or unverified probe restriction.
         """
         lookup_key = self._make_lookup_key(consortium_id, requesting_bank_id, target_bank_id)
-        probe_timeout = policy.half_open_probe_timeout_seconds if policy else DEFAULT_HALF_OPEN_PROBE_TIMEOUT_SECONDS
 
         with self._lock:
             conn = self._get_connection()
@@ -220,7 +230,16 @@ class DurableCrossBankCircuitBreakerStore:
                             f"cooldown in progress ({remaining:.1f}s remaining)",
                         )
 
-                    # Cooldown has expired: atomically transition to HALF_OPEN and admit this single probe
+                    # Cooldown has expired: recovery probe admission requires allow_probe=True
+                    if not allow_probe:
+                        conn.commit()
+                        return (
+                            False,
+                            CircuitState.OPEN.value,
+                            "cooldown expired but recovery probe requires verified operational execution",
+                        )
+
+                    # Atomically transition to HALF_OPEN and admit this single probe
                     probe_id = str(uuid.uuid4())
                     conn.execute(
                         """
@@ -238,9 +257,15 @@ class DurableCrossBankCircuitBreakerStore:
 
                 if current_state == CircuitState.HALF_OPEN.value:
                     existing_probe_id = row["half_open_probe_id"]
-                    probe_started_at_str = row["half_open_probe_started_at"]
 
                     if not existing_probe_id:
+                        if not allow_probe:
+                            conn.commit()
+                            return (
+                                False,
+                                CircuitState.HALF_OPEN.value,
+                                "recovery probe requires verified operational execution",
+                            )
                         # No active probe lease: admit this caller
                         probe_id = str(uuid.uuid4())
                         conn.execute(
@@ -256,31 +281,9 @@ class DurableCrossBankCircuitBreakerStore:
                         conn.commit()
                         return True, CircuitState.HALF_OPEN.value, probe_id
 
-                    # A probe is already active: check if it timed out / was abandoned
-                    probe_started_dt = None
-                    if probe_started_at_str:
-                        try:
-                            probe_started_dt = datetime.datetime.fromisoformat(probe_started_at_str)
-                        except (ValueError, TypeError):
-                            probe_started_dt = None
-
-                    if probe_started_dt is not None and (now_dt - probe_started_dt).total_seconds() > probe_timeout:
-                        # Stale probe lease reclaimed: admit this caller
-                        new_probe_id = str(uuid.uuid4())
-                        conn.execute(
-                            """
-                            UPDATE cross_bank_circuit_breaker_states
-                            SET half_open_probe_id = ?,
-                                half_open_probe_started_at = ?,
-                                updated_at = ?
-                            WHERE lookup_key = ?
-                            """,
-                            (new_probe_id, now_iso, now_iso, lookup_key),
-                        )
-                        conn.commit()
-                        return True, CircuitState.HALF_OPEN.value, new_probe_id
-
-                    # Active recovery probe currently in flight: reject concurrent callers
+                    # Correction D: An active probe is already in flight.
+                    # Never infer completion solely from elapsed lease time.
+                    # Overlapping replacement probes are prohibited; dispatch remains blocked.
                     conn.commit()
                     return False, CircuitState.HALF_OPEN.value, "recovery probe currently in flight"
 
@@ -299,10 +302,15 @@ class DurableCrossBankCircuitBreakerStore:
         requesting_bank_id: str,
         target_bank_id: str,
         probe_id: str | None = None,
-    ) -> None:
-        """Record an authentic, cryptographically verified healthy execution.
+    ) -> bool:
+        """Record an authentic, cryptographically verified healthy operational execution.
 
-        Resets consecutive failures to 0 and transitions HALF_OPEN -> CLOSED.
+        Enforces transactional compare-and-transition fencing (Correction C):
+        - In HALF_OPEN state, requires matching probe_id to transition to CLOSED.
+        - Late, superseded, missing, or mismatched probe tokens are strictly rejected
+          and will not close the circuit or clear active leases.
+        - In CLOSED state, legitimate verified traffic resets failure counters.
+        - In OPEN state, late success callbacks are rejected and cannot close the breaker.
         """
         lookup_key = self._make_lookup_key(consortium_id, requesting_bank_id, target_bank_id)
         now_iso = datetime.datetime.now(UTC).isoformat()
@@ -316,8 +324,25 @@ class DurableCrossBankCircuitBreakerStore:
                     (lookup_key,),
                 ).fetchone()
 
-                if row is not None:
-                    conn.execute(
+                if row is None:
+                    conn.commit()
+                    return True
+
+                current_state = str(row["state"])
+                active_probe_id = row["half_open_probe_id"]
+
+                if current_state == CircuitState.HALF_OPEN.value:
+                    if not probe_id or probe_id != active_probe_id:
+                        logger.warning(
+                            "Fenced record_success rejected: probe_id '%s' does not match active HALF_OPEN probe '%s' for key %s.",
+                            probe_id,
+                            active_probe_id,
+                            lookup_key,
+                        )
+                        conn.commit()
+                        return False
+
+                    cursor = conn.execute(
                         """
                         UPDATE cross_bank_circuit_breaker_states
                         SET state = ?,
@@ -328,11 +353,53 @@ class DurableCrossBankCircuitBreakerStore:
                             opened_at = NULL,
                             last_failure_reason = NULL,
                             updated_at = ?
-                        WHERE lookup_key = ?
+                        WHERE lookup_key = ? AND state = ? AND half_open_probe_id = ?
                         """,
-                        (CircuitState.CLOSED.value, now_iso, lookup_key),
+                        (
+                            CircuitState.CLOSED.value,
+                            now_iso,
+                            lookup_key,
+                            CircuitState.HALF_OPEN.value,
+                            probe_id,
+                        ),
                     )
+                    conn.commit()
+                    return cursor.rowcount > 0
+
+                elif current_state == CircuitState.CLOSED.value:
+                    if probe_id and probe_id != active_probe_id:
+                        logger.warning(
+                            "Late probe success '%s' ignored in CLOSED state for key %s.",
+                            probe_id,
+                            lookup_key,
+                        )
+                        conn.commit()
+                        return False
+
+                    conn.execute(
+                        """
+                        UPDATE cross_bank_circuit_breaker_states
+                        SET consecutive_failures = 0,
+                            last_failure_reason = NULL,
+                            updated_at = ?
+                        WHERE lookup_key = ? AND state = ?
+                        """,
+                        (now_iso, lookup_key, CircuitState.CLOSED.value),
+                    )
+                    conn.commit()
+                    return True
+
+                elif current_state == CircuitState.OPEN.value:
+                    logger.warning(
+                        "Late record_success rejected: circuit is OPEN for key %s. Probe '%s' is superseded.",
+                        lookup_key,
+                        probe_id,
+                    )
+                    conn.commit()
+                    return False
+
                 conn.commit()
+                return True
             except Exception:
                 conn.rollback()
                 raise
@@ -347,11 +414,16 @@ class DurableCrossBankCircuitBreakerStore:
         error_category: str,
         probe_id: str | None = None,
         policy: CounterpartyCircuitBreakerPolicy | None = None,
-    ) -> None:
+    ) -> bool:
         """Record an eligible transport, timeout, or worker-unavailability failure.
 
-        If consecutive failures reach threshold, or if in HALF_OPEN, transitions to OPEN.
-        Security, authorization, or integrity errors must NEVER be passed here.
+        Enforces transactional compare-and-transition fencing (Correction C):
+        - In HALF_OPEN state, only an active probe failure (matching probe_id)
+          transitions the circuit to OPEN. Late or mismatched probes cannot mutate state.
+        - In CLOSED state, preserves legitimate failure accumulation from normal dispatches
+          (probe_id is None). Late probe callbacks cannot increment newer generation failures.
+        - In OPEN state, late failure callbacks cannot reset cooldown or alter state.
+        - Security, authorization, or integrity errors must NEVER be counted toward thresholds.
         """
         sanitized_category = sanitize_circuit_breaker_reason(error_category)
         if sanitized_category not in ELIGIBLE_FAILURE_CATEGORIES:
@@ -360,7 +432,7 @@ class DurableCrossBankCircuitBreakerStore:
                 error_category,
                 target_bank_id,
             )
-            return
+            return False
 
         lookup_key = self._make_lookup_key(consortium_id, requesting_bank_id, target_bank_id)
         clean_consortium = consortium_id.lower().strip()
@@ -384,6 +456,16 @@ class DurableCrossBankCircuitBreakerStore:
                 ).fetchone()
 
                 if row is None:
+                    # In absence of an existing row, a probe_id must not be present
+                    if probe_id is not None:
+                        logger.warning(
+                            "Late probe failure '%s' ignored for non-existent circuit state %s.",
+                            probe_id,
+                            lookup_key,
+                        )
+                        conn.commit()
+                        return False
+
                     failures = 1
                     should_open = failures >= effective_threshold
                     state = CircuitState.OPEN.value if should_open else CircuitState.CLOSED.value
@@ -416,12 +498,71 @@ class DurableCrossBankCircuitBreakerStore:
                             now_iso,
                         ),
                     )
-                else:
+                    conn.commit()
+                    return True
+
+                current_state = str(row["state"])
+                active_probe_id = row["half_open_probe_id"]
+
+                if current_state == CircuitState.HALF_OPEN.value:
+                    if not probe_id or probe_id != active_probe_id:
+                        logger.warning(
+                            "Fenced record_failure rejected: probe_id '%s' does not match active HALF_OPEN probe '%s' for key %s.",
+                            probe_id,
+                            active_probe_id,
+                            lookup_key,
+                        )
+                        conn.commit()
+                        return False
+
+                    failures = int(row["consecutive_failures"]) + 1
+                    cursor = conn.execute(
+                        """
+                        UPDATE cross_bank_circuit_breaker_states
+                        SET state = ?,
+                            consecutive_failures = ?,
+                            failure_threshold = ?,
+                            cooldown_seconds = ?,
+                            last_failure_at = ?,
+                            last_failure_reason = ?,
+                            opened_at = ?,
+                            cooldown_expires_at = ?,
+                            half_open_probe_id = NULL,
+                            half_open_probe_started_at = NULL,
+                            updated_at = ?
+                        WHERE lookup_key = ? AND state = ? AND half_open_probe_id = ?
+                        """,
+                        (
+                            CircuitState.OPEN.value,
+                            failures,
+                            effective_threshold,
+                            effective_cooldown,
+                            now_iso,
+                            sanitized_category,
+                            now_iso,
+                            expires_at_iso,
+                            now_iso,
+                            lookup_key,
+                            CircuitState.HALF_OPEN.value,
+                            probe_id,
+                        ),
+                    )
+                    conn.commit()
+                    return cursor.rowcount > 0
+
+                elif current_state == CircuitState.CLOSED.value:
+                    if probe_id is not None:
+                        logger.warning(
+                            "Late probe failure '%s' ignored in CLOSED state for key %s.",
+                            probe_id,
+                            lookup_key,
+                        )
+                        conn.commit()
+                        return False
+
                     failures = int(row["consecutive_failures"]) + 1
                     threshold = policy.failure_threshold if policy else int(row["failure_threshold"])
-                    is_half_open = row["state"] == CircuitState.HALF_OPEN.value
-                    # Any eligible failure during HALF_OPEN probe immediately re-opens the circuit
-                    should_open = is_half_open or (failures >= threshold)
+                    should_open = failures >= threshold
                     new_state = CircuitState.OPEN.value if should_open else CircuitState.CLOSED.value
                     opened_at_val = now_iso if should_open else row["opened_at"]
                     expires_at_val = expires_at_iso if should_open else None
@@ -440,7 +581,7 @@ class DurableCrossBankCircuitBreakerStore:
                             half_open_probe_id = NULL,
                             half_open_probe_started_at = NULL,
                             updated_at = ?
-                        WHERE lookup_key = ?
+                        WHERE lookup_key = ? AND state = ?
                         """,
                         (
                             new_state,
@@ -453,9 +594,23 @@ class DurableCrossBankCircuitBreakerStore:
                             expires_at_val,
                             now_iso,
                             lookup_key,
+                            CircuitState.CLOSED.value,
                         ),
                     )
+                    conn.commit()
+                    return True
+
+                elif current_state == CircuitState.OPEN.value:
+                    logger.debug(
+                        "record_failure ignored: Circuit is already OPEN for key %s (probe_id=%s).",
+                        lookup_key,
+                        probe_id,
+                    )
+                    conn.commit()
+                    return False
+
                 conn.commit()
+                return False
             except Exception:
                 conn.rollback()
                 raise
@@ -470,11 +625,13 @@ class DurableCrossBankCircuitBreakerStore:
         probe_id: str | None = None,
         reason: str = "SECURITY_REJECTED",
         policy: CounterpartyCircuitBreakerPolicy | None = None,
-    ) -> None:
+    ) -> bool:
         """Handle an aborted recovery probe due to a non-recoverable security or indeterminate error.
 
-        Clears the probe lease and ensures the circuit remains/re-enters OPEN without claiming recovery.
-        Does NOT count toward eligible transport failure accumulation.
+        Enforces transactional compare-and-transition fencing (Correction C):
+        - In HALF_OPEN state, requires matching probe_id to transition back to OPEN.
+        - Late or mismatched probe tokens cannot abort or clear another caller's lease.
+        - Does NOT count toward eligible transport failure accumulation.
         """
         lookup_key = self._make_lookup_key(consortium_id, requesting_bank_id, target_bank_id)
         sanitized_reason = sanitize_circuit_breaker_reason(reason)
@@ -494,7 +651,18 @@ class DurableCrossBankCircuitBreakerStore:
                 ).fetchone()
 
                 if row is not None and row["state"] == CircuitState.HALF_OPEN.value:
-                    conn.execute(
+                    active_probe_id = row["half_open_probe_id"]
+                    if not probe_id or probe_id != active_probe_id:
+                        logger.warning(
+                            "Fenced record_probe_aborted rejected: probe_id '%s' does not match active HALF_OPEN probe '%s' for key %s.",
+                            probe_id,
+                            active_probe_id,
+                            lookup_key,
+                        )
+                        conn.commit()
+                        return False
+
+                    cursor = conn.execute(
                         """
                         UPDATE cross_bank_circuit_breaker_states
                         SET state = ?,
@@ -503,7 +671,7 @@ class DurableCrossBankCircuitBreakerStore:
                             half_open_probe_started_at = NULL,
                             last_failure_reason = ?,
                             updated_at = ?
-                        WHERE lookup_key = ?
+                        WHERE lookup_key = ? AND state = ? AND half_open_probe_id = ?
                         """,
                         (
                             CircuitState.OPEN.value,
@@ -511,9 +679,15 @@ class DurableCrossBankCircuitBreakerStore:
                             sanitized_reason,
                             now_iso,
                             lookup_key,
+                            CircuitState.HALF_OPEN.value,
+                            probe_id,
                         ),
                     )
+                    conn.commit()
+                    return cursor.rowcount > 0
+
                 conn.commit()
+                return False
             except Exception:
                 conn.rollback()
                 raise
@@ -555,15 +729,12 @@ class DurableCrossBankCircuitBreakerStore:
             now_dt = datetime.datetime.now(UTC)
             expires_at_str = row["cooldown_expires_at"]
             remaining = 0.0
-            evaluated_state = str(row["state"])
+            persisted_state = str(row["state"])
 
-            if evaluated_state == CircuitState.OPEN.value and expires_at_str:
+            if persisted_state == CircuitState.OPEN.value and expires_at_str:
                 try:
                     expires_at_dt = datetime.datetime.fromisoformat(expires_at_str)
-                    if now_dt >= expires_at_dt:
-                        evaluated_state = CircuitState.HALF_OPEN.value
-                    else:
-                        remaining = max(0.0, (expires_at_dt - now_dt).total_seconds())
+                    remaining = max(0.0, (expires_at_dt - now_dt).total_seconds())
                 except (ValueError, TypeError):
                     pass
 
@@ -571,7 +742,7 @@ class DurableCrossBankCircuitBreakerStore:
                 "consortium_id": str(row["consortium_id"]),
                 "requesting_bank_id": str(row["requesting_bank_id"]),
                 "target_bank_id": str(row["target_bank_id"]),
-                "state": evaluated_state,
+                "state": persisted_state,
                 "consecutive_failures": int(row["consecutive_failures"]),
                 "failure_threshold": int(row["failure_threshold"]),
                 "cooldown_seconds": float(row["cooldown_seconds"]),

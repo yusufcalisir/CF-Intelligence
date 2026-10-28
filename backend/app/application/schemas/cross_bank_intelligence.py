@@ -107,6 +107,18 @@ class CrossBankIntelligenceQueryRequest(BaseModel):
         default=None,
         description="Optional explicit override to enable or disable circuit breaker enforcement for this counterpart.",
     )
+    circuit_breaker_failure_threshold: int | None = Field(
+        default=None,
+        ge=1,
+        le=50,
+        description="Optional failure threshold count before circuit breaker opens (bounded [1, 50]).",
+    )
+    circuit_breaker_cooldown_seconds: float | None = Field(
+        default=None,
+        ge=0.001,
+        le=3600.0,
+        description="Optional cooldown period in seconds before circuit breaker transitions to HALF_OPEN (bounded [0.001, 3600.0]).",
+    )
 
 
 

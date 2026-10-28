@@ -18,6 +18,7 @@ Verifies:
 from __future__ import annotations
 
 import hashlib
+import time
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -599,5 +600,129 @@ def test_multi_counterparty_docker_psi_controlled_worker_failure(
         assert response.execution_outcomes["bank_c"].status == "FAILED"
         assert response.execution_outcomes["bank_c"].signal is None
         assert response.execution_outcomes["bank_c"].failure is not None
+    finally:
+        _run_cmd(["docker", "start", container_c], check=False)
+
+
+def test_multi_counterparty_docker_psi_circuit_breaker_recovery(
+    three_bank_docker_topology: dict[str, Any],
+    isolated_tri_governance_env: tuple[ConsortiumGovernanceService, str, str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that an open circuit breaker against an unavailable Docker container recovers to CLOSED
+    after container restart and genuine verified operational PSI execution."""
+    gov_svc, token_a, _, _ = isolated_tri_governance_env
+    client_a = three_bank_docker_topology["client_a"]
+    client_b = three_bank_docker_topology["client_b"]
+    client_c = three_bank_docker_topology["client_c"]
+    port_coord: int = three_bank_docker_topology["port_coord"]
+    port_c: int = three_bank_docker_topology["port_c"]
+    container_c = three_bank_docker_topology["container_worker_c"]
+
+    coord_url = f"http://127.0.0.1:{port_coord}"
+    monkeypatch.setenv("CFI_COORDINATOR_URL", coord_url)
+
+    shared_identifier = "TR550001112223334445556667"
+    client_a.store_private_entity({
+        "id": "ent_cb_rec_a",
+        "bank_id": "bank_a",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["ORGANIZED_CRIME"],
+    })
+    client_b.store_private_entity({
+        "id": "ent_cb_rec_b",
+        "bank_id": "bank_b",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["ORGANIZED_CRIME"],
+    })
+    client_c.store_private_entity({
+        "id": "ent_cb_rec_c",
+        "bank_id": "bank_c",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["ORGANIZED_CRIME"],
+    })
+
+    cbi_service = CrossBankIntelligenceService(consortium_service=gov_svc)
+    ent_a = Entity(
+        id="ent_cb_rec_a",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id=hashlib.sha256(shared_identifier.encode()).hexdigest(),
+        bank_id="bank_a",
+        display_label="Circuit Breaker Recovery Target",
+        risk_level=RiskLevel.HIGH,
+        attributes={"raw_identifier": shared_identifier},
+    )
+    cbi_service.entity_service._entities.set("ent_cb_rec_a", _entity_to_dict(ent_a))
+
+    # Temporarily stop Bank C's container to trigger worker failure
+    _run_cmd(["docker", "stop", container_c], check=True)
+    try:
+        # 1. Query with circuit breaker enabled (failure threshold=1, cooldown=0.2s)
+        req_fail = MultiCounterpartyIntelligenceQueryRequest(
+            consortium_id="c_tri_m63_docker",
+            requesting_bank_id="bank_a",
+            target_bank_ids=["bank_b", "bank_c"],
+            query_entity_id="ent_cb_rec_a",
+            purpose="AML_COLLABORATIVE_INVESTIGATION",
+            execution_mode="VERIFIED_OPERATIONAL",
+            use_established_psi=True,
+            require_established_psi=True,
+            circuit_breaker_enabled=True,
+            circuit_breaker_failure_threshold=1,
+            circuit_breaker_cooldown_seconds=0.2,
+        )
+
+        resp1 = cbi_service.query_multi_counterparty_intelligence(req=req_fail, auth_token=token_a)
+        assert resp1.overall_outcome == "PARTIAL_FAILURE"
+        assert resp1.execution_outcomes["bank_b"].status == "SUCCESS"
+        assert resp1.execution_outcomes["bank_c"].status == "FAILED"
+
+        # Circuit for Bank C is now OPEN in SQLite
+        st_open = cbi_service.circuit_breaker_store.get_circuit_state("c_tri_m63_docker", "bank_a", "bank_c")
+        assert st_open["state"] == "OPEN"
+        assert st_open["consecutive_failures"] >= 1
+
+        # 2. Before cooldown expires: immediate subsequent dispatch is rejected before PSI
+        resp2 = cbi_service.query_multi_counterparty_intelligence(req=req_fail, auth_token=token_a)
+        assert resp2.execution_outcomes["bank_c"].status == "FAILED"
+        assert resp2.execution_outcomes["bank_c"].failure is not None
+        assert resp2.execution_outcomes["bank_c"].failure.error_category == "CIRCUIT_BREAKER_OPEN"
+
+        # 3. Restart Bank C container
+        _run_cmd(["docker", "start", container_c], check=True)
+        t_start = time.monotonic()
+        healthy = False
+        while time.monotonic() - t_start < 20.0:
+            try:
+                import urllib.request
+                with urllib.request.urlopen(f"http://127.0.0.1:{port_c}/worker/health", timeout=1.0) as h_resp:
+                    if h_resp.status == 200:
+                        healthy = True
+                        break
+            except Exception:
+                time.sleep(0.5)
+        assert healthy, "Worker C container failed to reach healthy state within 20s"
+        time.sleep(0.3)  # ensure 0.2s cooldown has elapsed
+
+        # 4. Dispatch recovery probe: Bank C executes genuine operational PSI and recovers!
+        resp3 = cbi_service.query_multi_counterparty_intelligence(req=req_fail, auth_token=token_a)
+        assert resp3.overall_outcome == "COMPLETED"
+        assert resp3.execution_outcomes["bank_c"].status == "SUCCESS"
+        sig_c = resp3.execution_outcomes["bank_c"].signal
+        assert sig_c is not None
+        assert sig_c.execution_mode == "VERIFIED_OPERATIONAL"
+        assert sig_c.is_authoritative is True
+
+        # 5. Circuit is now confirmed CLOSED in persistent SQLite!
+        st_closed = cbi_service.circuit_breaker_store.get_circuit_state("c_tri_m63_docker", "bank_a", "bank_c")
+        assert st_closed["state"] == "CLOSED"
+        assert st_closed["consecutive_failures"] == 0
+        assert st_closed["half_open_probe_id"] is None
     finally:
         _run_cmd(["docker", "start", container_c], check=False)
