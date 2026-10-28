@@ -135,9 +135,9 @@ def compute_multi_counterparty_request_fingerprint(
     if req.total_batch_timeout_seconds is not None:
         canonical_payload["total_batch_timeout_seconds"] = float(req.total_batch_timeout_seconds)
     if req.circuit_breaker_enabled is not None:
-        canonical_payload["circuit_breaker_enabled"] = bool(req.circuit_breaker_enabled)
+        canonical_payload["circuit_breaker_enabled"] = req.circuit_breaker_enabled
     if req.circuit_breaker_failure_threshold is not None:
-        canonical_payload["circuit_breaker_failure_threshold"] = int(req.circuit_breaker_failure_threshold)
+        canonical_payload["circuit_breaker_failure_threshold"] = req.circuit_breaker_failure_threshold
     if req.circuit_breaker_cooldown_seconds is not None:
         canonical_payload["circuit_breaker_cooldown_seconds"] = float(req.circuit_breaker_cooldown_seconds)
     if governance_scope:
