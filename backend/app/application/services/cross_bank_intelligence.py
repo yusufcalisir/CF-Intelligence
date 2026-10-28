@@ -39,6 +39,7 @@ from app.application.services.case_service import (
     CaseManagementService,
     CaseNotFoundError,
     EvidenceRegistryService,
+    InvalidCaseTransitionError,
     TerminalCaseImmutableError,
 )
 from app.application.services.consortium_service import ConsortiumGovernanceService
@@ -102,6 +103,8 @@ PERMITTED_INTELLIGENCE_ROLES: frozenset[str] = frozenset(
         "investigator",
         "compliance",
         "compliance_auditor",
+        "compliance_officer",
+        "fraud_investigator",
         "admin",
         "ml_lead",
         "cross_bank_investigator",
@@ -2793,6 +2796,39 @@ class CrossBankIntelligenceService:
             raise
 
 
+    def _audit_attachment_rejection(
+        self,
+        case_id: str,
+        signal_id: str | None,
+        reason: str,
+        error_type: str,
+        uploader: str = "unknown",
+        caller_bank: str = "unknown",
+        consortium_id: str | None = None,
+    ) -> None:
+        """Record attributable immutable audit event for rejected evidence attachment attempts."""
+        try:
+            actor = (
+                f"user:{uploader}@{caller_bank}"
+                if uploader not in ("unknown", "anonymous", "")
+                else f"user:anonymous@{caller_bank}"
+            )
+            ImmutableAuditChain.get_instance().append_event(
+                event_type="CROSS_BANK_INTELLIGENCE_EVIDENCE_ATTACHMENT_REJECTED",
+                actor_id=actor,
+                action=f"attach_cross_bank_evidence:{case_id}",
+                resource_id=f"case:{case_id}",
+                details={
+                    "case_id": case_id,
+                    "signal_id": signal_id,
+                    "rejection_reason": reason,
+                    "error_type": error_type,
+                    "consortium_id": consortium_id,
+                },
+            )
+        except Exception as audit_err:
+            logger.warning("Failed to record attachment rejection audit event: %s", audit_err)
+
     def attach_signal_to_case_evidence(
         self,
         case_id: str,
@@ -2808,434 +2844,473 @@ class CrossBankIntelligenceService:
         **kwargs: Any,
     ) -> CrossBankEvidenceAttachResponse:
         """Attach verified authoritative cross-bank intelligence signal into case evidence ledger."""
-        # 1. Caller Authentication & Institutional Role Verification
-        if principal is None and not auth_token and (case_bank or caller_bank_id or actor):
-            effective_bank = (case_bank or caller_bank_id or "bank_a").lower().strip()
-            auth_principal = AuthenticatedPrincipal(
-                principal_id=actor or "analyst",
-                tenant_id=effective_bank,
-                roles=["fraud_investigator", "analyst"],
-                is_authenticated=True,
-            )
-        else:
+        resolved_signal_id = signal_id or (signal.signal_id if signal else None)
+        uploader = "unknown"
+        caller_bank = "unknown"
+        consortium_id: str | None = None
+
+        try:
+            # 1. Caller Authentication & Institutional Role Verification
             auth_principal = self._authenticate_principal(principal=principal, auth_token=auth_token)
-        caller_bank = (auth_principal.tenant_id or caller_bank_id or case_bank or "").lower().strip()
-        uploader = auth_principal.principal_id
-
-        if not any(r in PERMITTED_INTELLIGENCE_ROLES for r in auth_principal.roles):
-            raise PermissionError(
-                f"Principal '{auth_principal.principal_id}' lacks permitted role to attach evidence. "
-                f"Permitted roles: {sorted(PERMITTED_INTELLIGENCE_ROLES)}."
-            )
-
-        # 2. Case Verification & Tenant Isolation
-        case = self.case_service.get_case(case_id)
-        if not case:
-            if case_bank:
-                from app.domain.investigation_entities import Case, CasePriority, CaseStatus
-                case = Case(
-                    id=case_id,
-                    bank_id=case_bank,
-                    title=f"Case {case_id}",
-                    status=CaseStatus.OPEN,
-                    priority=CasePriority.P3_MEDIUM,
+            caller_bank = (auth_principal.tenant_id or "").lower().strip()
+            if not caller_bank:
+                raise PermissionError(
+                    "Unauthenticated or unassociated principal: Institutional tenant_id is required for evidence attachment."
                 )
-            else:
+            uploader = auth_principal.principal_id
+
+            if not any(r in PERMITTED_INTELLIGENCE_ROLES for r in auth_principal.roles):
+                raise PermissionError(
+                    f"Principal '{auth_principal.principal_id}' lacks permitted role to attach evidence. "
+                    f"Permitted roles: {sorted(PERMITTED_INTELLIGENCE_ROLES)}."
+                )
+
+            # 2. Case Verification & Tenant Isolation
+            case = self.case_service.get_case(case_id)
+            if not case:
                 raise CaseNotFoundError(f"Case '{case_id}' not found.")
 
-        eff_case_bank = (getattr(case, "bank_id", None) or case_bank or "").lower().strip()
-        if not auth_principal.is_privileged and caller_bank != eff_case_bank:
-            raise PermissionError(
-                f"Tenant isolation violation: Caller institution '{caller_bank}' cannot modify "
-                f"or attach evidence to case '{case_id}' owned by institution '{eff_case_bank}'."
-            )
+            eff_case_bank = str(getattr(case, "bank_id", "") or "").lower().strip()
+            if not eff_case_bank:
+                raise ValueError(f"Case '{case_id}' lacks authoritative institution binding (bank_id).")
 
-        # 3. Retrieve Authoritative Signal Server-Side (Anti-Forgery & Tamper Check)
-        resolved_signal_id = signal_id or (signal.signal_id if signal else None)
-        if not resolved_signal_id:
-            raise ValueError(
-                "Mandatory signal_id missing. Evidence attachment must reference an authoritative server-issued signal."
-            )
-
-        record = self._signal_store.get(resolved_signal_id)
-        if not record:
-            from app.infrastructure.redis_store import RedisStore
-
-            research_store = RedisStore("research_prototype_signals")
-            research_record = research_store.get(resolved_signal_id)
-            if research_record:
-                raise ConsortiumSecurityError(
-                    f"Signal '{resolved_signal_id}' is a research prototype result and cannot enter "
-                    "case evidence in any case state (ordinary open, escalated, or SAR). "
-                    "Defensible evidence requires verified operational execution and independent cryptographic audit."
-                )
-            raise ValueError(
-                f"Authoritative signal '{resolved_signal_id}' not found or was never issued by an authorized intelligence query. "
-                f"Client-fabricated or unauthorized signal attachment rejected."
-            )
-
-        # Enforce admission state transition: unfinalized or rejected signals cannot enter case evidence
-        adm_status = record.get("admission_status")
-        if adm_status and adm_status != "COMMITTED":
-            raise ConsortiumSecurityError(
-                f"Authoritative signal '{resolved_signal_id}' admission status is '{adm_status}', "
-                f"not COMMITTED. Unfinalized or rejected signals cannot enter case evidence."
-            )
-        if record.get("is_attachable") is False or record.get("is_authoritative") is False:
-            raise ConsortiumSecurityError(
-                f"Authoritative signal '{resolved_signal_id}' is marked non-authoritative or unattachable (rejected)."
-            )
-
-        if not case.is_open:
-            raise TerminalCaseImmutableError(
-                f"Cannot attach cross-bank intelligence: Case '{case_id}' is finalized in terminal state '{case.status.value}'."
-            )
-
-        # 3a. Authoritative Signal Content Integrity & Tamper Verification (if signal_data payload present)
-        signal_data = record.get("signal_data")
-        if signal_data and isinstance(signal_data, dict):
-            recomputed_hash = hashlib.sha256(
-                json.dumps(signal_data, sort_keys=True).encode("utf-8")
-            ).hexdigest()
-            if record.get("content_hash") and recomputed_hash != record.get("content_hash"):
-                raise ConsortiumSecurityError(
-                    f"Authoritative signal failed server-side tamper verification for '{resolved_signal_id}': "
-                    f"canonical content digest mismatch. Stored record has been tampered with or corrupted."
+            if not auth_principal.is_privileged and caller_bank != eff_case_bank:
+                raise PermissionError(
+                    f"Tenant isolation violation: Caller institution '{caller_bank}' cannot modify "
+                    f"or attach evidence to case '{case_id}' owned by institution '{eff_case_bank}'."
                 )
 
-        # 3b. Required Institutional and Principal Bindings
-        sig_requesting_bank = str(record.get("requesting_bank_id", "")).lower().strip()
-        if not sig_requesting_bank or sig_requesting_bank != eff_case_bank:
-            raise PermissionError(
-                f"Cross-tenant signal violation: Authoritative signal '{resolved_signal_id}' was issued to institution "
-                f"'{sig_requesting_bank}', cannot be attached to case belonging to institution '{eff_case_bank}'."
+            if not case.is_open:
+                raise TerminalCaseImmutableError(
+                    f"Cannot attach cross-bank intelligence: Case '{case_id}' is finalized in terminal state '{case.status.value}'."
+                )
+
+            # 3. Retrieve Authoritative Signal Server-Side (Anti-Forgery & Tamper Check)
+            if not resolved_signal_id:
+                raise ValueError(
+                    "Mandatory signal_id missing. Evidence attachment must reference an authoritative server-issued signal."
+                )
+
+            record = self._signal_store.get(resolved_signal_id)
+            if not record:
+                from app.infrastructure.redis_store import RedisStore
+
+                research_store = RedisStore("research_prototype_signals")
+                research_record = research_store.get(resolved_signal_id)
+                if research_record:
+                    raise ConsortiumSecurityError(
+                        f"Signal '{resolved_signal_id}' is a research prototype result and cannot enter "
+                        "case evidence in any case state (ordinary open, escalated, or SAR). "
+                        "Defensible evidence requires verified operational execution and independent cryptographic audit."
+                    )
+                raise ValueError(
+                    f"Authoritative signal '{resolved_signal_id}' not found or was never issued by an authorized intelligence query. "
+                    f"Client-fabricated or unauthorized signal attachment rejected."
+                )
+
+            # 3a. Authoritative Signal Content Integrity & Tamper Verification
+            signal_data = record.get("signal_data")
+            if signal_data and isinstance(signal_data, dict):
+                recomputed_hash = hashlib.sha256(
+                    json.dumps(signal_data, sort_keys=True).encode("utf-8")
+                ).hexdigest()
+                if record.get("content_hash") and recomputed_hash != record.get("content_hash"):
+                    raise ConsortiumSecurityError(
+                        f"Authoritative signal failed server-side tamper verification for '{resolved_signal_id}': "
+                        f"canonical content digest mismatch. Stored record has been tampered with or corrupted."
+                    )
+
+            # 3b. Required Institutional and Principal Bindings
+            sig_requesting_bank = str(record.get("requesting_bank_id", "")).lower().strip()
+            if not sig_requesting_bank or sig_requesting_bank != eff_case_bank:
+                raise PermissionError(
+                    f"Cross-tenant signal violation: Authoritative signal '{resolved_signal_id}' was issued to institution "
+                    f"'{sig_requesting_bank}', cannot be attached to case belonging to institution '{eff_case_bank}'."
+                )
+
+            consortium_id = str(record.get("consortium_id", "")).lower().strip()
+            if not consortium_id:
+                raise ValueError(f"Corrupted signal '{resolved_signal_id}': missing consortium_id binding.")
+            if not record.get("query_entity_id"):
+                raise ValueError(f"Corrupted signal '{resolved_signal_id}': missing query_entity_id binding.")
+            if not record.get("issued_to_principal"):
+                raise ValueError(f"Corrupted signal '{resolved_signal_id}': missing issuing principal binding.")
+
+            # 3c. Expiry check
+            now = datetime.datetime.now(UTC)
+            expires_at = datetime.datetime.fromisoformat(record["expires_at"])
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=UTC)
+            if now >= expires_at:
+                raise ValueError(
+                    f"Authoritative signal '{resolved_signal_id}' has expired. Queries must be refreshed before attachment."
+                )
+
+            # 3c-ii. Pilot Governance & Kill Switch Enforcement
+            from app.application.services.pilot_operations_service import (
+                PilotOperationsService,
             )
+            from app.domain.consortium_governance import ConsortiumStatus
+            from app.domain.pilot_operations import PilotStatus
 
-        if not record.get("consortium_id"):
-            raise ValueError(f"Corrupted signal '{resolved_signal_id}': missing consortium_id binding.")
-        if not record.get("query_entity_id"):
-            raise ValueError(f"Corrupted signal '{resolved_signal_id}': missing query_entity_id binding.")
-        if not record.get("issued_to_principal"):
-            raise ValueError(f"Corrupted signal '{resolved_signal_id}': missing issuing principal binding.")
+            pilot_svc = PilotOperationsService.get_instance()
+            pilot_id = record.get("pilot_id")
+            req_b = str(record.get("requesting_bank_id") or sig_requesting_bank).lower().strip()
+            tgt_b = str(record.get("target_bank_id") or "").lower().strip()
+            purp = str(record.get("purpose") or "")
 
-        # 3c. Expiry check
-        now = datetime.datetime.now(UTC)
-        expires_at = datetime.datetime.fromisoformat(record["expires_at"])
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=UTC)
-        if now >= expires_at:
-            raise ValueError(
-                f"Authoritative signal '{resolved_signal_id}' has expired. Queries must be refreshed before attachment."
-            )
-
-        # 3c-ii. Pilot Governance & Kill Switch Enforcement
-        from app.application.services.pilot_operations_service import (
-            PilotOperationsService,
-        )
-        from app.domain.consortium_governance import ConsortiumStatus
-        from app.domain.pilot_operations import PilotStatus
-
-        pilot_svc = PilotOperationsService.get_instance()
-        pilot_id = record.get("pilot_id")
-        req_b = str(record.get("requesting_bank_id") or sig_requesting_bank).lower().strip()
-        tgt_b = str(record.get("target_bank_id") or "").lower().strip()
-        purp = str(record.get("purpose") or "")
-
-        if not pilot_id and req_b and tgt_b:
-            p_scoped = pilot_svc.find_active_or_scoped_pilot(
-                requesting_bank=req_b,
-                target_bank=tgt_b,
-                purpose=purp,
-            )
-            if p_scoped:
-                pilot_id = p_scoped.config.pilot_id
-
-        if pilot_id:
-            governing_pilot = pilot_svc.get_pilot(pilot_id)
-            if not governing_pilot:
-                raise ConsortiumSecurityError(
-                    f"Governing pilot '{pilot_id}' not found. Cannot attach unverified pilot signal."
+            if not pilot_id and req_b and tgt_b:
+                p_scoped = pilot_svc.find_active_or_scoped_pilot(
+                    requesting_bank=req_b,
+                    target_bank=tgt_b,
+                    purpose=purp,
                 )
-            if governing_pilot.status != PilotStatus.ACTIVE:
-                raise ConsortiumSecurityError(
-                    f"Governing pilot '{pilot_id}' is in non-active status '{governing_pilot.status.value}'. "
-                    f"Reason: {governing_pilot.status_reason}. Evidence attachment rejected."
-                )
-            if governing_pilot.has_expired():
-                raise ConsortiumSecurityError(
-                    f"Governing pilot '{pilot_id}' has expired. Evidence attachment rejected."
-                )
+                if p_scoped:
+                    pilot_id = p_scoped.config.pilot_id
 
-            # Recheck consortium and operational consent
-            consortium = pilot_svc.consortium_service.get_consortium(governing_pilot.config.consortium_id)
-            if not consortium or consortium.status != ConsortiumStatus.ACTIVE:
-                raise ConsortiumSecurityError(
-                    f"Underlying consortium '{governing_pilot.config.consortium_id}' is not ACTIVE. Evidence attachment rejected."
-                )
-            c_meta = getattr(consortium, "metadata", {}) or {}
-            op_grant = c_meta.get("operational_data_sharing_grant") or {}
-            if not op_grant.get("is_active", True):
-                raise ConsortiumSecurityError("Operational data sharing grant is inactive or revoked. Evidence attachment rejected.")
-            revoked = set(op_grant.get("revoked_by_institutions", []))
-            if req_b in revoked or tgt_b in revoked:
-                raise ConsortiumSecurityError("Operational consent has been revoked by participating institution. Evidence attachment rejected.")
+            if pilot_id:
+                governing_pilot = pilot_svc.get_pilot(pilot_id)
+                if not governing_pilot:
+                    raise ConsortiumSecurityError(
+                        f"Governing pilot '{pilot_id}' not found. Cannot attach unverified pilot signal."
+                    )
+                if governing_pilot.status != PilotStatus.ACTIVE:
+                    raise ConsortiumSecurityError(
+                        f"Governing pilot '{pilot_id}' is in non-active status '{governing_pilot.status.value}'. "
+                        f"Reason: {governing_pilot.status_reason}. Evidence attachment rejected."
+                    )
+                if governing_pilot.has_expired():
+                    raise ConsortiumSecurityError(
+                        f"Governing pilot '{pilot_id}' has expired. Evidence attachment rejected."
+                    )
 
-            # Enforce durable reservation binding
-            res_id = record.get("reservation_id")
-            if not res_id:
+                # Recheck consortium and operational consent
+                consortium = pilot_svc.consortium_service.get_consortium(governing_pilot.config.consortium_id)
+                if not consortium or consortium.status != ConsortiumStatus.ACTIVE:
+                    raise ConsortiumSecurityError(
+                        f"Underlying consortium '{governing_pilot.config.consortium_id}' is not ACTIVE. Evidence attachment rejected."
+                    )
+                c_meta = getattr(consortium, "metadata", {}) or {}
+                op_grant = c_meta.get("operational_data_sharing_grant") or {}
+                if not op_grant.get("is_active", True):
+                    raise ConsortiumSecurityError("Operational data sharing grant is inactive or revoked. Evidence attachment rejected.")
+                revoked = set(op_grant.get("revoked_by_institutions", []))
+                if req_b in revoked or tgt_b in revoked:
+                    raise ConsortiumSecurityError("Operational consent has been revoked by participating institution. Evidence attachment rejected.")
+
+                # Enforce durable reservation binding
+                res_id = record.get("reservation_id")
+                if not res_id:
+                    raise ConsortiumSecurityError(
+                        f"Signal '{resolved_signal_id}' governed by pilot '{pilot_id}' lacks durable execution reservation binding."
+                    )
+                durable_res = pilot_svc.store.get_query_reservation(res_id)
+                if not durable_res:
+                    raise ConsortiumSecurityError(
+                        f"Durable execution reservation '{res_id}' for pilot '{pilot_id}' not found."
+                    )
+                res_status = durable_res.get("status")
+                if res_status != "PUBLISHED":
+                    raise ConsortiumSecurityError(
+                        f"Execution reservation '{res_id}' for pilot '{pilot_id}' publication status is '{res_status}', "
+                        f"not PUBLISHED. Evidence admission requires genuinely finalized authoritative publication."
+                    )
+                if durable_res.get("signal_id") != resolved_signal_id:
+                    raise ConsortiumSecurityError(
+                        f"Execution reservation '{res_id}' is bound to signal '{durable_res.get('signal_id')}', does not match '{resolved_signal_id}'."
+                    )
+                if durable_res.get("pilot_id") != pilot_id:
+                    raise ConsortiumSecurityError(
+                        f"Execution reservation '{res_id}' is bound to pilot '{durable_res.get('pilot_id')}', does not match '{pilot_id}'."
+                    )
+                record_rcp = record.get("receipt_id")
+                if record_rcp and durable_res.get("receipt_id") and durable_res.get("receipt_id") != record_rcp:
+                    raise ConsortiumSecurityError(
+                        f"Execution reservation '{res_id}' receipt '{durable_res.get('receipt_id')}' does not match record receipt '{record_rcp}'."
+                    )
+
+            # 3d. Admission State Transition Checks
+            adm_status = record.get("admission_status")
+            if adm_status and adm_status != "COMMITTED":
                 raise ConsortiumSecurityError(
-                    f"Signal '{resolved_signal_id}' governed by pilot '{pilot_id}' lacks durable execution reservation binding."
+                    f"Authoritative signal '{resolved_signal_id}' admission status is '{adm_status}', "
+                    f"not COMMITTED. Unfinalized or rejected signals cannot enter case evidence."
                 )
-            durable_res = pilot_svc.store.get_query_reservation(res_id)
-            if not durable_res:
+            pub_status = record.get("publication_status")
+            if pub_status and pub_status != "PUBLISHED":
                 raise ConsortiumSecurityError(
-                    f"Durable execution reservation '{res_id}' for pilot '{pilot_id}' not found."
-                )
-            res_status = durable_res.get("status")
-            if res_status != "PUBLISHED":
-                raise ConsortiumSecurityError(
-                    f"Execution reservation '{res_id}' for pilot '{pilot_id}' publication status is '{res_status}', "
+                    f"Authoritative signal '{resolved_signal_id}' publication status is '{pub_status}', "
                     f"not PUBLISHED. Evidence admission requires genuinely finalized authoritative publication."
                 )
-            if durable_res.get("signal_id") != resolved_signal_id:
+            if record.get("is_attachable") is False:
                 raise ConsortiumSecurityError(
-                    f"Execution reservation '{res_id}' is bound to signal '{durable_res.get('signal_id')}', does not match '{resolved_signal_id}'."
+                    f"Authoritative signal '{resolved_signal_id}' is marked non-authoritative or unattachable."
                 )
-            if durable_res.get("pilot_id") != pilot_id:
+
+            # 3e. Assurance Level & Execution Mode Boundary
+            assurance_level = (
+                (signal_data.get("assurance_level") if isinstance(signal_data, dict) else None)
+                or record.get("assurance_level")
+            )
+            execution_mode = (
+                (signal_data.get("execution_mode") if isinstance(signal_data, dict) else None)
+                or record.get("execution_mode")
+            )
+            is_authoritative = bool(
+                record.get("is_authoritative", True)
+                and (signal_data.get("is_authoritative", True) if isinstance(signal_data, dict) else True)
+            )
+            is_synthetic = bool(
+                record.get("is_synthetic", False)
+                or (signal_data.get("is_synthetic", False) if isinstance(signal_data, dict) else False)
+            )
+
+            if (
+                assurance_level in ("PROTOCOL_PROTOTYPE", "RESEARCH_PROTOTYPE", "LOCAL_PROTOTYPE")
+                or execution_mode in ("RESEARCH_PROTOTYPE", "PROTOTYPE")
+            ):
                 raise ConsortiumSecurityError(
-                    f"Execution reservation '{res_id}' is bound to pilot '{durable_res.get('pilot_id')}', does not match '{pilot_id}'."
-                )
-            record_rcp = record.get("receipt_id")
-            if record_rcp and durable_res.get("receipt_id") and durable_res.get("receipt_id") != record_rcp:
-                raise ConsortiumSecurityError(
-                    f"Execution reservation '{res_id}' receipt '{durable_res.get('receipt_id')}' does not match record receipt '{record_rcp}'."
+                    "Protocol prototype matching results cannot enter case evidence in any case state "
+                    "(ordinary open, escalated, or SAR). Defensible evidence requires verified operational "
+                    "execution and independent cryptographic audit."
                 )
 
-        # Enforce admission state transition: unfinalized or rejected signals cannot enter case evidence
-        adm_status = record.get("admission_status")
-        if adm_status and adm_status != "COMMITTED":
-            raise ConsortiumSecurityError(
-                f"Authoritative signal '{resolved_signal_id}' admission status is '{adm_status}', "
-                f"not COMMITTED. Unfinalized or rejected signals cannot enter case evidence."
-            )
-        pub_status = record.get("publication_status")
-        if pub_status and pub_status != "PUBLISHED":
-            raise ConsortiumSecurityError(
-                f"Authoritative signal '{resolved_signal_id}' publication status is '{pub_status}', "
-                f"not PUBLISHED. Evidence admission requires genuinely finalized authoritative publication."
-            )
-        if record.get("is_attachable") is False or record.get("is_authoritative") is False:
-            raise ConsortiumSecurityError(
-                f"Authoritative signal '{resolved_signal_id}' is marked non-authoritative or unattachable."
-            )
-
-        # 3d. Prevent Prototype Matching Results from Entering Case Evidence in Any Case State
-        assurance_level = signal_data.get("assurance_level") or record.get("assurance_level")
-        execution_mode = signal_data.get("execution_mode") or record.get("execution_mode")
-        is_authoritative = bool(record.get("is_authoritative", True) and signal_data.get("is_authoritative", True))
-
-        if (
-            assurance_level in ("PROTOCOL_PROTOTYPE", "RESEARCH_PROTOTYPE", "LOCAL_PROTOTYPE")
-            or execution_mode in ("RESEARCH_PROTOTYPE", "PROTOTYPE")
-        ):
-            raise ConsortiumSecurityError(
-                "Protocol prototype matching results cannot enter case evidence in any case state "
-                "(ordinary open, escalated, or SAR). Defensible evidence requires verified operational "
-                "execution and independent cryptographic audit."
-            )
-
-        # 3e. Prevent Simulated Research Intelligence from Entering Authoritative Case Evidence or Production Filings
-        from app.config import get_settings
-        from app.domain.enums import CaseStatus
-
-        settings = get_settings()
-        is_signal_simulated = bool(
-            execution_mode == "SIMULATED_RESEARCH"
-            or not is_authoritative
-            or record.get("is_synthetic", False)
-            or signal_data.get("is_synthetic", False)
-        )
-
-        if is_signal_simulated:
-            if settings.is_production or settings.app_env.lower() in ("production", "prod"):
-                raise ValueError(
-                    "Simulated research intelligence cannot be attached to fraud cases in production environments."
-                )
-
-            is_authoritative_case = bool(
-                getattr(case, "is_authoritative", False)
-                or (getattr(case, "signature_metadata", {}) or {}).get("is_authoritative", False)
-                or case.status in (CaseStatus.ESCALATED, CaseStatus.SAR_FILED)
-            )
-            if is_authoritative_case:
+            if (
+                execution_mode == "SIMULATED_RESEARCH"
+                or not is_authoritative
+                or is_synthetic
+            ):
                 raise ConsortiumSecurityError(
                     "Simulated research signals cannot be attached to authoritative fraud investigation evidence or regulatory filings."
                 )
 
-        # 4. Revalidate Current Consortium Governance & Revocation Status
-        consortium_id = str(record.get("consortium_id", "")).lower().strip()
-        consortium = self.consortium_service.get_consortium(consortium_id)
-        if not consortium:
-            raise ConsortiumSecurityError(f"Consortium '{consortium_id}' no longer exists.")
-        if consortium.status != ConsortiumStatus.ACTIVE:
-            raise ConsortiumSecurityError(
-                f"Consortium '{consortium_id}' is in non-active status '{consortium.status.value}'."
+            # 4. Revalidate Current Consortium Governance & Revocation Status
+            consortium = self.consortium_service.get_consortium(consortium_id)
+            if not consortium:
+                raise ConsortiumSecurityError(f"Consortium '{consortium_id}' no longer exists.")
+            if consortium.status != ConsortiumStatus.ACTIVE:
+                raise ConsortiumSecurityError(
+                    f"Consortium '{consortium_id}' is in non-active status '{consortium.status.value}'."
+                )
+            if eff_case_bank in consortium.removed_members:
+                raise ConsortiumSecurityError(
+                    f"Institution '{eff_case_bank}' has been revoked/evicted from consortium '{consortium_id}'."
+                )
+            if eff_case_bank not in consortium.members:
+                raise ConsortiumSecurityError(
+                    f"Institution '{eff_case_bank}' is not an active member of consortium '{consortium_id}'."
+                )
+
+            # 4b. Revalidate Operational Data-Sharing Grant & Bilateral Consent
+            grant_id = record.get("grant_id") or (
+                signal_data.get("provenance", {}).get("grant_id")
+                if isinstance(signal_data, dict)
+                else None
             )
-        active_case_bank = (case_bank or eff_case_bank or caller_bank or "").lower().strip()
-        if active_case_bank in consortium.removed_members:
-            raise ConsortiumSecurityError(
-                f"Institution '{active_case_bank}' has been revoked/evicted from consortium '{consortium_id}'."
+            if grant_id:
+                grant = consortium.metadata.get("operational_data_sharing_grant") or {}
+                is_grant_active = bool(grant.get("is_active", False) and grant.get("status") != "REVOKED")
+                revoked_institutions = set(grant.get("revoked_by_institutions") or [])
+                target_bank = record.get("target_bank_id") or (
+                    signal_data.get("provenance", {}).get("target_bank_id")
+                    if isinstance(signal_data, dict)
+                    else None
+                )
+                if (
+                    grant.get("grant_id") != grant_id
+                    or not is_grant_active
+                    or (eff_case_bank in revoked_institutions)
+                    or (target_bank and target_bank in revoked_institutions)
+                ):
+                    raise ConsortiumSecurityError(
+                        f"Operational consent for grant '{grant_id}' has been revoked or is no longer active in consortium '{consortium_id}'. "
+                        "Evidence attachment denied."
+                    )
+                expected_rev = record.get("grant_revision") or (
+                    signal_data.get("provenance", {}).get("grant_revision")
+                    if isinstance(signal_data, dict)
+                    else None
+                )
+                if expected_rev is not None and grant.get("revision") != expected_rev:
+                    raise ConsortiumSecurityError(
+                        f"Operational grant '{grant_id}' revision changed (was {expected_rev}, now {grant.get('revision')}). "
+                        "Prior consent no longer authorizes evidence attachment without reapproval."
+                    )
+                approvals = grant.get("approvals") or {}
+                if eff_case_bank not in approvals:
+                    raise ConsortiumSecurityError(
+                        f"Institution '{eff_case_bank}' has not approved current grant revision for grant '{grant_id}'. "
+                        "Evidence attachment denied."
+                    )
+                if target_bank and target_bank not in approvals:
+                    raise ConsortiumSecurityError(
+                        f"Target counterpart institution '{target_bank}' has not approved current grant revision for grant '{grant_id}'. "
+                        "Evidence attachment denied."
+                    )
+
+            # 5. Idempotent Submission Check (Prevent Duplicate Evidence Creation)
+            existing_evidence = self.evidence_service.get_case_evidence(case_id)
+            for ev in existing_evidence:
+                ev_meta = ev.get("metadata") or {}
+                if ev_meta.get("signal_id") == resolved_signal_id or (
+                    idempotency_key and ev_meta.get("idempotency_key") == idempotency_key
+                ):
+                    logger.info(
+                        "Idempotent attachment replay detected for signal %s on case %s (evidence_id=%s)",
+                        resolved_signal_id,
+                        case_id,
+                        ev["id"],
+                    )
+                    return CrossBankEvidenceAttachResponse(
+                        evidence_id=ev["id"],
+                        case_id=case_id,
+                        signal_id=resolved_signal_id,
+                        evidence_type=ev.get("evidence_type", "CROSS_BANK_INTELLIGENCE"),
+                        title=ev.get("title", ""),
+                        content_hash=ev.get("content_hash", ""),
+                        uploaded_at=ev.get("uploaded_at", ""),
+                        uploaded_by=ev.get("uploaded_by", uploader),
+                        case_version=getattr(case, "version", 1),
+                        timeline_event_recorded=False,
+                        is_duplicate_submission=True,
+                    )
+
+            # 6. Durably Register Evidence with CAS Concurrency & Sanitized Provenance
+            effective_disclosure_mode = (
+                (signal_data.get("disclosure_mode") if isinstance(signal_data, dict) else None)
+                or record.get("disclosure_mode")
+                or "ANONYMOUS_SUMMARY"
             )
-        if active_case_bank not in consortium.members:
-            raise ConsortiumSecurityError(
-                f"Institution '{active_case_bank}' is not an active member of consortium '{consortium_id}'."
-            )
-
-        # 4b. Revalidate Operational Data-Sharing Grant & Bilateral Consent
-        grant_id = record.get("grant_id") or signal_data.get("provenance", {}).get("grant_id")
-        if grant_id:
-            grant = consortium.metadata.get("operational_data_sharing_grant") or {}
-            is_grant_active = bool(grant.get("is_active", False) and grant.get("status") != "REVOKED")
-            revoked_institutions = set(grant.get("revoked_by_institutions") or [])
-            target_bank = record.get("target_bank_id") or signal_data.get("provenance", {}).get("target_bank_id")
-            if (
-                grant.get("grant_id") != grant_id
-                or not is_grant_active
-                or (active_case_bank in revoked_institutions)
-                or (target_bank and target_bank in revoked_institutions)
-            ):
-                raise ConsortiumSecurityError(
-                    f"Operational consent for grant '{grant_id}' has been revoked or is no longer active in consortium '{consortium_id}'. "
-                    "Evidence attachment denied."
-                )
-            expected_rev = record.get("grant_revision") or signal_data.get("provenance", {}).get("grant_revision")
-            if expected_rev is not None and grant.get("revision") != expected_rev:
-                raise ConsortiumSecurityError(
-                    f"Operational grant '{grant_id}' revision changed (was {expected_rev}, now {grant.get('revision')}). "
-                    "Prior consent no longer authorizes evidence attachment without reapproval."
-                )
-            approvals = grant.get("approvals") or {}
-            if active_case_bank not in approvals:
-                raise ConsortiumSecurityError(
-                    f"Institution '{active_case_bank}' has not approved current grant revision for grant '{grant_id}'. "
-                    "Evidence attachment denied."
-                )
-            target_bank = record.get("target_bank_id") or signal_data.get("provenance", {}).get("target_bank_id")
-            if target_bank and target_bank not in approvals:
-                raise ConsortiumSecurityError(
-                    f"Target counterpart institution '{target_bank}' has not approved current grant revision for grant '{grant_id}'. "
-                    "Evidence attachment denied."
-                )
-
-        # 5. Idempotent Submission Check (Prevent Duplicate Evidence Creation)
-        existing_evidence = self.evidence_service.get_case_evidence(case_id)
-        for ev in existing_evidence:
-            ev_meta = ev.get("metadata") or {}
-            if ev_meta.get("signal_id") == resolved_signal_id or (
-                idempotency_key and ev_meta.get("idempotency_key") == idempotency_key
-            ):
-                logger.info(
-                    "Idempotent attachment replay detected for signal %s on case %s (evidence_id=%s)",
-                    resolved_signal_id,
-                    case_id,
-                    ev["id"],
-                )
-                return CrossBankEvidenceAttachResponse(
-                    evidence_id=ev["id"],
-                    case_id=case_id,
-                    signal_id=resolved_signal_id,
-                    evidence_type=ev.get("evidence_type", "CROSS_BANK_INTELLIGENCE"),
-                    title=ev.get("title", ""),
-                    content_hash=ev.get("content_hash", ""),
-                    uploaded_at=ev.get("uploaded_at", ""),
-                    uploaded_by=ev.get("uploaded_by", uploader),
-                    case_version=getattr(case, "version", 1),
-                    timeline_event_recorded=False,
-                    is_duplicate_submission=True,
-                )
-
-        # 6. Durably Register Evidence with CAS Rollback Protection & Collision-Resistant Paths
-        payload = {
-            "signal_id": resolved_signal_id,
-            "consortium_id": consortium_id,
-            "requesting_bank_id": sig_requesting_bank,
-            "query_entity_id": record.get("query_entity_id"),
-            "signal_content": signal_data,
-            "analyst_notes": notes,
-            "attached_by": uploader,
-            "attached_at": now.isoformat(),
-            "idempotency_key": idempotency_key,
-            "is_authoritative": is_authoritative,
-            "operational_status": "OPERATIONAL"
-            if is_authoritative
-            else "NON_OPERATIONAL_SYNTHETIC",
-        }
-        content_json = json.dumps(payload, sort_keys=True, indent=2)
-        payload_digest = hashlib.sha256(content_json.encode("utf-8")).hexdigest()
-        file_path = f"storage/evidence/case_{case_id}_signal_{resolved_signal_id}_{payload_digest[:16]}.json"
-        title = f"Consortium Intelligence Evidence ({consortium_id.upper()})"
-
-        ev = self.evidence_service.register_evidence(
-            case_id=case_id,
-            evidence_type="CROSS_BANK_INTELLIGENCE",
-            title=title,
-            file_path=file_path,
-            content=content_json,
-            uploaded_by=uploader,
-            metadata={
+            sanitized_provenance: dict[str, Any] = {
                 "signal_id": resolved_signal_id,
                 "consortium_id": consortium_id,
+                "requesting_bank_id": sig_requesting_bank,
+                "query_entity_id": record.get("query_entity_id"),
+                "disclosure_mode": effective_disclosure_mode,
+                "execution_mode": execution_mode,
+                "assurance_level": assurance_level,
+            }
+            if effective_disclosure_mode == "ATTRIBUTED_INSTITUTIONS":
+                sanitized_provenance["target_bank_id"] = record.get("target_bank_id")
+                if isinstance(signal_data, dict):
+                    sanitized_provenance["contributing_institutions"] = signal_data.get(
+                        "contributing_institutions", []
+                    )
+
+            payload = {
+                "signal_id": resolved_signal_id,
+                "consortium_id": consortium_id,
+                "requesting_bank_id": sig_requesting_bank,
+                "query_entity_id": record.get("query_entity_id"),
+                "signal_content": signal_data,
+                "provenance": sanitized_provenance,
+                "analyst_notes": notes,
+                "attached_by": uploader,
+                "attached_at": now.isoformat(),
                 "idempotency_key": idempotency_key,
                 "is_authoritative": is_authoritative,
-                "operational_status": "OPERATIONAL"
-                if is_authoritative
-                else "NON_OPERATIONAL_SYNTHETIC",
-            },
-        )
+                "operational_status": "OPERATIONAL",
+            }
+            content_json = json.dumps(payload, sort_keys=True, indent=2)
+            payload_digest = hashlib.sha256(content_json.encode("utf-8")).hexdigest()
+            file_path = f"storage/evidence/case_{case_id}_signal_{resolved_signal_id}_{payload_digest[:16]}.json"
+            title = f"Consortium Intelligence Evidence ({consortium_id.upper()})"
 
-        # Record attachment in authoritative record
-        record.setdefault("attached_to_cases", []).append(case_id)
-        self._signal_store.set(resolved_signal_id, record)
+            try:
+                ev = self.evidence_service.register_evidence(
+                    case_id=case_id,
+                    evidence_type="CROSS_BANK_INTELLIGENCE",
+                    title=title,
+                    file_path=file_path,
+                    content=content_json,
+                    uploaded_by=uploader,
+                    metadata={
+                        "signal_id": resolved_signal_id,
+                        "consortium_id": consortium_id,
+                        "idempotency_key": idempotency_key,
+                        "is_authoritative": is_authoritative,
+                        "operational_status": "OPERATIONAL",
+                        "disclosure_mode": effective_disclosure_mode,
+                    },
+                )
+            except InvalidCaseTransitionError:
+                fresh_evidence = self.evidence_service.get_case_evidence(case_id)
+                for fresh_ev in fresh_evidence:
+                    fresh_meta = fresh_ev.get("metadata") or {}
+                    if fresh_meta.get("signal_id") == resolved_signal_id or (
+                        idempotency_key and fresh_meta.get("idempotency_key") == idempotency_key
+                    ):
+                        fresh_case = self.case_service.get_case(case_id)
+                        return CrossBankEvidenceAttachResponse(
+                            evidence_id=fresh_ev["id"],
+                            case_id=case_id,
+                            signal_id=resolved_signal_id,
+                            evidence_type=fresh_ev.get("evidence_type", "CROSS_BANK_INTELLIGENCE"),
+                            title=fresh_ev.get("title", ""),
+                            content_hash=fresh_ev.get("content_hash", ""),
+                            uploaded_at=fresh_ev.get("uploaded_at", ""),
+                            uploaded_by=fresh_ev.get("uploaded_by", uploader),
+                            case_version=getattr(fresh_case, "version", getattr(case, "version", 1)),
+                            timeline_event_recorded=False,
+                            is_duplicate_submission=True,
+                        )
+                raise
 
-        # Refresh updated case version
-        updated_case = self.case_service.get_case(case_id)
-        current_version = getattr(updated_case, "version", 1)
+            # Record attachment in authoritative record
+            record.setdefault("attached_to_cases", []).append(case_id)
+            self._signal_store.set(resolved_signal_id, record)
 
-        ImmutableAuditChain.get_instance().append_event(
-            event_type="CROSS_BANK_INTELLIGENCE_EVIDENCE_ATTACHED",
-            actor_id=f"user:{uploader}@{case_bank}",
-            action=f"attach_cross_bank_evidence:{case_id}",
-            resource_id=f"evidence:{ev['id']}",
-            details={
-                "case_id": case_id,
-                "evidence_id": ev["id"],
-                "content_hash": ev["content_hash"],
-                "signal_id": resolved_signal_id,
-                "consortium_id": consortium_id,
-            },
-        )
+            # Refresh updated case version
+            updated_case = self.case_service.get_case(case_id)
+            current_version = getattr(updated_case, "version", 1)
 
-        logger.info(
-            "Attached authoritative cross-bank intelligence signal %s to case %s (evidence_id=%s, hash=%s)",
-            resolved_signal_id,
-            case_id,
-            ev["id"],
-            ev["content_hash"][:8],
-        )
+            ImmutableAuditChain.get_instance().append_event(
+                event_type="CROSS_BANK_INTELLIGENCE_EVIDENCE_ATTACHED",
+                actor_id=f"user:{uploader}@{eff_case_bank}",
+                action=f"attach_cross_bank_evidence:{case_id}",
+                resource_id=f"evidence:{ev['id']}",
+                details={
+                    "case_id": case_id,
+                    "evidence_id": ev["id"],
+                    "content_hash": ev["content_hash"],
+                    "signal_id": resolved_signal_id,
+                    "consortium_id": consortium_id,
+                    "disclosure_mode": effective_disclosure_mode,
+                },
+            )
 
-        return CrossBankEvidenceAttachResponse(
-            evidence_id=ev["id"],
-            case_id=case_id,
-            signal_id=resolved_signal_id,
-            evidence_type=ev["evidence_type"],
-            title=ev["title"],
-            content_hash=ev["content_hash"],
-            uploaded_at=ev["uploaded_at"],
-            uploaded_by=ev["uploaded_by"],
-            case_version=current_version,
-            timeline_event_recorded=True,
-            is_duplicate_submission=False,
-        )
+            logger.info(
+                "Attached authoritative cross-bank intelligence signal %s to case %s (evidence_id=%s, hash=%s)",
+                resolved_signal_id,
+                case_id,
+                ev["id"],
+                ev["content_hash"][:8],
+            )
+
+            return CrossBankEvidenceAttachResponse(
+                evidence_id=ev["id"],
+                case_id=case_id,
+                signal_id=resolved_signal_id,
+                evidence_type=ev["evidence_type"],
+                title=ev["title"],
+                content_hash=ev["content_hash"],
+                uploaded_at=ev["uploaded_at"],
+                uploaded_by=ev["uploaded_by"],
+                case_version=current_version,
+                timeline_event_recorded=True,
+                is_duplicate_submission=False,
+            )
+        except Exception as exc:
+            self._audit_attachment_rejection(
+                case_id=case_id,
+                signal_id=resolved_signal_id,
+                reason=str(exc),
+                error_type=exc.__class__.__name__,
+                uploader=uploader,
+                caller_bank=caller_bank,
+                consortium_id=consortium_id,
+            )
+            raise
 
     def attach_signal_to_research_case_evidence(
         self,

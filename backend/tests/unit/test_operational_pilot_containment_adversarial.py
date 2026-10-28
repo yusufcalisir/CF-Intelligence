@@ -34,6 +34,7 @@ from typing import Any
 
 import pytest
 
+from app.application.services.case_service import _case_to_dict
 from app.application.services.consortium_service import (
     ConsortiumGovernanceService,
 )
@@ -59,6 +60,7 @@ from app.domain.institutional_identity import (
     InstitutionalSigningIdentity,
     canonical_coordinator_readiness_bytes,
 )
+from app.domain.investigation_entities import Case
 from app.domain.pilot_operations import (
     PilotEntity,
     PilotGovernanceError,
@@ -226,6 +228,11 @@ def containment_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generato
         daemon_a.stop()
         daemon_b.stop()
         coord_daemon.stop()
+
+
+def _register_test_case(case_svc: Any, case_id: str = "case_01", bank_id: str = "bank_a") -> None:
+    c = Case(id=case_id, title=f"Case {case_id}", bank_id=bank_id)
+    case_svc._cases.set(case_id, _case_to_dict(c))
 
 
 def _create_and_activate_pilot(
@@ -501,11 +508,12 @@ def test_admission_race_midflight_pause_fails_closed(containment_env: dict[str, 
     intel_svc._signal_store.set(sig_id, provisional_record)
 
     # 6. Evidence attachment must reject rejected/uncommitted signal
+    _register_test_case(intel_svc.case_service, "case_race_01", "bank_a")
     with pytest.raises(ConsortiumSecurityError) as exc_attach:
         intel_svc.attach_signal_to_case_evidence(
             case_id="case_race_01",
             signal_id=sig_id,
-            case_bank="bank_a",
+            principal=containment_env["principal_a"],
         )
     assert "rejected" in str(exc_attach.value).lower() or "not committed" in str(exc_attach.value).lower()
 
@@ -519,7 +527,7 @@ def test_admission_race_midflight_pause_fails_closed(containment_env: dict[str, 
         intel_svc.attach_signal_to_case_evidence(
             case_id="case_race_01",
             signal_id=sig_id,
-            case_bank="bank_a",
+            principal=containment_env["principal_a"],
         )
 
     # 8. Fresh operational query can now succeed cleanly
@@ -574,11 +582,12 @@ def test_attachment_verifies_durable_reservation_and_signal_binding(containment_
     intel_svc._signal_store.set(tampered_sig_id, tampered_record)
 
     # 1. While reservation status is COMMITTED (not yet PUBLISHED): rejected
+    _register_test_case(intel_svc.case_service, "case_01", "bank_a")
     with pytest.raises(ConsortiumSecurityError) as exc_unpub:
         intel_svc.attach_signal_to_case_evidence(
             case_id="case_01",
             signal_id=tampered_sig_id,
-            case_bank="bank_a",
+            principal=containment_env["principal_a"],
         )
     assert "not published" in str(exc_unpub.value).lower()
 
@@ -590,7 +599,7 @@ def test_attachment_verifies_durable_reservation_and_signal_binding(containment_
         intel_svc.attach_signal_to_case_evidence(
             case_id="case_01",
             signal_id=tampered_sig_id,
-            case_bank="bank_a",
+            principal=containment_env["principal_a"],
         )
     assert "does not match" in str(exc.value).lower()
 
@@ -1145,9 +1154,14 @@ def test_process_crash_after_preparation_before_redis_completion(containment_env
 
     # Step 2: Simulate process crash before publication finalization and Redis write
     cbi_svc = CrossBankIntelligenceService(consortium_service=containment_env["gov_svc"])
+    _register_test_case(cbi_svc.case_service, "case_01", "bank_a")
     # Case evidence attachment must fail closed because signal is not in Redis
     with pytest.raises(ValueError, match="Authoritative signal .* not found"):
-        cbi_svc.attach_signal_to_case_evidence(case_id="case_01", signal_id=sig_id, case_bank="bank_a")
+        cbi_svc.attach_signal_to_case_evidence(
+            case_id="case_01",
+            signal_id=sig_id,
+            principal=containment_env["principal_a"],
+        )
 
     # Even if an unfinalized record exists in Redis with publication_status=PUBLICATION_PREPARED
     cbi_svc._signal_store.set(sig_id, {
@@ -1167,8 +1181,12 @@ def test_process_crash_after_preparation_before_redis_completion(containment_env
         "issued_to_principal": "analyst",
         "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
     })
-    with pytest.raises(ConsortiumSecurityError, match="is marked non-authoritative or unattachable"):
-        cbi_svc.attach_signal_to_case_evidence(case_id="case_01", signal_id=sig_id, case_bank="bank_a")
+    with pytest.raises(ConsortiumSecurityError, match="publication status is 'PUBLICATION_PREPARED', not PUBLISHED"):
+        cbi_svc.attach_signal_to_case_evidence(
+            case_id="case_01",
+            signal_id=sig_id,
+            principal=containment_env["principal_a"],
+        )
 
     # If attacker attempts to claim authoritative in Redis, SQLite durable check fails closed
     cbi_svc._signal_store.set(sig_id, {
@@ -1189,7 +1207,11 @@ def test_process_crash_after_preparation_before_redis_completion(containment_env
         "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
     })
     with pytest.raises(ConsortiumSecurityError, match="publication status is 'PUBLICATION_PREPARED', not PUBLISHED"):
-        cbi_svc.attach_signal_to_case_evidence(case_id="case_01", signal_id=sig_id, case_bank="bank_a")
+        cbi_svc.attach_signal_to_case_evidence(
+            case_id="case_01",
+            signal_id=sig_id,
+            principal=containment_env["principal_a"],
+        )
 
 
 def test_redis_publication_failure_records_failed(containment_env: dict[str, Any]) -> None:
@@ -1218,8 +1240,13 @@ def test_redis_publication_failure_records_failed(containment_env: dict[str, Any
 
     # Evidence attachment fails closed
     cbi_svc = CrossBankIntelligenceService(consortium_service=containment_env["gov_svc"])
+    _register_test_case(cbi_svc.case_service, "case_01", "bank_a")
     with pytest.raises(ValueError):
-        cbi_svc.attach_signal_to_case_evidence(case_id="case_01", signal_id=sig_id, case_bank="bank_a")
+        cbi_svc.attach_signal_to_case_evidence(
+            case_id="case_01",
+            signal_id=sig_id,
+            principal=containment_env["principal_a"],
+        )
 
 
 def test_two_concurrent_application_processes_attempting_same_publication(containment_env: dict[str, Any]) -> None:

@@ -17,6 +17,8 @@ Verifies:
 from __future__ import annotations
 
 import datetime
+import hashlib
+import json
 from collections.abc import Generator
 from datetime import UTC
 from pathlib import Path
@@ -500,6 +502,18 @@ class TestCrossBankIntelligenceWorkflow:
             auth_token=auth_tokens["bank_a"],
         )
         assert signal.signal_id is not None
+        # Promote signal to operational authoritative for evidence ledger admission
+        rec = intel_service._signal_store.get(signal.signal_id)
+        assert rec is not None
+        rec["is_authoritative"] = True
+        rec["is_synthetic"] = False
+        rec["signal_data"]["execution_mode"] = "VERIFIED_OPERATIONAL"
+        rec["signal_data"]["is_authoritative"] = True
+        rec["signal_data"]["is_synthetic"] = False
+        rec["content_hash"] = hashlib.sha256(
+            json.dumps(rec["signal_data"], sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        intel_service._signal_store.set(signal.signal_id, rec)
 
         # 2. Create open investigation case for Bank A
         case = case_svc.create_case(
@@ -575,6 +589,17 @@ class TestCrossBankIntelligenceWorkflow:
             req=query_req,
             auth_token=auth_tokens["bank_a"],
         )
+        rec = intel_service._signal_store.get(signal.signal_id)
+        assert rec is not None
+        rec["is_authoritative"] = True
+        rec["is_synthetic"] = False
+        rec["signal_data"]["execution_mode"] = "VERIFIED_OPERATIONAL"
+        rec["signal_data"]["is_authoritative"] = True
+        rec["signal_data"]["is_synthetic"] = False
+        rec["content_hash"] = hashlib.sha256(
+            json.dumps(rec["signal_data"], sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        intel_service._signal_store.set(signal.signal_id, rec)
 
         # Mutate authoritative record to simulate expiration
         record = intel_service._signal_store.get(signal.signal_id)
@@ -613,6 +638,17 @@ class TestCrossBankIntelligenceWorkflow:
             req=query_req,
             auth_token=auth_tokens["bank_b"],
         )
+        rec_b = intel_service._signal_store.get(signal_b.signal_id)
+        assert rec_b is not None
+        rec_b["is_authoritative"] = True
+        rec_b["is_synthetic"] = False
+        rec_b["signal_data"]["execution_mode"] = "VERIFIED_OPERATIONAL"
+        rec_b["signal_data"]["is_authoritative"] = True
+        rec_b["signal_data"]["is_synthetic"] = False
+        rec_b["content_hash"] = hashlib.sha256(
+            json.dumps(rec_b["signal_data"], sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        intel_service._signal_store.set(signal_b.signal_id, rec_b)
 
         case_a = intel_service.case_service.create_case(title="Bank A Case", bank_id="bank_a")
 
@@ -644,6 +680,17 @@ class TestCrossBankIntelligenceWorkflow:
             req=query_req,
             auth_token=auth_tokens["bank_a"],
         )
+        rec = intel_service._signal_store.get(signal.signal_id)
+        assert rec is not None
+        rec["is_authoritative"] = True
+        rec["is_synthetic"] = False
+        rec["signal_data"]["execution_mode"] = "VERIFIED_OPERATIONAL"
+        rec["signal_data"]["is_authoritative"] = True
+        rec["signal_data"]["is_synthetic"] = False
+        rec["content_hash"] = hashlib.sha256(
+            json.dumps(rec["signal_data"], sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        intel_service._signal_store.set(signal.signal_id, rec)
 
         case = intel_service.case_service.create_case(title="Idempotency Test", bank_id="bank_a")
 

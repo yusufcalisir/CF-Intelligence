@@ -467,6 +467,7 @@ class TestServerIssuedSignalIntegrity:
             consortium_id=test_setup["consortium_id"],
         )
         signal = intel_svc.query_cross_bank_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+        _make_signal_authoritative(intel_svc, signal.signal_id)
 
         # Tamper with signal_data in store
         record = intel_svc._signal_store.get(signal.signal_id)
@@ -502,6 +503,7 @@ class TestServerIssuedSignalIntegrity:
             consortium_id=test_setup["consortium_id"],
         )
         signal = intel_svc.query_cross_bank_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+        _make_signal_authoritative(intel_svc, signal.signal_id)
 
         # Create different consortium
         gov_svc: ConsortiumGovernanceService = test_setup["gov_svc"]
@@ -547,6 +549,7 @@ class TestServerIssuedSignalIntegrity:
             consortium_id=test_setup["consortium_id"],
         )
         signal = intel_svc.query_cross_bank_intelligence(req=req, auth_token=auth_tokens["bank_a"])
+        _make_signal_authoritative(intel_svc, signal.signal_id)
 
         case = case_svc.create_case(title="Revocation Case", bank_id="bank_a")
 
