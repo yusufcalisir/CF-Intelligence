@@ -2970,9 +2970,9 @@ class CrossBankIntelligenceService:
     ) -> str:
         """Compute a canonical SHA-256 fingerprint over case ID, signal ID, notes, and material payload fields."""
         canonical_data: dict[str, Any] = {
-            "case_id": str(case_id).strip(),
-            "signal_id": str(signal_id).strip(),
-            "notes": str(notes).strip() if notes is not None else None,
+            "case_id": case_id.strip(),
+            "signal_id": signal_id.strip(),
+            "notes": notes.strip() if notes is not None else None,
         }
         if extra_payload:
             for k, v in sorted(extra_payload.items()):
@@ -3073,6 +3073,7 @@ class CrossBankIntelligenceService:
                 )
 
             # 3a. Authoritative Signal Content Integrity & Tamper Verification
+            recomputed_hash: str | None = None
             signal_data = record.get("signal_data")
             if signal_data and isinstance(signal_data, dict):
                 recomputed_hash = hashlib.sha256(
