@@ -1652,7 +1652,7 @@ class CrossBankIntelligenceService:
         caller can immediately propagate the failure and terminate the batch request.
         """
         # 1. Never recover from governance, permission, or admission errors
-        if isinstance(exc, PermissionError) or cls._is_governance_authorization_failure(exc):
+        if cls._has_security_or_governance_cause(exc):
             return None
 
         # 2. Extract underlying root causes from exception chain (__cause__ or __context__)
@@ -1661,10 +1661,6 @@ class CrossBankIntelligenceService:
         while curr is not None and len(underlying_causes) < 5:
             underlying_causes.append(curr)
             curr = curr.__cause__ or curr.__context__
-
-        for cause in underlying_causes:
-            if isinstance(cause, PermissionError) or cls._is_governance_authorization_failure(cause):
-                return None
 
         # 3. Check for explicit timeout errors
         is_timeout = False
@@ -1845,6 +1841,36 @@ class CrossBankIntelligenceService:
             "signature",
         )
         return any(marker in msg for marker in gov_markers)
+
+    @classmethod
+    def _is_security_or_governance_failure(cls, exc: BaseException) -> bool:
+        """Determine whether an error represents a non-recoverable security, governance,
+        cryptographic integrity, ticket/receipt, or authorization failure.
+        """
+        if isinstance(exc, PermissionError):
+            return True
+        if cls._is_governance_authorization_failure(exc):
+            return True
+        return isinstance(exc, ConsortiumSecurityError) and not isinstance(
+            exc,
+            (
+                CounterpartyTimeoutError,
+                CounterpartyWorkerUnavailableError,
+                CounterpartyTransportError,
+            ),
+        )
+
+    @classmethod
+    def _has_security_or_governance_cause(cls, exc: BaseException) -> bool:
+        """Check whether the exception or any cause/context in its chain represents a security failure."""
+        curr: BaseException | None = exc
+        depth = 0
+        while curr is not None and depth < 10:
+            if cls._is_security_or_governance_failure(curr):
+                return True
+            curr = curr.__cause__ or curr.__context__
+            depth += 1
+        return False
 
     def query_multi_counterparty_intelligence(
         self,
@@ -2284,17 +2310,17 @@ class CrossBankIntelligenceService:
                     )
                     completed_targets.append(clean_target)
                 except Exception as exc:
-                    # Check if failure is demonstrably pre-dispatch
-                    is_pre_dispatch = False
-                    if isinstance(exc, CounterpartyDeadlineExceededError) and exc.is_pre_dispatch:
-                        is_pre_dispatch = True
-                    else:
-                        curr_exc: BaseException | None = exc
-                        while curr_exc is not None:
-                            if isinstance(curr_exc, CounterpartyDeadlineExceededError) and curr_exc.is_pre_dispatch:
-                                is_pre_dispatch = True
-                                break
-                            curr_exc = curr_exc.__cause__ or curr_exc.__context__
+                    # Security-First Classification Rule (M6.4 Task 4 Correction A):
+                    # 1. Explicit security, integrity, authorization, and governance failures take absolute
+                    #    precedence over timeout causes and must NEVER be treated as pre-dispatch timeouts.
+                    # 2. A pre-dispatch designation is trusted ONLY when the top-level exception itself is
+                    #    a CounterpartyDeadlineExceededError with is_pre_dispatch=True and contains no security cause.
+                    is_security_failure = self._has_security_or_governance_cause(exc)
+                    is_pre_dispatch = (
+                        not is_security_failure
+                        and isinstance(exc, CounterpartyDeadlineExceededError)
+                        and getattr(exc, "is_pre_dispatch", False) is True
+                    )
 
                     if is_pre_dispatch:
                         if clean_target in dispatched_targets:

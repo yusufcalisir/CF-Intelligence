@@ -36,8 +36,10 @@ from app.application.services.cross_bank_intelligence import (
     compute_multi_counterparty_request_fingerprint,
 )
 from app.application.services.entity_resolution import EntityResolutionService, _entity_to_dict
+from app.application.services.isolated_matching_service import InstitutionalCoordinatorClient
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
+    CounterpartyDeadlineExceededError,
     CounterpartyTimeoutError,
     CounterpartyWorkerUnavailableError,
     CrossBankIdempotencyConflictError,
@@ -954,3 +956,166 @@ def test_coordinator_client_and_worker_client_error_messages_do_not_leak_interna
         assert "internal-secret-worker" not in err
         assert "secret_token_123" not in err
         assert "bank_b" in err
+
+
+# =========================================================================
+# 11. Security Exception Laundering Prevention (Correction A)
+# =========================================================================
+
+def test_adversarial_security_exception_with_chained_pre_dispatch_deadline_never_laundered_into_timeout(
+    test_setup: tuple[CrossBankIntelligenceService, Entity, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    svc, test_entity, c_id = test_setup
+    idem_key = "idem-security-laundering-adversarial-001"
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=test_entity.id,
+        privacy_id=test_entity.privacy_id,
+        consortium_id=c_id,
+        target_bank_ids=["bank_b", "bank_c"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="SIMULATED_RESEARCH",
+        idempotency_key=idem_key,
+    )
+
+    def adversarial_execution(req: CrossBankIntelligenceQueryRequest | None = None, *a: Any, **kw: Any) -> CrossBankIntelligenceSignal:
+        assert req is not None
+        if req.target_bank_id == "bank_b":
+            return _mock_signal(req, match_confirmed=True)
+        # Bank C raises ConsortiumSecurityError for cryptographic signature failure
+        # with an explicitly chained CounterpartyDeadlineExceededError(is_pre_dispatch=True) cause!
+        pre_deadline = CounterpartyDeadlineExceededError(
+            message="Execution deadline exceeded during probe",
+            target_bank_id="bank_c",
+            is_pre_dispatch=True,
+        )
+        sec_err = ConsortiumSecurityError("Cryptographic signature verification failed: invalid ed25519 signature")
+        sec_err.__cause__ = pre_deadline
+        raise sec_err
+
+    with patch.object(svc, "query_cross_bank_intelligence", side_effect=adversarial_execution):
+        # 1. Security rejection must propagate and NOT be swallowed or converted into PARTIAL_FAILURE
+        with pytest.raises(ConsortiumSecurityError, match="invalid ed25519 signature"):
+            svc.query_multi_counterparty_intelligence(
+                req=req,
+                auth_token=auth_tokens["bank_a"],
+            )
+
+    # 2. Bank B completed before crash -> committed
+    b_budget = svc.budget_store.get_budget(c_id, "bank_a", "bank_b")
+    assert b_budget is not None and b_budget["consumed_executions"] == 1
+    assert b_budget["in_flight_reservations"] == 0
+
+    # 3. Bank C failed closed -> consumed as indeterminate, NOT refunded
+    c_budget = svc.budget_store.get_budget(c_id, "bank_a", "bank_c")
+    assert c_budget is not None and c_budget["consumed_executions"] == 1
+    assert c_budget["in_flight_reservations"] == 0
+
+    # 4. Idempotency store must record indeterminate / AMBIGUOUS_EXECUTION state and reject replay
+    with pytest.raises(CrossBankIdempotencyConflictError, match="indeterminate state"):
+        svc.query_multi_counterparty_intelligence(
+            req=req,
+            auth_token=auth_tokens["bank_a"],
+        )
+
+
+# =========================================================================
+# 12. Real Local HTTP Timeout Enforcement (Correction B)
+# =========================================================================
+
+def test_real_loopback_http_coordinator_health_timeout_enforcement(
+    test_setup: tuple[CrossBankIntelligenceService, Entity, str],
+    auth_tokens: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    svc, test_entity, c_id = test_setup
+    import http.server
+    import threading
+    import time
+
+    received_paths: list[str] = []
+
+    class SlowHealthHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, format_str: str, *args: Any) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            received_paths.append(self.path)
+            if self.path == "/health":
+                # Deliberately delay response past the client timeout
+                time.sleep(2.0)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"status":"ok"}')
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        def do_POST(self) -> None:
+            received_paths.append(self.path)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{}')
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), SlowHealthHandler)
+    port = server.server_port
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+
+    loopback_url = f"http://127.0.0.1:{port}"
+    monkeypatch.setenv("CFI_COORDINATOR_URL", loopback_url)
+
+    try:
+        # 1. Exercise real InstitutionalCoordinatorClient.health_check over urllib.request with bounded timeout
+        coord_client = InstitutionalCoordinatorClient(loopback_url)
+        with pytest.raises(CounterpartyTimeoutError) as exc_info:
+            coord_client.health_check(timeout=0.3)
+        err_msg = str(exc_info.value)
+        assert "Coordinator probe timed out" in err_msg
+        assert loopback_url not in err_msg  # Sanitized URL check
+
+        # 2. Exercise through multi-counterparty service with 1.0s timeout
+        req = MultiCounterpartyIntelligenceQueryRequest(
+            requesting_bank_id="bank_a",
+            query_entity_id=test_entity.id,
+            privacy_id=test_entity.privacy_id,
+            consortium_id=c_id,
+            target_bank_ids=["bank_b"],
+            purpose="AML_COLLABORATIVE_INVESTIGATION",
+            execution_mode="VERIFIED_OPERATIONAL",
+            per_counterparty_timeout_seconds=1.0,
+            total_batch_timeout_seconds=5.0,
+        )
+
+        resp = svc.query_multi_counterparty_intelligence(
+            req=req,
+            auth_token=auth_tokens["bank_a"],
+        )
+
+        # 3. Verify actual network timeout and sanitized error classification
+        assert resp.overall_outcome == "FAILED"
+        assert "bank_b" in resp.failures
+        b_fail = resp.failures["bank_b"]
+        assert b_fail.error_category == "TIMEOUT"
+        assert "before counterpart dispatch" in b_fail.error_message
+        assert loopback_url not in b_fail.error_message
+
+        # 4. Verify /coordinator/execute-match was NEVER invoked on loopback HTTP server
+        assert "/health" in received_paths
+        assert not any("execute-match" in p for p in received_paths)
+
+        # 5. Confirm budget reservation released cleanly without extra PSI execution
+        b_budget = svc.budget_store.get_budget(c_id, "bank_a", "bank_b")
+        assert b_budget is not None and b_budget["consumed_executions"] == 0
+        assert b_budget["in_flight_reservations"] == 0
+
+    finally:
+        # 6. Clean shutdown of loopback server, no leaked threads or sockets
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=3.0)
+
