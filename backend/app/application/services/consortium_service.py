@@ -83,8 +83,8 @@ def compute_pairwise_grant_scope_digest(
             for k, v in sorted(institution_jurisdictions.items())
         },
         "allowed_jurisdictions": sorted(list(set(j.strip() for j in allowed_jurisdictions))),
-        "allow_cross_border": bool(allow_cross_border),
-        "allow_institution_identity_sharing": bool(allow_institution_identity_sharing),
+        "allow_cross_border": allow_cross_border,
+        "allow_institution_identity_sharing": allow_institution_identity_sharing,
     }
     canonical_bytes = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(canonical_bytes).hexdigest()

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import datetime
+from collections.abc import Generator
 from datetime import UTC
 from pathlib import Path
 from typing import Any
@@ -62,7 +63,9 @@ SHARED_COORDINATOR_SECRET = "coordinator_secret_unit_test_8392173491827"
 
 
 @pytest.fixture
-def unit_pilot_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+def unit_pilot_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Generator[dict[str, Any], None, None]:
     consortium_store_file = tmp_path / "unit_pilot_consortium_store.json"
     account_store_file = tmp_path / "unit_pilot_account_store.json"
     pilot_db_file = tmp_path / "unit_pilot_operations.db"
