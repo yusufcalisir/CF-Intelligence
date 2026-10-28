@@ -575,7 +575,17 @@ def test_consent_revocation_before_evidence_attachment(tmp_path):
         },
     }
     intel_svc._admitted_receipts_store.set(
-        "rcp_ev_gov_test", {"admitted_at": now.isoformat(), "signal_id": signal_id}
+        "rcp_ev_gov_test",
+        {
+            "admitted_at": now.isoformat(),
+            "signal_id": signal_id,
+            "receipt_id": "rcp_ev_gov_test",
+            "content_hash": record["content_hash"],
+            "requesting_bank_id": "bank_a",
+            "target_bank_id": "bank_b",
+            "consortium_id": consortium.consortium_id,
+            "execution_mode": "VERIFIED_OPERATIONAL",
+        },
     )
     RedisStore("authoritative_signals").set(signal_id, record)
 

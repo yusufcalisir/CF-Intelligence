@@ -1170,6 +1170,7 @@ class EvidenceRegistryService:
         content: str,
         uploaded_by: str = "analyst",
         metadata: dict[str, Any] | None = None,
+        expected_case_version: int | None = None,
     ) -> dict[str, Any]:
         """Register new evidence and link to a case with cryptographic hash verification.
 
@@ -1193,6 +1194,11 @@ class EvidenceRegistryService:
                 f"Invalid evidence registration: Case '{case_id}' is finalized in terminal state '{case.status.value}'."
             )
         old_version = getattr(case, "version", 1)
+        if expected_case_version is not None and old_version != expected_case_version:
+            raise InvalidCaseTransitionError(
+                f"Precondition failed: Case '{case_id}' was concurrently modified before registering evidence "
+                f"(expected version {expected_case_version}, current {old_version})."
+            )
 
         meta = metadata or {}
         # 1a. Contain Unverified Protocol Prototype Records across ALL Case States
@@ -1335,7 +1341,7 @@ class EvidenceRegistryService:
         success = self._case_service._cases.update_conditional(
             case.id,
             _case_to_dict(case),
-            expected_version=old_version,
+            expected_version=expected_case_version if expected_case_version is not None else old_version,
         )
         if not success:
             # Roll back orphaned evidence record and remove file ONLY if this invocation created it

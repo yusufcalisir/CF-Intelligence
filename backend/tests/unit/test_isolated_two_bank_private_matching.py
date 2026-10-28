@@ -747,7 +747,17 @@ class TestAuthoritativeEvidenceBinding:
             },
         )
         intel_svc._admitted_receipts_store.set(
-            f"rcp_{auth_sig_id}", {"admitted_at": datetime.datetime.now(datetime.UTC).isoformat(), "signal_id": auth_sig_id}
+            f"rcp_{auth_sig_id}",
+            {
+                "admitted_at": datetime.datetime.now(datetime.UTC).isoformat(),
+                "signal_id": auth_sig_id,
+                "receipt_id": f"rcp_{auth_sig_id}",
+                "content_hash": content_hash,
+                "requesting_bank_id": "bank_a",
+                "target_bank_id": "bank_b",
+                "consortium_id": consortium_id,
+                "execution_mode": "VERIFIED_OPERATIONAL",
+            },
         )
 
         attach_resp = intel_svc.attach_signal_to_case_evidence(
@@ -853,7 +863,17 @@ class TestAuthoritativeEvidenceBinding:
             },
         )
         intel_svc._admitted_receipts_store.set(
-            f"rcp_{auth_sig_id}", {"admitted_at": datetime.datetime.now(datetime.UTC).isoformat(), "signal_id": auth_sig_id}
+            f"rcp_{auth_sig_id}",
+            {
+                "admitted_at": datetime.datetime.now(datetime.UTC).isoformat(),
+                "signal_id": auth_sig_id,
+                "receipt_id": f"rcp_{auth_sig_id}",
+                "content_hash": content_hash,
+                "requesting_bank_id": "bank_a",
+                "target_bank_id": "bank_b",
+                "consortium_id": consortium_id,
+                "execution_mode": "VERIFIED_OPERATIONAL",
+            },
         )
 
         case = case_svc.create_case(title="Idempotent Target Case", bank_id="bank_a")

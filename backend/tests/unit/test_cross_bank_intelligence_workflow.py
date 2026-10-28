@@ -486,7 +486,17 @@ def _promote_to_authoritative_operational(intel_service: CrossBankIntelligenceSe
     rcp_id = rec.get("receipt_id") or f"rcp_{signal_id}"
     rec["receipt_id"] = rcp_id
     intel_service._admitted_receipts_store.set(
-        rcp_id, {"admitted_at": datetime.datetime.now(UTC).isoformat(), "signal_id": signal_id}
+        rcp_id,
+        {
+            "admitted_at": datetime.datetime.now(UTC).isoformat(),
+            "signal_id": signal_id,
+            "receipt_id": rcp_id,
+            "content_hash": rec["content_hash"],
+            "requesting_bank_id": rec.get("requesting_bank_id"),
+            "target_bank_id": rec.get("target_bank_id"),
+            "consortium_id": rec.get("consortium_id"),
+            "execution_mode": "VERIFIED_OPERATIONAL",
+        },
     )
     intel_service._signal_store.set(signal_id, rec)
 

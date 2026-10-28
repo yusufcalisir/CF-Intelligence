@@ -265,7 +265,17 @@ def _make_signal_authoritative(intel_svc: CrossBankIntelligenceService, signal_i
     rcp_id = record.get("receipt_id") or f"rcp_{signal_id}"
     record["receipt_id"] = rcp_id
     intel_svc._admitted_receipts_store.set(
-        rcp_id, {"admitted_at": datetime.datetime.now(UTC).isoformat(), "signal_id": signal_id}
+        rcp_id,
+        {
+            "admitted_at": datetime.datetime.now(UTC).isoformat(),
+            "signal_id": signal_id,
+            "receipt_id": rcp_id,
+            "content_hash": record["content_hash"],
+            "requesting_bank_id": record.get("requesting_bank_id"),
+            "target_bank_id": record.get("target_bank_id"),
+            "consortium_id": record.get("consortium_id"),
+            "execution_mode": "VERIFIED_OPERATIONAL",
+        },
     )
     intel_svc._signal_store.set(signal_id, record)
 

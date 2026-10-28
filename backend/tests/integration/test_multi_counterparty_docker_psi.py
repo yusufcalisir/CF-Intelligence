@@ -675,7 +675,7 @@ def test_multi_counterparty_docker_psi_circuit_breaker_recovery(
             require_established_psi=True,
             circuit_breaker_enabled=True,
             circuit_breaker_failure_threshold=1,
-            circuit_breaker_cooldown_seconds=0.2,
+            circuit_breaker_cooldown_seconds=3.0,
         )
 
         resp1 = cbi_service.query_multi_counterparty_intelligence(req=req_fail, auth_token=token_a)
@@ -708,7 +708,7 @@ def test_multi_counterparty_docker_psi_circuit_breaker_recovery(
             except Exception:
                 time.sleep(0.5)
         assert healthy, "Worker C container failed to reach healthy state within 20s"
-        time.sleep(0.3)  # ensure 0.2s cooldown has elapsed
+        time.sleep(2.0)  # ensure 3.0s cooldown has elapsed
 
         # 4. Dispatch recovery probe: Bank C executes genuine operational PSI and recovers!
         resp3 = cbi_service.query_multi_counterparty_intelligence(req=req_fail, auth_token=token_a)

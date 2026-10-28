@@ -15,6 +15,7 @@ Verifies:
 
 from __future__ import annotations
 
+import concurrent.futures
 import datetime
 import hashlib
 import json
@@ -288,7 +289,22 @@ def _create_verified_operational_signal_record(
         and publication_status == "PUBLISHED"
         and is_attachable is True
     ):
-        cbi_svc._admitted_receipts_store.set(rcp_id, {"admitted_at": now.isoformat(), "signal_id": sig_id})
+        cbi_svc._admitted_receipt_ids.add(rcp_id)
+        cbi_svc._admitted_receipts_store.set(
+            rcp_id,
+            {
+                "admitted_at": now.isoformat(),
+                "signal_id": sig_id,
+                "receipt_id": rcp_id,
+                "content_hash": content_hash,
+                "requesting_bank_id": requesting_bank_id,
+                "target_bank_id": target_bank_id,
+                "consortium_id": consortium_id,
+                "query_entity_id": query_entity_id,
+                "execution_mode": execution_mode,
+                "assurance_level": assurance_level,
+            },
+        )
 
     cbi_svc._signal_store.set(sig_id, record)
     return sig_id, record
@@ -1117,4 +1133,408 @@ class TestAuthoritativeEvidenceAdmission:
         assert sig_content["contributing_institutions"] == ["bank_b"]
         assert persisted_content["provenance"]["target_bank_id"] == "bank_b"
         assert persisted_content["provenance"]["contributing_institutions"] == ["bank_b"]
+
+    def test_adversarial_stolen_receipt_attachment_rejected(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction A: Storing receipt R from authentic signal A onto signal B fails closed even if R is in memory."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        case = case_svc.create_case(title="Stolen Receipt Defense Case", bank_id="bank_a")
+
+        # 1. Authentic signal A admitted with receipt R
+        sig_id_a, rec_a = _create_verified_operational_signal_record(
+            cbi_svc,
+            requesting_bank_id="bank_a",
+            target_bank_id="bank_b",
+        )
+        receipt_r = rec_a["receipt_id"]
+        assert receipt_r in cbi_svc._admitted_receipt_ids
+
+        # 2. Fabricate signal B pointing to receipt R with affirmative flags
+        sig_id_b = f"sig_stolen_{uuid.uuid4().hex}"
+        sig_data_b = dict(rec_a["signal_data"])
+        sig_data_b["signal_id"] = sig_id_b
+        sig_data_b["provenance"] = dict(rec_a["signal_data"]["provenance"])
+        sig_data_b["provenance"]["receipt_id"] = receipt_r
+        content_hash_b = hashlib.sha256(
+            json.dumps(sig_data_b, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+
+        rec_b = dict(rec_a)
+        rec_b["signal_id"] = sig_id_b
+        rec_b["signal_data"] = sig_data_b
+        rec_b["content_hash"] = content_hash_b
+        rec_b["receipt_id"] = receipt_r
+        cbi_svc._signal_store.set(sig_id_b, rec_b)
+
+        # 3. Attachment of B must fail closed: receipt R is bound to signal A, not B
+        with pytest.raises(ConsortiumSecurityError, match="Cryptographic admission binding mismatch"):
+            cbi_svc.attach_signal_to_case_evidence(
+                case_id=case.id,
+                signal_id=sig_id_b,
+                principal=principal_a,
+            )
+
+    def test_adversarial_tampered_signal_content_with_recomputed_hash_rejected_by_trusted_issuance_digest(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction A: Modifying authentic signal content and recomputing hash in store fails against trusted admission digest."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        case = case_svc.create_case(title="Mutated Content Defense Case", bank_id="bank_a")
+
+        # 1. Authentic signal A admitted with receipt R
+        sig_id_a, rec_a = _create_verified_operational_signal_record(
+            cbi_svc,
+            requesting_bank_id="bank_a",
+            target_bank_id="bank_b",
+        )
+
+        # 2. Mutate signal data content and recompute hash in signal store
+        rec_a["signal_data"]["match_category"] = "HIGH_CONFIDENCE_MATCH"
+        rec_a["signal_data"]["sanitized_risk_level"] = "CRITICAL"
+        recomputed_hash = hashlib.sha256(
+            json.dumps(rec_a["signal_data"], sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        rec_a["content_hash"] = recomputed_hash
+        cbi_svc._signal_store.set(sig_id_a, rec_a)
+
+        # 3. Attachment must fail closed because recomputed_hash != trusted_content_hash in admitted_receipts_store
+        with pytest.raises(ConsortiumSecurityError, match="diverges from cryptographically admitted issuance digest"):
+            cbi_svc.attach_signal_to_case_evidence(
+                case_id=case.id,
+                signal_id=sig_id_a,
+                principal=principal_a,
+            )
+
+    def test_idempotency_same_key_different_notes_raises_conflict(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction B: Same idempotency key with materially altered notes raises CrossBankIdempotencyConflictError."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        case = case_svc.create_case(title="Idempotency Material Conflict Case", bank_id="bank_a")
+        sig_id, _ = _create_verified_operational_signal_record(cbi_svc, requesting_bank_id="bank_a")
+
+        # 1. Attach with initial note
+        resp1 = cbi_svc.attach_signal_to_case_evidence(
+            case_id=case.id,
+            signal_id=sig_id,
+            principal=principal_a,
+            idempotency_key="idemp_key_notes_test",
+            notes="Initial investigation finding: High risk correlation.",
+        )
+        assert resp1.is_duplicate_submission is False
+
+        # 2. Replay with identical note succeeds idempotently
+        resp2 = cbi_svc.attach_signal_to_case_evidence(
+            case_id=case.id,
+            signal_id=sig_id,
+            principal=principal_a,
+            idempotency_key="idemp_key_notes_test",
+            notes="Initial investigation finding: High risk correlation.",
+        )
+        assert resp2.is_duplicate_submission is True
+        assert resp2.evidence_id == resp1.evidence_id
+
+        # 3. Reuse same key with altered note raises typed conflict
+        with pytest.raises(CrossBankIdempotencyConflictError, match="altered material attachment payload"):
+            cbi_svc.attach_signal_to_case_evidence(
+                case_id=case.id,
+                signal_id=sig_id,
+                principal=principal_a,
+                idempotency_key="idemp_key_notes_test",
+                notes="Altered conflicting note: Cleared of suspicion.",
+            )
+
+    def test_cas_concurrency_conflict_recovery_with_matching_fingerprint_returns_duplicate(
+        self, admission_env: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Correction B: CAS recovery path detects matching fingerprint under same key and returns duplicate."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        evidence_svc: EvidenceRegistryService = admission_env["evidence_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        case = case_svc.create_case(title="CAS Concurrency Match Case", bank_id="bank_a")
+        sig_id, _ = _create_verified_operational_signal_record(cbi_svc, requesting_bank_id="bank_a")
+
+        orig_register = evidence_svc.register_evidence
+        matching_fp = CrossBankIntelligenceService._compute_evidence_attachment_fingerprint(
+            case_id=case.id,
+            signal_id=sig_id,
+            notes="Identical Concurrent Note",
+        )
+
+        def mock_register(*args: Any, **kwargs: Any):
+            orig_register(
+                case_id=case.id,
+                evidence_type="CROSS_BANK_INTELLIGENCE",
+                title="Concurrent attachment",
+                file_path=f"storage/evidence/case_{case.id}_match_{uuid.uuid4().hex[:8]}.json",
+                content="{}",
+                uploaded_by=principal_a.principal_id,
+                metadata={
+                    "idempotency_key": "cas_match_key_001",
+                    "signal_id": sig_id,
+                    "attachment_fingerprint": matching_fp,
+                },
+            )
+            raise InvalidCaseTransitionError("Precondition failed: concurrent modification")
+
+        monkeypatch.setattr(evidence_svc, "register_evidence", mock_register)
+
+        # Attempt to attach with matching note; CAS recovery detects duplicate and succeeds
+        resp = cbi_svc.attach_signal_to_case_evidence(
+            case_id=case.id,
+            signal_id=sig_id,
+            principal=principal_a,
+            idempotency_key="cas_match_key_001",
+            notes="Identical Concurrent Note",
+        )
+        assert resp.is_duplicate_submission is True
+        assert resp.signal_id == sig_id
+
+    def test_cas_concurrency_conflict_recovery_with_differing_notes_raises_idempotency_conflict(
+        self, admission_env: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Correction B: CAS recovery path detects altered notes under same key and raises conflict."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        evidence_svc: EvidenceRegistryService = admission_env["evidence_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        case = case_svc.create_case(title="CAS Concurrency Notes Conflict Case", bank_id="bank_a")
+        sig_id, _ = _create_verified_operational_signal_record(cbi_svc, requesting_bank_id="bank_a")
+
+        orig_register = evidence_svc.register_evidence
+        committed_fp = CrossBankIntelligenceService._compute_evidence_attachment_fingerprint(
+            case_id=case.id,
+            signal_id=sig_id,
+            notes="Committed Note by Worker 1",
+        )
+
+        def mock_register(*args: Any, **kwargs: Any):
+            orig_register(
+                case_id=case.id,
+                evidence_type="CROSS_BANK_INTELLIGENCE",
+                title="Concurrent attachment",
+                file_path=f"storage/evidence/case_{case.id}_concurrent_{uuid.uuid4().hex[:8]}.json",
+                content="{}",
+                uploaded_by=principal_a.principal_id,
+                metadata={
+                    "idempotency_key": "cas_notes_key_001",
+                    "signal_id": sig_id,
+                    "attachment_fingerprint": committed_fp,
+                },
+            )
+            raise InvalidCaseTransitionError("Precondition failed: concurrent modification")
+
+        monkeypatch.setattr(evidence_svc, "register_evidence", mock_register)
+
+        # Attempt to attach under same key with different notes; CAS recovery must catch fingerprint conflict
+        with pytest.raises(CrossBankIdempotencyConflictError, match="altered material attachment payload"):
+            cbi_svc.attach_signal_to_case_evidence(
+                case_id=case.id,
+                signal_id=sig_id,
+                principal=principal_a,
+                idempotency_key="cas_notes_key_001",
+                notes="Conflicting Note by Worker 2",
+            )
+
+    def test_real_concurrent_evidence_attachments_with_independent_service_instances(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction B: Independent service instances executing concurrent attachments on shared storage."""
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        evidence_svc: EvidenceRegistryService = admission_env["evidence_svc"]
+        gov_svc: ConsortiumGovernanceService = admission_env["gov_svc"]
+        entity_svc: EntityResolutionService = admission_env["entity_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        inst_1 = CrossBankIntelligenceService(
+            consortium_service=gov_svc,
+            case_service=case_svc,
+            evidence_service=evidence_svc,
+            entity_service=entity_svc,
+        )
+        inst_2 = CrossBankIntelligenceService(
+            consortium_service=gov_svc,
+            case_service=case_svc,
+            evidence_service=evidence_svc,
+            entity_service=entity_svc,
+        )
+
+        case = case_svc.create_case(title="Real Concurrency Case", bank_id="bank_a")
+        sig_id, _ = _create_verified_operational_signal_record(inst_1, requesting_bank_id="bank_a")
+
+        # Part 1: Concurrent identical attachment
+        results: list[CrossBankEvidenceAttachResponse] = []
+        errors: list[Exception] = []
+
+        def worker_call(service: CrossBankIntelligenceService, key: str, note: str) -> None:
+            try:
+                resp = service.attach_signal_to_case_evidence(
+                    case_id=case.id,
+                    signal_id=sig_id,
+                    principal=principal_a,
+                    idempotency_key=key,
+                    notes=note,
+                )
+                results.append(resp)
+            except Exception as exc:
+                errors.append(exc)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            fut1 = executor.submit(worker_call, inst_1, "real_concurrent_key_001", "Identical note")
+            fut2 = executor.submit(worker_call, inst_2, "real_concurrent_key_001", "Identical note")
+            concurrent.futures.wait([fut1, fut2])
+
+        assert len(errors) == 0
+        assert len(results) == 2
+        assert results[0].evidence_id == results[1].evidence_id
+        assert results[0].signal_id == sig_id
+        assert results[1].signal_id == sig_id
+
+        case_evidence = evidence_svc.get_case_evidence(case.id)
+        assert len(case_evidence) == 1
+        assert case_evidence[0]["id"] == results[0].evidence_id
+
+        # Part 2: Concurrent conflicting attachment with same key but differing notes
+        results_conflict: list[CrossBankEvidenceAttachResponse] = []
+        errors_conflict: list[Exception] = []
+
+        case_2 = case_svc.create_case(title="Real Concurrency Conflict Case", bank_id="bank_a")
+        sig_id_2, _ = _create_verified_operational_signal_record(inst_1, requesting_bank_id="bank_a")
+
+        def worker_call_conflict(service: CrossBankIntelligenceService, key: str, note: str) -> None:
+            try:
+                resp = service.attach_signal_to_case_evidence(
+                    case_id=case_2.id,
+                    signal_id=sig_id_2,
+                    principal=principal_a,
+                    idempotency_key=key,
+                    notes=note,
+                )
+                results_conflict.append(resp)
+            except Exception as exc:
+                errors_conflict.append(exc)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            fut1 = executor.submit(worker_call_conflict, inst_1, "conflict_concurrent_key", "Note from Thread 1")
+            fut2 = executor.submit(worker_call_conflict, inst_2, "conflict_concurrent_key", "Note from Thread 2")
+            concurrent.futures.wait([fut1, fut2])
+
+        assert len(results_conflict) == 1
+        assert len(errors_conflict) == 1
+        assert isinstance(errors_conflict[0], CrossBankIdempotencyConflictError)
+
+    def test_anonymized_evidence_projection_zero_counterpart_leak_with_injected_identity_text(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction C: Deliberately injected counterpart text in typologies or provenance is completely excluded in anonymized mode."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        evidence_svc: EvidenceRegistryService = admission_env["evidence_svc"]
+        gov_svc: ConsortiumGovernanceService = admission_env["gov_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        def _setup_active_grant(consortia: Any, proposals: Any) -> None:
+            c = consortia["c_admission_test"]
+            if not hasattr(c, "metadata") or c.metadata is None:
+                c.metadata = {}
+            c.metadata["operational_data_sharing_grant"] = {
+                "grant_id": "grant_bilateral_bank_a_bank_b",
+                "is_active": True,
+                "status": "ACTIVE",
+                "revision": 1,
+                "approvals": {"bank_a": True, "bank_b": True},
+                "revoked_by_institutions": [],
+            }
+
+        gov_svc._store.atomic_mutate(_setup_active_grant)
+
+        case = case_svc.create_case(title="Adversarial Anonymized Projection Case", bank_id="bank_a")
+        sig_id, rec = _create_verified_operational_signal_record(
+            cbi_svc,
+            requesting_bank_id="bank_a",
+            target_bank_id="bank_b",
+            disclosure_mode="ANONYMOUS_SUMMARY",
+        )
+
+        # Inject counterpart-identifying strings into typology indicators and provenance references
+        rec["signal_data"]["sanitized_typology_indicators"] = [
+            "CROSS_BANK_ENTITY_OBSERVED",
+            "INJECTED_FLAG_TARGET_BANK_B",
+            "SUSPICIOUS_NODE_BANK_B",
+            "UNRECOGNIZED_UNSAFE_TYPOLOGY",
+        ]
+        rec["signal_data"]["provenance"]["ticket_id"] = "ticket_issued_to_bank_b"
+        rec["signal_data"]["provenance"]["grant_id"] = "grant_bilateral_bank_a_bank_b"
+        rec["signal_data"]["provenance"]["grant_revision"] = 1
+        rec["signal_data"]["provenance"]["receipt_id"] = "rcp_exec_bank_b"
+        rec["ticket_id"] = "ticket_issued_to_bank_b"
+        rec["grant_id"] = "grant_bilateral_bank_a_bank_b"
+        rec["grant_revision"] = 1
+        rec["receipt_id"] = "rcp_exec_bank_b"
+        rec["content_hash"] = hashlib.sha256(
+            json.dumps(rec["signal_data"], sort_keys=True).encode("utf-8")
+        ).hexdigest()
+
+        cbi_svc._admitted_receipts_store.set(
+            "rcp_exec_bank_b",
+            {
+                "admitted_at": datetime.datetime.now(UTC).isoformat(),
+                "signal_id": sig_id,
+                "receipt_id": "rcp_exec_bank_b",
+                "content_hash": rec["content_hash"],
+                "requesting_bank_id": "bank_a",
+                "target_bank_id": "bank_b",
+                "consortium_id": "c_admission_test",
+                "query_entity_id": rec.get("query_entity_id"),
+                "execution_mode": "VERIFIED_OPERATIONAL",
+                "assurance_level": "REVIEWED_ESTABLISHED_PSI_VERIFIED",
+            },
+        )
+        cbi_svc._signal_store.set(sig_id, rec)
+
+        resp = cbi_svc.attach_signal_to_case_evidence(
+            case_id=case.id,
+            signal_id=sig_id,
+            principal=principal_a,
+            notes="Analyst reviewing zero-counterpart leak projection.",
+        )
+
+        ev = evidence_svc.get_evidence(resp.evidence_id)
+        assert ev is not None
+        persisted_content = json.loads(Path(ev["file_path"]).read_text(encoding="utf-8"))
+
+        def assert_no_forbidden_counterpart(data: Any, forbidden: str) -> None:
+            if isinstance(data, str):
+                assert forbidden.lower() not in data.lower(), (
+                    f"Forbidden counterpart identity '{forbidden}' leaked in persisted string: '{data}'"
+                )
+            elif isinstance(data, dict):
+                for k, v in data.items():
+                    assert forbidden.lower() not in k.lower(), (
+                        f"Forbidden counterpart identity '{forbidden}' leaked in dictionary key: '{k}'"
+                    )
+                    assert_no_forbidden_counterpart(v, forbidden)
+            elif isinstance(data, list):
+                for item in data:
+                    assert_no_forbidden_counterpart(item, forbidden)
+
+        assert_no_forbidden_counterpart(persisted_content, "bank_b")
+
+        sig_content = persisted_content["signal_content"]
+        assert sig_content["sanitized_typology_indicators"] == ["CROSS_BANK_ENTITY_OBSERVED"]
+        assert sig_content["target_bank_id"] is None
+        assert sig_content["contributing_institutions"] == []
 

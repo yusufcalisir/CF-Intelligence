@@ -1324,9 +1324,6 @@ class CrossBankIntelligenceService:
                     "Adoption rejection: Cryptographic verification failed for Coordinator relay execution signature."
                 )
 
-        self._admitted_receipt_ids.add(receipt_id)
-        self._admitted_receipts_store.set(receipt_id, {"admitted_at": now.isoformat(), "signal_id": signal.signal_id})
-
         signal_dict = signal.model_dump()
         # Authoritative server-side normalization before persistence
         signal_dict["contributing_institutions_count"] = expected_count
@@ -1349,6 +1346,25 @@ class CrossBankIntelligenceService:
         content_hash = hashlib.sha256(
             json.dumps(signal_dict, sort_keys=True).encode("utf-8")
         ).hexdigest()
+
+        self._admitted_receipt_ids.add(receipt_id)
+        self._admitted_receipts_store.set(
+            receipt_id,
+            {
+                "admitted_at": now.isoformat(),
+                "signal_id": signal.signal_id,
+                "receipt_id": receipt_id,
+                "content_hash": content_hash,
+                "requesting_bank_id": clean_requesting,
+                "target_bank_id": clean_target,
+                "consortium_id": clean_consortium_id,
+                "query_entity_id": expected_req.query_entity_id,
+                "execution_mode": "VERIFIED_OPERATIONAL",
+                "assurance_level": signal_dict.get("assurance_level", "REVIEWED_ESTABLISHED_PSI_VERIFIED"),
+                "grant_id": ticket.get("grant_id"),
+                "ticket_id": ticket.get("ticket_id"),
+            },
+        )
 
         return {
             "signal_id": signal.signal_id,
@@ -2829,8 +2845,25 @@ class CrossBankIntelligenceService:
         except Exception as audit_err:
             logger.warning("Failed to record attachment rejection audit event: %s", audit_err)
 
-    @staticmethod
+    SAFE_TYPOLOGY_ALLOWLIST: set[str] = {
+        "CROSS_BANK_ENTITY_OBSERVED",
+        "MULTI_INSTITUTION_EXPOSURE",
+        "RAPID_HOP_OVERLAP",
+        "BURST_ACTIVITY_OBSERVED",
+        "HIGH_RISK_CORRIDOR",
+        "CIRCULAR_FLOW_OBSERVED",
+        "VELOCITY_ANOMALY",
+        "STRUCTURING_INDICATOR",
+        "COUNTERPARTY_RISK_ELEVATED",
+        "EXACT_MATCH_OBSERVED",
+        "NO_MATCH_OBSERVED",
+        "CROSS_INSTITUTION_ACTIVITY",
+        "HIGH_RISK_JURISDICTION_ACTIVITY",
+    }
+
+    @classmethod
     def _project_evidence_signal_content(
+        cls,
         signal_data: dict[str, Any] | None,
         disclosure_mode: str,
         target_bank_id: str | None,
@@ -2838,13 +2871,29 @@ class CrossBankIntelligenceService:
         """Project an allowlisted, safe signal content representation for case evidence persistence.
 
         Enforces consortium disclosure policy: In non-attributed (anonymized) disclosure modes,
-        counterparty identities (e.g. target_bank_id, contributing_institutions) are strictly excluded
-        from nested provenance, graph context, and payload fields.
+        counterparty identities (e.g. target_bank_id, contributing_institutions, counterpart references
+        in typologies and provenance) are strictly excluded from nested provenance, graph context,
+        and payload fields.
         """
         if not isinstance(signal_data, dict):
             return {}
 
         is_attributed = (disclosure_mode == "ATTRIBUTED_INSTITUTIONS")
+        clean_target = (target_bank_id or "").lower().strip()
+
+        # Validate and sanitize typology indicators
+        raw_typologies = signal_data.get("sanitized_typology_indicators") or []
+        filtered_typologies: list[str] = []
+        for typ in raw_typologies:
+            if not isinstance(typ, str):
+                continue
+            typ_str = typ.strip()
+            # In non-attributed mode, strictly reject any typology leaking counterpart identity
+            if not is_attributed and clean_target and clean_target in typ_str.lower():
+                continue
+            # Validate against safe typology allowlist
+            if typ_str in cls.SAFE_TYPOLOGY_ALLOWLIST or is_attributed:
+                filtered_typologies.append(typ_str)
 
         projected: dict[str, Any] = {
             "signal_id": signal_data.get("signal_id"),
@@ -2858,7 +2907,7 @@ class CrossBankIntelligenceService:
             "contributing_institutions_count": int(signal_data.get("contributing_institutions_count", 0)),
             "disclosure_mode": disclosure_mode,
             "sanitized_risk_level": signal_data.get("sanitized_risk_level", "UNOBSERVED"),
-            "sanitized_typology_indicators": list(signal_data.get("sanitized_typology_indicators", [])),
+            "sanitized_typology_indicators": sorted(filtered_typologies),
             "execution_mode": signal_data.get("execution_mode", "VERIFIED_OPERATIONAL"),
             "assurance_level": signal_data.get("assurance_level", "REVIEWED_ESTABLISHED_PSI_VERIFIED"),
             "attestation_status": signal_data.get("attestation_status", "SOFTWARE_CONTAINER_VERIFIED"),
@@ -2903,9 +2952,41 @@ class CrossBankIntelligenceService:
             else:
                 sanitized_prov["target_bank_id"] = None
                 sanitized_prov["contributing_institutions"] = []
+                for field in ("ticket_id", "grant_id", "receipt_id"):
+                    val = sanitized_prov.get(field)
+                    if val and isinstance(val, str) and clean_target and clean_target in val.lower():
+                        prefix = field.split("_")[0]
+                        sanitized_prov[field] = f"{prefix}_anon_{hashlib.sha256(val.encode('utf-8')).hexdigest()[:16]}"
             projected["provenance"] = sanitized_prov
 
         return projected
+
+    @staticmethod
+    def _compute_evidence_attachment_fingerprint(
+        case_id: str,
+        signal_id: str,
+        notes: str | None = None,
+        extra_payload: dict[str, Any] | None = None,
+    ) -> str:
+        """Compute a canonical SHA-256 fingerprint over case ID, signal ID, notes, and material payload fields."""
+        canonical_data: dict[str, Any] = {
+            "case_id": str(case_id).strip(),
+            "signal_id": str(signal_id).strip(),
+            "notes": str(notes).strip() if notes is not None else None,
+        }
+        if extra_payload:
+            for k, v in sorted(extra_payload.items()):
+                if k not in (
+                    "auth_token",
+                    "principal",
+                    "idempotency_key",
+                    "actor",
+                    "caller_bank_id",
+                    "case_bank",
+                ):
+                    canonical_data[k] = v
+        serialized = json.dumps(canonical_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(serialized).hexdigest()
 
     def attach_signal_to_case_evidence(
         self,
@@ -2947,6 +3028,7 @@ class CrossBankIntelligenceService:
             case = self.case_service.get_case(case_id)
             if not case:
                 raise CaseNotFoundError(f"Case '{case_id}' not found.")
+            initial_case_version = getattr(case, "version", 1)
 
             eff_case_bank = str(getattr(case, "bank_id", "") or "").lower().strip()
             if not eff_case_bank:
@@ -3190,43 +3272,7 @@ class CrossBankIntelligenceService:
                         f"Authoritative signal '{resolved_signal_id}' signal_data execution_mode is not 'VERIFIED_OPERATIONAL' ({signal_data.get('execution_mode')})."
                     )
 
-            # 3f. Authoritative Issuance / Cryptographic Admission Chain Verification
-            receipt_id = (
-                record.get("receipt_id")
-                or (record.get("receipt", {}).get("receipt_id") if isinstance(record.get("receipt"), dict) else None)
-                or (signal_data.get("provenance", {}).get("receipt_id") if isinstance(signal_data, dict) and isinstance(signal_data.get("provenance"), dict) else None)
-                or (record.get("provenance", {}).get("receipt_id") if isinstance(record.get("provenance"), dict) else None)
-            )
-            if not receipt_id:
-                raise ConsortiumSecurityError(
-                    f"Authoritative signal '{resolved_signal_id}' lacks authentic cryptographic receipt reference. "
-                    "Unattested signals cannot be admitted into institutional evidence."
-                )
-
-            is_admitted_in_registry = False
-            if receipt_id in self._admitted_receipt_ids:
-                is_admitted_in_registry = True
-            admitted_receipt = self._admitted_receipts_store.get(receipt_id)
-            if admitted_receipt and isinstance(admitted_receipt, dict) and admitted_receipt.get("signal_id") == resolved_signal_id:
-                is_admitted_in_registry = True
-
-            is_finalized_in_pilot = False
-            if record.get("reservation_id") and record.get("pilot_id"):
-                from app.application.services.pilot_operations_service import PilotOperationsService
-                pilot_svc = PilotOperationsService.get_instance()
-                durable_res = pilot_svc.store.get_query_reservation(record["reservation_id"])
-                if durable_res and durable_res.get("status") == "PUBLISHED" and durable_res.get("signal_id") == resolved_signal_id:
-                    is_finalized_in_pilot = True
-
-            if not (is_admitted_in_registry or is_finalized_in_pilot):
-                raise ConsortiumSecurityError(
-                    f"Authoritative issuance verification failed for signal '{resolved_signal_id}': "
-                    f"Receipt '{receipt_id}' has no authentic admission entry in cryptographic registry "
-                    "or finalized pilot reservation. "
-                    "Defensible evidence requires verified operational execution and independent cryptographic admission."
-                )
-
-            # 4. Revalidate Current Consortium Governance & Revocation Status
+            # 3f. Revalidate Current Consortium Governance & Active Membership
             consortium = self.consortium_service.get_consortium(consortium_id)
             if not consortium:
                 raise ConsortiumSecurityError(f"Consortium '{consortium_id}' no longer exists.")
@@ -3243,7 +3289,102 @@ class CrossBankIntelligenceService:
                     f"Institution '{eff_case_bank}' is not an active member of consortium '{consortium_id}'."
                 )
 
-            # 4b. Revalidate Operational Data-Sharing Grant & Bilateral Consent
+            # 3g. Authoritative Issuance / Cryptographic Admission Chain Verification
+            receipt_id = (
+                record.get("receipt_id")
+                or (record.get("receipt", {}).get("receipt_id") if isinstance(record.get("receipt"), dict) else None)
+                or (signal_data.get("provenance", {}).get("receipt_id") if isinstance(signal_data, dict) and isinstance(signal_data.get("provenance"), dict) else None)
+                or (record.get("provenance", {}).get("receipt_id") if isinstance(record.get("provenance"), dict) else None)
+            )
+            if not receipt_id:
+                raise ConsortiumSecurityError(
+                    f"Authoritative signal '{resolved_signal_id}' lacks authentic cryptographic receipt reference. "
+                    "Unattested signals cannot be admitted into institutional evidence."
+                )
+
+            # Look up authoritative cryptographic admission record
+            admitted_receipt = self._admitted_receipts_store.get(receipt_id)
+            if not admitted_receipt and (record.get("reservation_id") and record.get("pilot_id")):
+                from app.application.services.pilot_operations_service import PilotOperationsService
+                pilot_svc = PilotOperationsService.get_instance()
+                durable_res = pilot_svc.store.get_query_reservation(record["reservation_id"])
+                if durable_res and durable_res.get("status") == "PUBLISHED" and durable_res.get("signal_id") == resolved_signal_id:
+                    admitted_receipt = {
+                        "receipt_id": receipt_id,
+                        "signal_id": resolved_signal_id,
+                        "requesting_bank_id": durable_res.get("requesting_bank_id"),
+                        "target_bank_id": durable_res.get("target_bank_id"),
+                        "consortium_id": consortium_id,
+                        "content_hash": record.get("content_hash"),
+                        "execution_mode": "VERIFIED_OPERATIONAL",
+                    }
+
+            if not admitted_receipt or not isinstance(admitted_receipt, dict):
+                raise ConsortiumSecurityError(
+                    f"Authoritative issuance verification failed for signal '{resolved_signal_id}': "
+                    f"Receipt '{receipt_id}' has no authentic admission entry in cryptographic registry "
+                    "or finalized pilot reservation. "
+                    "Defensible evidence requires verified operational execution and independent cryptographic admission."
+                )
+
+            # Strict Receipt-to-Signal Binding (Correction A)
+            if admitted_receipt.get("signal_id") != resolved_signal_id:
+                raise ConsortiumSecurityError(
+                    f"Cryptographic admission binding mismatch: Receipt '{receipt_id}' was issued for signal "
+                    f"'{admitted_receipt.get('signal_id')}', cannot be bound to requested signal '{resolved_signal_id}'."
+                )
+
+            # Trusted Issuance Content Digest Verification (Correction A)
+            trusted_content_hash = admitted_receipt.get("content_hash")
+            if trusted_content_hash:
+                if record.get("content_hash") != trusted_content_hash:
+                    raise ConsortiumSecurityError(
+                        f"Authoritative signal '{resolved_signal_id}' content hash '{record.get('content_hash')}' "
+                        f"diverges from cryptographically admitted issuance digest '{trusted_content_hash}' for receipt '{receipt_id}'. "
+                        "Stored record has been mutated or tampered with."
+                    )
+                if recomputed_hash and recomputed_hash != trusted_content_hash:
+                    raise ConsortiumSecurityError(
+                        f"Authoritative signal '{resolved_signal_id}' canonical content digest '{recomputed_hash}' "
+                        f"diverges from cryptographically admitted issuance digest '{trusted_content_hash}' for receipt '{receipt_id}'. "
+                        "Stored signal data has been mutated or tampered with."
+                    )
+
+            # Consistency across Consortium, Requesting Bank, and Counterpart Scope
+            adm_consortium = admitted_receipt.get("consortium_id")
+            if adm_consortium and adm_consortium.lower() != consortium_id.lower():
+                raise ConsortiumSecurityError(
+                    f"Admitted receipt '{receipt_id}' consortium '{adm_consortium}' does not match signal consortium '{consortium_id}'."
+                )
+            adm_requesting = admitted_receipt.get("requesting_bank_id")
+            if adm_requesting and adm_requesting.lower() != eff_case_bank.lower():
+                raise ConsortiumSecurityError(
+                    f"Admitted receipt '{receipt_id}' requesting bank '{adm_requesting}' does not match case bank '{eff_case_bank}'."
+                )
+            adm_target = admitted_receipt.get("target_bank_id")
+            target_bank = (record.get("target_bank_id") or "").lower().strip()
+            if adm_target and target_bank and adm_target.lower() != target_bank:
+                raise ConsortiumSecurityError(
+                    f"Admitted receipt '{receipt_id}' target bank '{adm_target}' does not match signal target bank '{target_bank}'."
+                )
+
+            # Consistency check with Finalized Pilot Reservation if present
+            if record.get("reservation_id") and record.get("pilot_id"):
+                from app.application.services.pilot_operations_service import PilotOperationsService
+                pilot_svc = PilotOperationsService.get_instance()
+                durable_res = pilot_svc.store.get_query_reservation(record["reservation_id"])
+                if not durable_res:
+                    raise ConsortiumSecurityError(f"Pilot reservation '{record['reservation_id']}' not found in durable store.")
+                if durable_res.get("status") != "PUBLISHED":
+                    raise ConsortiumSecurityError(f"Pilot reservation '{record['reservation_id']}' status is '{durable_res.get('status')}', not PUBLISHED.")
+                if durable_res.get("signal_id") != resolved_signal_id:
+                    raise ConsortiumSecurityError(f"Pilot reservation '{record['reservation_id']}' signal_id '{durable_res.get('signal_id')}' does not match '{resolved_signal_id}'.")
+                if durable_res.get("receipt_id") != receipt_id:
+                    raise ConsortiumSecurityError(f"Pilot reservation '{record['reservation_id']}' receipt_id '{durable_res.get('receipt_id')}' does not match '{receipt_id}'.")
+                if durable_res.get("requesting_bank_id", "").lower() != eff_case_bank.lower():
+                    raise ConsortiumSecurityError(f"Pilot reservation requesting bank '{durable_res.get('requesting_bank_id')}' does not match case bank '{eff_case_bank}'.")
+
+            # 4. Revalidate Operational Data-Sharing Grant & Bilateral Consent
             grant_id = record.get("grant_id") or (
                 signal_data.get("provenance", {}).get("grant_id")
                 if isinstance(signal_data, dict)
@@ -3290,7 +3431,13 @@ class CrossBankIntelligenceService:
                         "Evidence attachment denied."
                     )
 
-            # 5. Idempotent Submission Check (Prevent Duplicate Evidence Creation & Enforce Subject Binding)
+            # 5. Idempotent Submission Check (Prevent Duplicate Evidence Creation & Enforce Subject/Material Binding)
+            attachment_fingerprint = self._compute_evidence_attachment_fingerprint(
+                case_id=case_id,
+                signal_id=resolved_signal_id,
+                notes=notes,
+                extra_payload=kwargs,
+            )
             existing_evidence = self.evidence_service.get_case_evidence(case_id)
             for ev in existing_evidence:
                 ev_meta = ev.get("metadata") or {}
@@ -3304,11 +3451,19 @@ class CrossBankIntelligenceService:
                             f"for evidence '{ev['id']}' with signal '{ev_meta.get('signal_id')}', "
                             f"cannot be reused for differing signal '{resolved_signal_id}'."
                         )
+                    ev_fp = ev_meta.get("attachment_fingerprint")
+                    if ev_fp and ev_fp != attachment_fingerprint:
+                        raise CrossBankIdempotencyConflictError(
+                            f"Idempotency conflict for key '{idempotency_key}': Key was already used on case '{case_id}' "
+                            f"for evidence '{ev['id']}' with attachment fingerprint '{ev_fp}', "
+                            f"cannot be reused with altered material attachment payload (fingerprint '{attachment_fingerprint}')."
+                        )
                     logger.info(
-                        "Idempotent attachment replay detected for signal %s on case %s (evidence_id=%s)",
+                        "Idempotent attachment replay detected for signal %s on case %s (evidence_id=%s, fingerprint=%s)",
                         resolved_signal_id,
                         case_id,
                         ev["id"],
+                        attachment_fingerprint,
                     )
                     return CrossBankEvidenceAttachResponse(
                         evidence_id=ev["id"],
@@ -3326,7 +3481,7 @@ class CrossBankIntelligenceService:
 
                 if matched_by_signal:
                     logger.info(
-                        "Idempotent attachment replay detected for signal %s on case %s (evidence_id=%s)",
+                        "Same-signal duplicate attachment detected for signal %s on case %s (evidence_id=%s)",
                         resolved_signal_id,
                         case_id,
                         ev["id"],
@@ -3352,7 +3507,19 @@ class CrossBankIntelligenceService:
                 or "ANONYMOUS_SUMMARY"
             )
 
-            # Build safe allowlisted signal content projection (Correction D)
+            # Ensure attributed disclosure mode is authorized by consortium policy
+            c_meta = getattr(consortium, "metadata", {}) or {}
+            sharing_policy = getattr(consortium, "sharing_policy", None) or c_meta.get("sharing_policy", {})
+            if effective_disclosure_mode == "ATTRIBUTED_INSTITUTIONS" and (
+                sharing_policy.get("allow_institution_identity_sharing") is False
+                or c_meta.get("allow_institution_identity_sharing") is False
+            ):
+                    raise ConsortiumSecurityError(
+                        f"Attributed disclosure mode 'ATTRIBUTED_INSTITUTIONS' denied for signal '{resolved_signal_id}': "
+                        f"Consortium '{consortium_id}' sharing policy explicitly prohibits institution identity sharing."
+                    )
+
+            # Build safe allowlisted signal content projection (Correction C)
             projected_signal_content = self._project_evidence_signal_content(
                 signal_data=signal_data,
                 disclosure_mode=effective_disclosure_mode,
@@ -3381,6 +3548,12 @@ class CrossBankIntelligenceService:
             else:
                 sanitized_provenance["target_bank_id"] = None
                 sanitized_provenance["contributing_institutions"] = []
+                clean_target = (record.get("target_bank_id") or "").lower().strip()
+                for field in ("ticket_id", "grant_id", "receipt_id"):
+                    val = sanitized_provenance.get(field)
+                    if val and isinstance(val, str) and clean_target and clean_target in val.lower():
+                        prefix = field.split("_")[0]
+                        sanitized_provenance[field] = f"{prefix}_anon_{hashlib.sha256(val.encode('utf-8')).hexdigest()[:16]}"
 
             payload = {
                 "signal_id": resolved_signal_id,
@@ -3393,6 +3566,7 @@ class CrossBankIntelligenceService:
                 "attached_by": uploader,
                 "attached_at": now.isoformat(),
                 "idempotency_key": idempotency_key,
+                "attachment_fingerprint": attachment_fingerprint,
                 "is_authoritative": True,
                 "operational_status": "OPERATIONAL",
             }
@@ -3413,10 +3587,13 @@ class CrossBankIntelligenceService:
                         "signal_id": resolved_signal_id,
                         "consortium_id": consortium_id,
                         "idempotency_key": idempotency_key,
+                        "attachment_fingerprint": attachment_fingerprint,
                         "is_authoritative": True,
                         "operational_status": "OPERATIONAL",
                         "disclosure_mode": effective_disclosure_mode,
+                        "notes": notes,
                     },
+                    expected_case_version=initial_case_version,
                 )
             except InvalidCaseTransitionError:
                 fresh_evidence = self.evidence_service.get_case_evidence(case_id)
@@ -3431,6 +3608,13 @@ class CrossBankIntelligenceService:
                                 f"Idempotency conflict for key '{idempotency_key}' during concurrent submission on case '{case_id}': "
                                 f"Key was committed for evidence '{fresh_ev['id']}' with signal '{fresh_meta.get('signal_id')}', "
                                 f"cannot be reused for differing signal '{resolved_signal_id}'."
+                            )
+                        fresh_fp = fresh_meta.get("attachment_fingerprint")
+                        if fresh_fp and fresh_fp != attachment_fingerprint:
+                            raise CrossBankIdempotencyConflictError(
+                                f"Idempotency conflict for key '{idempotency_key}' during concurrent submission on case '{case_id}': "
+                                f"Key was committed for evidence '{fresh_ev['id']}' with attachment fingerprint '{fresh_fp}', "
+                                f"cannot be reused with altered material attachment payload (fingerprint '{attachment_fingerprint}')."
                             )
                         fresh_case = self.case_service.get_case(case_id)
                         return CrossBankEvidenceAttachResponse(
