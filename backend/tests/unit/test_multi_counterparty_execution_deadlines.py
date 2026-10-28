@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -249,7 +250,11 @@ def test_healthy_three_bank_query_completes_within_deadline(
     )
 
     with patch.object(svc, "query_cross_bank_intelligence") as mock_query:
-        mock_query.side_effect = lambda req=None, *a, **kw: _mock_signal(req, match_confirmed=True)
+        def mock_query_impl(req: CrossBankIntelligenceQueryRequest | None = None, *a: Any, **kw: Any) -> CrossBankIntelligenceSignal:
+            assert req is not None
+            return _mock_signal(req, match_confirmed=True)
+
+        mock_query.side_effect = mock_query_impl
 
         resp = svc.query_multi_counterparty_intelligence(
             req=req,
@@ -361,9 +366,10 @@ def test_pre_dispatch_deadline_exhaustion_triggers_zero_remote_execution(
     def mock_mono() -> float:
         return current_mono
 
-    def controlled_execution(req: CrossBankIntelligenceQueryRequest | None = None, *args, **kw):
+    def controlled_execution(req: CrossBankIntelligenceQueryRequest | None = None, *args: Any, **kw: Any) -> CrossBankIntelligenceSignal:
         nonlocal current_mono
         assert req is not None
+        assert req.target_bank_id is not None
         call_count[req.target_bank_id] += 1
         # Bank B execution takes 2.5 seconds, pushing elapsed time past the 2.0s batch deadline
         current_mono += 2.5
@@ -665,9 +671,10 @@ def test_subsecond_remaining_time_pre_dispatch_accounting_bank_b_success_bank_c_
     def mock_mono() -> float:
         return current_mono
 
-    def controlled_execution(req: CrossBankIntelligenceQueryRequest | None = None, *args, **kw):
+    def controlled_execution(req: CrossBankIntelligenceQueryRequest | None = None, *args: Any, **kw: Any) -> CrossBankIntelligenceSignal:
         nonlocal current_mono
         assert req is not None
+        assert req.target_bank_id is not None
         call_count[req.target_bank_id] += 1
         # Bank B completes successfully, taking 2.6 seconds.
         # This leaves 3.0 - 2.6 = 0.4 seconds (< 1.0s minimum supported timeout)
@@ -749,7 +756,11 @@ def test_subsecond_remaining_time_first_target_case_zero_psi_executions(
         patch.object(svc, "_resolve_execution_deadline_policy", side_effect=resolve_hook),
         patch.object(svc, "query_cross_bank_intelligence") as mock_exec,
     ):
-        mock_exec.side_effect = lambda req=None, *a, **kw: _mock_signal(req, match_confirmed=True)
+        def mock_exec_impl(req: CrossBankIntelligenceQueryRequest | None = None, *a: Any, **kw: Any) -> CrossBankIntelligenceSignal:
+            assert req is not None
+            return _mock_signal(req, match_confirmed=True)
+
+        mock_exec.side_effect = mock_exec_impl
         resp = svc.query_multi_counterparty_intelligence(
             req=req,
             auth_token=auth_tokens["bank_a"],
@@ -786,18 +797,15 @@ def test_slow_coordinator_health_probe_honors_remaining_deadline_pre_dispatch(
 
     from app.application.services.isolated_matching_service import InstitutionalCoordinatorClient
 
-    health_probe_called = False
-    execute_match_called = False
+    tracker = {"health_probe_called": False, "execute_match_called": False}
 
     def slow_health_check(self, timeout: float | None = None) -> dict[str, str]:
-        nonlocal health_probe_called
-        health_probe_called = True
+        tracker["health_probe_called"] = True
         # Simulate health probe timing out
         raise CounterpartyTimeoutError("Probe timed out waiting for coordinator response")
 
-    def mock_execute_match(self, *a, **kw):
-        nonlocal execute_match_called
-        execute_match_called = True
+    def mock_execute_match(self, *a: Any, **kw: Any) -> CrossBankIntelligenceSignal:
+        tracker["execute_match_called"] = True
         raise AssertionError("execute_match must NOT be called when health probe times out!")
 
     req = MultiCounterpartyIntelligenceQueryRequest(
@@ -821,8 +829,8 @@ def test_slow_coordinator_health_probe_honors_remaining_deadline_pre_dispatch(
             auth_token=auth_tokens["bank_a"],
         )
 
-        assert health_probe_called is True
-        assert execute_match_called is False
+        assert tracker["health_probe_called"] is True
+        assert tracker["execute_match_called"] is False
         assert resp.overall_outcome == "FAILED"
         assert "bank_b" in resp.failures
         b_fail = resp.failures["bank_b"]
