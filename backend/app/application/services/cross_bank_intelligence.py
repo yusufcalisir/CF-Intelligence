@@ -134,6 +134,12 @@ def compute_multi_counterparty_request_fingerprint(
         canonical_payload["per_counterparty_timeout_seconds"] = float(req.per_counterparty_timeout_seconds)
     if req.total_batch_timeout_seconds is not None:
         canonical_payload["total_batch_timeout_seconds"] = float(req.total_batch_timeout_seconds)
+    if req.circuit_breaker_enabled is not None:
+        canonical_payload["circuit_breaker_enabled"] = bool(req.circuit_breaker_enabled)
+    if req.circuit_breaker_failure_threshold is not None:
+        canonical_payload["circuit_breaker_failure_threshold"] = int(req.circuit_breaker_failure_threshold)
+    if req.circuit_breaker_cooldown_seconds is not None:
+        canonical_payload["circuit_breaker_cooldown_seconds"] = float(req.circuit_breaker_cooldown_seconds)
     if governance_scope:
         canonical_payload["governance_scope"] = governance_scope
 
@@ -1459,7 +1465,7 @@ class CrossBankIntelligenceService:
                 )
 
             if not _circuit_breaker_managed and cb_policy_single and cb_policy_single.enabled and clean_target_single:
-                if self._is_verified_operational_signal(signal):
+                if req.execution_mode == "VERIFIED_OPERATIONAL" and self._is_verified_operational_signal(signal):
                     self.circuit_breaker_store.record_success(
                         consortium_id=clean_consortium_id,
                         requesting_bank_id=clean_requesting,
@@ -1478,16 +1484,26 @@ class CrossBankIntelligenceService:
             return signal
         except Exception as exc:
             if not _circuit_breaker_managed and cb_policy_single and cb_policy_single.enabled and clean_target_single:
-                recoverable = self._classify_recoverable_counterparty_failure(clean_target_single, exc)
-                if recoverable is not None:
-                    self.circuit_breaker_store.record_failure(
-                        consortium_id=clean_consortium_id,
-                        requesting_bank_id=clean_requesting,
-                        target_bank_id=clean_target_single,
-                        error_category=recoverable.error_category,
-                        probe_id=cb_probe_id,
-                        policy=cb_policy_single,
-                    )
+                if req.execution_mode == "VERIFIED_OPERATIONAL":
+                    recoverable = self._classify_recoverable_counterparty_failure(clean_target_single, exc)
+                    if recoverable is not None:
+                        self.circuit_breaker_store.record_failure(
+                            consortium_id=clean_consortium_id,
+                            requesting_bank_id=clean_requesting,
+                            target_bank_id=clean_target_single,
+                            error_category=recoverable.error_category,
+                            probe_id=cb_probe_id,
+                            policy=cb_policy_single,
+                        )
+                    elif cb_probe_id:
+                        self.circuit_breaker_store.record_probe_aborted(
+                            consortium_id=clean_consortium_id,
+                            requesting_bank_id=clean_requesting,
+                            target_bank_id=clean_target_single,
+                            probe_id=cb_probe_id,
+                            reason="SECURITY_REJECTED",
+                            policy=cb_policy_single,
+                        )
                 elif cb_probe_id:
                     self.circuit_breaker_store.record_probe_aborted(
                         consortium_id=clean_consortium_id,
@@ -2538,7 +2554,7 @@ class CrossBankIntelligenceService:
                     )
                     completed_targets.append(clean_target)
                     if cb_policy.enabled:
-                        if self._is_verified_operational_signal(signal):
+                        if req.execution_mode == "VERIFIED_OPERATIONAL" and self._is_verified_operational_signal(signal):
                             self.circuit_breaker_store.record_success(
                                 consortium_id=clean_consortium_id,
                                 requesting_bank_id=clean_requesting,
@@ -2687,14 +2703,24 @@ class CrossBankIntelligenceService:
                     )
                     completed_targets.append(clean_target)
                     if cb_policy.enabled:
-                        self.circuit_breaker_store.record_failure(
-                            consortium_id=clean_consortium_id,
-                            requesting_bank_id=clean_requesting,
-                            target_bank_id=clean_target,
-                            error_category=recoverable_failure.error_category,
-                            probe_id=cb_probe_id,
-                            policy=cb_policy,
-                        )
+                        if req.execution_mode == "VERIFIED_OPERATIONAL":
+                            self.circuit_breaker_store.record_failure(
+                                consortium_id=clean_consortium_id,
+                                requesting_bank_id=clean_requesting,
+                                target_bank_id=clean_target,
+                                error_category=recoverable_failure.error_category,
+                                probe_id=cb_probe_id,
+                                policy=cb_policy,
+                            )
+                        elif cb_probe_id:
+                            self.circuit_breaker_store.record_probe_aborted(
+                                consortium_id=clean_consortium_id,
+                                requesting_bank_id=clean_requesting,
+                                target_bank_id=clean_target,
+                                probe_id=cb_probe_id,
+                                reason="SECURITY_REJECTED",
+                                policy=cb_policy,
+                            )
                     logger.warning(
                         "Counterpart '%s' execution failed with recoverable transport error: [%s] %s",
                         clean_target,

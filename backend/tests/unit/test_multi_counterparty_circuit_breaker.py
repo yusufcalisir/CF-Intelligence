@@ -45,6 +45,7 @@ from app.domain.circuit_breaker_policy import (
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
     CounterpartyWorkerUnavailableError,
+    CrossBankIdempotencyConflictError,
     MemberRole,
 )
 from app.domain.investigation_entities import Entity, EntityType, RiskLevel
@@ -321,10 +322,10 @@ def test_repeated_eligible_transport_failures_open_only_affected_target(
         circuit_breaker_enabled=True,
         circuit_breaker_failure_threshold=3,
         circuit_breaker_cooldown_seconds=60.0,
-        execution_mode="SIMULATED_RESEARCH",
+        execution_mode="VERIFIED_OPERATIONAL",
     )
 
-    with patch.object(svc, "query_cross_bank_intelligence", side_effect=dispatch_side_effect):
+    with patch.object(svc, "_execute_verified_operational_psi", side_effect=dispatch_side_effect):
         # Query 1: failure 1 for bank_c
         resp1 = svc.query_multi_counterparty_intelligence(req=req, principal=principal)
         assert resp1.overall_outcome == "PARTIAL_FAILURE"
@@ -810,6 +811,7 @@ def test_stale_recovery_probe_reclaimed_after_timeout(
     allowed3, state3, reason3 = store.evaluate_and_acquire_dispatch("c1", "bank_a", "bank_c", policy=policy)
     assert allowed3 is False
     assert state3 == "HALF_OPEN"
+    assert reason3 is not None
     assert "currently in flight" in reason3
 
     # Only explicit lifecycle resolution (e.g. failure or reset) resolves the lease
@@ -911,6 +913,7 @@ def test_independent_store_in_flight_recovery_blocks_second_dispatch_after_deadl
     allowed2, state2, reason2 = store2.evaluate_and_acquire_dispatch("c1", "bank_a", "bank_c", policy=policy)
     assert allowed2 is False
     assert state2 == "HALF_OPEN"
+    assert reason2 is not None
     assert "currently in flight" in reason2
 
 
@@ -961,6 +964,7 @@ def test_server_authoritative_circuit_policy_cannot_be_disabled_or_weakened(
     resp = svc.query_multi_counterparty_intelligence(req=multi_req, principal=principal)
     assert resp.overall_outcome == "FAILED"
     assert resp.execution_outcomes["bank_c"].status == "FAILED"
+    assert resp.execution_outcomes["bank_c"].failure is not None
     assert resp.execution_outcomes["bank_c"].failure.error_category == "CIRCUIT_BREAKER_OPEN"
 
     # Single-counterparty request attempting client bypass
@@ -1088,3 +1092,190 @@ def test_single_target_resolves_probe_lifecycle_and_nested_calls_do_not_double_a
     with patch.object(svc, "query_cross_bank_intelligence", wraps=svc.query_cross_bank_intelligence):
         resp = svc.query_multi_counterparty_intelligence(req=multi_req, principal=principal)
         assert resp is not None
+
+
+def test_simulated_research_failures_do_not_poison_operational_circuit_state(
+    test_setup: tuple[CrossBankIntelligenceService, Entity, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """Correction A: Simulated research failures must never update operational circuit availability counters.
+
+    1. Single-target simulated request encountering recoverable transport failure raises without updating counters.
+    2. Multi-target simulated request encountering recoverable transport failure reports partial failure
+       without mutating circuit state or counters.
+    3. Genuine operational execution with equivalent failure correctly updates failure counters.
+    """
+    svc, ent, c_id = test_setup
+    principal = AuthenticatedPrincipal(
+        principal_id="user_a",
+        tenant_id="bank_a",
+        roles=["analyst"],
+        is_authenticated=True,
+    )
+
+    # Initial state: CLOSED with 0 consecutive failures
+    st_init = svc.circuit_breaker_store.get_circuit_state(c_id, "bank_a", "bank_c")
+    assert st_init["state"] == "CLOSED"
+    assert st_init["consecutive_failures"] == 0
+
+    # 1. Single-target simulated request with recoverable transport failure
+    single_req = CrossBankIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=ent.id,
+        consortium_id=c_id,
+        target_bank_id="bank_c",
+        circuit_breaker_enabled=True,
+        circuit_breaker_failure_threshold=2,
+        circuit_breaker_cooldown_seconds=30.0,
+        execution_mode="SIMULATED_RESEARCH",
+    )
+
+    with patch.object(
+        svc,
+        "_execute_simulated_research_query",
+        side_effect=CounterpartyWorkerUnavailableError("Simulated worker connection failure"),
+    ):
+        with pytest.raises(CounterpartyWorkerUnavailableError):
+            svc.query_cross_bank_intelligence(req=single_req, principal=principal)
+
+    # Circuit counter MUST NOT be incremented by simulated research failure
+    st_single = svc.circuit_breaker_store.get_circuit_state(c_id, "bank_a", "bank_c")
+    assert st_single["state"] == "CLOSED"
+    assert st_single["consecutive_failures"] == 0
+
+    # 2. Multi-target simulated request where bank_c encounters recoverable failure
+    multi_req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=ent.id,
+        consortium_id=c_id,
+        target_bank_ids=["bank_b", "bank_c"],
+        circuit_breaker_enabled=True,
+        circuit_breaker_failure_threshold=2,
+        circuit_breaker_cooldown_seconds=30.0,
+        execution_mode="SIMULATED_RESEARCH",
+    )
+
+    def mock_multi_sim_dispatch(req: CrossBankIntelligenceQueryRequest, **kw: Any) -> CrossBankIntelligenceSignal:
+        if req.target_bank_id == "bank_c":
+            raise CounterpartyWorkerUnavailableError("Simulated remote worker timed out")
+        return _mock_signal(req)
+
+    with patch.object(svc, "query_cross_bank_intelligence", side_effect=mock_multi_sim_dispatch):
+        resp = svc.query_multi_counterparty_intelligence(req=multi_req, principal=principal)
+
+    # Truthful outcomes preserved
+    assert resp.overall_outcome == "PARTIAL_FAILURE"
+    assert resp.execution_outcomes["bank_b"].status == "SUCCESS"
+    c_out = resp.execution_outcomes["bank_c"]
+    assert c_out.status == "FAILED"
+    assert c_out.failure is not None
+    assert c_out.failure.error_category == "WORKER_UNAVAILABLE"
+
+    # Circuit state MUST still be CLOSED with 0 failures
+    st_multi = svc.circuit_breaker_store.get_circuit_state(c_id, "bank_a", "bank_c")
+    assert st_multi["state"] == "CLOSED"
+    assert st_multi["consecutive_failures"] == 0
+
+    # 3. Operational query with equivalent failure MUST count toward opening circuit
+    op_req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=ent.id,
+        consortium_id=c_id,
+        target_bank_ids=["bank_b", "bank_c"],
+        circuit_breaker_enabled=True,
+        circuit_breaker_failure_threshold=2,
+        circuit_breaker_cooldown_seconds=30.0,
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+
+    def mock_multi_op_dispatch(req: CrossBankIntelligenceQueryRequest, **kw: Any) -> CrossBankIntelligenceSignal:
+        if req.target_bank_id == "bank_c":
+            raise CounterpartyWorkerUnavailableError("Operational worker unreachable")
+        return _mock_signal(req)
+
+    with patch.object(svc, "_execute_verified_operational_psi", side_effect=mock_multi_op_dispatch):
+        resp_op = svc.query_multi_counterparty_intelligence(req=op_req, principal=principal)
+
+    assert resp_op.overall_outcome == "PARTIAL_FAILURE"
+    st_op1 = svc.circuit_breaker_store.get_circuit_state(c_id, "bank_a", "bank_c")
+    assert st_op1["state"] == "CLOSED"
+    assert st_op1["consecutive_failures"] == 1
+
+    # Second failure opens circuit
+    with patch.object(svc, "_execute_verified_operational_psi", side_effect=mock_multi_op_dispatch):
+        resp_op2 = svc.query_multi_counterparty_intelligence(req=op_req, principal=principal)
+
+    assert resp_op2.overall_outcome == "PARTIAL_FAILURE"
+    st_op2 = svc.circuit_breaker_store.get_circuit_state(c_id, "bank_a", "bank_c")
+    assert st_op2["state"] == "OPEN"
+    assert st_op2["consecutive_failures"] == 2
+
+
+def test_circuit_policy_parameters_bound_to_durable_idempotency_fingerprints(
+    test_setup: tuple[CrossBankIntelligenceService, Entity, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    """Correction B: Canonical request fingerprint must bind explicit circuit breaker parameters.
+
+    1. Request with idempotency key and explicit circuit settings succeeds.
+    2. Replay with identical key/payload reuses cached result with 0 new dispatches.
+    3. Reusing key with different circuit_breaker_enabled raises CrossBankIdempotencyConflictError.
+    4. Reusing key with different circuit_breaker_failure_threshold raises CrossBankIdempotencyConflictError.
+    5. Reusing key with different circuit_breaker_cooldown_seconds raises CrossBankIdempotencyConflictError.
+    """
+    svc, ent, c_id = test_setup
+    principal = AuthenticatedPrincipal(
+        principal_id="user_a",
+        tenant_id="bank_a",
+        roles=["analyst"],
+        is_authenticated=True,
+    )
+
+    svc.budget_store.set_budget(c_id, "bank_a", "bank_b", max_executions=10)
+    svc.budget_store.set_budget(c_id, "bank_a", "bank_c", max_executions=10)
+
+    base_req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=ent.id,
+        consortium_id=c_id,
+        target_bank_ids=["bank_b", "bank_c"],
+        idempotency_key="cb-fingerprint-test-key",
+        circuit_breaker_enabled=True,
+        circuit_breaker_failure_threshold=3,
+        circuit_breaker_cooldown_seconds=45.0,
+        execution_mode="SIMULATED_RESEARCH",
+    )
+
+    with patch.object(svc, "query_cross_bank_intelligence", side_effect=_mock_signal) as mock_dispatch:
+        resp1 = svc.query_multi_counterparty_intelligence(req=base_req, principal=principal)
+        assert resp1.overall_outcome == "COMPLETED"
+        assert mock_dispatch.call_count == 2
+
+    # Verify budget consumed
+    b_b_1 = svc.budget_store.get_budget(c_id, "bank_a", "bank_b")
+    assert b_b_1 is not None and b_b_1["consumed_executions"] == 1
+
+    # Replay identical request: returns cached response without new dispatches or budget consumption
+    with patch.object(svc, "query_cross_bank_intelligence", side_effect=_mock_signal) as mock_replay:
+        resp2 = svc.query_multi_counterparty_intelligence(req=base_req, principal=principal)
+        assert resp2.overall_outcome == "COMPLETED"
+        assert resp2.query_id == resp1.query_id
+        assert mock_replay.call_count == 0
+
+    b_b_2 = svc.budget_store.get_budget(c_id, "bank_a", "bank_b")
+    assert b_b_2 is not None and b_b_2["consumed_executions"] == 1
+
+    # Conflict variant 1: changed circuit_breaker_enabled
+    req_conflict_enabled = base_req.model_copy(update={"circuit_breaker_enabled": False})
+    with pytest.raises(CrossBankIdempotencyConflictError, match="Idempotency key conflict"):
+        svc.query_multi_counterparty_intelligence(req=req_conflict_enabled, principal=principal)
+
+    # Conflict variant 2: changed failure threshold
+    req_conflict_threshold = base_req.model_copy(update={"circuit_breaker_failure_threshold": 5})
+    with pytest.raises(CrossBankIdempotencyConflictError, match="Idempotency key conflict"):
+        svc.query_multi_counterparty_intelligence(req=req_conflict_threshold, principal=principal)
+
+    # Conflict variant 3: changed cooldown seconds
+    req_conflict_cooldown = base_req.model_copy(update={"circuit_breaker_cooldown_seconds": 90.0})
+    with pytest.raises(CrossBankIdempotencyConflictError, match="Idempotency key conflict"):
+        svc.query_multi_counterparty_intelligence(req=req_conflict_cooldown, principal=principal)
