@@ -250,6 +250,48 @@ class Settings(BaseSettings):
         description="Path to durable training receipt trust store registry file.",
     )
 
+    # ── M6.4 Cross-Bank Circuit Breaker Controls ──
+    cfi_circuit_breaker_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "cfi_circuit_breaker_enabled",
+            "circuit_breaker_enabled",
+        ),
+        description="Whether to enforce per-counterparty circuit breaker controls on cross-bank queries.",
+    )
+    cfi_circuit_breaker_failure_threshold: int = Field(
+        default=3,
+        validation_alias=AliasChoices(
+            "cfi_circuit_breaker_failure_threshold",
+            "circuit_breaker_failure_threshold",
+        ),
+        description="Failure threshold count before per-counterparty circuit breaker opens.",
+    )
+    cfi_circuit_breaker_cooldown_seconds: float = Field(
+        default=60.0,
+        validation_alias=AliasChoices(
+            "cfi_circuit_breaker_cooldown_seconds",
+            "circuit_breaker_cooldown_seconds",
+        ),
+        description="Cooldown period in seconds before circuit breaker transitions to HALF_OPEN.",
+    )
+    cfi_circuit_breaker_half_open_probe_timeout_seconds: float = Field(
+        default=30.0,
+        validation_alias=AliasChoices(
+            "cfi_circuit_breaker_half_open_probe_timeout_seconds",
+            "circuit_breaker_half_open_probe_timeout_seconds",
+        ),
+        description="Timeout for half-open probe lease before allowing a new recovery probe.",
+    )
+    cfi_circuit_breaker_db_path: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "cfi_circuit_breaker_db_path",
+            "circuit_breaker_db_path",
+        ),
+        description="Path to durable cross-bank circuit breaker SQLite database file.",
+    )
+
     # ── Enterprise Security Suite ─────────────
     mtls_enabled: bool = True
     mtls_ca_cn: str = "CFI-Root-CA"

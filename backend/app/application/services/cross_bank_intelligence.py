@@ -46,6 +46,11 @@ from app.application.services.entity_resolution import EntityResolutionService
 from app.application.services.isolated_matching_service import (
     CrossBankMatchingCoordinator,
 )
+from app.domain.circuit_breaker_policy import (
+    CircuitState,
+    CounterpartyCircuitBreakerOpenError,
+    CounterpartyCircuitBreakerPolicy,
+)
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
     ConsortiumStatus,
@@ -73,8 +78,12 @@ from app.domain.value_objects_investigation import (
 from app.infrastructure.redis_store import RedisStore
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
+from app.infrastructure.storage.durable_circuit_breaker_store import (
+    DurableCrossBankCircuitBreakerStore,
+)
 from app.infrastructure.storage.durable_execution_budget_store import (
     REASON_BATCH_ABORTED_BEFORE_DISPATCH,
+    REASON_CIRCUIT_BREAKER_BLOCKED,
     REASON_EXECUTION_COMPLETED,
     REASON_EXECUTION_INDETERMINATE,
     REASON_PILOT_PREFLIGHT_REJECTED,
@@ -165,6 +174,7 @@ class CrossBankIntelligenceService:
         institutional_registry: InstitutionalVerificationRegistry | None = None,
         idempotency_store: DurableCrossBankIdempotencyStore | None = None,
         budget_store: DurableCrossBankExecutionBudgetStore | None = None,
+        circuit_breaker_store: DurableCrossBankCircuitBreakerStore | None = None,
     ) -> None:
         self.consortium_service = consortium_service or ConsortiumGovernanceService()
         self.entity_service = entity_service or EntityResolutionService()
@@ -180,6 +190,7 @@ class CrossBankIntelligenceService:
         self.institutional_registry = institutional_registry or InstitutionalVerificationRegistry()
         self.idempotency_store = idempotency_store or DurableCrossBankIdempotencyStore.get_instance()
         self.budget_store = budget_store or DurableCrossBankExecutionBudgetStore.get_instance()
+        self.circuit_breaker_store = circuit_breaker_store or DurableCrossBankCircuitBreakerStore.get_instance()
         self._signal_store = RedisStore("authoritative_signals")
         self._synthetic_entity_store = RedisStore("synthetic_entities")
         self._research_case_evidence_store = RedisStore("research_case_evidence")
@@ -277,6 +288,49 @@ class CrossBankIntelligenceService:
             per_counterparty_timeout_seconds=effective_per_counterpart,
             total_batch_timeout_seconds=effective_total_batch,
         )
+
+    def _resolve_circuit_breaker_policy(
+        self, req: MultiCounterpartyIntelligenceQueryRequest | CrossBankIntelligenceQueryRequest
+    ) -> CounterpartyCircuitBreakerPolicy:
+        """Resolve authoritative circuit breaker policy from request overrides and system settings."""
+        from app.config import get_settings
+        from app.domain.circuit_breaker_policy import (
+            DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS,
+            DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+            DEFAULT_HALF_OPEN_PROBE_TIMEOUT_SECONDS,
+            CounterpartyCircuitBreakerPolicy,
+        )
+
+        settings = get_settings()
+        req_enabled = getattr(req, "circuit_breaker_enabled", None)
+        enabled = (
+            bool(req_enabled)
+            if req_enabled is not None
+            else bool(getattr(settings, "cfi_circuit_breaker_enabled", False))
+        )
+        req_threshold = getattr(req, "circuit_breaker_failure_threshold", None)
+        failure_threshold = (
+            int(req_threshold)
+            if req_threshold is not None
+            else int(getattr(settings, "cfi_circuit_breaker_failure_threshold", DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD))
+        )
+        req_cooldown = getattr(req, "circuit_breaker_cooldown_seconds", None)
+        cooldown_seconds = (
+            float(req_cooldown)
+            if req_cooldown is not None
+            else float(getattr(settings, "cfi_circuit_breaker_cooldown_seconds", DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS))
+        )
+        half_open_timeout = float(
+            getattr(settings, "cfi_circuit_breaker_half_open_probe_timeout_seconds", DEFAULT_HALF_OPEN_PROBE_TIMEOUT_SECONDS)
+        )
+
+        return CounterpartyCircuitBreakerPolicy(
+            enabled=enabled,
+            failure_threshold=failure_threshold,
+            cooldown_seconds=cooldown_seconds,
+            half_open_probe_timeout_seconds=half_open_timeout,
+        )
+
 
     def execute_two_bank_private_matching(
         self,
@@ -1318,6 +1372,27 @@ class CrossBankIntelligenceService:
                 "Production hardware attestation requirement failed closed."
             )
 
+        if req.target_bank_id:
+            clean_target_single = req.target_bank_id.lower().strip()
+            cb_policy_single = self._resolve_circuit_breaker_policy(req)
+            if cb_policy_single.enabled:
+                can_dispatch, cb_state, cb_probe_or_reason = (
+                    self.circuit_breaker_store.evaluate_and_acquire_dispatch(
+                        consortium_id=clean_consortium_id,
+                        requesting_bank_id=clean_requesting,
+                        target_bank_id=clean_target_single,
+                        policy=cb_policy_single,
+                    )
+                )
+                if not can_dispatch:
+                    raise CounterpartyCircuitBreakerOpenError(
+                        message=f"Circuit breaker is OPEN for counterpart '{clean_target_single}' ({cb_probe_or_reason}). Dispatch rejected.",
+                        target_bank_id=clean_target_single,
+                        consortium_id=clean_consortium_id,
+                        requesting_bank_id=clean_requesting,
+                    )
+
+
         if req.execution_mode == "VERIFIED_OPERATIONAL":
             if not req.target_bank_id:
                 raise RuntimeError(
@@ -2218,6 +2293,7 @@ class CrossBankIntelligenceService:
 
         # 6.7. Authoritative Execution Deadline Policy & Monotonic Time Horizon
         deadline_policy = self._resolve_execution_deadline_policy(req)
+        cb_policy = self._resolve_circuit_breaker_policy(req)
         batch_start_mono = time.monotonic()
         batch_deadline_mono = batch_start_mono + deadline_policy.total_batch_timeout_seconds
 
@@ -2269,6 +2345,51 @@ class CrossBankIntelligenceService:
                     )
                     continue
 
+                # Pre-dispatch circuit breaker check & recovery probe admission gate
+                cb_probe_id: str | None = None
+                if cb_policy.enabled:
+                    can_dispatch, cb_state, cb_probe_or_reason = (
+                        self.circuit_breaker_store.evaluate_and_acquire_dispatch(
+                            consortium_id=clean_consortium_id,
+                            requesting_bank_id=clean_requesting,
+                            target_bank_id=clean_target,
+                            policy=cb_policy,
+                        )
+                    )
+                    if not can_dispatch:
+                        self.budget_store.release_reservations(
+                            batch_id=budget_batch_id,
+                            targets=[clean_target],
+                            reason=REASON_CIRCUIT_BREAKER_BLOCKED,
+                        )
+                        cb_failure = CounterpartyExecutionFailure(
+                            target_bank_id=clean_target,
+                            error_category="CIRCUIT_BREAKER_OPEN",
+                            error_message=(
+                                f"Circuit breaker is OPEN for counterpart '{clean_target}' "
+                                f"({cb_probe_or_reason}). Dispatch rejected."
+                            ),
+                            failed_at=datetime.datetime.now(UTC).isoformat(),
+                            retryable=False,
+                        )
+                        failures[clean_target] = cb_failure
+                        execution_outcomes[clean_target] = CounterpartyExecutionOutcome(
+                            target_bank_id=clean_target,
+                            status="FAILED",
+                            signal=None,
+                            failure=cb_failure,
+                        )
+                        logger.warning(
+                            "Counterpart '%s' skipped: circuit breaker is %s (%s).",
+                            clean_target,
+                            cb_state,
+                            cb_probe_or_reason,
+                        )
+                        continue
+
+                    if cb_state == CircuitState.HALF_OPEN.value and cb_probe_or_reason:
+                        cb_probe_id = cb_probe_or_reason
+
                 single_req = CrossBankIntelligenceQueryRequest(
                     requesting_bank_id=clean_requesting,
                     query_entity_id=req.query_entity_id,
@@ -2309,6 +2430,13 @@ class CrossBankIntelligenceService:
                         failure=None,
                     )
                     completed_targets.append(clean_target)
+                    if cb_policy.enabled:
+                        self.circuit_breaker_store.record_success(
+                            consortium_id=clean_consortium_id,
+                            requesting_bank_id=clean_requesting,
+                            target_bank_id=clean_target,
+                            probe_id=cb_probe_id,
+                        )
                 except Exception as exc:
                     # Security-First Classification Rule (M6.4 Task 4 Correction A):
                     # 1. Explicit security, integrity, authorization, and governance failures take absolute
@@ -2325,6 +2453,15 @@ class CrossBankIntelligenceService:
                     if is_pre_dispatch:
                         if clean_target in dispatched_targets:
                             dispatched_targets.remove(clean_target)
+                        if cb_policy.enabled and cb_probe_id:
+                            self.circuit_breaker_store.record_probe_aborted(
+                                consortium_id=clean_consortium_id,
+                                requesting_bank_id=clean_requesting,
+                                target_bank_id=clean_target,
+                                probe_id=cb_probe_id,
+                                reason="PROBE_FAILED",
+                                policy=cb_policy,
+                            )
                         self.budget_store.release_reservations(
                             batch_id=budget_batch_id,
                             targets=[clean_target],
@@ -2354,6 +2491,15 @@ class CrossBankIntelligenceService:
                     if isinstance(exc, PilotQuotaExceededError):
                         if clean_target in dispatched_targets:
                             dispatched_targets.remove(clean_target)
+                        if cb_policy.enabled and cb_probe_id:
+                            self.circuit_breaker_store.record_probe_aborted(
+                                consortium_id=clean_consortium_id,
+                                requesting_bank_id=clean_requesting,
+                                target_bank_id=clean_target,
+                                probe_id=cb_probe_id,
+                                reason="SECURITY_REJECTED",
+                                policy=cb_policy,
+                            )
                         logger.warning(
                             "Counterpart '%s' rejected in pre-dispatch pilot quota check: %s. Releasing reservation.",
                             clean_target,
@@ -2386,6 +2532,15 @@ class CrossBankIntelligenceService:
                             clean_target,
                             exc,
                         )
+                        if cb_policy.enabled and cb_probe_id:
+                            self.circuit_breaker_store.record_probe_aborted(
+                                consortium_id=clean_consortium_id,
+                                requesting_bank_id=clean_requesting,
+                                target_bank_id=clean_target,
+                                probe_id=cb_probe_id,
+                                reason="SECURITY_REJECTED",
+                                policy=cb_policy,
+                            )
                         undispatched = [t for t in clean_targets if t not in dispatched_targets]
                         if undispatched:
                             self.budget_store.release_reservations(
@@ -2414,6 +2569,15 @@ class CrossBankIntelligenceService:
                         failure=recoverable_failure,
                     )
                     completed_targets.append(clean_target)
+                    if cb_policy.enabled:
+                        self.circuit_breaker_store.record_failure(
+                            consortium_id=clean_consortium_id,
+                            requesting_bank_id=clean_requesting,
+                            target_bank_id=clean_target,
+                            error_category=recoverable_failure.error_category,
+                            probe_id=cb_probe_id,
+                            policy=cb_policy,
+                        )
                     logger.warning(
                         "Counterpart '%s' execution failed with recoverable transport error: [%s] %s",
                         clean_target,

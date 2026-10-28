@@ -103,6 +103,11 @@ class CrossBankIntelligenceQueryRequest(BaseModel):
         le=60.0,
         description="Optional caller-specified execution timeout in seconds allocated for this counterparty query (bounded [1.0, 60.0]).",
     )
+    circuit_breaker_enabled: bool | None = Field(
+        default=None,
+        description="Optional explicit override to enable or disable circuit breaker enforcement for this counterpart.",
+    )
+
 
 
 class MultiCounterpartyIntelligenceQueryRequest(BaseModel):
@@ -193,6 +198,22 @@ class MultiCounterpartyIntelligenceQueryRequest(BaseModel):
         ge=1.0,
         le=300.0,
         description="Optional total wall-clock execution deadline in seconds for the complete query batch (bounded [1.0, 300.0]).",
+    )
+    circuit_breaker_enabled: bool | None = Field(
+        default=None,
+        description="Optional explicit override to enable or disable per-counterparty circuit breaker enforcement.",
+    )
+    circuit_breaker_failure_threshold: int | None = Field(
+        default=None,
+        ge=1,
+        le=50,
+        description="Optional failure threshold count before circuit breaker opens (bounded [1, 50]).",
+    )
+    circuit_breaker_cooldown_seconds: float | None = Field(
+        default=None,
+        ge=0.001,
+        le=3600.0,
+        description="Optional cooldown period in seconds before circuit breaker transitions to HALF_OPEN (bounded [0.001, 3600.0]).",
     )
 
     @model_validator(mode="after")
