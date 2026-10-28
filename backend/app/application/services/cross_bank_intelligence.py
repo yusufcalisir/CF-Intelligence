@@ -58,6 +58,7 @@ from app.domain.consortium_governance import (
 )
 from app.domain.consortium_policy import ConsortiumPolicyEngine
 from app.domain.execution_deadline_policy import (
+    MIN_PER_COUNTERPARTY_TIMEOUT_SECONDS,
     CounterpartyExecutionDeadlinePolicy,
 )
 from app.domain.institutional_identity import (
@@ -496,6 +497,12 @@ class CrossBankIntelligenceService:
                 resolved_auth_token = auth_svc.create_token_bundle(user).access_token
 
         t0 = time.perf_counter()
+        t0_mono = time.monotonic()
+        target_deadline_mono = (
+            t0_mono + float(effective_timeout) if effective_timeout is not None else None
+        )
+        match_timeout: float | None = None
+
         try:
             if coordinator_url:
                 from app.application.services.isolated_matching_service import (
@@ -503,17 +510,53 @@ class CrossBankIntelligenceService:
                 )
 
                 coord_client = InstitutionalCoordinatorClient(coordinator_url)
+
+                # Monotonic per-target deadline propagation across network boundaries (Correction C)
+                if target_deadline_mono is not None:
+                    remaining_for_probe = target_deadline_mono - time.monotonic()
+                    if remaining_for_probe <= 0:
+                        raise CounterpartyDeadlineExceededError(
+                            message=f"Execution deadline exceeded before coordinator probe for '{clean_target}'.",
+                            target_bank_id=clean_target,
+                            is_pre_dispatch=True,
+                        )
+                    probe_timeout = min(5.0, remaining_for_probe)
+                else:
+                    probe_timeout = 5.0
+
                 try:
-                    coord_client.health_check()
+                    coord_client.health_check(timeout=probe_timeout)
+                except (CounterpartyTimeoutError, TimeoutError) as exc:
+                    raise CounterpartyDeadlineExceededError(
+                        message=f"Coordinator health probe timed out before dispatch for '{clean_target}'.",
+                        target_bank_id=clean_target,
+                        is_pre_dispatch=True,
+                    ) from exc
+                except CounterpartyWorkerUnavailableError:
+                    raise
                 except Exception as exc:
                     raise ConsortiumSecurityError(
-                        f"Operational established PSI coordinator at '{coordinator_url}' is unreachable or offline: {exc}. Failing closed."
+                        f"Operational established PSI coordinator is unreachable or offline: {type(exc).__name__}. Failing closed."
                     ) from exc
+
+                # Recalculate remaining time before the matching HTTP request
+                if target_deadline_mono is not None:
+                    remaining_for_match = target_deadline_mono - time.monotonic()
+                    if remaining_for_match <= 0:
+                        raise CounterpartyDeadlineExceededError(
+                            message=f"Execution deadline exceeded before matching invocation for '{clean_target}'.",
+                            target_bank_id=clean_target,
+                            is_pre_dispatch=True,
+                        )
+                    match_timeout = float(remaining_for_match)
+                else:
+                    match_timeout = float(effective_timeout) if effective_timeout is not None else None
+
                 signal = coord_client.execute_match(
                     req=est_req,
                     auth_token=resolved_auth_token,
                     actor=audited_actor,
-                    timeout=effective_timeout,
+                    timeout=match_timeout,
                 )
 
                 resolved_receipt_id = (
@@ -646,11 +689,22 @@ class CrossBankIntelligenceService:
                 try:
                     self.matching_coordinator.get_worker(clean_requesting)
                     self.matching_coordinator.get_worker(clean_target)
+                    if target_deadline_mono is not None:
+                        remaining_for_match = target_deadline_mono - time.monotonic()
+                        if remaining_for_match <= 0:
+                            raise CounterpartyDeadlineExceededError(
+                                message=f"Execution deadline exceeded before in-process matching for '{clean_target}'.",
+                                target_bank_id=clean_target,
+                                is_pre_dispatch=True,
+                            )
+                        match_timeout = float(remaining_for_match)
+                    else:
+                        match_timeout = float(effective_timeout) if effective_timeout is not None else None
                     signal = self.matching_coordinator.execute_two_bank_private_matching(
                         req=est_req,
                         auth_token=resolved_auth_token,
                         actor=audited_actor,
-                        timeout=timeout,
+                        timeout=match_timeout,
                     )
 
                     resolved_receipt_id = (
@@ -2153,8 +2207,15 @@ class CrossBankIntelligenceService:
                 # Pre-dispatch execution deadline check using monotonic time
                 now_mono = time.monotonic()
                 remaining_batch_time = batch_deadline_mono - now_mono
-                if remaining_batch_time <= 0:
-                    # Total batch deadline exhausted before this counterpart could be dispatched
+                effective_target_timeout = min(
+                    deadline_policy.per_counterparty_timeout_seconds,
+                    remaining_batch_time,
+                )
+                if (
+                    remaining_batch_time <= 0
+                    or effective_target_timeout < MIN_PER_COUNTERPARTY_TIMEOUT_SECONDS
+                ):
+                    # Total batch deadline exhausted or insufficient remaining time (< 1.0s) before counterpart dispatch
                     self.budget_store.release_reservations(
                         batch_id=budget_batch_id,
                         targets=[clean_target],
@@ -2175,16 +2236,13 @@ class CrossBankIntelligenceService:
                         failure=pre_dispatch_failure,
                     )
                     logger.warning(
-                        "Counterpart '%s' skipped: total batch execution deadline exhausted prior to dispatch.",
+                        "Counterpart '%s' skipped: insufficient remaining execution deadline prior to dispatch (remaining=%.3fs, min=%.1fs).",
                         clean_target,
+                        remaining_batch_time,
+                        MIN_PER_COUNTERPARTY_TIMEOUT_SECONDS,
                     )
                     continue
 
-                effective_target_timeout = min(
-                    deadline_policy.per_counterparty_timeout_seconds,
-                    remaining_batch_time,
-                )
-                dispatched_targets.append(clean_target)
                 single_req = CrossBankIntelligenceQueryRequest(
                     requesting_bank_id=clean_requesting,
                     query_entity_id=req.query_entity_id,
@@ -2202,6 +2260,7 @@ class CrossBankIntelligenceService:
                     timeout_seconds=effective_target_timeout,
                 )
                 try:
+                    dispatched_targets.append(clean_target)
                     if req.execution_mode == "VERIFIED_OPERATIONAL":
                         signal = self._execute_verified_operational_psi(
                             req=single_req,
@@ -2225,6 +2284,46 @@ class CrossBankIntelligenceService:
                     )
                     completed_targets.append(clean_target)
                 except Exception as exc:
+                    # Check if failure is demonstrably pre-dispatch
+                    is_pre_dispatch = False
+                    if isinstance(exc, CounterpartyDeadlineExceededError) and exc.is_pre_dispatch:
+                        is_pre_dispatch = True
+                    else:
+                        curr_exc: BaseException | None = exc
+                        while curr_exc is not None:
+                            if isinstance(curr_exc, CounterpartyDeadlineExceededError) and curr_exc.is_pre_dispatch:
+                                is_pre_dispatch = True
+                                break
+                            curr_exc = curr_exc.__cause__ or curr_exc.__context__
+
+                    if is_pre_dispatch:
+                        if clean_target in dispatched_targets:
+                            dispatched_targets.remove(clean_target)
+                        self.budget_store.release_reservations(
+                            batch_id=budget_batch_id,
+                            targets=[clean_target],
+                            reason=REASON_PRE_DISPATCH_DEADLINE_EXCEEDED,
+                        )
+                        pre_dispatch_failure = CounterpartyExecutionFailure(
+                            target_bank_id=clean_target,
+                            error_category="TIMEOUT",
+                            error_message=f"Execution deadline exceeded before counterpart dispatch for '{clean_target}'.",
+                            failed_at=datetime.datetime.now(UTC).isoformat(),
+                            retryable=True,
+                        )
+                        failures[clean_target] = pre_dispatch_failure
+                        execution_outcomes[clean_target] = CounterpartyExecutionOutcome(
+                            target_bank_id=clean_target,
+                            status="FAILED",
+                            signal=None,
+                            failure=pre_dispatch_failure,
+                        )
+                        logger.warning(
+                            "Counterpart '%s' failed pre-dispatch deadline check: %s. Releasing reservation.",
+                            clean_target,
+                            exc,
+                        )
+                        continue
                     # Handle demonstrably pre-dispatch pilot quota rejections without consuming pairwise budget
                     if isinstance(exc, PilotQuotaExceededError):
                         if clean_target in dispatched_targets:

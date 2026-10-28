@@ -38,6 +38,7 @@ from app.application.services.entity_resolution import EntityResolutionService, 
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
     CounterpartyTimeoutError,
+    CounterpartyWorkerUnavailableError,
     CrossBankIdempotencyConflictError,
     MemberRole,
 )
@@ -48,6 +49,7 @@ from app.domain.execution_deadline_policy import (
 )
 from app.domain.investigation_entities import Entity, EntityType, RiskLevel
 from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 from app.infrastructure.storage.durable_execution_budget_store import (
     DurableCrossBankExecutionBudgetStore,
@@ -632,3 +634,315 @@ def test_idempotency_fingerprint_includes_timeout_parameters() -> None:
 
     assert fp1 == fp3
     assert fp1 != fp2  # Modifying timeout changes fingerprint!
+
+
+# =========================================================================
+# 9. Subsecond Remaining Time Before Dispatch (Correction B)
+# =========================================================================
+
+def test_subsecond_remaining_time_pre_dispatch_accounting_bank_b_success_bank_c_skipped(
+    test_setup: tuple[CrossBankIntelligenceService, Entity, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    svc, test_entity, c_id = test_setup
+
+    # Total batch timeout = 3.0s, per-counterpart timeout = 5.0s
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=test_entity.id,
+        privacy_id=test_entity.privacy_id,
+        consortium_id=c_id,
+        target_bank_ids=["bank_b", "bank_c"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="SIMULATED_RESEARCH",
+        per_counterparty_timeout_seconds=5.0,
+        total_batch_timeout_seconds=3.0,
+    )
+
+    current_mono = 100.0
+    call_count = {"bank_b": 0, "bank_c": 0}
+
+    def mock_mono() -> float:
+        return current_mono
+
+    def controlled_execution(req: CrossBankIntelligenceQueryRequest | None = None, *args, **kw):
+        nonlocal current_mono
+        assert req is not None
+        call_count[req.target_bank_id] += 1
+        # Bank B completes successfully, taking 2.6 seconds.
+        # This leaves 3.0 - 2.6 = 0.4 seconds (< 1.0s minimum supported timeout)
+        current_mono += 2.6
+        return _mock_signal(req, match_confirmed=True)
+
+    with (
+        patch("time.monotonic", side_effect=mock_mono),
+        patch.object(svc, "query_cross_bank_intelligence", side_effect=controlled_execution),
+    ):
+        resp = svc.query_multi_counterparty_intelligence(
+            req=req,
+            auth_token=auth_tokens["bank_a"],
+        )
+
+        # 1. Bank B was dispatched and completed successfully
+        assert call_count["bank_b"] == 1
+        # 2. Bank C had 0.4s (< 1.0s) remaining: was NOT dispatched
+        assert call_count["bank_c"] == 0
+
+        # 3. Outcome is truthfully PARTIAL_FAILURE without validation exceptions or fabricated signals
+        assert resp.overall_outcome == "PARTIAL_FAILURE"
+        assert "bank_b" in resp.results
+        assert resp.results["bank_b"].match_confirmed is True
+
+        assert "bank_c" not in resp.results
+        assert "bank_c" in resp.failures
+        c_fail = resp.failures["bank_c"]
+        assert c_fail.error_category == "TIMEOUT"
+        assert "before counterpart dispatch" in c_fail.error_message
+
+        # 4. Bank C's budget reservation is released (consumed == 0, in_flight == 0)
+        c_budget = svc.budget_store.get_budget(c_id, "bank_a", "bank_c")
+        assert c_budget is not None and c_budget["consumed_executions"] == 0
+        assert c_budget["in_flight_reservations"] == 0
+
+        # 5. Bank B's budget reservation is committed (consumed == 1, in_flight == 0)
+        b_budget = svc.budget_store.get_budget(c_id, "bank_a", "bank_b")
+        assert b_budget is not None and b_budget["consumed_executions"] == 1
+        assert b_budget["in_flight_reservations"] == 0
+
+
+def test_subsecond_remaining_time_first_target_case_zero_psi_executions(
+    test_setup: tuple[CrossBankIntelligenceService, Entity, str],
+    auth_tokens: dict[str, str],
+) -> None:
+    svc, test_entity, c_id = test_setup
+
+    # Total batch timeout = 3.0s
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=test_entity.id,
+        privacy_id=test_entity.privacy_id,
+        consortium_id=c_id,
+        target_bank_ids=["bank_b", "bank_c"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="SIMULATED_RESEARCH",
+        total_batch_timeout_seconds=3.0,
+    )
+
+    timeline: dict[str, bool] = {"policy_resolved": False, "batch_started": False}
+    original_resolve = svc._resolve_execution_deadline_policy
+
+    def resolve_hook(r: MultiCounterpartyIntelligenceQueryRequest) -> CounterpartyExecutionDeadlinePolicy:
+        timeline["policy_resolved"] = True
+        return original_resolve(r)
+
+    def mock_mono() -> float:
+        if not timeline["policy_resolved"]:
+            return 50.0
+        if not timeline["batch_started"]:
+            timeline["batch_started"] = True
+            return 100.0  # batch_start_mono: total_batch_deadline = 100.0 + 3.0 = 103.0
+        # Inside the counterpart loop: now_mono = 102.5 -> remaining_batch_time = 103.0 - 102.5 = 0.5s (< 1.0s)
+        return 102.5
+
+    with (
+        patch("time.monotonic", side_effect=mock_mono),
+        patch.object(svc, "_resolve_execution_deadline_policy", side_effect=resolve_hook),
+        patch.object(svc, "query_cross_bank_intelligence") as mock_exec,
+    ):
+        mock_exec.side_effect = lambda req=None, *a, **kw: _mock_signal(req, match_confirmed=True)
+        resp = svc.query_multi_counterparty_intelligence(
+            req=req,
+            auth_token=auth_tokens["bank_a"],
+        )
+
+        # Zero PSI executions occur
+        assert mock_exec.call_count == 0
+        assert resp.overall_outcome == "FAILED"
+        assert len(resp.results) == 0
+        assert len(resp.failures) == 2
+        assert resp.failures["bank_b"].error_category == "TIMEOUT"
+        assert resp.failures["bank_c"].error_category == "TIMEOUT"
+
+        # All reservations released cleanly
+        b_budget = svc.budget_store.get_budget(c_id, "bank_a", "bank_b")
+        c_budget = svc.budget_store.get_budget(c_id, "bank_a", "bank_c")
+        assert b_budget is not None and b_budget["consumed_executions"] == 0
+        assert c_budget is not None and c_budget["consumed_executions"] == 0
+        assert b_budget["in_flight_reservations"] == 0
+        assert c_budget["in_flight_reservations"] == 0
+
+
+# =========================================================================
+# 10. Coordinator Health Probe Deadline & Monotonic Propagation (Correction C)
+# =========================================================================
+
+def test_slow_coordinator_health_probe_honors_remaining_deadline_pre_dispatch(
+    test_setup: tuple[CrossBankIntelligenceService, Entity, str],
+    auth_tokens: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    svc, test_entity, c_id = test_setup
+    monkeypatch.setenv("CFI_COORDINATOR_URL", "http://127.0.0.1:9999")
+
+    from app.application.services.isolated_matching_service import InstitutionalCoordinatorClient
+
+    health_probe_called = False
+    execute_match_called = False
+
+    def slow_health_check(self, timeout: float | None = None) -> dict[str, str]:
+        nonlocal health_probe_called
+        health_probe_called = True
+        # Simulate health probe timing out
+        raise CounterpartyTimeoutError("Probe timed out waiting for coordinator response")
+
+    def mock_execute_match(self, *a, **kw):
+        nonlocal execute_match_called
+        execute_match_called = True
+        raise AssertionError("execute_match must NOT be called when health probe times out!")
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=test_entity.id,
+        privacy_id=test_entity.privacy_id,
+        consortium_id=c_id,
+        target_bank_ids=["bank_b"],
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+        per_counterparty_timeout_seconds=5.0,
+        total_batch_timeout_seconds=15.0,
+    )
+
+    with (
+        patch.object(InstitutionalCoordinatorClient, "health_check", slow_health_check),
+        patch.object(InstitutionalCoordinatorClient, "execute_match", mock_execute_match),
+    ):
+        resp = svc.query_multi_counterparty_intelligence(
+            req=req,
+            auth_token=auth_tokens["bank_a"],
+        )
+
+        assert health_probe_called is True
+        assert execute_match_called is False
+        assert resp.overall_outcome == "FAILED"
+        assert "bank_b" in resp.failures
+        b_fail = resp.failures["bank_b"]
+        assert b_fail.error_category == "TIMEOUT"
+        assert "before counterpart dispatch" in b_fail.error_message
+
+        # Reservation is released cleanly (pre-dispatch)
+        b_budget = svc.budget_store.get_budget(c_id, "bank_a", "bank_b")
+        assert b_budget is not None and b_budget["consumed_executions"] == 0
+        assert b_budget["in_flight_reservations"] == 0
+
+
+def test_health_probe_and_matching_request_share_absolute_deadline_instead_of_fresh_timeout(
+    test_setup: tuple[CrossBankIntelligenceService, Entity, str],
+    auth_tokens: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    svc, test_entity, c_id = test_setup
+    monkeypatch.setenv("CFI_COORDINATOR_URL", "http://127.0.0.1:9999")
+
+    from app.application.services.isolated_matching_service import InstitutionalCoordinatorClient
+
+    observed_probe_timeout: list[float | None] = []
+    observed_match_timeout: list[float | None] = []
+
+    current_mono = 100.0
+
+    def mock_mono() -> float:
+        return current_mono
+
+    def mock_health_check(self, timeout: float | None = None) -> dict[str, str]:
+        nonlocal current_mono
+        observed_probe_timeout.append(timeout)
+        # Probe takes 1.5 seconds out of the 4.0s allowance
+        current_mono += 1.5
+        return {"status": "ok"}
+
+    def mock_execute_match(self, req, auth_token, actor=None, timeout=None):
+        observed_match_timeout.append(timeout)
+        return _mock_signal(req, match_confirmed=True)
+
+    single_req = CrossBankIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id=test_entity.id,
+        privacy_id=test_entity.privacy_id,
+        consortium_id=c_id,
+        target_bank_id="bank_b",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+        timeout_seconds=4.0,
+    )
+
+    principal = AuthenticatedPrincipal(
+        principal_id="user_a",
+        roles=["admin", "ml_lead"],
+        tenant_id="bank_a",
+        is_authenticated=True,
+    )
+
+    with (
+        patch("time.monotonic", side_effect=mock_mono),
+        patch.object(InstitutionalCoordinatorClient, "health_check", mock_health_check),
+        patch.object(InstitutionalCoordinatorClient, "execute_match", mock_execute_match),
+        patch.object(svc, "_admit_and_verify_operational_signal", return_value={}),
+    ):
+        signal = svc._execute_verified_operational_psi(
+            req=single_req,
+            auth_token=auth_tokens["bank_a"],
+            auth_principal=principal,
+            audited_actor="user_a",
+        )
+
+        assert signal.match_confirmed is True
+        # Probe timeout was bounded by probe ceiling min(5.0, 4.0) = 4.0s
+        assert observed_probe_timeout[0] == pytest.approx(4.0, abs=0.1)
+        # Match request DID NOT receive fresh 4.0s; it received remaining time: 4.0 - 1.5 = 2.5s!
+        assert observed_match_timeout[0] == pytest.approx(2.5, abs=0.1)
+
+
+def test_coordinator_client_and_worker_client_error_messages_do_not_leak_internal_urls() -> None:
+    import urllib.error
+
+    from app.application.services.isolated_matching_service import (
+        InstitutionalCoordinatorClient,
+        InstitutionalWorkerClient,
+    )
+
+    coord = InstitutionalCoordinatorClient("http://internal-secret-coordinator.cluster.local:8000")
+    worker = InstitutionalWorkerClient("bank_b", "http://internal-secret-worker.cluster.local:9000", matching_token="secret_token_123")
+
+    # Coordinator health_check on TimeoutError
+    with patch("urllib.request.urlopen", side_effect=TimeoutError("socket connection timed out")):
+        with pytest.raises(CounterpartyTimeoutError) as exc_info:
+            coord.health_check(timeout=1.0)
+        err = str(exc_info.value)
+        assert "internal-secret-coordinator" not in err
+        assert "http://" not in err
+        assert "TimeoutError" in err
+
+    # Coordinator execute_match on URLError(socket.timeout)
+    single_req = CrossBankIntelligenceQueryRequest(
+        requesting_bank_id="bank_a",
+        query_entity_id="ENT-001",
+        consortium_id="c_alpha",
+        target_bank_id="bank_b",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+    )
+    with patch("urllib.request.urlopen", side_effect=urllib.error.URLError(TimeoutError("socket timeout"))):
+        with pytest.raises(CounterpartyTimeoutError) as exc_info:
+            coord.execute_match(single_req, auth_token="token", timeout=1.0)
+        err = str(exc_info.value)
+        assert "internal-secret-coordinator" not in err
+        assert "http://" not in err
+
+    # Worker health_check on ConnectionError
+    with patch("urllib.request.urlopen", side_effect=ConnectionError("connection refused")):
+        with pytest.raises(CounterpartyWorkerUnavailableError) as exc_info:
+            worker.health_check(timeout=1.0)
+        err = str(exc_info.value)
+        assert "internal-secret-worker" not in err
+        assert "secret_token_123" not in err
+        assert "bank_b" in err

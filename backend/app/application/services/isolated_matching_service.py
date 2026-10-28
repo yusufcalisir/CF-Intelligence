@@ -2058,7 +2058,7 @@ class InstitutionalWorkerClient:
         self.default_timeout = default_timeout
         self._is_network_transport = True
 
-    def health_check(self) -> dict[str, Any]:
+    def health_check(self, timeout: float | None = None) -> dict[str, Any]:
         """Perform health check probe to worker node."""
         url = f"{self.base_url}/health"
         if not (url.startswith("http://") or url.startswith("https://")):
@@ -2068,30 +2068,31 @@ class InstitutionalWorkerClient:
             headers={"Authorization": f"Bearer {self.matching_token}"},
             method="GET",
         )
+        probe_timeout = 5.0 if timeout is None else max(0.001, float(timeout))
         try:
-            with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
+            with urllib.request.urlopen(req, timeout=probe_timeout) as resp:  # nosec B310
                 body = resp.read()
         except TimeoutError as exc:
             raise CounterpartyTimeoutError(
-                f"Worker probe timed out for '{self.bank_id}': {exc}"
+                f"Worker probe timed out for '{self.bank_id}': {type(exc).__name__}"
             ) from exc
         except ConnectionError as exc:
             raise CounterpartyWorkerUnavailableError(
-                f"Worker unreachable on health probe for '{self.bank_id}': {exc}"
+                f"Worker unreachable on health probe for '{self.bank_id}': {type(exc).__name__}"
             ) from exc
         except urllib.error.URLError as exc:
             reason = getattr(exc, "reason", None)
             if isinstance(reason, (TimeoutError, socket.timeout)):
                 raise CounterpartyTimeoutError(
-                    f"Worker probe timed out for '{self.bank_id}': {exc}"
+                    f"Worker probe timed out for '{self.bank_id}': {type(reason).__name__}"
                 ) from exc
             if isinstance(reason, ConnectionError):
                 raise CounterpartyWorkerUnavailableError(
-                    f"Worker unreachable on health probe for '{self.bank_id}': {exc}"
+                    f"Worker unreachable on health probe for '{self.bank_id}': {type(reason).__name__}"
                 ) from exc
             if isinstance(reason, (socket.gaierror, socket.herror)):
                 raise CounterpartyWorkerUnavailableError(
-                    f"Worker unreachable on health probe for '{self.bank_id}' (DNS resolution failed): {exc}"
+                    f"Worker unreachable on health probe for '{self.bank_id}' (DNS resolution failed): {type(reason).__name__}"
                 ) from exc
             raise CounterpartyTransportError(
                 f"Worker probe transport error for '{self.bank_id}': {exc}"
@@ -3137,36 +3138,37 @@ class InstitutionalCoordinatorClient:
             raise ValueError(f"Unsupported URL scheme for coordinator client: {base_url}")
         self.base_url = clean_url
 
-    def health_check(self) -> dict[str, Any]:
+    def health_check(self, timeout: float | None = None) -> dict[str, Any]:
         url = f"{self.base_url}/health"
         req = urllib.request.Request(url, method="GET")
+        probe_timeout = 5.0 if timeout is None else max(0.001, float(timeout))
         try:
-            with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
+            with urllib.request.urlopen(req, timeout=probe_timeout) as resp:  # nosec B310
                 body = resp.read()
         except TimeoutError as exc:
             raise CounterpartyTimeoutError(
-                f"Coordinator probe timed out on '{self.base_url}': {exc}"
+                f"Coordinator probe timed out: {type(exc).__name__}"
             ) from exc
         except ConnectionError as exc:
             raise CounterpartyWorkerUnavailableError(
-                f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
+                f"Coordinator daemon is unreachable or offline: {type(exc).__name__}"
             ) from exc
         except urllib.error.URLError as exc:
             reason = getattr(exc, "reason", None)
             if isinstance(reason, (TimeoutError, socket.timeout)):
                 raise CounterpartyTimeoutError(
-                    f"Coordinator probe timed out on '{self.base_url}': {exc}"
+                    f"Coordinator probe timed out: {type(reason).__name__}"
                 ) from exc
             if isinstance(reason, ConnectionError):
                 raise CounterpartyWorkerUnavailableError(
-                    f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
+                    f"Coordinator daemon is unreachable or offline: {type(reason).__name__}"
                 ) from exc
             raise ConsortiumSecurityError(
-                f"Coordinator daemon at '{self.base_url}' is unreachable: {exc}"
+                f"Coordinator daemon is unreachable: {type(exc).__name__}"
             ) from exc
         except Exception as exc:
             raise ConsortiumSecurityError(
-                f"Coordinator daemon at '{self.base_url}' is unreachable: {exc}"
+                f"Coordinator daemon is unreachable: {type(exc).__name__}"
             ) from exc
 
         try:
@@ -3298,32 +3300,32 @@ class InstitutionalCoordinatorClient:
                 raise ValueError(f"HTTP transport error from coordinator: {http_err}") from http_err
         except TimeoutError as exc:
             raise CounterpartyTimeoutError(
-                f"Coordinator matching invocation timed out on '{self.base_url}': {exc}"
+                f"Coordinator matching invocation timed out: {type(exc).__name__}"
             ) from exc
         except ConnectionError as exc:
             raise CounterpartyWorkerUnavailableError(
-                f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
+                f"Coordinator daemon is unreachable or offline: {type(exc).__name__}"
             ) from exc
         except urllib.error.URLError as exc:
             reason = getattr(exc, "reason", None)
             if isinstance(reason, (TimeoutError, socket.timeout)):
                 raise CounterpartyTimeoutError(
-                    f"Coordinator matching invocation timed out on '{self.base_url}': {exc}"
+                    f"Coordinator matching invocation timed out: {type(reason).__name__}"
                 ) from exc
             if isinstance(reason, ConnectionError):
                 raise CounterpartyWorkerUnavailableError(
-                    f"Coordinator daemon at '{self.base_url}' is unreachable or offline: {exc}"
+                    f"Coordinator daemon is unreachable or offline: {type(reason).__name__}"
                 ) from exc
             if isinstance(reason, (socket.gaierror, socket.herror)):
                 raise CounterpartyWorkerUnavailableError(
-                    f"Coordinator daemon at '{self.base_url}' is unreachable (DNS resolution failed): {exc}"
+                    f"Coordinator daemon is unreachable (DNS resolution failed): {type(reason).__name__}"
                 ) from exc
             raise CounterpartyTransportError(
-                f"Coordinator matching invocation failed on '{self.base_url}': {exc}"
+                f"Coordinator matching invocation failed: {type(exc).__name__}"
             ) from exc
         except (http.client.HTTPException, OSError) as exc:
             raise CounterpartyTransportError(
-                f"Coordinator matching invocation failed on '{self.base_url}': {exc}"
+                f"Coordinator matching invocation failed: {type(exc).__name__}"
             ) from exc
 
         # Response parsing and schema validation must execute OUTSIDE the network exception handlers.

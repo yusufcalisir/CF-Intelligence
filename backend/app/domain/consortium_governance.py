@@ -66,7 +66,7 @@ class CounterpartyDeadlineExceededError(CounterpartyTimeoutError):
 
     def __init__(
         self,
-        message: str,
+        message: str = "Execution deadline exceeded",
         target_bank_id: str | None = None,
         is_pre_dispatch: bool = False,
     ) -> None:
