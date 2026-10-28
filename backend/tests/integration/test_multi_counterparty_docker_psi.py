@@ -18,7 +18,9 @@ Verifies:
 from __future__ import annotations
 
 import hashlib
+import json
 import time
+import uuid
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -38,6 +40,7 @@ from app.application.services.entity_resolution import _entity_to_dict
 from app.domain.consortium_governance import ConsortiumSecurityError, MemberRole
 from app.domain.investigation_entities import Entity, EntityType, RiskLevel
 from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
 from app.main import app
 from tests.integration.conftest import (
@@ -726,3 +729,229 @@ def test_multi_counterparty_docker_psi_circuit_breaker_recovery(
         assert st_closed["half_open_probe_id"] is None
     finally:
         _run_cmd(["docker", "start", container_c], check=False)
+
+
+def test_multi_counterparty_docker_psi_case_evidence_admission_lifecycle(
+    three_bank_docker_topology: dict[str, Any],
+    isolated_tri_governance_env: tuple[ConsortiumGovernanceService, str, str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """End-to-End verified admission lifecycle from genuine Docker OpenMined PSI to institutional case evidence.
+
+    Verifies:
+    1. Executes genuine authenticated OpenMined PSI against Bank B and Bank C.
+    2. Verifies signed operational receipt through the authentic admission path (_admitted_receipts_store).
+    3. Confirms signal is finalized and published (COMMITTED, PUBLISHED, is_authoritative=True).
+    4. Creates genuine institution-owned investigation case (Bank A).
+    5. Attaches signal using authenticated Bank A investigator.
+    6. Reloads persisted evidence and verifies content integrity, scope, disclosure policy, and audit event.
+    7. Proves simulated, tampered, or unpublished signals are rejected from entering the evidence ledger.
+    """
+    gov_svc, token_a, _, _ = isolated_tri_governance_env
+    client_a = three_bank_docker_topology["client_a"]
+    client_b = three_bank_docker_topology["client_b"]
+    client_c = three_bank_docker_topology["client_c"]
+    port_coord: int = three_bank_docker_topology["port_coord"]
+
+    coord_url = f"http://127.0.0.1:{port_coord}"
+    monkeypatch.setenv("CFI_COORDINATOR_URL", coord_url)
+
+    # 1. Execute genuine authenticated OpenMined PSI
+    shared_identifier = "TR990001112223334445558888"
+    clean_identifier = "TR112233445566778899009999"
+
+    client_a.store_private_entity({
+        "id": "ent_target_e2e_a",
+        "bank_id": "bank_a",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["CORRUPTION_FACILITATION"],
+    })
+    client_b.store_private_entity({
+        "id": "ent_target_e2e_b",
+        "bank_id": "bank_b",
+        "entity_type": "account",
+        "raw_identifier": shared_identifier,
+        "risk_level": "high",
+        "typologies": ["CORRUPTION_FACILITATION"],
+    })
+    client_c.store_private_entity({
+        "id": "ent_target_e2e_c",
+        "bank_id": "bank_c",
+        "entity_type": "account",
+        "raw_identifier": clean_identifier,
+        "risk_level": "low",
+        "typologies": [],
+    })
+
+    cbi_service = CrossBankIntelligenceService(consortium_service=gov_svc)
+    ent_a = Entity(
+        id="ent_target_e2e_a",
+        entity_type=EntityType.CUSTOMER,
+        privacy_id=hashlib.sha256(shared_identifier.encode()).hexdigest(),
+        bank_id="bank_a",
+        display_label="Syndicate Target E2E",
+        risk_level=RiskLevel.HIGH,
+        attributes={"raw_identifier": shared_identifier},
+    )
+    cbi_service.entity_service._entities.set("ent_target_e2e_a", _entity_to_dict(ent_a))
+
+    req = MultiCounterpartyIntelligenceQueryRequest(
+        consortium_id="c_tri_m63_docker",
+        requesting_bank_id="bank_a",
+        target_bank_ids=["bank_b", "bank_c"],
+        query_entity_id="ent_target_e2e_a",
+        purpose="AML_COLLABORATIVE_INVESTIGATION",
+        execution_mode="VERIFIED_OPERATIONAL",
+        use_established_psi=True,
+        require_established_psi=True,
+    )
+
+    query_response: MultiCounterpartyIntelligenceQueryResponse = (
+        cbi_service.query_multi_counterparty_intelligence(req=req, auth_token=token_a)
+    )
+
+    assert query_response.overall_outcome == "COMPLETED"
+    assert "bank_b" in query_response.results
+    sig_b = query_response.results["bank_b"]
+    assert sig_b.match_confirmed is True
+    assert sig_b.execution_mode == "VERIFIED_OPERATIONAL"
+    assert sig_b.is_authoritative is True
+
+    # 2. Verify signed operational receipt through the actual admission path
+    rcp_id_b = sig_b.provenance["receipt_id"]
+    admitted_rec = cbi_service._admitted_receipts_store.get(rcp_id_b)
+    assert admitted_rec is not None
+    assert admitted_rec["execution_mode"] == "VERIFIED_OPERATIONAL"
+    assert admitted_rec["signal_id"] == sig_b.signal_id
+    assert admitted_rec["requesting_bank_id"] == "bank_a"
+    assert admitted_rec["target_bank_id"] == "bank_b"
+    assert admitted_rec["consortium_id"] == "c_tri_m63_docker"
+    assert len(admitted_rec["content_hash"]) == 64
+
+    # 3. Confirm signal is finalized and published
+    stored_sig = cbi_service._signal_store.get(sig_b.signal_id)
+    assert stored_sig is not None
+    assert stored_sig["admission_status"] == "COMMITTED"
+    assert stored_sig["publication_status"] == "PUBLISHED"
+    assert stored_sig["is_authoritative"] is True
+    assert stored_sig["is_attachable"] is True
+    assert stored_sig["content_hash"] == admitted_rec["content_hash"]
+
+    # 4. Create a genuine institution-owned investigation case (Bank A)
+    case_svc = cbi_service.case_service
+    case = case_svc.create_case(
+        title="Tri-Bank Docker PSI Case Evidence Integration",
+        bank_id="bank_a",
+    )
+    assert case.id is not None
+    assert case.bank_id == "bank_a"
+
+    # 5. Attach the signal using an authenticated investigator
+    attach_resp = cbi_service.attach_signal_to_case_evidence(
+        case_id=case.id,
+        signal_id=sig_b.signal_id,
+        auth_token=token_a,
+        notes="Authentic evidence attached from genuine OpenMined PSI execution",
+    )
+
+    assert attach_resp.evidence_id is not None
+    assert attach_resp.case_id == case.id
+    assert attach_resp.signal_id == sig_b.signal_id
+    assert attach_resp.is_duplicate_submission is False
+
+    # 6. Reload persisted evidence and verify matching content integrity, scope, disclosure policy, and audit event
+    evidence_svc = cbi_service.evidence_service
+    ev = evidence_svc.get_evidence(attach_resp.evidence_id)
+    assert ev is not None
+    ev_path = Path(ev["file_path"])
+    assert ev_path.exists()
+
+    persisted_raw = ev_path.read_text(encoding="utf-8")
+    persisted_json = json.loads(persisted_raw)
+
+    assert persisted_json["signal_id"] == sig_b.signal_id
+    assert persisted_json["consortium_id"] == "c_tri_m63_docker"
+    assert persisted_json["requesting_bank_id"] == "bank_a"
+    assert persisted_json["is_authoritative"] is True
+    assert persisted_json["operational_status"] == "OPERATIONAL"
+
+    sig_content = persisted_json["signal_content"]
+    assert sig_content["match_confirmed"] is True
+    assert sig_content["match_category"] == "PROBABILISTIC_FUZZY"
+    assert sig_content["execution_mode"] == "VERIFIED_OPERATIONAL"
+    assert sig_content["is_authoritative"] is True
+
+    # Under ATTRIBUTED_INSTITUTIONS, verify target bank identity is preserved per authorized grant policy
+    assert sig_content["disclosure_mode"] == "ATTRIBUTED_INSTITUTIONS"
+    assert sig_content["target_bank_id"] == "bank_b"
+    assert sig_content["contributing_institutions"] == ["bank_b"]
+    prov = persisted_json["provenance"]
+    assert prov["target_bank_id"] == "bank_b"
+    assert prov["receipt_id"] == rcp_id_b
+
+    # Verify audit event in ImmutableAuditChain
+    audit_events = ImmutableAuditChain.get_instance().get_snapshot()
+    matched_audit = [
+        e for e in audit_events
+        if e.event_type == "CROSS_BANK_INTELLIGENCE_EVIDENCE_ATTACHED"
+        and e.details.get("signal_id") == sig_b.signal_id
+        and e.details.get("case_id") == case.id
+    ]
+    assert len(matched_audit) >= 1
+    assert "tri_analyst_a" in matched_audit[0].actor_id
+    assert matched_audit[0].actor_institution == "bank_a"
+
+    # 7. Prove simulated, tampered, or unpublished signals cannot enter that ledger
+    # 7a. Simulated research signal rejected
+    sim_sig_id = f"sig_sim_{uuid.uuid4().hex[:8]}"
+    sim_rec = dict(stored_sig)
+    sim_rec["signal_id"] = sim_sig_id
+    sim_rec["execution_mode"] = "SIMULATED_RESEARCH"
+    sim_rec["is_authoritative"] = False
+    sim_rec["is_synthetic"] = True
+    sim_data = dict(stored_sig["signal_data"])
+    sim_data["signal_id"] = sim_sig_id
+    sim_data["execution_mode"] = "SIMULATED_RESEARCH"
+    sim_data["is_authoritative"] = False
+    sim_data["is_synthetic"] = True
+    sim_rec["signal_data"] = sim_data
+    sim_rec["content_hash"] = hashlib.sha256(json.dumps(sim_data, sort_keys=True).encode("utf-8")).hexdigest()
+    cbi_service._signal_store.set(sim_sig_id, sim_rec)
+    with pytest.raises(ConsortiumSecurityError, match="Simulated research signals cannot be attached"):
+        cbi_service.attach_signal_to_case_evidence(
+            case_id=case.id,
+            signal_id=sim_sig_id,
+            auth_token=token_a,
+        )
+
+    # 7b. Tampered signal content rejected
+    tampered_sig_id = f"sig_tamper_{uuid.uuid4().hex[:8]}"
+    tampered_rec = dict(stored_sig)
+    tampered_rec["signal_id"] = tampered_sig_id
+    tampered_data = dict(stored_sig["signal_data"])
+    tampered_data["signal_id"] = tampered_sig_id
+    tampered_data["match_confidence"] = 0.50
+    tampered_rec["signal_data"] = tampered_data
+    tampered_rec["content_hash"] = hashlib.sha256(json.dumps(tampered_data, sort_keys=True).encode("utf-8")).hexdigest()
+    cbi_service._signal_store.set(tampered_sig_id, tampered_rec)
+    with pytest.raises(ConsortiumSecurityError, match="Cryptographic admission binding mismatch|diverges from cryptographically admitted"):
+        cbi_service.attach_signal_to_case_evidence(
+            case_id=case.id,
+            signal_id=tampered_sig_id,
+            auth_token=token_a,
+        )
+
+    # 7c. Unpublished signal rejected
+    unpub_sig_id = f"sig_unpub_{uuid.uuid4().hex[:8]}"
+    unpub_rec = dict(stored_sig)
+    unpub_rec["signal_id"] = unpub_sig_id
+    unpub_rec["publication_status"] = "PENDING_PUBLICATION"
+    cbi_service._signal_store.set(unpub_sig_id, unpub_rec)
+    with pytest.raises(ConsortiumSecurityError, match="publication status is 'PENDING_PUBLICATION'"):
+        cbi_service.attach_signal_to_case_evidence(
+            case_id=case.id,
+            signal_id=unpub_sig_id,
+            auth_token=token_a,
+        )

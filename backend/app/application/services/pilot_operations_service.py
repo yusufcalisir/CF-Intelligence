@@ -1317,6 +1317,7 @@ class PilotOperationsService:
         match_confirmed: bool | None,
         signal_id: str | None = None,
         case_id: str | None = None,
+        content_hash: str | None = None,
     ) -> tuple[PilotEntity, PilotExecutionReceipt]:
         """Commit an in-flight reservation upon successful PSI execution and result admission."""
         return self.store.commit_query_reservation(
@@ -1327,6 +1328,7 @@ class PilotOperationsService:
             match_confirmed=match_confirmed,
             signal_id=signal_id,
             case_id=case_id,
+            content_hash=content_hash,
         )
 
     def prepare_query_publication(

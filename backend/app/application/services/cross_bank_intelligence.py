@@ -14,6 +14,7 @@ import http.client
 import json
 import logging
 import os
+import re
 import socket
 import threading
 import time
@@ -708,6 +709,7 @@ class CrossBankIntelligenceService:
                             match_confirmed=bool(getattr(signal, "match_confirmed", False)),
                             signal_id=signal.signal_id,
                             case_id=req_case_id,
+                            content_hash=record.get("content_hash"),
                         )
                     except Exception as commit_exc:
                         record["admission_status"] = "REJECTED"
@@ -855,6 +857,7 @@ class CrossBankIntelligenceService:
                                 match_confirmed=bool(getattr(signal, "match_confirmed", False)),
                                 signal_id=signal.signal_id,
                                 case_id=req_case_id,
+                                content_hash=record.get("content_hash"),
                             )
                         except Exception as commit_exc:
                             record["admission_status"] = "REJECTED"
@@ -2832,6 +2835,7 @@ class CrossBankIntelligenceService:
             ImmutableAuditChain.get_instance().append_event(
                 event_type="CROSS_BANK_INTELLIGENCE_EVIDENCE_ATTACHMENT_REJECTED",
                 actor_id=actor,
+                actor_institution=caller_bank,
                 action=f"attach_cross_bank_evidence:{case_id}",
                 resource_id=f"case:{case_id}",
                 details={
@@ -2939,24 +2943,24 @@ class CrossBankIntelligenceService:
             sanitized_prov: dict[str, Any] = {
                 "execution_mode": raw_prov.get("execution_mode", "VERIFIED_OPERATIONAL"),
                 "assurance_level": raw_prov.get("assurance_level", "REVIEWED_ESTABLISHED_PSI_VERIFIED"),
-                "receipt_id": raw_prov.get("receipt_id"),
-                "ticket_id": raw_prov.get("ticket_id"),
-                "grant_id": raw_prov.get("grant_id"),
-                "grant_revision": raw_prov.get("grant_revision"),
                 "executed_at": raw_prov.get("executed_at"),
                 "disclosure_mode": disclosure_mode,
             }
             if is_attributed:
+                sanitized_prov["receipt_id"] = raw_prov.get("receipt_id")
+                sanitized_prov["ticket_id"] = raw_prov.get("ticket_id")
+                sanitized_prov["grant_id"] = raw_prov.get("grant_id")
+                sanitized_prov["grant_revision"] = raw_prov.get("grant_revision")
                 sanitized_prov["target_bank_id"] = target_bank_id or raw_prov.get("target_bank_id")
                 sanitized_prov["contributing_institutions"] = projected["contributing_institutions"]
             else:
                 sanitized_prov["target_bank_id"] = None
                 sanitized_prov["contributing_institutions"] = []
-                for field in ("ticket_id", "grant_id", "receipt_id"):
-                    val = sanitized_prov.get(field)
-                    if val and isinstance(val, str) and clean_target and clean_target in val.lower():
-                        prefix = field.split("_")[0]
-                        sanitized_prov[field] = f"{prefix}_anon_{hashlib.sha256(val.encode('utf-8')).hexdigest()[:16]}"
+                sanitized_prov["receipt_id"] = None
+                sanitized_prov["ticket_id"] = None
+                sanitized_prov["grant_id"] = None
+                sanitized_prov["grant_revision"] = None
+                sanitized_prov["opaque_provenance_ref"] = f"prov_ref_{uuid.uuid4().hex[:16]}"
             projected["provenance"] = sanitized_prov
 
         return projected
@@ -2987,6 +2991,73 @@ class CrossBankIntelligenceService:
                     canonical_data[k] = v
         serialized = json.dumps(canonical_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(serialized).hexdigest()
+
+    @classmethod
+    def _validate_anonymous_notes_policy(
+        cls,
+        notes: str | None,
+        consortium: Any,
+        requesting_bank: str,
+        target_bank: str | None,
+    ) -> None:
+        """Enforce strict anonymity policy on free-text analyst notes for anonymous evidence admission.
+
+        Rejects notes containing counterpart institution names, consortium member identities,
+        or institutional identifier patterns (fail closed).
+        """
+        if not notes or not isinstance(notes, str):
+            return
+
+        clean_notes = notes.strip()
+        if not clean_notes:
+            return
+
+        # 1. Identify forbidden counterparties & member banks
+        forbidden_terms: set[str] = set()
+        clean_req = requesting_bank.lower().strip()
+
+        if target_bank:
+            tb = target_bank.lower().strip()
+            if tb and tb != clean_req:
+                forbidden_terms.add(tb)
+
+        # Extract consortium member banks
+        c_members = getattr(consortium, "member_bank_ids", None) or []
+        if not c_members and hasattr(consortium, "metadata") and isinstance(consortium.metadata, dict):
+            c_members = consortium.metadata.get("member_bank_ids") or []
+        for m in c_members:
+            if isinstance(m, str):
+                m_clean = m.lower().strip()
+                if m_clean and m_clean != clean_req:
+                    forbidden_terms.add(m_clean)
+
+        # 2. Check for exact counterpart / member name occurrences (with word boundaries and separators)
+        for term in forbidden_terms:
+            variants = [
+                re.escape(term),
+                re.escape(term.replace("_", " ")),
+                re.escape(term.replace("_", "-")),
+                re.escape(term.replace("-", " ")),
+            ]
+            pattern = r"(?i)\b(" + "|".join(variants) + r")\b"
+            if re.search(pattern, clean_notes):
+                raise ConsortiumSecurityError(
+                    f"Analyst notes violate anonymity policy for disclosure mode 'ANONYMOUS_SUMMARY': "
+                    f"Counterpart or institution identifier '{term}' detected in free-text notes. "
+                    "Anonymous case evidence strictly prohibits persisting counterparty identities."
+                )
+
+        # 3. Detect general institutional identifier patterns referring to non-requesting banks
+        inst_pattern = r"(?i)\b(bank|institution)[_\-\s]?([a-zA-Z0-9]+)\b"
+        for match in re.finditer(inst_pattern, clean_notes):
+            matched_id = match.group(0).lower().replace(" ", "_").replace("-", "_")
+            req_normalized = clean_req.replace(" ", "_").replace("-", "_")
+            if matched_id != req_normalized and match.group(2).lower() != req_normalized.split("_")[-1]:
+                raise ConsortiumSecurityError(
+                    f"Analyst notes violate anonymity policy for disclosure mode 'ANONYMOUS_SUMMARY': "
+                    f"Institutional identifier '{match.group(0)}' detected in free-text notes. "
+                    "Anonymous case evidence strictly prohibits persisting counterparty identities."
+                )
 
     def attach_signal_to_case_evidence(
         self,
@@ -3310,13 +3381,15 @@ class CrossBankIntelligenceService:
                 pilot_svc = PilotOperationsService.get_instance()
                 durable_res = pilot_svc.store.get_query_reservation(record["reservation_id"])
                 if durable_res and durable_res.get("status") == "PUBLISHED" and durable_res.get("signal_id") == resolved_signal_id:
+                    pilot_obj = pilot_svc.store.get_pilot(durable_res.get("pilot_id", ""))
+                    pilot_consortium = pilot_obj.consortium_id if pilot_obj else None
                     admitted_receipt = {
-                        "receipt_id": receipt_id,
-                        "signal_id": resolved_signal_id,
+                        "receipt_id": durable_res.get("receipt_id"),
+                        "signal_id": durable_res.get("signal_id"),
                         "requesting_bank_id": durable_res.get("requesting_bank_id"),
                         "target_bank_id": durable_res.get("target_bank_id"),
-                        "consortium_id": consortium_id,
-                        "content_hash": record.get("content_hash"),
+                        "consortium_id": pilot_consortium,
+                        "content_hash": durable_res.get("content_hash"),
                         "execution_mode": "VERIFIED_OPERATIONAL",
                     }
 
@@ -3329,45 +3402,76 @@ class CrossBankIntelligenceService:
                 )
 
             # Strict Receipt-to-Signal Binding (Correction A)
-            if admitted_receipt.get("signal_id") != resolved_signal_id:
+            adm_receipt_id = admitted_receipt.get("receipt_id")
+            if not adm_receipt_id or adm_receipt_id != receipt_id:
+                raise ConsortiumSecurityError(
+                    f"Cryptographic admission receipt mismatch: Admitted receipt '{adm_receipt_id}' does not match requested receipt '{receipt_id}'."
+                )
+
+            adm_signal_id = admitted_receipt.get("signal_id")
+            if not adm_signal_id or adm_signal_id != resolved_signal_id:
                 raise ConsortiumSecurityError(
                     f"Cryptographic admission binding mismatch: Receipt '{receipt_id}' was issued for signal "
-                    f"'{admitted_receipt.get('signal_id')}', cannot be bound to requested signal '{resolved_signal_id}'."
+                    f"'{adm_signal_id}', cannot be bound to requested signal '{resolved_signal_id}'."
                 )
 
             # Trusted Issuance Content Digest Verification (Correction A)
             trusted_content_hash = admitted_receipt.get("content_hash")
-            if trusted_content_hash:
-                if record.get("content_hash") != trusted_content_hash:
-                    raise ConsortiumSecurityError(
-                        f"Authoritative signal '{resolved_signal_id}' content hash '{record.get('content_hash')}' "
-                        f"diverges from cryptographically admitted issuance digest '{trusted_content_hash}' for receipt '{receipt_id}'. "
-                        "Stored record has been mutated or tampered with."
-                    )
-                if recomputed_hash and recomputed_hash != trusted_content_hash:
-                    raise ConsortiumSecurityError(
-                        f"Authoritative signal '{resolved_signal_id}' canonical content digest '{recomputed_hash}' "
-                        f"diverges from cryptographically admitted issuance digest '{trusted_content_hash}' for receipt '{receipt_id}'. "
-                        "Stored signal data has been mutated or tampered with."
-                    )
+            if not trusted_content_hash or not isinstance(trusted_content_hash, str) or len(trusted_content_hash) != 64:
+                raise ConsortiumSecurityError(
+                    f"Authoritative signal '{resolved_signal_id}' lacks a valid, independently established issuance digest "
+                    f"in cryptographic registry (got '{trusted_content_hash}'). "
+                    "Historic or un-attested pilot records lacking immutable content digest cannot provide "
+                    "independently verified issuance integrity and cannot enter institutional case evidence."
+                )
 
-            # Consistency across Consortium, Requesting Bank, and Counterpart Scope
+            stored_hash = record.get("content_hash")
+            if not stored_hash or stored_hash != trusted_content_hash:
+                raise ConsortiumSecurityError(
+                    f"Authoritative signal '{resolved_signal_id}' content hash '{stored_hash}' "
+                    f"diverges from cryptographically admitted issuance digest '{trusted_content_hash}' for receipt '{receipt_id}'. "
+                    "Stored record has been mutated or tampered with."
+                )
+            if not recomputed_hash or recomputed_hash != trusted_content_hash:
+                raise ConsortiumSecurityError(
+                    f"Authoritative signal '{resolved_signal_id}' canonical content digest '{recomputed_hash}' "
+                    f"diverges from cryptographically admitted issuance digest '{trusted_content_hash}' for receipt '{receipt_id}'. "
+                    "Stored signal data has been mutated or tampered with."
+                )
+
+            # Consistency across Consortium, Requesting Bank, and Counterpart Scope (Mandatory)
             adm_consortium = admitted_receipt.get("consortium_id")
-            if adm_consortium and adm_consortium.lower() != consortium_id.lower():
+            if not adm_consortium or adm_consortium.lower() != consortium_id.lower():
                 raise ConsortiumSecurityError(
-                    f"Admitted receipt '{receipt_id}' consortium '{adm_consortium}' does not match signal consortium '{consortium_id}'."
+                    f"Admitted receipt '{receipt_id}' consortium scope '{adm_consortium}' does not match signal consortium '{consortium_id}'."
                 )
+
             adm_requesting = admitted_receipt.get("requesting_bank_id")
-            if adm_requesting and adm_requesting.lower() != eff_case_bank.lower():
+            if not adm_requesting or adm_requesting.lower() != eff_case_bank.lower():
                 raise ConsortiumSecurityError(
-                    f"Admitted receipt '{receipt_id}' requesting bank '{adm_requesting}' does not match case bank '{eff_case_bank}'."
+                    f"Admitted receipt '{receipt_id}' requesting bank scope '{adm_requesting}' does not match case bank '{eff_case_bank}'."
                 )
+            sig_requesting = (record.get("requesting_bank_id") or "").lower().strip()
+            if not sig_requesting or sig_requesting != eff_case_bank.lower():
+                raise ConsortiumSecurityError(
+                    f"Signal '{resolved_signal_id}' requesting bank '{sig_requesting}' does not match case bank '{eff_case_bank}'."
+                )
+
             adm_target = admitted_receipt.get("target_bank_id")
-            target_bank = (record.get("target_bank_id") or "").lower().strip()
-            if adm_target and target_bank and adm_target.lower() != target_bank:
+            raw_signal_target = (
+                record.get("target_bank_id")
+                or (signal_data.get("contributing_institutions") or [None])[0]
+                or (signal_data.get("provenance", {}) if isinstance(signal_data, dict) else {}).get("target_bank_id")
+                or (signal_data.get("target_bank_id") if isinstance(signal_data, dict) else None)
+                or ""
+            )
+            target_bank = raw_signal_target.lower().strip() if isinstance(raw_signal_target, str) else ""
+            if not adm_target or not target_bank or adm_target.lower() != target_bank:
                 raise ConsortiumSecurityError(
-                    f"Admitted receipt '{receipt_id}' target bank '{adm_target}' does not match signal target bank '{target_bank}'."
+                    f"Admitted receipt '{receipt_id}' counterpart scope '{adm_target}' does not match signal target bank '{target_bank}'."
                 )
+            if not record.get("target_bank_id"):
+                record["target_bank_id"] = target_bank
 
             # Consistency check with Finalized Pilot Reservation if present
             if record.get("reservation_id") and record.get("pilot_id"):
@@ -3384,6 +3488,14 @@ class CrossBankIntelligenceService:
                     raise ConsortiumSecurityError(f"Pilot reservation '{record['reservation_id']}' receipt_id '{durable_res.get('receipt_id')}' does not match '{receipt_id}'.")
                 if durable_res.get("requesting_bank_id", "").lower() != eff_case_bank.lower():
                     raise ConsortiumSecurityError(f"Pilot reservation requesting bank '{durable_res.get('requesting_bank_id')}' does not match case bank '{eff_case_bank}'.")
+                if durable_res.get("target_bank_id", "").lower() != target_bank.lower():
+                    raise ConsortiumSecurityError(f"Pilot reservation target bank '{durable_res.get('target_bank_id')}' does not match signal target bank '{target_bank}'.")
+                res_content_hash = durable_res.get("content_hash")
+                if res_content_hash and res_content_hash != trusted_content_hash:
+                    raise ConsortiumSecurityError(
+                        f"Pilot reservation '{record['reservation_id']}' content hash '{res_content_hash}' "
+                        f"diverges from admitted issuance digest '{trusted_content_hash}'."
+                    )
 
             # 4. Revalidate Operational Data-Sharing Grant & Bilateral Consent
             grant_id = record.get("grant_id") or (
@@ -3392,19 +3504,33 @@ class CrossBankIntelligenceService:
                 else None
             )
             if grant_id:
-                grant = consortium.metadata.get("operational_data_sharing_grant") or {}
-                is_grant_active = bool(grant.get("is_active", False) and grant.get("status") != "REVOKED")
+                grant = {}
+                if hasattr(consortium, "operational_data_sharing_grants"):
+                    grant = (consortium.operational_data_sharing_grants or {}).get(grant_id) or {}
+                if not grant:
+                    grant = consortium.metadata.get("operational_data_sharing_grant") or {}
+                if not grant or grant.get("grant_id") != grant_id:
+                    if hasattr(consortium, "get_pairwise_operational_grant"):
+                        grant = consortium.get_pairwise_operational_grant(grant_id) or {}
+                    elif hasattr(consortium, "pairwise_operational_grants"):
+                        grant = (consortium.pairwise_operational_grants or {}).get(grant_id) or {}
+
+                is_grant_active = bool(
+                    (grant.get("is_active") is True or grant.get("status") == "ACTIVE")
+                    and grant.get("status") != "REVOKED"
+                )
                 revoked_institutions = set(grant.get("revoked_by_institutions") or [])
-                target_bank = record.get("target_bank_id") or (
+                target_bank_override = record.get("target_bank_id") or (
                     signal_data.get("provenance", {}).get("target_bank_id")
                     if isinstance(signal_data, dict)
                     else None
                 )
+                target_bank_str = str(target_bank_override).lower().strip() if target_bank_override else target_bank
                 if (
                     grant.get("grant_id") != grant_id
                     or not is_grant_active
                     or (eff_case_bank in revoked_institutions)
-                    or (target_bank and target_bank in revoked_institutions)
+                    or (target_bank_str and target_bank_str in revoked_institutions)
                 ):
                     raise ConsortiumSecurityError(
                         f"Operational consent for grant '{grant_id}' has been revoked or is no longer active in consortium '{consortium_id}'. "
@@ -3426,9 +3552,9 @@ class CrossBankIntelligenceService:
                         f"Institution '{eff_case_bank}' has not approved current grant revision for grant '{grant_id}'. "
                         "Evidence attachment denied."
                     )
-                if target_bank and target_bank not in approvals:
+                if target_bank_str and target_bank_str not in approvals:
                     raise ConsortiumSecurityError(
-                        f"Target counterpart institution '{target_bank}' has not approved current grant revision for grant '{grant_id}'. "
+                        f"Target counterpart institution '{target_bank_str}' has not approved current grant revision for grant '{grant_id}'. "
                         "Evidence attachment denied."
                     )
 
@@ -3527,6 +3653,15 @@ class CrossBankIntelligenceService:
                 target_bank_id=record.get("target_bank_id"),
             )
 
+            # Validate anonymous analyst notes policy (Correction C)
+            if effective_disclosure_mode != "ATTRIBUTED_INSTITUTIONS" and notes:
+                self._validate_anonymous_notes_policy(
+                    notes=notes,
+                    consortium=consortium,
+                    requesting_bank=eff_case_bank,
+                    target_bank=record.get("target_bank_id"),
+                )
+
             sanitized_provenance: dict[str, Any] = {
                 "signal_id": resolved_signal_id,
                 "consortium_id": consortium_id,
@@ -3535,13 +3670,13 @@ class CrossBankIntelligenceService:
                 "disclosure_mode": effective_disclosure_mode,
                 "execution_mode": execution_mode,
                 "assurance_level": assurance_level,
-                "receipt_id": receipt_id,
-                "ticket_id": record.get("ticket_id"),
-                "grant_id": record.get("grant_id"),
-                "grant_revision": record.get("grant_revision"),
             }
             if effective_disclosure_mode == "ATTRIBUTED_INSTITUTIONS":
                 sanitized_provenance["target_bank_id"] = record.get("target_bank_id")
+                sanitized_provenance["receipt_id"] = receipt_id
+                sanitized_provenance["ticket_id"] = record.get("ticket_id")
+                sanitized_provenance["grant_id"] = record.get("grant_id")
+                sanitized_provenance["grant_revision"] = record.get("grant_revision")
                 if isinstance(signal_data, dict):
                     sanitized_provenance["contributing_institutions"] = list(
                         signal_data.get("contributing_institutions", [])
@@ -3549,12 +3684,11 @@ class CrossBankIntelligenceService:
             else:
                 sanitized_provenance["target_bank_id"] = None
                 sanitized_provenance["contributing_institutions"] = []
-                clean_target = (record.get("target_bank_id") or "").lower().strip()
-                for field in ("ticket_id", "grant_id", "receipt_id"):
-                    val = sanitized_provenance.get(field)
-                    if val and isinstance(val, str) and clean_target and clean_target in val.lower():
-                        prefix = field.split("_")[0]
-                        sanitized_provenance[field] = f"{prefix}_anon_{hashlib.sha256(val.encode('utf-8')).hexdigest()[:16]}"
+                sanitized_provenance["receipt_id"] = None
+                sanitized_provenance["ticket_id"] = None
+                sanitized_provenance["grant_id"] = None
+                sanitized_provenance["grant_revision"] = None
+                sanitized_provenance["opaque_provenance_ref"] = f"prov_ref_{uuid.uuid4().hex[:16]}"
 
             payload = {
                 "signal_id": resolved_signal_id,
@@ -3660,6 +3794,7 @@ class CrossBankIntelligenceService:
             ImmutableAuditChain.get_instance().append_event(
                 event_type="CROSS_BANK_INTELLIGENCE_EVIDENCE_ATTACHED",
                 actor_id=f"user:{uploader}@{eff_case_bank}",
+                actor_institution=eff_case_bank,
                 action=f"attach_cross_bank_evidence:{case_id}",
                 resource_id=f"evidence:{ev['id']}",
                 details={

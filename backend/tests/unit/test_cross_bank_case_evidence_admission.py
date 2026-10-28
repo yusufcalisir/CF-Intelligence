@@ -37,11 +37,13 @@ from app.application.services.case_service import (
 from app.application.services.consortium_service import ConsortiumGovernanceService
 from app.application.services.cross_bank_intelligence import CrossBankIntelligenceService
 from app.application.services.entity_resolution import EntityResolutionService
+from app.application.services.pilot_operations_service import PilotOperationsService
 from app.domain.consortium_governance import (
     ConsortiumSecurityError,
     CrossBankIdempotencyConflictError,
 )
 from app.domain.enums import CaseStatus
+from app.domain.pilot_operations import PilotEntity, PilotOperationalConfig, PilotStatus
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
@@ -1537,4 +1539,329 @@ class TestAuthoritativeEvidenceAdmission:
         assert sig_content["sanitized_typology_indicators"] == ["CROSS_BANK_ENTITY_OBSERVED"]
         assert sig_content["target_bank_id"] is None
         assert sig_content["contributing_institutions"] == []
+
+    def test_adversarial_missing_digest_in_admission_record_rejected(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction A: Admission record lacking a content digest must fail closed."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        case = case_svc.create_case(title="Missing Digest Test Case", bank_id="bank_a")
+        sig_id, rec = _create_verified_operational_signal_record(cbi_svc, requesting_bank_id="bank_a")
+
+        # Corrupt admission record to have missing content_hash
+        rcp_id = rec["receipt_id"]
+        adm_entry = cbi_svc._admitted_receipts_store.get(rcp_id)
+        assert adm_entry is not None
+        adm_entry["content_hash"] = None
+        cbi_svc._admitted_receipts_store.set(rcp_id, adm_entry)
+
+        with pytest.raises(ConsortiumSecurityError, match="lacks a valid, independently established issuance digest"):
+            cbi_svc.attach_signal_to_case_evidence(
+                case_id=case.id,
+                signal_id=sig_id,
+                principal=principal_a,
+            )
+
+    def test_adversarial_malformed_digest_in_admission_record_rejected(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction A: Malformed or truncated digest in admission registry must fail closed."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        case = case_svc.create_case(title="Malformed Digest Test Case", bank_id="bank_a")
+        sig_id, rec = _create_verified_operational_signal_record(cbi_svc, requesting_bank_id="bank_a")
+
+        rcp_id = rec["receipt_id"]
+        adm_entry = cbi_svc._admitted_receipts_store.get(rcp_id)
+        assert adm_entry is not None
+        adm_entry["content_hash"] = "short_hash_123"
+        cbi_svc._admitted_receipts_store.set(rcp_id, adm_entry)
+
+        with pytest.raises(ConsortiumSecurityError, match="lacks a valid, independently established issuance digest"):
+            cbi_svc.attach_signal_to_case_evidence(
+                case_id=case.id,
+                signal_id=sig_id,
+                principal=principal_a,
+            )
+
+    def test_adversarial_mismatched_or_missing_scope_bindings_rejected(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction A: Missing or mismatched consortium, requesting bank, or counterpart scope must fail closed."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        case = case_svc.create_case(title="Scope Verification Case", bank_id="bank_a")
+        sig_id, rec = _create_verified_operational_signal_record(cbi_svc, requesting_bank_id="bank_a")
+        rcp_id = rec["receipt_id"]
+        base_adm = dict(cbi_svc._admitted_receipts_store.get(rcp_id))
+
+        # 1. Missing consortium scope
+        adm_no_consortium = dict(base_adm)
+        adm_no_consortium["consortium_id"] = None
+        cbi_svc._admitted_receipts_store.set(rcp_id, adm_no_consortium)
+        with pytest.raises(ConsortiumSecurityError, match="consortium scope 'None' does not match"):
+            cbi_svc.attach_signal_to_case_evidence(case_id=case.id, signal_id=sig_id, principal=principal_a)
+
+        # 2. Mismatched consortium scope
+        adm_wrong_consortium = dict(base_adm)
+        adm_wrong_consortium["consortium_id"] = "other_consortium"
+        cbi_svc._admitted_receipts_store.set(rcp_id, adm_wrong_consortium)
+        with pytest.raises(ConsortiumSecurityError, match="consortium scope 'other_consortium' does not match"):
+            cbi_svc.attach_signal_to_case_evidence(case_id=case.id, signal_id=sig_id, principal=principal_a)
+
+        # 3. Missing requesting bank scope
+        adm_no_requesting = dict(base_adm)
+        adm_no_requesting["requesting_bank_id"] = None
+        cbi_svc._admitted_receipts_store.set(rcp_id, adm_no_requesting)
+        with pytest.raises(ConsortiumSecurityError, match="requesting bank scope 'None' does not match"):
+            cbi_svc.attach_signal_to_case_evidence(case_id=case.id, signal_id=sig_id, principal=principal_a)
+
+        # 4. Mismatched counterpart (target bank) scope
+        adm_wrong_target = dict(base_adm)
+        adm_wrong_target["target_bank_id"] = "bank_c"
+        cbi_svc._admitted_receipts_store.set(rcp_id, adm_wrong_target)
+        with pytest.raises(ConsortiumSecurityError, match="counterpart scope 'bank_c' does not match"):
+            cbi_svc.attach_signal_to_case_evidence(case_id=case.id, signal_id=sig_id, principal=principal_a)
+
+        # 5. Missing counterpart scope
+        adm_no_target = dict(base_adm)
+        adm_no_target["target_bank_id"] = None
+        cbi_svc._admitted_receipts_store.set(rcp_id, adm_no_target)
+        with pytest.raises(ConsortiumSecurityError, match="counterpart scope 'None' does not match"):
+            cbi_svc.attach_signal_to_case_evidence(case_id=case.id, signal_id=sig_id, principal=principal_a)
+
+    def test_adversarial_historic_pilot_record_lacking_immutable_digest_rejected(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction A: Historic pilot reservation lacking independently stored content_hash must fail closed."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+        pilot_svc = PilotOperationsService.get_instance()
+
+        case = case_svc.create_case(title="Historic Pilot Case", bank_id="bank_a")
+        sig_id, rec = _create_verified_operational_signal_record(cbi_svc, requesting_bank_id="bank_a")
+
+        res_id = f"res_historic_{uuid.uuid4().hex[:8]}"
+        p_id = "pilot_historic_test"
+
+        pilot_svc.store.save_pilot(
+            PilotEntity(
+                config=PilotOperationalConfig(
+                    pilot_id=p_id,
+                    consortium_id="c_admission_test",
+                    participating_institutions=["bank_a", "bank_b"],
+                ),
+                status=PilotStatus.ACTIVE,
+            )
+        )
+        with pilot_svc.store._lock, pilot_svc.store._get_connection() as conn:
+            conn.execute(
+                """INSERT INTO pilot_query_reservations (
+                    reservation_id, pilot_id, requesting_bank_id, target_bank_id, purpose,
+                    status, reserved_at, finalized_at, published_at, receipt_id, signal_id, content_hash
+                ) VALUES (?, ?, ?, ?, ?, 'PUBLISHED', ?, ?, ?, ?, ?, NULL);""",
+                (
+                    res_id, p_id, "bank_a", "bank_b", "AML_INVESTIGATION",
+                    datetime.datetime.now(UTC).isoformat(),
+                    datetime.datetime.now(UTC).isoformat(),
+                    datetime.datetime.now(UTC).isoformat(),
+                    rec["receipt_id"], sig_id,
+                )
+            )
+            conn.commit()
+
+        rec["reservation_id"] = res_id
+        rec["pilot_id"] = p_id
+        cbi_svc._signal_store.set(sig_id, rec)
+
+        cbi_svc._admitted_receipts_store.delete(rec["receipt_id"])
+
+        with pytest.raises(ConsortiumSecurityError, match="lacks a valid, independently established issuance digest"):
+            cbi_svc.attach_signal_to_case_evidence(
+                case_id=case.id,
+                signal_id=sig_id,
+                principal=principal_a,
+            )
+
+    def test_adversarial_pilot_record_with_tampered_content_and_recomputed_hash_rejected(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction A: Pilot record with modified content and recomputed mutable hash must be rejected against durable pilot digest."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+        pilot_svc = PilotOperationsService.get_instance()
+
+        case = case_svc.create_case(title="Pilot Tampering Case", bank_id="bank_a")
+        sig_id, rec = _create_verified_operational_signal_record(cbi_svc, requesting_bank_id="bank_a")
+
+        original_hash = rec["content_hash"]
+        res_id = f"res_tamper_{uuid.uuid4().hex[:8]}"
+        p_id = "pilot_tamper_test"
+
+        pilot_svc.store.save_pilot(
+            PilotEntity(
+                config=PilotOperationalConfig(
+                    pilot_id=p_id,
+                    consortium_id="c_admission_test",
+                    participating_institutions=["bank_a", "bank_b"],
+                ),
+                status=PilotStatus.ACTIVE,
+            )
+        )
+        with pilot_svc.store._lock, pilot_svc.store._get_connection() as conn:
+            conn.execute(
+                """INSERT INTO pilot_query_reservations (
+                    reservation_id, pilot_id, requesting_bank_id, target_bank_id, purpose,
+                    status, reserved_at, finalized_at, published_at, receipt_id, signal_id, content_hash
+                ) VALUES (?, ?, ?, ?, ?, 'PUBLISHED', ?, ?, ?, ?, ?, ?);""",
+                (
+                    res_id, p_id, "bank_a", "bank_b", "AML_INVESTIGATION",
+                    datetime.datetime.now(UTC).isoformat(),
+                    datetime.datetime.now(UTC).isoformat(),
+                    datetime.datetime.now(UTC).isoformat(),
+                    rec["receipt_id"], sig_id, original_hash,
+                )
+            )
+            conn.commit()
+
+        rec["reservation_id"] = res_id
+        rec["pilot_id"] = p_id
+
+        # Adversary tampers with signal_data and recomputes the mutable content_hash
+        rec["signal_data"]["match_confidence"] = 0.1234
+        recomputed = hashlib.sha256(json.dumps(rec["signal_data"], sort_keys=True).encode("utf-8")).hexdigest()
+        rec["content_hash"] = recomputed
+        cbi_svc._signal_store.set(sig_id, rec)
+
+        cbi_svc._admitted_receipts_store.delete(rec["receipt_id"])
+
+        with pytest.raises(ConsortiumSecurityError, match="diverges from cryptographically admitted issuance digest"):
+            cbi_svc.attach_signal_to_case_evidence(
+                case_id=case.id,
+                signal_id=sig_id,
+                principal=principal_a,
+            )
+
+    def test_anonymized_evidence_projection_zero_identifying_tokens_with_predictable_ids(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction B: Predictable institution-bearing IDs do not expose raw names or recoverable tokens in anonymized mode."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        evidence_svc: EvidenceRegistryService = admission_env["evidence_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        case = case_svc.create_case(title="Predictable IDs Test Case", bank_id="bank_a")
+        sig_id, rec = _create_verified_operational_signal_record(
+            cbi_svc,
+            requesting_bank_id="bank_a",
+            target_bank_id="bank_b",
+            disclosure_mode="ANONYMOUS_SUMMARY",
+            receipt_id="rcp_predictable_bank_b_target_999",
+            ticket_id="ticket_predictable_bank_b_target_999",
+        )
+
+        resp = cbi_svc.attach_signal_to_case_evidence(
+            case_id=case.id,
+            signal_id=sig_id,
+            principal=principal_a,
+            notes="Analyst verifying no predictable tokens persist in anonymous summary",
+        )
+
+        ev = evidence_svc.get_evidence(resp.evidence_id)
+        assert ev is not None
+        persisted_raw = Path(ev["file_path"]).read_text(encoding="utf-8")
+        persisted_json = json.loads(persisted_raw)
+
+        # 1. No raw "bank_b" in persisted content
+        assert "bank_b" not in persisted_raw.lower()
+
+        # 2. No recoverable unsalted hashes of predictable tokens
+        pred_tokens = [
+            "rcp_predictable_bank_b_target_999",
+            "ticket_predictable_bank_b_target_999",
+            "grant_test",
+        ]
+        for tok in pred_tokens:
+            full_h = hashlib.sha256(tok.encode("utf-8")).hexdigest()
+            assert full_h not in persisted_raw
+            assert full_h[:16] not in persisted_raw
+
+        # 3. Provenance exposes only independent opaque reference
+        prov = persisted_json["provenance"]
+        assert prov["target_bank_id"] is None
+        assert prov["receipt_id"] is None
+        assert prov["ticket_id"] is None
+        assert prov["grant_id"] is None
+        assert prov.get("opaque_provenance_ref") is not None
+        assert prov["opaque_provenance_ref"].startswith("prov_ref_")
+
+    def test_negative_anonymous_notes_with_counterparty_reference_rejected(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction C: Negative test - notes referencing counterparty are rejected under ANONYMOUS_SUMMARY."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        evidence_svc: EvidenceRegistryService = admission_env["evidence_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        case = case_svc.create_case(title="Negative Notes Test Case", bank_id="bank_a")
+        sig_id, _ = _create_verified_operational_signal_record(
+            cbi_svc,
+            requesting_bank_id="bank_a",
+            target_bank_id="bank_b",
+            disclosure_mode="ANONYMOUS_SUMMARY",
+        )
+
+        with pytest.raises(ConsortiumSecurityError, match="violat.*anonymity.*policy|counterpart.*identifier"):
+            cbi_svc.attach_signal_to_case_evidence(
+                case_id=case.id,
+                signal_id=sig_id,
+                principal=principal_a,
+                notes="Investigation confirmed by bank_b",
+            )
+
+        # Verify no evidence was registered on the case
+        case_evs = evidence_svc.get_case_evidence(case.id)
+        assert len(case_evs) == 0
+
+    def test_attributed_mode_allows_ordinary_analyst_notes_with_counterparty(
+        self, admission_env: dict[str, Any]
+    ) -> None:
+        """Correction C: Attributed disclosure mode preserves ordinary analyst notes when permitted by governance."""
+        cbi_svc: CrossBankIntelligenceService = admission_env["cbi_svc"]
+        case_svc: CaseManagementService = admission_env["case_svc"]
+        evidence_svc: EvidenceRegistryService = admission_env["evidence_svc"]
+        principal_a = admission_env["principals"]["bank_a"]
+
+        case = case_svc.create_case(title="Attributed Notes Test Case", bank_id="bank_a")
+        sig_id, _ = _create_verified_operational_signal_record(
+            cbi_svc,
+            requesting_bank_id="bank_a",
+            target_bank_id="bank_b",
+            disclosure_mode="ATTRIBUTED_INSTITUTIONS",
+        )
+
+        resp = cbi_svc.attach_signal_to_case_evidence(
+            case_id=case.id,
+            signal_id=sig_id,
+            principal=principal_a,
+            notes="Investigation confirmed by bank_b",
+        )
+
+        assert resp.evidence_id is not None
+        ev = evidence_svc.get_evidence(resp.evidence_id)
+        assert ev is not None
+        persisted = json.loads(Path(ev["file_path"]).read_text(encoding="utf-8"))
+        assert persisted["analyst_notes"] == "Investigation confirmed by bank_b"
+        assert persisted["provenance"]["target_bank_id"] == "bank_b"
 

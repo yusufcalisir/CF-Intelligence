@@ -250,6 +250,8 @@ class TestSimulationIsolation:
 def _make_signal_authoritative(intel_svc: CrossBankIntelligenceService, signal_id: str) -> None:
     record = intel_svc._signal_store.get(signal_id)
     assert record is not None
+    target_bank = record.get("target_bank_id") or "bank_b"
+    record["target_bank_id"] = target_bank
     record["is_authoritative"] = True
     record["is_synthetic"] = False
     record["execution_mode"] = "VERIFIED_OPERATIONAL"
@@ -271,9 +273,9 @@ def _make_signal_authoritative(intel_svc: CrossBankIntelligenceService, signal_i
             "signal_id": signal_id,
             "receipt_id": rcp_id,
             "content_hash": record["content_hash"],
-            "requesting_bank_id": record.get("requesting_bank_id"),
-            "target_bank_id": record.get("target_bank_id"),
-            "consortium_id": record.get("consortium_id"),
+            "requesting_bank_id": record.get("requesting_bank_id") or "bank_a",
+            "target_bank_id": target_bank,
+            "consortium_id": record.get("consortium_id") or "high_assurance_ring",
             "execution_mode": "VERIFIED_OPERATIONAL",
         },
     )
@@ -619,7 +621,7 @@ class TestAuthoritativeConsortiumSharingPolicy:
             requesting_bank_id="bank_a",
             query_entity_id=ent_a.id,
             consortium_id=test_setup["consortium_id"],
-            sharing_purpose="FRAUD_INVESTIGATION",
+            purpose="FRAUD_INVESTIGATION",
         )
 
         with pytest.raises(ConsortiumSecurityError, match="Consortium data-sharing policy rejected query"):

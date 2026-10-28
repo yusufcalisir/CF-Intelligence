@@ -118,6 +118,8 @@ class DurablePilotStore:
                 conn.execute("ALTER TABLE pilot_query_reservations ADD COLUMN prepared_at TEXT;")
             if "publication_fence" not in res_cols:
                 conn.execute("ALTER TABLE pilot_query_reservations ADD COLUMN publication_fence TEXT;")
+            if "content_hash" not in res_cols:
+                conn.execute("ALTER TABLE pilot_query_reservations ADD COLUMN content_hash TEXT;")
 
             conn.execute("CREATE INDEX IF NOT EXISTS idx_pilot_status ON pilot_operations(status);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_pilot_consortium ON pilot_operations(consortium_id);")
@@ -306,6 +308,7 @@ class DurablePilotStore:
         match_confirmed: bool | None,
         signal_id: str | None = None,
         case_id: str | None = None,
+        content_hash: str | None = None,
     ) -> tuple[PilotEntity, PilotExecutionReceipt]:
         """Atomically commit an in-flight reservation upon successful PSI execution and result admission."""
         clean_pilot_id = pilot_id.strip()
@@ -380,9 +383,10 @@ class DurablePilotStore:
                     status = 'COMMITTED',
                     finalized_at = ?,
                     receipt_id = ?,
-                    signal_id = ?
+                    signal_id = ?,
+                    content_hash = ?
                 WHERE reservation_id = ?;
-            """, (now_iso, receipt_id, signal_id, reservation_id))
+            """, (now_iso, receipt_id, signal_id, content_hash, reservation_id))
             conn.commit()
             return entity, receipt
 

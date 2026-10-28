@@ -242,6 +242,16 @@ class PilotEntity:
         return self.status == PilotStatus.ACTIVE and not self.has_expired()
 
     @property
+    def pilot_id(self) -> str:
+        """Returns pilot identifier."""
+        return self.config.pilot_id
+
+    @property
+    def consortium_id(self) -> str:
+        """Returns consortium identifier."""
+        return self.config.consortium_id
+
+    @property
     def config_revision(self) -> int:
         """Returns configuration revision number."""
         return self.config.revision
