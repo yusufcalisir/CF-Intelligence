@@ -2829,6 +2829,84 @@ class CrossBankIntelligenceService:
         except Exception as audit_err:
             logger.warning("Failed to record attachment rejection audit event: %s", audit_err)
 
+    @staticmethod
+    def _project_evidence_signal_content(
+        signal_data: dict[str, Any] | None,
+        disclosure_mode: str,
+        target_bank_id: str | None,
+    ) -> dict[str, Any]:
+        """Project an allowlisted, safe signal content representation for case evidence persistence.
+
+        Enforces consortium disclosure policy: In non-attributed (anonymized) disclosure modes,
+        counterparty identities (e.g. target_bank_id, contributing_institutions) are strictly excluded
+        from nested provenance, graph context, and payload fields.
+        """
+        if not isinstance(signal_data, dict):
+            return {}
+
+        is_attributed = (disclosure_mode == "ATTRIBUTED_INSTITUTIONS")
+
+        projected: dict[str, Any] = {
+            "signal_id": signal_data.get("signal_id"),
+            "consortium_id": signal_data.get("consortium_id"),
+            "query_entity_id": signal_data.get("query_entity_id"),
+            "requesting_bank_id": signal_data.get("requesting_bank_id"),
+            "privacy_hash_truncated": signal_data.get("privacy_hash_truncated"),
+            "match_confirmed": bool(signal_data.get("match_confirmed", False)),
+            "match_category": signal_data.get("match_category", "NO_MATCH"),
+            "match_confidence": float(signal_data.get("match_confidence", 0.0)),
+            "contributing_institutions_count": int(signal_data.get("contributing_institutions_count", 0)),
+            "disclosure_mode": disclosure_mode,
+            "sanitized_risk_level": signal_data.get("sanitized_risk_level", "UNOBSERVED"),
+            "sanitized_typology_indicators": list(signal_data.get("sanitized_typology_indicators", [])),
+            "execution_mode": signal_data.get("execution_mode", "VERIFIED_OPERATIONAL"),
+            "assurance_level": signal_data.get("assurance_level", "REVIEWED_ESTABLISHED_PSI_VERIFIED"),
+            "attestation_status": signal_data.get("attestation_status", "SOFTWARE_CONTAINER_VERIFIED"),
+            "is_authoritative": True,
+            "is_synthetic": False,
+        }
+
+        # Graph context: preserve topological indicators without institution identities
+        raw_graph = signal_data.get("graph_context") or {}
+        if isinstance(raw_graph, dict):
+            projected["graph_context"] = {
+                "has_incident_cross_bank_correlations": bool(raw_graph.get("has_incident_cross_bank_correlations", False)),
+                "sanitized_degree_band": raw_graph.get("sanitized_degree_band", "ISOLATED"),
+            }
+        else:
+            projected["graph_context"] = {}
+
+        # Attribution-dependent projection
+        if is_attributed:
+            projected["target_bank_id"] = target_bank_id or signal_data.get("target_bank_id")
+            projected["contributing_institutions"] = list(signal_data.get("contributing_institutions", []))
+        else:
+            projected["target_bank_id"] = None
+            projected["contributing_institutions"] = []
+
+        # Provenance: safe allowlisted references only (no secret signing keys or raw tickets)
+        raw_prov = signal_data.get("provenance") or {}
+        if isinstance(raw_prov, dict):
+            sanitized_prov: dict[str, Any] = {
+                "execution_mode": raw_prov.get("execution_mode", "VERIFIED_OPERATIONAL"),
+                "assurance_level": raw_prov.get("assurance_level", "REVIEWED_ESTABLISHED_PSI_VERIFIED"),
+                "receipt_id": raw_prov.get("receipt_id"),
+                "ticket_id": raw_prov.get("ticket_id"),
+                "grant_id": raw_prov.get("grant_id"),
+                "grant_revision": raw_prov.get("grant_revision"),
+                "executed_at": raw_prov.get("executed_at"),
+                "disclosure_mode": disclosure_mode,
+            }
+            if is_attributed:
+                sanitized_prov["target_bank_id"] = target_bank_id or raw_prov.get("target_bank_id")
+                sanitized_prov["contributing_institutions"] = projected["contributing_institutions"]
+            else:
+                sanitized_prov["target_bank_id"] = None
+                sanitized_prov["contributing_institutions"] = []
+            projected["provenance"] = sanitized_prov
+
+        return projected
+
     def attach_signal_to_case_evidence(
         self,
         case_id: str,
@@ -2874,10 +2952,14 @@ class CrossBankIntelligenceService:
             if not eff_case_bank:
                 raise ValueError(f"Case '{case_id}' lacks authoritative institution binding (bank_id).")
 
-            if not auth_principal.is_privileged and caller_bank != eff_case_bank:
+            # Correction A: Strict Case-Write Tenant Ownership
+            # Authoritative evidence writes require caller-bank ownership of the existing case
+            # regardless of generalized cross-bank administrative roles (e.g. super_admin, cross_bank_investigator, compliance_auditor).
+            if caller_bank != eff_case_bank:
                 raise PermissionError(
                     f"Tenant isolation violation: Caller institution '{caller_bank}' cannot modify "
-                    f"or attach evidence to case '{case_id}' owned by institution '{eff_case_bank}'."
+                    f"or attach evidence to case '{case_id}' owned by institution '{eff_case_bank}'. "
+                    "Authoritative case evidence writes require caller-bank ownership regardless of administrative roles."
                 )
 
             if not case.is_open:
@@ -3029,25 +3111,7 @@ class CrossBankIntelligenceService:
                         f"Execution reservation '{res_id}' receipt '{durable_res.get('receipt_id')}' does not match record receipt '{record_rcp}'."
                     )
 
-            # 3d. Admission State Transition Checks
-            adm_status = record.get("admission_status")
-            if adm_status and adm_status != "COMMITTED":
-                raise ConsortiumSecurityError(
-                    f"Authoritative signal '{resolved_signal_id}' admission status is '{adm_status}', "
-                    f"not COMMITTED. Unfinalized or rejected signals cannot enter case evidence."
-                )
-            pub_status = record.get("publication_status")
-            if pub_status and pub_status != "PUBLISHED":
-                raise ConsortiumSecurityError(
-                    f"Authoritative signal '{resolved_signal_id}' publication status is '{pub_status}', "
-                    f"not PUBLISHED. Evidence admission requires genuinely finalized authoritative publication."
-                )
-            if record.get("is_attachable") is False:
-                raise ConsortiumSecurityError(
-                    f"Authoritative signal '{resolved_signal_id}' is marked non-authoritative or unattachable."
-                )
-
-            # 3e. Assurance Level & Execution Mode Boundary
+            # 3c. Assurance Level & Execution Mode Boundary
             assurance_level = (
                 (signal_data.get("assurance_level") if isinstance(signal_data, dict) else None)
                 or record.get("assurance_level")
@@ -3055,14 +3119,6 @@ class CrossBankIntelligenceService:
             execution_mode = (
                 (signal_data.get("execution_mode") if isinstance(signal_data, dict) else None)
                 or record.get("execution_mode")
-            )
-            is_authoritative = bool(
-                record.get("is_authoritative", True)
-                and (signal_data.get("is_authoritative", True) if isinstance(signal_data, dict) else True)
-            )
-            is_synthetic = bool(
-                record.get("is_synthetic", False)
-                or (signal_data.get("is_synthetic", False) if isinstance(signal_data, dict) else False)
             )
 
             if (
@@ -3077,11 +3133,97 @@ class CrossBankIntelligenceService:
 
             if (
                 execution_mode == "SIMULATED_RESEARCH"
-                or not is_authoritative
-                or is_synthetic
+                or record.get("is_synthetic") is True
+                or record.get("is_authoritative") is False
             ):
                 raise ConsortiumSecurityError(
-                    "Simulated research signals cannot be attached to authoritative fraud investigation evidence or regulatory filings."
+                    "Simulated research signals cannot be attached to authoritative fraud "
+                    "investigation evidence or regulatory filings."
+                )
+
+            # 3d. Admission State Transition Checks (Correction B: Strict Affirmative Values Required)
+            adm_status = record.get("admission_status")
+            if adm_status != "COMMITTED":
+                raise ConsortiumSecurityError(
+                    f"Authoritative signal '{resolved_signal_id}' admission status is '{adm_status}', "
+                    f"not COMMITTED. Unfinalized, rejected, or absent admission states cannot enter case evidence."
+                )
+
+            pub_status = record.get("publication_status")
+            if pub_status != "PUBLISHED":
+                raise ConsortiumSecurityError(
+                    f"Authoritative signal '{resolved_signal_id}' publication status is '{pub_status}', "
+                    f"not PUBLISHED. Evidence admission requires genuinely finalized authoritative publication."
+                )
+
+            if record.get("is_attachable") is not True:
+                raise ConsortiumSecurityError(
+                    f"Authoritative signal '{resolved_signal_id}' is marked non-authoritative or unattachable (is_attachable={record.get('is_attachable')})."
+                )
+
+            if record.get("is_authoritative") is not True:
+                raise ConsortiumSecurityError(
+                    f"Authoritative signal '{resolved_signal_id}' lacks affirmative is_authoritative=True (got {record.get('is_authoritative')})."
+                )
+
+            if record.get("is_synthetic") is not False:
+                raise ConsortiumSecurityError(
+                    f"Authoritative signal '{resolved_signal_id}' has non-false is_synthetic flag (got {record.get('is_synthetic')})."
+                )
+
+            if execution_mode != "VERIFIED_OPERATIONAL":
+                raise ConsortiumSecurityError(
+                    f"Authoritative signal '{resolved_signal_id}' execution_mode must be 'VERIFIED_OPERATIONAL' (got '{execution_mode}')."
+                )
+
+            if isinstance(signal_data, dict):
+                if signal_data.get("is_authoritative") is not True:
+                    raise ConsortiumSecurityError(
+                        f"Authoritative signal '{resolved_signal_id}' signal_data lacks affirmative is_authoritative=True."
+                    )
+                if signal_data.get("is_synthetic") is not False:
+                    raise ConsortiumSecurityError(
+                        f"Authoritative signal '{resolved_signal_id}' signal_data has non-false is_synthetic ({signal_data.get('is_synthetic')})."
+                    )
+                if signal_data.get("execution_mode") != "VERIFIED_OPERATIONAL":
+                    raise ConsortiumSecurityError(
+                        f"Authoritative signal '{resolved_signal_id}' signal_data execution_mode is not 'VERIFIED_OPERATIONAL' ({signal_data.get('execution_mode')})."
+                    )
+
+            # 3f. Authoritative Issuance / Cryptographic Admission Chain Verification
+            receipt_id = (
+                record.get("receipt_id")
+                or (record.get("receipt", {}).get("receipt_id") if isinstance(record.get("receipt"), dict) else None)
+                or (signal_data.get("provenance", {}).get("receipt_id") if isinstance(signal_data, dict) and isinstance(signal_data.get("provenance"), dict) else None)
+                or (record.get("provenance", {}).get("receipt_id") if isinstance(record.get("provenance"), dict) else None)
+            )
+            if not receipt_id:
+                raise ConsortiumSecurityError(
+                    f"Authoritative signal '{resolved_signal_id}' lacks authentic cryptographic receipt reference. "
+                    "Unattested signals cannot be admitted into institutional evidence."
+                )
+
+            is_admitted_in_registry = False
+            if receipt_id in self._admitted_receipt_ids:
+                is_admitted_in_registry = True
+            admitted_receipt = self._admitted_receipts_store.get(receipt_id)
+            if admitted_receipt and isinstance(admitted_receipt, dict) and admitted_receipt.get("signal_id") == resolved_signal_id:
+                is_admitted_in_registry = True
+
+            is_finalized_in_pilot = False
+            if record.get("reservation_id") and record.get("pilot_id"):
+                from app.application.services.pilot_operations_service import PilotOperationsService
+                pilot_svc = PilotOperationsService.get_instance()
+                durable_res = pilot_svc.store.get_query_reservation(record["reservation_id"])
+                if durable_res and durable_res.get("status") == "PUBLISHED" and durable_res.get("signal_id") == resolved_signal_id:
+                    is_finalized_in_pilot = True
+
+            if not (is_admitted_in_registry or is_finalized_in_pilot):
+                raise ConsortiumSecurityError(
+                    f"Authoritative issuance verification failed for signal '{resolved_signal_id}': "
+                    f"Receipt '{receipt_id}' has no authentic admission entry in cryptographic registry "
+                    "or finalized pilot reservation. "
+                    "Defensible evidence requires verified operational execution and independent cryptographic admission."
                 )
 
             # 4. Revalidate Current Consortium Governance & Revocation Status
@@ -3148,13 +3290,20 @@ class CrossBankIntelligenceService:
                         "Evidence attachment denied."
                     )
 
-            # 5. Idempotent Submission Check (Prevent Duplicate Evidence Creation)
+            # 5. Idempotent Submission Check (Prevent Duplicate Evidence Creation & Enforce Subject Binding)
             existing_evidence = self.evidence_service.get_case_evidence(case_id)
             for ev in existing_evidence:
                 ev_meta = ev.get("metadata") or {}
-                if ev_meta.get("signal_id") == resolved_signal_id or (
-                    idempotency_key and ev_meta.get("idempotency_key") == idempotency_key
-                ):
+                matched_by_key = bool(idempotency_key and ev_meta.get("idempotency_key") == idempotency_key)
+                matched_by_signal = bool(ev_meta.get("signal_id") == resolved_signal_id)
+
+                if matched_by_key:
+                    if ev_meta.get("signal_id") != resolved_signal_id:
+                        raise CrossBankIdempotencyConflictError(
+                            f"Idempotency conflict for key '{idempotency_key}': Key was already used on case '{case_id}' "
+                            f"for evidence '{ev['id']}' with signal '{ev_meta.get('signal_id')}', "
+                            f"cannot be reused for differing signal '{resolved_signal_id}'."
+                        )
                     logger.info(
                         "Idempotent attachment replay detected for signal %s on case %s (evidence_id=%s)",
                         resolved_signal_id,
@@ -3164,7 +3313,7 @@ class CrossBankIntelligenceService:
                     return CrossBankEvidenceAttachResponse(
                         evidence_id=ev["id"],
                         case_id=case_id,
-                        signal_id=resolved_signal_id,
+                        signal_id=ev_meta["signal_id"],
                         evidence_type=ev.get("evidence_type", "CROSS_BANK_INTELLIGENCE"),
                         title=ev.get("title", ""),
                         content_hash=ev.get("content_hash", ""),
@@ -3175,12 +3324,41 @@ class CrossBankIntelligenceService:
                         is_duplicate_submission=True,
                     )
 
-            # 6. Durably Register Evidence with CAS Concurrency & Sanitized Provenance
+                if matched_by_signal:
+                    logger.info(
+                        "Idempotent attachment replay detected for signal %s on case %s (evidence_id=%s)",
+                        resolved_signal_id,
+                        case_id,
+                        ev["id"],
+                    )
+                    return CrossBankEvidenceAttachResponse(
+                        evidence_id=ev["id"],
+                        case_id=case_id,
+                        signal_id=ev_meta["signal_id"],
+                        evidence_type=ev.get("evidence_type", "CROSS_BANK_INTELLIGENCE"),
+                        title=ev.get("title", ""),
+                        content_hash=ev.get("content_hash", ""),
+                        uploaded_at=ev.get("uploaded_at", ""),
+                        uploaded_by=ev.get("uploaded_by", uploader),
+                        case_version=getattr(case, "version", 1),
+                        timeline_event_recorded=False,
+                        is_duplicate_submission=True,
+                    )
+
+            # 6. Durably Register Evidence with CAS Concurrency & Policy-Aware Projected Content
             effective_disclosure_mode = (
                 (signal_data.get("disclosure_mode") if isinstance(signal_data, dict) else None)
                 or record.get("disclosure_mode")
                 or "ANONYMOUS_SUMMARY"
             )
+
+            # Build safe allowlisted signal content projection (Correction D)
+            projected_signal_content = self._project_evidence_signal_content(
+                signal_data=signal_data,
+                disclosure_mode=effective_disclosure_mode,
+                target_bank_id=record.get("target_bank_id"),
+            )
+
             sanitized_provenance: dict[str, Any] = {
                 "signal_id": resolved_signal_id,
                 "consortium_id": consortium_id,
@@ -3189,26 +3367,33 @@ class CrossBankIntelligenceService:
                 "disclosure_mode": effective_disclosure_mode,
                 "execution_mode": execution_mode,
                 "assurance_level": assurance_level,
+                "receipt_id": receipt_id,
+                "ticket_id": record.get("ticket_id"),
+                "grant_id": record.get("grant_id"),
+                "grant_revision": record.get("grant_revision"),
             }
             if effective_disclosure_mode == "ATTRIBUTED_INSTITUTIONS":
                 sanitized_provenance["target_bank_id"] = record.get("target_bank_id")
                 if isinstance(signal_data, dict):
-                    sanitized_provenance["contributing_institutions"] = signal_data.get(
-                        "contributing_institutions", []
+                    sanitized_provenance["contributing_institutions"] = list(
+                        signal_data.get("contributing_institutions", [])
                     )
+            else:
+                sanitized_provenance["target_bank_id"] = None
+                sanitized_provenance["contributing_institutions"] = []
 
             payload = {
                 "signal_id": resolved_signal_id,
                 "consortium_id": consortium_id,
                 "requesting_bank_id": sig_requesting_bank,
                 "query_entity_id": record.get("query_entity_id"),
-                "signal_content": signal_data,
+                "signal_content": projected_signal_content,
                 "provenance": sanitized_provenance,
                 "analyst_notes": notes,
                 "attached_by": uploader,
                 "attached_at": now.isoformat(),
                 "idempotency_key": idempotency_key,
-                "is_authoritative": is_authoritative,
+                "is_authoritative": True,
                 "operational_status": "OPERATIONAL",
             }
             content_json = json.dumps(payload, sort_keys=True, indent=2)
@@ -3228,7 +3413,7 @@ class CrossBankIntelligenceService:
                         "signal_id": resolved_signal_id,
                         "consortium_id": consortium_id,
                         "idempotency_key": idempotency_key,
-                        "is_authoritative": is_authoritative,
+                        "is_authoritative": True,
                         "operational_status": "OPERATIONAL",
                         "disclosure_mode": effective_disclosure_mode,
                     },
@@ -3237,14 +3422,37 @@ class CrossBankIntelligenceService:
                 fresh_evidence = self.evidence_service.get_case_evidence(case_id)
                 for fresh_ev in fresh_evidence:
                     fresh_meta = fresh_ev.get("metadata") or {}
-                    if fresh_meta.get("signal_id") == resolved_signal_id or (
-                        idempotency_key and fresh_meta.get("idempotency_key") == idempotency_key
-                    ):
+                    matched_by_key = bool(idempotency_key and fresh_meta.get("idempotency_key") == idempotency_key)
+                    matched_by_signal = bool(fresh_meta.get("signal_id") == resolved_signal_id)
+
+                    if matched_by_key:
+                        if fresh_meta.get("signal_id") != resolved_signal_id:
+                            raise CrossBankIdempotencyConflictError(
+                                f"Idempotency conflict for key '{idempotency_key}' during concurrent submission on case '{case_id}': "
+                                f"Key was committed for evidence '{fresh_ev['id']}' with signal '{fresh_meta.get('signal_id')}', "
+                                f"cannot be reused for differing signal '{resolved_signal_id}'."
+                            )
                         fresh_case = self.case_service.get_case(case_id)
                         return CrossBankEvidenceAttachResponse(
                             evidence_id=fresh_ev["id"],
                             case_id=case_id,
-                            signal_id=resolved_signal_id,
+                            signal_id=fresh_meta["signal_id"],
+                            evidence_type=fresh_ev.get("evidence_type", "CROSS_BANK_INTELLIGENCE"),
+                            title=fresh_ev.get("title", ""),
+                            content_hash=fresh_ev.get("content_hash", ""),
+                            uploaded_at=fresh_ev.get("uploaded_at", ""),
+                            uploaded_by=fresh_ev.get("uploaded_by", uploader),
+                            case_version=getattr(fresh_case, "version", getattr(case, "version", 1)),
+                            timeline_event_recorded=False,
+                            is_duplicate_submission=True,
+                        )
+
+                    if matched_by_signal:
+                        fresh_case = self.case_service.get_case(case_id)
+                        return CrossBankEvidenceAttachResponse(
+                            evidence_id=fresh_ev["id"],
+                            case_id=case_id,
+                            signal_id=fresh_meta["signal_id"],
                             evidence_type=fresh_ev.get("evidence_type", "CROSS_BANK_INTELLIGENCE"),
                             title=fresh_ev.get("title", ""),
                             content_hash=fresh_ev.get("content_hash", ""),

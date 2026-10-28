@@ -733,8 +733,21 @@ class TestAuthoritativeEvidenceBinding:
                 "is_synthetic": False,
                 "operational_status": "OPERATIONAL",
                 "assurance_level": "OPERATIONAL_PRIVACY_VERIFIED",
+                "execution_mode": "VERIFIED_OPERATIONAL",
+                "admission_status": "COMMITTED",
+                "publication_status": "PUBLISHED",
+                "is_attachable": True,
+                "receipt_id": f"rcp_{auth_sig_id}",
+                "receipt": {
+                    "receipt_id": f"rcp_{auth_sig_id}",
+                    "worker_signature": "sig_worker_a_valid",
+                    "coordinator_signature": "sig_coord_valid",
+                },
                 "attached_to_cases": [],
             },
+        )
+        intel_svc._admitted_receipts_store.set(
+            f"rcp_{auth_sig_id}", {"admitted_at": datetime.datetime.now(datetime.UTC).isoformat(), "signal_id": auth_sig_id}
         )
 
         attach_resp = intel_svc.attach_signal_to_case_evidence(
@@ -826,8 +839,21 @@ class TestAuthoritativeEvidenceBinding:
                 "is_synthetic": False,
                 "operational_status": "OPERATIONAL",
                 "assurance_level": "OPERATIONAL_PRIVACY_VERIFIED",
+                "execution_mode": "VERIFIED_OPERATIONAL",
+                "admission_status": "COMMITTED",
+                "publication_status": "PUBLISHED",
+                "is_attachable": True,
+                "receipt_id": f"rcp_{auth_sig_id}",
+                "receipt": {
+                    "receipt_id": f"rcp_{auth_sig_id}",
+                    "worker_signature": "sig_worker_a_valid",
+                    "coordinator_signature": "sig_coord_valid",
+                },
                 "attached_to_cases": [],
             },
+        )
+        intel_svc._admitted_receipts_store.set(
+            f"rcp_{auth_sig_id}", {"admitted_at": datetime.datetime.now(datetime.UTC).isoformat(), "signal_id": auth_sig_id}
         )
 
         case = case_svc.create_case(title="Idempotent Target Case", bank_id="bank_a")

@@ -564,7 +564,19 @@ def test_consent_revocation_before_evidence_attachment(tmp_path):
         "is_synthetic": False,
         "assurance_level": "REVIEWED_ESTABLISHED_PSI_VERIFIED",
         "execution_mode": "VERIFIED_OPERATIONAL",
+        "admission_status": "COMMITTED",
+        "publication_status": "PUBLISHED",
+        "is_attachable": True,
+        "receipt_id": "rcp_ev_gov_test",
+        "receipt": {
+            "receipt_id": "rcp_ev_gov_test",
+            "worker_signature": "sig_worker_a_valid",
+            "coordinator_signature": "sig_coord_valid",
+        },
     }
+    intel_svc._admitted_receipts_store.set(
+        "rcp_ev_gov_test", {"admitted_at": now.isoformat(), "signal_id": signal_id}
+    )
     RedisStore("authoritative_signals").set(signal_id, record)
 
     # 1. Attachment succeeds while grant is active

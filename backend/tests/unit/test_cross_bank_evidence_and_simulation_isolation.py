@@ -26,8 +26,10 @@ Verifies:
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import json
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -250,12 +252,21 @@ def _make_signal_authoritative(intel_svc: CrossBankIntelligenceService, signal_i
     assert record is not None
     record["is_authoritative"] = True
     record["is_synthetic"] = False
+    record["execution_mode"] = "VERIFIED_OPERATIONAL"
+    record["admission_status"] = "COMMITTED"
+    record["publication_status"] = "PUBLISHED"
+    record["is_attachable"] = True
     record["signal_data"]["execution_mode"] = "VERIFIED_OPERATIONAL"
     record["signal_data"]["is_authoritative"] = True
     record["signal_data"]["is_synthetic"] = False
     record["content_hash"] = hashlib.sha256(
         json.dumps(record["signal_data"], sort_keys=True).encode("utf-8")
     ).hexdigest()
+    rcp_id = record.get("receipt_id") or f"rcp_{signal_id}"
+    record["receipt_id"] = rcp_id
+    intel_svc._admitted_receipts_store.set(
+        rcp_id, {"admitted_at": datetime.datetime.now(UTC).isoformat(), "signal_id": signal_id}
+    )
     intel_svc._signal_store.set(signal_id, record)
 
 
