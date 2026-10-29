@@ -1002,6 +1002,11 @@ async def get_case_intelligence_evidence(
     batch_store = DurableCrossBankBatchStore.get_instance()
     intel_svc = CrossBankIntelligenceService.get_instance()
     consortium_svc = ConsortiumGovernanceService()
+    audit_chain = ImmutableAuditChain.get_instance()
+
+    chain_report = audit_chain.verify_chain_integrity()
+    audit_chain_valid = chain_report.is_valid
+    audit_chain_tamper_reason = chain_report.tamper_reason
 
     all_evidence = _evidence_service.get_case_evidence(case_id)
     projected: list[CaseIntelligenceEvidenceResponse] = []
@@ -1086,6 +1091,14 @@ async def get_case_intelligence_evidence(
                 operational_status = "UNAVAILABLE"
                 is_authoritative = False
                 explanation = "Authoritative evidence artifact is missing from durable storage or unreadable."
+        elif not audit_chain_valid:
+            verification_state = "FAILED_VERIFICATION"
+            operational_status = "TAMPERED"
+            is_authoritative = False
+            explanation = (
+                f"Cryptographic verification failed: Immutable audit chain integrity corrupted "
+                f"({audit_chain_tamper_reason or 'broken HMAC chain'})."
+            )
         else:
             # Content is cryptographically intact on disk; now evaluate issuance provenance
             receipt_id = provenance.get("receipt_id")
@@ -1118,17 +1131,51 @@ async def get_case_intelligence_evidence(
             issuance_mismatch_reason: str | None = None
 
             # 1. Independent Audit Chain & Authorized Attachment Pathway Verification
-            audit_chain = ImmutableAuditChain.get_instance()
             ev_audit_events = audit_chain.query_events(target_id=f"evidence:{ev_id}")
-            has_exact_attachment_audit = any(
-                e.event_type == "CROSS_BANK_INTELLIGENCE_EVIDENCE_ATTACHED"
-                and e.details.get("case_id") == case.id
-                and e.details.get("signal_id") == signal_id
-                for e in ev_audit_events
-            )
+            exact_attachment_event = None
+            attachment_hash_mismatch = False
+            mismatched_audit_hash: str | None = None
+
+            eff_consortium = (consortium_id or "").lower().strip()
+
+            for e in ev_audit_events:
+                if e.event_type != "CROSS_BANK_INTELLIGENCE_EVIDENCE_ATTACHED":
+                    continue
+                if e.target_id != f"evidence:{ev_id}":
+                    continue
+                details = e.details if isinstance(e.details, dict) else {}
+                if details.get("evidence_id") != ev_id:
+                    continue
+                if details.get("case_id") != case.id:
+                    continue
+                if details.get("signal_id") != signal_id:
+                    continue
+                audit_consortium = (details.get("consortium_id") or "").lower().strip()
+                if eff_consortium and audit_consortium and audit_consortium != eff_consortium:
+                    continue
+                audit_disclosure = details.get("disclosure_mode")
+                if audit_disclosure and audit_disclosure != disclosure_mode:
+                    continue
+
+                audit_hash = details.get("content_hash")
+                if audit_hash and expected_content_hash and audit_hash != expected_content_hash:
+                    attachment_hash_mismatch = True
+                    mismatched_audit_hash = str(audit_hash)
+                    continue
+
+                if audit_hash == expected_content_hash:
+                    exact_attachment_event = e
+                    break
+
+            has_exact_attachment_audit = (exact_attachment_event is not None)
             case_in_signal_store = bool(sig_rec and case.id in sig_rec.get("attached_to_cases", []))
 
-            if not admitted_rcp:
+            if attachment_hash_mismatch and not exact_attachment_event:
+                issuance_mismatch_reason = (
+                    f"evidence payload content hash diverges from authenticated attachment audit record "
+                    f"(stored '{expected_content_hash}', audit recorded '{mismatched_audit_hash}')"
+                )
+            elif not admitted_rcp:
                 issuance_mismatch_reason = (
                     "lacks authentic operational issuance receipt and lacks authentic operational issuance proof "
                     "in cryptographic admission registry"
@@ -1144,7 +1191,6 @@ async def get_case_intelligence_evidence(
                 trusted_digest = admitted_rcp.get("content_hash")
                 case_bank = (case.bank_id or "").lower().strip()
                 payload_entity = (payload.get("query_entity_id") or "").strip()
-                eff_consortium = (consortium_id or "").lower().strip()
 
                 if not adm_signal_id or adm_signal_id != signal_id:
                     issuance_mismatch_reason = f"receipt '{receipt_id}' signal binding mismatch (bound to '{adm_signal_id}', got '{signal_id}')"
@@ -1167,11 +1213,15 @@ async def get_case_intelligence_evidence(
                     "ESTABLISHED_PSI_VERIFIED",
                 ) and not str(admitted_rcp.get("assurance_level", "")).startswith("REVIEWED_ESTABLISHED_PSI"):
                     issuance_mismatch_reason = f"admitted receipt assurance level '{admitted_rcp.get('assurance_level')}' is unverified"
-                elif not has_exact_attachment_audit and not case_in_signal_store:
-                    # 2. Independent Audit Chain & Authorized Attachment Pathway Verification
+                elif not has_exact_attachment_audit:
                     issuance_mismatch_reason = (
-                        "evidence artifact lacks independent audit chain or authoritative signal attachment proof "
-                        "for destination case (unauthorized generic registry bypass)"
+                        "evidence artifact lacks authenticated attachment audit event for this evidence instance "
+                        "(unauthorized generic registry bypass)"
+                    )
+                elif sig_rec and not case_in_signal_store:
+                    issuance_mismatch_reason = (
+                        f"authoritative signal '{signal_id}' attached_to_cases ledger does not contain "
+                        f"destination case '{case.id}'"
                     )
                 else:
                     # 3. Authoritative Signal Verification & Material Parity
@@ -1263,6 +1313,8 @@ async def get_case_intelligence_evidence(
                     "diverges" in (issuance_mismatch_reason or "")
                     or "does not match cryptographically admitted" in (issuance_mismatch_reason or "")
                     or "unverified indicators" in (issuance_mismatch_reason or "")
+                    or "corrupted" in (issuance_mismatch_reason or "")
+                    or "tampered" in (issuance_mismatch_reason or "")
                 ):
                     verification_state = "FAILED_VERIFICATION"
                     operational_status = "TAMPERED"

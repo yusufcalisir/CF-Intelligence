@@ -50,6 +50,7 @@ from app.domain.enums import AlertSeverity, AlertStatus, CasePriority, EntityTyp
 from app.domain.institutional_identity import InstitutionalVerificationRegistry
 from app.domain.investigation_entities import Alert
 from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.principal_auth import AuthenticatedPrincipal
 from app.infrastructure.storage.durable_batch_store import DurableCrossBankBatchStore
 from app.infrastructure.storage.durable_consortium_store import DurableConsortiumStore
@@ -80,6 +81,7 @@ def clean_isolated_environment(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -
     DurableCrossBankBatchStore.reset_instance()
     DurableConsortiumStore.set_instance(None)
     CrossBankIntelligenceService.reset_instance()
+    ImmutableAuditChain.reset_instance()
     reg = InstitutionalVerificationRegistry()
     reg.register_public_key("bank_a", TEST_SIGNING_IDENTITY_A.public_key)
     reg.register_public_key("bank_b", TEST_SIGNING_IDENTITY_B.public_key)
@@ -88,6 +90,7 @@ def clean_isolated_environment(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -
     DurableCrossBankBatchStore.reset_instance()
     DurableConsortiumStore.set_instance(None)
     CrossBankIntelligenceService.reset_instance()
+    ImmutableAuditChain.reset_instance()
 
 
 def _attach_authentic_test_evidence(
@@ -473,7 +476,61 @@ def test_get_case_intelligence_evidence_anonymous_masking_and_scrubbing(
     assert "BURST_ACTIVITY_OBSERVED" in ev_item["typology_indicators"]
     assert ev_item["retention_status"] == "ACTIVE"
     assert ev_item["batch_expires_at"] is not None
+    # Post-attachment file mutation triggers content digest divergence against immutable attachment audit event
+    assert ev_item["verification_state"] == "FAILED_VERIFICATION"
+    assert ev_item["operational_status"] == "TAMPERED"
+    assert ev_item["is_authoritative"] is False
+    assert "diverges from authenticated attachment audit record" in ev_item["explanation"]
+
+
+def test_get_case_intelligence_evidence_anonymous_legitimate_verified(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """Authentic unmutated evidence under ANONYMIZED_SUMMARY is VERIFIED and strictly masks counterpart identity."""
+    case_svc = CaseManagementService()
+
+    consortium_id = f"c_{uuid.uuid4().hex[:8]}"
+    case = case_svc.create_case(
+        title="Bank A Unmutated Anonymous Case",
+        priority=CasePriority.P2_HIGH,
+        bank_id="bank_a",
+        assigned_to="analyst_alice",
+    )
+    query_id = f"batch_{uuid.uuid4().hex[:12]}"
+
+    sig, attach_res, admitted = _attach_authentic_test_evidence(
+        case_id=case.id,
+        consortium_id=consortium_id,
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        query_entity_id="ent_cust_alice",
+        disclosure_mode="ANONYMIZED_SUMMARY",
+        match_confirmed=True,
+        match_category="EXACT_MATCH",
+        confidence=0.98,
+        sanitized_risk_level="HIGH",
+        sanitized_typologies=("BURST_ACTIVITY_OBSERVED",),
+        batch_query_id=query_id,
+        record_in_batch_store=True,
+    )
+
+    headers = {
+        "X-Tenant-ID": "bank_a",
+        "Authorization": f"Bearer {auth_tokens['bank_a']}",
+    }
+    resp = test_client.get(f"/api/v1/cases/{case.id}/intelligence-evidence", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data) == 1
+    ev_item = data[0]
+
+    assert ev_item["case_id"] == case.id
+    assert ev_item["batch_query_id"] == query_id
+    assert ev_item["disclosure_mode"] == "ANONYMIZED_SUMMARY"
+    assert ev_item["target_bank_id"] is None
     assert ev_item["verification_state"] == "VERIFIED"
+    assert ev_item["operational_status"] == "OPERATIONAL"
+    assert ev_item["is_authoritative"] is True
 
 
 def test_get_case_intelligence_evidence_attributed_disclosure(
@@ -1823,3 +1880,375 @@ def test_adversarial_10_same_case_idempotent_replay_unchanged_evidence(
     assert ev_item["verification_state"] == "VERIFIED"
     assert ev_item["operational_status"] == "OPERATIONAL"
     assert ev_item["is_authoritative"] is True
+
+
+def test_adversarial_instance_binding_e1_verified_e2_generic_not_verified(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """Authentic E1 attached via accepted pipeline is VERIFIED; E2 registered directly for same signal/case is NOT."""
+    case_svc = CaseManagementService()
+    evidence_svc = EvidenceRegistryService()
+
+    case = case_svc.create_case(
+        title="Instance Binding Dual Evidence Case",
+        priority=CasePriority.P2_HIGH,
+        bank_id="bank_a",
+        assigned_to="analyst_a1",
+    )
+
+    query_id = f"batch_{uuid.uuid4().hex[:12]}"
+    sig, attach_res, admitted = _attach_authentic_test_evidence(
+        case_id=case.id,
+        consortium_id="consortium_alpha",
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        query_entity_id="ent_cust_alice",
+        disclosure_mode="ATTRIBUTED_INSTITUTIONS",
+        match_confirmed=True,
+        match_category="EXACT_MATCH",
+        confidence=0.98,
+        sanitized_risk_level="CRITICAL",
+        batch_query_id=query_id,
+        record_in_batch_store=True,
+    )
+    e1_id = attach_res.evidence_id
+    assert isinstance(e1_id, str)
+
+    # Construct generic evidence E2 registered directly into evidence registry
+    # for the SAME signal and SAME case, bypassing attach_signal_to_case_evidence
+    payload_e2 = {
+        "signal_id": sig.signal_id,
+        "consortium_id": "consortium_alpha",
+        "requesting_bank_id": "bank_a",
+        "query_entity_id": "ent_cust_alice",
+        "signal_content": {
+            "match_confirmed": sig.match_confirmed,
+            "match_category": sig.match_category,
+            "confidence": sig.match_confidence,
+            "risk_level": sig.sanitized_risk_level,
+        },
+        "provenance": {
+            "signal_id": sig.signal_id,
+            "consortium_id": "consortium_alpha",
+            "disclosure_mode": "ATTRIBUTED_INSTITUTIONS",
+            "target_bank_id": "bank_b",
+            "receipt_id": admitted["receipt_id"],
+        },
+        "batch_query_id": query_id,
+    }
+    content_e2 = json.dumps(payload_e2, sort_keys=True)
+    file_path_e2 = f"storage/evidence/case_{case.id}_e2_generic.json"
+    evidence_svc.register_evidence(
+        case_id=case.id,
+        evidence_type="CROSS_BANK_INTELLIGENCE",
+        title="Generic Unauthenticated E2",
+        file_path=file_path_e2,
+        content=content_e2,
+        uploaded_by="analyst_a1",
+        metadata={"signal_id": sig.signal_id, "batch_query_id": query_id},
+    )
+
+    headers = {"X-Tenant-ID": "bank_a", "Authorization": f"Bearer {auth_tokens['bank_a']}"}
+    resp = test_client.get(f"/api/v1/cases/{case.id}/intelligence-evidence", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data) == 2
+
+    e1_items = [x for x in data if x["evidence_id"] == e1_id]
+    assert len(e1_items) == 1
+    e1_item = e1_items[0]
+    assert e1_item["verification_state"] == "VERIFIED"
+    assert e1_item["operational_status"] == "OPERATIONAL"
+    assert e1_item["is_authoritative"] is True
+
+    e2_items = [x for x in data if x["evidence_id"] != e1_id]
+    assert len(e2_items) == 1
+    e2_item = e2_items[0]
+    assert e2_item["verification_state"] == "INTEGRITY_VERIFIED_ONLY"
+    assert e2_item["is_authoritative"] is False
+    assert "unauthorized generic registry bypass" in e2_item["explanation"]
+
+
+def test_adversarial_audit_event_references_different_evidence_id_not_verified(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """Audit event referencing different evidence ID cannot support VERIFIED classification."""
+    case_svc = CaseManagementService()
+    evidence_svc = EvidenceRegistryService()
+
+    case = case_svc.create_case(
+        title="Audit Event ID Mismatch Case",
+        priority=CasePriority.P2_HIGH,
+        bank_id="bank_a",
+        assigned_to="analyst_a1",
+    )
+
+    query_id = f"batch_{uuid.uuid4().hex[:12]}"
+    sig, _, admitted = _attach_authentic_test_evidence(
+        case_id=case.id,
+        consortium_id="consortium_alpha",
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        query_entity_id="ent_cust_alice",
+        disclosure_mode="ATTRIBUTED_INSTITUTIONS",
+        match_confirmed=True,
+        match_category="EXACT_MATCH",
+        confidence=0.98,
+        sanitized_risk_level="CRITICAL",
+        batch_query_id=query_id,
+        record_in_batch_store=True,
+        attach_to_case=False,
+    )
+
+    payload = {
+        "signal_id": sig.signal_id,
+        "consortium_id": "consortium_alpha",
+        "requesting_bank_id": "bank_a",
+        "query_entity_id": "ent_cust_alice",
+        "signal_content": {
+            "match_confirmed": sig.match_confirmed,
+            "match_category": sig.match_category,
+            "confidence": sig.match_confidence,
+            "risk_level": sig.sanitized_risk_level,
+        },
+        "provenance": {
+            "signal_id": sig.signal_id,
+            "consortium_id": "consortium_alpha",
+            "disclosure_mode": "ATTRIBUTED_INSTITUTIONS",
+            "target_bank_id": "bank_b",
+            "receipt_id": admitted["receipt_id"],
+        },
+        "batch_query_id": query_id,
+    }
+    content_str = json.dumps(payload, sort_keys=True)
+    file_path = f"storage/evidence/case_{case.id}_audit_mismatch.json"
+    ev_reg = evidence_svc.register_evidence(
+        case_id=case.id,
+        evidence_type="CROSS_BANK_INTELLIGENCE",
+        title="Audit Mismatch Evidence",
+        file_path=file_path,
+        content=content_str,
+        uploaded_by="analyst_a1",
+        metadata={"signal_id": sig.signal_id, "batch_query_id": query_id},
+    )
+    ev_id = ev_reg["id"]
+    content_hash = ev_reg["content_hash"]
+
+    # Append audit event referencing a DIFFERENT evidence ID in details
+    audit_chain = ImmutableAuditChain.get_instance()
+    audit_chain.append_event(
+        event_type="CROSS_BANK_INTELLIGENCE_EVIDENCE_ATTACHED",
+        actor_id="user:analyst_a1@bank_a",
+        action=f"attach_cross_bank_evidence:{case.id}",
+        resource_id=f"evidence:{ev_id}",
+        actor_institution="bank_a",
+        details={
+            "case_id": case.id,
+            "evidence_id": f"different_ev_{uuid.uuid4().hex[:8]}",
+            "content_hash": content_hash,
+            "signal_id": sig.signal_id,
+            "consortium_id": "consortium_alpha",
+            "disclosure_mode": "ATTRIBUTED_INSTITUTIONS",
+        },
+    )
+
+    headers = {"X-Tenant-ID": "bank_a", "Authorization": f"Bearer {auth_tokens['bank_a']}"}
+    resp = test_client.get(f"/api/v1/cases/{case.id}/intelligence-evidence", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data) == 1
+    ev_item = data[0]
+
+    assert ev_item["verification_state"] != "VERIFIED"
+    assert ev_item["verification_state"] == "INTEGRITY_VERIFIED_ONLY"
+    assert ev_item["is_authoritative"] is False
+
+
+def test_adversarial_audit_event_content_hash_mismatch_failed_verification(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """Stored evidence digest mismatching audit event content hash is classified FAILED_VERIFICATION / TAMPERED."""
+    case_svc = CaseManagementService()
+    evidence_svc = EvidenceRegistryService()
+
+    case = case_svc.create_case(
+        title="Audit Event Hash Mismatch Case",
+        priority=CasePriority.P2_HIGH,
+        bank_id="bank_a",
+        assigned_to="analyst_a1",
+    )
+
+    query_id = f"batch_{uuid.uuid4().hex[:12]}"
+    sig, attach_res, admitted = _attach_authentic_test_evidence(
+        case_id=case.id,
+        consortium_id="consortium_alpha",
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        query_entity_id="ent_cust_alice",
+        disclosure_mode="ATTRIBUTED_INSTITUTIONS",
+        match_confirmed=True,
+        match_category="EXACT_MATCH",
+        confidence=0.98,
+        sanitized_risk_level="CRITICAL",
+        batch_query_id=query_id,
+        record_in_batch_store=True,
+    )
+    ev_id = attach_res.evidence_id
+    assert isinstance(ev_id, str)
+
+    # Mutate evidence payload and update registry hash (file integrity matches registry, but differs from audit event)
+    raw_content = evidence_svc.get_evidence_content(ev_id)
+    ev_payload = json.loads(raw_content)
+    ev_payload["analyst_notes"] = "Tampered analyst note post attachment."
+    updated_content = json.dumps(ev_payload, sort_keys=True, indent=2)
+    updated_hash = hashlib.sha256(updated_content.encode("utf-8")).hexdigest()
+
+    item = evidence_svc._evidence_store.get(ev_id)
+    assert item is not None
+    item["content_hash"] = updated_hash
+    with open(item["file_path"], "w", encoding="utf-8") as f:
+        f.write(updated_content)
+    evidence_svc._evidence_store.set(ev_id, item)
+
+    headers = {"X-Tenant-ID": "bank_a", "Authorization": f"Bearer {auth_tokens['bank_a']}"}
+    resp = test_client.get(f"/api/v1/cases/{case.id}/intelligence-evidence", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data) == 1
+    ev_item = data[0]
+
+    assert ev_item["verification_state"] == "FAILED_VERIFICATION"
+    assert ev_item["operational_status"] == "TAMPERED"
+    assert ev_item["is_authoritative"] is False
+    assert "diverges from authenticated attachment audit record" in ev_item["explanation"]
+
+
+def test_adversarial_case_in_signal_store_without_exact_audit_event_not_verified(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """Missing attachment audit event despite case_id in sig_rec['attached_to_cases'] cannot be VERIFIED."""
+    case_svc = CaseManagementService()
+    evidence_svc = EvidenceRegistryService()
+    intel_svc = CrossBankIntelligenceService.get_instance()
+
+    case = case_svc.create_case(
+        title="Signal Store Attached Without Audit Case",
+        priority=CasePriority.P2_HIGH,
+        bank_id="bank_a",
+        assigned_to="analyst_a1",
+    )
+
+    query_id = f"batch_{uuid.uuid4().hex[:12]}"
+    sig, _, admitted = _attach_authentic_test_evidence(
+        case_id=case.id,
+        consortium_id="consortium_alpha",
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        query_entity_id="ent_cust_alice",
+        disclosure_mode="ATTRIBUTED_INSTITUTIONS",
+        match_confirmed=True,
+        match_category="EXACT_MATCH",
+        confidence=0.98,
+        sanitized_risk_level="CRITICAL",
+        batch_query_id=query_id,
+        record_in_batch_store=True,
+        attach_to_case=False,
+    )
+
+    # Manually add case.id to signal store attached_to_cases WITHOUT creating an audit event
+    sig_rec = intel_svc._signal_store.get(sig.signal_id)
+    assert sig_rec is not None
+    sig_rec.setdefault("attached_to_cases", []).append(case.id)
+    intel_svc._signal_store.set(sig.signal_id, sig_rec)
+
+    # Register evidence directly
+    payload = {
+        "signal_id": sig.signal_id,
+        "consortium_id": "consortium_alpha",
+        "requesting_bank_id": "bank_a",
+        "query_entity_id": "ent_cust_alice",
+        "signal_content": {
+            "match_confirmed": sig.match_confirmed,
+            "match_category": sig.match_category,
+            "confidence": sig.match_confidence,
+            "risk_level": sig.sanitized_risk_level,
+        },
+        "provenance": {
+            "signal_id": sig.signal_id,
+            "consortium_id": "consortium_alpha",
+            "disclosure_mode": "ATTRIBUTED_INSTITUTIONS",
+            "target_bank_id": "bank_b",
+            "receipt_id": admitted["receipt_id"],
+        },
+        "batch_query_id": query_id,
+    }
+    content_str = json.dumps(payload, sort_keys=True)
+    file_path = f"storage/evidence/case_{case.id}_no_audit.json"
+    evidence_svc.register_evidence(
+        case_id=case.id,
+        evidence_type="CROSS_BANK_INTELLIGENCE",
+        title="No Audit Event Record",
+        file_path=file_path,
+        content=content_str,
+        uploaded_by="analyst_a1",
+        metadata={"signal_id": sig.signal_id, "batch_query_id": query_id},
+    )
+
+    headers = {"X-Tenant-ID": "bank_a", "Authorization": f"Bearer {auth_tokens['bank_a']}"}
+    resp = test_client.get(f"/api/v1/cases/{case.id}/intelligence-evidence", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data) == 1
+    ev_item = data[0]
+
+    assert ev_item["verification_state"] != "VERIFIED"
+    assert ev_item["verification_state"] == "INTEGRITY_VERIFIED_ONLY"
+    assert ev_item["is_authoritative"] is False
+    assert "unauthorized generic registry bypass" in ev_item["explanation"]
+
+
+def test_adversarial_corrupted_audit_chain_rejects_verification(
+    test_client: TestClient, auth_tokens: dict[str, str]
+) -> None:
+    """Corrupted immutable audit chain fails closed: all evidence classified FAILED_VERIFICATION / TAMPERED."""
+    case_svc = CaseManagementService()
+
+    case = case_svc.create_case(
+        title="Corrupted Audit Chain Case",
+        priority=CasePriority.P2_HIGH,
+        bank_id="bank_a",
+        assigned_to="analyst_a1",
+    )
+
+    query_id = f"batch_{uuid.uuid4().hex[:12]}"
+    sig, attach_res, admitted = _attach_authentic_test_evidence(
+        case_id=case.id,
+        consortium_id="consortium_alpha",
+        requesting_bank_id="bank_a",
+        target_bank_id="bank_b",
+        query_entity_id="ent_cust_alice",
+        disclosure_mode="ATTRIBUTED_INSTITUTIONS",
+        match_confirmed=True,
+        match_category="EXACT_MATCH",
+        confidence=0.98,
+        sanitized_risk_level="CRITICAL",
+        batch_query_id=query_id,
+        record_in_batch_store=True,
+    )
+
+    # Corrupt the immutable audit chain
+    audit_chain = ImmutableAuditChain.get_instance()
+    audit_chain._is_corrupted = True
+    audit_chain._tamper_reason = "Simulated HMAC chain corruption"
+
+    headers = {"X-Tenant-ID": "bank_a", "Authorization": f"Bearer {auth_tokens['bank_a']}"}
+    resp = test_client.get(f"/api/v1/cases/{case.id}/intelligence-evidence", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data) == 1
+    ev_item = data[0]
+
+    assert ev_item["verification_state"] == "FAILED_VERIFICATION"
+    assert ev_item["operational_status"] == "TAMPERED"
+    assert ev_item["is_authoritative"] is False
+    assert "audit chain integrity corrupted" in ev_item["explanation"].lower()
