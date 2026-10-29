@@ -447,10 +447,7 @@ def get_cross_bank_query_capabilities(
                             and getattr(c_node, "status", "") == "ONLINE"
                             for c_node in active_clients
                         )
-                        if is_online:
-                            readiness = "OPERATIONAL"
-                        else:
-                            readiness = "UNVERIFIED"
+                        readiness = "OPERATIONAL" if is_online else "UNVERIFIED"
                     except Exception:
                         readiness = "UNVERIFIED"
             else:

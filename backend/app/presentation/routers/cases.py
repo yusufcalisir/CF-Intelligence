@@ -1138,7 +1138,11 @@ async def get_case_intelligence_evidence(
                     issuance_mismatch_reason = f"admitted receipt execution mode '{admitted_rcp.get('execution_mode')}' is not VERIFIED_OPERATIONAL"
                 else:
                     # Optional signal store digest check
-                    sig_rec = intel_svc._signal_store.get(signal_id) if hasattr(intel_svc, "_signal_store") else None
+                    sig_rec = (
+                        intel_svc._signal_store.get(signal_id)
+                        if isinstance(signal_id, str) and hasattr(intel_svc, "_signal_store")
+                        else None
+                    )
                     if sig_rec and sig_rec.get("content_hash") and sig_rec.get("content_hash") != trusted_digest:
                         issuance_mismatch_reason = "signal store content hash diverges from cryptographically admitted issuance digest"
                     elif batch_record:
