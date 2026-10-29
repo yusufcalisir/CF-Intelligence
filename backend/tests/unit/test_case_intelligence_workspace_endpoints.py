@@ -434,6 +434,7 @@ def test_get_case_intelligence_evidence_anonymous_masking_and_scrubbing(
     # Directly inject unscrubbed free-text notes into the registered evidence payload
     # to verify read-side deterministic scrubbing of counterpart references
     ev_id = attach_res.evidence_id
+    assert isinstance(ev_id, str)
     raw_content = evidence_svc.get_evidence_content(ev_id)
     ev_payload = json.loads(raw_content)
     ev_payload["analyst_notes"] = "Cryptographic match confirmed across consortium peer bank_b with high confidence."
@@ -1088,6 +1089,7 @@ def test_authentic_operational_admission_with_matching_receipt_verified(
     assert ev_item["is_authoritative"] is True
     assert ev_item["retention_status"] == "ACTIVE"
     expected_ev_id = getattr(attach_res, "evidence_id", None)
+    assert isinstance(expected_ev_id, str)
     assert ev_item["evidence_id"] == expected_ev_id
 
 
@@ -1354,6 +1356,7 @@ def test_adversarial_2_admitted_signal_with_altered_match_results_not_verified(
     )
 
     ev_id = getattr(attach_res, "evidence_id", None)
+    assert isinstance(ev_id, str)
     ev_rec = evidence_svc._evidence_store.get(ev_id)
     assert ev_rec is not None
     file_path = ev_rec["file_path"]
@@ -1554,6 +1557,7 @@ def test_adversarial_5_authentic_admitted_signal_attached_through_m65_pipeline_v
     assert ev_item["is_authoritative"] is True
     assert ev_item["retention_status"] == "ACTIVE"
     expected_ev_id = getattr(attach_res, "evidence_id", None)
+    assert isinstance(expected_ev_id, str)
     assert ev_item["evidence_id"] == expected_ev_id
 
 
@@ -1803,6 +1807,8 @@ def test_adversarial_10_same_case_idempotent_replay_unchanged_evidence(
     is_dup = getattr(attach_res2, "is_duplicate_submission", False)
     ev_id2 = getattr(attach_res2, "evidence_id", None)
     ev_id1 = getattr(attach_res1, "evidence_id", None)
+    assert isinstance(ev_id2, str)
+    assert isinstance(ev_id1, str)
     assert is_dup is True
     assert ev_id2 == ev_id1
 
