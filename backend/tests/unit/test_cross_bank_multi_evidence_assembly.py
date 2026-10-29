@@ -1680,7 +1680,7 @@ def test_post_preflight_write_failure_retains_case_binding(multi_assembly_env: d
             raise ValueError("Simulated storage failure during evidence registration")
         return real_attach(*args, **kwargs)
 
-    cbi_svc.attach_signal_to_case_evidence = _flaky_attach
+    cbi_svc.attach_signal_to_case_evidence = _flaky_attach  # type: ignore[method-assign]
 
     # Attempt attachment to Case A -> pre-screening passes, binds Case A, but write fails
     res_a = cbi_svc.attach_multi_counterparty_to_case_evidence(
@@ -1715,8 +1715,10 @@ def test_post_preflight_write_failure_retains_case_binding(multi_assembly_env: d
     )
     assert retry_res.assembly_status == "COMPLETED"
     assert retry_res.attached_count == 1
-    assert batch_store.get_batch(query_id)["bound_case_id"] == case_a.id
-    cbi_svc.attach_signal_to_case_evidence = real_attach
+    retry_rec = batch_store.get_batch(query_id)
+    assert retry_rec is not None
+    assert retry_rec["bound_case_id"] == case_a.id
+    cbi_svc.attach_signal_to_case_evidence = real_attach  # type: ignore[method-assign]
 
 
 def test_deterministic_concurrency_a1_failure_a2_inflight_blocks_case_b(multi_assembly_env: dict[str, Any]):
@@ -1781,7 +1783,7 @@ def test_deterministic_concurrency_a1_failure_a2_inflight_blocks_case_b(multi_as
 
         return real_attach(*args, **kwargs)
 
-    cbi_svc.attach_signal_to_case_evidence = hooked_attach_signal
+    cbi_svc.attach_signal_to_case_evidence = hooked_attach_signal  # type: ignore[method-assign]
 
     res_a1: Any = None
     res_a2: Any = None
@@ -1867,7 +1869,7 @@ def test_deterministic_concurrency_a1_failure_a2_inflight_blocks_case_b(multi_as
     assert rec_restarted["bound_case_id"] == case_a.id
 
     # Step 10: Same-case retry remains idempotent
-    cbi_svc.attach_signal_to_case_evidence = real_attach
+    cbi_svc.attach_signal_to_case_evidence = real_attach  # type: ignore[method-assign]
     retry_res = cbi_svc.attach_multi_counterparty_to_case_evidence(
         query_id=query_id,
         case_id=case_a.id,
